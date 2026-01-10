@@ -13,6 +13,7 @@
 2. [Technology Stack](#2-technology-stack)
    - 2A. [Architecture Decisions](#2a-architecture-decisions)
    - 2B. [Schema Review Decisions](#2b-schema-review-decisions-january-2026)
+   - 2C. [AI Integration](#2c-ai-integration)
 3. [Authentication & Authorization](#3-authentication--authorization)
 4. [Database Schema](#4-database-schema)
 5. [Core Modules](#5-core-modules)
@@ -878,6 +879,114 @@ Brink B-002 (strain: WLP001, parent: B-001, weight: 8 lbs)
 **Decision**: Retain `location_transfers` + `transfer_lines` normalized structure.
 
 **Rationale**: Proper normalization enables partial receives (per DEC-GAP-007) and supports multi-FG transfers with line-level tracking.
+
+---
+
+## 2C. AI Integration
+
+MGR is designed with an AI-first philosophy, making it easy for AI agents to understand, query, and assist with brewery operations.
+
+### AI Documentation
+See [`docs/AI.md`](./AI.md) for comprehensive AI integration guide including:
+- Schema introspection patterns
+- Recipe analysis queries
+- Common AI task examples
+- Brewing calculation formulas
+
+### DEC-AI-001: Schema Registry for AI Context
+**Status**: Implemented
+**Decision**: Enhance `_schema_registry` with AI-specific metadata.
+
+```sql
+_schema_registry:
+  table_name      TEXT PRIMARY KEY
+  description     TEXT              -- Human-readable description
+  domain          TEXT              -- Domain grouping
+  relationships   JSONB             -- hasMany, belongsTo relations
+  key_fields      JSONB             -- Important fields for queries
+  state_machine   JSONB             -- State transitions if applicable
+  query_examples  JSONB             -- Natural language query examples
+  ai_context      JSONB             -- AI-specific context and actions
+  calculated_fields JSONB           -- Fields computed via views
+```
+
+AI agents query this table first to understand the schema without external documentation.
+
+### DEC-AI-002: Database Functions for AI
+**Status**: Implemented
+**Decision**: Provide database functions for common AI analysis tasks.
+
+| Function | Purpose |
+|----------|---------|
+| `analyze_recipe_style_compliance(recipe_id)` | Compare recipe estimates to BJCP guidelines |
+| `get_recipe_summary(recipe_id)` | Comprehensive recipe data in structured format |
+| `suggest_recipe_improvements(recipe_id)` | AI-generated improvement suggestions |
+| `analyze_batch_performance(batch_id)` | Compare actuals vs targets |
+| `get_inventory_overview()` | Current inventory status |
+| `get_ai_schema_context(domain)` | Schema information for AI context |
+
+### DEC-AI-003: TypeScript AI Utilities
+**Status**: Implemented
+**Decision**: Provide TypeScript utilities in `src/lib/ai/` for AI integration.
+
+```typescript
+// Recipe analysis
+import {
+  analyzeStyleCompliance,
+  getRecipeSummary,
+  getRecipeSuggestions,
+  BrewingCalculations,
+  WaterChemistry,
+  FermentationAnalysis
+} from '@/lib/ai';
+
+// Schema context
+import {
+  getSchemaContext,
+  getDomainSummary,
+  getValidTransitions,
+  QUERY_TEMPLATES,
+  STATE_MACHINES
+} from '@/lib/ai';
+
+// Query helpers
+import { AIQueryHelpers } from '@/lib/ai';
+```
+
+### AI Capabilities
+
+**Recipe Analysis:**
+- Style compliance checking (OG, FG, ABV, IBU, SRM vs BJCP)
+- Grain bill composition analysis
+- Water chemistry recommendations
+- Fermentation temperature validation
+- Improvement suggestions based on brewing best practices
+
+**Production Assistance:**
+- Batch status monitoring
+- Vessel availability tracking
+- Production schedule queries
+- Performance variance analysis
+
+**Inventory Intelligence:**
+- Stock level queries
+- Expiration tracking
+- Demand forecasting support
+- Allocation status
+
+### Natural Language Query Examples
+
+These are examples of questions AI can answer:
+
+| Question | Data Source |
+|----------|-------------|
+| "Show me all IPA recipes" | `recipes` + `beer_styles` |
+| "Does this recipe meet style guidelines?" | `analyze_recipe_style_compliance()` |
+| "What batches are fermenting?" | `batches WHERE status = 'fermenting'` |
+| "Which vessels are available?" | `vessels_with_current_batch` |
+| "How much [brand] is in stock?" | `bin_inventory` + `finished_goods` |
+| "What recipes use Citra hops?" | `recipe_hops` + `hops` |
+| "Compare batch results to targets" | `analyze_batch_performance()` |
 
 ---
 
