@@ -1,0 +1,435 @@
+/**
+ * Entity Configuration System
+ *
+ * This is the core abstraction for MGR. Every entity (batch, recipe, order, etc.)
+ * is defined declaratively using this configuration. Universal components
+ * (EntityList, EntityDetail, EntityForm) render based on these configs.
+ *
+ * Benefits:
+ * - Single source of truth per entity
+ * - AI can introspect configs to understand the system
+ * - Consistent patterns across all entities
+ * - Easy to add new entities
+ *
+ * Customization escape hatches:
+ * - Custom cell renderers via `render` prop
+ * - Custom dialog components via `dialogs[action].component`
+ * - Custom detail sections via `sections[].component`
+ */
+
+import type { ReactNode, ComponentType } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import type { ZodSchema } from "zod";
+
+// =============================================================================
+// Core Entity Configuration
+// =============================================================================
+
+export interface EntityConfig<T = Record<string, unknown>> {
+  /** Unique identifier for this entity (e.g., 'batch', 'recipe') */
+  name: string;
+
+  /** Database table name (e.g., 'batches', 'recipes') */
+  table: string;
+
+  /** Human-readable display name (e.g., 'Batch', 'Recipe') */
+  displayName: string;
+
+  /** Plural display name (e.g., 'Batches', 'Recipes') */
+  displayNamePlural: string;
+
+  /** Brief description for AI context */
+  description: string;
+
+  /** Domain this entity belongs to */
+  domain: EntityDomain;
+
+  // ---------------------------------------------------------------------------
+  // List View Configuration
+  // ---------------------------------------------------------------------------
+
+  /** Columns to display in list view */
+  listColumns: EntityColumnDef<T>[];
+
+  /** Available filters for list view */
+  listFilters?: EntityFilterDef[];
+
+  /** Default sort configuration */
+  defaultSort?: { column: keyof T & string; direction: "asc" | "desc" };
+
+  /** Searchable fields (for quick search) */
+  searchableFields?: (keyof T & string)[];
+
+  // ---------------------------------------------------------------------------
+  // Detail View Configuration
+  // ---------------------------------------------------------------------------
+
+  /** Sections to display in detail view */
+  detailSections?: EntitySectionDef<T>[];
+
+  /** Header fields to show prominently */
+  detailHeader?: {
+    title: keyof T & string;
+    subtitle?: keyof T & string;
+    badge?: keyof T & string;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Form Configuration
+  // ---------------------------------------------------------------------------
+
+  /** Zod schema for form validation */
+  formSchema: ZodSchema<Partial<T>>;
+
+  /** Form field definitions */
+  formFields: EntityFieldDef<T>[];
+
+  /** Fields to show in create mode (defaults to all) */
+  createFields?: (keyof T & string)[];
+
+  /** Fields to show in edit mode (defaults to all) */
+  editFields?: (keyof T & string)[];
+
+  // ---------------------------------------------------------------------------
+  // State Machine (for stateful entities)
+  // ---------------------------------------------------------------------------
+
+  stateMachine?: StateMachineConfig<T>;
+
+  // ---------------------------------------------------------------------------
+  // Actions & Dialogs
+  // ---------------------------------------------------------------------------
+
+  /** Available actions for this entity */
+  actions?: EntityActionDef<T>[];
+
+  /** Dialog configurations for actions */
+  dialogs?: Record<string, EntityDialogConfig<T>>;
+
+  // ---------------------------------------------------------------------------
+  // Relations
+  // ---------------------------------------------------------------------------
+
+  /** Relationships to other entities */
+  relations?: EntityRelationDef[];
+
+  // ---------------------------------------------------------------------------
+  // AI Context
+  // ---------------------------------------------------------------------------
+
+  /** Example natural language queries for AI */
+  queryExamples?: string[];
+
+  /** Key fields for AI to understand */
+  keyFields?: (keyof T & string)[];
+}
+
+// =============================================================================
+// List View Types
+// =============================================================================
+
+export type EntityColumnDef<T> = ColumnDef<T, unknown> & {
+  /** Field key for sorting/filtering */
+  accessorKey?: keyof T & string;
+
+  /** Whether this column is sortable */
+  sortable?: boolean;
+
+  /** Whether this column is filterable */
+  filterable?: boolean;
+
+  /** Custom render function */
+  render?: (value: unknown, row: T) => ReactNode;
+
+  /** Format type for automatic formatting */
+  format?: "date" | "datetime" | "currency" | "number" | "percentage";
+};
+
+export interface EntityFilterDef {
+  /** Field to filter on */
+  field: string;
+
+  /** Filter type */
+  type: "select" | "multiselect" | "date" | "daterange" | "search" | "boolean";
+
+  /** Display label */
+  label: string;
+
+  /** Options for select/multiselect */
+  options?: { value: string; label: string }[];
+
+  /** Function to fetch options dynamically */
+  fetchOptions?: () => Promise<{ value: string; label: string }[]>;
+}
+
+// =============================================================================
+// Detail View Types
+// =============================================================================
+
+export interface EntitySectionDef<T> {
+  /** Section identifier */
+  id: string;
+
+  /** Section title */
+  title: string;
+
+  /** Fields to display in this section */
+  fields?: EntityFieldDisplay<T>[];
+
+  /** Custom component to render (overrides fields) */
+  component?: ComponentType<{ data: T }>;
+
+  /** Whether this section is collapsible */
+  collapsible?: boolean;
+
+  /** Default collapsed state */
+  defaultCollapsed?: boolean;
+
+  /** Tab name if using tabbed layout */
+  tab?: string;
+}
+
+export interface EntityFieldDisplay<T> {
+  /** Field key */
+  field: keyof T & string;
+
+  /** Display label */
+  label: string;
+
+  /** Format type */
+  format?: "date" | "datetime" | "currency" | "number" | "percentage" | "json";
+
+  /** Custom render function */
+  render?: (value: unknown, data: T) => ReactNode;
+
+  /** Span full width */
+  fullWidth?: boolean;
+}
+
+// =============================================================================
+// Form Types
+// =============================================================================
+
+export interface EntityFieldDef<T> {
+  /** Field key */
+  name: keyof T & string;
+
+  /** Display label */
+  label: string;
+
+  /** Field type */
+  type:
+    | "text"
+    | "textarea"
+    | "number"
+    | "select"
+    | "multiselect"
+    | "combobox"
+    | "date"
+    | "datetime"
+    | "checkbox"
+    | "switch"
+    | "json"
+    | "relation";
+
+  /** Placeholder text */
+  placeholder?: string;
+
+  /** Help text */
+  description?: string;
+
+  /** Whether field is required */
+  required?: boolean;
+
+  /** Whether field is disabled */
+  disabled?: boolean;
+
+  /** Options for select/multiselect/combobox */
+  options?: { value: string; label: string }[];
+
+  /** Function to fetch options dynamically */
+  fetchOptions?: () => Promise<{ value: string; label: string }[]>;
+
+  /** Related entity (for relation type) */
+  relationEntity?: string;
+
+  /** Default value */
+  defaultValue?: unknown;
+
+  /** Grid column span (1-12) */
+  colSpan?: number;
+
+  /** Conditional visibility */
+  showWhen?: (values: Partial<T>) => boolean;
+}
+
+// =============================================================================
+// State Machine Types
+// =============================================================================
+
+export interface StateMachineConfig<T> {
+  /** Field that holds the state */
+  stateField: keyof T & string;
+
+  /** All possible states */
+  states: string[];
+
+  /** Initial state for new records */
+  initialState: string;
+
+  /** Valid transitions: { fromState: [toStates] } */
+  transitions: Record<string, string[]>;
+
+  /** State display configuration */
+  stateDisplay?: Record<
+    string,
+    { label: string; color: "default" | "success" | "warning" | "error" | "info" }
+  >;
+
+  /** Hooks for state transitions */
+  hooks?: {
+    onEnter?: Record<string, (data: T) => Promise<void> | void>;
+    onExit?: Record<string, (data: T) => Promise<void> | void>;
+    validate?: Record<string, (data: T) => Promise<string | null> | string | null>;
+  };
+}
+
+// =============================================================================
+// Action Types
+// =============================================================================
+
+export interface EntityActionDef<T> {
+  /** Action identifier */
+  name: string;
+
+  /** Display label */
+  label: string;
+
+  /** Icon name (lucide icon) */
+  icon?: string;
+
+  /** Action type */
+  type: "button" | "dropdown";
+
+  /** Button variant */
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+
+  /** When to show this action */
+  showWhen?: (data: T) => boolean;
+
+  /** Required states (for stateful entities) */
+  fromStates?: string[];
+
+  /** Target state after action (for state transitions) */
+  toState?: string;
+
+  /** Confirm before executing */
+  confirm?: boolean;
+
+  /** Handler function */
+  handler?: (data: T) => Promise<void> | void;
+
+  /** Opens a dialog instead of direct action */
+  dialog?: string;
+}
+
+// =============================================================================
+// Dialog Types
+// =============================================================================
+
+export interface EntityDialogConfig<T> {
+  /** Dialog title */
+  title: string;
+
+  /** Dialog description */
+  description?: string;
+
+  /** Confirm button label */
+  confirmLabel?: string;
+
+  /** Cancel button label */
+  cancelLabel?: string;
+
+  /** Button variant */
+  variant?: "default" | "destructive";
+
+  /** Require a reason/note */
+  requireReason?: boolean;
+
+  /** Custom form fields for dialog */
+  fields?: EntityFieldDef<Record<string, unknown>>[];
+
+  /** Custom component (overrides standard dialog) */
+  component?: ComponentType<{ data: T; onClose: () => void; onConfirm: (data: unknown) => void }>;
+}
+
+// =============================================================================
+// Relation Types
+// =============================================================================
+
+export interface EntityRelationDef {
+  /** Relation name for reference */
+  name: string;
+
+  /** Related entity name */
+  entity: string;
+
+  /** Type of relation */
+  type: "belongsTo" | "hasMany" | "hasOne" | "manyToMany";
+
+  /** Foreign key field */
+  foreignKey: string;
+
+  /** Display in detail view */
+  showInDetail?: boolean;
+
+  /** Tab name if showing in tabs */
+  detailTab?: string;
+
+  /** Inline editing allowed */
+  inlineEdit?: boolean;
+}
+
+// =============================================================================
+// Domain Types
+// =============================================================================
+
+export type EntityDomain =
+  | "system"
+  | "production"
+  | "packaging"
+  | "inventory"
+  | "purchasing"
+  | "sales"
+  | "reporting";
+
+// =============================================================================
+// Registry
+// =============================================================================
+
+/**
+ * Entity registry for accessing configs by name.
+ * Populated by entity definition files.
+ */
+export const entityRegistry = new Map<string, EntityConfig<Record<string, unknown>>>();
+
+/**
+ * Register an entity configuration.
+ */
+export function registerEntity<T = Record<string, unknown>>(config: EntityConfig<T>): void {
+  entityRegistry.set(config.name, config as EntityConfig<Record<string, unknown>>);
+}
+
+/**
+ * Get an entity configuration by name.
+ */
+export function getEntity(name: string): EntityConfig<Record<string, unknown>> | undefined {
+  return entityRegistry.get(name);
+}
+
+/**
+ * Get all entities in a domain.
+ */
+export function getEntitiesByDomain(domain: EntityDomain): EntityConfig<Record<string, unknown>>[] {
+  return Array.from(entityRegistry.values()).filter((e) => e.domain === domain);
+}
