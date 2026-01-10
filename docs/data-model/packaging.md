@@ -45,10 +45,11 @@ Packaging sessions (group multiple products/batches packaged together).
 | session_date | DATE | Session date |
 | status | TEXT | Status: planned, in_progress, completed, revised, cancelled |
 | notes | TEXT | Notes |
-| revisions | JSONB | Revision history |
 | created_by | UUID | FK to auth.users |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Audit trail:** All changes tracked in `entity_revisions` table (entity_type='packaging_session'). See `docs/data-model/system.md`.
 
 ---
 
@@ -111,7 +112,18 @@ Finished goods inventory (packaged products ready for sale).
 - M = month letter (A=Jan, B=Feb, ... J=Oct, K=Nov, L=Dec)
 - D = day (1-9 = 1-9, A=10, B=11, ... U=30, V=31)
 
-**External FG:** When `batch_id` is null, the FG originated externally (contract brewing, purchased, legacy). Use `notes` to document source. External lot codes bypass format setting.
+**Entry point rules:** See `docs/data-model/inventory.md` "FG Entry Points" for complete documentation.
+
+- **Internal FG:** `batch_id` AND `session_line_item_id` are both required
+- **External FG:** Both are NULL, and `notes` is required to document source
+
+```sql
+-- Constraint to enforce valid entry point combinations
+ALTER TABLE finished_goods ADD CONSTRAINT chk_fg_entry_point CHECK (
+  (batch_id IS NOT NULL AND session_line_item_id IS NOT NULL) OR
+  (batch_id IS NULL AND session_line_item_id IS NULL)
+);
+```
 
 ---
 

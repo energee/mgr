@@ -302,6 +302,67 @@ Recipes with `use_default_additions = TRUE` use the defaults; otherwise use reci
 
 ---
 
+## Brew-to-Batch Workflow
+
+This section clarifies the relationship between brew logs (hot-side) and batches (cold-side).
+
+### Order of Operations
+
+```
+1. PLANNING PHASE
+   └── Create batch(es) with status=planned, planned_start_date, recipe_id
+       (Batches exist BEFORE brewing - they represent scheduled fermentation slots)
+
+2. BREW DAY
+   └── Create brew_log with status=draft
+   └── Record events as brewing progresses (→ status=in_progress)
+   └── Complete knockout (→ status=completed)
+
+3. WORT ALLOCATION
+   └── Link brew_log to batch(es) via brew_log_batches
+       • Specify volume_bbl allocated to each batch
+       • One brew can feed multiple batches (split/parti-gyle)
+       • Multiple brews can feed one batch (blend - rare)
+   └── Batch transitions: planned → fermenting
+
+4. FERMENTATION
+   └── Batch progresses through fermentation states
+   └── Yeast pitched to BATCH (not brew_log)
+   └── Readings recorded against BATCH
+```
+
+### Volume Flow
+
+| Stage | Source | Destination |
+|-------|--------|-------------|
+| Knockout | brew_log events (ko_end.volume_bbl) | Total wort produced |
+| Allocation | brew_log_batches.volume_bbl | Volume assigned per batch |
+| Fermentation | batch via vessel_transfers | Volume tracked through vessels |
+| Packaging | finished_goods.volume_bbl | Final packaged volume |
+
+**Key principle:** `brew_log_batches.volume_bbl` is the handoff point. The sum of all `brew_log_batches` for a brew should equal the total knockout volume.
+
+### Common Scenarios
+
+| Scenario | Brews | Batches | brew_log_batches entries |
+|----------|-------|---------|-------------------------|
+| Standard | 1 | 1 | 1 (full volume) |
+| Split fermentation | 1 | 2+ | 2+ (split volume) |
+| Parti-gyle | 1 | 2+ | 2+ (first/second runnings) |
+| Double batch | 2 | 1 | 2 (combined into one batch) |
+
+### What Lives Where
+
+| Data | Location | Rationale |
+|------|----------|-----------|
+| Brew date | brew_logs.brew_date | Hot-side event |
+| OG | Derived from brew_log events | Hot-side measurement |
+| Yeast pitch | pitch_usage → batches | Cold-side operation |
+| FG | batches.actual_fg | Cold-side measurement |
+| ABV | batches.actual_abv | Calculated from OG/FG |
+
+---
+
 ## `batches`
 
 Production batches (cold-side: fermentation through packaging). Hot-side data comes from linked `brew_logs` via `brew_log_batches`.
@@ -435,6 +496,88 @@ LEFT JOIN batches b ON b.id = latest.batch_id;
 
 **Rationale**: Single source of truth (transfer log), no sync issues between stored field and actual transfers.
 
+### Performance Considerations
+
+**Required indexes:**
+```sql
+-- Critical for LATERAL subquery performance
+CREATE INDEX idx_vessel_transfers_to_vessel ON vessel_transfers(to_vessel_id, transferred_at DESC);
+CREATE INDEX idx_vessel_transfers_from_vessel ON vessel_transfers(from_vessel_id, batch_id, transferred_at);
+```
+
+**Performance characteristics:**
+- Query time: ~5-10ms for typical brewery (10-50 vessels, <1000 transfers)
+- LATERAL with NOT EXISTS is efficient with proper indexes
+- No need to materialize for typical use cases
+
+**If performance becomes an issue:**
+```sql
+-- Option 1: Materialized view with refresh trigger
+CREATE MATERIALIZED VIEW vessels_with_current_batch_mat AS
+SELECT ... -- same query
+WITH DATA;
+
+CREATE UNIQUE INDEX ON vessels_with_current_batch_mat(id);
+
+-- Refresh on transfer INSERT/UPDATE
+CREATE OR REPLACE FUNCTION refresh_vessel_current_batch()
+RETURNS TRIGGER AS $$
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY vessels_with_current_batch_mat;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Application Query Patterns
+
+**Get all vessels with current batch (dashboard):**
+```typescript
+const { data: vessels } = await supabase
+  .from('vessels_with_current_batch')
+  .select('*, current_batch:batches(id, batch_number, status)')
+  .order('name');
+```
+
+**Get single vessel with current batch:**
+```typescript
+const { data: vessel } = await supabase
+  .from('vessels_with_current_batch')
+  .select('*')
+  .eq('id', vesselId)
+  .single();
+```
+
+**Find empty vessels (for scheduling):**
+```typescript
+const { data: emptyVessels } = await supabase
+  .from('vessels_with_current_batch')
+  .select('*')
+  .is('current_batch_id', null)
+  .eq('status', 'ready_for_use');
+```
+
+### Handling In-Flight Transfers
+
+The view shows **current state** based on completed transfers. For transfers in progress:
+
+| Transfer Status | Vessel Shows |
+|-----------------|--------------|
+| planned | Still shows previous batch (transfer not started) |
+| in_progress | Source shows batch (hasn't left yet), destination shows previous |
+| completed | Source shows empty/new batch, destination shows transferred batch |
+
+**To include planned transfers in availability calculations:**
+```sql
+-- Vessels that will be available soon (transfer out is planned)
+SELECT v.* FROM vessels v
+WHERE EXISTS (
+  SELECT 1 FROM vessel_transfers vt
+  WHERE vt.from_vessel_id = v.id
+  AND vt.status = 'planned'
+);
+```
+
 ---
 
 ## `vessel_cleanings`
@@ -537,46 +680,171 @@ Source batches for blends (many-to-many).
 
 ---
 
-## `yeast_pitches`
+## Yeast Management (Brinks Model)
 
-Yeast pitch inventory with lineage tracking.
+Yeast tracking uses a brinks-based model where physical containers ("brinks") hold yeast that can be pitched to multiple batches. This enables:
+- Accurate tracking of yeast weight remaining in each container
+- Viability testing over time
+- Cost spreading across all batches in a lineage
+- Harvest and repitch tracking across generations
+
+### Workflow
+
+```
+Purchase Yeast (Gen 0)
+    ↓
+Brink B-001 (strain: WLP001, weight: 10 lbs)
+    ↓
+├── Viability reading: 95% (day before brew)
+├── Pitch 2 lbs → Batch #101
+├── Pitch 2 lbs → Batch #102
+├── Viability reading: 75%
+└── Remaining 6 lbs → viability too low → DUMP
+
+Harvest from Batch #101 (Gen 1)
+    ↓
+Brink B-002 (strain: WLP001, parent: B-001, weight: 8 lbs)
+    ↓
+└── Continue pitching...
+```
+
+---
+
+## `yeast_brinks`
+
+Physical yeast containers with lineage tracking.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| yeast_id | UUID | FK to yeasts |
-| parent_pitch_id | UUID | FK to yeast_pitches (for harvested) |
-| source_batch_id | UUID | FK to batches (if harvested from) |
-| generation | INTEGER | Generation (0 = purchased) |
-| cell_count_billion | DECIMAL(12,2) | Cell count in billions |
-| viability_percent | DECIMAL(5,2) | Viability percentage |
-| volume_ml | DECIMAL(10,2) | Volume in mL |
-| purchase_cost | DECIMAL(10,2) | Cost (only for gen 0) |
-| purchase_date | DATE | Purchase date |
-| harvest_date | DATE | Harvest date (if harvested) |
-| status | TEXT | Status: available, pitched, depleted, retired |
+| brink_identifier | TEXT | Physical label (e.g., "B-001") - unique |
+| strain_id | UUID | FK to yeasts |
+| source_batch_id | UUID | FK to batches (NULL if purchased) |
+| harvested_at | TIMESTAMPTZ | Harvest timestamp (NULL if purchased) |
+| initial_weight_lbs | DECIMAL(8,2) | Initial weight in pounds |
+| generation | INTEGER | Generation (0 = purchased, 1+ = harvested) |
+| parent_brink_id | UUID | FK to yeast_brinks (lineage) |
+| status | TEXT | Status: active, depleted, dumped |
+| cost_cents | INTEGER | Purchase cost in cents (gen 0 only) |
 | notes | TEXT | Notes |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
+**Calculated fields** (via view or application):
+- `current_weight_lbs = initial_weight_lbs - SUM(yeast_pitches.weight_lbs)`
+- `current_viability` = most recent reading, or decay formula from last reading
+
+**Viability decay formula** (Zainasheff):
+```
+viability = last_reading_viability × (0.79 ^ months_since_reading)
+```
+
 ---
 
-## `pitch_usage`
+## `brink_viability_readings`
 
-Record of yeast pitches used in batches.
+Viability measurements for yeast brinks over time.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| pitch_id | UUID | FK to yeast_pitches |
+| brink_id | UUID | FK to yeast_brinks |
+| measured_at | TIMESTAMPTZ | Measurement timestamp |
+| viability_percent | DECIMAL(5,2) | Viability percentage (0-100) |
+| cell_count_billion | DECIMAL(12,2) | Cell count in billions (optional) |
+| method | TEXT | Method: hemocytometer, cell_counter, estimated |
+| measured_by | UUID | FK to auth.users |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+---
+
+## `yeast_pitches`
+
+Record of yeast pitched from brinks to batches.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| brink_id | UUID | FK to yeast_brinks |
 | batch_id | UUID | FK to batches |
-| cells_pitched_billion | DECIMAL(12,2) | Cells pitched |
-| viability_at_pitch | DECIMAL(5,2) | Viability at time of pitch |
-| pitch_rate | DECIMAL(5,3) | Actual pitch rate (M cells/mL/°P) |
 | pitched_at | TIMESTAMPTZ | Pitch timestamp |
+| weight_lbs | DECIMAL(8,4) | Weight removed from brink |
+| viability_at_pitch | DECIMAL(5,2) | Viability snapshot at pitch time |
+| pitch_rate | DECIMAL(5,3) | Actual pitch rate (M cells/mL/°P) |
 | pitched_by | UUID | FK to auth.users |
 | notes | TEXT | Notes |
 | created_at | TIMESTAMPTZ | Created timestamp |
+
+---
+
+## `yeast_brinks_with_status` (View)
+
+Calculated view showing current brink status.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| *(all yeast_brinks columns)* | | Base brink data |
+| current_weight_lbs | DECIMAL | Remaining weight |
+| latest_viability | DECIMAL | Most recent viability reading |
+| latest_reading_date | TIMESTAMPTZ | When last measured |
+| estimated_viability | DECIMAL | Viability with decay formula applied |
+| pitch_count | INTEGER | Number of pitches from this brink |
+
+```sql
+CREATE VIEW yeast_brinks_with_status AS
+SELECT
+  yb.*,
+  yb.initial_weight_lbs - COALESCE(SUM(yp.weight_lbs), 0) as current_weight_lbs,
+  latest.viability_percent as latest_viability,
+  latest.measured_at as latest_reading_date,
+  latest.viability_percent * POWER(0.79,
+    EXTRACT(EPOCH FROM (NOW() - latest.measured_at)) / (30.44 * 24 * 60 * 60)
+  ) as estimated_viability,
+  COUNT(yp.id) as pitch_count
+FROM yeast_brinks yb
+LEFT JOIN yeast_pitches yp ON yp.brink_id = yb.id
+LEFT JOIN LATERAL (
+  SELECT viability_percent, measured_at
+  FROM brink_viability_readings bvr
+  WHERE bvr.brink_id = yb.id
+  ORDER BY measured_at DESC
+  LIMIT 1
+) latest ON true
+GROUP BY yb.id, latest.viability_percent, latest.measured_at;
+```
+
+---
+
+## Yeast Cost Spreading
+
+Per DEC-GAP-003, yeast costs are spread equally across all batches in a lineage:
+
+```
+cost_per_batch = original_purchase_cost / COUNT(batches_in_lineage)
+```
+
+This is recalculated when new batches are added to the lineage. Query:
+
+```sql
+-- Get cost per batch for a lineage
+WITH RECURSIVE lineage AS (
+  SELECT id, parent_brink_id, cost_cents, generation
+  FROM yeast_brinks WHERE id = :root_brink_id
+  UNION ALL
+  SELECT yb.id, yb.parent_brink_id, yb.cost_cents, yb.generation
+  FROM yeast_brinks yb
+  JOIN lineage l ON yb.parent_brink_id = l.id
+),
+batches_in_lineage AS (
+  SELECT DISTINCT yp.batch_id
+  FROM yeast_pitches yp
+  WHERE yp.brink_id IN (SELECT id FROM lineage)
+)
+SELECT
+  (SELECT cost_cents FROM lineage WHERE generation = 0) / COUNT(*) as cost_per_batch_cents
+FROM batches_in_lineage;
+```
 
 ---
 

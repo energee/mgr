@@ -235,20 +235,32 @@ This section documents architectural decisions from a comprehensive schema revie
 ```sql
 allocations:
   id                  UUID PRIMARY KEY
-  source_type         TEXT NOT NULL  -- 'batch', 'finished_good', 'inventory_lot', 'external'
+  source_type         TEXT NOT NULL  -- 'inventory_lot', 'batch', 'finished_good', 'external'
   source_id           UUID NOT NULL
-  destination_type    TEXT NOT NULL  -- 'finished_good', 'order', 'sample', 'adjustment', etc.
-  destination_id      UUID
+  destination_type    TEXT NOT NULL  -- 'batch', 'finished_good', 'order', 'sample', 'adjustment', 'destruction', 'loss', 'transfer'
+  destination_id      UUID           -- nullable for sample/adjustment/destruction/loss
   quantity            DECIMAL NOT NULL
   volume_bbl          DECIMAL
   status              TEXT NOT NULL  -- 'planned', 'completed', 'cancelled'
-  reference_type      TEXT           -- context for the allocation
-  reference_id        UUID
-  reason_code         TEXT           -- for adjustments: 'breakage', 'sample_customer', etc.
+  reason_code         TEXT           -- for samples/adjustments: 'breakage', 'sample_customer', etc.
+  lot_number          TEXT           -- traceability
   notes               TEXT
   created_at          TIMESTAMPTZ
   updated_at          TIMESTAMPTZ
 ```
+
+**Allocation flows:**
+| Flow | source_type | destination_type |
+|------|-------------|------------------|
+| Raw material → Batch | inventory_lot | batch |
+| Batch → Packaging | batch | finished_good |
+| FG → Sale | finished_good | order |
+| FG → Sample | finished_good | sample |
+| FG → Adjustment | finished_good | adjustment |
+| FG → Destroyed | finished_good | destruction |
+| FG → Lost | finished_good | loss |
+| FG → Transfer | finished_good | transfer |
+| External → FG | external | finished_good |
 
 **Rationale**: Single audit trail, simpler queries, consistent allocation logic across all inventory types.
 
@@ -281,12 +293,25 @@ recipe_hops:
 **Rationale**: Enables queries like "all recipes using Citra hops", database-level constraints, proper indexing.
 
 #### DEC-HP-003: Brew Log to Batch Linking
+**Status**: Documented (data model updated)
 **Decision**: Clarify brew log to batch relationship rules.
 
+**Core principle:** Batches represent fermentation slots and are created during planning. Brew logs capture hot-side execution. The two are linked when wort is allocated to fermenter(s).
+
+**Workflow:**
+1. Create batch(es) with `status=planned` and `planned_start_date` (planning phase)
+2. On brew day, create brew_log and record events
+3. At knockout, link brew_log to batch(es) via `brew_log_batches` with `volume_bbl`
+4. Batch transitions `planned → fermenting`
+
+**Rules:**
 - **Batches pre-exist**: Batches are scheduled in advance; brew logs link to existing batches
-- **Yeast binds to batch**: Yeast pitch tracking is at batch level, not brew log
-- **Blends create new batch**: When consolidating batches from multiple brew logs, create a new batch record
+- **Yeast binds to batch**: Yeast pitch tracking is at batch level, not brew log (cold-side operation)
+- **Volume allocation**: `brew_log_batches.volume_bbl` specifies wort allocated to each batch
 - **Multi-brew acknowledged**: Batches derived from multiple brews are linked via `brew_log_batches` junction table
+- **Split fermentation**: One brew can feed multiple batches (parti-gyle, different yeasts)
+
+See `docs/data-model/production.md` "Brew-to-Batch Workflow" section for complete documentation.
 
 #### DEC-HP-004: Database Constraints
 **Decision**: Add comprehensive indexes and constraints.
@@ -333,6 +358,12 @@ ALTER TABLE yeast_pitches ADD CONSTRAINT chk_viability_range CHECK (viability BE
 -- Logical date ordering
 ALTER TABLE inventory_lots ADD CONSTRAINT chk_dates_logical
   CHECK (expiration_date IS NULL OR expiration_date > received_date);
+
+-- FG entry point: either both batch_id AND session_line_item_id set (internal), or both null (external)
+ALTER TABLE finished_goods ADD CONSTRAINT chk_fg_entry_point CHECK (
+  (batch_id IS NOT NULL AND session_line_item_id IS NOT NULL) OR
+  (batch_id IS NULL AND session_line_item_id IS NULL)
+);
 ```
 
 #### DEC-HP-005: Remove Redundant Calculated Fields
@@ -2237,8 +2268,20 @@ batch | finished_good | inventory_lot | external
 
 #### Destination Types
 ```
-finished_good | order | sample | adjustment | transfer | destruction | loss
+batch | finished_good | order | sample | adjustment | destruction | loss | transfer
 ```
+
+**Destination type usage:**
+| Type | Use Case | destination_id |
+|------|----------|----------------|
+| batch | Raw materials allocated to production | batches.id |
+| finished_good | Batch packaged into FG | finished_goods.id |
+| order | FG sold to customer | orders.id |
+| sample | Trade/quality samples | NULL |
+| adjustment | Inventory corrections | NULL |
+| destruction | QC failure, contamination | NULL |
+| loss | Breakage, spillage, theft | NULL |
+| transfer | Inter-location movement | location_transfers.id |
 
 #### Allocation Status
 ```

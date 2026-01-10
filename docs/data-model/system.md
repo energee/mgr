@@ -20,7 +20,7 @@ Brewery settings (singleton table for single-tenant mode).
 | ttb_registry_number | TEXT | TTB registry number |
 | default_batch_size_bbl | DECIMAL(6,2) | Default batch size |
 | default_efficiency | DECIMAL(4,1) | Default mash efficiency |
-| default_water_profile_id | UUID | FK to water_profiles (default source water) |
+| default_water_profile_id | UUID | FK to water_profiles (brewery's source water - see below) |
 | fiscal_year_start_month | INTEGER | Fiscal year start month |
 | features | JSONB | Feature flags |
 | created_at | TIMESTAMPTZ | Created timestamp |
@@ -31,22 +31,55 @@ The settings table uses a singleton constraint to ensure only one row exists:
 CONSTRAINT settings_singleton CHECK (id = '00000000-0000-0000-0000-000000000001'::uuid)
 ```
 
+### Water Profile Defaults
+
+The `default_water_profile_id` references a water profile in `production.water_profiles`. This represents the brewery's **source water** chemistry.
+
+**Resolution order for recipes:**
+1. Recipe has `water_profile_id` set → use recipe's profile
+2. Recipe has `water_profile_id` = NULL → use `settings.default_water_profile_id`
+
+Individual water chemistry values (Ca, Mg, SO4, etc.) are stored on the `water_profiles` table, not on settings. See `docs/data-model/production.md` for water_profiles schema.
+
 ---
 
 ## `locations`
 
-Physical locations/facilities.
+Physical locations/facilities. Locations are the top level of the storage hierarchy.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
 | name | TEXT | Location name |
-| address | JSONB | Address |
+| address | JSONB | Address (see schema below) |
 | location_type | TEXT | Type: brewery, warehouse, taproom, offsite |
 | is_primary | BOOLEAN | Is this the primary location |
+| is_offsite_premises | BOOLEAN | Whether this is an offsite TTB premise (affects reporting) |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+### Location Types
+
+| Type | Description | Typical Bin Types |
+|------|-------------|-------------------|
+| brewery | Main production facility | storage, cold_room, staging |
+| warehouse | Off-site storage | storage, shipping |
+| taproom | Customer-facing location | taproom, hold |
+| offsite | External storage/partner | storage, quarantine |
+
+### Location → Bin Hierarchy
+
+```
+Location (brewery, warehouse, taproom, offsite)
+    └── Bins (storage units within location)
+        └── bin_inventory (FG quantities per bin)
+```
+
+**Constraints:**
+- Each bin belongs to exactly one location
+- `is_offsite_premises = true` affects TTB Line 19 reporting
+- Primary location (`is_primary = true`) is used as default for new batches
 
 ---
 
@@ -89,6 +122,23 @@ Unified audit trail for all entity changes. Replaces scattered JSONB revision ar
 | status_changed | State machine transition |
 | deleted | Entity was soft-deleted |
 
+### Entities Using entity_revisions
+
+All stateful entities track changes via `entity_revisions`. The following entities are tracked:
+
+| Entity | entity_type | Key Changes Tracked |
+|--------|-------------|---------------------|
+| batches | batch | Status transitions, FG/ABV updates, notes |
+| brew_logs | brew_log | Status transitions, events modifications |
+| recipes | recipe | Ingredient changes, parameter updates |
+| orders | order | Status transitions, line item changes |
+| packaging_sessions | packaging_session | Status transitions, quantity adjustments |
+| finished_goods | finished_good | Quantity adjustments, location changes |
+| vessels | vessel | Status transitions, cleaning events |
+| inventory_items | inventory_item | Stock adjustments |
+
+**Note:** Legacy tables may have `revisions JSONB` columns. These should be migrated to `entity_revisions` during implementation.
+
 ### Query Examples
 
 ```sql
@@ -107,6 +157,140 @@ SELECT * FROM entity_revisions
 WHERE user_id = '...'
 ORDER BY created_at DESC
 LIMIT 50;
+```
+
+### Migration from JSONB Revisions
+
+For tables with legacy `revisions JSONB` columns:
+
+```sql
+-- Example migration: packaging_sessions
+INSERT INTO entity_revisions (entity_type, entity_id, action, previous_value, new_value, user_id, created_at)
+SELECT
+  'packaging_session',
+  ps.id,
+  (r->>'action')::text,
+  r->'previous_value',
+  r->'new_value',
+  (r->>'user_id')::uuid,
+  (r->>'timestamp')::timestamptz
+FROM packaging_sessions ps,
+     jsonb_array_elements(ps.revisions) r
+WHERE ps.revisions IS NOT NULL;
+
+-- Then drop the column
+ALTER TABLE packaging_sessions DROP COLUMN revisions;
+```
+
+### Creating Revision Records
+
+Application code should create revision records on all entity changes:
+
+```typescript
+async function createRevision(
+  entityType: string,
+  entityId: string,
+  action: 'created' | 'updated' | 'status_changed' | 'deleted',
+  changes: { field?: string; previousValue?: any; newValue?: any; reason?: string },
+  userId: string
+) {
+  await supabase.from('entity_revisions').insert({
+    entity_type: entityType,
+    entity_id: entityId,
+    action,
+    field: changes.field,
+    previous_value: changes.previousValue,
+    new_value: changes.newValue,
+    reason: changes.reason,
+    user_id: userId
+  });
+}
+```
+
+---
+
+## Soft Delete Rules
+
+Entities with `is_active` flag use soft delete. This section documents when soft vs hard delete is allowed.
+
+### Delete Rules by Entity
+
+| Entity | Delete Type | Blocking Conditions |
+|--------|-------------|---------------------|
+| **Catalog** | | |
+| malts, hops, etc. | Soft only | None (set is_active=false) |
+| yeasts | Soft only | None |
+| beer_styles | Soft only | None |
+| **Production** | | |
+| recipes | Soft only | None |
+| batches | No delete | Use status=cancelled instead |
+| brew_logs | No delete | Use status=cancelled instead |
+| vessels | Soft only | Must be empty (no current batch) |
+| **Inventory** | | |
+| inventory_items | Soft only | None (lots remain for history) |
+| allocations | No delete | Use status=cancelled instead |
+| finished_goods | No delete | Use allocations to remove quantity |
+| **Packaging** | | |
+| package_types | Soft only | None |
+| packaging_sessions | No delete | Use status=cancelled instead |
+| **Sales** | | |
+| customers | Soft only | No unpaid orders |
+| orders | Soft (draft only) | Hard delete only if draft, no line items |
+| price_tiers | Soft only | None |
+| **Purchasing** | | |
+| suppliers | Soft only | No open POs |
+| purchase_orders | Soft (draft only) | Hard delete only if draft |
+| **System** | | |
+| locations | Soft only | No associated bins with inventory |
+| bins | Soft only | Must be empty |
+
+### Application Enforcement
+
+```typescript
+// Check before soft delete
+async function canDeactivate(entity: string, id: string): Promise<boolean> {
+  switch (entity) {
+    case 'vessel':
+      const vessel = await getVesselWithCurrentBatch(id);
+      return vessel.current_batch_id === null;
+
+    case 'customer':
+      const openOrders = await supabase
+        .from('orders')
+        .select('id')
+        .eq('customer_id', id)
+        .not('status', 'in', ['fulfilled', 'cancelled'])
+        .limit(1);
+      return openOrders.data?.length === 0;
+
+    case 'bin':
+      const binInventory = await supabase
+        .from('bin_inventory')
+        .select('quantity')
+        .eq('bin_id', id)
+        .gt('quantity', 0)
+        .limit(1);
+      return binInventory.data?.length === 0;
+
+    default:
+      return true;
+  }
+}
+```
+
+### Query Patterns
+
+Always filter for active records in normal queries:
+
+```sql
+-- Standard query pattern
+SELECT * FROM customers WHERE is_active = true;
+
+-- Admin view (include inactive)
+SELECT * FROM customers;
+
+-- Find inactive records
+SELECT * FROM customers WHERE is_active = false;
 ```
 
 ---

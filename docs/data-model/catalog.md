@@ -2,6 +2,75 @@
 
 Catalog tables store reference data for ingredients. These are templates with properties used for calculations and inventory management.
 
+## Catalog Architecture
+
+The catalog uses **separate tables per ingredient type** (malts, hops, yeasts, etc.) for strong typing and type-specific fields. Cross-domain references use a polymorphic pattern.
+
+### Polymorphic References
+
+When other tables need to reference any catalog item, they use:
+
+```sql
+catalog_type  TEXT  -- 'malt', 'hop', 'yeast', 'adjunct', 'sugar', 'spice', 'fruit', 'additive'
+catalog_id    UUID  -- FK to the appropriate table
+```
+
+**Tables using this pattern:**
+- `supplier_catalog` - What suppliers offer
+- `po_line_items` - What's being ordered
+- `inventory_items` - Stock tracking items
+- `batch_additions` - Post-brew additions
+
+### Recipe Ingredient Pattern
+
+Recipe ingredients use **concrete junction tables** with direct FKs for stronger typing:
+
+```
+recipes ──┬── recipe_malts ──── malts
+          ├── recipe_hops ──── hops
+          ├── recipe_adjuncts ── adjuncts
+          ├── recipe_sugars ─── sugars
+          ├── recipe_spices ─── spices
+          └── recipe_fruits ─── fruits
+```
+
+**Why concrete tables for recipes?**
+- Enables queries like "all recipes using Citra hops"
+- Type-specific columns (timing, boil_time_min for hops)
+- Database-level referential integrity
+- Proper indexing for ingredient searches
+
+### Querying All Catalog Items
+
+To query across all ingredient types:
+
+```sql
+-- Union query for all catalog items
+SELECT 'malt' as type, id, name FROM malts WHERE is_active = true
+UNION ALL
+SELECT 'hop' as type, id, name FROM hops WHERE is_active = true
+UNION ALL
+SELECT 'yeast' as type, id, name FROM yeasts WHERE is_active = true
+UNION ALL
+SELECT 'adjunct' as type, id, name FROM adjuncts WHERE is_active = true
+UNION ALL
+SELECT 'sugar' as type, id, name FROM sugars WHERE is_active = true
+UNION ALL
+SELECT 'spice' as type, id, name FROM spices WHERE is_active = true
+UNION ALL
+SELECT 'fruit' as type, id, name FROM fruits WHERE is_active = true
+UNION ALL
+SELECT 'additive' as type, id, name FROM additives WHERE is_active = true;
+```
+
+### Valid catalog_type Values
+
+```
+malt | hop | yeast | adjunct | sugar | spice | fruit | additive
+```
+
+---
+
 ## `beer_styles`
 
 Beer style definitions (e.g., BJCP styles).

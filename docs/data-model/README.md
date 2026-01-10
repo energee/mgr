@@ -139,16 +139,70 @@ System Domain
 
 ## Units Convention
 
-All measurements use these standard units in the database:
-- **Volume**: BBL (barrels) for production scale, gallons for water
-- **Weight**: pounds (lbs) for large quantities, ounces for hops/spices
-- **Temperature**: Fahrenheit (°F)
-- **Time**: minutes for process times, days for fermentation/conditioning
-- **Gravity**: specific gravity format (e.g., 1.050)
-- **Color**: SRM (Standard Reference Method) or Lovibond
-- **Bitterness**: IBU (International Bitterness Units)
+All measurements use standardized units in the database. The application layer handles conversions for display.
 
-The application layer handles unit conversions for display.
+### Volume
+
+| Context | Unit | Column Suffix | Notes |
+|---------|------|---------------|-------|
+| Batch/FG volume | BBL | `_bbl` | US barrel = 31 gallons |
+| Water (mash/sparge) | Gallons | `_gal` | |
+| Yeast slurry | mL | `_ml` | |
+| Additives (liquids) | mL | `_ml` | |
+
+### Weight
+
+| Context | Unit | Column Suffix | Notes |
+|---------|------|---------------|-------|
+| Grain bill | lbs | `_lbs` | |
+| Hops | oz | `_oz` | |
+| Yeast | lbs | `_lbs` | Brinks measured in lbs |
+| Spices/additives | oz or g | `_oz`, `_g` | Context-dependent |
+
+### Temperature, Time, Gravity
+
+| Measurement | Unit | Column Suffix |
+|-------------|------|---------------|
+| Temperature | °F | `_f` |
+| Process time | minutes | `_min` |
+| Fermentation/conditioning | days | `_days` |
+| Gravity | Plato (°P) | `_plato` |
+| Original/Final Gravity | Specific gravity | None (e.g., `og`, `fg`) |
+
+### Color, Bitterness, Chemistry
+
+| Measurement | Unit | Notes |
+|-------------|------|-------|
+| Color | SRM or Lovibond | Lovibond for malts, SRM for beer |
+| Bitterness | IBU | International Bitterness Units |
+| pH | pH units | 0-14 scale |
+| Water chemistry | ppm | Ca, Mg, SO4, Cl, Na, HCO3 |
+
+### Cost
+
+| Context | Unit | Notes |
+|---------|------|-------|
+| Unit cost | Decimal | Dollars with 4 decimal places |
+| Yeast cost | cents | Integer (avoids decimal issues) |
+
+### Validation Constraints
+
+```sql
+-- Volume must be positive
+CHECK (volume_bbl >= 0)
+
+-- Temperature reasonable range
+CHECK (temp_f BETWEEN 32 AND 220)
+
+-- Gravity reasonable range
+CHECK (og BETWEEN 1.000 AND 1.200)
+
+-- Percentage bounds
+CHECK (abv BETWEEN 0 AND 100)
+CHECK (viability_percent BETWEEN 0 AND 100)
+```
+
+The application layer handles unit conversions for display (e.g., BBL ↔ gallons, °F ↔ °C).
 
 ## Calculated Fields
 
@@ -170,6 +224,111 @@ Calculated fields are computed on read via database views - no cached/stored val
 - Ingredient bags count - From weight and bag size
 - Ingredient value - From weight and cost per unit
 - Total grain bill % - Per malt contribution to total weight
+
+## State Machine Reference
+
+All stateful entities use consistent status patterns. This section provides a unified view.
+
+### Status Terminology
+
+| Term | Meaning | Used By |
+|------|---------|---------|
+| `draft` | Not yet started, still editable | brew_log, order, purchase_order |
+| `planned` | Scheduled but not started | batch, allocation, transfer |
+| `in_progress` | Currently being worked on | brew_log, packaging_session |
+| `pending_approval` | Awaiting manager approval | allocation |
+| `confirmed` | Committed/approved | order, purchase_order |
+| `completed` | Finished successfully | brew_log, batch, packaging_session, transfer |
+| `fulfilled` | All items received/delivered | order, purchase_order |
+| `cancelled` | Cancelled before completion | All entities |
+| `rejected` | Approval denied | allocation |
+
+### Entity State Machines
+
+| Entity | States | Initial | Terminal |
+|--------|--------|---------|----------|
+| batch | planned → fermenting → conditioning → packaging → completed | planned | completed, cancelled |
+| brew_log | draft → in_progress → completed | draft | completed, cancelled |
+| order | draft → confirmed → scheduled → picking → packed → fulfilled | draft | fulfilled, cancelled |
+| purchase_order | draft → submitted → confirmed → partial → fulfilled | draft | fulfilled, cancelled |
+| packaging_session | planned → in_progress → completed → revised | planned | completed (revised), cancelled |
+| allocation | planned → pending_approval → completed | planned | completed, rejected, cancelled |
+| location_transfer | planned → in_transit → completed | planned | completed, cancelled |
+| vessel | dirty → caustic_cleaned → ready_for_use → in_use | dirty | (cycles) |
+
+### Terminal States
+
+| State | Can be modified? | Can transition? |
+|-------|------------------|-----------------|
+| completed | Read-only | No |
+| fulfilled | Read-only | No |
+| cancelled | Read-only | No |
+| rejected | Can edit & resubmit | Yes (new approval cycle) |
+
+## Contact & Address Standards
+
+### Contact Fields
+
+Contact information uses consistent field naming across all entities:
+
+| Field | Used By | Notes |
+|-------|---------|-------|
+| `contact_name` | customers, suppliers | Primary contact person |
+| `email` | customers, settings | Primary email |
+| `contact_email` | suppliers | Supplier contact email |
+| `phone` | customers, settings | Primary phone |
+| `contact_phone` | suppliers | Supplier contact phone |
+
+**Note:** Customers use shorter field names (`email`, `phone`) because the contact is typically the customer themselves. Suppliers use prefixed names (`contact_email`) to distinguish the contact from the company.
+
+### Address JSONB Schema
+
+All `address` fields use this consistent JSONB structure:
+
+```typescript
+interface Address {
+  street1: string;      // Required: Street address line 1
+  street2?: string;     // Optional: Apt, Suite, etc.
+  city: string;         // Required
+  state: string;        // Required: State/Province code (e.g., "CA")
+  postal_code: string;  // Required: ZIP/Postal code
+  country: string;      // Required: ISO 3166-1 alpha-2 (e.g., "US")
+}
+```
+
+**Example:**
+```json
+{
+  "street1": "123 Brewery Lane",
+  "street2": "Suite 100",
+  "city": "Portland",
+  "state": "OR",
+  "postal_code": "97201",
+  "country": "US"
+}
+```
+
+**Entities with address fields:**
+- `settings.address` - Brewery address
+- `customers.address` - Customer address
+- `customers.shipping_address` - Different shipping address (if applicable)
+- `suppliers.address` - Supplier address
+- `locations.address` - Location address
+- `orders.shipping_address` - Order-specific shipping address
+
+### Validation
+
+```typescript
+// Application-level address validation
+const addressSchema = z.object({
+  street1: z.string().min(1),
+  street2: z.string().optional(),
+  city: z.string().min(1),
+  state: z.string().min(2).max(3),
+  postal_code: z.string().min(3),
+  country: z.string().length(2)
+});
+```
 
 ## Common Columns
 
