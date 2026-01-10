@@ -19,13 +19,13 @@ This directory contains the relational database schema for MGR. This is the **so
 
 ## Design Principles
 
-1. **JSONB for recipe ingredients** - Malts, hops, adjuncts, sugars, spices, fruits are stored as JSONB arrays in the recipe. This captures a snapshot of ingredient properties at recipe creation time and simplifies read/write operations.
+1. **Junction tables for recipe ingredients** - Malts, hops, adjuncts, sugars, spices, fruits are stored in junction tables (e.g., `recipe_malts`, `recipe_hops`). This enables queries like "all recipes using Citra hops", database-level referential integrity, and proper indexing. Snapshots of catalog properties (color, alpha acid, etc.) are stored in the junction record.
 
-2. **Junction tables for shared/reusable data** - Water profiles and recipe additions use proper tables because they can be shared (defaults) or need querying across recipes.
+2. **JSONB for schedules and complex nested data** - Mash schedules, fermentation schedules, and event timelines use JSONB arrays. These are self-contained within a record and don't need cross-record querying.
 
-3. **Catalog tables for reference data** - All ingredient types have catalog tables for autocomplete, inventory linking, and property management. Recipes store both the catalog ID and a snapshot of relevant properties.
+3. **Catalog tables for reference data** - All ingredient types have catalog tables for autocomplete, inventory linking, and property management. Junction tables store both the catalog FK and snapshots of relevant properties.
 
-4. **Allocation-based inventory** - No mutable running balances. Quantities calculated from allocation records.
+4. **Allocation-based inventory** - No mutable running balances. Quantities calculated from unified allocation records.
 
 5. **State machines for workflows** - Stateful entities (batches, orders, sessions, transfers) use consistent state machine patterns.
 
@@ -45,11 +45,16 @@ Catalog Domain
 
 Production Domain
 ├── recipes
+│   └── recipe_malts (recipe_id) → malts
+│   └── recipe_hops (recipe_id) → hops
+│   └── recipe_adjuncts (recipe_id) → adjuncts
+│   └── recipe_sugars (recipe_id) → sugars
+│   └── recipe_spices (recipe_id) → spices
+│   └── recipe_fruits (recipe_id) → fruits
 │   └── recipe_collaborators (recipe_id)
 │   └── recipe_additions (recipe_id)
 │   └── batches (recipe_id)
 │   └── brew_logs (recipe_id)
-│   └── [JSONB] malts, hops, adjuncts, sugars, spices, fruits
 ├── brew_logs (hot-side)
 │   └── brew_log_batches (brew_log_id) - volume allocation to batches
 │   └── [JSONB] events - timeline with measurements
@@ -78,13 +83,17 @@ Packaging Domain
 │   └── finished_goods (session_line_item_id)
 ├── finished_goods
 │   └── bin_inventory (finished_good_id)
-│   └── fg_allocations (finished_good_id)
+│   └── allocations (source_type='finished_good')
 │   └── transfer_lines (finished_good_id)
 
 Inventory Domain
 ├── inventory_items
-│   └── allocations (inventory_item_id)
 │   └── inventory_lots (inventory_item_id)
+├── inventory_lots
+│   └── allocations (source_type='inventory_lot')
+├── allocations (unified - tracks all inventory movements)
+│   └── source: inventory_lot, batch, finished_good, external
+│   └── destination: batch, finished_good, order, sample, adjustment, waste, transfer
 ├── bins
 │   └── bin_inventory (bin_id)
 │   └── location_transfers (from/to_bin_id)
@@ -143,9 +152,9 @@ The application layer handles unit conversions for display.
 
 ## Calculated Fields
 
-These fields are calculated and cached, updated when dependencies change:
+Calculated fields are computed on read via database views - no cached/stored values that can become stale.
 
-**Recipe**:
+**Recipe estimates** (via `recipes_with_estimates` view):
 - `est_og` - From grain bill and efficiency
 - `est_fg` - From OG and attenuation
 - `est_abv` - From OG and FG
@@ -153,11 +162,14 @@ These fields are calculated and cached, updated when dependencies change:
 - `est_srm` - From grain bill color contributions
 - `est_cogs` - Sum of ingredient costs
 
-**Application-level calculations** (not stored):
+**Inventory quantities** (via `allocations` table aggregation):
+- Available quantity - Total minus allocated
+- Remaining lot quantity - Received minus used
+
+**Application-level calculations** (not stored, computed in UI):
 - Ingredient bags count - From weight and bag size
 - Ingredient value - From weight and cost per unit
 - Total grain bill % - Per malt contribution to total weight
-- Available quantity - Total minus allocated
 
 ## Common Columns
 
@@ -167,6 +179,12 @@ All tables include these standard columns:
 - `updated_at` - Last update timestamp (where applicable)
 - `is_active` - Soft delete flag (where applicable)
 
-## SQL Generation
+## Schema Maintenance
 
-SQL CREATE statements will be generated from these markdown definitions. Until then, use the markdown tables as the authoritative schema reference.
+Migrations are maintained manually in `supabase/migrations/`. The markdown documentation in this directory serves as the authoritative schema reference for understanding table structures, relationships, and design rationale.
+
+When adding new tables or modifying schema:
+1. Update the relevant data model markdown file
+2. Create a new migration in `supabase/migrations/`
+3. Update `_schema_registry` entries in the migration
+4. Run `pnpm db:generate` to regenerate TypeScript types

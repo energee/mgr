@@ -167,6 +167,41 @@ stateMachine: {
 - Consistent with rest of TanStack ecosystem
 - Better async validation support
 
+### DEC-005: Single-Tenant Architecture
+**Status**: Implemented (January 2026)
+**Decision**: Single-tenant architecture instead of multi-tenant SaaS.
+
+**Changes from multi-tenant design**:
+- Removed `breweries` and `user_breweries` tables
+- Removed `brewery_id` foreign key from all data tables
+- User roles stored directly in `users.roles` array
+- Single `settings` table (singleton) for brewery configuration
+- RLS policies check role membership, not brewery membership
+
+**Authorization model**:
+```sql
+-- Users have roles directly
+CREATE TABLE users (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  email TEXT NOT NULL,
+  name TEXT,
+  roles TEXT[] NOT NULL DEFAULT '{}', -- ['admin', 'brewer', 'sales', 'production_manager']
+  ...
+);
+
+-- RLS checks role membership
+CREATE POLICY "Role-based access" ON batches FOR SELECT
+USING (auth.uid() IN (SELECT id FROM users WHERE 'brewer' = ANY(roles)));
+```
+
+**Benefits**:
+- Simpler data model (no brewery_id on every table)
+- Easier queries (no brewery filtering)
+- Reduced complexity (fewer joins, simpler RLS)
+- Better performance (fewer indexes needed)
+
+**Future multi-tenancy**: If needed, add back `breweries` table, `brewery_id` columns, and update RLS policies. Current schema documented in `docs/data-model/system.md` under "Future: Multi-Tenant Support".
+
 ### Deviations from Original Spec
 | Area | Original | Implementation | Rationale |
 |------|----------|----------------|-----------|
@@ -174,6 +209,7 @@ stateMachine: {
 | Notifications | In-app, email, Slack | In-app only (Phase 1) | Ship core first |
 | Next.js | 14+ | 16.x | Latest stable |
 | Forms | React Hook Form | TanStack Form | Ecosystem consistency |
+| Tenancy | Multi-tenant SaaS | Single-tenant | Simpler for target use case |
 
 ---
 
@@ -181,9 +217,19 @@ stateMachine: {
 
 This section documents architectural decisions from a comprehensive schema review.
 
+### Decision Status Legend
+
+| Status | Meaning |
+|--------|---------|
+| **Documented** | Data model docs updated, migration pending |
+| **Implemented** | Migration created and applied |
+| **Rejected** | Decision was considered but not adopted |
+| *(no status)* | Proposed, not yet reviewed |
+
 ### HIGH PRIORITY DECISIONS
 
 #### DEC-HP-001: Unified Allocation Table
+**Status**: Documented (data model updated, migration pending)
 **Decision**: Merge `allocations` and `fg_allocations` into single polymorphic `allocations` table.
 
 ```sql
@@ -207,6 +253,7 @@ allocations:
 **Rationale**: Single audit trail, simpler queries, consistent allocation logic across all inventory types.
 
 #### DEC-HP-002: Recipe Ingredients as Junction Tables
+**Status**: Documented (data model updated, migration pending)
 **Decision**: Move recipe ingredients from JSONB arrays to proper junction tables.
 
 ```sql
@@ -289,6 +336,7 @@ ALTER TABLE inventory_lots ADD CONSTRAINT chk_dates_logical
 ```
 
 #### DEC-HP-005: Remove Redundant Calculated Fields
+**Status**: Documented (data model updated, migration pending)
 **Decision**: Remove stored fields that should be calculated.
 
 | Remove | Calculate From |
@@ -305,6 +353,7 @@ ALTER TABLE inventory_lots ADD CONSTRAINT chk_dates_logical
 ### MEDIUM PRIORITY DECISIONS
 
 #### DEC-MP-001: Unified Entity Revisions
+**Status**: Documented (data model updated, migration pending)
 **Decision**: Single `entity_revisions` table for all audit tracking.
 
 ```sql
@@ -324,6 +373,7 @@ entity_revisions:
 **Rationale**: Consistent audit trail across all entities, replaces scattered JSONB revision arrays.
 
 #### DEC-MP-002: Water Profile Consolidation
+**Status**: Documented (data model updated, migration pending)
 **Decision**: Remove `default_water_*` fields from system_settings; always use `water_profiles` table.
 
 - Create a default water profile record
@@ -331,6 +381,7 @@ entity_revisions:
 - Single source of truth for water chemistry
 
 #### DEC-MP-003: Temporal Pricing
+**Status**: Documented (data model updated, migration pending)
 **Decision**: Add `valid_from` and `valid_to` dates to `tier_prices`.
 
 ```sql
@@ -339,7 +390,7 @@ tier_prices:
   tier_id     UUID REFERENCES price_tiers(id)
   style_id    UUID REFERENCES beer_styles(id)  -- NEW: for style-level pricing
   brand_id    UUID REFERENCES brands(id)       -- nullable if style-level
-  format_id   UUID REFERENCES package_formats(id)
+  format_id   UUID REFERENCES package_types(id)
   price       DECIMAL NOT NULL
   valid_from  DATE NOT NULL DEFAULT CURRENT_DATE
   valid_to    DATE           -- null = current
@@ -355,6 +406,7 @@ tier_prices:
 3. Flag for manual entry (no match)
 
 #### DEC-MP-004: Derive Vessel Current Batch
+**Status**: Documented (data model updated, migration pending)
 **Decision**: Remove `vessels.current_batch_id`; derive from `vessel_transfers`.
 
 ```sql
