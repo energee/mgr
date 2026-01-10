@@ -30,7 +30,7 @@ Manufactured products (beers, ciders, wines, etc.). A brand represents a finishe
 
 ## `water_profiles`
 
-Reusable water profiles (source water chemistry).
+Reusable water profiles (source water chemistry). Single source of truth for all water chemistry data.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -44,16 +44,17 @@ Reusable water profiles (source water chemistry).
 | bicarbonate_ppm | DECIMAL(6,1) | Bicarbonate (HCO3) ppm |
 | ph | DECIMAL(3,1) | Source water pH |
 | description | TEXT | Notes about this profile |
-| is_default | BOOLEAN | Is this the brewery default profile? |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Default profile**: The brewery's default water profile is set via `settings.default_water_profile_id`. Recipes without a specific `water_profile_id` use this default.
 
 ---
 
 ## `recipes`
 
-Brewing recipes with all parameters. Ingredients are stored as JSONB arrays.
+Brewing recipes with all parameters. Ingredients are stored in junction tables for queryability and referential integrity.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -90,23 +91,9 @@ Brewing recipes with all parameters. Ingredients are stored as JSONB arrays.
 | target_attenuation | DECIMAL(4,1) | Target attenuation % |
 | target_pitching_rate | DECIMAL(3,1) | Pitching rate (M cells/mL/°P) |
 | yeast_nutrient_amount_g | DECIMAL(6,2) | Yeast nutrient amount |
-| **Ingredients (JSONB)** | | |
-| malts | JSONB | Malt bill array (see schema below) |
-| hops | JSONB | Hop additions array |
-| adjuncts | JSONB | Adjunct additions array |
-| sugars | JSONB | Sugar additions array |
-| spices | JSONB | Spice additions array |
-| fruits | JSONB | Fruit additions array |
 | **Schedules (JSONB)** | | |
 | mash_schedule | JSONB | Mash step schedule |
 | fermentation_schedule | JSONB | Fermentation stage schedule |
-| **Calculated** | | |
-| est_og | DECIMAL(4,3) | Estimated OG |
-| est_fg | DECIMAL(4,3) | Estimated FG |
-| est_abv | DECIMAL(3,1) | Estimated ABV |
-| est_ibu | INTEGER | Estimated IBU |
-| est_srm | INTEGER | Estimated color |
-| est_cogs | DECIMAL(10,2) | Estimated cost of goods |
 | **Notes** | | |
 | brew_day_notes | TEXT | Brew day instructions |
 | tasting_notes | TEXT | Tasting notes |
@@ -118,79 +105,7 @@ Brewing recipes with all parameters. Ingredients are stored as JSONB arrays.
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-### Ingredient JSONB Schemas
-
-**malts** array:
-```json
-[{
-  "malt_id": "uuid",
-  "name": "Pale Malt 2-Row",
-  "weight_lbs": 50.0,
-  "color_lov": 1.8,
-  "ppg": 37,
-  "position": 1
-}]
-```
-
-**hops** array:
-```json
-[{
-  "hop_id": "uuid",
-  "name": "Citra",
-  "weight_lbs": 0.5,
-  "alpha_acid": 12.0,
-  "timing": "boil|whirlpool|dry_hop|first_wort",
-  "boil_time_min": 60,
-  "position": 1
-}]
-```
-
-**adjuncts** array:
-```json
-[{
-  "adjunct_id": "uuid",
-  "name": "Flaked Oats",
-  "weight_lbs": 5.0,
-  "timing": "mash|boil|fermentation",
-  "position": 1
-}]
-```
-
-**sugars** array:
-```json
-[{
-  "sugar_id": "uuid",
-  "name": "Corn Sugar",
-  "weight_lbs": 1.0,
-  "timing": "boil|fermentation|packaging",
-  "position": 1
-}]
-```
-
-**spices** array:
-```json
-[{
-  "spice_id": "uuid",
-  "name": "Coriander",
-  "amount": 2.0,
-  "unit": "oz|g|tsp|tbsp|each",
-  "timing": "boil|whirlpool|fermentation|secondary",
-  "boil_time_min": 5,
-  "position": 1
-}]
-```
-
-**fruits** array:
-```json
-[{
-  "fruit_id": "uuid",
-  "name": "Mango Puree",
-  "amount": 10.0,
-  "unit": "lbs|oz|gal|l|can",
-  "timing": "boil_end|primary|secondary|packaging",
-  "position": 1
-}]
-```
+### Schedule JSONB Schemas
 
 **mash_schedule** array:
 ```json
@@ -212,6 +127,142 @@ Brewing recipes with all parameters. Ingredients are stored as JSONB arrays.
   "position": 1
 }]
 ```
+
+---
+
+## Recipe Ingredient Junction Tables
+
+Ingredients are stored in junction tables rather than JSONB arrays. This enables:
+- Queries like "all recipes using Citra hops"
+- Database-level referential integrity
+- Proper indexing for ingredient searches
+
+### `recipe_malts`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_id | UUID | FK to recipes |
+| malt_id | UUID | FK to malts |
+| weight_lbs | DECIMAL(10,4) | Weight in pounds |
+| color_lov | DECIMAL(4,1) | Color (snapshot from catalog) |
+| ppg | INTEGER | Points per gallon (snapshot) |
+| position | INTEGER | Sort order in grain bill |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### `recipe_hops`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_id | UUID | FK to recipes |
+| hop_id | UUID | FK to hops |
+| weight_oz | DECIMAL(10,4) | Weight in ounces |
+| alpha_acid | DECIMAL(4,2) | Alpha acid % (snapshot) |
+| timing | TEXT | Timing: mash, first_wort, boil, whirlpool, dry_hop |
+| boil_time_min | INTEGER | Boil time (for boil additions) |
+| position | INTEGER | Sort order |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### `recipe_adjuncts`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_id | UUID | FK to recipes |
+| adjunct_id | UUID | FK to adjuncts |
+| weight_lbs | DECIMAL(10,4) | Weight in pounds |
+| timing | TEXT | Timing: mash, boil, fermentation |
+| position | INTEGER | Sort order |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### `recipe_sugars`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_id | UUID | FK to recipes |
+| sugar_id | UUID | FK to sugars |
+| weight_lbs | DECIMAL(10,4) | Weight in pounds |
+| timing | TEXT | Timing: boil, fermentation, packaging |
+| position | INTEGER | Sort order |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### `recipe_spices`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_id | UUID | FK to recipes |
+| spice_id | UUID | FK to spices |
+| amount | DECIMAL(10,4) | Amount |
+| unit | TEXT | Unit: oz, g, tsp, tbsp, each |
+| timing | TEXT | Timing: boil, whirlpool, fermentation, secondary |
+| boil_time_min | INTEGER | Boil time (for boil additions) |
+| position | INTEGER | Sort order |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### `recipe_fruits`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_id | UUID | FK to recipes |
+| fruit_id | UUID | FK to fruits |
+| amount | DECIMAL(10,4) | Amount |
+| unit | TEXT | Unit: lbs, oz, gal, l, can |
+| timing | TEXT | Timing: boil_end, primary, secondary, packaging |
+| position | INTEGER | Sort order |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+---
+
+## `recipes_with_estimates` (View)
+
+Calculated view that computes recipe estimates on read. Use this view instead of the base `recipes` table when estimates are needed.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| *(all recipes columns)* | | Base recipe data |
+| est_og | DECIMAL(4,3) | Estimated OG (from grain bill + efficiency) |
+| est_fg | DECIMAL(4,3) | Estimated FG (from OG + attenuation) |
+| est_abv | DECIMAL(3,1) | Estimated ABV (from OG and FG) |
+| est_ibu | INTEGER | Estimated IBU (from hop additions + timing) |
+| est_srm | INTEGER | Estimated color (from grain bill) |
+| est_cogs | DECIMAL(10,2) | Estimated COGS (sum of ingredient costs) |
+
+**Calculation formulas:**
+
+```sql
+-- OG: Points from grain / volume
+est_og = 1 + (SUM(malt.weight_lbs * malt.ppg) * efficiency / volume_gal) / 1000
+
+-- FG: OG adjusted by attenuation
+est_fg = 1 + (est_og - 1) * (1 - attenuation / 100)
+
+-- ABV: Standard formula
+est_abv = (est_og - est_fg) * 131.25
+
+-- IBU: Tinseth formula per hop addition
+est_ibu = SUM(hop.weight_oz * hop.alpha_acid * utilization / volume_gal * 74.89)
+
+-- SRM: Morey equation
+est_srm = 1.4922 * (SUM(malt.weight_lbs * malt.color_lov / volume_gal) ^ 0.6859)
+
+-- COGS: Sum of all ingredient costs
+est_cogs = SUM(ingredient costs from all junction tables)
+```
+
+**Performance notes:**
+- Simple aggregations with indexed JOINs - milliseconds for typical queries
+- Application layer (React Query) provides additional caching
+- If needed, can convert to materialized view with refresh triggers
 
 ---
 
@@ -318,11 +369,12 @@ Brewing vessels (fermenters, brite tanks, kettles, etc.).
 | capacity_bbl | DECIMAL(8,2) | Capacity in barrels |
 | location_id | UUID | FK to locations |
 | status | TEXT | Status: dirty, caustic_cleaned, ready_for_use, in_use, maintenance |
-| current_batch_id | UUID | FK to batches (if in_use) |
 | notes | TEXT | Notes |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Current batch**: Derived from `vessel_transfers` via `vessels_with_current_batch` view (see below). No stored `current_batch_id` field - single source of truth is the transfer log.
 
 ---
 
@@ -341,6 +393,47 @@ Track batch movements between vessels.
 | transferred_by | UUID | FK to auth.users |
 | notes | TEXT | Notes (explain loss if any) |
 | created_at | TIMESTAMPTZ | Created timestamp |
+
+---
+
+## `vessels_with_current_batch` (View)
+
+Derives current batch for each vessel from the transfer log. Use this view instead of base `vessels` table when you need current batch info.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| *(all vessels columns)* | | Base vessel data |
+| current_batch_id | UUID | Currently contained batch (derived) |
+| current_batch_number | TEXT | Batch number (from batches table) |
+| volume_in_vessel_bbl | DECIMAL(8,2) | Volume currently in vessel |
+
+**Derivation logic:**
+```sql
+-- Current batch = latest transfer TO this vessel with no subsequent transfer OUT
+CREATE VIEW vessels_with_current_batch AS
+SELECT
+  v.*,
+  latest.batch_id as current_batch_id,
+  b.batch_number as current_batch_number,
+  latest.volume_bbl as volume_in_vessel_bbl
+FROM vessels v
+LEFT JOIN LATERAL (
+  SELECT vt.batch_id, vt.volume_bbl
+  FROM vessel_transfers vt
+  WHERE vt.to_vessel_id = v.id
+  AND NOT EXISTS (
+    SELECT 1 FROM vessel_transfers vt2
+    WHERE vt2.from_vessel_id = v.id
+    AND vt2.batch_id = vt.batch_id
+    AND vt2.transferred_at > vt.transferred_at
+  )
+  ORDER BY vt.transferred_at DESC
+  LIMIT 1
+) latest ON true
+LEFT JOIN batches b ON b.id = latest.batch_id;
+```
+
+**Rationale**: Single source of truth (transfer log), no sync issues between stored field and actual transfers.
 
 ---
 

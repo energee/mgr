@@ -25,22 +25,48 @@ Inventory item catalog (links to catalog items for stock tracking).
 
 ## `allocations`
 
-Inventory movements for raw materials. Sum allocations to get current balance.
+Unified allocation table for all inventory movements (raw materials, finished goods, batches). Polymorphic source/destination enables single audit trail across all inventory types.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| inventory_item_id | UUID | FK to inventory_items |
-| allocation_type | TEXT | Type: receipt, batch_usage, adjustment, transfer, waste |
-| quantity | DECIMAL(10,4) | Quantity (+/-) |
+| source_type | TEXT | Source type: inventory_lot, batch, finished_good, external |
+| source_id | UUID | FK to source record (polymorphic) |
+| destination_type | TEXT | Destination: batch, finished_good, order, sample, adjustment, waste, transfer |
+| destination_id | UUID | FK to destination record (polymorphic, nullable for adjustments) |
+| quantity | DECIMAL(10,4) | Quantity allocated (always positive) |
+| volume_bbl | DECIMAL(10,4) | Volume in BBL (for TTB reporting, nullable) |
 | unit_cost | DECIMAL(10,4) | Unit cost at time of allocation |
-| reference_type | TEXT | Reference type: batch, order, adjustment |
-| reference_id | UUID | FK to referenced record |
-| lot_number | TEXT | Lot number |
-| expiration_date | DATE | Expiration date |
+| status | TEXT | Status: planned, completed, cancelled |
+| reason_code | TEXT | For adjustments/removals: breakage, sample_customer, sample_quality, contamination, expired, spillage, theft |
+| lot_number | TEXT | Lot number for traceability |
 | notes | TEXT | Notes |
-| created_at | TIMESTAMPTZ | Created timestamp |
+| completed_at | TIMESTAMPTZ | When completed |
+| cancelled_at | TIMESTAMPTZ | When cancelled |
 | created_by | UUID | FK to auth.users |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+### Source Types
+
+| source_type | source_id references | Use case |
+|-------------|---------------------|----------|
+| inventory_lot | inventory_lots.id | Raw material usage in batches |
+| batch | batches.id | Batch transfer to packaging/blending |
+| finished_good | finished_goods.id | FG sold, sampled, or removed |
+| external | NULL | External receipts (contract brewing, purchases) |
+
+### Destination Types
+
+| destination_type | destination_id references | Use case |
+|------------------|--------------------------|----------|
+| batch | batches.id | Raw materials used in production |
+| finished_good | finished_goods.id | Packaging creates FG from batch |
+| order | orders.id | FG sold to customer |
+| sample | NULL | Trade or quality samples |
+| adjustment | NULL | Inventory corrections |
+| waste | NULL | Breakage, spillage, expired |
+| transfer | location_transfers.id | Inter-location movement |
 
 ---
 
@@ -113,30 +139,6 @@ Line items for location transfers.
 
 ---
 
-## `fg_allocations`
-
-Finished goods allocations (tracks FG committed to orders, samples, etc.).
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| finished_good_id | UUID | FK to finished_goods |
-| destination_type | TEXT | Type: order, sample_trade, sample_quality, consumed, destruction, loss, adjustment |
-| destination_id | UUID | FK to destination record (order_id, etc.) |
-| quantity | INTEGER | Quantity allocated |
-| volume_bbl | DECIMAL(10,4) | Volume in BBL (for TTB reporting) |
-| status | TEXT | Status: planned, completed, cancelled |
-| lot_number | TEXT | Lot number |
-| removal_reason | TEXT | For TTB: contamination, failed_qc, expired, breakage, spillage, theft |
-| notes | TEXT | Notes |
-| completed_at | TIMESTAMPTZ | When completed |
-| cancelled_at | TIMESTAMPTZ | When cancelled |
-| created_by | UUID | FK to auth.users |
-| created_at | TIMESTAMPTZ | Created timestamp |
-| updated_at | TIMESTAMPTZ | Updated timestamp |
-
----
-
 ## State Machine: Location Transfer
 
 ```
@@ -155,14 +157,40 @@ cancelled   cancelled
 
 ## Calculated Quantities
 
-**Available FG:**
-```
-Available = Total Quantity - SUM(planned + completed allocations)
+All quantities are calculated from the unified `allocations` table. No mutable balances are stored.
+
+**Raw Material Available:**
+```sql
+SELECT i.id, i.name,
+  COALESCE(SUM(CASE WHEN a.destination_type = 'batch' THEN 0 ELSE a.quantity END), 0) as received,
+  COALESCE(SUM(CASE WHEN a.destination_type = 'batch' AND a.status IN ('planned', 'completed') THEN a.quantity ELSE 0 END), 0) as used
+FROM inventory_items i
+LEFT JOIN inventory_lots l ON l.inventory_item_id = i.id
+LEFT JOIN allocations a ON a.source_type = 'inventory_lot' AND a.source_id = l.id
+GROUP BY i.id, i.name;
+-- Available = received - used
 ```
 
-**Bin Available:**
+**Finished Goods Available:**
+```sql
+SELECT fg.id, fg.lot_number,
+  fg.quantity as total,
+  COALESCE(SUM(CASE WHEN a.status IN ('planned', 'completed') THEN a.quantity ELSE 0 END), 0) as allocated
+FROM finished_goods fg
+LEFT JOIN allocations a ON a.source_type = 'finished_good' AND a.source_id = fg.id
+GROUP BY fg.id, fg.lot_number, fg.quantity;
+-- Available = total - allocated
 ```
-Bin Available = Bin Quantity - SUM(planned + completed allocations for that FG in that bin)
+
+**Batch Volume Remaining:**
+```sql
+SELECT b.id, b.batch_number,
+  b.actual_volume_bbl as total,
+  COALESCE(SUM(CASE WHEN a.status = 'completed' THEN a.volume_bbl ELSE 0 END), 0) as packaged
+FROM batches b
+LEFT JOIN allocations a ON a.source_type = 'batch' AND a.source_id = b.id
+GROUP BY b.id, b.batch_number, b.actual_volume_bbl;
+-- Remaining = total - packaged
 ```
 
 ---

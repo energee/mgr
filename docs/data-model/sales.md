@@ -57,7 +57,7 @@ Order line items.
 | unit_price | DECIMAL(10,2) | Unit price |
 | price_override | DECIMAL(10,2) | Manual price override |
 | line_total | DECIMAL(10,2) | Line total |
-| allocation_id | UUID | FK to fg_allocations |
+| allocation_id | UUID | FK to allocations (where source_type='finished_good') |
 | allocation_warning | TEXT | Warning: unallocated, over_committed |
 | bin_assignments | JSONB | Bin assignments at picking |
 | notes | TEXT | Notes |
@@ -122,7 +122,7 @@ Map price tiers to sales channels (many-to-many).
 
 ## `tier_prices`
 
-Prices by tier, product, and package type.
+Prices by tier, product, and package type. Supports temporal pricing with valid date ranges.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -132,12 +132,29 @@ Prices by tier, product, and package type.
 | brand_id | UUID | FK to brands (overrides style) |
 | package_type_id | UUID | FK to package_types |
 | price | DECIMAL(10,2) | Price |
+| valid_from | DATE | Price effective from (defaults to creation date) |
+| valid_to | DATE | Price effective until (NULL = current/no end) |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**Price resolution:** Brand-specific price takes precedence over style price.
-
 **Constraint:** Either style_id or brand_id must be set.
+
+**Price resolution order** (for a given order date):
+1. Brand + Package Type + Tier (most specific, where date in valid range)
+2. Style + Package Type + Tier (fallback, where date in valid range)
+3. Flag for manual entry (no match found)
+
+**Temporal query:**
+```sql
+SELECT * FROM tier_prices
+WHERE tier_id = :tier
+  AND package_type_id = :package
+  AND (brand_id = :brand OR (brand_id IS NULL AND style_id = :style))
+  AND valid_from <= :order_date
+  AND (valid_to IS NULL OR valid_to >= :order_date)
+ORDER BY brand_id NULLS LAST  -- prefer brand over style
+LIMIT 1;
+```
 
 ---
 
