@@ -45,7 +45,10 @@ jobs:
           done
 
       - name: Run Database Migrations
-        run: supabase db reset --no-seed
+        run: |
+          # Use db push instead of db reset to avoid pulling additional service images
+          # db push applies migrations to the running database without reinitializing
+          supabase db push --local
 
       - name: Run Database Linter
         id: lint
