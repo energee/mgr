@@ -990,6 +990,232 @@ These are examples of questions AI can answer:
 
 ---
 
+## 2D. Performance & Optimization
+
+### PERFORMANCE & OPTIMIZATION DECISIONS
+
+#### DEC-PERF-001: Allocation Indexes
+**Status**: Pending implementation
+**Decision**: Add comprehensive indexes for allocation hot paths.
+
+```sql
+-- Allocation approval workflow (high priority)
+CREATE INDEX idx_allocations_status_date
+  ON allocations(status, created_at DESC);
+
+-- Source/destination lookups with status (common query pattern)
+CREATE INDEX idx_allocations_src_dest_status
+  ON allocations(source_type, destination_type, status);
+
+-- TTB reporting (monthly aggregations)
+CREATE INDEX idx_allocations_dest_created
+  ON allocations(destination_type, created_at);
+
+-- FG order fulfillment (hot path - very frequent)
+CREATE INDEX idx_allocations_fg_order
+  ON allocations(source_id, destination_type)
+  WHERE source_type = 'finished_good' AND destination_type = 'order';
+
+-- Inventory lot availability (frequent)
+CREATE INDEX idx_allocations_inventory_lot
+  ON allocations(source_id, status)
+  WHERE source_type = 'inventory_lot';
+
+-- Bin inventory lookups
+CREATE INDEX idx_bin_inventory_bin_fg_qty
+  ON bin_inventory(bin_id, finished_good_id)
+  WHERE quantity > 0;
+
+-- Vessel transfer performance (for vessels_with_current_batch view)
+CREATE INDEX idx_vessel_transfers_to_vessel
+  ON vessel_transfers(to_vessel_id, transferred_at DESC);
+CREATE INDEX idx_vessel_transfers_from_batch
+  ON vessel_transfers(from_vessel_id, batch_id, transferred_at);
+```
+
+**Impact**: 10-50x faster queries on hot paths.
+
+#### DEC-PERF-002: Calculated Field Views
+**Status**: Pending implementation
+**Decision**: Create views for fields removed per DEC-HP-005.
+
+```sql
+-- Inventory lots with calculated remaining quantity
+CREATE VIEW inventory_lots_with_quantities AS
+SELECT
+  il.*,
+  il.quantity as received_quantity,
+  COALESCE(SUM(CASE WHEN a.status IN ('planned', 'completed')
+    THEN a.quantity ELSE 0 END), 0) as allocated_quantity,
+  il.quantity - COALESCE(SUM(CASE WHEN a.status IN ('planned', 'completed')
+    THEN a.quantity ELSE 0 END), 0) as remaining_quantity
+FROM inventory_lots il
+LEFT JOIN allocations a
+  ON a.source_type = 'inventory_lot' AND a.source_id = il.id
+GROUP BY il.id;
+
+-- PO line items with calculated received quantity
+CREATE VIEW po_line_items_with_quantities AS
+SELECT
+  pli.*,
+  pli.quantity as ordered_quantity,
+  COALESCE(SUM(por.quantity), 0) as received_quantity,
+  pli.quantity - COALESCE(SUM(por.quantity), 0) as outstanding_quantity
+FROM po_line_items pli
+LEFT JOIN po_receives por ON por.po_line_item_id = pli.id
+GROUP BY pli.id;
+
+-- Finished goods with available quantity
+CREATE VIEW finished_goods_with_availability AS
+SELECT
+  fg.*,
+  fg.quantity as total_quantity,
+  COALESCE(SUM(CASE WHEN a.status = 'completed'
+    THEN a.quantity ELSE 0 END), 0) as allocated_quantity,
+  COALESCE(SUM(CASE WHEN a.status = 'planned'
+    THEN a.quantity ELSE 0 END), 0) as planned_quantity,
+  fg.quantity - COALESCE(SUM(CASE WHEN a.status IN ('planned', 'completed')
+    THEN a.quantity ELSE 0 END), 0) as available_quantity
+FROM finished_goods fg
+LEFT JOIN allocations a
+  ON a.source_type = 'finished_good' AND a.source_id = fg.id
+GROUP BY fg.id;
+```
+
+**Rationale**: Application queries use views; underlying tables don't store calculated values.
+
+#### DEC-PERF-003: Materialized Views for Scale
+**Status**: Conditional (implement when thresholds exceeded)
+**Decision**: Materialize expensive views when data volumes grow.
+
+**Thresholds:**
+| View | Materialize When | Refresh Strategy |
+|------|-----------------|------------------|
+| `recipes_with_estimates` | >500 recipes | On recipe/ingredient change |
+| `vessels_with_current_batch` | >100 vessels | On vessel_transfers change |
+| `ttb_monthly_summaries` | Always | Monthly or on-demand |
+
+```sql
+-- TTB monthly summary (always materialize for reporting)
+CREATE TABLE ttb_monthly_summaries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_month DATE NOT NULL UNIQUE,
+  line_2_production DECIMAL(12,4),
+  line_5_adj_plus DECIMAL(12,4),
+  line_10_domestic DECIMAL(12,4),
+  line_11_export DECIMAL(12,4),
+  line_12_samples DECIMAL(12,4),
+  line_13_destroyed DECIMAL(12,4),
+  line_14_losses DECIMAL(12,4),
+  line_15_adj_minus DECIMAL(12,4),
+  line_19_offsite DECIMAL(12,4),
+  beginning_inventory DECIMAL(12,4),
+  ending_inventory DECIMAL(12,4),
+  calculated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### DEC-PERF-004: Additional CHECK Constraints
+**Status**: Pending implementation
+**Decision**: Add database-level integrity constraints.
+
+```sql
+-- Allocation quantity must be positive
+ALTER TABLE allocations ADD CONSTRAINT chk_allocation_quantity_positive
+  CHECK (quantity > 0);
+
+-- Allocation status must be valid
+ALTER TABLE allocations ADD CONSTRAINT chk_allocation_status_valid
+  CHECK (status IN ('planned', 'pending_approval', 'completed', 'rejected', 'cancelled'));
+
+-- Volume must be non-negative
+ALTER TABLE allocations ADD CONSTRAINT chk_allocation_volume_nonnegative
+  CHECK (volume_bbl IS NULL OR volume_bbl >= 0);
+
+-- Approval fields consistency
+ALTER TABLE allocations ADD CONSTRAINT chk_allocation_approval_consistency
+  CHECK (
+    (status != 'completed' OR requires_approval = false OR approved_by IS NOT NULL)
+  );
+
+-- External FG must have documentation
+ALTER TABLE finished_goods ADD CONSTRAINT chk_external_fg_documented
+  CHECK (
+    (batch_id IS NOT NULL) OR (notes IS NOT NULL AND LENGTH(TRIM(notes)) > 5)
+  );
+
+-- Batch readings temperature range
+ALTER TABLE batch_readings ADD CONSTRAINT chk_reading_temp_range
+  CHECK (temp_f IS NULL OR temp_f BETWEEN 32 AND 220);
+
+-- Gravity range
+ALTER TABLE batch_readings ADD CONSTRAINT chk_reading_gravity_range
+  CHECK (gravity IS NULL OR gravity BETWEEN 0.990 AND 1.200);
+```
+
+#### DEC-PERF-005: Orphan Record Cleanup
+**Status**: Pending implementation
+**Decision**: Implement automatic cleanup of stale records.
+
+**Rules:**
+| Record Type | Stale After | Action |
+|-------------|------------|--------|
+| Pending approvals | 72 hours | Auto-reject with reason "expired" |
+| Draft orders | 30 days | Notify, then cancel after 7 more days |
+| Planned allocations (unlinked) | 7 days | Auto-cancel |
+| Draft POs | 30 days | Notify, then cancel |
+
+```sql
+-- Scheduled job: Reject expired pending approvals
+UPDATE allocations
+SET
+  status = 'rejected',
+  rejection_reason = 'Auto-rejected: approval timeout exceeded',
+  updated_at = NOW()
+WHERE status = 'pending_approval'
+  AND created_at < NOW() - INTERVAL '72 hours';
+```
+
+---
+
+### SCALABILITY GUIDELINES
+
+#### Scale Thresholds
+
+| Entity | Comfortable Limit | Action at Threshold |
+|--------|------------------|---------------------|
+| allocations | 5M rows | Partition by year |
+| finished_goods | 500K rows | Archive old records |
+| batches | 50K rows | No action needed |
+| orders | 200K rows | Archive after 2 years |
+| inventory_lots | 100K rows | Annual cleanup of depleted lots |
+| vessel_transfers | 100K rows | Consider materialized view |
+
+#### Partitioning Strategy (Future)
+
+When allocations exceed 5M rows:
+
+```sql
+-- Convert to partitioned table
+CREATE TABLE allocations_partitioned (
+  LIKE allocations INCLUDING ALL
+) PARTITION BY RANGE (created_at);
+
+CREATE TABLE allocations_2024 PARTITION OF allocations_partitioned
+  FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+
+CREATE TABLE allocations_2025 PARTITION OF allocations_partitioned
+  FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
+
+-- Benefits:
+-- 1. Faster queries filtered by date range
+-- 2. Easy archival: DROP TABLE allocations_2023
+-- 3. Parallel query execution
+```
+
+---
+
 ## 3. Authentication & Authorization
 
 ### 3.1 Authentication

@@ -338,6 +338,63 @@ All tables include these standard columns:
 - `updated_at` - Last update timestamp (where applicable)
 - `is_active` - Soft delete flag (where applicable)
 
+## Scalability Considerations
+
+The schema is designed for single-tenant brewery operations with straightforward scaling paths.
+
+### Typical Scale
+
+| Metric | Expected Range | Notes |
+|--------|----------------|-------|
+| Batches/year | 100-500 | ~1-2 per day |
+| Active vessels | 10-50 | Fermenters, brites, unitanks |
+| Inventory lots | 500-2000 | Rotates with FIFO usage |
+| Orders/year | 1000-5000 | Distribution + taproom |
+| Allocations | 10K-50K/year | Primary growth table |
+
+### Indexing Strategy
+
+Hot-path queries have dedicated indexes. See `docs/MGR-SPECIFICATION.md` section 2B for complete index definitions.
+
+**Critical indexes:**
+- `allocations(status, created_at)` - Dashboard queries
+- `allocations(source_id, destination_type)` - Availability calculations
+- `vessel_transfers(to_vessel_id, transferred_at)` - Current batch derivation
+- `finished_goods(brand_id, package_type_id)` - Inventory lookups
+
+### When to Consider Partitioning
+
+At ~100K+ allocations (typically 3-5 years of operation):
+
+1. **Allocations table**: Partition by year
+   ```sql
+   CREATE TABLE allocations (...) PARTITION BY RANGE (created_at);
+   ```
+
+2. **Entity revisions**: Partition by entity_type
+   ```sql
+   CREATE TABLE entity_revisions (...) PARTITION BY LIST (entity_type);
+   ```
+
+### Calculated Fields via Views
+
+All quantity calculations use views rather than stored mutable fields:
+- `finished_goods_with_availability` - Available FG quantity
+- `inventory_lots_with_quantities` - Remaining lot quantity
+- `po_line_items_with_quantities` - Outstanding PO quantity
+- `vessels_with_current_batch` - Current batch in each vessel
+
+**Performance notes:**
+- Views use indexed JOINs - typical query time <10ms
+- Application layer (React Query) provides caching
+- Can convert to materialized views with refresh triggers if needed
+
+### Multi-Tenant Future
+
+The schema supports future multi-tenant via `brewery_id` addition to all tables with RLS policies. See `docs/data-model/system.md` for the planned tenant model.
+
+---
+
 ## Schema Maintenance
 
 Migrations are maintained manually in `supabase/migrations/`. The markdown documentation in this directory serves as the authoritative schema reference for understanding table structures, relationships, and design rationale.
