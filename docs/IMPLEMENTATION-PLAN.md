@@ -849,20 +849,20 @@ This document tracks the implementation progress of MGR features based on the sp
 ## Phase 11: Unit System & Preferences
 
 **Goal:** Implement user-configurable unit display and conversion.
-**Status:** Not Started
+**Status:** Partial (conversion library and UnitInput component complete)
 **Depends On:** Phase 8.1 (System Settings)
 
 ### 11.1 Conversion Library
 
 > Pure functions for unit conversion.
 
-- [ ] Create `src/lib/units.ts`
-  - [ ] Volume: BBL ↔ gal ↔ L ↔ hL
-  - [ ] Weight: lbs ↔ kg
-  - [ ] Temperature: °F ↔ °C
-  - [ ] Gravity: Plato ↔ SG
-  - [ ] Retail volume: oz ↔ mL
-- [ ] Never round during conversion (round at display only)
+- [x] Create `src/lib/units.ts`
+  - [x] Volume: BBL ↔ gal ↔ L ↔ hL
+  - [x] Weight: lbs ↔ kg
+  - [x] Temperature: °F ↔ °C
+  - [x] Gravity: Plato ↔ SG
+  - [x] Retail volume: oz ↔ mL
+- [x] Never round during conversion (round at display only)
 
 ### 11.2 User Preferences
 
@@ -985,7 +985,7 @@ This document tracks the implementation progress of MGR features based on the sp
 ## Phase 13: AI Integration Implementation
 
 **Goal:** Implement AI-first features including database functions, TypeScript utilities, and schema context.
-**Status:** Not Started
+**Status:** Partial (database functions and TypeScript utilities implemented)
 **Depends On:** Phase 1 (Schema)
 
 ### 13.1 Schema Registry Population
@@ -1003,51 +1003,53 @@ This document tracks the implementation progress of MGR features based on the sp
 ### 13.2 Database Functions for AI
 
 > PostgreSQL functions that AI agents can call for analysis.
+> Note: All functions implemented in migration 00008_ai_integration.sql
 
-- [ ] Create `analyze_recipe_style_compliance(recipe_id UUID)`
-  - [ ] Compare recipe estimates to BJCP style guidelines
-  - [ ] Return compliance status for OG, FG, ABV, IBU, SRM
-  - [ ] Include suggestions for adjustments
-- [ ] Create `get_recipe_summary(recipe_id UUID)`
-  - [ ] Return comprehensive recipe data in structured JSON
-  - [ ] Include all ingredients, schedules, estimates
-  - [ ] Include style information
-- [ ] Create `suggest_recipe_improvements(recipe_id UUID)`
-  - [ ] Analyze grain bill balance
-  - [ ] Check hop schedule timing
-  - [ ] Verify water chemistry for style
-  - [ ] Return prioritized suggestions
-- [ ] Create `analyze_batch_performance(batch_id UUID)`
-  - [ ] Compare actual vs target metrics
-  - [ ] Calculate efficiency variance
-  - [ ] Identify potential issues
-- [ ] Create `get_inventory_overview()`
-  - [ ] Current FG by brand/format
-  - [ ] Low stock alerts
-  - [ ] Expiring soon alerts
-- [ ] Create `get_ai_schema_context(domain TEXT)`
-  - [ ] Return schema info for specified domain
-  - [ ] Include relationships and examples
+- [x] Create `analyze_recipe_style_compliance(recipe_id UUID)`
+  - [x] Compare recipe estimates to BJCP style guidelines
+  - [x] Return compliance status for OG, FG, ABV, IBU, SRM
+  - [x] Include suggestions for adjustments
+- [x] Create `get_recipe_summary(recipe_id UUID)`
+  - [x] Return comprehensive recipe data in structured JSON
+  - [x] Include all ingredients, schedules, estimates
+  - [x] Include style information
+- [x] Create `suggest_recipe_improvements(recipe_id UUID)`
+  - [x] Analyze grain bill balance
+  - [x] Check hop schedule timing
+  - [x] Verify water chemistry for style
+  - [x] Return prioritized suggestions
+- [x] Create `analyze_batch_performance(batch_id UUID)`
+  - [x] Compare actual vs target metrics
+  - [x] Calculate efficiency variance
+  - [x] Identify potential issues
+- [x] Create `get_inventory_overview()`
+  - [x] Current FG by brand/format
+  - [x] Low stock alerts
+  - [x] Expiring soon alerts
+- [x] Create `get_ai_schema_context(domain TEXT)`
+  - [x] Return schema info for specified domain
+  - [x] Include relationships and examples
 
 ### 13.3 TypeScript AI Utilities
 
 > Client-side utilities in `src/lib/ai/` for AI-assisted features.
+> Note: Core utilities implemented in `src/lib/ai/`
 
-- [ ] Create `src/lib/ai/index.ts` (barrel export)
-- [ ] Create `src/lib/ai/recipe-analysis.ts`
-  - [ ] `analyzeStyleCompliance(recipeId)` - call DB function
-  - [ ] `getRecipeSummary(recipeId)` - call DB function
-  - [ ] `getRecipeSuggestions(recipeId)` - call DB function
-- [ ] Create `src/lib/ai/calculations.ts`
-  - [ ] `BrewingCalculations` class with OG, FG, ABV, IBU, SRM formulas
-  - [ ] `WaterChemistry` class with ion calculations
-  - [ ] `FermentationAnalysis` class with timeline predictions
-- [ ] Create `src/lib/ai/schema-context.ts`
-  - [ ] `getSchemaContext(domain)` - fetch from registry
-  - [ ] `getDomainSummary()` - high-level overview
-  - [ ] `getValidTransitions(entity, currentState)` - state machine helper
-- [ ] Create `src/lib/ai/query-helpers.ts`
-  - [ ] `AIQueryHelpers` class with common query patterns
+- [x] Create `src/lib/ai/index.ts` (barrel export)
+- [x] Create `src/lib/ai/recipe-analysis.ts` (named recipe-analyzer.ts)
+  - [x] `analyzeStyleCompliance(recipeId)` - call DB function
+  - [x] `getRecipeSummary(recipeId)` - call DB function
+  - [x] `getRecipeSuggestions(recipeId)` - call DB function
+- [x] Create `src/lib/ai/calculations.ts` (in recipe-analyzer.ts)
+  - [x] `BrewingCalculations` class with OG, FG, ABV, IBU, SRM formulas
+  - [x] `WaterChemistry` class with ion calculations
+  - [x] `FermentationAnalysis` class with timeline predictions
+- [x] Create `src/lib/ai/schema-context.ts`
+  - [x] `getSchemaContext(domain)` - fetch from registry
+  - [x] `getDomainSummary()` - high-level overview
+  - [x] `getValidTransitions(entity, currentState)` - state machine helper
+- [x] Create `src/lib/ai/query-helpers.ts`
+  - [x] `AIQueryHelpers` class with common query patterns
   - [ ] Natural language to SQL hints
   - [ ] Query template library
 
@@ -1338,6 +1340,9 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 
 | Date | Change |
 |------|--------|
+| 2026-01-11 | Fixed recipe entity: enabled viewTable for recipes_with_estimates, added dynamicOptions for brand/style/yeast/water_profile selects |
+| 2026-01-11 | Updated Phase 11 and 13 status to Partial based on existing code (units.ts, src/lib/ai/) |
+| 2026-01-11 | Created expanded implementation plan docs in feature/implementation-plan branch |
 | 2026-01-11 | Added Phase 2.2.1-2.2.2: Batch readings UI (mobile-first), batch additions UI with variance tracking |
 | 2026-01-11 | Added Phase 12 (API Routes): Full REST API with auth, validation, error handling for all entities |
 | 2026-01-11 | Added Phase 13 (AI Implementation): Schema registry, database functions, TypeScript utilities, AI components |
