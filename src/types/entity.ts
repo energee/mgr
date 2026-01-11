@@ -32,6 +32,9 @@ export interface EntityConfig<T = Record<string, unknown>> {
   /** Database table name (e.g., 'batches', 'recipes') */
   table: string;
 
+  /** Optional view name for list display (when extra columns from joins are needed) */
+  viewTable?: string;
+
   /** Human-readable display name (e.g., 'Batch', 'Recipe') */
   displayName: string;
 
@@ -262,6 +265,15 @@ export interface EntityFieldDef<T> {
 
   /** Function to fetch options dynamically */
   fetchOptions?: () => Promise<{ value: string; label: string }[]>;
+
+  /** Dynamic options from database table */
+  dynamicOptions?: {
+    table: string;
+    valueField: string;
+    labelField: string;
+    filter?: Record<string, unknown>;
+    orderBy?: string;
+  };
 
   /** Related entity (for relation type) - deprecated, use relation instead */
   relationEntity?: string;

@@ -5,12 +5,13 @@
  *
  * Renders a create/edit form for any entity based on its configuration.
  * Handles: validation via Zod, field rendering, submit, conditional fields.
+ * Supports dynamicOptions for select fields that fetch from database tables.
  */
 
 import { useState, useMemo, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import type { EntityConfig, EntityFieldDef } from "@/types/entity";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,68 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
+
+// Hook to fetch dynamic options for fields
+function useDynamicOptions<T>(fields: EntityFieldDef<T>[]) {
+  const supabase = createClient();
+
+  // Get all fields that have dynamicOptions
+  const dynamicFields = fields.filter((f) => f.dynamicOptions);
+
+  // Create queries for each dynamic field
+  const queries = useQueries({
+    queries: dynamicFields.map((field) => ({
+      queryKey: ["dynamic-options", field.dynamicOptions!.table, field.name],
+      queryFn: async () => {
+        const { table, valueField, labelField, filter, orderBy } = field.dynamicOptions!;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let query = supabase.from(table as any).select(`${valueField}, ${labelField}`);
+
+        // Apply filters
+        if (filter) {
+          Object.entries(filter).forEach(([key, val]) => {
+            query = query.eq(key, val);
+          });
+        }
+
+        // Apply ordering
+        if (orderBy) {
+          query = query.order(orderBy);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const rows = data as unknown as Record<string, unknown>[] | null;
+        return {
+          fieldName: field.name,
+          options: (rows || []).map((row) => ({
+            value: String(row[valueField]),
+            label: String(row[labelField]),
+          })),
+        };
+      },
+      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    })),
+  });
+
+  // Combine results into a map of fieldName -> options
+  const optionsMap = useMemo(() => {
+    const map: Record<string, { value: string; label: string }[]> = {};
+    queries.forEach((query) => {
+      if (query.data) {
+        map[query.data.fieldName as string] = query.data.options;
+      }
+    });
+    return map;
+  }, [queries]);
+
+  return {
+    optionsMap,
+    isLoading: queries.some((q) => q.isLoading),
+  };
+}
 
 interface EntityFormProps<T = Record<string, unknown>> {
   /** Entity configuration */
@@ -98,6 +161,9 @@ export function EntityForm<T = Record<string, unknown>>({
       setValues((prev) => ({ ...prev, ...existingData }));
     }
   }, [existingData, isEdit]);
+
+  // Fetch dynamic options for select fields
+  const { optionsMap: dynamicOptionsMap } = useDynamicOptions(entity.formFields);
 
   // Get visible fields based on mode
   const visibleFields = useMemo(() => {
@@ -218,6 +284,7 @@ export function EntityForm<T = Record<string, unknown>>({
                   error={errors[field.name]}
                   onChange={(value) => handleChange(field.name, value)}
                   disabled={isSubmitting || field.disabled}
+                  dynamicOptions={dynamicOptionsMap[field.name]}
                 />
               ))}
             </div>
@@ -248,12 +315,14 @@ function FormField<T>({
   error,
   onChange,
   disabled,
+  dynamicOptions,
 }: {
   field: EntityFieldDef<T>;
   value: unknown;
   error?: string;
   onChange: (value: unknown) => void;
   disabled?: boolean;
+  dynamicOptions?: { value: string; label: string }[];
 }) {
   const colSpan = field.colSpan || 6;
 
@@ -265,7 +334,7 @@ function FormField<T>({
       </Label>
 
       <div className="mt-1.5">
-        {renderFieldInput(field, value, onChange, disabled)}
+        {renderFieldInput(field, value, onChange, disabled, dynamicOptions)}
       </div>
 
       {field.description && (
@@ -282,7 +351,8 @@ function renderFieldInput<T>(
   field: EntityFieldDef<T>,
   value: unknown,
   onChange: (value: unknown) => void,
-  disabled?: boolean
+  disabled?: boolean,
+  dynamicOptions?: { value: string; label: string }[]
 ) {
   switch (field.type) {
     case "text":
@@ -320,7 +390,9 @@ function renderFieldInput<T>(
         />
       );
 
-    case "select":
+    case "select": {
+      // Use dynamic options if available, otherwise fall back to static options
+      const options = dynamicOptions || field.options || [];
       return (
         <Select
           value={(value as string) || ""}
@@ -331,7 +403,7 @@ function renderFieldInput<T>(
             <SelectValue placeholder={field.placeholder || "Select..."} />
           </SelectTrigger>
           <SelectContent>
-            {field.options?.map((option) => (
+            {options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
@@ -339,6 +411,7 @@ function renderFieldInput<T>(
           </SelectContent>
         </Select>
       );
+    }
 
     case "switch":
     case "checkbox":
