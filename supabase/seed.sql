@@ -16,7 +16,7 @@ WHERE id = '00000000-0000-0000-0000-000000000001';
 -- Recipes
 -- =============================================================================
 
-INSERT INTO recipes (id, name, style, description, target_og, target_fg, target_abv, target_ibu, target_srm, batch_size_gallons, boil_time_minutes)
+INSERT INTO recipes (id, name, style, description, target_og, target_fg, target_abv, target_ibu, target_srm, batch_size_gallons, boil_time_min)
 VALUES
   ('00000000-0000-0000-0001-000000000001',
    'Hazy Days IPA', 'New England IPA', 'Juicy, hazy IPA with tropical hop character',
@@ -474,7 +474,7 @@ ON CONFLICT DO NOTHING;
 -- CATALOG DATA: Water Profiles
 -- =============================================================================
 
-INSERT INTO water_profiles (name, calcium, magnesium, sodium, sulfate, chloride, bicarbonate, description)
+INSERT INTO water_profiles (name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, description)
 VALUES
   ('RO/Distilled', 0, 0, 0, 0, 0, 0, 'Blank slate. Build up from scratch.'),
   ('Burton-on-Trent', 275, 40, 25, 610, 36, 260, 'High sulfate English water. Classic for IPAs.'),
