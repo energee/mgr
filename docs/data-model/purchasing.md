@@ -185,3 +185,29 @@ cancelled  cancelled   cancelled   cancelled
 | confirmed -> partial | Some items received |
 | partial -> fulfilled | All items received |
 | confirmed -> fulfilled | All received at once |
+
+---
+
+## Indexes
+
+Performance indexes for purchasing domain tables:
+
+```sql
+-- Purchase order queries
+CREATE INDEX idx_purchase_orders_supplier_status ON purchase_orders(supplier_id, status);
+CREATE INDEX idx_purchase_orders_status_date ON purchase_orders(status, order_date DESC);
+CREATE INDEX idx_purchase_orders_po_number ON purchase_orders(po_number);
+
+-- PO line items (for receiving and COGS)
+CREATE INDEX idx_po_line_items_po ON po_line_items(purchase_order_id);
+CREATE INDEX idx_po_line_items_catalog ON po_line_items(catalog_type, catalog_id);
+
+-- Supplier catalog lookups
+CREATE INDEX idx_supplier_catalog_supplier ON supplier_catalog(supplier_id, is_active);
+CREATE INDEX idx_supplier_catalog_catalog ON supplier_catalog(catalog_type, catalog_id, is_active);
+CREATE INDEX idx_supplier_catalog_sku ON supplier_catalog(supplier_sku);
+
+-- Supplier queries
+CREATE INDEX idx_suppliers_active ON suppliers(is_active);
+CREATE INDEX idx_suppliers_name ON suppliers(name) WHERE is_active = true;
+```

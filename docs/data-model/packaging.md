@@ -59,8 +59,8 @@ Packaged beer records (simple tracking, see `finished_goods` for full inventory)
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| batch_id | UUID | FK to batches |
-| package_type_id | UUID | FK to package_types |
+| batch_id | UUID | FK to [batches](./production.md#batches) |
+| package_type_id | UUID | FK to [package_types](#package_types) |
 | quantity | INTEGER | Number of units |
 | packaged_date | DATE | Packaging date |
 | best_by_date | DATE | Best by date |
@@ -95,9 +95,9 @@ Line items within a packaging session.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| session_id | UUID | FK to packaging_sessions |
-| brand_id | UUID | FK to brands |
-| package_type_id | UUID | FK to package_types |
+| session_id | UUID | FK to [packaging_sessions](#packaging_sessions) |
+| brand_id | UUID | FK to [brands](./production.md#brands) |
+| package_type_id | UUID | FK to [package_types](#package_types) |
 | source_batches | JSONB | Source batch allocations |
 | planned_quantity | INTEGER | Planned quantity |
 | actual_quantity | INTEGER | Actual quantity |
@@ -198,6 +198,39 @@ if (result.count === 0) {
 
 ---
 
+## Packaging to Inventory Flow
+
+When a packaging session is completed, the system creates:
+
+1. **Finished Goods Record(s)** - One `finished_goods` record per line item
+2. **Allocations** - Batch-to-FG allocations tracking the inventory movement
+
+**Allocation pattern:**
+```sql
+-- When packaging session completes:
+INSERT INTO allocations (
+  source_type, source_id,        -- 'batch', batch.id
+  destination_type, destination_id, -- 'finished_good', fg.id
+  quantity, volume_bbl,
+  status                          -- 'completed'
+) VALUES (
+  'batch', session_line.source_batches[0].batch_id,
+  'finished_good', new_fg.id,
+  session_line.actual_quantity,
+  calculated_volume_bbl,
+  'completed'
+);
+```
+
+This creates an audit trail of batch → FG movement and enables:
+- Volume reconciliation (wort volume vs. packaged volume = packaging loss)
+- COGS calculation (batch cost spread across FG units)
+- TTB reporting (Line 2: production removals)
+
+See [inventory.md](./inventory.md#allocations) for complete allocation documentation.
+
+---
+
 ## State Machine: Packaging Session
 
 ```
@@ -210,6 +243,96 @@ cancelled   cancelled    (adjust only if no downstream orders packed)
 | Transition | Trigger |
 |------------|---------|
 | planned -> in_progress | Start packaging |
-| in_progress -> completed | Finish, create finished goods |
+| in_progress -> completed | Finish, create finished goods + allocations |
 | completed -> revised | Adjust quantities |
 | completed -> (rollback) | Only if no downstream orders packed |
+
+---
+
+## Example Queries
+
+### Packaging Loss Calculation
+
+Calculate packaging loss (wort volume vs. packaged volume):
+
+```sql
+SELECT
+  ps.id as session_id,
+  ps.session_date,
+  sli.brand_id,
+  b.brand_name,
+  -- Input: total batch volume allocated
+  SUM(
+    (SELECT a.volume_bbl
+     FROM allocations a
+     WHERE a.source_type = 'batch'
+       AND a.destination_type = 'finished_good'
+       AND a.destination_id IN (
+         SELECT id FROM finished_goods WHERE session_line_item_id = sli.id
+       ))
+  ) as input_volume_bbl,
+  -- Output: packaged volume
+  SUM(sli.actual_quantity * pt.volume_oz / 128.0 / 31.0) as packaged_volume_bbl,
+  -- Loss
+  SUM(
+    (SELECT a.volume_bbl FROM allocations a
+     WHERE a.source_type = 'batch'
+       AND a.destination_type = 'finished_good'
+       AND a.destination_id IN (SELECT id FROM finished_goods WHERE session_line_item_id = sli.id))
+  ) - SUM(sli.actual_quantity * pt.volume_oz / 128.0 / 31.0) as loss_bbl
+FROM packaging_sessions ps
+JOIN session_line_items sli ON sli.session_id = ps.id
+JOIN brands b ON sli.brand_id = b.id
+JOIN package_types pt ON sli.package_type_id = pt.id
+WHERE ps.status = 'completed'
+GROUP BY ps.id, ps.session_date, sli.brand_id, b.brand_name
+ORDER BY ps.session_date DESC;
+```
+
+### Recent Packaging Sessions with FG Output
+
+```sql
+SELECT
+  ps.session_date,
+  ps.status,
+  b.name as brand,
+  pt.name as package,
+  sli.planned_quantity,
+  sli.actual_quantity,
+  sli.actual_quantity - sli.planned_quantity as variance,
+  fg.lot_number,
+  fg.best_by_date
+FROM packaging_sessions ps
+JOIN session_line_items sli ON sli.session_id = ps.id
+JOIN brands b ON sli.brand_id = b.id
+JOIN package_types pt ON sli.package_type_id = pt.id
+LEFT JOIN finished_goods fg ON fg.session_line_item_id = sli.id
+WHERE ps.session_date >= CURRENT_DATE - INTERVAL '30 days'
+ORDER BY ps.session_date DESC, b.name;
+```
+
+### Session Completion Checklist
+
+Before completing a packaging session, verify all line items are ready:
+
+```sql
+SELECT
+  sli.id,
+  b.name as brand,
+  pt.name as package,
+  sli.planned_quantity,
+  sli.actual_quantity,
+  CASE
+    WHEN sli.actual_quantity IS NULL THEN 'Missing actual quantity'
+    WHEN sli.actual_quantity <= 0 THEN 'Invalid quantity'
+    WHEN jsonb_array_length(sli.source_batches) = 0 THEN 'No source batches'
+    ELSE 'OK'
+  END as validation_status
+FROM session_line_items sli
+JOIN brands b ON sli.brand_id = b.id
+JOIN package_types pt ON sli.package_type_id = pt.id
+WHERE sli.session_id = 'session-uuid-here'
+  AND (sli.actual_quantity IS NULL
+    OR sli.actual_quantity <= 0
+    OR jsonb_array_length(sli.source_batches) = 0);
+```

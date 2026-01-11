@@ -123,6 +123,33 @@ Yeast strains catalog.
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
+**Constraints:**
+```sql
+-- Attenuation percentages must be 0-100
+ALTER TABLE yeasts ADD CONSTRAINT chk_yeast_attenuation_range
+  CHECK (attenuation_min >= 0 AND attenuation_min <= 100
+    AND attenuation_max >= 0 AND attenuation_max <= 100
+    AND attenuation_typical >= 0 AND attenuation_typical <= 100);
+
+-- Attenuation min <= typical <= max
+ALTER TABLE yeasts ADD CONSTRAINT chk_yeast_attenuation_order
+  CHECK (attenuation_min <= attenuation_typical
+    AND attenuation_typical <= attenuation_max);
+
+-- Temperature ranges must be valid
+ALTER TABLE yeasts ADD CONSTRAINT chk_yeast_temp_range
+  CHECK (temp_min_f >= 32 AND temp_max_f <= 120
+    AND temp_min_f <= temp_ideal_f AND temp_ideal_f <= temp_max_f);
+
+-- Alcohol tolerance must be reasonable (0-25% ABV)
+ALTER TABLE yeasts ADD CONSTRAINT chk_yeast_alcohol_tolerance
+  CHECK (alcohol_tolerance >= 0 AND alcohol_tolerance <= 25);
+
+-- Pitching rate must be positive
+ALTER TABLE yeasts ADD CONSTRAINT chk_yeast_pitching_rate
+  CHECK (pitching_rate > 0);
+```
+
 ---
 
 ## `malts`
@@ -149,6 +176,30 @@ Malt and grain catalog.
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Constraints:**
+```sql
+-- Color Lovibond must be non-negative
+ALTER TABLE malts ADD CONSTRAINT chk_malt_color_nonnegative
+  CHECK (color_lovibond >= 0);
+
+-- Potential PPG must be positive
+ALTER TABLE malts ADD CONSTRAINT chk_malt_ppg_positive
+  CHECK (potential_ppg > 0);
+
+-- Max percentage must be 0-100
+ALTER TABLE malts ADD CONSTRAINT chk_malt_max_percentage
+  CHECK (max_percentage IS NULL OR (max_percentage >= 0 AND max_percentage <= 100));
+
+-- Percentages (protein, moisture) must be 0-100
+ALTER TABLE malts ADD CONSTRAINT chk_malt_percentages_valid
+  CHECK ((protein_percent IS NULL OR (protein_percent >= 0 AND protein_percent <= 100))
+    AND (moisture_percent IS NULL OR (moisture_percent >= 0 AND moisture_percent <= 100)));
+
+-- Diastatic power must be non-negative
+ALTER TABLE malts ADD CONSTRAINT chk_malt_diastatic_power_nonnegative
+  CHECK (diastatic_power IS NULL OR diastatic_power >= 0);
+```
 
 ---
 
@@ -180,6 +231,36 @@ Hop varieties catalog.
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Constraints:**
+```sql
+-- Alpha acid percentages must be 0-100
+ALTER TABLE hops ADD CONSTRAINT chk_hop_alpha_acid_range
+  CHECK (alpha_acid_min >= 0 AND alpha_acid_min <= 100
+    AND alpha_acid_max >= 0 AND alpha_acid_max <= 100
+    AND alpha_acid_typical >= 0 AND alpha_acid_typical <= 100);
+
+-- Alpha acid min <= typical <= max
+ALTER TABLE hops ADD CONSTRAINT chk_hop_alpha_acid_order
+  CHECK (alpha_acid_min <= alpha_acid_typical
+    AND alpha_acid_typical <= alpha_acid_max);
+
+-- Beta acid percentages must be 0-100
+ALTER TABLE hops ADD CONSTRAINT chk_hop_beta_acid_range
+  CHECK ((beta_acid_min IS NULL OR (beta_acid_min >= 0 AND beta_acid_min <= 100))
+    AND (beta_acid_max IS NULL OR (beta_acid_max >= 0 AND beta_acid_max <= 100)));
+
+-- Oil percentages must be 0-100
+ALTER TABLE hops ADD CONSTRAINT chk_hop_oil_percentages
+  CHECK ((myrcene_percent IS NULL OR (myrcene_percent >= 0 AND myrcene_percent <= 100))
+    AND (humulene_percent IS NULL OR (humulene_percent >= 0 AND humulene_percent <= 100))
+    AND (caryophyllene_percent IS NULL OR (caryophyllene_percent >= 0 AND caryophyllene_percent <= 100))
+    AND (farnesene_percent IS NULL OR (farnesene_percent >= 0 AND farnesene_percent <= 100)));
+
+-- HSI must be non-negative
+ALTER TABLE hops ADD CONSTRAINT chk_hop_hsi_nonnegative
+  CHECK (hsi IS NULL OR hsi >= 0);
+```
 
 ---
 
