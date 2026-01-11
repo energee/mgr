@@ -2,18 +2,53 @@
 
 ## `package_types`
 
-Package type definitions.
+Package type definitions with support for inner pack configurations.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| name | TEXT | Package name (e.g., "16oz Can") |
+| name | TEXT | Package name (e.g., "16oz Can 6x4-pack") |
 | container_type | TEXT | Type: can, bottle, keg, growler |
-| volume_oz | DECIMAL(6,2) | Volume in ounces |
-| units_per_case | INTEGER | Units per case |
+| volume_oz | DECIMAL(6,2) | Volume per unit in ounces |
+| inner_pack_size | INTEGER | Units per inner pack (NULL = loose) |
+| inner_packs_per_case | INTEGER | Inner packs per case (NULL if loose) |
+| units_per_case | INTEGER | Total units per case (calculated or direct) |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+### Inner Pack Configuration
+
+| Configuration | inner_pack_size | inner_packs_per_case | units_per_case |
+|---------------|-----------------|----------------------|----------------|
+| 24 loose cans | NULL | NULL | 24 |
+| 6 × 4-packs | 4 | 6 | 24 |
+| 4 × 6-packs | 6 | 4 | 24 |
+| 2 × 12-packs | 12 | 2 | 24 |
+| 1/6 BBL keg | NULL | NULL | 1 |
+
+**Constraint:**
+```sql
+-- Ensure units_per_case matches inner pack math when both are set
+ALTER TABLE package_types ADD CONSTRAINT chk_package_units_consistency CHECK (
+  (inner_pack_size IS NULL AND inner_packs_per_case IS NULL) OR
+  (inner_pack_size IS NOT NULL AND inner_packs_per_case IS NOT NULL
+   AND units_per_case = inner_pack_size * inner_packs_per_case)
+);
+```
+
+**Display name generation:**
+```typescript
+function formatPackageName(pkg: PackageType): string {
+  if (!pkg.inner_pack_size) {
+    return `${pkg.volume_oz}oz ${pkg.container_type} (${pkg.units_per_case}/case)`;
+  }
+  return `${pkg.volume_oz}oz ${pkg.container_type} ${pkg.inner_packs_per_case}×${pkg.inner_pack_size}-pack`;
+}
+// Examples:
+// "16oz can (24/case)" - loose
+// "16oz can 6×4-pack" - inner packs
+```
 
 ---
 
