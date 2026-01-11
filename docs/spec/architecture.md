@@ -123,6 +123,97 @@ USING (auth.uid() IN (SELECT id FROM users WHERE 'brewer' = ANY(roles)));
 
 **Future multi-tenancy**: If needed, add back `breweries` table, `brewery_id` columns, and update RLS policies.
 
+### DEC-006: Entity Configuration Extensions
+
+**Status**: Implemented (January 2026)
+
+The Entity Configuration System (DEC-001) has been extended with two patterns that enhance how entities interact with the database and forms.
+
+#### View Tables for List Displays
+
+Entity configurations can specify a `viewTable` property to use database views with joined/calculated columns for list displays, while maintaining the base `table` for CRUD operations.
+
+**Pattern**:
+```typescript
+export const vesselEntity: EntityConfig<Vessel> = {
+  name: "vessel",
+  table: "vessels",              // Used for create, update, delete
+  viewTable: "vessels_with_batch", // Used for list queries (includes joins)
+
+  listColumns: [
+    {
+      accessorKey: "current_batch_id",
+      header: "Current Batch",
+      render: (_value, row) => {
+        // Access joined columns from view
+        const viewRow = row as VesselWithBatch;
+        return viewRow.batch_number || viewRow.batch_name;
+      },
+    },
+  ],
+};
+```
+
+**When to use**:
+- List displays need to show data from related tables (e.g., vessel list showing current batch name)
+- Calculated fields are needed in list view (e.g., inventory with remaining quantity)
+- Complex aggregations are required for display (e.g., orders with total value)
+
+**Implementation**: EntityList component uses `entity.viewTable || entity.table` for queries ([entity-list.tsx:90-91](https://github.com/energee/mgr/blob/feature/phase-2-vessel-brewlog/src/components/universal/entity-list.tsx#L90-L91))
+
+#### Dynamic Options for Form Fields
+
+Form field configurations can specify `dynamicOptions` to populate select fields from database tables at runtime, enabling data-driven dropdowns.
+
+**Pattern**:
+```typescript
+formFields: [
+  {
+    name: "fermenter",
+    label: "Vessel",
+    type: "select",
+    dynamicOptions: {
+      table: "vessels",           // Table to query
+      valueField: "name",          // Field to use as option value
+      labelField: "name",          // Field to display as option label
+      filter: { is_active: true }, // Optional WHERE conditions
+      orderBy: "name",             // Optional ORDER BY clause
+    },
+  },
+]
+```
+
+**When to use**:
+- Foreign key fields where options come from another table (e.g., selecting a vessel for a batch)
+- Dropdown values that change frequently (e.g., active locations, available ingredients)
+- Fields that need filtered options based on business rules (e.g., only active items)
+
+**When NOT to use**:
+- Static enums or fixed value lists (use hardcoded `options` array instead)
+- Complex multi-table joins (use `relation` type field instead)
+- Very large datasets (>1000 records) where autocomplete would be better
+
+**Example** ([batch.tsx:231-237](https://github.com/energee/mgr/blob/feature/phase-2-vessel-brewlog/src/entities/batch.tsx#L231-L237)):
+```typescript
+{
+  name: "fermenter",
+  label: "Vessel",
+  type: "select",
+  dynamicOptions: {
+    table: "vessels",
+    valueField: "name",
+    labelField: "name",
+    filter: { is_active: true },
+    orderBy: "name",
+  },
+}
+```
+
+**Relationship to `relation` type**:
+- `dynamicOptions`: Simple select field populated from a table, stores primitive value
+- `relation`: Foreign key field that stores UUID, may render as autocomplete/lookup with entity preview
+- Use `dynamicOptions` for simple dropdowns, `relation` for full entity relationships
+
 ---
 
 ## Database Schema
