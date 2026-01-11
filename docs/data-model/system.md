@@ -308,6 +308,8 @@ Self-documenting schema metadata for AI agents. Query this table to understand t
 | key_fields | JSONB | Array of important fields |
 | state_machine | JSONB | State machine definition (if applicable) |
 | query_examples | JSONB | Example queries for this table |
+| ai_context | JSONB | AI-specific context and guidance for this table |
+| calculated_fields | JSONB | Array of field names that are calculated (not stored) |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
