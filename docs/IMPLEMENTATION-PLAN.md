@@ -125,6 +125,51 @@ This document tracks the implementation progress of MGR features based on the sp
   - [ ] Timeline visualization
 - [ ] Add navigation from batch detail to linked brew logs
 
+### 2.2.1 Batch Readings UI (Mobile-First)
+
+> Record fermentation metrics - optimized for tablet/phone use on brewery floor.
+
+- [ ] Create `src/components/domain/batch-reading-form.tsx`
+  - [ ] Large touch-friendly input fields
+  - [ ] Quick metric type selector (gravity, temp, pH, pressure, DO, diacetyl, clarity)
+  - [ ] Timestamp auto-fill with manual override
+  - [ ] Notes field for observations
+- [ ] Create `src/app/(app)/production/batches/[id]/readings/page.tsx`
+  - [ ] Mobile-optimized layout
+  - [ ] Quick-add floating action button
+  - [ ] Recent readings list with inline editing
+- [ ] Create reading types and validation
+  - [ ] `gravity`: SG or Plato with auto-convert
+  - [ ] `temperature`: °F or °C with fermentation range warnings
+  - [ ] `ph`: 0-14 range with style-appropriate warnings
+  - [ ] `pressure`: PSI for carbonation tracking
+  - [ ] `dissolved_oxygen`: ppb with threshold warnings
+  - [ ] `diacetyl`: present/absent/trace with VDK rest reminder
+  - [ ] `clarity`: scale 1-5 or turbidity NTU
+- [ ] Create readings chart visualization
+  - [ ] Gravity curve over time (with target FG line)
+  - [ ] Temperature profile (with fermentation schedule overlay)
+  - [ ] Multi-metric overlay option
+
+### 2.2.2 Batch Additions UI
+
+> Record additions during fermentation (dry hops, fruit, adjuncts).
+
+- [ ] Create `src/components/domain/batch-addition-form.tsx`
+  - [ ] Addition type selector (dry_hop, fruit, adjunct, fining, other)
+  - [ ] Ingredient selector (from catalog or free-text)
+  - [ ] Weight/quantity input with unit conversion
+  - [ ] Timestamp and duration (for dry hops: contact time)
+  - [ ] Notes field
+- [ ] Create `src/app/(app)/production/batches/[id]/additions/page.tsx`
+  - [ ] List of additions with timing
+  - [ ] Quick-add from recipe's planned additions
+  - [ ] Variance tracking (planned vs actual)
+- [ ] Link additions to recipe expectations
+  - [ ] Show recipe's dry hop schedule
+  - [ ] Highlight deviations from plan
+  - [ ] Calculate actual IBU contribution for dry hops
+
 ### 2.3 Batch-Brew Log Linking
 
 > Connect brews to batches via `brew_log_batches` junction.
@@ -848,6 +893,393 @@ This document tracks the implementation progress of MGR features based on the sp
 
 ---
 
+## Phase 12: API Routes & Backend
+
+**Goal:** Implement REST API endpoints for all entities with proper auth, validation, and error handling.
+**Status:** Not Started
+**Depends On:** Phase 5.5 (Error Handling)
+
+### 12.1 API Infrastructure
+
+> Common patterns and utilities for all API routes.
+
+- [ ] Create `src/lib/api/response.ts`
+  - [ ] Standard success response format: `{ data: T, meta?: { page, per_page, total } }`
+  - [ ] Standard error response format: `{ error: { code, message, details } }`
+  - [ ] Helper functions: `success()`, `error()`, `paginated()`
+- [ ] Create `src/lib/api/auth.ts`
+  - [ ] `withAuth()` wrapper for protected routes
+  - [ ] `withRoles(roles[])` wrapper for role-based access
+  - [ ] Extract user and roles from Supabase session
+- [ ] Create `src/lib/api/validation.ts`
+  - [ ] Request body validation with Zod
+  - [ ] Query parameter parsing and validation
+  - [ ] File upload validation
+- [ ] Create `src/lib/api/errors.ts`
+  - [ ] API-specific error classes
+  - [ ] PostgreSQL error code mapping
+  - [ ] Constraint violation messages
+
+### 12.2 Production API Routes
+
+> Batches, brew logs, vessels, recipes.
+
+- [ ] `app/api/batches/route.ts` (GET list, POST create)
+- [ ] `app/api/batches/[id]/route.ts` (GET, PATCH, DELETE)
+- [ ] `app/api/batches/[id]/readings/route.ts` (GET, POST)
+- [ ] `app/api/batches/[id]/additions/route.ts` (GET, POST)
+- [ ] `app/api/batches/[id]/transfer/route.ts` (POST - vessel transfer)
+- [ ] `app/api/recipes/route.ts` (GET, POST)
+- [ ] `app/api/recipes/[id]/route.ts` (GET, PATCH, DELETE)
+- [ ] `app/api/recipes/[id]/clone/route.ts` (POST - clone recipe)
+- [ ] `app/api/brew-logs/route.ts` (GET, POST)
+- [ ] `app/api/brew-logs/[id]/route.ts` (GET, PATCH, DELETE)
+- [ ] `app/api/vessels/route.ts` (GET, POST)
+- [ ] `app/api/vessels/[id]/route.ts` (GET, PATCH, DELETE)
+
+### 12.3 Packaging & Inventory API Routes
+
+- [ ] `app/api/packaging/sessions/route.ts` (GET, POST)
+- [ ] `app/api/packaging/sessions/[id]/route.ts` (GET, PATCH, DELETE)
+- [ ] `app/api/packaging/sessions/[id]/complete/route.ts` (POST - finalize)
+- [ ] `app/api/inventory/finished-goods/route.ts` (GET, POST)
+- [ ] `app/api/inventory/bins/route.ts` (GET, POST)
+- [ ] `app/api/inventory/transfers/route.ts` (GET, POST)
+- [ ] `app/api/inventory/kegs/route.ts` (GET, POST)
+
+### 12.4 Sales & Orders API Routes
+
+- [ ] `app/api/orders/route.ts` (GET, POST)
+- [ ] `app/api/orders/[id]/route.ts` (GET, PATCH, DELETE)
+- [ ] `app/api/orders/[id]/items/route.ts` (GET, POST, DELETE)
+- [ ] `app/api/orders/[id]/allocate/route.ts` (POST - allocate FG)
+- [ ] `app/api/orders/[id]/fulfill/route.ts` (POST - mark shipped)
+- [ ] `app/api/customers/route.ts` (GET, POST)
+- [ ] `app/api/customers/[id]/route.ts` (GET, PATCH, DELETE)
+
+### 12.5 Purchasing API Routes
+
+- [ ] `app/api/purchasing/pos/route.ts` (GET, POST)
+- [ ] `app/api/purchasing/pos/[id]/route.ts` (GET, PATCH, DELETE)
+- [ ] `app/api/purchasing/pos/[id]/receive/route.ts` (POST - receive items)
+- [ ] `app/api/purchasing/generate/route.ts` (POST - auto-generate POs)
+- [ ] `app/api/suppliers/route.ts` (GET, POST)
+- [ ] `app/api/suppliers/[id]/route.ts` (GET, PATCH, DELETE)
+
+### 12.6 Reports API Routes
+
+- [ ] `app/api/reports/ttb/route.ts` (GET - TTB 5130.9 data)
+- [ ] `app/api/reports/projections/route.ts` (GET - ingredient projections)
+- [ ] `app/api/reports/cogs/route.ts` (GET - cost of goods sold)
+- [ ] `app/api/reports/inventory/route.ts` (GET - inventory summary)
+
+### 12.7 Webhook Routes
+
+- [ ] `app/api/webhooks/square/route.ts` (POST - Square POS events)
+- [ ] `app/api/webhooks/qbo/route.ts` (POST - QuickBooks events)
+- [ ] Webhook signature verification
+- [ ] Idempotency handling
+
+---
+
+## Phase 13: AI Integration Implementation
+
+**Goal:** Implement AI-first features including database functions, TypeScript utilities, and schema context.
+**Status:** Not Started
+**Depends On:** Phase 1 (Schema)
+
+### 13.1 Schema Registry Population
+
+> Ensure all tables have comprehensive AI context in `_schema_registry`.
+
+- [ ] Audit existing `_schema_registry` entries
+- [ ] Add missing tables to registry
+- [ ] Populate `key_fields` for all tables
+- [ ] Populate `query_examples` with natural language examples
+- [ ] Populate `ai_context` with domain-specific guidance
+- [ ] Add `calculated_fields` for views
+- [ ] Document state machines in registry
+
+### 13.2 Database Functions for AI
+
+> PostgreSQL functions that AI agents can call for analysis.
+
+- [ ] Create `analyze_recipe_style_compliance(recipe_id UUID)`
+  - [ ] Compare recipe estimates to BJCP style guidelines
+  - [ ] Return compliance status for OG, FG, ABV, IBU, SRM
+  - [ ] Include suggestions for adjustments
+- [ ] Create `get_recipe_summary(recipe_id UUID)`
+  - [ ] Return comprehensive recipe data in structured JSON
+  - [ ] Include all ingredients, schedules, estimates
+  - [ ] Include style information
+- [ ] Create `suggest_recipe_improvements(recipe_id UUID)`
+  - [ ] Analyze grain bill balance
+  - [ ] Check hop schedule timing
+  - [ ] Verify water chemistry for style
+  - [ ] Return prioritized suggestions
+- [ ] Create `analyze_batch_performance(batch_id UUID)`
+  - [ ] Compare actual vs target metrics
+  - [ ] Calculate efficiency variance
+  - [ ] Identify potential issues
+- [ ] Create `get_inventory_overview()`
+  - [ ] Current FG by brand/format
+  - [ ] Low stock alerts
+  - [ ] Expiring soon alerts
+- [ ] Create `get_ai_schema_context(domain TEXT)`
+  - [ ] Return schema info for specified domain
+  - [ ] Include relationships and examples
+
+### 13.3 TypeScript AI Utilities
+
+> Client-side utilities in `src/lib/ai/` for AI-assisted features.
+
+- [ ] Create `src/lib/ai/index.ts` (barrel export)
+- [ ] Create `src/lib/ai/recipe-analysis.ts`
+  - [ ] `analyzeStyleCompliance(recipeId)` - call DB function
+  - [ ] `getRecipeSummary(recipeId)` - call DB function
+  - [ ] `getRecipeSuggestions(recipeId)` - call DB function
+- [ ] Create `src/lib/ai/calculations.ts`
+  - [ ] `BrewingCalculations` class with OG, FG, ABV, IBU, SRM formulas
+  - [ ] `WaterChemistry` class with ion calculations
+  - [ ] `FermentationAnalysis` class with timeline predictions
+- [ ] Create `src/lib/ai/schema-context.ts`
+  - [ ] `getSchemaContext(domain)` - fetch from registry
+  - [ ] `getDomainSummary()` - high-level overview
+  - [ ] `getValidTransitions(entity, currentState)` - state machine helper
+- [ ] Create `src/lib/ai/query-helpers.ts`
+  - [ ] `AIQueryHelpers` class with common query patterns
+  - [ ] Natural language to SQL hints
+  - [ ] Query template library
+
+### 13.4 AI-Enhanced UI Components
+
+> UI components that leverage AI analysis.
+
+- [ ] Create `src/components/ai/recipe-analyzer.tsx`
+  - [ ] Display style compliance results
+  - [ ] Show improvement suggestions
+  - [ ] Interactive "what-if" adjustments
+- [ ] Create `src/components/ai/batch-insights.tsx`
+  - [ ] Performance vs target visualization
+  - [ ] Fermentation predictions
+  - [ ] Issue detection alerts
+- [ ] Create `src/components/ai/inventory-alerts.tsx`
+  - [ ] Smart reorder recommendations
+  - [ ] Demand forecasting display
+  - [ ] Expiration warnings
+
+### 13.5 Entity Config AI Enhancements
+
+> Add AI context to all entity configurations.
+
+- [ ] Add `queryExamples` to all entities
+  - [ ] Natural language query examples
+  - [ ] Common question patterns
+- [ ] Add `keyFields` to all entities
+  - [ ] Fields most relevant for AI queries
+  - [ ] Search/filter priority fields
+- [ ] Add `aiActions` to relevant entities
+  - [ ] Available AI-assisted actions
+  - [ ] Analysis function mappings
+
+---
+
+## Phase 14: Advanced Workflows
+
+**Goal:** Implement complex business workflows that span multiple entities.
+**Status:** Not Started
+**Depends On:** Phase 3, Phase 4
+
+### 14.1 Batch Blending
+
+> Combine multiple batches into a single batch.
+
+- [ ] Create `blend_batches` table
+  - [ ] blend_id (new batch), source_batch_id, volume_bbl
+- [ ] Create blending UI
+  - [ ] Select source batches
+  - [ ] Specify volumes from each
+  - [ ] Calculate blended estimates (OG, ABV, IBU weighted by volume)
+- [ ] Create allocation records for source batches
+- [ ] Update source batch remaining volumes
+- [ ] Link blended batch to all source recipes
+
+### 14.2 PO Generation from Demand
+
+> Auto-generate purchase orders from planned production.
+
+- [ ] Create `src/lib/purchasing/demand-calculator.ts`
+  - [ ] Calculate ingredient needs from planned batches
+  - [ ] Factor in current inventory levels
+  - [ ] Apply lead times per supplier
+  - [ ] Group shortfalls by supplier
+- [ ] Create `src/lib/purchasing/po-generator.ts`
+  - [ ] Generate draft POs from shortfalls
+  - [ ] Apply preferred suppliers
+  - [ ] Respect minimum order quantities
+- [ ] Create ingredient projections UI
+  - [ ] Timeline view of ingredient needs
+  - [ ] Shortfall highlighting
+  - [ ] One-click PO generation
+- [ ] Create `app/api/purchasing/generate/route.ts`
+  - [ ] Accept date range and options
+  - [ ] Return generated PO drafts
+
+### 14.3 Pick List Generation
+
+> Generate warehouse pick lists for order fulfillment.
+
+- [ ] Create `pick_lists` table
+  - [ ] order_id, status (pending, in_progress, completed)
+  - [ ] generated_at, picked_at, picker_id
+- [ ] Create `pick_list_items` table
+  - [ ] pick_list_id, finished_good_id, bin_id
+  - [ ] quantity, picked_quantity
+- [ ] Create pick list generation logic
+  - [ ] FIFO allocation (oldest FG first)
+  - [ ] Bin location optimization (minimize travel)
+  - [ ] Split handling for partial bins
+- [ ] Create pick list UI
+  - [ ] Mobile-optimized for warehouse tablet
+  - [ ] Scan-to-pick support (barcode)
+  - [ ] Quantity confirmation
+  - [ ] Variance recording
+
+### 14.4 Landed Cost Calculation
+
+> Calculate true cost of received inventory including shipping.
+
+- [ ] Add `shipping_cost` to PO receipts
+- [ ] Create landed cost calculation
+  - [ ] Allocate shipping across line items by weight or value
+  - [ ] Calculate per-unit landed cost
+  - [ ] Store on inventory lot record
+- [ ] Update COGS calculations to use landed cost
+- [ ] Display landed cost in inventory views
+
+### 14.5 Batch Cancellation Workflow
+
+> Handle batch cancellation with proper cleanup.
+
+- [ ] Create cancellation dialog
+  - [ ] Reason code selection (quality, equipment, other)
+  - [ ] Loss quantity recording
+  - [ ] Notes field
+- [ ] Implement cancellation logic
+  - [ ] Create loss allocation record
+  - [ ] Release vessel assignment
+  - [ ] Update inventory if materials consumed
+  - [ ] Trigger notifications
+- [ ] Create cancellation audit trail
+
+---
+
+## Phase 15: Testing & Quality
+
+**Goal:** Comprehensive testing strategy with automated CI/CD.
+**Status:** Not Started
+**Depends On:** All phases (parallel work)
+
+### 15.1 Unit Testing
+
+> Test pure functions and calculations.
+
+- [ ] Set up Vitest configuration
+- [ ] Create `src/lib/__tests__/` structure
+- [ ] Test brewing calculations
+  - [ ] OG calculation from grain bill
+  - [ ] IBU calculation (Tinseth formula)
+  - [ ] SRM calculation (Morey equation)
+  - [ ] ABV calculation
+- [ ] Test unit conversions
+  - [ ] Volume conversions (BBL ↔ gal ↔ L)
+  - [ ] Weight conversions (lbs ↔ kg)
+  - [ ] Temperature conversions (°F ↔ °C)
+  - [ ] Gravity conversions (SG ↔ Plato)
+- [ ] Test allocation calculations
+  - [ ] Available quantity calculation
+  - [ ] FIFO allocation logic
+- [ ] Test water chemistry calculations
+  - [ ] Ion contribution from additions
+  - [ ] Sulfate:chloride ratio
+- [ ] Test yeast viability decay
+- [ ] Target: 90%+ coverage for `src/lib/`
+
+### 15.2 Integration Testing
+
+> Test database operations and API routes.
+
+- [ ] Set up test database (Supabase local or test project)
+- [ ] Create test fixtures and factories
+- [ ] Test state machine transitions
+  - [ ] Batch state transitions
+  - [ ] Order state transitions
+  - [ ] PO state transitions
+  - [ ] Vessel state transitions
+- [ ] Test allocation workflows
+  - [ ] FG allocation to orders
+  - [ ] Inventory lot allocation to batches
+- [ ] Test API routes
+  - [ ] Auth middleware
+  - [ ] CRUD operations
+  - [ ] Error responses
+- [ ] Test RLS policies
+  - [ ] Per-role access verification
+  - [ ] Cross-role isolation
+
+### 15.3 E2E Testing
+
+> Test critical user workflows.
+
+- [ ] Set up Playwright configuration
+- [ ] Create test user accounts per role
+- [ ] Test production workflow
+  - [ ] Create recipe → create batch → record brew log → record readings → package
+- [ ] Test order fulfillment workflow
+  - [ ] Create order → allocate FG → generate pick list → fulfill
+- [ ] Test purchasing workflow
+  - [ ] Create PO → submit → receive → verify lots created
+- [ ] Test authentication flows
+  - [ ] Login, logout, session expiry
+  - [ ] Role-based UI visibility
+
+### 15.4 CI/CD Pipeline
+
+> Automated testing and deployment.
+
+- [ ] Create `.github/workflows/test.yml`
+  - [ ] Run unit tests on PR
+  - [ ] Run integration tests on PR
+  - [ ] Type checking
+  - [ ] Linting
+- [ ] Create `.github/workflows/e2e.yml`
+  - [ ] Run E2E tests on main branch
+  - [ ] Screenshot on failure
+- [ ] Create `.github/workflows/deploy.yml`
+  - [ ] Deploy to Vercel on main
+  - [ ] Run migrations on deploy
+- [ ] Set up test coverage reporting
+- [ ] Add status badges to README
+
+### 15.5 Database Testing
+
+> Test migrations and seed data.
+
+- [ ] Create migration test script
+  - [ ] Apply migrations to fresh database
+  - [ ] Verify schema matches expected
+  - [ ] Test rollback procedures
+- [ ] Create seed data for development
+  - [ ] Sample recipes (various styles)
+  - [ ] Sample batches (various states)
+  - [ ] Sample orders and customers
+  - [ ] Sample inventory
+- [ ] Create data validation scripts
+  - [ ] Referential integrity checks
+  - [ ] State consistency checks
+
+---
+
 ## Quick Wins (Can Be Done Anytime)
 
 These are low-effort improvements that can be tackled between phases.
@@ -894,9 +1326,11 @@ Migrations follow the pattern: `00XXX_description.sql`
 
 ### Testing Strategy
 
+See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 - Unit tests for calculations (brewing formulas, allocations)
 - Integration tests for state machine transitions
 - E2E tests for critical workflows (order → fulfillment)
+- CI/CD pipeline with automated testing
 
 ---
 
@@ -904,6 +1338,11 @@ Migrations follow the pattern: `00XXX_description.sql`
 
 | Date | Change |
 |------|--------|
+| 2026-01-11 | Added Phase 2.2.1-2.2.2: Batch readings UI (mobile-first), batch additions UI with variance tracking |
+| 2026-01-11 | Added Phase 12 (API Routes): Full REST API with auth, validation, error handling for all entities |
+| 2026-01-11 | Added Phase 13 (AI Implementation): Schema registry, database functions, TypeScript utilities, AI components |
+| 2026-01-11 | Added Phase 14 (Advanced Workflows): Blending, PO generation from demand, pick lists, landed cost, batch cancellation |
+| 2026-01-11 | Added Phase 15 (Testing & Quality): Unit/integration/E2E tests, CI/CD pipeline, database testing |
 | 2026-01-11 | Added Phase 2.5 (Recipe Builder): mash schedule, fermentation schedule, water chemistry, additional ingredient editors, templates |
 | 2026-01-11 | Added Phase 8 (Settings): system settings, user management, locations, integrations, notifications, reference data |
 | 2026-01-11 | Added Phase 9 (Yeast Management): pitch tracking, lineage, viability, cost spreading |
