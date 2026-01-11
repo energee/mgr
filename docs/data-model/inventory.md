@@ -517,3 +517,35 @@ TTB reports use calendar months. For allocations that span month boundaries:
 - Use `created_at` as the reporting date (when allocation was completed)
 - For multi-day packaging sessions, each FG record has its own `created_at`
 - Transfers in-transit at month end: report when completed, not when started
+
+---
+
+## Indexes
+
+Performance indexes for inventory domain tables (critical for allocation calculations):
+
+```sql
+-- Allocation calculations (most critical - used constantly)
+CREATE INDEX idx_allocations_source ON allocations(source_type, source_id, status);
+CREATE INDEX idx_allocations_destination ON allocations(destination_type, destination_id, status);
+CREATE INDEX idx_allocations_status_created ON allocations(status, created_at);
+CREATE INDEX idx_allocations_approval ON allocations(status, requires_approval) WHERE requires_approval = true;
+
+-- Inventory lot queries (FIFO, expiration tracking)
+CREATE INDEX idx_inventory_lots_item_date ON inventory_lots(inventory_item_id, received_date, expiration_date);
+CREATE INDEX idx_inventory_lots_lot_number ON inventory_lots(lot_number);
+CREATE INDEX idx_inventory_lots_po_line ON inventory_lots(po_line_item_id);
+
+-- Inventory item lookups (catalog polymorphic pattern)
+CREATE INDEX idx_inventory_items_catalog ON inventory_items(catalog_type, catalog_id);
+
+-- Bin inventory (FG location tracking)
+CREATE INDEX idx_bin_inventory_bin_fg ON bin_inventory(bin_id, finished_good_id);
+CREATE INDEX idx_bin_inventory_fg ON bin_inventory(finished_good_id);
+CREATE INDEX idx_bins_location ON bins(location_id, is_active);
+
+-- Location transfers
+CREATE INDEX idx_location_transfers_status ON location_transfers(status, transfer_date);
+CREATE INDEX idx_location_transfers_from ON location_transfers(from_location_id, transfer_date);
+CREATE INDEX idx_location_transfers_to ON location_transfers(to_location_id, transfer_date);
+```
