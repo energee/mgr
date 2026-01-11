@@ -308,4 +308,111 @@ CREATE INDEX idx_tier_prices_temporal ON tier_prices(valid_from, valid_to);
 -- Customer lookups
 CREATE INDEX idx_customers_type_active ON customers(customer_type, is_active);
 CREATE INDEX idx_customers_name ON customers(name) WHERE is_active = true;
+## Square Integration (Taproom POS)
+
+Tables supporting Square POS integration for automatic taproom inventory debit. See `docs/MGR-SPECIFICATION.md` Section 12.3 for implementation details.
+
+---
+
+## `square_settings`
+
+Square integration configuration (singleton table).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key (fixed, singleton) |
+| access_token | TEXT | Square OAuth access token (encrypted or vault reference) |
+| refresh_token | TEXT | Square OAuth refresh token (nullable for personal access tokens) |
+| location_id | TEXT | Square location ID for the taproom |
+| webhook_signature_key | TEXT | Key for validating webhook payloads |
+| is_enabled | BOOLEAN | Whether sync is active |
+| last_sync_at | TIMESTAMPTZ | Last successful sync timestamp |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Singleton constraint:**
+```sql
+CONSTRAINT square_settings_singleton CHECK (id = '00000000-0000-0000-0000-000000000002'::uuid)
+```
+
+---
+
+## `square_item_mappings`
+
+Map Square catalog items to MGR products.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| square_catalog_id | TEXT | Square catalog object ID |
+| square_item_name | TEXT | Item name from Square (for display) |
+| finished_good_id | UUID | FK to finished_goods (specific lot, nullable) |
+| brand_id | UUID | FK to brands (fallback if no specific FG) |
+| package_type_id | UUID | FK to package_types (required if brand_id set) |
+| is_active | BOOLEAN | Active flag |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Unique constraint:** `square_catalog_id`
+
+**Validation:** Either `finished_good_id` is set, OR both `brand_id` and `package_type_id` are set.
+
+### Mapping Resolution
+
+```typescript
+// When processing a Square sale:
+// 1. If finished_good_id is set → use that specific FG
+// 2. If brand_id + package_type_id set → find any available FG matching those
+// 3. If no inventory available → log error, skip item
+```
+
+---
+
+## `square_sync_log`
+
+Successful sync records for deduplication and audit.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| square_order_id | TEXT | Square order ID |
+| square_payment_id | TEXT | Square payment ID |
+| items_synced | INTEGER | Number of items successfully processed |
+| items_skipped | INTEGER | Number of items skipped (unmapped, no inventory) |
+| synced_at | TIMESTAMPTZ | When sync occurred |
+
+**Unique constraint:** `square_order_id`
+
+---
+
+## `square_sync_errors`
+
+Failed/skipped items for manual review.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| square_order_id | TEXT | Square order ID |
+| square_item_id | TEXT | Square catalog object ID |
+| item_name | TEXT | Item name from Square |
+| error | TEXT | Error type: unmapped_item, no_inventory_available, api_error |
+| error_details | TEXT | Additional error context |
+| resolved_at | TIMESTAMPTZ | When manually resolved (nullable) |
+| resolved_by | UUID | FK to auth.users (nullable) |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### Error Types
+
+| error | Description | Resolution |
+|-------|-------------|------------|
+| `unmapped_item` | Square item not mapped to MGR product | Create mapping in `square_item_mappings` |
+| `no_inventory_available` | Mapping exists but no FG in stock | Transfer inventory to taproom or adjust |
+| `api_error` | Square API call failed | Retry or investigate |
+
+### Query: Unresolved Errors
+
+```sql
+SELECT * FROM square_sync_errors
+WHERE resolved_at IS NULL
+ORDER BY created_at DESC;
 ```

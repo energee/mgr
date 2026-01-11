@@ -127,7 +127,8 @@ Unified allocation table for all inventory movements (raw materials, finished go
 |------------------|--------------------------|----------|----------|
 | batch | batches.id | Raw materials used in production | — |
 | finished_good | finished_goods.id | Packaging creates FG from batch | Line 2 |
-| order | orders.id | FG sold to customer | Line 10/11 |
+| order | orders.id | FG sold to customer (wholesale) | Line 10/11 |
+| taproom_sale | NULL | POS sale from Square integration | Line 10 |
 | sample | NULL | Trade or quality samples (use reason_code for type) | Line 12/18-21 |
 | adjustment | NULL | Inventory corrections (+/-) | Line 5/15 |
 | destruction | NULL | Contamination, QC failure, intentional destruction | Line 13 |
@@ -449,8 +450,9 @@ SELECT
   -- Line 5: Positive adjustments
   COALESCE(SUM(CASE WHEN destination_type = 'adjustment' AND quantity > 0 THEN volume_bbl END), 0) as line_5_adj_plus,
 
-  -- Line 10: Domestic taxable removals
-  COALESCE(SUM(CASE WHEN destination_type = 'order' AND NOT COALESCE(is_export, false) THEN volume_bbl END), 0) as line_10_domestic,
+  -- Line 10: Domestic taxable removals (wholesale orders + taproom POS sales)
+  COALESCE(SUM(CASE WHEN destination_type = 'taproom_sale' THEN volume_bbl
+                    WHEN destination_type = 'order' AND NOT COALESCE(is_export, false) THEN volume_bbl END), 0) as line_10_domestic,
 
   -- Line 11: Export
   COALESCE(SUM(CASE WHEN destination_type = 'order' AND COALESCE(is_export, false) THEN volume_bbl END), 0) as line_11_export,
@@ -487,11 +489,11 @@ WITH inventory_as_of AS (
 
   UNION ALL
 
-  -- All FG removed (sales, samples, adjustments, destruction, loss)
+  -- All FG removed (sales, taproom, samples, adjustments, destruction, loss)
   SELECT -SUM(volume_bbl) as total_out
   FROM allocations
   WHERE source_type = 'finished_good'
-    AND destination_type IN ('order', 'sample', 'adjustment', 'destruction', 'loss')
+    AND destination_type IN ('order', 'taproom_sale', 'sample', 'adjustment', 'destruction', 'loss')
     AND status = 'completed'
     AND created_at <= :as_of_date
 )
