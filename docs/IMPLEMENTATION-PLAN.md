@@ -21,7 +21,7 @@ This document tracks the implementation progress of MGR features based on the sp
 
 **Goal:** Establish core data model patterns that other features depend on.
 **Timeline:** 1-2 weeks
-**Status:** In Progress (migrations created, pending application)
+**Status:** Complete (migrations applied, seed data created, UI components built)
 
 ### 1.1 Recipe Junction Tables (DEC-HP-002)
 
@@ -43,7 +43,9 @@ This document tracks the implementation progress of MGR features based on the sp
   - [x] Update recipes table with new columns (style_id, yeast_id, water_profile_id, volumes in BBL, etc.)
 - [x] Create `recipes_with_estimates` view with calculated OG, FG, ABV, IBU, SRM
 - [x] Update recipe entity config to handle junction table relations
-- [ ] Create ingredient management UI components (grain bill editor, hop schedule editor)
+- [x] Create ingredient management UI components (grain bill editor, hop schedule editor)
+  - [x] `src/components/domain/grain-bill-editor.tsx` - Malt selection and weight management
+  - [x] `src/components/domain/hop-schedule-editor.tsx` - Hop timing, weight, and IBU calculation
 - [ ] Create data migration script for existing JSONB data (if any)
 - [ ] Remove deprecated JSONB columns after verification
 
@@ -396,8 +398,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00009
-- Next available: 00010
+- Current: 00001-00012
+- Next available: 00013
 
 ### Testing Strategy
 
@@ -411,5 +413,6 @@ Migrations follow the pattern: `00XXX_description.sql`
 
 | Date | Change |
 |------|--------|
+| 2026-01-11 | Phase 1 complete: migrations applied, seed data for catalogs, ingredient UI components |
 | 2026-01-11 | Phase 1 migrations created: catalog tables, recipe junction tables, performance indexes |
 | 2026-01-11 | Initial plan created based on spec review |
