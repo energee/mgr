@@ -11,6 +11,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { formatValue } from "@/lib/utils";
 import type { EntityConfig, EntitySectionDef } from "@/types/entity";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -332,7 +333,7 @@ function SectionCard<T>({
                 <dd className="mt-1">
                   {field.render
                     ? field.render(value, data)
-                    : formatFieldValue(value, field.format)}
+                    : formatValue(value, field.format)}
                 </dd>
               </div>
             );
@@ -341,32 +342,6 @@ function SectionCard<T>({
       </CardContent>
     </Card>
   );
-}
-
-// Format field value based on type
-function formatFieldValue(
-  value: unknown,
-  format?: "date" | "datetime" | "currency" | "number" | "percentage" | "json"
-): string {
-  if (value === null || value === undefined) return "—";
-
-  switch (format) {
-    case "date":
-      return new Date(value as string).toLocaleDateString();
-    case "datetime":
-      return new Date(value as string).toLocaleString();
-    case "currency":
-      return `$${(value as number).toFixed(2)}`;
-    case "number":
-      return (value as number).toLocaleString();
-    case "percentage":
-      return `${value}%`;
-    case "json":
-      return JSON.stringify(value, null, 2);
-    default:
-      if (typeof value === "boolean") return value ? "Yes" : "No";
-      return String(value);
-  }
 }
 
 // Loading skeleton

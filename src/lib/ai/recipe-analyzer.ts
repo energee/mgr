@@ -7,6 +7,9 @@
 
 import { createClient } from "@/lib/supabase/client";
 
+// Create client once at module level (createClient returns singleton)
+const supabase = createClient();
+
 // Types
 export interface StyleComplianceResult {
   recipe_id: string;
@@ -138,7 +141,6 @@ export interface RecipeSuggestionsResult {
 export async function analyzeStyleCompliance(
   recipeId: string
 ): Promise<StyleComplianceResult> {
-  const supabase = createClient();
 
   const { data, error } = await supabase.rpc("analyze_recipe_style_compliance", {
     p_recipe_id: recipeId,
@@ -155,7 +157,6 @@ export async function analyzeStyleCompliance(
  * Get a comprehensive summary of a recipe for AI analysis
  */
 export async function getRecipeSummary(recipeId: string): Promise<RecipeSummary> {
-  const supabase = createClient();
 
   const { data, error } = await supabase.rpc("get_recipe_summary", {
     p_recipe_id: recipeId,
@@ -174,7 +175,6 @@ export async function getRecipeSummary(recipeId: string): Promise<RecipeSummary>
 export async function getRecipeSuggestions(
   recipeId: string
 ): Promise<RecipeSuggestionsResult> {
-  const supabase = createClient();
 
   const { data, error } = await supabase.rpc("suggest_recipe_improvements", {
     p_recipe_id: recipeId,
@@ -273,6 +273,23 @@ export const BrewingCalculations = {
   },
 };
 
+// Water profile data by style character
+type WaterProfile = { sulfate: [number, number]; chloride: [number, number]; ratio: string };
+
+const WATER_PROFILES: Record<string, WaterProfile> = {
+  hoppy: { sulfate: [150, 300], chloride: [50, 100], ratio: "2:1 to 3:1" },
+  malty: { sulfate: [50, 100], chloride: [100, 200], ratio: "1:2" },
+  balanced: { sulfate: [30, 80], chloride: [30, 80], ratio: "1:1" },
+  default: { sulfate: [75, 150], chloride: [75, 150], ratio: "1:1" },
+};
+
+const STYLE_KEYWORDS: Record<keyof typeof WATER_PROFILES, string[]> = {
+  hoppy: ["ipa", "pale ale", "hoppy"],
+  malty: ["stout", "porter", "malty"],
+  balanced: ["pilsner", "lager", "kolsch"],
+  default: [],
+};
+
 /**
  * Water chemistry analysis helpers
  */
@@ -288,37 +305,14 @@ export const WaterChemistry = {
   /**
    * Get recommended profile for a style category
    */
-  getRecommendedProfile(
-    styleCategory: string
-  ): { sulfate: [number, number]; chloride: [number, number]; ratio: string } {
-    const lowerCategory = styleCategory.toLowerCase();
-
-    if (
-      lowerCategory.includes("ipa") ||
-      lowerCategory.includes("pale ale") ||
-      lowerCategory.includes("hoppy")
-    ) {
-      return { sulfate: [150, 300], chloride: [50, 100], ratio: "2:1 to 3:1" };
+  getRecommendedProfile(styleCategory: string): WaterProfile {
+    const lower = styleCategory.toLowerCase();
+    for (const [profileKey, keywords] of Object.entries(STYLE_KEYWORDS)) {
+      if (keywords.some((kw) => lower.includes(kw))) {
+        return WATER_PROFILES[profileKey];
+      }
     }
-
-    if (
-      lowerCategory.includes("stout") ||
-      lowerCategory.includes("porter") ||
-      lowerCategory.includes("malty")
-    ) {
-      return { sulfate: [50, 100], chloride: [100, 200], ratio: "1:2" };
-    }
-
-    if (
-      lowerCategory.includes("pilsner") ||
-      lowerCategory.includes("lager") ||
-      lowerCategory.includes("kolsch")
-    ) {
-      return { sulfate: [30, 80], chloride: [30, 80], ratio: "1:1" };
-    }
-
-    // Balanced default
-    return { sulfate: [75, 150], chloride: [75, 150], ratio: "1:1" };
+    return WATER_PROFILES.default;
   },
 
   /**

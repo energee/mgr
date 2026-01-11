@@ -14,6 +14,10 @@ import { registerEntity, entityRegistry, type EntityConfig } from "@/types/entit
 // Import entity configurations
 import { batchEntity } from "./batch";
 import { brewLogEntity } from "./brew-log";
+import { recipeEntity } from "./recipe";
+import { orderEntity } from "./order";
+import { customerEntity } from "./customer";
+import { inventoryItemEntity } from "./inventory-item";
 
 // =============================================================================
 // Register All Entities
@@ -22,29 +26,14 @@ import { brewLogEntity } from "./brew-log";
 // Production domain
 registerEntity(batchEntity);
 registerEntity(brewLogEntity);
-
-// TODO: Add remaining entities as they're created
-// registerEntity(recipeEntity);
-// registerEntity(vesselEntity);
-
-// Packaging domain
-// registerEntity(packagingSessionEntity);
-// registerEntity(packagingFormatEntity);
-// registerEntity(finishedGoodEntity);
+registerEntity(recipeEntity);
 
 // Inventory domain
-// registerEntity(binEntity);
-// registerEntity(locationTransferEntity);
-
-// Purchasing domain
-// registerEntity(supplierEntity);
-// registerEntity(ingredientEntity);
-// registerEntity(purchaseOrderEntity);
+registerEntity(inventoryItemEntity);
 
 // Sales domain
-// registerEntity(orderEntity);
-// registerEntity(customerEntity);
-// registerEntity(priceTierEntity);
+registerEntity(orderEntity);
+registerEntity(customerEntity);
 
 // =============================================================================
 // Exports
@@ -56,6 +45,10 @@ export { entityRegistry };
 export { batchEntity } from "./batch";
 export { brewLogEntity, phaseConfig, metricConfig } from "./brew-log";
 export type { BrewEvent, BrewMeasurement, BrewLogFormValues } from "./brew-log";
+export { recipeEntity } from "./recipe";
+export { orderEntity } from "./order";
+export { customerEntity } from "./customer";
+export { inventoryItemEntity } from "./inventory-item";
 
 // =============================================================================
 // Helper Functions
