@@ -348,6 +348,60 @@ GROUP BY fg.id;
 | `vessels_with_current_batch` | >100 vessels | On vessel_transfers change |
 | `ttb_monthly_summaries` | Always | Monthly or on-demand |
 
+### DEC-PERF-004: RLS Policy Performance
+**Status**: Implemented (January 2026)
+
+Row Level Security (RLS) policies in Supabase/PostgreSQL can cause significant performance issues when `auth.<function>()` calls are evaluated per-row instead of once per query.
+
+**The Problem:**
+```sql
+-- BAD: auth.uid() is evaluated for each row
+CREATE POLICY example_access ON table_name
+  FOR ALL USING (auth.uid() IS NOT NULL);
+```
+
+**The Solution:**
+```sql
+-- GOOD: Subquery makes it an InitPlan, evaluated once per query
+CREATE POLICY example_access ON table_name
+  FOR ALL USING ((SELECT auth.uid()) IS NOT NULL);
+```
+
+**Why this works:** Wrapping the function in a subquery `(SELECT ...)` converts it to a PostgreSQL InitPlan, which is executed once and cached for the entire query execution.
+
+**When writing RLS policies:**
+1. Always wrap `auth.uid()`, `auth.jwt()`, and other `auth.<function>()` calls in a subquery
+2. Always wrap `current_setting()` calls in a subquery
+3. For complex policies, consider using a helper function with `SECURITY DEFINER` that caches the user context
+
+**Examples:**
+```sql
+-- Simple authentication check
+CREATE POLICY table_access ON my_table
+  FOR ALL USING ((SELECT auth.uid()) IS NOT NULL);
+
+-- User-specific access
+CREATE POLICY user_data_access ON user_data
+  FOR ALL USING (user_id = (SELECT auth.uid()));
+
+-- Role-based access
+CREATE POLICY admin_access ON admin_table
+  FOR ALL USING (
+    (SELECT auth.uid()) IN (
+      SELECT id FROM users WHERE 'admin' = ANY(roles)
+    )
+  );
+```
+
+### DEC-PERF-005: Index Management
+**Status**: Implemented (January 2026)
+
+**Best Practices:**
+1. Always use `CREATE INDEX IF NOT EXISTS` to prevent duplicate index errors during migrations
+2. Use consistent naming: `idx_<table>_<column>` or `idx_<table>_<purpose>`
+3. Before creating a new index, verify no equivalent index exists
+4. Document index purpose in migrations with comments
+
 ### Scalability Guidelines
 
 | Entity | Comfortable Limit | Action at Threshold |
