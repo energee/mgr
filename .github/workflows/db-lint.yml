@@ -1,0 +1,90 @@
+name: Database Security Lint
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**/*.sql'
+      - 'supabase/functions/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**/*.sql'
+
+jobs:
+  db-lint:
+    name: Supabase Database Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (database only)
+        run: |
+          # Start only the database container to avoid image pull issues with other services
+          supabase start --ignore-health-check -x gotrue,storage,imgproxy,inbucket,pgadmin-schema-diff,migra,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+        env:
+          SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+
+      - name: Wait for database
+        run: |
+          echo "Waiting for database to be ready..."
+          for i in {1..30}; do
+            if supabase status 2>/dev/null | grep -q "DB URL"; then
+              echo "Database is ready"
+              break
+            fi
+            echo "Attempt $i/30..."
+            sleep 2
+          done
+
+      - name: Run Database Migrations
+        run: supabase db reset --no-seed
+
+      - name: Run Database Linter
+        id: lint
+        run: |
+          # Run the linter and capture output
+          supabase db lint --level error > lint-output.txt 2>&1 || true
+
+          # Check for ERROR level issues
+          if grep -q "ERROR" lint-output.txt; then
+            echo "::error::Database linter found ERROR-level security issues"
+            cat lint-output.txt
+            echo "has_errors=true" >> $GITHUB_OUTPUT
+          else
+            echo "No ERROR-level issues found"
+            cat lint-output.txt
+            echo "has_errors=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Full Lint Report
+        if: always()
+        run: |
+          echo "## Full Database Lint Report" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          supabase db lint >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail on Errors
+        if: steps.lint.outputs.has_errors == 'true'
+        run: |
+          echo "::error::Database security lint failed. See the lint report above for details."
+          echo ""
+          echo "Common fixes:"
+          echo "- security_definer_view: Add 'WITH (security_invoker = true)' to views"
+          echo "- auth_users_exposed: Don't join auth.users in views, cache user info instead"
+          echo "- rls_disabled_in_public: Add 'ALTER TABLE x ENABLE ROW LEVEL SECURITY'"
+          echo "- function_search_path_mutable: Add 'SET search_path = public' to functions"
+          echo ""
+          echo "See docs/spec/architecture.md for security guidelines."
+          exit 1
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup

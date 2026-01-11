@@ -425,6 +425,127 @@ CREATE POLICY admin_access ON admin_table
 | Forms | React Hook Form | TanStack Form | Ecosystem consistency |
 | Tenancy | Multi-tenant SaaS | Single-tenant | Simpler for target use case |
 
+---
+
+## Database Security Guidelines
+
+### DEC-SEC-001: View Security (security_invoker)
+**Status**: Enforced (January 2026)
+
+All views in the public schema MUST use `security_invoker = true` to ensure RLS policies are respected.
+
+```sql
+-- CORRECT: Uses caller's permissions
+CREATE VIEW my_view
+WITH (security_invoker = true)
+AS SELECT ...;
+
+-- WRONG: Uses view owner's permissions (bypasses RLS)
+CREATE VIEW my_view AS SELECT ...;
+```
+
+**Rationale**: By default, PostgreSQL views use SECURITY DEFINER behavior, meaning they run with the permissions of the view creator (usually postgres). This bypasses Row Level Security policies and can expose data to unauthorized users.
+
+### DEC-SEC-002: Never Expose auth.users
+**Status**: Enforced (January 2026)
+
+Views and functions MUST NOT join with or select from `auth.users` directly.
+
+```sql
+-- WRONG: Exposes auth.users data
+CREATE VIEW recent_activity AS
+SELECT a.*, u.email
+FROM activities a
+JOIN auth.users u ON a.user_id = u.id;
+
+-- CORRECT: Cache user info in the table or use a users table
+CREATE VIEW recent_activity AS
+SELECT a.*, a.user_name  -- Cached at write time
+FROM activities a;
+```
+
+**Rationale**: The `auth.users` table contains sensitive authentication data. Exposing it through views can leak user emails and metadata to the PostgREST API.
+
+### DEC-SEC-003: RLS Must Be Enabled
+**Status**: Enforced (January 2026)
+
+All tables in the public schema MUST have RLS enabled. If a policy exists, RLS MUST be enabled.
+
+```sql
+-- CORRECT: Enable RLS before or after creating policy
+ALTER TABLE my_table ENABLE ROW LEVEL SECURITY;
+CREATE POLICY my_policy ON my_table ...;
+
+-- WRONG: Policy without RLS enabled (policy has no effect!)
+CREATE POLICY my_policy ON my_table ...;
+-- Missing: ALTER TABLE my_table ENABLE ROW LEVEL SECURITY;
+```
+
+### DEC-SEC-004: Function Search Path
+**Status**: Enforced (January 2026)
+
+All functions MUST set `search_path` to prevent search path injection attacks.
+
+```sql
+-- CORRECT: Explicit search path
+CREATE FUNCTION my_func()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$ ... $$;
+
+-- WRONG: Mutable search path
+CREATE FUNCTION my_func()
+RETURNS void
+LANGUAGE plpgsql
+AS $$ ... $$;
+```
+
+**Rationale**: Without an explicit search_path, malicious users could potentially hijack function calls by creating objects in their own schema that shadow public schema objects.
+
+### DEC-SEC-005: Extensions Not in Public Schema
+**Status**: Recommended
+
+Extensions should be installed in the `extensions` schema, not `public`.
+
+```sql
+-- CORRECT: Extension in dedicated schema
+CREATE EXTENSION pg_trgm SCHEMA extensions;
+
+-- NOT RECOMMENDED: Extension in public
+CREATE EXTENSION pg_trgm;  -- Defaults to public
+```
+
+### DEC-SEC-006: Restrictive RLS Policies
+**Status**: Enforced (January 2026)
+
+Avoid overly permissive RLS policies. Never use `WITH CHECK (true)` for INSERT/UPDATE/DELETE unless absolutely necessary.
+
+```sql
+-- WRONG: Allows anyone to insert
+CREATE POLICY "Too permissive" ON my_table
+  FOR INSERT WITH CHECK (true);
+
+-- CORRECT: Restrict to specific roles or conditions
+CREATE POLICY "Users can insert own records" ON my_table
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+```
+
+### Automated Security Checks
+
+The project includes CI checks that run `supabase db lint` on every PR. All ERROR-level findings must be resolved before merging.
+
+| Level | Action Required |
+|-------|-----------------|
+| ERROR | Must fix before merge |
+| WARN | Should fix, review if acceptable |
+| INFO | Consider fixing |
+
+---
+
 ## Related Documents
 
 - [Decisions](./decisions.md) - Schema review decisions
