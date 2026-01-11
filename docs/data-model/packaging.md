@@ -125,6 +125,42 @@ ALTER TABLE finished_goods ADD CONSTRAINT chk_fg_entry_point CHECK (
 );
 ```
 
+### `finished_goods_with_availability` (View)
+
+Use this view for order fulfillment and inventory queries. Available quantity is calculated from allocations.
+
+```sql
+CREATE VIEW finished_goods_with_availability AS
+SELECT
+  fg.*,
+  fg.quantity as total_quantity,
+  COALESCE(SUM(CASE WHEN a.status = 'completed'
+    THEN a.quantity ELSE 0 END), 0) as allocated_quantity,
+  COALESCE(SUM(CASE WHEN a.status = 'planned'
+    THEN a.quantity ELSE 0 END), 0) as reserved_quantity,
+  fg.quantity - COALESCE(SUM(CASE WHEN a.status IN ('planned', 'completed')
+    THEN a.quantity ELSE 0 END), 0) as available_quantity
+FROM finished_goods fg
+LEFT JOIN allocations a
+  ON a.source_type = 'finished_good' AND a.source_id = fg.id
+GROUP BY fg.id;
+```
+
+**Optimistic Locking:** The `version` column enables optimistic locking for concurrent updates:
+
+```typescript
+// Application pattern
+const result = await supabase
+  .from('finished_goods')
+  .update({ quantity: newQty, version: currentVersion + 1 })
+  .eq('id', fgId)
+  .eq('version', currentVersion);
+
+if (result.count === 0) {
+  throw new Error('Concurrent modification detected');
+}
+```
+
 ---
 
 ## State Machine: Packaging Session

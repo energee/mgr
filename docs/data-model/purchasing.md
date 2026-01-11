@@ -80,8 +80,23 @@ Purchase order line items.
 | quantity | DECIMAL(10,4) | Ordered quantity |
 | unit | TEXT | Unit |
 | unit_price | DECIMAL(10,4) | Unit price |
-| received_quantity | DECIMAL(10,4) | Total received so far |
 | created_at | TIMESTAMPTZ | Created timestamp |
+
+**Note:** `received_quantity` is calculated, not stored. Use `po_line_items_with_quantities` view.
+
+### `po_line_items_with_quantities` (View)
+
+```sql
+CREATE VIEW po_line_items_with_quantities AS
+SELECT
+  pli.*,
+  pli.quantity as ordered_quantity,
+  COALESCE(SUM(por.quantity), 0) as received_quantity,
+  pli.quantity - COALESCE(SUM(por.quantity), 0) as outstanding_quantity
+FROM po_line_items pli
+LEFT JOIN po_receives por ON por.po_line_item_id = pli.id
+GROUP BY pli.id;
+```
 
 ---
 
@@ -113,8 +128,7 @@ Inventory lots from received POs. Tracks lot-level inventory for FIFO costing.
 | inventory_item_id | UUID | FK to inventory_items |
 | po_receive_id | UUID | FK to po_receives (optional) |
 | lot_number | TEXT | Lot number |
-| quantity | DECIMAL(10,4) | Original quantity |
-| remaining_quantity | DECIMAL(10,4) | Remaining quantity |
+| quantity | DECIMAL(10,4) | Original received quantity |
 | unit | TEXT | Unit |
 | unit_cost | DECIMAL(10,4) | Unit cost before shipping |
 | landed_cost | DECIMAL(10,4) | Unit cost including shipping allocation |
@@ -124,6 +138,34 @@ Inventory lots from received POs. Tracks lot-level inventory for FIFO costing.
 | notes | TEXT | Notes |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Note:** `remaining_quantity` is calculated from allocations, not stored. Use `inventory_lots_with_quantities` view.
+
+### `inventory_lots_with_quantities` (View)
+
+```sql
+CREATE VIEW inventory_lots_with_quantities AS
+SELECT
+  il.*,
+  il.quantity as received_quantity,
+  COALESCE(SUM(CASE WHEN a.status IN ('planned', 'completed')
+    THEN a.quantity ELSE 0 END), 0) as allocated_quantity,
+  il.quantity - COALESCE(SUM(CASE WHEN a.status IN ('planned', 'completed')
+    THEN a.quantity ELSE 0 END), 0) as remaining_quantity
+FROM inventory_lots il
+LEFT JOIN allocations a
+  ON a.source_type = 'inventory_lot' AND a.source_id = il.id
+GROUP BY il.id;
+```
+
+**FIFO Usage Query:**
+```sql
+-- Get available lots for an inventory item, oldest first
+SELECT * FROM inventory_lots_with_quantities
+WHERE inventory_item_id = :item_id
+  AND remaining_quantity > 0
+ORDER BY received_date ASC, expiration_date ASC NULLS LAST;
+```
 
 ---
 
