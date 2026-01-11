@@ -945,15 +945,10 @@ END $$;
 -- Drop the overly permissive policy
 DROP POLICY IF EXISTS "System can insert preferences" ON user_preferences;
 
--- Create a more restrictive policy that only allows the trigger function to insert
--- The create_user_preferences function uses SECURITY DEFINER so it runs as owner
--- For service_role operations (like the trigger), we allow insert
-CREATE POLICY "Service role can insert preferences" ON user_preferences
-  FOR INSERT
-  TO service_role
-  WITH CHECK (true);
-
--- Also allow users to insert their own preferences (in case trigger fails)
+-- Create a more restrictive policy for authenticated users
+-- The create_user_preferences() function uses SECURITY DEFINER and can insert on behalf of users
+-- The service_role bypasses RLS by default, so no explicit policy is needed
+-- Users can also manually insert their own preferences (in case trigger fails)
 CREATE POLICY "Users can insert own preferences" ON user_preferences
   FOR INSERT
   TO authenticated
