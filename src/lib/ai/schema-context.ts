@@ -7,6 +7,9 @@
 
 import { createClient } from "@/lib/supabase/client";
 
+// Create client once at module level (createClient returns singleton)
+const supabase = createClient();
+
 // Types
 export interface SchemaTable {
   table_name: string;
@@ -71,7 +74,6 @@ export const DOMAIN_DESCRIPTIONS: Record<string, string> = {
 export async function getSchemaContext(
   domain?: string
 ): Promise<SchemaContext> {
-  const supabase = createClient();
 
   const { data, error } = await supabase.rpc("get_ai_schema_context", {
     p_domain: domain || null,
@@ -90,7 +92,6 @@ export async function getSchemaContext(
 export async function getSchemaRegistry(
   domain?: string
 ): Promise<SchemaTable[]> {
-  const supabase = createClient();
 
   let query = supabase
     .from("_schema_registry")
@@ -115,7 +116,6 @@ export async function getSchemaRegistry(
  * Get a summary of all domains
  */
 export async function getDomainSummary(): Promise<DomainSummary[]> {
-  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("_schema_registry")
@@ -146,7 +146,6 @@ export async function getDomainSummary(): Promise<DomainSummary[]> {
  * Get table information with relationships
  */
 export async function getTableInfo(tableName: string): Promise<SchemaTable | null> {
-  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("_schema_registry")
@@ -170,7 +169,6 @@ export async function getTableInfo(tableName: string): Promise<SchemaTable | nul
 export async function getRelatedTables(
   tableName: string
 ): Promise<{ table: string; relationship: string; direction: string }[]> {
-  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("_schema_registry")
@@ -283,92 +281,6 @@ export async function generateAIContextPrompt(
 
   return prompt;
 }
-
-/**
- * Entity state machine configurations for common entities
- */
-export const STATE_MACHINES = {
-  batch: {
-    stateField: "status",
-    states: [
-      "planned",
-      "fermenting",
-      "conditioning",
-      "packaging",
-      "completed",
-      "cancelled",
-    ],
-    transitions: {
-      planned: ["fermenting", "cancelled"],
-      fermenting: ["conditioning", "cancelled"],
-      conditioning: ["packaging", "cancelled"],
-      packaging: ["completed", "cancelled"],
-      completed: [],
-      cancelled: [],
-    },
-  },
-  order: {
-    stateField: "status",
-    states: [
-      "draft",
-      "confirmed",
-      "scheduled",
-      "picking",
-      "packed",
-      "out_the_door",
-      "fulfilled",
-      "cancelled",
-    ],
-    transitions: {
-      draft: ["confirmed", "cancelled"],
-      confirmed: ["scheduled", "cancelled"],
-      scheduled: ["picking", "cancelled"],
-      picking: ["packed", "cancelled"],
-      packed: ["out_the_door"],
-      out_the_door: ["fulfilled"],
-      fulfilled: [],
-      cancelled: [],
-    },
-  },
-  brew_log: {
-    stateField: "status",
-    states: ["draft", "in_progress", "completed", "cancelled"],
-    transitions: {
-      draft: ["in_progress", "cancelled"],
-      in_progress: ["completed", "cancelled"],
-      completed: [],
-      cancelled: [],
-    },
-  },
-  packaging_session: {
-    stateField: "status",
-    states: ["planned", "in_progress", "completed", "revised", "cancelled"],
-    transitions: {
-      planned: ["in_progress", "cancelled"],
-      in_progress: ["completed", "cancelled"],
-      completed: ["revised"],
-      revised: [],
-      cancelled: [],
-    },
-  },
-  vessel: {
-    stateField: "status",
-    states: [
-      "dirty",
-      "caustic_cleaned",
-      "ready_for_use",
-      "in_use",
-      "maintenance",
-    ],
-    transitions: {
-      dirty: ["caustic_cleaned", "maintenance"],
-      caustic_cleaned: ["ready_for_use", "maintenance"],
-      ready_for_use: ["in_use", "maintenance"],
-      in_use: ["dirty", "maintenance"],
-      maintenance: ["dirty"],
-    },
-  },
-};
 
 /**
  * Query templates for common AI operations

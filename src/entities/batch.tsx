@@ -14,7 +14,8 @@
  */
 
 import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, StateMachineConfig } from "@/types/entity";
+import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 
@@ -31,7 +32,7 @@ export const batchSchema = z.object({
   status: z.string().default("planned"),
   recipe_id: z.string().uuid().nullable().optional(),
   planned_start_date: z.string().nullable().optional(),  // Planned fermentation start
-  volume_gallons: z.coerce.number().nullable().optional(),
+  volume_bbl: z.coerce.number().nullable().optional(),   // Stored in BBL (canonical unit)
   fermenter: z.string().nullable().optional(),
   // Note: actual_og and actual brew_date come from linked brew_logs
   actual_fg: z.coerce.number().nullable().optional(),
@@ -40,6 +41,35 @@ export const batchSchema = z.object({
 });
 
 export type BatchFormValues = z.infer<typeof batchSchema>;
+
+// =============================================================================
+// State Machine (defined separately to derive options)
+// =============================================================================
+
+const batchStateMachine: StateMachineConfig<Batch> = {
+  stateField: "status",
+  states: ["planned", "fermenting", "conditioning", "packaging", "completed", "cancelled"],
+  initialState: "planned",
+  transitions: {
+    planned: ["fermenting", "cancelled"],
+    fermenting: ["conditioning", "cancelled"],
+    conditioning: ["packaging", "cancelled"],
+    packaging: ["completed", "cancelled"],
+    completed: [],
+    cancelled: [],
+  },
+  stateDisplay: {
+    planned: { label: "Planned", color: "default" },
+    fermenting: { label: "Fermenting", color: "info" },
+    conditioning: { label: "Conditioning", color: "info" },
+    packaging: { label: "Packaging", color: "warning" },
+    completed: { label: "Completed", color: "success" },
+    cancelled: { label: "Cancelled", color: "error" },
+  },
+};
+
+// Derive status options from state machine (single source of truth)
+const statusOptions = statesAsOptions(batchStateMachine);
 
 // =============================================================================
 // Entity Configuration
@@ -88,10 +118,11 @@ export const batchEntity: EntityConfig<Batch> = {
       format: "date",
     },
     {
-      accessorKey: "volume_gallons",
-      header: "Volume (gal)",
+      accessorKey: "volume_bbl",
+      header: "Volume",
       sortable: true,
-      format: "number",
+      format: "unit",
+      unitType: "volume",
     },
     {
       accessorKey: "fermenter",
@@ -105,14 +136,7 @@ export const batchEntity: EntityConfig<Batch> = {
       field: "status",
       type: "multiselect",
       label: "Status",
-      options: [
-        { value: "planned", label: "Planned" },
-        { value: "fermenting", label: "Fermenting" },
-        { value: "conditioning", label: "Conditioning" },
-        { value: "packaging", label: "Packaging" },
-        { value: "completed", label: "Completed" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: statusOptions,
     },
   ],
 
@@ -137,7 +161,7 @@ export const batchEntity: EntityConfig<Batch> = {
         { field: "name", label: "Name" },
         { field: "status", label: "Status" },
         { field: "planned_start_date", label: "Planned Start", format: "date" },
-        { field: "volume_gallons", label: "Volume (gallons)" },
+        { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
         { field: "fermenter", label: "Fermenter" },
       ],
     },
@@ -189,10 +213,11 @@ export const batchEntity: EntityConfig<Batch> = {
       colSpan: 6,
     },
     {
-      name: "volume_gallons",
-      label: "Volume (gallons)",
-      type: "number",
-      placeholder: "e.g., 310",
+      name: "volume_bbl",
+      label: "Volume",
+      type: "unit",
+      unitType: "volume",
+      placeholder: "e.g., 10",
       colSpan: 6,
     },
     {
@@ -206,14 +231,7 @@ export const batchEntity: EntityConfig<Batch> = {
       name: "status",
       label: "Status",
       type: "select",
-      options: [
-        { value: "planned", label: "Planned" },
-        { value: "fermenting", label: "Fermenting" },
-        { value: "conditioning", label: "Conditioning" },
-        { value: "packaging", label: "Packaging" },
-        { value: "completed", label: "Completed" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: statusOptions,
       colSpan: 6,
     },
     {
@@ -241,27 +259,7 @@ export const batchEntity: EntityConfig<Batch> = {
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------
-  stateMachine: {
-    stateField: "status",
-    states: ["planned", "fermenting", "conditioning", "packaging", "completed", "cancelled"],
-    initialState: "planned",
-    transitions: {
-      planned: ["fermenting", "cancelled"],  // Batch starts fermenting when wort is transferred
-      fermenting: ["conditioning", "cancelled"],
-      conditioning: ["packaging", "cancelled"],
-      packaging: ["completed", "cancelled"],
-      completed: [],
-      cancelled: [],
-    },
-    stateDisplay: {
-      planned: { label: "Planned", color: "default" },
-      fermenting: { label: "Fermenting", color: "info" },
-      conditioning: { label: "Conditioning", color: "info" },
-      packaging: { label: "Packaging", color: "warning" },
-      completed: { label: "Completed", color: "success" },
-      cancelled: { label: "Cancelled", color: "error" },
-    },
-  },
+  stateMachine: batchStateMachine,
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -270,7 +268,6 @@ export const batchEntity: EntityConfig<Batch> = {
     {
       name: "start_fermentation",
       label: "Start Fermentation",
-      description: "Wort transferred from brew to fermenter",
       icon: "flask",
       type: "button",
       fromStates: ["planned"],

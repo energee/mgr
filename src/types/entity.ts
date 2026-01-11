@@ -142,7 +142,10 @@ export type EntityColumnDef<T> = ColumnDef<T, unknown> & {
   render?: (value: unknown, row: T) => ReactNode;
 
   /** Format type for automatic formatting */
-  format?: "date" | "datetime" | "currency" | "number" | "percentage";
+  format?: "date" | "datetime" | "currency" | "number" | "percentage" | "unit";
+
+  /** Unit type for unit formatting (volume, weight, temperature, gravity, retail_volume) */
+  unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
 };
 
 export interface EntityFilterDef {
@@ -197,7 +200,10 @@ export interface EntityFieldDisplay<T> {
   label: string;
 
   /** Format type */
-  format?: "date" | "datetime" | "currency" | "number" | "percentage" | "json";
+  format?: "date" | "datetime" | "currency" | "number" | "percentage" | "json" | "unit";
+
+  /** Unit type for unit formatting (volume, weight, temperature, gravity, retail_volume) */
+  unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
 
   /** Custom render function */
   render?: (value: unknown, data: T) => ReactNode;
@@ -230,7 +236,8 @@ export interface EntityFieldDef<T> {
     | "checkbox"
     | "switch"
     | "json"
-    | "relation";
+    | "relation"
+    | "unit";
 
   /** Placeholder text */
   placeholder?: string;
@@ -261,6 +268,12 @@ export interface EntityFieldDef<T> {
 
   /** Conditional visibility */
   showWhen?: (values: Partial<T>) => boolean;
+
+  /** Unit type for unit fields (volume, weight, temperature, gravity, retail_volume) */
+  unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
+
+  /** Allow inline unit switching (for recipe builder, brew log) */
+  allowUnitSwitch?: boolean;
 }
 
 // =============================================================================
@@ -375,10 +388,13 @@ export interface EntityRelationDef {
   entity: string;
 
   /** Type of relation */
-  type: "belongsTo" | "hasMany" | "hasOne" | "manyToMany";
+  type: "belongsTo" | "hasMany" | "hasOne" | "manyToMany" | "hasManyThrough";
 
   /** Foreign key field */
   foreignKey: string;
+
+  /** Junction table for hasManyThrough relations */
+  through?: string;
 
   /** Display in detail view */
   showInDetail?: boolean;
@@ -432,4 +448,28 @@ export function getEntity(name: string): EntityConfig<Record<string, unknown>> |
  */
 export function getEntitiesByDomain(domain: EntityDomain): EntityConfig<Record<string, unknown>>[] {
   return Array.from(entityRegistry.values()).filter((e) => e.domain === domain);
+}
+
+/**
+ * Helper to generate select options from a state machine config.
+ * This eliminates the need to duplicate status options in filters and form fields.
+ */
+export function statesAsOptions<T>(
+  stateMachine: StateMachineConfig<T>
+): { value: string; label: string }[] {
+  return stateMachine.states.map((state) => ({
+    value: state,
+    label: stateMachine.stateDisplay?.[state]?.label || formatStateLabel(state),
+  }));
+}
+
+/**
+ * Format a state string as a human-readable label.
+ * Converts snake_case/kebab-case to Title Case.
+ */
+function formatStateLabel(state: string): string {
+  return state
+    .split(/[_-]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }

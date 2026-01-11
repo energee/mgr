@@ -5,6 +5,10 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
+import { batchEntity } from "@/entities/batch";
+
+// Create client once at module level (createClient returns singleton)
+const supabase = createClient();
 
 /**
  * Helper functions for AI to query the MGR system
@@ -17,7 +21,6 @@ export const AIQueryHelpers = {
     query: string,
     options?: { limit?: number; includeEstimates?: boolean }
   ) {
-    const supabase = createClient();
     const limit = options?.limit || 10;
 
     const table = options?.includeEstimates
@@ -46,7 +49,6 @@ export const AIQueryHelpers = {
     ingredientType: "malt" | "hop" | "yeast",
     ingredientId: string
   ) {
-    const supabase = createClient();
 
     if (ingredientType === "yeast") {
       const { data, error } = await supabase
@@ -78,7 +80,6 @@ export const AIQueryHelpers = {
    * Get current batch status summary
    */
   async getBatchStatusSummary() {
-    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("batches")
@@ -98,7 +99,6 @@ export const AIQueryHelpers = {
    * Get batches ready for next step
    */
   async getBatchesReadyForTransition() {
-    const supabase = createClient();
 
     const { data: batches, error } = await supabase
       .from("batches")
@@ -126,7 +126,6 @@ export const AIQueryHelpers = {
    * Get vessel availability
    */
   async getVesselAvailability() {
-    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("vessels_with_current_batch")
@@ -167,7 +166,6 @@ export const AIQueryHelpers = {
    * Get inventory levels for a specific brand
    */
   async getBrandInventory(brandId: string) {
-    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("bin_inventory")
@@ -192,7 +190,6 @@ export const AIQueryHelpers = {
    * Get orders pending fulfillment
    */
   async getPendingOrders(options?: { customerId?: string; limit?: number }) {
-    const supabase = createClient();
 
     let query = supabase
       .from("orders")
@@ -226,7 +223,6 @@ export const AIQueryHelpers = {
    * Get recent brew logs
    */
   async getRecentBrewLogs(limit = 10) {
-    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("brew_logs")
@@ -250,7 +246,6 @@ export const AIQueryHelpers = {
    * Get style guidelines
    */
   async getStyleGuidelines(styleId: string) {
-    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("beer_styles")
@@ -266,7 +261,6 @@ export const AIQueryHelpers = {
    * Compare recipe estimates to style
    */
   async compareRecipeToStyle(recipeId: string) {
-    const supabase = createClient();
 
     const { data, error } = await supabase.rpc(
       "analyze_recipe_style_compliance",
@@ -281,7 +275,6 @@ export const AIQueryHelpers = {
    * Get yeast inventory and viability
    */
   async getYeastInventory() {
-    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("yeast_brinks_with_status")
@@ -307,7 +300,6 @@ export const AIQueryHelpers = {
    * Get ingredient inventory levels
    */
   async getIngredientInventory(ingredientType?: string) {
-    const supabase = createClient();
 
     let query = supabase.from("inventory_items").select(
       `
@@ -354,7 +346,6 @@ export const AIQueryHelpers = {
    * Get production schedule for date range
    */
   async getProductionSchedule(startDate: string, endDate: string) {
-    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("batches")
@@ -384,15 +375,8 @@ export const AIQueryHelpers = {
 
 /**
  * Helper to get next possible states for a batch
+ * Uses the batch entity's state machine as the single source of truth
  */
 function getNextStates(currentState: string): string[] {
-  const transitions: Record<string, string[]> = {
-    planned: ["fermenting", "cancelled"],
-    fermenting: ["conditioning", "cancelled"],
-    conditioning: ["packaging", "cancelled"],
-    packaging: ["completed", "cancelled"],
-    completed: [],
-    cancelled: [],
-  };
-  return transitions[currentState] || [];
+  return batchEntity.stateMachine?.transitions[currentState] || [];
 }

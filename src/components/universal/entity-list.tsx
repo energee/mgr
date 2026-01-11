@@ -24,6 +24,7 @@ import {
 } from "@tanstack/react-table";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { formatValue } from "@/lib/utils";
 import type { EntityConfig, EntityColumnDef } from "@/types/entity";
 import {
   Table,
@@ -117,26 +118,8 @@ export function EntityList<T = Record<string, unknown>>({
           return col.render(value, row.original);
         }
 
-        // Format helpers
-        if (col.format) {
-          switch (col.format) {
-            case "date":
-              return value ? new Date(value as string).toLocaleDateString() : "—";
-            case "datetime":
-              return value ? new Date(value as string).toLocaleString() : "—";
-            case "currency":
-              return value != null ? `$${(value as number).toFixed(2)}` : "—";
-            case "number":
-              return value != null ? (value as number).toLocaleString() : "—";
-            case "percentage":
-              return value != null ? `${value}%` : "—";
-          }
-        }
-
-        // Default rendering
-        if (value === null || value === undefined) return "—";
-        if (typeof value === "boolean") return value ? "Yes" : "No";
-        return String(value);
+        // Use shared formatValue utility
+        return formatValue(value, col.format);
       },
     }));
   }, [entity.listColumns]);

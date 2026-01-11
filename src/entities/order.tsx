@@ -6,7 +6,8 @@
  */
 
 import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, StateMachineConfig } from "@/types/entity";
+import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 
@@ -27,6 +28,37 @@ export const orderSchema = z.object({
 });
 
 export type OrderFormValues = z.infer<typeof orderSchema>;
+
+// =============================================================================
+// State Machine (defined separately to derive options)
+// =============================================================================
+
+const orderStateMachine: StateMachineConfig<Order> = {
+  stateField: "status",
+  states: ["draft", "confirmed", "scheduled", "picking", "packed", "fulfilled", "cancelled"],
+  initialState: "draft",
+  transitions: {
+    draft: ["confirmed", "cancelled"],
+    confirmed: ["scheduled", "cancelled"],
+    scheduled: ["picking", "cancelled"],
+    picking: ["packed", "cancelled"],
+    packed: ["fulfilled", "cancelled"],
+    fulfilled: [],
+    cancelled: [],
+  },
+  stateDisplay: {
+    draft: { label: "Draft", color: "default" },
+    confirmed: { label: "Confirmed", color: "info" },
+    scheduled: { label: "Scheduled", color: "info" },
+    picking: { label: "Picking", color: "warning" },
+    packed: { label: "Packed", color: "warning" },
+    fulfilled: { label: "Fulfilled", color: "success" },
+    cancelled: { label: "Cancelled", color: "error" },
+  },
+};
+
+// Derive status options from state machine (single source of truth)
+const statusOptions = statesAsOptions(orderStateMachine);
 
 // =============================================================================
 // Entity Configuration
@@ -85,15 +117,7 @@ export const orderEntity: EntityConfig<Order> = {
       field: "status",
       type: "multiselect",
       label: "Status",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "confirmed", label: "Confirmed" },
-        { value: "scheduled", label: "Scheduled" },
-        { value: "picking", label: "Picking" },
-        { value: "packed", label: "Packed" },
-        { value: "fulfilled", label: "Fulfilled" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: statusOptions,
     },
   ],
 
@@ -149,15 +173,7 @@ export const orderEntity: EntityConfig<Order> = {
       name: "status",
       label: "Status",
       type: "select",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "confirmed", label: "Confirmed" },
-        { value: "scheduled", label: "Scheduled" },
-        { value: "picking", label: "Picking" },
-        { value: "packed", label: "Packed" },
-        { value: "fulfilled", label: "Fulfilled" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: statusOptions,
       colSpan: 6,
     },
     {
@@ -191,29 +207,7 @@ export const orderEntity: EntityConfig<Order> = {
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------
-  stateMachine: {
-    stateField: "status",
-    states: ["draft", "confirmed", "scheduled", "picking", "packed", "fulfilled", "cancelled"],
-    initialState: "draft",
-    transitions: {
-      draft: ["confirmed", "cancelled"],
-      confirmed: ["scheduled", "cancelled"],
-      scheduled: ["picking", "cancelled"],
-      picking: ["packed", "cancelled"],
-      packed: ["fulfilled", "cancelled"],
-      fulfilled: [],
-      cancelled: [],
-    },
-    stateDisplay: {
-      draft: { label: "Draft", color: "default" },
-      confirmed: { label: "Confirmed", color: "info" },
-      scheduled: { label: "Scheduled", color: "info" },
-      picking: { label: "Picking", color: "warning" },
-      packed: { label: "Packed", color: "warning" },
-      fulfilled: { label: "Fulfilled", color: "success" },
-      cancelled: { label: "Cancelled", color: "error" },
-    },
-  },
+  stateMachine: orderStateMachine,
 
   // ---------------------------------------------------------------------------
   // Actions
