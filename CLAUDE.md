@@ -6,8 +6,11 @@ MGR is a professional brewery management system following an **AI-first, minimal
 
 **Key Docs**:
 - `README.md` - Setup, commands, project structure
-- `docs/MGR-SPECIFICATION.md` - Full specification including architecture decisions (Section 2A/2B/2C)
-- `docs/AI.md` - AI integration guide with query examples and analysis functions
+- `docs/spec/` - Technical specification (see `docs/spec/README.md` for navigation)
+  - `docs/spec/decisions.md` - Schema review decisions (DEC-*)
+  - `docs/spec/architecture.md` - Tech stack and design patterns
+  - `docs/spec/workflows.md` - State machines and allocation rules
+  - `docs/spec/ai-integration.md` - AI patterns, queries, brewing science
 - `docs/data-model/` - Schema documentation (source of truth for table structures)
 
 ## Design Principles
@@ -49,12 +52,12 @@ ORDER BY domain, table_name;
 
 ## When Making Changes
 
-1. Check `docs/MGR-SPECIFICATION.md` Section 2B for schema decisions and their status
+1. Check `docs/spec/decisions.md` for schema decisions and their status
 2. Follow entity configuration pattern for new entities
 3. Use universal components; only create domain components when necessary
 4. Update data model docs in `docs/data-model/` when changing schema
 5. Add `_schema_registry` entries in migrations for new tables
-6. Document new architecture decisions in Section 2A/2B of the specification
+6. Document new architecture decisions in `docs/spec/decisions.md` or `docs/spec/architecture.md`
 
 ## AI Integration
 
