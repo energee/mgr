@@ -87,36 +87,38 @@ This document tracks the implementation progress of MGR features based on the sp
 
 **Goal:** Complete the recipe → batch → brew log → vessel workflow.
 **Timeline:** 1-2 weeks
-**Status:** Not Started
+**Status:** In Progress (2.1, 2.2 core pages complete)
 **Depends On:** Phase 1
 
 ### 2.1 Vessel Entity
 
 > Vessels (fermenters, brites, etc.) are critical for batch assignment.
 
-- [ ] Create `src/entities/vessel.tsx`
-  - [ ] Define vessel state machine (dirty → cleaned → ready → in_use → dirty)
-  - [ ] Define list columns (name, type, capacity, status, current batch)
-  - [ ] Define form fields (name, type, capacity, location, notes)
-  - [ ] Define detail sections
-- [ ] Register vessel entity in `src/entities/index.ts`
-- [ ] Create vessel pages
-  - [ ] `src/app/(app)/production/vessels/page.tsx` (list)
-  - [ ] `src/app/(app)/production/vessels/[id]/page.tsx` (detail)
-  - [ ] `src/app/(app)/production/vessels/[id]/edit/page.tsx` (edit)
-  - [ ] `src/app/(app)/production/vessels/new/page.tsx` (create)
-- [ ] Add vessel selector to batch form
-- [ ] Create `vessels_with_current_batch` view
+- [x] Create `src/entities/vessel.tsx`
+  - [x] Define vessel state machine (dirty → caustic_cleaned → ready_for_use → in_use → maintenance)
+  - [x] Define list columns (name, type, capacity, status, current batch)
+  - [x] Define form fields (name, type, capacity, location, notes)
+  - [x] Define detail sections
+- [x] Register vessel entity in `src/entities/index.ts`
+- [x] Create vessel pages
+  - [x] `src/app/(app)/production/vessels/page.tsx` (list)
+  - [x] `src/app/(app)/production/vessels/[id]/page.tsx` (detail)
+  - [x] `src/app/(app)/production/vessels/[id]/edit/page.tsx` (edit)
+  - [x] `src/app/(app)/production/vessels/new/page.tsx` (create)
+- [x] Add vessel selector to batch form (uses dynamicOptions from vessels table)
+- [x] Use `vessels_with_batch` view (existed in migration 00006)
+  - [x] Added `viewTable` support to EntityConfig
+  - [x] Updated EntityList to use viewTable when available
 
 ### 2.2 Brew Log Pages
 
 > Entity config exists; needs routes and pages.
 
-- [ ] Create brew log pages
-  - [ ] `src/app/(app)/production/brew-logs/page.tsx` (list)
-  - [ ] `src/app/(app)/production/brew-logs/[id]/page.tsx` (detail)
-  - [ ] `src/app/(app)/production/brew-logs/[id]/edit/page.tsx` (edit)
-  - [ ] `src/app/(app)/production/brew-logs/new/page.tsx` (create)
+- [x] Create brew log pages
+  - [x] `src/app/(app)/production/brew-logs/page.tsx` (list)
+  - [x] `src/app/(app)/production/brew-logs/[id]/page.tsx` (detail)
+  - [x] `src/app/(app)/production/brew-logs/[id]/edit/page.tsx` (edit)
+  - [x] `src/app/(app)/production/brew-logs/new/page.tsx` (create)
 - [ ] Implement brew log events UI
   - [ ] Phase tracking (mash, lauter, boil, whirlpool, knockout)
   - [ ] Metric recording (temps, gravities, pH)
@@ -413,6 +415,7 @@ Migrations follow the pattern: `00XXX_description.sql`
 
 | Date | Change |
 |------|--------|
+| 2026-01-11 | Phase 2 progress: Vessel entity, vessel pages, brew log pages, dynamic options support |
 | 2026-01-11 | Phase 1 complete: migrations applied, seed data for catalogs, ingredient UI components |
 | 2026-01-11 | Phase 1 migrations created: catalog tables, recipe junction tables, performance indexes |
 | 2026-01-11 | Initial plan created based on spec review |

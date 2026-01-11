@@ -15,6 +15,7 @@ import { registerEntity, entityRegistry, type EntityConfig } from "@/types/entit
 import { batchEntity } from "./batch";
 import { brewLogEntity } from "./brew-log";
 import { recipeEntity } from "./recipe";
+import { vesselEntity } from "./vessel";
 import { orderEntity } from "./order";
 import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
@@ -27,6 +28,7 @@ import { inventoryItemEntity } from "./inventory-item";
 registerEntity(batchEntity);
 registerEntity(brewLogEntity);
 registerEntity(recipeEntity);
+registerEntity(vesselEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
@@ -46,6 +48,8 @@ export { batchEntity } from "./batch";
 export { brewLogEntity, phaseConfig, metricConfig } from "./brew-log";
 export type { BrewEvent, BrewMeasurement, BrewLogFormValues } from "./brew-log";
 export { recipeEntity } from "./recipe";
+export { vesselEntity, VESSEL_TYPES } from "./vessel";
+export type { VesselType, VesselFormValues } from "./vessel";
 export { orderEntity } from "./order";
 export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";

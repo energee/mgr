@@ -222,10 +222,19 @@ export const batchEntity: EntityConfig<Batch> = {
     },
     {
       name: "fermenter",
-      label: "Fermenter",
-      type: "text",
-      placeholder: "e.g., FV-1",
+      label: "Vessel",
+      type: "select",
+      placeholder: "Select vessel...",
       colSpan: 6,
+      // Options populated dynamically from vessels table
+      // See VesselSelector component for enhanced version
+      dynamicOptions: {
+        table: "vessels",
+        valueField: "name",
+        labelField: "name",
+        filter: { is_active: true },
+        orderBy: "name",
+      },
     },
     {
       name: "status",
