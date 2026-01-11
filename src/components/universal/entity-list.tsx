@@ -87,11 +87,12 @@ export function EntityList<T = Record<string, unknown>>({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
 
-  // Fetch data
+  // Fetch data - use viewTable if available (for views with joins), otherwise use base table
+  const fetchTable = entity.viewTable || entity.table;
   const { data, isLoading, error } = useQuery({
-    queryKey: [entity.table, filters],
+    queryKey: [fetchTable, filters],
     queryFn: async () => {
-      let query = db.from(entity.table).select("*");
+      let query = db.from(fetchTable).select("*");
 
       // Apply additional filters
       if (filters) {
