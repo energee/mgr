@@ -71,9 +71,9 @@ export const recipeEntity: EntityConfig<Recipe> = {
   description: "Brewing recipes with ingredients and process parameters",
   domain: "production",
 
-  // Use the view for calculated estimates
-  // Note: Forms should write to base table, reads use this view
-  // viewTable: "recipes_with_estimates",
+  // Use the view for calculated estimates in list/detail views
+  // Forms write to base table, reads use this view
+  viewTable: "recipes_with_estimates",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -88,8 +88,9 @@ export const recipeEntity: EntityConfig<Recipe> = {
       accessorKey: "style_id",
       header: "Style",
       sortable: true,
-      // TODO: Render style name from joined data
-      render: (value) => value ? "Style" : "—",
+      // Note: view needs to be updated to join beer_styles for style_name
+      // For now, this shows the UUID. Future migration will add style_name.
+      render: (value) => value ? "—" : "—",
     },
     {
       accessorKey: "volume_bbl",
@@ -126,8 +127,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       field: "style_id",
       type: "select",
       label: "Style",
-      // TODO: Populate from beer_styles table
-      options: [],
+      dynamicOptions: {
+        table: "beer_styles",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "category,name",
+      },
     },
   ],
 
@@ -242,8 +247,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "select",
       placeholder: "Select brand...",
       colSpan: 6,
-      // TODO: Populate from brands table
-      options: [],
+      dynamicOptions: {
+        table: "brands",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "name",
+      },
     },
     {
       name: "style_id",
@@ -251,8 +260,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "select",
       placeholder: "Select style...",
       colSpan: 6,
-      // TODO: Populate from beer_styles table
-      options: [],
+      dynamicOptions: {
+        table: "beer_styles",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "category,name",
+      },
     },
     {
       name: "yeast_id",
@@ -260,8 +273,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "select",
       placeholder: "Select yeast...",
       colSpan: 6,
-      // TODO: Populate from yeasts table
-      options: [],
+      dynamicOptions: {
+        table: "yeasts",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "lab,name",
+      },
     },
     {
       name: "water_profile_id",
@@ -269,8 +286,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "select",
       placeholder: "Select water profile...",
       colSpan: 6,
-      // TODO: Populate from water_profiles table
-      options: [],
+      dynamicOptions: {
+        table: "water_profiles",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "name",
+      },
     },
     {
       name: "is_active",
