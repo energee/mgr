@@ -30,7 +30,8 @@ jobs:
       - name: Start Supabase (database only)
         run: |
           # Start only the database container to avoid image pull issues with other services
-          supabase start --ignore-health-check -x gotrue,storage,imgproxy,inbucket,pgadmin-schema-diff,migra,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          # Valid exclude options: gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          supabase start --ignore-health-check -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
       - name: Wait for database
         run: |
