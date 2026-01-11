@@ -146,6 +146,12 @@ export type EntityColumnDef<T> = ColumnDef<T, unknown> & {
 
   /** Unit type for unit formatting (volume, weight, temperature, gravity, retail_volume) */
   unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
+
+  /** Related entity for FK columns (displays name from related table) */
+  relation?: {
+    entity: string;
+    displayField: string;
+  };
 };
 
 export interface EntityFilterDef {
@@ -179,8 +185,8 @@ export interface EntitySectionDef<T> {
   /** Fields to display in this section */
   fields?: EntityFieldDisplay<T>[];
 
-  /** Custom component to render (overrides fields) */
-  component?: ComponentType<{ data: T }>;
+  /** Custom component to render (overrides fields) - string for lazy loading, ComponentType for direct */
+  component?: ComponentType<{ data: T }> | string;
 
   /** Whether this section is collapsible */
   collapsible?: boolean;
@@ -257,8 +263,14 @@ export interface EntityFieldDef<T> {
   /** Function to fetch options dynamically */
   fetchOptions?: () => Promise<{ value: string; label: string }[]>;
 
-  /** Related entity (for relation type) */
+  /** Related entity (for relation type) - deprecated, use relation instead */
   relationEntity?: string;
+
+  /** Related entity configuration (for relation type fields) */
+  relation?: {
+    entity: string;
+    displayField: string;
+  };
 
   /** Default value */
   defaultValue?: unknown;

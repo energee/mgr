@@ -150,7 +150,7 @@ export async function analyzeStyleCompliance(
     throw new Error(`Failed to analyze recipe: ${error.message}`);
   }
 
-  return data as StyleComplianceResult;
+  return data as unknown as StyleComplianceResult;
 }
 
 /**
@@ -166,7 +166,7 @@ export async function getRecipeSummary(recipeId: string): Promise<RecipeSummary>
     throw new Error(`Failed to get recipe summary: ${error.message}`);
   }
 
-  return data as RecipeSummary;
+  return data as unknown as RecipeSummary;
 }
 
 /**
@@ -184,7 +184,7 @@ export async function getRecipeSuggestions(
     throw new Error(`Failed to get suggestions: ${error.message}`);
   }
 
-  return data as RecipeSuggestionsResult;
+  return data as unknown as RecipeSuggestionsResult;
 }
 
 /**
