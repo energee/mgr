@@ -1,4 +1,4 @@
--- Migration: 00013_security_fixes.sql
+-- Migration: 00014_security_fixes.sql
 -- Purpose: Fix security advisories from Supabase database linter
 -- Issues addressed:
 --   ERROR: auth_users_exposed (recent_vessel_cleanings exposes auth.users)
@@ -8,6 +8,46 @@
 --   WARN: function_search_path_mutable (8 functions without search_path)
 --   WARN: extension_in_public (pg_trgm in public schema)
 --   WARN: rls_policy_always_true (user_preferences INSERT policy too permissive)
+
+-- =============================================================================
+-- 0. Fix water_profiles column names (schema mismatch fix)
+-- =============================================================================
+-- Some environments may have water_profiles with columns like 'calcium' instead of 'calcium_ppm'
+-- Rename columns if they exist with the wrong names
+
+DO $$
+BEGIN
+  -- Rename calcium -> calcium_ppm if needed
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'water_profiles' AND column_name = 'calcium' AND table_schema = 'public') THEN
+    ALTER TABLE water_profiles RENAME COLUMN calcium TO calcium_ppm;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'water_profiles' AND column_name = 'magnesium' AND table_schema = 'public') THEN
+    ALTER TABLE water_profiles RENAME COLUMN magnesium TO magnesium_ppm;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'water_profiles' AND column_name = 'sodium' AND table_schema = 'public') THEN
+    ALTER TABLE water_profiles RENAME COLUMN sodium TO sodium_ppm;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'water_profiles' AND column_name = 'sulfate' AND table_schema = 'public') THEN
+    ALTER TABLE water_profiles RENAME COLUMN sulfate TO sulfate_ppm;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'water_profiles' AND column_name = 'chloride' AND table_schema = 'public') THEN
+    ALTER TABLE water_profiles RENAME COLUMN chloride TO chloride_ppm;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'water_profiles' AND column_name = 'bicarbonate' AND table_schema = 'public') THEN
+    ALTER TABLE water_profiles RENAME COLUMN bicarbonate TO bicarbonate_ppm;
+  END IF;
+END $$;
 
 -- =============================================================================
 -- 1. Fix auth_users_exposed: Remove auth.users join from recent_vessel_cleanings
