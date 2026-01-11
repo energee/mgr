@@ -348,6 +348,60 @@ GROUP BY fg.id;
 | `vessels_with_current_batch` | >100 vessels | On vessel_transfers change |
 | `ttb_monthly_summaries` | Always | Monthly or on-demand |
 
+### DEC-PERF-004: RLS Policy Performance
+**Status**: Implemented (January 2026)
+
+Row Level Security (RLS) policies in Supabase/PostgreSQL can cause significant performance issues when `auth.<function>()` calls are evaluated per-row instead of once per query.
+
+**The Problem:**
+```sql
+-- BAD: auth.uid() is evaluated for each row
+CREATE POLICY example_access ON table_name
+  FOR ALL USING (auth.uid() IS NOT NULL);
+```
+
+**The Solution:**
+```sql
+-- GOOD: Subquery makes it an InitPlan, evaluated once per query
+CREATE POLICY example_access ON table_name
+  FOR ALL USING ((SELECT auth.uid()) IS NOT NULL);
+```
+
+**Why this works:** Wrapping the function in a subquery `(SELECT ...)` converts it to a PostgreSQL InitPlan, which is executed once and cached for the entire query execution.
+
+**When writing RLS policies:**
+1. Always wrap `auth.uid()`, `auth.jwt()`, and other `auth.<function>()` calls in a subquery
+2. Always wrap `current_setting()` calls in a subquery
+3. For complex policies, consider using a helper function with `SECURITY DEFINER` that caches the user context
+
+**Examples:**
+```sql
+-- Simple authentication check
+CREATE POLICY table_access ON my_table
+  FOR ALL USING ((SELECT auth.uid()) IS NOT NULL);
+
+-- User-specific access
+CREATE POLICY user_data_access ON user_data
+  FOR ALL USING (user_id = (SELECT auth.uid()));
+
+-- Role-based access
+CREATE POLICY admin_access ON admin_table
+  FOR ALL USING (
+    (SELECT auth.uid()) IN (
+      SELECT id FROM users WHERE 'admin' = ANY(roles)
+    )
+  );
+```
+
+### DEC-PERF-005: Index Management
+**Status**: Implemented (January 2026)
+
+**Best Practices:**
+1. Always use `CREATE INDEX IF NOT EXISTS` to prevent duplicate index errors during migrations
+2. Use consistent naming: `idx_<table>_<column>` or `idx_<table>_<purpose>`
+3. Before creating a new index, verify no equivalent index exists
+4. Document index purpose in migrations with comments
+
 ### Scalability Guidelines
 
 | Entity | Comfortable Limit | Action at Threshold |
@@ -370,6 +424,127 @@ GROUP BY fg.id;
 | Next.js | 14+ | 16.x | Latest stable |
 | Forms | React Hook Form | TanStack Form | Ecosystem consistency |
 | Tenancy | Multi-tenant SaaS | Single-tenant | Simpler for target use case |
+
+---
+
+## Database Security Guidelines
+
+### DEC-SEC-001: View Security (security_invoker)
+**Status**: Enforced (January 2026)
+
+All views in the public schema MUST use `security_invoker = true` to ensure RLS policies are respected.
+
+```sql
+-- CORRECT: Uses caller's permissions
+CREATE VIEW my_view
+WITH (security_invoker = true)
+AS SELECT ...;
+
+-- WRONG: Uses view owner's permissions (bypasses RLS)
+CREATE VIEW my_view AS SELECT ...;
+```
+
+**Rationale**: By default, PostgreSQL views use SECURITY DEFINER behavior, meaning they run with the permissions of the view creator (usually postgres). This bypasses Row Level Security policies and can expose data to unauthorized users.
+
+### DEC-SEC-002: Never Expose auth.users
+**Status**: Enforced (January 2026)
+
+Views and functions MUST NOT join with or select from `auth.users` directly.
+
+```sql
+-- WRONG: Exposes auth.users data
+CREATE VIEW recent_activity AS
+SELECT a.*, u.email
+FROM activities a
+JOIN auth.users u ON a.user_id = u.id;
+
+-- CORRECT: Cache user info in the table or use a users table
+CREATE VIEW recent_activity AS
+SELECT a.*, a.user_name  -- Cached at write time
+FROM activities a;
+```
+
+**Rationale**: The `auth.users` table contains sensitive authentication data. Exposing it through views can leak user emails and metadata to the PostgREST API.
+
+### DEC-SEC-003: RLS Must Be Enabled
+**Status**: Enforced (January 2026)
+
+All tables in the public schema MUST have RLS enabled. If a policy exists, RLS MUST be enabled.
+
+```sql
+-- CORRECT: Enable RLS before or after creating policy
+ALTER TABLE my_table ENABLE ROW LEVEL SECURITY;
+CREATE POLICY my_policy ON my_table ...;
+
+-- WRONG: Policy without RLS enabled (policy has no effect!)
+CREATE POLICY my_policy ON my_table ...;
+-- Missing: ALTER TABLE my_table ENABLE ROW LEVEL SECURITY;
+```
+
+### DEC-SEC-004: Function Search Path
+**Status**: Enforced (January 2026)
+
+All functions MUST set `search_path` to prevent search path injection attacks.
+
+```sql
+-- CORRECT: Explicit search path
+CREATE FUNCTION my_func()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$ ... $$;
+
+-- WRONG: Mutable search path
+CREATE FUNCTION my_func()
+RETURNS void
+LANGUAGE plpgsql
+AS $$ ... $$;
+```
+
+**Rationale**: Without an explicit search_path, malicious users could potentially hijack function calls by creating objects in their own schema that shadow public schema objects.
+
+### DEC-SEC-005: Extensions Not in Public Schema
+**Status**: Recommended
+
+Extensions should be installed in the `extensions` schema, not `public`.
+
+```sql
+-- CORRECT: Extension in dedicated schema
+CREATE EXTENSION pg_trgm SCHEMA extensions;
+
+-- NOT RECOMMENDED: Extension in public
+CREATE EXTENSION pg_trgm;  -- Defaults to public
+```
+
+### DEC-SEC-006: Restrictive RLS Policies
+**Status**: Enforced (January 2026)
+
+Avoid overly permissive RLS policies. Never use `WITH CHECK (true)` for INSERT/UPDATE/DELETE unless absolutely necessary.
+
+```sql
+-- WRONG: Allows anyone to insert
+CREATE POLICY "Too permissive" ON my_table
+  FOR INSERT WITH CHECK (true);
+
+-- CORRECT: Restrict to specific roles or conditions
+CREATE POLICY "Users can insert own records" ON my_table
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+```
+
+### Automated Security Checks
+
+The project includes CI checks that run `supabase db lint` on every PR. All ERROR-level findings must be resolved before merging.
+
+| Level | Action Required |
+|-------|-----------------|
+| ERROR | Must fix before merge |
+| WARN | Should fix, review if acceptable |
+| INFO | Consider fixing |
+
+---
 
 ## Related Documents
 
