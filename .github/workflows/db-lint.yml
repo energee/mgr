@@ -45,6 +45,25 @@ jobs:
         with:
           version: latest
 
+      - name: Create Supabase roles
+        run: |
+          # Create the roles that Supabase migrations expect
+          psql "$DATABASE_URL" <<EOF
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN;
+          CREATE ROLE authenticator NOLOGIN;
+          GRANT anon TO authenticator;
+          GRANT authenticated TO authenticator;
+          GRANT service_role TO authenticator;
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE SCHEMA IF NOT EXISTS extensions;
+          -- Mock auth.uid() function for RLS policies
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS \$\$
+            SELECT NULL::uuid;
+          \$\$ LANGUAGE sql;
+          EOF
+
       - name: Apply migrations
         run: |
           # Apply all migrations in order using psql
