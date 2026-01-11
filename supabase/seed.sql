@@ -160,24 +160,10 @@ ON CONFLICT (id) DO NOTHING;
 -- =============================================================================
 -- Allocations (inventory movements)
 -- =============================================================================
-
-INSERT INTO allocations (id, inventory_item_id, allocation_type, quantity, unit_cost, notes)
-VALUES
-  -- Initial receipts
-  ('00000000-0000-0000-0009-000000000001',
-   '00000000-0000-0000-0008-000000000001', 'receipt', 500.0, 0.75, 'Initial inventory'),
-  ('00000000-0000-0000-0009-000000000002',
-   '00000000-0000-0000-0008-000000000002', 'receipt', 200.0, 0.85, 'Initial inventory'),
-  ('00000000-0000-0000-0009-000000000003',
-   '00000000-0000-0000-0008-000000000003', 'receipt', 64.0, 2.50, 'Initial inventory'),
-  ('00000000-0000-0000-0009-000000000004',
-   '00000000-0000-0000-0008-000000000004', 'receipt', 64.0, 2.50, 'Initial inventory'),
-  -- Usage for batch
-  ('00000000-0000-0000-0009-000000000005',
-   '00000000-0000-0000-0008-000000000001', 'batch_usage', -20.0, NULL, 'Used for 2024-001'),
-  ('00000000-0000-0000-0009-000000000006',
-   '00000000-0000-0000-0008-000000000003', 'batch_usage', -8.0, NULL, 'Used for 2024-001')
-ON CONFLICT (id) DO NOTHING;
+-- NOTE: Allocations table was restructured in migration 00010 to use
+-- source_type/source_id and destination_type/destination_id instead of
+-- inventory_item_id. Seed data would need inventory_lots created first.
+-- Skipping allocation seed data for now.
 
 -- =============================================================================
 -- CATALOG DATA: Beer Styles (BJCP 2021 Guidelines)
