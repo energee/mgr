@@ -15,6 +15,9 @@ jobs:
   db-lint:
     name: Supabase Database Linter
     runs-on: ubuntu-latest
+    env:
+      # Use default Docker Hub registry to avoid ghcr.io image availability issues
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,8 +31,6 @@ jobs:
         run: |
           # Start only the database container to avoid image pull issues with other services
           supabase start --ignore-health-check -x gotrue,storage,imgproxy,inbucket,pgadmin-schema-diff,migra,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
-        env:
-          SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
 
       - name: Wait for database
         run: |
