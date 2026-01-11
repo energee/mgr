@@ -281,3 +281,31 @@ When `price_source = 'manual'`:
 When `price_source = 'style_tier'`:
 1. Show info icon indicating fallback pricing used
 2. Tooltip: "Using style-level pricing (no brand-specific price)"
+
+---
+
+## Indexes
+
+Performance indexes for sales domain tables:
+
+```sql
+-- Order queries (critical for order management UI)
+CREATE INDEX idx_orders_customer_status_date ON orders(customer_id, status, order_date DESC);
+CREATE INDEX idx_orders_status_requested_date ON orders(status, requested_date);
+CREATE INDEX idx_orders_order_number ON orders(order_number);
+
+-- Order items (line item lookups and FG allocation)
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_brand_package ON order_items(brand_id, package_type_id);
+CREATE INDEX idx_order_items_allocation ON order_items(allocation_id) WHERE allocation_id IS NOT NULL;
+
+-- Price tier lookups (pricing resolution)
+CREATE INDEX idx_tier_prices_tier ON tier_prices(price_tier_id, valid_from, valid_to);
+CREATE INDEX idx_tier_prices_brand_package ON tier_prices(brand_id, package_type_id, valid_from, valid_to);
+CREATE INDEX idx_tier_prices_style_package ON tier_prices(style_id, package_type_id, valid_from, valid_to) WHERE style_id IS NOT NULL;
+CREATE INDEX idx_tier_prices_temporal ON tier_prices(valid_from, valid_to);
+
+-- Customer lookups
+CREATE INDEX idx_customers_type_active ON customers(customer_type, is_active);
+CREATE INDEX idx_customers_name ON customers(name) WHERE is_active = true;
+```

@@ -8,7 +8,7 @@ Manufactured products (beers, ciders, wines, etc.). A brand represents a finishe
 |--------|------|-------------|
 | id | UUID | Primary key |
 | name | TEXT | Brand name (unique per brewery) |
-| style_id | UUID | FK to beer_styles |
+| style_id | UUID | FK to [beer_styles](./catalog.md#beer_styles) |
 | description | TEXT | Brand description |
 | abv | DECIMAL(3,1) | ABV (0-30) |
 | variant | TEXT | Machine name/slug (lowercase, dashes) |
@@ -60,10 +60,10 @@ Brewing recipes with all parameters. Ingredients are stored in junction tables f
 |--------|------|-------------|
 | id | UUID | Primary key |
 | name | TEXT | Recipe name |
-| brand_id | UUID | FK to brands (optional) |
-| style_id | UUID | FK to beer_styles |
-| yeast_id | UUID | FK to yeasts |
-| water_profile_id | UUID | FK to water_profiles |
+| brand_id | UUID | FK to [brands](#brands) (optional) |
+| style_id | UUID | FK to [beer_styles](./catalog.md#beer_styles) |
+| yeast_id | UUID | FK to [yeasts](./catalog.md#yeasts) |
+| water_profile_id | UUID | FK to [water_profiles](#water_profiles) |
 | created_by | UUID | FK to auth.users |
 | **Volumes** | | |
 | volume_bbl | DECIMAL(8,2) | Recipe volume in BBL |
@@ -370,17 +370,18 @@ Production batches (cold-side: fermentation through packaging). Hot-side data co
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| recipe_id | UUID | FK to recipes |
+| recipe_id | UUID | FK to [recipes](#recipes) |
 | batch_number | TEXT | Unique batch identifier |
 | name | TEXT | Batch name |
 | status | TEXT | Status: planned, fermenting, conditioning, packaging, completed, cancelled |
 | **Planning** | | |
 | planned_start_date | DATE | Planned fermentation start date (for scheduling) |
 | **Volumes** | | |
-| volume_gallons | DECIMAL(6,2) | Volume in fermenter |
+| volume_gallons | DECIMAL(6,2) | Volume in fermenter ⚠️ See note below |
 | **Fermentation Results** | | |
 | actual_fg | DECIMAL(4,3) | Actual final gravity |
 | actual_abv | DECIMAL(3,1) | Actual ABV |
+| actual_og | DECIMAL(4,3) | Actual original gravity ⚠️ See note below |
 | **Equipment** | | |
 | fermenter | TEXT | Fermenter identifier |
 | **Notes** | | |
@@ -398,6 +399,19 @@ Production batches (cold-side: fermentation through packaging). Hot-side data co
 **Planned vs Actual:**
 - `planned_start_date` - when we plan to start fermentation (for scheduling)
 - `brew_date` (derived) - when the brew actually happened
+
+**⚠️ Specification Conflict - Stored vs. Derived Fields:**
+
+The following fields are documented as stored columns above, but [MGR-SPECIFICATION.md](../MGR-SPECIFICATION.md) proposes deriving them instead:
+
+- **`batches.volume_gallons`** (DEC-RED-004): Specification proposes removing this stored field and deriving volume from `brew_log_batches.volume_bbl` minus `finished_goods` allocations
+- **`batches.actual_og`** (DEC-RED-002): Specification proposes removing this stored field and deriving OG from linked `brew_logs.events` data
+
+**Current implementation:** These fields exist as stored columns in the schema.
+
+**Decision needed:** Choose whether to:
+1. Keep stored fields (requires updating specification to mark DEC-RED-002 and DEC-RED-004 as rejected)
+2. Implement derived approach (requires schema migration to remove columns and create views)
 
 **See also:** [brew-logs.md](./brew-logs.md) for the decoupled hot-side data model.
 
@@ -897,3 +911,56 @@ Any state can transition to maintenance, which returns to dirty.
 - `caustic_cleaned` is an intermediate state after caustic wash but before sanitizing
 - `ready_for_use` means fully cleaned and sanitized, ready for beer
 - Some breweries skip `caustic_cleaned` and go `dirty` → `ready_for_use` directly
+
+---
+
+## Indexes
+
+Performance indexes for production domain tables:
+
+```sql
+-- Recipe queries and filtering
+CREATE INDEX idx_recipes_brand ON recipes(brand_id);
+CREATE INDEX idx_recipes_style ON recipes(style_id);
+CREATE INDEX idx_recipes_yeast ON recipes(yeast_id);
+CREATE INDEX idx_recipes_water_profile ON recipes(water_profile_id);
+
+-- Recipe ingredient lookups
+CREATE INDEX idx_recipe_malts_recipe ON recipe_malts(recipe_id);
+CREATE INDEX idx_recipe_malts_malt ON recipe_malts(malt_id);
+CREATE INDEX idx_recipe_hops_recipe ON recipe_hops(recipe_id);
+CREATE INDEX idx_recipe_hops_hop ON recipe_hops(hop_id);
+CREATE INDEX idx_recipe_adjuncts_recipe ON recipe_adjuncts(recipe_id);
+CREATE INDEX idx_recipe_adjuncts_adjunct ON recipe_adjuncts(adjunct_id);
+CREATE INDEX idx_recipe_sugars_recipe ON recipe_sugars(recipe_id);
+CREATE INDEX idx_recipe_sugars_sugar ON recipe_sugars(sugar_id);
+CREATE INDEX idx_recipe_spices_recipe ON recipe_spices(recipe_id);
+CREATE INDEX idx_recipe_spices_spice ON recipe_spices(spice_id);
+CREATE INDEX idx_recipe_fruits_recipe ON recipe_fruits(recipe_id);
+CREATE INDEX idx_recipe_fruits_fruit ON recipe_fruits(fruit_id);
+
+-- Batch operations (critical for dashboard and scheduling)
+CREATE INDEX idx_batches_status_recipe ON batches(status, recipe_id);
+CREATE INDEX idx_batches_planned_start ON batches(planned_start_date) WHERE status = 'planned';
+CREATE INDEX idx_batches_batch_number ON batches(batch_number);
+
+-- Batch readings (time-series queries)
+CREATE INDEX idx_batch_readings_batch_date ON batch_readings(batch_id, recorded_at DESC);
+
+-- Brew log to batch linking
+CREATE INDEX idx_brew_log_batches_batch ON brew_log_batches(batch_id);
+CREATE INDEX idx_brew_log_batches_brew ON brew_log_batches(brew_log_id);
+
+-- Yeast management (brinks model)
+CREATE INDEX idx_yeast_brinks_status ON yeast_brinks(status, yeast_id);
+CREATE INDEX idx_yeast_brinks_parent ON yeast_brinks(parent_brink_id);
+CREATE INDEX idx_brink_viability_brink_date ON brink_viability_readings(yeast_brink_id, reading_date DESC);
+CREATE INDEX idx_yeast_pitches_batch ON yeast_pitches(batch_id);
+CREATE INDEX idx_yeast_pitches_brink ON yeast_pitches(yeast_brink_id);
+CREATE INDEX idx_yeast_pitches_parent ON yeast_pitches(parent_pitch_id, generation);
+
+-- Vessel operations
+CREATE INDEX idx_vessels_status ON vessels(status, type);
+CREATE INDEX idx_vessel_transfers_source ON vessel_transfers(source_vessel_id, transfer_date);
+CREATE INDEX idx_vessel_transfers_dest ON vessel_transfers(destination_vessel_id, transfer_date);
+```
