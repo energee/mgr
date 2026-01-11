@@ -880,6 +880,27 @@ Brink B-002 (strain: WLP001, parent: B-001, weight: 8 lbs)
 
 **Rationale**: Proper normalization enables partial receives (per DEC-GAP-007) and supports multi-FG transfers with line-level tracking.
 
+#### DEC-SIMP-006: Inner Pack Columns for Package Composition
+**Status**: Approved
+**Decision**: Add `inner_pack_size` and `inner_packs_per_case` columns to `package_types`.
+
+**Schema:**
+```sql
+package_types:
+  inner_pack_size       INTEGER   -- Units per inner pack (NULL = loose)
+  inner_packs_per_case  INTEGER   -- Inner packs per case (NULL if loose)
+  units_per_case        INTEGER   -- Total units (must equal inner_pack_size × inner_packs_per_case when both set)
+```
+
+**Examples:**
+| Configuration | inner_pack_size | inner_packs_per_case | units_per_case |
+|---------------|-----------------|----------------------|----------------|
+| 24 loose cans | NULL | NULL | 24 |
+| 6 × 4-packs | 4 | 6 | 24 |
+| 4 × 6-packs | 6 | 4 | 24 |
+
+**Rationale**: Simple approach that handles 90%+ of real-world cases without complex hierarchical modeling. Constraint ensures data integrity.
+
 ---
 
 ## 2C. AI Integration
