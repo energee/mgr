@@ -1,17 +1,80 @@
-# AI Integration Guide
+# AI Integration
 
-This document describes how AI agents can interact with and understand the MGR brewery management system.
+MGR is built with an **AI-first design philosophy**. This document describes how AI agents can interact with and understand the system.
+
+## Architecture Decisions
+
+### DEC-AI-001: Schema Registry for AI Context
+**Status**: Implemented
+
+The `_schema_registry` table provides AI-specific metadata:
+
+```sql
+_schema_registry:
+  table_name      TEXT PRIMARY KEY
+  description     TEXT              -- Human-readable description
+  domain          TEXT              -- Domain grouping
+  relationships   JSONB             -- hasMany, belongsTo relations
+  key_fields      JSONB             -- Important fields for queries
+  state_machine   JSONB             -- State transitions if applicable
+  query_examples  JSONB             -- Natural language query examples
+  ai_context      JSONB             -- AI-specific context and actions
+  calculated_fields JSONB           -- Fields computed via views
+```
+
+AI agents query this table first to understand the schema without external documentation.
+
+### DEC-AI-002: Database Functions for AI
+**Status**: Implemented
+
+| Function | Purpose |
+|----------|---------|
+| `analyze_recipe_style_compliance(recipe_id)` | Compare recipe estimates to BJCP guidelines |
+| `get_recipe_summary(recipe_id)` | Comprehensive recipe data in structured format |
+| `suggest_recipe_improvements(recipe_id)` | AI-generated improvement suggestions |
+| `analyze_batch_performance(batch_id)` | Compare actuals vs targets |
+| `get_inventory_overview()` | Current inventory status |
+| `get_ai_schema_context(domain)` | Schema information for AI context |
+
+### DEC-AI-003: TypeScript AI Utilities
+**Status**: Implemented
+
+TypeScript utilities in `src/lib/ai/`:
+
+```typescript
+// Recipe analysis
+import {
+  analyzeStyleCompliance,
+  getRecipeSummary,
+  getRecipeSuggestions,
+  BrewingCalculations,
+  WaterChemistry,
+  FermentationAnalysis
+} from '@/lib/ai';
+
+// Schema context
+import {
+  getSchemaContext,
+  getDomainSummary,
+  getValidTransitions,
+  QUERY_TEMPLATES,
+  STATE_MACHINES
+} from '@/lib/ai';
+
+// Query helpers
+import { AIQueryHelpers } from '@/lib/ai';
+```
+
+---
 
 ## Quick Start for AI Agents
 
-MGR is a brewery management system built with an **AI-first design philosophy**. The system is self-describing through:
+The system is self-describing through:
 
 1. **Schema Registry** - Database table `_schema_registry` contains metadata about all tables
 2. **Entity Configurations** - TypeScript configs define UI, validation, and behavior
 3. **Calculated Views** - Complex data derived on read, not stored
 4. **Consistent Patterns** - Universal state machines, allocation-based inventory
-
-## Understanding the Domain
 
 ### Core Workflow
 ```
@@ -31,6 +94,8 @@ Recipe → Brew Log (hot-side) → Batch (cold-side) → Packaging → Finished 
 | **Batch** | Cold-side fermentation slot - planned independently, linked to brew logs |
 | **Finished Good** | Packaged product ready for sale |
 | **Allocation** | Inventory movement record (never mutable balances) |
+
+---
 
 ## Querying the Schema
 
@@ -59,6 +124,8 @@ SELECT
 FROM _schema_registry
 WHERE relationships IS NOT NULL;
 ```
+
+---
 
 ## Recipe Analysis
 
@@ -130,6 +197,8 @@ JOIN beer_styles bs ON bs.id = r.style_id
 WHERE r.id = :recipe_id;
 ```
 
+---
+
 ## Common AI Tasks
 
 ### 1. Recipe Review
@@ -197,6 +266,8 @@ WHERE b.status NOT IN ('completed', 'cancelled')
 ORDER BY b.planned_start_date;
 ```
 
+---
+
 ## Recipe Calculation Formulas
 
 ### Original Gravity (OG)
@@ -229,6 +300,8 @@ MCU = SUM(malt.weight_lbs * malt.color_lov / volume_gal)
 SRM = 1.4922 * MCU^0.6859
 ```
 
+---
+
 ## Water Chemistry Guidelines
 
 ### Style Profiles
@@ -247,6 +320,8 @@ SRM = 1.4922 * MCU^0.6859
 - **Chloride (Cl)**: 50-250 ppm - fullness, malt sweetness
 - **Sodium (Na)**: 0-150 ppm - palate fullness
 - **Bicarbonate (HCO3)**: 0-250 ppm - pH buffering
+
+---
 
 ## Mash Schedule Guidance
 
@@ -276,6 +351,8 @@ SRM = 1.4922 * MCU^0.6859
 | 152-156 | Balanced |
 | 156-160 | Less fermentable, fuller body |
 
+---
+
 ## Fermentation Guidance
 
 ### Schedule Template
@@ -291,6 +368,8 @@ SRM = 1.4922 * MCU^0.6859
 - **Ale yeasts**: 60-75F (style dependent)
 - **Lager yeasts**: 46-58F
 - **Belgian yeasts**: 65-85F (often ramped)
+
+---
 
 ## API Endpoints for AI Tools
 
@@ -322,9 +401,9 @@ const { data } = await supabase
   .single();
 ```
 
-## Natural Language Query Examples
+---
 
-These are examples of questions AI can answer using the schema:
+## Natural Language Query Examples
 
 **Recipes:**
 - "Show me all IPA recipes"
@@ -348,6 +427,8 @@ These are examples of questions AI can answer using the schema:
 - "Compare actual vs target OG for recent batches"
 - "What's our average fermentation time for IPAs?"
 - "Which recipes have the highest COGS?"
+
+---
 
 ## Entity Configuration Structure
 
@@ -385,6 +466,8 @@ interface EntityConfig<T> {
 }
 ```
 
+---
+
 ## Best Practices for AI Interaction
 
 1. **Always query `_schema_registry` first** to understand available tables
@@ -403,3 +486,12 @@ Common issues AI should detect:
 - Mash temperature affecting fermentability
 - Low yeast viability
 - Insufficient inventory for planned production
+
+---
+
+## Related Documents
+
+- [Architecture](./architecture.md) - System design decisions
+- [Modules](./modules.md) - Feature specifications
+- [Workflows](./workflows.md) - State machines
+- [Data Model](../data-model/) - Schema details
