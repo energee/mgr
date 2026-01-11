@@ -23,20 +23,22 @@ export const AIQueryHelpers = {
   ) {
     const limit = options?.limit || 10;
 
-    const table = options?.includeEstimates
-      ? "recipes_with_estimates"
-      : "recipes";
-
-    const { data, error } = await supabase
-      .from(table)
-      .select(
-        `
+    const selectQuery = `
         *,
         style:beer_styles(id, name, category)
-      `
-      )
-      .or(`name.ilike.%${query}%`)
-      .limit(limit);
+      `;
+
+    const { data, error } = options?.includeEstimates
+      ? await supabase
+          .from("recipes_with_estimates")
+          .select(selectQuery)
+          .or(`name.ilike.%${query}%`)
+          .limit(limit)
+      : await supabase
+          .from("recipes")
+          .select(selectQuery)
+          .or(`name.ilike.%${query}%`)
+          .limit(limit);
 
     if (error) throw error;
     return data;
@@ -128,7 +130,7 @@ export const AIQueryHelpers = {
   async getVesselAvailability() {
 
     const { data, error } = await supabase
-      .from("vessels_with_current_batch")
+      .from("vessels_with_batch")
       .select(
         `
         id,
@@ -137,7 +139,7 @@ export const AIQueryHelpers = {
         capacity_bbl,
         status,
         current_batch_id,
-        current_batch_number
+        batch_number
       `
       )
       .eq("is_active", true)
@@ -273,71 +275,63 @@ export const AIQueryHelpers = {
 
   /**
    * Get yeast inventory and viability
+   * TODO: Implement when yeast_brinks table is created
    */
   async getYeastInventory() {
-
-    const { data, error } = await supabase
-      .from("yeast_brinks_with_status")
-      .select(
-        `
-        id,
-        brink_identifier,
-        strain:yeasts(name),
-        status,
-        current_weight_lbs,
-        estimated_viability,
-        generation
-      `
-      )
-      .eq("status", "active")
-      .order("brink_identifier");
-
-    if (error) throw error;
-    return data;
+    // yeast_brinks table not yet implemented
+    return [];
   },
 
   /**
    * Get ingredient inventory levels
    */
-  async getIngredientInventory(ingredientType?: string) {
-
+  async getIngredientInventory(ingredientCategory?: string) {
     let query = supabase.from("inventory_items").select(
       `
         id,
         name,
-        catalog_type,
+        category,
         unit,
         reorder_point,
-        lots:inventory_lots(
+        inventory_lots(
           quantity,
           expiration_date
         )
       `
     );
 
-    if (ingredientType) {
-      query = query.eq("catalog_type", ingredientType);
+    if (ingredientCategory) {
+      query = query.eq("category", ingredientCategory);
     }
 
     const { data, error } = await query;
     if (error) throw error;
 
     // Calculate available quantities
-    return data?.map((item) => ({
+    type InventoryItemWithLots = {
+      id: string;
+      name: string;
+      category: string;
+      unit: string;
+      reorder_point: number | null;
+      inventory_lots: { quantity: number; expiration_date: string | null }[];
+    };
+
+    return (data as InventoryItemWithLots[] | null)?.map((item) => ({
       ...item,
-      total_quantity: item.lots?.reduce(
-        (sum: number, lot: { quantity: number }) => sum + lot.quantity,
+      total_quantity: item.inventory_lots?.reduce(
+        (sum, lot) => sum + lot.quantity,
         0
       ) || 0,
-      earliest_expiration: item.lots?.reduce(
-        (earliest: string | null, lot: { expiration_date: string | null }) => {
+      earliest_expiration: item.inventory_lots?.reduce(
+        (earliest: string | null, lot) => {
           if (!lot.expiration_date) return earliest;
           if (!earliest) return lot.expiration_date;
           return lot.expiration_date < earliest
             ? lot.expiration_date
             : earliest;
         },
-        null
+        null as string | null
       ),
     }));
   },

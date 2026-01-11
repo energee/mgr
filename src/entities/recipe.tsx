@@ -13,7 +13,8 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-type Recipe = Database["public"]["Tables"]["recipes"]["Row"];
+// Use view type to include calculated estimates
+type Recipe = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
 
 // =============================================================================
 // Zod Schema

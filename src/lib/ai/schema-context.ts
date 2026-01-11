@@ -76,14 +76,14 @@ export async function getSchemaContext(
 ): Promise<SchemaContext> {
 
   const { data, error } = await supabase.rpc("get_ai_schema_context", {
-    p_domain: domain || null,
+    p_domain: domain ?? undefined,
   });
 
   if (error) {
     throw new Error(`Failed to get schema context: ${error.message}`);
   }
 
-  return data as SchemaContext;
+  return data as unknown as SchemaContext;
 }
 
 /**
@@ -180,12 +180,21 @@ export async function getRelatedTables(
 
   const related: { table: string; relationship: string; direction: string }[] = [];
 
+  // Type for the relationships JSONB column
+  type RelationshipDef = { table: string; name: string };
+  type RelationshipsJson = {
+    hasMany?: RelationshipDef[];
+    belongsTo?: RelationshipDef[];
+  };
+
   for (const row of data) {
     if (!row.relationships) continue;
 
+    const relationships = row.relationships as RelationshipsJson;
+
     // Check hasMany relationships
-    if (row.relationships.hasMany) {
-      for (const rel of row.relationships.hasMany) {
+    if (relationships.hasMany) {
+      for (const rel of relationships.hasMany) {
         if (rel.table === tableName) {
           related.push({
             table: row.table_name,
@@ -204,8 +213,8 @@ export async function getRelatedTables(
     }
 
     // Check belongsTo relationships
-    if (row.relationships.belongsTo) {
-      for (const rel of row.relationships.belongsTo) {
+    if (relationships.belongsTo) {
+      for (const rel of relationships.belongsTo) {
         if (rel.table === tableName) {
           related.push({
             table: row.table_name,
