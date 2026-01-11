@@ -59,6 +59,53 @@ ORDER BY domain, table_name;
 5. Add `_schema_registry` entries in migrations for new tables
 6. Document new architecture decisions in `docs/spec/decisions.md` or `docs/spec/architecture.md`
 
+## Database Security Rules (MUST FOLLOW)
+
+When writing SQL migrations, always follow these rules. See `docs/spec/architecture.md` for full details.
+
+### Views: Use security_invoker
+```sql
+-- ALWAYS use security_invoker = true
+CREATE VIEW my_view
+WITH (security_invoker = true)
+AS SELECT ...;
+```
+
+### Never expose auth.users
+```sql
+-- WRONG: Don't join auth.users in views
+SELECT u.email FROM auth.users u ...
+
+-- CORRECT: Cache user info in the table itself
+ALTER TABLE my_table ADD COLUMN user_name TEXT;
+```
+
+### Enable RLS on all tables
+```sql
+-- Always pair policies with RLS enabled
+ALTER TABLE my_table ENABLE ROW LEVEL SECURITY;
+CREATE POLICY my_policy ON my_table ...;
+```
+
+### Set search_path on functions
+```sql
+CREATE FUNCTION my_func()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public  -- Always set this
+AS $$ ... $$;
+```
+
+### Restrictive RLS policies
+```sql
+-- WRONG: Too permissive
+WITH CHECK (true)
+
+-- CORRECT: Specific conditions
+WITH CHECK (auth.uid() = user_id)
+```
+
 ## AI Integration
 
 MGR is designed for AI assistance. Key resources:
