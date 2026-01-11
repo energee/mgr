@@ -4,6 +4,7 @@
  * Email/password authentication with magic link option.
  */
 
+import { Suspense } from "react";
 import { LoginForm } from "./login-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -15,7 +16,9 @@ export default function LoginPage() {
         <CardDescription>Sign in to your brewery account</CardDescription>
       </CardHeader>
       <CardContent>
-        <LoginForm />
+        <Suspense fallback={<div className="h-64 animate-pulse" />}>
+          <LoginForm />
+        </Suspense>
       </CardContent>
     </Card>
   );
