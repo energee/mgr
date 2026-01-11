@@ -21,69 +21,63 @@ This document tracks the implementation progress of MGR features based on the sp
 
 **Goal:** Establish core data model patterns that other features depend on.
 **Timeline:** 1-2 weeks
-**Status:** Not Started
+**Status:** In Progress (migrations created, pending application)
 
 ### 1.1 Recipe Junction Tables (DEC-HP-002)
 
 > Move recipe ingredients from JSONB arrays to proper junction tables for queryability.
 
-- [ ] Create migration `00010_recipe_junction_tables.sql`
-  - [ ] Create `recipe_malts` table (recipe_id, malt_id, weight_lbs, position)
-  - [ ] Create `recipe_hops` table (recipe_id, hop_id, weight_oz, use, time_minutes, position)
-  - [ ] Create `recipe_adjuncts` table (recipe_id, adjunct_id, amount, unit, use, position)
-  - [ ] Create `recipe_yeasts` table (recipe_id, yeast_id, pitch_rate, position) - supports multi-yeast
-  - [ ] Add foreign key constraints
-  - [ ] Add `_schema_registry` entries for new tables
-- [ ] Create data migration script for existing JSONB data
-- [ ] Update `recipes_with_estimates` view to use junction tables
-- [ ] Update recipe entity config to handle junction table relations
-- [ ] Update recipe form to use junction table CRUD
+- [x] Create migration `00011_catalog_and_recipe_junction.sql`
+  - [x] Create all catalog tables (malts, hops, yeasts, adjuncts, sugars, spices, fruits, additives)
+  - [x] Create beer_styles reference table
+  - [x] Create water_profiles table
+  - [x] Create `recipe_malts` table (recipe_id, malt_id, weight_lbs, position)
+  - [x] Create `recipe_hops` table (recipe_id, hop_id, weight_oz, timing, boil_time_min, position)
+  - [x] Create `recipe_adjuncts` table (recipe_id, adjunct_id, weight_lbs, timing, position)
+  - [x] Create `recipe_sugars` table
+  - [x] Create `recipe_spices` table
+  - [x] Create `recipe_fruits` table
+  - [x] Create `recipe_additions` table (water chemistry, clarifiers)
+  - [x] Add foreign key constraints
+  - [x] Add `_schema_registry` entries for new tables
+  - [x] Update recipes table with new columns (style_id, yeast_id, water_profile_id, volumes in BBL, etc.)
+- [x] Create `recipes_with_estimates` view with calculated OG, FG, ABV, IBU, SRM
+- [x] Update recipe entity config to handle junction table relations
+- [ ] Create ingredient management UI components (grain bill editor, hop schedule editor)
+- [ ] Create data migration script for existing JSONB data (if any)
 - [ ] Remove deprecated JSONB columns after verification
 
 ### 1.2 Database Indexes (DEC-HP-004)
 
 > Add performance indexes for common query patterns.
 
-- [ ] Create migration `00011_performance_indexes.sql`
-  - [ ] Allocation lookup indexes
-    ```sql
-    CREATE INDEX idx_allocations_source ON allocations(source_type, source_id);
-    CREATE INDEX idx_allocations_dest ON allocations(destination_type, destination_id);
-    CREATE INDEX idx_allocations_item ON allocations(item_type, item_id);
-    ```
-  - [ ] Batch status and date indexes
-    ```sql
-    CREATE INDEX idx_batches_status ON batches(status);
-    CREATE INDEX idx_batches_planned_date ON batches(planned_start_date);
-    ```
-  - [ ] Order fulfillment indexes
-    ```sql
-    CREATE INDEX idx_orders_status ON orders(status);
-    CREATE INDEX idx_orders_customer ON orders(customer_id);
-    CREATE INDEX idx_orders_requested_date ON orders(requested_date);
-    ```
-  - [ ] Recipe ingredient indexes (after junction tables)
-  - [ ] Inventory lot indexes
-  - [ ] Brew log indexes
+- [x] Create migration `00012_performance_indexes.sql`
+  - [x] Batch status and date indexes
+  - [x] Order fulfillment indexes (status, customer, dates)
+  - [x] Vessel indexes (status, type, location)
+  - [x] Vessel transfer indexes (critical for current_batch view)
+  - [x] Brew log indexes
+  - [x] Recipe indexes (style, brand, name)
+  - [x] Inventory item indexes
+  - [x] Brand and package type indexes
+  - [x] Text search indexes (pg_trgm for fuzzy search)
 
 ### 1.3 Calculated Views (DEC-HP-005 / DEC-PERF-002)
 
 > Create views for calculated fields; remove redundant stored fields.
 
-- [ ] Create/update `recipes_with_estimates` view
-  - [ ] Calculate OG from grain bill
-  - [ ] Calculate FG from OG and attenuation
-  - [ ] Calculate ABV from OG/FG
-  - [ ] Calculate IBU from hop schedule
-  - [ ] Calculate SRM from grain bill
-  - [ ] Calculate COGS from ingredient costs
-- [ ] Create `inventory_lots_with_quantities` view
-  - [ ] Calculate remaining quantity from allocations
-- [ ] Create `finished_goods_with_availability` view
-  - [ ] Calculate available quantity from allocations
+- [x] Create `recipes_with_estimates` view (in 00011 migration)
+  - [x] Calculate OG from grain bill (using PPG and efficiency)
+  - [x] Calculate FG from OG and attenuation
+  - [x] Calculate ABV from OG/FG (standard formula)
+  - [x] Calculate IBU from hop schedule (Tinseth with timing-based utilization)
+  - [x] Calculate SRM from grain bill (Morey equation)
+  - [ ] Calculate COGS from ingredient costs (future enhancement)
+- [ ] Create `inventory_lots_with_quantities` view (in 00010 - pending commit)
+- [ ] Create `finished_goods_with_availability` view (in 00010 - pending commit)
 - [ ] Create `batches_with_brew_info` view
   - [ ] Join brew log data (actual OG, brew date)
-- [ ] Update entity configs to use view data
+- [x] Update recipe entity config to reference view data
 
 ---
 
@@ -417,4 +411,5 @@ Migrations follow the pattern: `00XXX_description.sql`
 
 | Date | Change |
 |------|--------|
+| 2026-01-11 | Phase 1 migrations created: catalog tables, recipe junction tables, performance indexes |
 | 2026-01-11 | Initial plan created based on spec review |

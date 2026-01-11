@@ -3,6 +3,10 @@
  *
  * Recipes define the specifications for brewing - ingredients,
  * process parameters, and target measurements.
+ *
+ * Ingredients are stored in junction tables (recipe_malts, recipe_hops, etc.)
+ * and calculated estimates (OG, FG, ABV, IBU, SRM) come from the
+ * recipes_with_estimates view.
  */
 
 import { z } from "zod";
@@ -17,17 +21,38 @@ type Recipe = Database["public"]["Tables"]["recipes"]["Row"];
 
 export const recipeSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  style: z.string().nullable().optional(),
+  brand_id: z.string().uuid().nullable().optional(),
+  style_id: z.string().uuid().nullable().optional(),
+  yeast_id: z.string().uuid().nullable().optional(),
+  water_profile_id: z.string().uuid().nullable().optional(),
   description: z.string().nullable().optional(),
-  target_og: z.coerce.number().nullable().optional(),
-  target_fg: z.coerce.number().nullable().optional(),
-  target_abv: z.coerce.number().nullable().optional(),
-  target_ibu: z.coerce.number().int().nullable().optional(),
-  target_srm: z.coerce.number().int().nullable().optional(),
-  batch_size_gallons: z.coerce.number().nullable().optional(),
-  boil_time_minutes: z.coerce.number().int().nullable().optional(),
+  // Volumes
+  volume_bbl: z.coerce.number().nullable().optional(),
+  batch_size_bbl: z.coerce.number().nullable().optional(),
+  preboil_volume_bbl: z.coerce.number().nullable().optional(),
+  target_ko_volume_bbl: z.coerce.number().nullable().optional(),
+  mash_water_volume_gal: z.coerce.number().nullable().optional(),
+  sparge_water_volume_gal: z.coerce.number().nullable().optional(),
+  // Times
+  boil_time_min: z.coerce.number().int().nullable().optional(),
+  fermentation_days: z.coerce.number().int().nullable().optional(),
+  conditioning_days: z.coerce.number().int().nullable().optional(),
+  // Whirlpool
+  whirlpool_time_min: z.coerce.number().int().nullable().optional(),
+  whirlpool_temp_f: z.coerce.number().int().nullable().optional(),
+  // Mash
   mash_temp_f: z.coerce.number().int().nullable().optional(),
-  notes: z.string().nullable().optional(),
+  target_mash_ph: z.coerce.number().nullable().optional(),
+  mash_efficiency: z.coerce.number().nullable().optional(),
+  // Yeast
+  target_attenuation: z.coerce.number().nullable().optional(),
+  target_pitching_rate: z.coerce.number().nullable().optional(),
+  // Notes
+  brew_day_notes: z.string().nullable().optional(),
+  tasting_notes: z.string().nullable().optional(),
+  development_notes: z.string().nullable().optional(),
+  // Flags
+  use_default_additions: z.boolean().default(true),
   is_active: z.boolean().default(true),
 });
 
@@ -42,8 +67,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
   table: "recipes",
   displayName: "Recipe",
   displayNamePlural: "Recipes",
-  description: "Recipes with ingredients and brewing parameters",
+  description: "Brewing recipes with ingredients and process parameters",
   domain: "production",
+
+  // Use the view for calculated estimates
+  // Note: Forms should write to base table, reads use this view
+  // viewTable: "recipes_with_estimates",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -55,25 +84,28 @@ export const recipeEntity: EntityConfig<Recipe> = {
       sortable: true,
     },
     {
-      accessorKey: "style",
+      accessorKey: "style_id",
       header: "Style",
+      sortable: true,
+      // TODO: Render style name from joined data
+      render: (value) => value ? "Style" : "—",
+    },
+    {
+      accessorKey: "volume_bbl",
+      header: "Volume (BBL)",
       sortable: true,
     },
     {
-      accessorKey: "target_abv",
-      header: "ABV %",
+      accessorKey: "mash_efficiency",
+      header: "Efficiency %",
       sortable: true,
       render: (value) => value ? `${value}%` : "—",
     },
     {
-      accessorKey: "target_ibu",
-      header: "IBU",
+      accessorKey: "boil_time_min",
+      header: "Boil Time",
       sortable: true,
-    },
-    {
-      accessorKey: "batch_size_gallons",
-      header: "Batch Size (gal)",
-      sortable: true,
+      render: (value) => value ? `${value} min` : "—",
     },
     {
       accessorKey: "is_active",
@@ -90,21 +122,23 @@ export const recipeEntity: EntityConfig<Recipe> = {
       label: "Active Only",
     },
     {
-      field: "style",
-      type: "search",
+      field: "style_id",
+      type: "select",
       label: "Style",
+      // TODO: Populate from beer_styles table
+      options: [],
     },
   ],
 
   defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name", "style", "description"],
+  searchableFields: ["name", "brew_day_notes", "development_notes"],
 
   // ---------------------------------------------------------------------------
   // Detail View
   // ---------------------------------------------------------------------------
   detailHeader: {
     title: "name",
-    subtitle: "style",
+    // badge: "is_active",
   },
 
   detailSections: [
@@ -113,36 +147,74 @@ export const recipeEntity: EntityConfig<Recipe> = {
       title: "Overview",
       fields: [
         { field: "name", label: "Name" },
-        { field: "style", label: "Style" },
-        { field: "description", label: "Description", fullWidth: true },
+        { field: "brand_id", label: "Brand" },
+        { field: "style_id", label: "Style" },
+        { field: "yeast_id", label: "Yeast" },
+        { field: "water_profile_id", label: "Water Profile" },
         { field: "is_active", label: "Active" },
       ],
     },
     {
-      id: "targets",
-      title: "Target Specifications",
+      id: "estimates",
+      title: "Calculated Estimates",
       fields: [
-        { field: "target_og", label: "Original Gravity" },
-        { field: "target_fg", label: "Final Gravity" },
-        { field: "target_abv", label: "ABV %" },
-        { field: "target_ibu", label: "IBU" },
-        { field: "target_srm", label: "SRM (Color)" },
+        // These come from recipes_with_estimates view
+        { field: "est_og", label: "Est. OG" },
+        { field: "est_fg", label: "Est. FG" },
+        { field: "est_abv", label: "Est. ABV %" },
+        { field: "est_ibu", label: "Est. IBU" },
+        { field: "est_srm", label: "Est. SRM" },
       ],
     },
     {
-      id: "process",
-      title: "Process Parameters",
+      id: "volumes",
+      title: "Volumes",
       fields: [
-        { field: "batch_size_gallons", label: "Batch Size (gallons)" },
-        { field: "boil_time_minutes", label: "Boil Time (minutes)" },
-        { field: "mash_temp_f", label: "Mash Temperature (°F)" },
+        { field: "volume_bbl", label: "Recipe Volume (BBL)" },
+        { field: "batch_size_bbl", label: "Batch Size (BBL)" },
+        { field: "preboil_volume_bbl", label: "Pre-Boil Volume (BBL)" },
+        { field: "target_ko_volume_bbl", label: "Target KO Volume (BBL)" },
+        { field: "mash_water_volume_gal", label: "Mash Water (gal)" },
+        { field: "sparge_water_volume_gal", label: "Sparge Water (gal)" },
+      ],
+    },
+    {
+      id: "mash",
+      title: "Mash Parameters",
+      fields: [
+        { field: "mash_temp_f", label: "Mash Temp (°F)" },
+        { field: "target_mash_ph", label: "Target Mash pH" },
+        { field: "mash_efficiency", label: "Mash Efficiency %" },
+        { field: "water_to_grain_ratio", label: "Water:Grain Ratio" },
+      ],
+    },
+    {
+      id: "boil",
+      title: "Boil & Whirlpool",
+      fields: [
+        { field: "boil_time_min", label: "Boil Time (min)" },
+        { field: "whirlpool_time_min", label: "Whirlpool Time (min)" },
+        { field: "whirlpool_temp_f", label: "Whirlpool Temp (°F)" },
+        { field: "target_ko_temp_f", label: "Target KO Temp (°F)" },
+      ],
+    },
+    {
+      id: "fermentation",
+      title: "Fermentation",
+      fields: [
+        { field: "target_attenuation", label: "Target Attenuation %" },
+        { field: "target_pitching_rate", label: "Pitching Rate (M cells/mL/°P)" },
+        { field: "fermentation_days", label: "Fermentation Days" },
+        { field: "conditioning_days", label: "Conditioning Days" },
       ],
     },
     {
       id: "notes",
       title: "Notes",
       fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
+        { field: "brew_day_notes", label: "Brew Day Notes", fullWidth: true },
+        { field: "tasting_notes", label: "Tasting Notes", fullWidth: true },
+        { field: "development_notes", label: "Development Notes", fullWidth: true },
       ],
       collapsible: true,
     },
@@ -154,6 +226,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
   formSchema: recipeSchema,
 
   formFields: [
+    // Basic Info
     {
       name: "name",
       label: "Recipe Name",
@@ -163,78 +236,40 @@ export const recipeEntity: EntityConfig<Recipe> = {
       colSpan: 6,
     },
     {
-      name: "style",
-      label: "Style",
-      type: "text",
-      placeholder: "e.g., New England IPA",
+      name: "brand_id",
+      label: "Brand",
+      type: "select",
+      placeholder: "Select brand...",
       colSpan: 6,
+      // TODO: Populate from brands table
+      options: [],
     },
     {
-      name: "description",
-      label: "Description",
-      type: "textarea",
-      placeholder: "Brief description of this recipe...",
-      colSpan: 12,
+      name: "style_id",
+      label: "Style",
+      type: "select",
+      placeholder: "Select style...",
+      colSpan: 6,
+      // TODO: Populate from beer_styles table
+      options: [],
     },
     {
-      name: "target_og",
-      label: "Target OG",
-      type: "number",
-      placeholder: "e.g., 1.065",
-      description: "Original gravity target",
-      colSpan: 4,
+      name: "yeast_id",
+      label: "Yeast",
+      type: "select",
+      placeholder: "Select yeast...",
+      colSpan: 6,
+      // TODO: Populate from yeasts table
+      options: [],
     },
     {
-      name: "target_fg",
-      label: "Target FG",
-      type: "number",
-      placeholder: "e.g., 1.012",
-      description: "Final gravity target",
-      colSpan: 4,
-    },
-    {
-      name: "target_abv",
-      label: "Target ABV %",
-      type: "number",
-      placeholder: "e.g., 6.8",
-      colSpan: 4,
-    },
-    {
-      name: "target_ibu",
-      label: "Target IBU",
-      type: "number",
-      placeholder: "e.g., 45",
-      description: "Bitterness units",
-      colSpan: 4,
-    },
-    {
-      name: "target_srm",
-      label: "Target SRM",
-      type: "number",
-      placeholder: "e.g., 5",
-      description: "Color (Standard Reference Method)",
-      colSpan: 4,
-    },
-    {
-      name: "batch_size_gallons",
-      label: "Batch Size (gallons)",
-      type: "number",
-      placeholder: "e.g., 10",
-      colSpan: 4,
-    },
-    {
-      name: "boil_time_minutes",
-      label: "Boil Time (minutes)",
-      type: "number",
-      placeholder: "e.g., 60",
-      colSpan: 4,
-    },
-    {
-      name: "mash_temp_f",
-      label: "Mash Temp (°F)",
-      type: "number",
-      placeholder: "e.g., 152",
-      colSpan: 4,
+      name: "water_profile_id",
+      label: "Water Profile",
+      type: "select",
+      placeholder: "Select water profile...",
+      colSpan: 6,
+      // TODO: Populate from water_profiles table
+      options: [],
     },
     {
       name: "is_active",
@@ -242,13 +277,102 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "switch",
       description: "Inactive recipes won't appear in dropdown menus",
       defaultValue: true,
+      colSpan: 6,
+    },
+    // Volumes
+    {
+      name: "volume_bbl",
+      label: "Recipe Volume (BBL)",
+      type: "number",
+      placeholder: "e.g., 7",
       colSpan: 4,
     },
     {
-      name: "notes",
-      label: "Brewing Notes",
+      name: "batch_size_bbl",
+      label: "Batch Size (BBL)",
+      type: "number",
+      placeholder: "e.g., 7",
+      colSpan: 4,
+    },
+    {
+      name: "mash_efficiency",
+      label: "Mash Efficiency %",
+      type: "number",
+      placeholder: "e.g., 75",
+      colSpan: 4,
+    },
+    // Process
+    {
+      name: "boil_time_min",
+      label: "Boil Time (min)",
+      type: "number",
+      placeholder: "e.g., 60",
+      colSpan: 3,
+    },
+    {
+      name: "mash_temp_f",
+      label: "Mash Temp (°F)",
+      type: "number",
+      placeholder: "e.g., 152",
+      colSpan: 3,
+    },
+    {
+      name: "target_mash_ph",
+      label: "Target Mash pH",
+      type: "number",
+      placeholder: "e.g., 5.4",
+      colSpan: 3,
+    },
+    {
+      name: "target_attenuation",
+      label: "Target Attenuation %",
+      type: "number",
+      placeholder: "e.g., 75",
+      colSpan: 3,
+    },
+    // Fermentation
+    {
+      name: "fermentation_days",
+      label: "Fermentation Days",
+      type: "number",
+      placeholder: "e.g., 14",
+      colSpan: 3,
+    },
+    {
+      name: "conditioning_days",
+      label: "Conditioning Days",
+      type: "number",
+      placeholder: "e.g., 7",
+      colSpan: 3,
+    },
+    {
+      name: "target_pitching_rate",
+      label: "Pitching Rate",
+      type: "number",
+      placeholder: "e.g., 0.75",
+      description: "Million cells/mL/°P",
+      colSpan: 3,
+    },
+    {
+      name: "use_default_additions",
+      label: "Use Default Water Additions",
+      type: "switch",
+      defaultValue: true,
+      colSpan: 3,
+    },
+    // Notes
+    {
+      name: "brew_day_notes",
+      label: "Brew Day Notes",
       type: "textarea",
-      placeholder: "Additional notes, tips, variations...",
+      placeholder: "Special instructions for brew day...",
+      colSpan: 12,
+    },
+    {
+      name: "development_notes",
+      label: "Development Notes",
+      type: "textarea",
+      placeholder: "Recipe development history, variations tried...",
       colSpan: 12,
     },
   ],
@@ -265,6 +389,40 @@ export const recipeEntity: EntityConfig<Recipe> = {
       showInDetail: true,
       detailTab: "Batches",
     },
+    {
+      name: "malts",
+      entity: "recipe_malt",
+      type: "hasMany",
+      foreignKey: "recipe_id",
+      showInDetail: true,
+      detailTab: "Grain Bill",
+    },
+    {
+      name: "hops",
+      entity: "recipe_hop",
+      type: "hasMany",
+      foreignKey: "recipe_id",
+      showInDetail: true,
+      detailTab: "Hop Schedule",
+    },
+    {
+      name: "style",
+      entity: "beer_style",
+      type: "belongsTo",
+      foreignKey: "style_id",
+    },
+    {
+      name: "yeast",
+      entity: "yeast",
+      type: "belongsTo",
+      foreignKey: "yeast_id",
+    },
+    {
+      name: "water_profile",
+      entity: "water_profile",
+      type: "belongsTo",
+      foreignKey: "water_profile_id",
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -272,10 +430,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
   // ---------------------------------------------------------------------------
   queryExamples: [
     "Show me all IPA recipes",
-    "What recipes have ABV over 7%?",
+    "What recipes have estimated ABV over 7%?",
     "List active recipes sorted by style",
-    "Find recipes with IBU over 50",
+    "Find recipes with estimated IBU over 50",
+    "What recipes use Citra hops?",
+    "Show grain bill for recipe X",
   ],
 
-  keyFields: ["name", "style", "target_abv", "target_ibu", "is_active"],
+  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_active"],
 };
