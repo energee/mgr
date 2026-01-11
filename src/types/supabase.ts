@@ -81,6 +81,93 @@ export type Database = {
         }
         Relationships: []
       }
+      additives: {
+        Row: {
+          cost_per_unit: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          type: string
+          typical_amount: number | null
+          typical_unit: string | null
+          unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cost_per_unit?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          type: string
+          typical_amount?: number | null
+          typical_unit?: string | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cost_per_unit?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          type?: string
+          typical_amount?: number | null
+          typical_unit?: string | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      adjuncts: {
+        Row: {
+          bag_weight_lbs: number | null
+          color_lovibond: number | null
+          cost_per_lb: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          potential_ppg: number | null
+          requires_mash: boolean | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          bag_weight_lbs?: number | null
+          color_lovibond?: number | null
+          cost_per_lb?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          potential_ppg?: number | null
+          requires_mash?: boolean | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          bag_weight_lbs?: number | null
+          color_lovibond?: number | null
+          cost_per_lb?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          potential_ppg?: number | null
+          requires_mash?: boolean | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       allocations: {
         Row: {
           approved_at: string | null
@@ -309,7 +396,74 @@ export type Database = {
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "batches_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      beer_styles: {
+        Row: {
+          abv_max: number | null
+          abv_min: number | null
+          category: string
+          created_at: string | null
+          description: string | null
+          fg_max: number | null
+          fg_min: number | null
+          ibu_max: number | null
+          ibu_min: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          og_max: number | null
+          og_min: number | null
+          srm_max: number | null
+          srm_min: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          abv_max?: number | null
+          abv_min?: number | null
+          category: string
+          created_at?: string | null
+          description?: string | null
+          fg_max?: number | null
+          fg_min?: number | null
+          ibu_max?: number | null
+          ibu_min?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          og_max?: number | null
+          og_min?: number | null
+          srm_max?: number | null
+          srm_min?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          abv_max?: number | null
+          abv_min?: number | null
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          fg_max?: number | null
+          fg_min?: number | null
+          ibu_max?: number | null
+          ibu_min?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          og_max?: number | null
+          og_min?: number | null
+          srm_max?: number | null
+          srm_min?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       bin_inventory: {
         Row: {
@@ -557,6 +711,13 @@ export type Database = {
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "brew_logs_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
         ]
       }
       customers: {
@@ -697,6 +858,120 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fruits: {
+        Row: {
+          cost_per_lb: number | null
+          created_at: string | null
+          description: string | null
+          form: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sugar_content: number | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cost_per_lb?: number | null
+          created_at?: string | null
+          description?: string | null
+          form?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sugar_content?: number | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cost_per_lb?: number | null
+          created_at?: string | null
+          description?: string | null
+          form?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sugar_content?: number | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hops: {
+        Row: {
+          alpha_acid_max: number | null
+          alpha_acid_min: number | null
+          alpha_acid_typical: number | null
+          bag_weight_lbs: number | null
+          beta_acid_max: number | null
+          beta_acid_min: number | null
+          caryophyllene_percent: number | null
+          cost_per_lb: number | null
+          created_at: string | null
+          farnesene_percent: number | null
+          flavor_profile: string | null
+          hsi: number | null
+          humulene_percent: number | null
+          id: string
+          is_active: boolean | null
+          myrcene_percent: number | null
+          name: string
+          oil_ml_100g: number | null
+          origin: string | null
+          substitutes: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          alpha_acid_max?: number | null
+          alpha_acid_min?: number | null
+          alpha_acid_typical?: number | null
+          bag_weight_lbs?: number | null
+          beta_acid_max?: number | null
+          beta_acid_min?: number | null
+          caryophyllene_percent?: number | null
+          cost_per_lb?: number | null
+          created_at?: string | null
+          farnesene_percent?: number | null
+          flavor_profile?: string | null
+          hsi?: number | null
+          humulene_percent?: number | null
+          id?: string
+          is_active?: boolean | null
+          myrcene_percent?: number | null
+          name: string
+          oil_ml_100g?: number | null
+          origin?: string | null
+          substitutes?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          alpha_acid_max?: number | null
+          alpha_acid_min?: number | null
+          alpha_acid_typical?: number | null
+          bag_weight_lbs?: number | null
+          beta_acid_max?: number | null
+          beta_acid_min?: number | null
+          caryophyllene_percent?: number | null
+          cost_per_lb?: number | null
+          created_at?: string | null
+          farnesene_percent?: number | null
+          flavor_profile?: string | null
+          hsi?: number | null
+          humulene_percent?: number | null
+          id?: string
+          is_active?: boolean | null
+          myrcene_percent?: number | null
+          name?: string
+          oil_ml_100g?: number | null
+          origin?: string | null
+          substitutes?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       inventory_items: {
         Row: {
@@ -895,6 +1170,69 @@ export type Database = {
           is_primary?: boolean | null
           location_type?: string
           name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      malts: {
+        Row: {
+          bag_weight_lbs: number | null
+          color_lovibond: number | null
+          cost_per_lb: number | null
+          country: string | null
+          created_at: string | null
+          description: string | null
+          diastatic_power: number | null
+          id: string
+          is_active: boolean | null
+          maltster: string | null
+          max_percentage: number | null
+          moisture_percent: number | null
+          name: string
+          potential_ppg: number | null
+          protein_percent: number | null
+          requires_mash: boolean | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          bag_weight_lbs?: number | null
+          color_lovibond?: number | null
+          cost_per_lb?: number | null
+          country?: string | null
+          created_at?: string | null
+          description?: string | null
+          diastatic_power?: number | null
+          id?: string
+          is_active?: boolean | null
+          maltster?: string | null
+          max_percentage?: number | null
+          moisture_percent?: number | null
+          name: string
+          potential_ppg?: number | null
+          protein_percent?: number | null
+          requires_mash?: boolean | null
+          type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          bag_weight_lbs?: number | null
+          color_lovibond?: number | null
+          cost_per_lb?: number | null
+          country?: string | null
+          created_at?: string | null
+          description?: string | null
+          diastatic_power?: number | null
+          id?: string
+          is_active?: boolean | null
+          maltster?: string | null
+          max_percentage?: number | null
+          moisture_percent?: number | null
+          name?: string
+          potential_ppg?: number | null
+          protein_percent?: number | null
+          requires_mash?: boolean | null
+          type?: string
           updated_at?: string | null
         }
         Relationships: []
@@ -1313,69 +1651,598 @@ export type Database = {
           },
         ]
       }
+      recipe_additions: {
+        Row: {
+          additive_id: string
+          amount: number
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          position: number | null
+          recipe_id: string | null
+          target: string | null
+          timing: string
+          unit: string
+        }
+        Insert: {
+          additive_id: string
+          amount: number
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          position?: number | null
+          recipe_id?: string | null
+          target?: string | null
+          timing: string
+          unit: string
+        }
+        Update: {
+          additive_id?: string
+          amount?: number
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          position?: number | null
+          recipe_id?: string | null
+          target?: string | null
+          timing?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_additions_additive_id_fkey"
+            columns: ["additive_id"]
+            isOneToOne: false
+            referencedRelation: "additives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_additions_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_additions_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_adjuncts: {
+        Row: {
+          adjunct_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          position: number | null
+          recipe_id: string
+          timing: string | null
+          weight_lbs: number
+        }
+        Insert: {
+          adjunct_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id: string
+          timing?: string | null
+          weight_lbs: number
+        }
+        Update: {
+          adjunct_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id?: string
+          timing?: string | null
+          weight_lbs?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_adjuncts_adjunct_id_fkey"
+            columns: ["adjunct_id"]
+            isOneToOne: false
+            referencedRelation: "adjuncts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_adjuncts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_adjuncts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_collaborators: {
+        Row: {
+          created_at: string | null
+          id: string
+          recipe_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          recipe_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          recipe_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_collaborators_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_collaborators_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_fruits: {
+        Row: {
+          amount: number
+          created_at: string | null
+          fruit_id: string
+          id: string
+          notes: string | null
+          position: number | null
+          recipe_id: string
+          timing: string | null
+          unit: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          fruit_id: string
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id: string
+          timing?: string | null
+          unit?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          fruit_id?: string
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id?: string
+          timing?: string | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_fruits_fruit_id_fkey"
+            columns: ["fruit_id"]
+            isOneToOne: false
+            referencedRelation: "fruits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_fruits_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_fruits_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_hops: {
+        Row: {
+          alpha_acid: number | null
+          boil_time_min: number | null
+          created_at: string | null
+          hop_id: string
+          id: string
+          notes: string | null
+          position: number | null
+          recipe_id: string
+          timing: string
+          weight_oz: number
+        }
+        Insert: {
+          alpha_acid?: number | null
+          boil_time_min?: number | null
+          created_at?: string | null
+          hop_id: string
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id: string
+          timing?: string
+          weight_oz: number
+        }
+        Update: {
+          alpha_acid?: number | null
+          boil_time_min?: number | null
+          created_at?: string | null
+          hop_id?: string
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id?: string
+          timing?: string
+          weight_oz?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_hops_hop_id_fkey"
+            columns: ["hop_id"]
+            isOneToOne: false
+            referencedRelation: "hops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_hops_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_hops_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_malts: {
+        Row: {
+          color_lov: number | null
+          created_at: string | null
+          id: string
+          malt_id: string
+          notes: string | null
+          position: number | null
+          ppg: number | null
+          recipe_id: string
+          weight_lbs: number
+        }
+        Insert: {
+          color_lov?: number | null
+          created_at?: string | null
+          id?: string
+          malt_id: string
+          notes?: string | null
+          position?: number | null
+          ppg?: number | null
+          recipe_id: string
+          weight_lbs: number
+        }
+        Update: {
+          color_lov?: number | null
+          created_at?: string | null
+          id?: string
+          malt_id?: string
+          notes?: string | null
+          position?: number | null
+          ppg?: number | null
+          recipe_id?: string
+          weight_lbs?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_malts_malt_id_fkey"
+            columns: ["malt_id"]
+            isOneToOne: false
+            referencedRelation: "malts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_malts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_malts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_spices: {
+        Row: {
+          amount: number
+          boil_time_min: number | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          position: number | null
+          recipe_id: string
+          spice_id: string
+          timing: string | null
+          unit: string
+        }
+        Insert: {
+          amount: number
+          boil_time_min?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id: string
+          spice_id: string
+          timing?: string | null
+          unit?: string
+        }
+        Update: {
+          amount?: number
+          boil_time_min?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id?: string
+          spice_id?: string
+          timing?: string | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_spices_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_spices_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_spices_spice_id_fkey"
+            columns: ["spice_id"]
+            isOneToOne: false
+            referencedRelation: "spices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_sugars: {
+        Row: {
+          created_at: string | null
+          id: string
+          notes: string | null
+          position: number | null
+          recipe_id: string
+          sugar_id: string
+          timing: string | null
+          weight_lbs: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id: string
+          sugar_id: string
+          timing?: string | null
+          weight_lbs: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          position?: number | null
+          recipe_id?: string
+          sugar_id?: string
+          timing?: string | null
+          weight_lbs?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_sugars_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_sugars_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_sugars_sugar_id_fkey"
+            columns: ["sugar_id"]
+            isOneToOne: false
+            referencedRelation: "sugars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
+          batch_size_bbl: number | null
           batch_size_gallons: number | null
-          boil_time_minutes: number | null
+          boil_time_min: number | null
           brand_id: string | null
+          brew_day_notes: string | null
+          conditioning_days: number | null
           created_at: string | null
+          created_by: string | null
           description: string | null
+          development_notes: string | null
+          fermentation_days: number | null
+          fermentation_schedule: Json | null
           id: string
           ingredients: Json | null
           instructions: Json | null
           is_active: boolean | null
+          mash_efficiency: number | null
+          mash_schedule: Json | null
           mash_temp_f: number | null
+          mash_water_volume_gal: number | null
           name: string
           notes: string | null
+          preboil_volume_bbl: number | null
+          sparge_water_volume_gal: number | null
           style: string | null
+          style_id: string | null
           target_abv: number | null
+          target_attenuation: number | null
           target_fg: number | null
           target_ibu: number | null
+          target_ko_temp_f: number | null
+          target_ko_volume_bbl: number | null
+          target_mash_ph: number | null
           target_og: number | null
+          target_pitching_rate: number | null
           target_srm: number | null
+          tasting_notes: string | null
           updated_at: string | null
+          use_default_additions: boolean | null
+          volume_bbl: number | null
+          water_profile_id: string | null
+          water_to_grain_ratio: number | null
+          whirlpool_rest_min: number | null
+          whirlpool_temp_f: number | null
+          whirlpool_time_min: number | null
+          yeast_id: string | null
+          yeast_nutrient_amount_g: number | null
         }
         Insert: {
+          batch_size_bbl?: number | null
           batch_size_gallons?: number | null
-          boil_time_minutes?: number | null
+          boil_time_min?: number | null
           brand_id?: string | null
+          brew_day_notes?: string | null
+          conditioning_days?: number | null
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
+          development_notes?: string | null
+          fermentation_days?: number | null
+          fermentation_schedule?: Json | null
           id?: string
           ingredients?: Json | null
           instructions?: Json | null
           is_active?: boolean | null
+          mash_efficiency?: number | null
+          mash_schedule?: Json | null
           mash_temp_f?: number | null
+          mash_water_volume_gal?: number | null
           name: string
           notes?: string | null
+          preboil_volume_bbl?: number | null
+          sparge_water_volume_gal?: number | null
           style?: string | null
+          style_id?: string | null
           target_abv?: number | null
+          target_attenuation?: number | null
           target_fg?: number | null
           target_ibu?: number | null
+          target_ko_temp_f?: number | null
+          target_ko_volume_bbl?: number | null
+          target_mash_ph?: number | null
           target_og?: number | null
+          target_pitching_rate?: number | null
           target_srm?: number | null
+          tasting_notes?: string | null
           updated_at?: string | null
+          use_default_additions?: boolean | null
+          volume_bbl?: number | null
+          water_profile_id?: string | null
+          water_to_grain_ratio?: number | null
+          whirlpool_rest_min?: number | null
+          whirlpool_temp_f?: number | null
+          whirlpool_time_min?: number | null
+          yeast_id?: string | null
+          yeast_nutrient_amount_g?: number | null
         }
         Update: {
+          batch_size_bbl?: number | null
           batch_size_gallons?: number | null
-          boil_time_minutes?: number | null
+          boil_time_min?: number | null
           brand_id?: string | null
+          brew_day_notes?: string | null
+          conditioning_days?: number | null
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
+          development_notes?: string | null
+          fermentation_days?: number | null
+          fermentation_schedule?: Json | null
           id?: string
           ingredients?: Json | null
           instructions?: Json | null
           is_active?: boolean | null
+          mash_efficiency?: number | null
+          mash_schedule?: Json | null
           mash_temp_f?: number | null
+          mash_water_volume_gal?: number | null
           name?: string
           notes?: string | null
+          preboil_volume_bbl?: number | null
+          sparge_water_volume_gal?: number | null
           style?: string | null
+          style_id?: string | null
           target_abv?: number | null
+          target_attenuation?: number | null
           target_fg?: number | null
           target_ibu?: number | null
+          target_ko_temp_f?: number | null
+          target_ko_volume_bbl?: number | null
+          target_mash_ph?: number | null
           target_og?: number | null
+          target_pitching_rate?: number | null
           target_srm?: number | null
+          tasting_notes?: string | null
           updated_at?: string | null
+          use_default_additions?: boolean | null
+          volume_bbl?: number | null
+          water_profile_id?: string | null
+          water_to_grain_ratio?: number | null
+          whirlpool_rest_min?: number | null
+          whirlpool_temp_f?: number | null
+          whirlpool_time_min?: number | null
+          yeast_id?: string | null
+          yeast_nutrient_amount_g?: number | null
         }
         Relationships: [
           {
@@ -1383,6 +2250,27 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_style_id_fkey"
+            columns: ["style_id"]
+            isOneToOne: false
+            referencedRelation: "beer_styles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_water_profile_id_fkey"
+            columns: ["water_profile_id"]
+            isOneToOne: false
+            referencedRelation: "water_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_yeast_id_fkey"
+            columns: ["yeast_id"]
+            isOneToOne: false
+            referencedRelation: "yeasts"
             referencedColumns: ["id"]
           },
         ]
@@ -1496,6 +2384,90 @@ export type Database = {
           ttb_registry_number?: string | null
           updated_at?: string | null
           website?: string | null
+        }
+        Relationships: []
+      }
+      spices: {
+        Row: {
+          cost_per_unit: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          type: string | null
+          typical_amount: number | null
+          typical_unit: string | null
+          unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cost_per_unit?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          type?: string | null
+          typical_amount?: number | null
+          typical_unit?: string | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cost_per_unit?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          type?: string | null
+          typical_amount?: number | null
+          typical_unit?: string | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sugars: {
+        Row: {
+          color_lovibond: number | null
+          cost_per_lb: number | null
+          created_at: string | null
+          description: string | null
+          fermentability: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          potential_ppg: number | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          color_lovibond?: number | null
+          cost_per_lb?: number | null
+          created_at?: string | null
+          description?: string | null
+          fermentability?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          potential_ppg?: number | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          color_lovibond?: number | null
+          cost_per_lb?: number | null
+          created_at?: string | null
+          description?: string | null
+          fermentability?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          potential_ppg?: number | null
+          type?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1923,6 +2895,120 @@ export type Database = {
           },
         ]
       }
+      water_profiles: {
+        Row: {
+          bicarbonate_ppm: number | null
+          calcium_ppm: number | null
+          chloride_ppm: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          magnesium_ppm: number | null
+          name: string
+          ph: number | null
+          sodium_ppm: number | null
+          sulfate_ppm: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          bicarbonate_ppm?: number | null
+          calcium_ppm?: number | null
+          chloride_ppm?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          magnesium_ppm?: number | null
+          name: string
+          ph?: number | null
+          sodium_ppm?: number | null
+          sulfate_ppm?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          bicarbonate_ppm?: number | null
+          calcium_ppm?: number | null
+          chloride_ppm?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          magnesium_ppm?: number | null
+          name?: string
+          ph?: number | null
+          sodium_ppm?: number | null
+          sulfate_ppm?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      yeasts: {
+        Row: {
+          alcohol_tolerance: number | null
+          attenuation_max: number | null
+          attenuation_min: number | null
+          attenuation_typical: number | null
+          created_at: string | null
+          description: string | null
+          flocculation: string | null
+          form: string | null
+          id: string
+          is_active: boolean | null
+          manufacturer: string | null
+          name: string
+          pitching_rate: number | null
+          product_code: string | null
+          temp_ideal_f: number | null
+          temp_max_f: number | null
+          temp_min_f: number | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          alcohol_tolerance?: number | null
+          attenuation_max?: number | null
+          attenuation_min?: number | null
+          attenuation_typical?: number | null
+          created_at?: string | null
+          description?: string | null
+          flocculation?: string | null
+          form?: string | null
+          id?: string
+          is_active?: boolean | null
+          manufacturer?: string | null
+          name: string
+          pitching_rate?: number | null
+          product_code?: string | null
+          temp_ideal_f?: number | null
+          temp_max_f?: number | null
+          temp_min_f?: number | null
+          type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          alcohol_tolerance?: number | null
+          attenuation_max?: number | null
+          attenuation_min?: number | null
+          attenuation_typical?: number | null
+          created_at?: string | null
+          description?: string | null
+          flocculation?: string | null
+          form?: string | null
+          id?: string
+          is_active?: boolean | null
+          manufacturer?: string | null
+          name?: string
+          pitching_rate?: number | null
+          product_code?: string | null
+          temp_ideal_f?: number | null
+          temp_max_f?: number | null
+          temp_min_f?: number | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       available_vessels: {
@@ -2037,6 +3123,13 @@ export type Database = {
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "batches_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
         ]
       }
       batches_with_remaining_volume: {
@@ -2064,6 +3157,13 @@ export type Database = {
             columns: ["recipe_id"]
             isOneToOne: false
             referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
             referencedColumns: ["id"]
           },
         ]
@@ -2273,6 +3373,92 @@ export type Database = {
           },
         ]
       }
+      recipes_with_estimates: {
+        Row: {
+          batch_size_bbl: number | null
+          batch_size_gallons: number | null
+          boil_time_min: number | null
+          brand_id: string | null
+          brew_day_notes: string | null
+          conditioning_days: number | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          development_notes: string | null
+          est_abv: number | null
+          est_fg: number | null
+          est_ibu: number | null
+          est_og: number | null
+          est_srm: number | null
+          fermentation_days: number | null
+          fermentation_schedule: Json | null
+          id: string | null
+          ingredients: Json | null
+          instructions: Json | null
+          is_active: boolean | null
+          mash_efficiency: number | null
+          mash_schedule: Json | null
+          mash_temp_f: number | null
+          mash_water_volume_gal: number | null
+          name: string | null
+          notes: string | null
+          preboil_volume_bbl: number | null
+          sparge_water_volume_gal: number | null
+          style: string | null
+          style_id: string | null
+          target_abv: number | null
+          target_attenuation: number | null
+          target_fg: number | null
+          target_ibu: number | null
+          target_ko_temp_f: number | null
+          target_ko_volume_bbl: number | null
+          target_mash_ph: number | null
+          target_og: number | null
+          target_pitching_rate: number | null
+          target_srm: number | null
+          tasting_notes: string | null
+          updated_at: string | null
+          use_default_additions: boolean | null
+          volume_bbl: number | null
+          water_profile_id: string | null
+          water_to_grain_ratio: number | null
+          whirlpool_rest_min: number | null
+          whirlpool_temp_f: number | null
+          whirlpool_time_min: number | null
+          yeast_id: string | null
+          yeast_nutrient_amount_g: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipes_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_style_id_fkey"
+            columns: ["style_id"]
+            isOneToOne: false
+            referencedRelation: "beer_styles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_water_profile_id_fkey"
+            columns: ["water_profile_id"]
+            isOneToOne: false
+            referencedRelation: "water_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_yeast_id_fkey"
+            columns: ["yeast_id"]
+            isOneToOne: false
+            referencedRelation: "yeasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vessels_with_batch: {
         Row: {
           batch_name: string | null
@@ -2332,6 +3518,8 @@ export type Database = {
       get_ai_schema_context: { Args: { p_domain?: string }; Returns: Json }
       get_inventory_overview: { Args: never; Returns: Json }
       get_recipe_summary: { Args: { p_recipe_id: string }; Returns: Json }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       suggest_recipe_improvements: {
         Args: { p_recipe_id: string }
         Returns: Json

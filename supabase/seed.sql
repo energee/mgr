@@ -179,4 +179,319 @@ VALUES
    '00000000-0000-0000-0008-000000000003', 'batch_usage', -8.0, NULL, 'Used for 2024-001')
 ON CONFLICT (id) DO NOTHING;
 
-SELECT 'Seed data created!' AS message;
+-- =============================================================================
+-- CATALOG DATA: Beer Styles (BJCP 2021 Guidelines)
+-- =============================================================================
+
+INSERT INTO beer_styles (name, category, og_min, og_max, fg_min, fg_max, ibu_min, ibu_max, srm_min, srm_max, abv_min, abv_max, description)
+VALUES
+  -- Pale Ales
+  ('American Pale Ale', 'Pale Ale', 1.045, 1.060, 1.010, 1.015, 30, 50, 5, 10, 4.5, 6.2, 'Moderate to strong hop aroma and flavor from American hop varieties'),
+  ('American IPA', 'IPA', 1.056, 1.070, 1.008, 1.014, 40, 70, 6, 14, 5.5, 7.5, 'Decidedly hoppy and bitter, moderately strong pale ale'),
+  ('Hazy IPA', 'IPA', 1.060, 1.085, 1.010, 1.020, 25, 60, 3, 7, 6.0, 9.0, 'Juicy, soft, hazy IPA with tropical fruit hop character'),
+  ('West Coast IPA', 'IPA', 1.056, 1.075, 1.008, 1.014, 50, 75, 5, 10, 5.5, 8.0, 'Clean, bitter, dry IPA with resinous/citrus hop character'),
+  ('Double IPA', 'IPA', 1.065, 1.100, 1.008, 1.018, 60, 100, 6, 14, 7.5, 10.0, 'Intense hoppy, bitter, alcoholic pale ale'),
+
+  -- Stouts & Porters
+  ('American Stout', 'Stout', 1.050, 1.075, 1.010, 1.022, 35, 75, 30, 40, 5.0, 7.0, 'Fairly strong, highly roasted, bitter, hoppy dark stout'),
+  ('Imperial Stout', 'Stout', 1.075, 1.115, 1.018, 1.030, 50, 90, 30, 40, 8.0, 12.0, 'Rich, intense, complex, full-bodied stout'),
+  ('Oatmeal Stout', 'Stout', 1.045, 1.065, 1.010, 1.018, 25, 40, 22, 40, 4.2, 5.9, 'Dark, roasty, medium-bodied stout with oat smoothness'),
+  ('American Porter', 'Porter', 1.050, 1.070, 1.012, 1.018, 25, 50, 22, 40, 4.8, 6.5, 'Substantial, malty dark beer with roasted character'),
+
+  -- Lagers
+  ('German Pilsner', 'Lager', 1.044, 1.050, 1.008, 1.013, 25, 45, 2, 5, 4.4, 5.2, 'Crisp, clean, refreshing with noble hop bitterness'),
+  ('American Lager', 'Lager', 1.040, 1.050, 1.004, 1.010, 8, 18, 2, 4, 4.2, 5.3, 'Light-bodied, highly carbonated, very well-lagered'),
+  ('Munich Helles', 'Lager', 1.044, 1.048, 1.006, 1.012, 16, 22, 3, 5, 4.7, 5.4, 'Malt-accented, clean German lager'),
+  ('Oktoberfest/Märzen', 'Lager', 1.054, 1.060, 1.010, 1.014, 20, 28, 8, 17, 5.6, 6.3, 'Rich, malty German amber lager'),
+
+  -- Wheat Beers
+  ('American Wheat', 'Wheat', 1.040, 1.055, 1.008, 1.013, 15, 30, 3, 6, 4.0, 5.5, 'Refreshing wheat-based ale with light flavor'),
+  ('Hefeweizen', 'Wheat', 1.044, 1.052, 1.010, 1.014, 8, 15, 2, 6, 4.3, 5.6, 'Bavarian wheat ale with banana and clove character'),
+  ('Witbier', 'Wheat', 1.044, 1.052, 1.008, 1.012, 8, 20, 2, 4, 4.5, 5.5, 'Belgian wheat ale with coriander and orange peel'),
+
+  -- Belgian
+  ('Belgian Blonde', 'Belgian', 1.062, 1.075, 1.008, 1.018, 15, 30, 4, 7, 6.0, 7.5, 'Moderate-strength golden Belgian ale'),
+  ('Belgian Tripel', 'Belgian', 1.075, 1.085, 1.008, 1.014, 20, 40, 4.5, 7, 7.5, 9.5, 'Strong, pale, effervescent Belgian ale'),
+  ('Saison', 'Belgian', 1.048, 1.065, 1.002, 1.008, 20, 35, 5, 14, 5.0, 7.0, 'Refreshing, fruity, spicy, hoppy farmhouse ale'),
+
+  -- Sours
+  ('Berliner Weisse', 'Sour', 1.028, 1.032, 1.003, 1.006, 3, 8, 2, 3, 2.8, 3.8, 'Very pale, refreshing, tart German wheat beer'),
+  ('Gose', 'Sour', 1.036, 1.056, 1.006, 1.010, 5, 12, 3, 4, 4.2, 4.8, 'Sour, salty, lightly herbal German wheat beer'),
+  ('Flanders Red', 'Sour', 1.048, 1.057, 1.002, 1.012, 10, 25, 10, 17, 4.6, 6.5, 'Complex, sour, wine-like Belgian red ale')
+ON CONFLICT (name) DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Yeasts
+-- =============================================================================
+
+INSERT INTO yeasts (name, manufacturer, product_code, type, form, attenuation_min, attenuation_max, attenuation_typical, temp_min_f, temp_max_f, temp_ideal_f, flocculation, alcohol_tolerance, description)
+VALUES
+  -- Dry Ale Yeasts
+  ('Safale US-05', 'Fermentis', 'US-05', 'ale', 'dry', 78, 82, 81, 59, 75, 66, 'medium', 12.0, 'Clean American ale yeast. Neutral profile, versatile.'),
+  ('Safale S-04', 'Fermentis', 'S-04', 'ale', 'dry', 72, 76, 74, 59, 75, 66, 'high', 11.5, 'English ale yeast. Fruity, fast fermentation.'),
+  ('Nottingham', 'Lallemand', 'NOTT', 'ale', 'dry', 73, 82, 77, 57, 70, 64, 'high', 14.0, 'Clean English ale yeast. Neutral, high attenuation option.'),
+  ('Belle Saison', 'Lallemand', 'BELLE-S', 'ale', 'dry', 85, 95, 90, 63, 95, 77, 'low', 15.0, 'Belgian saison yeast. Spicy, dry finish.'),
+  ('Verdant IPA', 'Lallemand', 'VERD', 'ale', 'dry', 73, 77, 75, 64, 73, 68, 'medium', 10.0, 'Hazy IPA yeast. Biotransformation, low flocculation.'),
+
+  -- Dry Lager Yeasts
+  ('Saflager W-34/70', 'Fermentis', 'W-34/70', 'lager', 'dry', 80, 84, 82, 48, 59, 53, 'high', 11.0, 'German lager yeast. Clean, crisp, versatile.'),
+  ('Diamond Lager', 'Lallemand', 'DIAM', 'lager', 'dry', 75, 79, 77, 50, 59, 54, 'high', 12.0, 'German lager yeast. Malty, clean profile.'),
+
+  -- Liquid Ale Yeasts (White Labs)
+  ('California Ale', 'White Labs', 'WLP001', 'ale', 'liquid', 73, 80, 76, 66, 72, 68, 'medium', 11.0, 'Clean American ale yeast. Most popular craft yeast.'),
+  ('English Ale', 'White Labs', 'WLP002', 'ale', 'liquid', 63, 70, 66, 64, 70, 66, 'very_high', 9.0, 'Malty English ale yeast. Leaves residual sweetness.'),
+  ('London Ale III', 'White Labs', 'WLP013', 'ale', 'liquid', 71, 75, 73, 64, 72, 68, 'medium', 10.0, 'Fruity English ale yeast. Rich, malty profile.'),
+  ('Belgian Wit', 'White Labs', 'WLP400', 'ale', 'liquid', 74, 78, 76, 67, 74, 70, 'low', 10.0, 'Belgian witbier yeast. Slight tartness, spicy.'),
+  ('Abbey Ale', 'White Labs', 'WLP530', 'ale', 'liquid', 75, 80, 78, 66, 72, 68, 'medium', 12.0, 'Belgian abbey yeast. Fruity esters, dry finish.'),
+
+  -- Liquid Ale Yeasts (Wyeast)
+  ('American Ale', 'Wyeast', '1056', 'ale', 'liquid', 73, 77, 75, 60, 72, 66, 'medium', 11.0, 'Clean fermentation profile. Very versatile.'),
+  ('American Ale II', 'Wyeast', '1272', 'ale', 'liquid', 72, 76, 74, 60, 72, 68, 'high', 10.0, 'Slightly nutty and soft ale profile.'),
+  ('London ESB', 'Wyeast', '1968', 'ale', 'liquid', 67, 71, 69, 64, 72, 68, 'very_high', 8.0, 'Fruity, malty English ale yeast.'),
+  ('Belgian Abbey', 'Wyeast', '1214', 'ale', 'liquid', 74, 78, 76, 68, 78, 72, 'medium', 11.0, 'Abbey-style yeast with complex esters.'),
+  ('Belgian Ardennes', 'Wyeast', '3522', 'ale', 'liquid', 72, 76, 74, 65, 85, 75, 'high', 12.0, 'Spicy, clove-like character. Dry finish.'),
+
+  -- Wild/Sour Yeasts
+  ('Lacto Blend', 'White Labs', 'WLP677', 'wild', 'liquid', NULL, NULL, NULL, 75, 95, 85, 'low', NULL, 'Lactobacillus blend for kettle souring.'),
+  ('Brettanomyces Brux', 'White Labs', 'WLP650', 'wild', 'liquid', NULL, NULL, NULL, 60, 85, 75, 'low', 15.0, 'Brettanomyces for funky sour character.')
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Malts
+-- =============================================================================
+
+INSERT INTO malts (name, maltster, country, type, color_lovibond, potential_ppg, max_percentage, requires_mash, diastatic_power, description)
+VALUES
+  -- Base Malts
+  ('2-Row Pale Malt', 'Rahr', 'USA', 'base', 1.8, 37, 100, true, 140, 'American 2-row. Clean base malt for most styles.'),
+  ('Pilsner Malt', 'Weyermann', 'Germany', 'base', 1.6, 37, 100, true, 130, 'German pilsner malt. Light color, grainy sweetness.'),
+  ('Maris Otter', 'Crisp', 'UK', 'base', 3.0, 38, 100, true, 120, 'English pale malt. Biscuity, rich flavor.'),
+  ('Golden Promise', 'Simpsons', 'UK', 'base', 2.5, 37, 100, true, 100, 'Scottish pale malt. Sweet, smooth flavor.'),
+  ('Vienna Malt', 'Weyermann', 'Germany', 'base', 3.5, 36, 100, true, 110, 'Adds light toast and orange hue.'),
+  ('Munich Malt', 'Weyermann', 'Germany', 'base', 9.0, 36, 80, true, 70, 'German Munich. Rich malt flavor, golden-orange color.'),
+  ('Munich Malt II', 'Weyermann', 'Germany', 'base', 9.0, 35, 100, true, 40, 'Darker Munich malt. Biscuity, toasty flavor.'),
+  ('Wheat Malt', 'Rahr', 'USA', 'base', 2.0, 38, 70, true, 95, 'White wheat malt. Adds body and head retention.'),
+
+  -- Specialty Malts
+  ('Crystal 40', 'Briess', 'USA', 'specialty', 40, 34, 25, false, 0, 'Medium caramel malt. Toffee and caramel flavor.'),
+  ('Crystal 60', 'Briess', 'USA', 'specialty', 60, 34, 20, false, 0, 'Medium-dark caramel. More intense caramel.'),
+  ('Crystal 80', 'Briess', 'USA', 'specialty', 80, 33, 15, false, 0, 'Dark caramel malt. Rich caramel, slight raisin.'),
+  ('Crystal 120', 'Briess', 'USA', 'specialty', 120, 32, 10, false, 0, 'Very dark caramel. Deep caramel, burnt sugar.'),
+  ('Honey Malt', 'Gambrinus', 'Canada', 'specialty', 25, 35, 20, false, 0, 'Sweet honey-like flavor. Golden color.'),
+  ('Victory Malt', 'Briess', 'USA', 'specialty', 28, 34, 15, true, 0, 'Biscuit character. Light toasted flavor.'),
+  ('Biscuit Malt', 'Dingemans', 'Belgium', 'specialty', 23, 35, 15, true, 0, 'Bread crust, biscuit flavor.'),
+  ('Aromatic Malt', 'Dingemans', 'Belgium', 'specialty', 20, 35, 15, true, 0, 'Intense malt aroma and flavor.'),
+  ('Melanoidin Malt', 'Weyermann', 'Germany', 'specialty', 27, 34, 15, true, 0, 'Enhances malty sweetness and body.'),
+  ('Carapils', 'Briess', 'USA', 'specialty', 1.5, 33, 20, false, 0, 'Dextrin malt. Adds body and head retention.'),
+  ('Acidulated Malt', 'Weyermann', 'Germany', 'specialty', 1.8, 27, 10, true, 0, 'Lactic acid malt. Lowers mash pH.'),
+
+  -- Roasted Malts
+  ('Chocolate Malt', 'Briess', 'USA', 'roasted', 350, 29, 10, false, 0, 'Roasted chocolate flavor. Dark color.'),
+  ('Black Malt', 'Briess', 'USA', 'roasted', 500, 28, 5, false, 0, 'Sharp roasted flavor. Deep black color.'),
+  ('Roasted Barley', 'Briess', 'USA', 'roasted', 300, 28, 10, false, 0, 'Unmalted barley. Coffee, dry roast character.'),
+  ('Carafa II', 'Weyermann', 'Germany', 'roasted', 425, 30, 5, false, 0, 'Dehusked. Smooth dark color without harsh roast.'),
+  ('Carafa III', 'Weyermann', 'Germany', 'roasted', 525, 29, 5, false, 0, 'Dehusked. Very dark, coffee-like flavor.'),
+  ('Pale Chocolate', 'Simpsons', 'UK', 'roasted', 200, 31, 10, false, 0, 'Lighter chocolate malt. Coffee, nutty flavor.'),
+
+  -- Adjunct Malts
+  ('Flaked Oats', 'Briess', 'USA', 'adjunct', 1.0, 32, 30, false, 0, 'Unmalted oats. Silky body, haze in NEIPAs.'),
+  ('Flaked Wheat', 'Briess', 'USA', 'adjunct', 1.0, 36, 40, false, 0, 'Unmalted wheat. Haze, body, head retention.'),
+  ('Flaked Barley', 'Briess', 'USA', 'adjunct', 1.0, 32, 20, false, 0, 'Unmalted barley. Adds body and creaminess.'),
+  ('Flaked Corn', 'Briess', 'USA', 'adjunct', 0.5, 39, 40, false, 0, 'Lightens body and color. American lager adjunct.'),
+  ('Flaked Rice', 'Briess', 'USA', 'adjunct', 0.5, 40, 40, false, 0, 'Very light, neutral. Lightens body.'),
+  ('Torrified Wheat', 'Simpsons', 'UK', 'adjunct', 1.5, 36, 40, false, 0, 'Puffed wheat. Head retention and body.')
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Hops
+-- =============================================================================
+
+INSERT INTO hops (name, origin, type, alpha_acid_min, alpha_acid_max, alpha_acid_typical, beta_acid_min, beta_acid_max, flavor_profile, substitutes)
+VALUES
+  -- American Hops
+  ('Citra', 'USA', 'dual', 11.0, 13.0, 12.0, 3.5, 4.5, 'Tropical, citrus, mango, grapefruit', 'Galaxy, Mosaic, Amarillo'),
+  ('Mosaic', 'USA', 'dual', 11.5, 13.5, 12.5, 3.2, 3.9, 'Complex tropical, berry, citrus, earthy', 'Citra, Simcoe, Amarillo'),
+  ('Simcoe', 'USA', 'dual', 12.0, 14.0, 13.0, 4.0, 5.0, 'Pine, citrus, earthy, berry', 'Mosaic, Columbus, Centennial'),
+  ('Amarillo', 'USA', 'aroma', 8.0, 11.0, 9.5, 6.0, 7.0, 'Orange citrus, floral, tropical', 'Cascade, Centennial, Citra'),
+  ('Centennial', 'USA', 'dual', 9.5, 11.5, 10.5, 3.5, 4.5, 'Floral, citrus, medium intensity', 'Cascade, Columbus, Amarillo'),
+  ('Cascade', 'USA', 'aroma', 4.5, 7.0, 5.5, 4.8, 7.0, 'Grapefruit, floral, spicy', 'Centennial, Amarillo, Columbus'),
+  ('Columbus', 'USA', 'bittering', 14.0, 16.0, 15.0, 4.5, 5.5, 'Dank, herbal, citrus, earthy', 'Simcoe, Chinook, Centennial'),
+  ('Chinook', 'USA', 'dual', 12.0, 14.0, 13.0, 3.0, 4.0, 'Pine, grapefruit, spicy', 'Columbus, Simcoe, Nugget'),
+  ('Galaxy', 'Australia', 'dual', 13.0, 15.0, 14.0, 5.6, 6.5, 'Passionfruit, peach, citrus', 'Citra, Nelson Sauvin'),
+  ('Nelson Sauvin', 'New Zealand', 'dual', 12.0, 13.0, 12.5, 6.0, 8.0, 'White wine, gooseberry, tropical', 'Galaxy, Motueka'),
+  ('Idaho 7', 'USA', 'dual', 13.0, 17.0, 15.0, 4.5, 5.5, 'Tropical, stone fruit, pine, dank', 'Mosaic, Simcoe, Citra'),
+  ('El Dorado', 'USA', 'dual', 14.0, 16.0, 15.0, 7.0, 8.0, 'Tropical, candy, watermelon', 'Mosaic, Citra, Galaxy'),
+  ('Sabro', 'USA', 'dual', 14.0, 17.0, 15.5, 4.0, 5.0, 'Coconut, tropical, citrus, stone fruit', 'Mosaic, Galaxy'),
+  ('Strata', 'USA', 'dual', 11.0, 14.0, 12.5, 4.0, 5.5, 'Passion fruit, hemp, citrus, grapefruit', 'Mosaic, Galaxy'),
+  ('Talus', 'USA', 'dual', 10.0, 12.0, 11.0, 6.5, 8.0, 'Pink grapefruit, rose, sage', 'Centennial, Citra'),
+
+  -- European Noble Hops
+  ('Saaz', 'Czech Republic', 'aroma', 2.5, 4.5, 3.5, 4.0, 6.0, 'Spicy, floral, earthy', 'Tettnang, Hallertau Mittelfrueh'),
+  ('Tettnang', 'Germany', 'aroma', 3.5, 5.0, 4.5, 3.5, 4.5, 'Spicy, floral, slightly citrus', 'Saaz, Hallertau'),
+  ('Hallertau Mittelfrueh', 'Germany', 'aroma', 3.0, 5.5, 4.0, 3.0, 5.0, 'Floral, spicy, earthy', 'Tettnang, Saaz'),
+  ('Perle', 'Germany', 'dual', 6.0, 9.0, 7.5, 3.5, 4.5, 'Slightly spicy, floral, minty', 'Northern Brewer, Hallertau'),
+  ('Magnum', 'Germany', 'bittering', 12.0, 14.0, 13.0, 4.5, 5.5, 'Clean bittering, neutral', 'German Northern Brewer'),
+  ('Mandarina Bavaria', 'Germany', 'aroma', 7.0, 10.0, 8.5, 5.0, 6.5, 'Tangerine, citrus, sweet', 'Cascade, Centennial'),
+
+  -- English Hops
+  ('East Kent Goldings', 'UK', 'aroma', 4.0, 5.5, 5.0, 2.0, 3.5, 'Floral, spicy, honey', 'Fuggle, Styrian Goldings'),
+  ('Fuggle', 'UK', 'aroma', 4.0, 5.5, 4.5, 1.5, 2.5, 'Earthy, woody, mild', 'East Kent Goldings, Willamette'),
+  ('Challenger', 'UK', 'dual', 6.0, 8.5, 7.0, 3.0, 4.0, 'Spicy, cedar, green tea', 'Northern Brewer, Perle'),
+
+  -- Bittering Hops
+  ('Nugget', 'USA', 'bittering', 12.0, 14.0, 13.0, 4.0, 6.0, 'Heavy herbal, slightly floral', 'Columbus, Magnum'),
+  ('Warrior', 'USA', 'bittering', 15.0, 17.0, 16.0, 4.5, 5.5, 'Clean bittering, mild citrus', 'Columbus, Magnum')
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Sugars
+-- =============================================================================
+
+INSERT INTO sugars (name, type, color_lovibond, potential_ppg, fermentability, description)
+VALUES
+  ('Corn Sugar (Dextrose)', 'simple', 0, 46, 100, 'Highly fermentable. Lightens body, raises ABV.'),
+  ('Table Sugar (Sucrose)', 'simple', 0, 46, 100, 'Fully fermentable. Lightens body.'),
+  ('Candi Sugar (Clear)', 'invert', 0, 40, 100, 'Belgian clear candi. Ferments completely.'),
+  ('Candi Sugar (Dark)', 'invert', 90, 38, 100, 'Belgian dark candi. Adds raisin, caramel, plum.'),
+  ('Candi Syrup D-90', 'invert', 90, 32, 95, 'Dark Belgian syrup. Rich dark fruit, toffee.'),
+  ('Candi Syrup D-180', 'invert', 180, 32, 95, 'Very dark Belgian syrup. Intense dark fruit.'),
+  ('Honey', 'honey', 3, 35, 95, 'Adds floral sweetness and complexity.'),
+  ('Maple Syrup', 'maple', 35, 30, 90, 'Grade A maple syrup. Adds distinctive maple character.'),
+  ('Brown Sugar', 'simple', 15, 44, 100, 'Adds light molasses character.'),
+  ('Molasses', 'molasses', 80, 36, 85, 'Strong molasses flavor. Use sparingly.'),
+  ('Rice Syrup', 'simple', 0, 32, 70, 'Lightens body. Neutral flavor.'),
+  ('Lactose', 'simple', 0, 35, 0, 'Unfermentable. Adds sweetness and body.')
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Adjuncts
+-- =============================================================================
+
+INSERT INTO adjuncts (name, type, color_lovibond, potential_ppg, requires_mash, description)
+VALUES
+  ('Rice Hulls', 'other', 0, 0, false, 'Improves lautering. No flavor contribution.'),
+  ('Corn (Maize)', 'grain', 0.5, 39, true, 'Lightens body and flavor. American lager adjunct.'),
+  ('Rice', 'grain', 0.5, 40, true, 'Very light, neutral. Asian lagers.'),
+  ('Rye (Flaked)', 'grain', 2.0, 36, true, 'Spicy character. Adds complexity to body.'),
+  ('Rye Malt', 'grain', 3.5, 35, true, 'Malted rye. Spicy, slightly sweet.')
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Spices
+-- =============================================================================
+
+INSERT INTO spices (name, type, description, typical_amount, typical_unit)
+VALUES
+  ('Coriander Seed', 'spice', 'Citrusy, peppery. Essential for witbier.', 1.0, 'oz'),
+  ('Orange Peel (Bitter)', 'botanical', 'Bitter citrus. Common in Belgian wits.', 0.5, 'oz'),
+  ('Orange Peel (Sweet)', 'botanical', 'Sweeter citrus peel.', 0.5, 'oz'),
+  ('Chamomile', 'herb', 'Floral, apple-like. Relaxing character.', 0.25, 'oz'),
+  ('Ginger', 'spice', 'Spicy, warming. Fresh or dried.', 0.5, 'oz'),
+  ('Cinnamon', 'spice', 'Warm spice. Common in winter warmers.', 0.25, 'oz'),
+  ('Vanilla Bean', 'spice', 'Sweet, creamy vanilla. Use whole beans.', 2.0, 'each'),
+  ('Coffee (Whole Bean)', 'botanical', 'Coffee character. Add post-fermentation.', 2.0, 'oz'),
+  ('Cocoa Nibs', 'botanical', 'Chocolate character without sweetness.', 4.0, 'oz'),
+  ('Star Anise', 'spice', 'Licorice flavor. Use sparingly.', 2.0, 'each'),
+  ('Juniper Berries', 'botanical', 'Piney, gin-like flavor.', 0.5, 'oz'),
+  ('Hibiscus', 'botanical', 'Tart, cranberry-like. Pink/red color.', 1.0, 'oz'),
+  ('Cardamom', 'spice', 'Warm, citrusy spice.', 0.25, 'oz'),
+  ('Black Pepper', 'spice', 'Spicy heat. Common in saisons.', 0.25, 'oz'),
+  ('Grains of Paradise', 'spice', 'Peppery, citrusy. African spice.', 0.25, 'oz'),
+  ('Rose Hips', 'botanical', 'Tart, floral. Vitamin C source.', 0.5, 'oz'),
+  ('Lemongrass', 'herb', 'Bright citrus character.', 0.5, 'oz'),
+  ('Thai Basil', 'herb', 'Anise-like, herbal character.', 0.5, 'oz')
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Fruits
+-- =============================================================================
+
+INSERT INTO fruits (name, type, form, sugar_content, description)
+VALUES
+  ('Passion Fruit', 'puree', 'frozen', 14.0, 'Tropical, tart. Popular in sours and IPAs.'),
+  ('Mango', 'puree', 'aseptic', 16.0, 'Sweet tropical. Pairs well with hops.'),
+  ('Raspberry', 'puree', 'frozen', 10.0, 'Tart berry. Classic for fruit beers.'),
+  ('Strawberry', 'puree', 'frozen', 8.0, 'Sweet berry. Delicate flavor.'),
+  ('Blackberry', 'puree', 'frozen', 10.0, 'Dark berry. Rich, jammy character.'),
+  ('Blueberry', 'puree', 'frozen', 10.0, 'Subtle berry. Adds color and mild flavor.'),
+  ('Cherry (Tart)', 'puree', 'frozen', 12.0, 'Sour cherry. Classic for krieks.'),
+  ('Cherry (Sweet)', 'puree', 'frozen', 16.0, 'Sweet cherry character.'),
+  ('Peach', 'puree', 'aseptic', 12.0, 'Stone fruit. Great in wheat beers.'),
+  ('Apricot', 'puree', 'aseptic', 12.0, 'Stone fruit. Subtle, complex.'),
+  ('Pineapple', 'puree', 'aseptic', 13.0, 'Tropical, bright. Can be aggressive.'),
+  ('Guava', 'puree', 'aseptic', 12.0, 'Tropical, musky. Unique character.'),
+  ('Blood Orange', 'juice', 'fresh', 11.0, 'Citrus with berry notes.'),
+  ('Grapefruit', 'juice', 'fresh', 10.0, 'Bitter citrus. Pairs with hops.'),
+  ('Lemon', 'juice', 'fresh', 8.0, 'Bright, tart citrus.'),
+  ('Lime', 'juice', 'fresh', 8.0, 'Sharp, tart citrus.'),
+  ('Coconut (Toasted)', 'dried', 'dried', 6.0, 'Sweet, tropical. Use toasted flakes.')
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Additives (Water Salts, Clarifiers, etc.)
+-- =============================================================================
+
+INSERT INTO additives (name, type, description, typical_amount, typical_unit)
+VALUES
+  -- Water Salts
+  ('Gypsum (CaSO4)', 'water_salt', 'Calcium sulfate. Enhances hop bitterness.', 5.0, 'g'),
+  ('Calcium Chloride (CaCl2)', 'water_salt', 'Enhances malt character and fullness.', 5.0, 'g'),
+  ('Epsom Salt (MgSO4)', 'water_salt', 'Magnesium sulfate. Adds dry minerality.', 2.0, 'g'),
+  ('Baking Soda (NaHCO3)', 'water_salt', 'Sodium bicarbonate. Raises pH.', 2.0, 'g'),
+  ('Chalk (CaCO3)', 'water_salt', 'Calcium carbonate. Raises pH for dark beers.', 3.0, 'g'),
+  ('Table Salt (NaCl)', 'water_salt', 'Enhances flavor. Use sparingly.', 1.0, 'g'),
+
+  -- Acids
+  ('Lactic Acid 88%', 'acid', 'Lowers mash/sparge pH. Minimal flavor.', 2.0, 'mL'),
+  ('Phosphoric Acid 10%', 'acid', 'Lowers pH. Very neutral flavor.', 5.0, 'mL'),
+  ('Citric Acid', 'acid', 'Adds tartness. Use in sours/kettle sours.', 2.0, 'g'),
+
+  -- Clarifiers
+  ('Whirlfloc', 'clarifier', 'Irish moss tablet. Add at 10min.', 1.0, 'tablet'),
+  ('Irish Moss', 'clarifier', 'Traditional kettle fining. Add at 15min.', 1.0, 'tsp'),
+  ('Gelatin', 'clarifier', 'Post-fermentation fining. Very effective.', 0.5, 'tsp'),
+  ('Biofine Clear', 'clarifier', 'Vegan post-fermentation fining.', 15.0, 'mL'),
+  ('PVPP (Polyclar)', 'clarifier', 'Removes polyphenols. Improves stability.', 2.0, 'g'),
+
+  -- Nutrients
+  ('Yeast Nutrient', 'nutrient', 'DAP-based nutrient. Add at 10min.', 1.0, 'tsp'),
+  ('Fermaid-O', 'nutrient', 'Organic yeast nutrient. No DAP.', 6.0, 'g'),
+  ('Fermaid-K', 'nutrient', 'Complete yeast nutrient blend.', 6.0, 'g'),
+  ('Zinc Sulfate', 'nutrient', 'Zinc supplement for yeast health.', 1.0, 'mg'),
+
+  -- Enzymes
+  ('Amylase Enzyme', 'enzyme', 'Converts starches. Brut IPA, dry beers.', 1.0, 'tsp'),
+  ('Clarity Ferm', 'enzyme', 'Reduces gluten. Also clarifies.', 2.5, 'mL'),
+  ('Pectinase', 'enzyme', 'Breaks down pectin. Use with fruit.', 0.5, 'tsp'),
+
+  -- Other
+  ('Anti-Foam', 'antifoam', 'Prevents boil-over. Use sparingly.', 2.0, 'drops'),
+  ('Campden Tablet', 'other', 'Removes chlorine/chloramine from water.', 1.0, 'tablet'),
+  ('Potassium Sorbate', 'other', 'Prevents refermentation. For back-sweetening.', 1.0, 'g')
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- CATALOG DATA: Water Profiles
+-- =============================================================================
+
+INSERT INTO water_profiles (name, calcium, magnesium, sodium, sulfate, chloride, bicarbonate, description)
+VALUES
+  ('RO/Distilled', 0, 0, 0, 0, 0, 0, 'Blank slate. Build up from scratch.'),
+  ('Burton-on-Trent', 275, 40, 25, 610, 36, 260, 'High sulfate English water. Classic for IPAs.'),
+  ('Dublin', 118, 4, 12, 54, 19, 319, 'High bicarbonate. Good for stouts.'),
+  ('London', 52, 16, 86, 32, 34, 104, 'Moderate mineral content. English ales.'),
+  ('Munich', 75, 18, 2, 10, 2, 152, 'Low mineral with bicarbonate. German lagers.'),
+  ('Pilsen', 7, 2, 2, 5, 5, 14, 'Very soft water. Bohemian pilsners.'),
+  ('Vienna', 200, 60, 8, 125, 12, 120, 'Moderate minerals. Vienna lagers, märzens.'),
+  ('Dortmund', 250, 25, 40, 120, 106, 220, 'Balanced high mineral. Export lagers.'),
+
+  -- Modern Brewing Profiles
+  ('Hoppy (Yellow)', 50, 5, 10, 150, 50, 0, 'High sulfate:chloride ratio. Crisp hop bite.'),
+  ('Balanced', 50, 5, 10, 75, 75, 0, '1:1 sulfate:chloride. Balanced character.'),
+  ('Malty (Full)', 50, 5, 10, 50, 150, 0, 'High chloride:sulfate. Round, malty body.'),
+  ('Hazy IPA', 75, 5, 20, 100, 150, 0, 'Higher chloride for soft mouthfeel, moderate sulfate.'),
+  ('Lager', 40, 5, 5, 30, 30, 50, 'Light mineral content. Clean lager character.'),
+  ('Stout/Porter', 100, 15, 50, 50, 100, 200, 'Higher bicarbonate for dark malt acidity.')
+ON CONFLICT (name) DO NOTHING;
+
+SELECT 'Seed data created (including catalog data)!' AS message;
