@@ -361,6 +361,24 @@ This section clarifies the relationship between brew logs (hot-side) and batches
 | FG | batches.actual_fg | Cold-side measurement |
 | ABV | batches.actual_abv | Calculated from OG/FG |
 
+### Validation Rules (per DEC-HP-003)
+
+| Rule | Enforcement | Description |
+|------|-------------|-------------|
+| Volume reconciliation | Application warning | SUM(brew_log_batches.volume_bbl) should match knockout volume ±5% |
+| Batch requires brew | Application | Batch cannot transition `planned → fermenting` without brew_log_batches link |
+| Volume positive | Database | `brew_log_batches.volume_bbl > 0` |
+| No unlink after fermenting | Application | Cannot delete brew_log_batches if batch.status != 'planned' |
+
+### Edge Cases
+
+| Scenario | Handling |
+|----------|----------|
+| Planned batch never brewed | Stays `planned`; user can cancel or reschedule |
+| Test brew / dump | brew_log completes with no batch links; flagged as "unallocated" |
+| Volume mismatch >5% | Warning shown; user must acknowledge before saving |
+| Add brew to fermenting batch | Allowed (blend scenario); batch volume recalculated |
+
 ---
 
 ## `batches`
@@ -722,6 +740,7 @@ Physical yeast containers with lineage tracking.
 | source_batch_id | UUID | FK to batches (NULL if purchased) |
 | harvested_at | TIMESTAMPTZ | Harvest timestamp (NULL if purchased) |
 | initial_weight_lbs | DECIMAL(8,2) | Initial weight in pounds |
+| initial_viability_percent | DECIMAL(5,2) | Viability at harvest/purchase (default: 95 harvested, 98 purchased) |
 | generation | INTEGER | Generation (0 = purchased, 1+ = harvested) |
 | parent_brink_id | UUID | FK to yeast_brinks (lineage) |
 | status | TEXT | Status: active, depleted, dumped |
@@ -732,12 +751,16 @@ Physical yeast containers with lineage tracking.
 
 **Calculated fields** (via view or application):
 - `current_weight_lbs = initial_weight_lbs - SUM(yeast_pitches.weight_lbs)`
-- `current_viability` = most recent reading, or decay formula from last reading
+- `current_viability` = see two-tier calculation below
 
-**Viability decay formula** (Zainasheff):
+**Viability decay formula** (Zainasheff, per DEC-GAP-004):
 ```
-viability = last_reading_viability × (0.79 ^ months_since_reading)
+viability = baseline_viability × (0.79 ^ months_elapsed)
 ```
+
+**Two-tier calculation:**
+1. **If readings exist**: Use most recent `brink_viability_readings.viability_percent`, decay from `measured_at`
+2. **If no readings**: Use `initial_viability_percent`, decay from `harvested_at` (or `created_at` for purchased)
 
 ---
 
@@ -780,15 +803,16 @@ Record of yeast pitched from brinks to batches.
 
 ## `yeast_brinks_with_status` (View)
 
-Calculated view showing current brink status.
+Calculated view showing current brink status with two-tier viability calculation (per DEC-GAP-004).
 
 | Column | Type | Description |
 |--------|------|-------------|
 | *(all yeast_brinks columns)* | | Base brink data |
 | current_weight_lbs | DECIMAL | Remaining weight |
-| latest_viability | DECIMAL | Most recent viability reading |
-| latest_reading_date | TIMESTAMPTZ | When last measured |
-| estimated_viability | DECIMAL | Viability with decay formula applied |
+| latest_viability | DECIMAL | Most recent viability reading (NULL if none) |
+| latest_reading_date | TIMESTAMPTZ | When last measured (NULL if none) |
+| estimated_viability | DECIMAL | **Two-tier calculation**: decay from reading if available, otherwise from initial |
+| viability_source | TEXT | 'reading' or 'initial' - indicates which tier was used |
 | pitch_count | INTEGER | Number of pitches from this brink |
 
 ```sql
@@ -798,9 +822,18 @@ SELECT
   yb.initial_weight_lbs - COALESCE(SUM(yp.weight_lbs), 0) as current_weight_lbs,
   latest.viability_percent as latest_viability,
   latest.measured_at as latest_reading_date,
-  latest.viability_percent * POWER(0.79,
-    EXTRACT(EPOCH FROM (NOW() - latest.measured_at)) / (30.44 * 24 * 60 * 60)
+  -- Two-tier viability: prefer reading decay, fallback to initial decay
+  COALESCE(
+    -- Tier 1: Decay from most recent reading
+    latest.viability_percent * POWER(0.79,
+      EXTRACT(EPOCH FROM (NOW() - latest.measured_at)) / (30.44 * 24 * 60 * 60)
+    ),
+    -- Tier 2: Decay from initial viability at harvest/purchase
+    yb.initial_viability_percent * POWER(0.79,
+      EXTRACT(EPOCH FROM (NOW() - COALESCE(yb.harvested_at, yb.created_at))) / (30.44 * 24 * 60 * 60)
+    )
   ) as estimated_viability,
+  CASE WHEN latest.viability_percent IS NOT NULL THEN 'reading' ELSE 'initial' END as viability_source,
   COUNT(yp.id) as pitch_count
 FROM yeast_brinks yb
 LEFT JOIN yeast_pitches yp ON yp.brink_id = yb.id

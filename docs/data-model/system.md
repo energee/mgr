@@ -317,6 +317,94 @@ This table is read-only for authenticated users and is populated via migrations.
 
 ---
 
+## `user_preferences`
+
+Per-user preferences including unit display settings. Auto-created on user signup via database trigger.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| user_id | UUID | FK to auth.users (unique) |
+| volume_unit | TEXT | Volume display: bbl, gal, l, hl |
+| weight_unit | TEXT | Weight display: lbs, kg |
+| temperature_unit | TEXT | Temperature display: f, c |
+| gravity_unit | TEXT | Gravity display: plato, sg |
+| retail_volume_unit | TEXT | Retail volume display: oz, ml |
+| theme | TEXT | UI theme: light, dark, system |
+| date_format | TEXT | Date format preference |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+### Constraints
+
+```sql
+CONSTRAINT user_preferences_user_unique UNIQUE (user_id)
+CHECK (volume_unit IN ('bbl', 'gal', 'l', 'hl'))
+CHECK (weight_unit IN ('lbs', 'kg'))
+CHECK (temperature_unit IN ('f', 'c'))
+CHECK (gravity_unit IN ('plato', 'sg'))
+CHECK (retail_volume_unit IN ('oz', 'ml'))
+CHECK (theme IN ('light', 'dark', 'system'))
+```
+
+### Defaults
+
+| Column | Default | Rationale |
+|--------|---------|-----------|
+| volume_unit | `bbl` | US brewing industry standard |
+| weight_unit | `lbs` | US standard |
+| temperature_unit | `f` | US standard |
+| gravity_unit | `plato` | Professional brewing convention |
+| retail_volume_unit | `oz` | US retail standard |
+| theme | `system` | Respects OS preference |
+
+### Auto-Creation Trigger
+
+```sql
+CREATE OR REPLACE FUNCTION create_user_preferences()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO user_preferences (user_id)
+  VALUES (NEW.id)
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION create_user_preferences();
+```
+
+### Query Examples
+
+```sql
+-- Get user's unit preferences
+SELECT volume_unit, weight_unit, temperature_unit, gravity_unit
+FROM user_preferences
+WHERE user_id = auth.uid();
+
+-- Update volume preference
+UPDATE user_preferences
+SET volume_unit = 'gal', updated_at = now()
+WHERE user_id = auth.uid();
+```
+
+### Application Usage
+
+```typescript
+// Hook provides preferences with defaults
+const { data: prefs } = useUnitPreferences();
+
+// Convert for display
+const displayVolume = formatVolume(batch.volume_bbl, prefs.volume_unit);
+
+// Convert input to canonical
+const canonicalVolume = parseVolumeInput(userInput, prefs.volume_unit);
+```
+
+---
+
 ## Future: Multi-Tenant Support
 
 The following tables would be added for multi-tenant SaaS deployment:

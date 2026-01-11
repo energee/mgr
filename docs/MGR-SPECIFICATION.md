@@ -230,7 +230,7 @@ This section documents architectural decisions from a comprehensive schema revie
 ### HIGH PRIORITY DECISIONS
 
 #### DEC-HP-001: Unified Allocation Table
-**Status**: Documented (data model updated, migration pending)
+**Status**: Implemented (migration 00010_unified_allocations.sql)
 **Decision**: Merge `allocations` and `fg_allocations` into single polymorphic `allocations` table.
 
 ```sql
@@ -295,7 +295,7 @@ recipe_hops:
 
 #### DEC-HP-003: Brew Log to Batch Linking
 **Status**: Documented (data model updated)
-**Decision**: Clarify brew log to batch relationship rules.
+**Decision**: Clarify brew log to batch relationship rules with validation constraints.
 
 **Core principle:** Batches represent fermentation slots and are created during planning. Brew logs capture hot-side execution. The two are linked when wort is allocated to fermenter(s).
 
@@ -305,12 +305,31 @@ recipe_hops:
 3. At knockout, link brew_log to batch(es) via `brew_log_batches` with `volume_bbl`
 4. Batch transitions `planned → fermenting`
 
-**Rules:**
+**Core Rules:**
 - **Batches pre-exist**: Batches are scheduled in advance; brew logs link to existing batches
 - **Yeast binds to batch**: Yeast pitch tracking is at batch level, not brew log (cold-side operation)
 - **Volume allocation**: `brew_log_batches.volume_bbl` specifies wort allocated to each batch
 - **Multi-brew acknowledged**: Batches derived from multiple brews are linked via `brew_log_batches` junction table
 - **Split fermentation**: One brew can feed multiple batches (parti-gyle, different yeasts)
+
+**Validation Constraints:**
+
+| Rule | Enforcement | Description |
+|------|-------------|-------------|
+| Volume reconciliation | Application warning | SUM(brew_log_batches.volume_bbl) should equal knockout volume ±5% |
+| Batch requires brew for fermenting | Application | Batch cannot transition to `fermenting` without at least one brew_log_batches link |
+| Brew completion optional | None | brew_log can complete without batch links (test brews, dump scenarios) |
+| No unlink after fermenting | Application | Cannot delete brew_log_batches record if batch.status != 'planned' |
+| Volume positive | Database | `brew_log_batches.volume_bbl > 0` |
+
+**Edge Cases:**
+
+| Scenario | Handling |
+|----------|----------|
+| Planned batch never brewed | Stays `planned`; user can cancel or reschedule |
+| Brew log with no batch links | Valid for test brews; flagged as "unallocated" in UI |
+| Volume mismatch >5% | Warning displayed; user must acknowledge or adjust |
+| Batch already fermenting, add another brew | Allowed (blend scenario); batch volume_bbl updated |
 
 See `docs/data-model/production.md` "Brew-to-Batch Workflow" section for complete documentation.
 
@@ -519,15 +538,33 @@ cost_per_batch = original_purchase_cost / COUNT(batches_in_lineage)
 Recalculate when new batches added to lineage.
 
 #### DEC-GAP-004: Yeast Viability Decay
-**Decision**: Industry standard formula (Zainasheff).
+**Status**: Documented (data model updated)
+**Decision**: Industry standard formula (Zainasheff) with two-tier calculation.
 
+**Formula:**
 ```
-viability = initial_viability × (0.79 ^ months_stored)
+viability = baseline_viability × (0.79 ^ months_elapsed)
 ```
 
-- Calculate based on `harvested_at` date
-- Allow manual override with tested value
-- Alert when viability drops below threshold (configurable, default 50%)
+**Calculation priority:**
+1. **If viability readings exist**: Use most recent reading as baseline, decay from reading date
+2. **If no readings exist**: Use `initial_viability_percent` as baseline, decay from `harvested_at` (or `created_at` for purchased yeast)
+
+**Implementation:**
+```sql
+estimated_viability = COALESCE(
+  -- Tier 1: Decay from most recent reading
+  latest_reading.viability_percent * POWER(0.79, months_since_reading),
+  -- Tier 2: Decay from initial viability at harvest/purchase
+  yb.initial_viability_percent * POWER(0.79, months_since_harvest)
+)
+```
+
+**Defaults:**
+- `initial_viability_percent`: 95% for harvested, 98% for purchased (gen 0)
+- Alert threshold: configurable, default 50%
+
+**Manual override:** Viability readings always take precedence over calculated values.
 
 #### DEC-GAP-005: Order Allocation & Production Planning
 **Decision**: Support both brand-specific and style-based ordering with demand-driven planning.
@@ -1946,52 +1983,359 @@ interface Revision {
 }
 ```
 
+### 8.6 Application Error Handling
+
+#### 8.6.1 Error Categories
+
+| Category | Examples | User Message | Recovery |
+|----------|----------|--------------|----------|
+| Validation | Invalid input, missing required fields | Specific field error | Fix input, retry |
+| Constraint | Unique violation, FK violation, check constraint | Business rule explanation | Adjust data, retry |
+| Concurrent | Optimistic lock failure, stale data | "Record modified by another user" | Refresh, retry |
+| Permission | RLS denied, role insufficient | "You don't have permission" | Contact admin |
+| Network | Timeout, connection lost | "Connection error, retrying..." | Auto-retry with backoff |
+| Server | 500 errors, unexpected exceptions | "Something went wrong" | Log, notify admin |
+
+#### 8.6.2 Validation Error Format
+
+```typescript
+interface ValidationError {
+  field: string;           // Field path (e.g., "volume_bbl", "items[0].quantity")
+  code: string;            // Machine-readable code (e.g., "required", "min", "invalid_format")
+  message: string;         // User-friendly message
+  meta?: Record<string, unknown>;  // Additional context (e.g., { min: 0, max: 100 })
+}
+
+// Example response
+{
+  success: false,
+  errors: [
+    { field: "volume_bbl", code: "min", message: "Volume must be greater than 0", meta: { min: 0 } },
+    { field: "batch_id", code: "required", message: "Batch is required" }
+  ]
+}
+```
+
+#### 8.6.3 Database Constraint Errors
+
+Map PostgreSQL constraint violations to user-friendly messages:
+
+| Constraint | PostgreSQL Code | User Message Template |
+|------------|-----------------|----------------------|
+| Unique violation | 23505 | "{field} already exists" |
+| Foreign key violation | 23503 | "Referenced {entity} not found or deleted" |
+| Check constraint | 23514 | Map by constraint name (see below) |
+| Not null violation | 23502 | "{field} is required" |
+
+**Check constraint messages** (by constraint name pattern):
+```typescript
+const constraintMessages: Record<string, string> = {
+  'chk_quantity_positive': 'Quantity must be positive',
+  'chk_volume_nonnegative': 'Volume cannot be negative',
+  'chk_viability_range': 'Viability must be between 0 and 100',
+  'chk_allocation_status_valid': 'Invalid allocation status',
+  'chk_fg_entry_point': 'Invalid finished goods entry point configuration',
+};
+```
+
+#### 8.6.4 Concurrent Modification Handling
+
+For entities with optimistic locking (`version` column):
+
+```typescript
+async function updateWithOptimisticLock<T>(
+  table: string,
+  id: string,
+  updates: Partial<T>,
+  currentVersion: number
+): Promise<T> {
+  const { data, error, count } = await supabase
+    .from(table)
+    .update({ ...updates, version: currentVersion + 1 })
+    .eq('id', id)
+    .eq('version', currentVersion)
+    .select()
+    .single();
+
+  if (count === 0) {
+    throw new ConcurrentModificationError(
+      'This record was modified by another user. Please refresh and try again.'
+    );
+  }
+  if (error) throw error;
+  return data;
+}
+```
+
+**Entities with optimistic locking:**
+- `finished_goods` (high contention during order fulfillment)
+- `bin_inventory` (warehouse operations)
+
+#### 8.6.5 API Error Response Format
+
+All API responses follow consistent format:
+
+```typescript
+// Success
+{ success: true, data: T }
+
+// Error
+{
+  success: false,
+  error: {
+    code: string;          // Machine-readable (e.g., "VALIDATION_ERROR", "NOT_FOUND")
+    message: string;       // User-friendly message
+    details?: unknown;     // Additional context (validation errors, etc.)
+  }
+}
+```
+
+#### 8.6.6 Network Error Handling
+
+```typescript
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1000,        // 1 second
+  maxDelay: 10000,        // 10 seconds
+  backoffMultiplier: 2,
+};
+
+// Retry with exponential backoff for network errors
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastError: Error;
+  for (let attempt = 0; attempt < RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (!isRetryableError(error)) throw error;
+      lastError = error;
+      const delay = Math.min(
+        RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt),
+        RETRY_CONFIG.maxDelay
+      );
+      await sleep(delay);
+    }
+  }
+  throw lastError;
+}
+
+function isRetryableError(error: unknown): boolean {
+  // Network errors, timeouts, 503s are retryable
+  // 4xx errors are not retryable
+  return error instanceof NetworkError ||
+         (error instanceof ApiError && error.status >= 500);
+}
+```
+
+#### 8.6.7 Error Logging
+
+All errors logged to `error_logs` table for monitoring:
+
+```sql
+CREATE TABLE error_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  error_type TEXT NOT NULL,      -- validation, constraint, concurrent, permission, network, server
+  error_code TEXT,               -- Specific error code
+  message TEXT NOT NULL,
+  stack_trace TEXT,
+  context JSONB,                 -- Request context, user, entity
+  user_id UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for monitoring queries
+CREATE INDEX idx_error_logs_type_date ON error_logs(error_type, created_at DESC);
+```
+
+**Logging rules:**
+- Log all server errors (5xx)
+- Log constraint violations (may indicate UI bug)
+- Log permission errors (may indicate security issue)
+- Do NOT log validation errors (expected user input issues)
+
+### 8.7 Batch Rules
+
+| Current State | Action | Allowed? | Effect |
+|---------------|--------|----------|--------|
+| planned | Cancel | ✓ | Delete batch, release any planned allocations |
+| planned | Reschedule | ✓ | Update planned_start_date |
+| fermenting | Rollback to planned | ✗ | Wort already allocated; adjust or continue |
+| fermenting | Cancel | ✓ with reason | Mark as cancelled, log reason, batch volume becomes loss |
+| conditioning | Rollback | ✗ | Too late; continue or cancel with loss |
+| packaging | Rollback | ✗ | FGs may exist; adjust only |
+| completed | Rollback | ✗ | Final state; adjustments via FG records |
+| completed | Adjust | ✓ | Update notes, actual values; log revision |
+
+**Batch cancellation at any fermentation stage requires:**
+- Reason code (contamination, stuck_fermentation, off_flavor, other)
+- Creates loss allocation for volume
+
+### 8.8 Brew Log Rules
+
+| Current State | Action | Allowed? | Effect |
+|---------------|--------|----------|--------|
+| draft | Delete | ✓ | Delete brew log |
+| in_progress | Rollback to draft | ✓ | Clear events, reset to draft |
+| in_progress | Cancel | ✓ | Delete brew log (no batches linked yet) |
+| completed | Rollback | ✓ if no batches linked | Delete brew log |
+| completed | Rollback | ✗ if batches linked | Batches depend on this brew; unlink first or adjust |
+| completed | Adjust | ✓ | Update events, recalculate OG; log revision |
+
+**Unlinking batches from completed brew:**
+- Only allowed if batch.status = 'planned'
+- Batch reverts to unlinked state (no source brew)
+
+### 8.9 Purchase Order Rules
+
+| Current State | Action | Allowed? | Effect |
+|---------------|--------|----------|--------|
+| draft | Delete | ✓ | Delete PO and line items |
+| submitted | Cancel | ✓ | Mark cancelled, notify supplier if integration exists |
+| submitted | Rollback to draft | ✓ | Clear submitted_at, revert to draft |
+| confirmed | Cancel | ✓ with reason | Mark cancelled; no receives yet |
+| partial | Cancel | ✗ | Some items received; close PO instead |
+| partial | Close | ✓ | Mark as fulfilled with remaining items as shortfall |
+| fulfilled | Rollback | ✗ | Inventory lots exist; adjust lots instead |
+| fulfilled | Adjust | ✓ | Update notes; log revision |
+
+**Cancellation after receives:**
+- Cannot cancel if `po_receives` exist
+- Must close with shortfall or adjust received quantities
+
+### 8.10 Vessel Rules
+
+| Current State | Action | Allowed? | Effect |
+|---------------|--------|----------|--------|
+| available | No rollback needed | — | Base state |
+| occupied | Release | ✓ if batch transferred out | Mark available, clear current_batch_id |
+| occupied | Force release | ✓ with override | Admin only; clears vessel without batch transfer |
+| cleaning | Complete | ✓ | Mark available, log cleaning record |
+| cleaning | Cancel | ✓ | Return to previous state (occupied or available) |
+| maintenance | Complete | ✓ | Mark available, log maintenance record |
+| maintenance | Extend | ✓ | Update expected completion date |
+
+**Vessel state is derived from:**
+- Current batch assignment (occupied)
+- Active cleaning/maintenance records
+- Default: available
+
 ---
 
 ## 9. Unit System
 
 ### 9.1 Base Units (Storage)
-All quantities stored in consistent base units:
-- **Volume**: Barrels (BBL)
-- **Weight**: Pounds (lbs)
-- **Temperature**: Fahrenheit (°F)
+
+All quantities stored in consistent base units in the database:
+
+| Measurement | Canonical Unit | Column Suffix | Example |
+|-------------|----------------|---------------|---------|
+| Production volume | BBL (barrels) | `_bbl` | `batches.volume_bbl` |
+| Retail container | oz (fluid ounces) | `_oz` | `package_types.volume_oz` |
+| Weight | lbs (pounds) | `_lbs` | `recipe_malts.weight_lbs` |
+| Gravity | Plato | (no suffix) | `brew_logs.og` |
+| Temperature | °F (Fahrenheit) | `_f` | `fermentation_temp_f` |
+
+**Rationale**: BBL is the US brewing industry standard and required for TTB reporting. Using a single canonical unit eliminates conversion errors in calculations and reporting.
 
 ### 9.2 User Preferences
-Users can set display preferences:
+
+Per-user display/input preferences stored in `user_preferences` table:
+
 ```typescript
-interface UserUnitPreferences {
-  volume: 'bbl' | 'gal' | 'l' | 'hl';
-  weight: 'lbs' | 'kg' | 'oz' | 'g';
-  temperature: 'f' | 'c';
-  gravity: 'plato' | 'sg';
+interface UnitPreferences {
+  volume_unit: 'bbl' | 'gal' | 'l' | 'hl';
+  weight_unit: 'lbs' | 'kg';
+  temperature_unit: 'f' | 'c';
+  gravity_unit: 'plato' | 'sg';
+  retail_volume_unit: 'oz' | 'ml';
 }
 ```
 
-### 9.3 Conversion Functions
+**Defaults**: BBL, lbs, °F, Plato, oz (US brewing conventions)
+
+### 9.3 Display Modes
+
+| Context | Unit Selection | Behavior |
+|---------|----------------|----------|
+| Most forms/lists | Global preference | Uses `user_preferences` setting |
+| Recipe Builder | Inline switcher | Dropdown next to input field |
+| Brew Log | Inline switcher | Dropdown next to input field |
+| Reports/TTB | Always BBL | Canonical unit for compliance |
+
+### 9.4 Conversion Constants
+
 ```typescript
-const volumeConversions = {
+// Volume (base: BBL)
+const VOLUME_CONVERSIONS = {
   bbl: 1,
-  gal: 31,
-  l: 117.348,
-  hl: 1.17348
+  gal: 31,           // 1 BBL = 31 US gallons
+  l: 117.348,        // 1 BBL = 117.348 liters
+  hl: 1.17348,       // 1 BBL = 1.17348 hectoliters
 };
 
-function convertVolume(value: number, from: string, to: string): number {
-  const inBbl = value / volumeConversions[from];
-  return inBbl * volumeConversions[to];
-}
+// Retail volume (base: oz)
+const RETAIL_VOLUME_CONVERSIONS = {
+  oz: 1,
+  ml: 29.5735,       // 1 oz = 29.5735 ml
+};
 
-// Never round during conversion - display only
-function formatVolume(bbl: number, displayUnit: string, decimals: number = 2): string {
-  const converted = convertVolume(bbl, 'bbl', displayUnit);
-  return `${converted.toFixed(decimals)} ${displayUnit}`;
-}
+// Weight (base: lbs)
+const WEIGHT_CONVERSIONS = {
+  lbs: 1,
+  kg: 0.453592,      // 1 lb = 0.453592 kg
+};
+
+// Temperature: °F to °C = (°F - 32) × 5/9
+// Gravity: Plato to SG = 1 + (Plato / (258.6 - 0.8796 × Plato))
 ```
 
-### 9.4 Input Handling
-- Accept input in user's preferred unit
-- Convert to base unit for storage
-- Store original unit for reference if needed
+### 9.5 Conversion Rules
+
+1. **Never round during conversion** - rounding only at display time
+2. **Convert on input** - user enters in preferred unit, stored in canonical
+3. **Convert on display** - stored in canonical, displayed in preferred
+4. **Preserve precision** - use DECIMAL types with adequate precision
+
+### 9.6 Implementation
+
+**Library**: `src/lib/units.ts` - pure conversion functions
+**Hook**: `src/hooks/useUnitPreferences.ts` - React Query hook for preferences
+**Component**: `src/components/ui/unit-input.tsx` - input with optional unit switcher
+
+```typescript
+// Example: UnitInput component usage
+<UnitInput
+  value={batch.volume_bbl}           // Canonical value
+  onChange={(bbl) => update(bbl)}    // Receives canonical
+  unitType="volume"
+  allowSwitch={false}                // Use global preference
+/>
+
+// Recipe builder with inline switcher
+<UnitInput
+  value={recipe.batch_size_bbl}
+  onChange={(bbl) => update(bbl)}
+  unitType="volume"
+  allowSwitch={true}                 // Show unit dropdown
+/>
+```
+
+### 9.7 Entity Config Integration
+
+Entity field definitions support unit-aware inputs:
+
+```typescript
+// In entity config
+formFields: [
+  {
+    name: "volume_bbl",
+    label: "Volume",              // No unit in label
+    type: "unit",                 // Triggers unit handling
+    unitType: "volume",           // Which conversion to use
+    allowSwitch: false,           // Global pref vs inline
+  },
+]
+```
 
 ---
 
