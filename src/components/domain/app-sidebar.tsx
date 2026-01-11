@@ -21,6 +21,8 @@ import {
   BoxesIcon,
   Users,
   ChevronDown,
+  Container,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -43,6 +45,8 @@ const navigation: NavSection[] = [
     items: [
       { label: "Batches", href: "/production/batches", icon: FlaskConical },
       { label: "Recipes", href: "/production/recipes", icon: FileText },
+      { label: "Vessels", href: "/production/vessels", icon: Container },
+      { label: "Brew Logs", href: "/production/brew-logs", icon: ClipboardList },
     ],
   },
   {
