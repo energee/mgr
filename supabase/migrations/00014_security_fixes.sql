@@ -313,14 +313,17 @@ SELECT
     WHEN gt.mcu_sum > 0 AND COALESCE(r.batch_size_bbl, r.volume_bbl, 1) > 0 THEN
       ROUND(1.4922 * POWER(gt.mcu_sum / (COALESCE(r.batch_size_bbl, r.volume_bbl, 1) * 31), 0.6859))
     ELSE NULL
-  END as est_srm
+  END as est_srm,
+
+  -- COGS estimate (placeholder for future calculation)
+  NULL::NUMERIC(10,2) as est_cogs
 
 FROM recipes r
 LEFT JOIN grain_totals gt ON gt.recipe_id = r.id
 LEFT JOIN hop_ibu hi ON hi.recipe_id = r.id
 LEFT JOIN yeasts y ON y.id = r.yeast_id;
 
-COMMENT ON VIEW recipes_with_estimates IS 'Recipes with calculated OG, FG, ABV, IBU, SRM estimates';
+COMMENT ON VIEW recipes_with_estimates IS 'Recipes with calculated OG, FG, ABV, IBU, SRM, COGS estimates';
 
 -- =============================================================================
 -- 4. Fix function_search_path_mutable: Set search_path on functions
@@ -628,13 +631,13 @@ BEGIN
     IF v_recipe.est_og < v_style.og_min THEN
       v_suggestions := v_suggestions || jsonb_build_object(
         'category', 'style_compliance', 'severity', 'warning',
-        'message', format('OG (%.3f) is below style minimum (%.3f). Consider increasing base malt or reducing volume.', v_recipe.est_og, v_style.og_min),
+        'message', format('OG (%s) is below style minimum (%s). Consider increasing base malt or reducing volume.', round(v_recipe.est_og::numeric, 3), round(v_style.og_min::numeric, 3)),
         'parameter', 'og'
       );
     ELSIF v_recipe.est_og > v_style.og_max THEN
       v_suggestions := v_suggestions || jsonb_build_object(
         'category', 'style_compliance', 'severity', 'warning',
-        'message', format('OG (%.3f) is above style maximum (%.3f). Consider reducing base malt or increasing volume.', v_recipe.est_og, v_style.og_max),
+        'message', format('OG (%s) is above style maximum (%s). Consider reducing base malt or increasing volume.', round(v_recipe.est_og::numeric, 3), round(v_style.og_max::numeric, 3)),
         'parameter', 'og'
       );
     END IF;
@@ -699,7 +702,7 @@ BEGIN
       IF v_base_pct < 70 THEN
         v_suggestions := v_suggestions || jsonb_build_object(
           'category', 'grain_bill', 'severity', 'info',
-          'message', format('Base malt is only %.0f%% of grain bill. Consider 70-90%% for most styles.', v_base_pct),
+          'message', format('Base malt is only %s%% of grain bill. Consider 70-90%% for most styles.', round(v_base_pct)),
           'parameter', 'base_malt_percentage'
         );
       END IF;
@@ -711,7 +714,7 @@ BEGIN
       IF v_water.sulfate_ppm / NULLIF(v_water.chloride_ppm, 0) < 1.5 THEN
         v_suggestions := v_suggestions || jsonb_build_object(
           'category', 'water_chemistry', 'severity', 'info',
-          'message', format('Sulfate:Chloride ratio (%.1f:1) is low for hoppy style. Consider 2:1 or higher.', v_water.sulfate_ppm / NULLIF(v_water.chloride_ppm, 1)),
+          'message', format('Sulfate:Chloride ratio (%s:1) is low for hoppy style. Consider 2:1 or higher.', round((v_water.sulfate_ppm / NULLIF(v_water.chloride_ppm, 1))::numeric, 1)),
           'parameter', 'sulfate_chloride_ratio'
         );
       END IF;
@@ -722,7 +725,7 @@ BEGIN
     IF v_recipe.mash_temp_f > 156 AND v_recipe.target_attenuation > 75 THEN
       v_suggestions := v_suggestions || jsonb_build_object(
         'category', 'mash', 'severity', 'warning',
-        'message', format('High mash temp (%s F) may limit fermentability. Target attenuation (%.0f%%) may not be achievable.', v_recipe.mash_temp_f, v_recipe.target_attenuation),
+        'message', format('High mash temp (%s F) may limit fermentability. Target attenuation (%s%%) may not be achievable.', v_recipe.mash_temp_f, round(v_recipe.target_attenuation)),
         'parameter', 'mash_temp'
       );
     END IF;
@@ -779,17 +782,8 @@ BEGIN
     ),
     'fermentation', jsonb_build_object(
       'planned_start', b.planned_start_date,
-      'readings_count', (SELECT COUNT(*) FROM batch_readings WHERE batch_id = b.id),
-      'latest_reading', (
-        SELECT jsonb_build_object(
-          'recorded_at', br.recorded_at,
-          'measurements', br.measurements
-        )
-        FROM batch_readings br
-        WHERE br.batch_id = b.id
-        ORDER BY br.recorded_at DESC
-        LIMIT 1
-      )
+      'readings_count', 0,
+      'latest_reading', NULL
     )
   ) INTO v_result
   FROM batches b
@@ -847,7 +841,7 @@ BEGIN
       FROM (
         SELECT
           ii.name,
-          ii.catalog_type as type,
+          ii.category as type,
           ii.unit,
           COALESCE(SUM(il.quantity), 0) - COALESCE(SUM(
             (SELECT SUM(a.quantity) FROM allocations a
@@ -857,7 +851,7 @@ BEGIN
           ), 0) as available
         FROM inventory_items ii
         LEFT JOIN inventory_lots il ON il.inventory_item_id = ii.id
-        GROUP BY ii.id, ii.name, ii.catalog_type, ii.unit
+        GROUP BY ii.id, ii.name, ii.category, ii.unit
       ) ri
       WHERE ri.available > 0
     ),
