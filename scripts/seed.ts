@@ -88,6 +88,8 @@ async function seed() {
   else console.log("✓ Recipes created");
 
   // Create batches
+  // Note: actual_og and brew_date are derived from linked brew_logs
+  // volume_bbl stores volume in barrels (10 gal = ~0.32 BBL)
   console.log("Creating batches...");
   const { error: batchesError } = await supabase.from("batches").upsert([
     {
@@ -96,10 +98,9 @@ async function seed() {
       batch_number: "2024-001",
       name: "Hazy Days #1",
       status: "completed",
-      volume_gallons: 10.0,
-      brew_date: "2024-12-01",
+      volume_bbl: 0.32,
+      planned_start_date: "2024-12-01",
       fermenter: "FV-1",
-      actual_og: 1.066,
       actual_fg: 1.013,
       actual_abv: 7.0,
       notes: "First batch of our NEIPA. Turned out great!",
@@ -110,10 +111,9 @@ async function seed() {
       batch_number: "2024-002",
       name: "Midnight Stout #1",
       status: "conditioning",
-      volume_gallons: 10.0,
-      brew_date: "2024-12-15",
+      volume_bbl: 0.32,
+      planned_start_date: "2024-12-15",
       fermenter: "FV-2",
-      actual_og: 1.074,
       actual_fg: 1.019,
       actual_abv: 7.3,
       notes: "Conditioning for another week.",
@@ -124,10 +124,9 @@ async function seed() {
       batch_number: "2025-001",
       name: "Summer Wheat #1",
       status: "fermenting",
-      volume_gallons: 10.0,
-      brew_date: "2025-01-02",
+      volume_bbl: 0.32,
+      planned_start_date: "2025-01-02",
       fermenter: "FV-1",
-      actual_og: 1.049,
       notes: "Fermentation looking healthy.",
     },
     {
@@ -135,11 +134,11 @@ async function seed() {
       recipe_id: "00000000-0000-0000-0001-000000000001",
       batch_number: "2025-002",
       name: "Hazy Days #2",
-      status: "brewing",
-      volume_gallons: 10.0,
-      brew_date: "2025-01-09",
+      status: "fermenting",
+      volume_bbl: 0.32,
+      planned_start_date: "2025-01-09",
       fermenter: "FV-3",
-      notes: "Brew day in progress.",
+      notes: "Fermentation in progress.",
     },
     {
       id: "00000000-0000-0000-0002-000000000005",
@@ -147,8 +146,8 @@ async function seed() {
       batch_number: "2025-003",
       name: "Classic Pilsner #1",
       status: "planned",
-      volume_gallons: 10.0,
-      brew_date: "2025-01-15",
+      volume_bbl: 0.32,
+      planned_start_date: "2025-01-15",
       notes: "Scheduled for next week.",
     },
   ]);

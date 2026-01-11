@@ -37,34 +37,36 @@ ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
 -- Batches
+-- Note: actual_og and brew_date are now derived from linked brew_logs
+-- volume_bbl stores volume in barrels (1 BBL = 31 gallons)
 -- =============================================================================
 
-INSERT INTO batches (id, recipe_id, batch_number, name, status, volume_gallons, brew_date, fermenter, actual_og, actual_fg, actual_abv, notes)
+INSERT INTO batches (id, recipe_id, batch_number, name, status, volume_bbl, planned_start_date, fermenter, actual_fg, actual_abv, notes)
 VALUES
-  -- Completed batch
+  -- Completed batch (10 gal = ~0.32 BBL)
   ('00000000-0000-0000-0002-000000000001',
    '00000000-0000-0000-0001-000000000001', '2024-001', 'Hazy Days #1', 'completed',
-   10.0, '2024-12-01', 'FV-1', 1.066, 1.013, 7.0, 'First batch of our NEIPA. Turned out great!'),
+   0.32, '2024-12-01', 'FV-1', 1.013, 7.0, 'First batch of our NEIPA. Turned out great!'),
 
   -- Conditioning batch
   ('00000000-0000-0000-0002-000000000002',
    '00000000-0000-0000-0001-000000000002', '2024-002', 'Midnight Stout #1', 'conditioning',
-   10.0, '2024-12-15', 'FV-2', 1.074, 1.019, 7.3, 'Conditioning for another week.'),
+   0.32, '2024-12-15', 'FV-2', 1.019, 7.3, 'Conditioning for another week.'),
 
   -- Fermenting batch
   ('00000000-0000-0000-0002-000000000003',
    '00000000-0000-0000-0001-000000000003', '2025-001', 'Summer Wheat #1', 'fermenting',
-   10.0, '2025-01-02', 'FV-1', 1.049, NULL, NULL, 'Fermentation looking healthy.'),
+   0.32, '2025-01-02', 'FV-1', NULL, NULL, 'Fermentation looking healthy.'),
 
-  -- Brewing batch
+  -- Fermenting batch (was "brewing" but that's not a valid status)
   ('00000000-0000-0000-0002-000000000004',
-   '00000000-0000-0000-0001-000000000001', '2025-002', 'Hazy Days #2', 'brewing',
-   10.0, '2025-01-09', 'FV-3', NULL, NULL, NULL, 'Brew day in progress.'),
+   '00000000-0000-0000-0001-000000000001', '2025-002', 'Hazy Days #2', 'fermenting',
+   0.32, '2025-01-09', 'FV-3', NULL, NULL, 'Fermentation in progress.'),
 
   -- Planned batch
   ('00000000-0000-0000-0002-000000000005',
    '00000000-0000-0000-0001-000000000004', '2025-003', 'Classic Pilsner #1', 'planned',
-   10.0, '2025-01-15', NULL, NULL, NULL, NULL, 'Scheduled for next week.')
+   0.32, '2025-01-15', NULL, NULL, NULL, 'Scheduled for next week.')
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================

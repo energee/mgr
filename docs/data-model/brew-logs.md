@@ -243,7 +243,7 @@ For migration purposes, the old structured fields are preserved:
 
 ## `brew_log_batches`
 
-Junction table linking brew logs to batches with volume allocation.
+Junction table linking brew logs to batches with volume allocation. Per DEC-HP-003.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -254,8 +254,28 @@ Junction table linking brew logs to batches with volume allocation.
 | notes | TEXT | Notes (e.g., "first runnings", "split for Brett") |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
-**Constraints:**
-- `UNIQUE(brew_log_id, batch_id)` - A brew can only be linked to a batch once
+**Database Constraints:**
+```sql
+UNIQUE(brew_log_id, batch_id)  -- A brew can only be linked to a batch once
+CHECK (volume_bbl > 0)         -- Volume must be positive
+```
+
+**Application-Level Validation:**
+
+| Rule | Description |
+|------|-------------|
+| Volume reconciliation | SUM(brew_log_batches.volume_bbl) for a brew should equal knockout volume ±5%; warn if not |
+| Batch requires brew for fermenting | Batch cannot transition `planned → fermenting` without at least one link |
+| No unlink after fermenting | Cannot delete link if batch.status != 'planned' |
+| Blend support | Can add additional brew_log_batches to an already-fermenting batch |
+
+**Edge Cases:**
+
+| Scenario | Handling |
+|----------|----------|
+| Test brew / dump | brew_log can complete with zero batch links; flagged as "unallocated" |
+| Volume mismatch >5% | Warning displayed; user must acknowledge before saving |
+| Planned batch never brewed | Stays `planned`; user can cancel or delete |
 
 ### Example Scenarios
 
