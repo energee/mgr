@@ -15,9 +15,27 @@ jobs:
   db-lint:
     name: Supabase Database Linter
     runs-on: ubuntu-latest
+
+    # Use a standard postgres container from Docker Hub instead of supabase start
+    # This avoids ghcr.io image availability issues entirely
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
-      # Use default Docker Hub registry to avoid ghcr.io image availability issues
-      SUPABASE_INTERNAL_IMAGE_REGISTRY: ""
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,35 +45,19 @@ jobs:
         with:
           version: latest
 
-      - name: Start Supabase (database only)
+      - name: Apply migrations
         run: |
-          # Start only the database container to avoid image pull issues with other services
-          # Valid exclude options: gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
-          supabase start --ignore-health-check -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
-
-      - name: Wait for database
-        run: |
-          echo "Waiting for database to be ready..."
-          for i in {1..30}; do
-            if supabase status 2>/dev/null | grep -q "DB URL"; then
-              echo "Database is ready"
-              break
-            fi
-            echo "Attempt $i/30..."
-            sleep 2
+          # Apply all migrations in order using psql
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying $migration..."
+            psql "$DATABASE_URL" -f "$migration"
           done
-
-      - name: Run Database Migrations
-        run: |
-          # Use db push instead of db reset to avoid pulling additional service images
-          # db push applies migrations to the running database without reinitializing
-          supabase db push --local
 
       - name: Run Database Linter
         id: lint
         run: |
-          # Run the linter and capture output
-          supabase db lint --level error > lint-output.txt 2>&1 || true
+          # Run the linter against our postgres instance
+          supabase db lint --db-url "$DATABASE_URL" --level error > lint-output.txt 2>&1 || true
 
           # Check for ERROR level issues
           if grep -q "ERROR" lint-output.txt; then
@@ -73,7 +75,7 @@ jobs:
         run: |
           echo "## Full Database Lint Report" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          supabase db lint >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          supabase db lint --db-url "$DATABASE_URL" >> $GITHUB_STEP_SUMMARY 2>&1 || true
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Fail on Errors
@@ -89,7 +91,3 @@ jobs:
           echo ""
           echo "See docs/spec/architecture.md for security guidelines."
           exit 1
-
-      - name: Stop Supabase
-        if: always()
-        run: supabase stop --no-backup
