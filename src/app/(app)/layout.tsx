@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/domain/app-sidebar";
 import { AppHeader } from "@/components/domain/app-header";
+import { AppProviders } from "@/components/domain/app-providers";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -34,12 +35,14 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   const breweryName = settings?.brewery_name || "My Brewery";
 
   return (
-    <div className="flex min-h-screen">
-      <AppSidebar />
-      <div className="flex-1 flex flex-col">
-        <AppHeader user={user} breweryName={breweryName} />
-        <main className="flex-1 p-6">{children}</main>
+    <AppProviders>
+      <div className="flex min-h-screen">
+        <AppSidebar />
+        <div className="flex-1 flex flex-col">
+          <AppHeader user={user} breweryName={breweryName} />
+          <main className="flex-1 p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </AppProviders>
   );
 }
