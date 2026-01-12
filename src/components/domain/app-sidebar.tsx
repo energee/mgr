@@ -25,6 +25,9 @@ import {
   ClipboardList,
   BarChart3,
   Package,
+  Truck,
+  Building2,
+  ShoppingCart,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -64,6 +67,14 @@ const navigation: NavSection[] = [
     icon: Warehouse,
     items: [
       { label: "Items", href: "/inventory/items", icon: BoxesIcon },
+    ],
+  },
+  {
+    label: "Purchasing",
+    icon: Truck,
+    items: [
+      { label: "Suppliers", href: "/purchasing/suppliers", icon: Building2 },
+      { label: "Purchase Orders", href: "/purchasing/pos", icon: ShoppingCart },
     ],
   },
   {
