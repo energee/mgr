@@ -19,6 +19,7 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
+import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
 
 // Use generated type from Supabase
 type Batch = Database["public"]["Tables"]["batches"]["Row"];
@@ -82,6 +83,7 @@ export const batchEntity: EntityConfig<Batch> = {
   // ---------------------------------------------------------------------------
   name: "batch",
   table: "batches",
+  viewTable: "batches_with_brew_info",  // Includes brew_date, actual_og from linked brew_logs
   displayName: "Batch",
   displayNamePlural: "Batches",
   description: "Production batches from brewing through packaging",
@@ -170,6 +172,11 @@ export const batchEntity: EntityConfig<Batch> = {
         { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
         { field: "fermenter", label: "Fermenter" },
       ],
+    },
+    {
+      id: "brew-info",
+      title: "Brewing",
+      component: BatchBrewInfo,
     },
     {
       id: "fermentation",
