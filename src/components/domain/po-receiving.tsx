@@ -77,15 +77,79 @@ interface POReceivingProps {
  * Map PO catalog_type to inventory_items category
  */
 function mapCatalogTypeToCategory(catalogType: string): string {
-  const mapping: Record<string, string> = {
-    malt: "grain",
-    hop: "hops",
-    yeast: "yeast",
-    adjunct: "adjunct",
-    additive: "adjunct",
-    packaging: "packaging",
-  };
-  return mapping[catalogType] || "other";
+  switch (catalogType) {
+    case "malt":
+      return "grain";
+    case "hop":
+      return "hops";
+    case "yeast":
+      return "yeast";
+    case "adjunct":
+    case "additive":
+      return "adjunct";
+    case "packaging":
+      return "packaging";
+    default:
+      return "other";
+  }
+}
+
+/**
+ * Fetch catalog item name by type and ID
+ */
+async function fetchCatalogItemName(
+  supabase: ReturnType<typeof createClient>,
+  catalogType: string,
+  catalogId: string
+): Promise<string> {
+  try {
+    switch (catalogType) {
+      case "malt": {
+        const { data } = await supabase
+          .from("malts")
+          .select("name")
+          .eq("id", catalogId)
+          .single();
+        return data?.name || "Unknown Malt";
+      }
+      case "hop": {
+        const { data } = await supabase
+          .from("hops")
+          .select("name")
+          .eq("id", catalogId)
+          .single();
+        return data?.name || "Unknown Hop";
+      }
+      case "yeast": {
+        const { data } = await supabase
+          .from("yeasts")
+          .select("name")
+          .eq("id", catalogId)
+          .single();
+        return data?.name || "Unknown Yeast";
+      }
+      case "adjunct": {
+        const { data } = await supabase
+          .from("adjuncts")
+          .select("name")
+          .eq("id", catalogId)
+          .single();
+        return data?.name || "Unknown Adjunct";
+      }
+      case "additive": {
+        const { data } = await supabase
+          .from("additives")
+          .select("name")
+          .eq("id", catalogId)
+          .single();
+        return data?.name || "Unknown Additive";
+      }
+      default:
+        return "Unknown Item";
+    }
+  } catch {
+    return "Unknown Item";
+  }
 }
 
 export function POReceiving({ poId, poStatus, onReceiveComplete }: POReceivingProps) {
@@ -105,12 +169,18 @@ export function POReceiving({ poId, poStatus, onReceiveComplete }: POReceivingPr
         .eq("po_id", poId);
       if (itemsError) throw itemsError;
 
-      // Get receive history
-      const { data: receives, error: receivesError } = await supabase
-        .from("po_receives")
-        .select("*")
-        .in("po_line_item_id", items.map((i) => i.id));
-      if (receivesError) throw receivesError;
+      // Get receive history (guard against empty items array)
+      const itemIds = items.map((i) => i.id);
+      const receives = itemIds.length > 0
+        ? await supabase
+            .from("po_receives")
+            .select("*")
+            .in("po_line_item_id", itemIds)
+            .then(({ data, error }) => {
+              if (error) throw error;
+              return data;
+            })
+        : [];
 
       // Calculate received quantities
       const receivedByLine = (receives || []).reduce((acc, r) => {
@@ -121,27 +191,11 @@ export function POReceiving({ poId, poStatus, onReceiveComplete }: POReceivingPr
       // Fetch item names from catalog tables
       const itemsWithNames = await Promise.all(
         items.map(async (item) => {
-          let itemName = "Unknown Item";
-          try {
-            // Use dynamic table based on catalog_type
-            const tableName = item.catalog_type === "hop" ? "hops" : `${item.catalog_type}s`;
-            const { data } = await (supabase as unknown as {
-              from: (table: string) => {
-                select: (fields: string) => {
-                  eq: (field: string, value: string) => {
-                    single: () => Promise<{ data: { name: string } | null }>;
-                  };
-                };
-              };
-            })
-              .from(tableName)
-              .select("name")
-              .eq("id", item.catalog_id)
-              .single();
-            if (data) itemName = data.name;
-          } catch {
-            // Catalog item not found
-          }
+          const itemName = await fetchCatalogItemName(
+            supabase,
+            item.catalog_type,
+            item.catalog_id
+          );
 
           const received = receivedByLine[item.id] || 0;
           return {
@@ -197,66 +251,73 @@ export function POReceiving({ poId, poStatus, onReceiveComplete }: POReceivingPr
         throw new Error("No items to receive");
       }
 
-      // Create po_receives records
+      // Create po_receives records and inventory lots
       for (const entry of entries) {
-        const { error: receiveError } = await supabase.from("po_receives").insert({
-          po_line_item_id: entry.line_item_id,
-          quantity: entry.quantity,
-          lot_number: entry.lot_number || null,
-          expiration_date: entry.expiration_date || null,
-          notes: entry.notes || null,
-          received_date: new Date().toISOString().slice(0, 10),
-        });
+        // Create po_receive record and get its ID
+        const { data: receiveRecord, error: receiveError } = await supabase
+          .from("po_receives")
+          .insert({
+            po_line_item_id: entry.line_item_id,
+            quantity: entry.quantity,
+            lot_number: entry.lot_number || null,
+            expiration_date: entry.expiration_date || null,
+            notes: entry.notes || null,
+            received_date: new Date().toISOString().slice(0, 10),
+          })
+          .select("id")
+          .single();
         if (receiveError) throw receiveError;
 
         // Find the line item to get catalog info
         const lineItem = lineItems.find((li) => li.id === entry.line_item_id);
-        if (lineItem) {
-          // Find or create inventory item by name
-          // First check if inventory_item exists with same name and category
-          const category = mapCatalogTypeToCategory(lineItem.catalog_type);
-          const itemName = lineItem.item_name || "Unknown";
+        if (!lineItem) continue;
 
-          const { data: existingItem } = await supabase
+        // Find or create inventory item by name
+        const category = mapCatalogTypeToCategory(lineItem.catalog_type);
+        const itemName = lineItem.item_name || "Unknown";
+
+        const { data: existingItem } = await supabase
+          .from("inventory_items")
+          .select("id")
+          .eq("name", itemName)
+          .eq("category", category)
+          .single();
+
+        let inventoryItemId: string | undefined = existingItem?.id;
+
+        if (!inventoryItemId) {
+          // Create inventory item with required fields
+          const { data: newItem, error: itemError } = await supabase
             .from("inventory_items")
-            .select("id")
-            .eq("name", itemName)
-            .eq("category", category)
-            .single();
-
-          let inventoryItemId = existingItem?.id;
-
-          if (!inventoryItemId) {
-            // Create inventory item with required fields
-            const { data: newItem, error: itemError } = await supabase
-              .from("inventory_items")
-              .insert({
-                name: itemName,
-                category: category,
-                unit: lineItem.unit,
-              })
-              .select("id")
-              .single();
-            if (itemError) throw itemError;
-            inventoryItemId = newItem?.id;
-          }
-
-          if (inventoryItemId) {
-            // Create inventory lot
-            const { error: lotError } = await supabase.from("inventory_lots").insert({
-              inventory_item_id: inventoryItemId,
-              lot_number: entry.lot_number || null,
-              quantity: entry.quantity,
+            .insert({
+              name: itemName,
+              category: category,
               unit: lineItem.unit,
-              unit_cost: lineItem.unit_price,
-              received_date: new Date().toISOString().slice(0, 10),
-              expiration_date: entry.expiration_date || null,
-              location: entry.location || null,
-              notes: entry.notes || null,
-            } as never);
-            if (lotError) throw lotError;
-          }
+            })
+            .select("id")
+            .single();
+          if (itemError) throw itemError;
+          inventoryItemId = newItem?.id;
         }
+
+        if (!inventoryItemId) {
+          throw new Error(`Failed to create or find inventory item for ${itemName}`);
+        }
+
+        // Create inventory lot linked to the po_receive
+        const { error: lotError } = await supabase.from("inventory_lots").insert({
+          inventory_item_id: inventoryItemId,
+          po_receive_id: receiveRecord?.id ?? null,
+          lot_number: entry.lot_number || null,
+          quantity: entry.quantity,
+          unit: lineItem.unit,
+          unit_cost: lineItem.unit_price ?? null,
+          received_date: new Date().toISOString().slice(0, 10),
+          expiration_date: entry.expiration_date || null,
+          location: entry.location || null,
+          notes: entry.notes || null,
+        });
+        if (lotError) throw lotError;
       }
 
       // Check if PO is fully received and update status
