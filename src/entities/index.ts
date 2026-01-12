@@ -16,6 +16,7 @@ import { batchEntity } from "./batch";
 import { brewLogEntity } from "./brew-log";
 import { recipeEntity } from "./recipe";
 import { vesselEntity } from "./vessel";
+import { vesselTransferEntity } from "./vessel-transfer";
 import { orderEntity } from "./order";
 import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
@@ -29,6 +30,7 @@ registerEntity(batchEntity);
 registerEntity(brewLogEntity);
 registerEntity(recipeEntity);
 registerEntity(vesselEntity);
+registerEntity(vesselTransferEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
@@ -50,6 +52,8 @@ export type { BrewEvent, BrewMeasurement, BrewLogFormValues } from "./brew-log";
 export { recipeEntity } from "./recipe";
 export { vesselEntity, VESSEL_TYPES } from "./vessel";
 export type { VesselType, VesselFormValues } from "./vessel";
+export { vesselTransferEntity } from "./vessel-transfer";
+export type { VesselTransferFormValues } from "./vessel-transfer";
 export { orderEntity } from "./order";
 export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
