@@ -5,6 +5,13 @@
  *
  * Shows ingredient cost breakdown and total COGS for a recipe.
  * Data comes from the recipes_with_cogs view.
+ *
+ * This is a domain component rather than using the universal entity system because:
+ * - COGS data is supplementary display-only information, not a primary entity
+ * - The cost breakdown UI has specialized rendering needs (grouped categories, totals)
+ * - It's embedded within the recipe detail view, not a standalone entity list/detail
+ *
+ * Note: Component uses "COGS" (all caps) as it's a standard accounting acronym.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -91,23 +98,16 @@ export function RecipeCOGSDisplay({ recipeId }: RecipeCOGSDisplayProps) {
   const { data: cogs, isLoading, error } = useQuery({
     queryKey: ["recipe-cogs", recipeId],
     queryFn: async () => {
-      // Note: recipes_with_cogs view added in migration 00019_recipe_cogs.sql
-      // Types will be available after running `npx supabase gen types`
-      const { data, error } = await (supabase as unknown as {
-        from: (table: string) => {
-          select: (query: string) => {
-            eq: (col: string, val: string) => {
-              single: () => Promise<{ data: RecipeCOGS | null; error: Error | null }>
-            }
-          }
-        }
-      }).from("recipes_with_cogs")
+      // TODO: After running `npx supabase gen types`, update to use:
+      // Database["public"]["Views"]["recipes_with_cogs"]["Row"]
+      const { data, error } = await supabase
+        .from("recipes_with_cogs" as "recipes")
         .select("*")
         .eq("id", recipeId)
         .single();
 
       if (error) throw error;
-      return data as RecipeCOGS;
+      return data as unknown as RecipeCOGS;
     },
   });
 
