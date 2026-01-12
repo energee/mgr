@@ -2,6 +2,12 @@
 --
 -- Adds COGS calculation for recipes based on ingredient costs.
 -- Creates a view that includes cost breakdown by ingredient category.
+--
+-- Design Note: This view provides detailed cost breakdown by ingredient type.
+-- The recipes_with_estimates view has est_cogs as a placeholder (NULL). This
+-- separate view is intentional - recipes_with_estimates focuses on brewing
+-- metrics (OG, FG, ABV, IBU, SRM) while this view focuses on cost analysis.
+-- Use recipes_with_cogs when detailed cost breakdown is needed.
 
 -- =============================================================================
 -- Add cost column to yeasts if missing
@@ -49,6 +55,9 @@ adjunct_costs AS (
   GROUP BY ra.recipe_id
 ),
 addition_costs AS (
+  -- Note: cost_per_unit should be entered per the additive's typical_unit.
+  -- This calculation assumes the recipe amount matches that unit.
+  -- Example: If additive cost is per gram, recipe amounts should be in grams.
   SELECT
     ra.recipe_id,
     SUM(ra.amount * COALESCE(ad.cost_per_unit, 0)) as addition_cost
