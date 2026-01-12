@@ -18,6 +18,7 @@ import { recipeEntity } from "./recipe";
 import { vesselEntity } from "./vessel";
 import { vesselTransferEntity } from "./vessel-transfer";
 import { finishedGoodEntity } from "./finished-good";
+import { packagingSessionEntity } from "./packaging-session";
 import { orderEntity } from "./order";
 import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
@@ -32,6 +33,7 @@ registerEntity(brewLogEntity);
 registerEntity(recipeEntity);
 registerEntity(vesselEntity);
 registerEntity(vesselTransferEntity);
+registerEntity(packagingSessionEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
@@ -56,6 +58,8 @@ export { vesselEntity, VESSEL_TYPES } from "./vessel";
 export type { VesselType, VesselFormValues } from "./vessel";
 export { vesselTransferEntity } from "./vessel-transfer";
 export type { VesselTransferFormValues } from "./vessel-transfer";
+export { packagingSessionEntity } from "./packaging-session";
+export type { PackagingSessionFormValues } from "./packaging-session";
 export { orderEntity } from "./order";
 export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
