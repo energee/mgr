@@ -55,53 +55,49 @@ addition_costs AS (
   FROM recipe_additions ra
   JOIN additives ad ON ad.id = ra.additive_id
   GROUP BY ra.recipe_id
+),
+recipe_totals AS (
+  SELECT
+    r.id,
+    r.name,
+    r.brand_id,
+    r.volume_bbl,
+    r.batch_size_bbl,
+    COALESCE(mc.malt_cost, 0) as malt_cost,
+    COALESCE(hc.hop_cost, 0) as hop_cost,
+    COALESCE(y.cost_per_unit, 0) as yeast_cost,
+    COALESCE(ac.adjunct_cost, 0) as adjunct_cost,
+    COALESCE(adc.addition_cost, 0) as addition_cost,
+    COALESCE(mc.total_grain_lbs, 0) as total_grain_lbs,
+    COALESCE(hc.total_hop_oz, 0) as total_hop_oz
+  FROM recipes r
+  LEFT JOIN malt_costs mc ON mc.recipe_id = r.id
+  LEFT JOIN hop_costs hc ON hc.recipe_id = r.id
+  LEFT JOIN yeasts y ON y.id = r.yeast_id
+  LEFT JOIN adjunct_costs ac ON ac.recipe_id = r.id
+  LEFT JOIN addition_costs adc ON adc.recipe_id = r.id
 )
 SELECT
-  r.id,
-  r.name,
-  r.brand_id,
-  r.volume_bbl,
-  r.batch_size_bbl,
-
-  -- Individual ingredient costs
-  ROUND(COALESCE(mc.malt_cost, 0)::numeric, 2) as malt_cost,
-  ROUND(COALESCE(hc.hop_cost, 0)::numeric, 2) as hop_cost,
-  ROUND(COALESCE(y.cost_per_unit, 0)::numeric, 2) as yeast_cost,
-  ROUND(COALESCE(ac.adjunct_cost, 0)::numeric, 2) as adjunct_cost,
-  ROUND(COALESCE(adc.addition_cost, 0)::numeric, 2) as addition_cost,
-
-  -- Total COGS
-  ROUND((
-    COALESCE(mc.malt_cost, 0) +
-    COALESCE(hc.hop_cost, 0) +
-    COALESCE(y.cost_per_unit, 0) +
-    COALESCE(ac.adjunct_cost, 0) +
-    COALESCE(adc.addition_cost, 0)
-  )::numeric, 2) as total_cogs,
-
-  -- COGS per BBL
+  id,
+  name,
+  brand_id,
+  volume_bbl,
+  batch_size_bbl,
+  ROUND(malt_cost::numeric, 2) as malt_cost,
+  ROUND(hop_cost::numeric, 2) as hop_cost,
+  ROUND(yeast_cost::numeric, 2) as yeast_cost,
+  ROUND(adjunct_cost::numeric, 2) as adjunct_cost,
+  ROUND(addition_cost::numeric, 2) as addition_cost,
+  ROUND((malt_cost + hop_cost + yeast_cost + adjunct_cost + addition_cost)::numeric, 2) as total_cogs,
   CASE
-    WHEN COALESCE(r.batch_size_bbl, r.volume_bbl, 0) > 0 THEN
-      ROUND((
-        COALESCE(mc.malt_cost, 0) +
-        COALESCE(hc.hop_cost, 0) +
-        COALESCE(y.cost_per_unit, 0) +
-        COALESCE(ac.adjunct_cost, 0) +
-        COALESCE(adc.addition_cost, 0)
-      ) / COALESCE(r.batch_size_bbl, r.volume_bbl)::numeric, 2)
+    WHEN COALESCE(batch_size_bbl, volume_bbl, 0) > 0 THEN
+      ROUND((malt_cost + hop_cost + yeast_cost + adjunct_cost + addition_cost)
+        / COALESCE(batch_size_bbl, volume_bbl)::numeric, 2)
     ELSE NULL
   END as cogs_per_bbl,
-
-  -- Ingredient quantities for reference
-  ROUND(COALESCE(mc.total_grain_lbs, 0)::numeric, 1) as total_grain_lbs,
-  ROUND(COALESCE(hc.total_hop_oz, 0)::numeric, 1) as total_hop_oz
-
-FROM recipes r
-LEFT JOIN malt_costs mc ON mc.recipe_id = r.id
-LEFT JOIN hop_costs hc ON hc.recipe_id = r.id
-LEFT JOIN yeasts y ON y.id = r.yeast_id
-LEFT JOIN adjunct_costs ac ON ac.recipe_id = r.id
-LEFT JOIN addition_costs adc ON adc.recipe_id = r.id;
+  ROUND(total_grain_lbs::numeric, 1) as total_grain_lbs,
+  ROUND(total_hop_oz::numeric, 1) as total_hop_oz
+FROM recipe_totals;
 
 COMMENT ON VIEW recipes_with_cogs IS 'Recipe cost breakdown by ingredient category';
 
