@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, User as UserIcon, Settings } from "lucide-react";
 import { toast } from "sonner";
+import { NotificationBell } from "@/components/domain/notification-bell";
 
 interface AppHeaderProps {
   user: User;
@@ -49,6 +50,9 @@ export function AppHeader({ user, breweryName }: AppHeaderProps) {
 
       {/* Right side actions */}
       <div className="flex items-center gap-4">
+        {/* Notifications */}
+        <NotificationBell />
+
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
