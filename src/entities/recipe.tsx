@@ -123,17 +123,13 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "boolean",
       label: "Active Only",
     },
-    {
-      field: "style_id",
-      type: "select",
-      label: "Style",
-      dynamicOptions: {
-        table: "beer_styles",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "category,name",
-      },
-    },
+    // TODO: Add dynamicOptions support to EntityFilterDef type
+    // {
+    //   field: "style_id",
+    //   type: "select",
+    //   label: "Style",
+    //   dynamicOptions: { table: "beer_styles", valueField: "id", labelField: "name" },
+    // },
   ],
 
   defaultSort: { column: "name", direction: "asc" },

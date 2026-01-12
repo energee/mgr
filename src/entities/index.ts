@@ -20,6 +20,8 @@ import { vesselTransferEntity } from "./vessel-transfer";
 import { orderEntity } from "./order";
 import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
+import { supplierEntity } from "./supplier";
+import { purchaseOrderEntity } from "./purchase-order";
 
 // =============================================================================
 // Register All Entities
@@ -39,6 +41,10 @@ registerEntity(inventoryItemEntity);
 registerEntity(orderEntity);
 registerEntity(customerEntity);
 
+// Purchasing domain
+registerEntity(supplierEntity);
+registerEntity(purchaseOrderEntity);
+
 // =============================================================================
 // Exports
 // =============================================================================
@@ -57,6 +63,8 @@ export type { VesselTransferFormValues } from "./vessel-transfer";
 export { orderEntity } from "./order";
 export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
+export { supplierEntity } from "./supplier";
+export { purchaseOrderEntity } from "./purchase-order";
 
 // =============================================================================
 // Helper Functions
