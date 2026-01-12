@@ -345,6 +345,14 @@ export const batchEntity: EntityConfig<Batch> = {
       detailTab: "Brew Logs",
     },
     {
+      name: "vessel_transfers",
+      entity: "vessel_transfer",
+      type: "hasMany",
+      foreignKey: "batch_id",
+      showInDetail: true,
+      detailTab: "Transfers",
+    },
+    {
       name: "batch_logs",
       entity: "batch_log",
       type: "hasMany",
