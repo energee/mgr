@@ -6,15 +6,29 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, Link2, Settings } from "lucide-react";
+import { Bell, Building2, Link2, MapPin, Settings, Users } from "lucide-react";
 
 const settingsLinks = [
   {
     title: "Brewery Settings",
-    description: "Configure brewery name, units, and general preferences",
+    description: "Configure brewery name, contact info, and business defaults",
     href: "/settings/brewery",
     icon: Building2,
-    available: false,
+    available: true,
+  },
+  {
+    title: "Locations",
+    description: "Manage facilities, warehouses, and taproom locations",
+    href: "/settings/locations",
+    icon: MapPin,
+    available: true,
+  },
+  {
+    title: "Users",
+    description: "View team members and manage access",
+    href: "/settings/users",
+    icon: Users,
+    available: true,
   },
   {
     title: "Notifications",
