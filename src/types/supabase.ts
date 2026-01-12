@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       _schema_registry: {
@@ -339,6 +314,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_with_remaining_volume"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_logs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
           },
         ]
       }
@@ -648,6 +630,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "brew_log_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
             foreignKeyName: "brew_log_batches_brew_log_id_fkey"
             columns: ["brew_log_id"]
             isOneToOne: false
@@ -835,6 +824,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_with_remaining_volume"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
           },
           {
             foreignKeyName: "finished_goods_brand_id_fkey"
@@ -1240,6 +1236,7 @@ export type Database = {
       order_items: {
         Row: {
           batch_id: string | null
+          brand_id: string | null
           created_at: string | null
           id: string
           notes: string | null
@@ -1251,6 +1248,7 @@ export type Database = {
         }
         Insert: {
           batch_id?: string | null
+          brand_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
@@ -1262,6 +1260,7 @@ export type Database = {
         }
         Update: {
           batch_id?: string | null
+          brand_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
@@ -1294,10 +1293,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "order_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_totals"
             referencedColumns: ["id"]
           },
           {
@@ -1463,6 +1483,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_with_remaining_volume"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packages_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
           },
           {
             foreignKeyName: "packages_package_type_id_fkey"
@@ -2096,6 +2123,64 @@ export type Database = {
           },
         ]
       }
+      recipe_yeasts: {
+        Row: {
+          created_at: string | null
+          fermentation_temp_f: number | null
+          id: string
+          is_primary: boolean | null
+          notes: string | null
+          pitch_rate: number | null
+          position: number | null
+          recipe_id: string
+          yeast_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          fermentation_temp_f?: number | null
+          id?: string
+          is_primary?: boolean | null
+          notes?: string | null
+          pitch_rate?: number | null
+          position?: number | null
+          recipe_id: string
+          yeast_id: string
+        }
+        Update: {
+          created_at?: string | null
+          fermentation_temp_f?: number | null
+          id?: string
+          is_primary?: boolean | null
+          notes?: string | null
+          pitch_rate?: number | null
+          position?: number | null
+          recipe_id?: string
+          yeast_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_yeasts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_yeasts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_yeasts_yeast_id_fkey"
+            columns: ["yeast_id"]
+            isOneToOne: false
+            referencedRelation: "yeasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
           batch_size_bbl: number | null
@@ -2665,6 +2750,7 @@ export type Database = {
           chemicals_used: Json | null
           cleaned_at: string
           cleaned_by: string | null
+          cleaned_by_name: string | null
           cleaning_type: Database["public"]["Enums"]["cleaning_type"]
           created_at: string | null
           duration_min: number | null
@@ -2678,6 +2764,7 @@ export type Database = {
           chemicals_used?: Json | null
           cleaned_at?: string
           cleaned_by?: string | null
+          cleaned_by_name?: string | null
           cleaning_type: Database["public"]["Enums"]["cleaning_type"]
           created_at?: string | null
           duration_min?: number | null
@@ -2691,6 +2778,7 @@ export type Database = {
           chemicals_used?: Json | null
           cleaned_at?: string
           cleaned_by?: string | null
+          cleaned_by_name?: string | null
           cleaning_type?: Database["public"]["Enums"]["cleaning_type"]
           created_at?: string | null
           duration_min?: number | null
@@ -2779,6 +2867,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_with_remaining_volume"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
           },
           {
             foreignKeyName: "vessel_transfers_from_vessel_id_fkey"
@@ -2885,6 +2980,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_with_remaining_volume"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
           },
           {
             foreignKeyName: "vessels_location_id_fkey"
@@ -3049,6 +3151,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
             foreignKeyName: "vessels_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -3074,8 +3183,8 @@ export type Database = {
           recipe_id: string | null
           status: string | null
           updated_at: string | null
+          volume_bbl: number | null
           volume_from_brews_bbl: number | null
-          volume_gallons: number | null
         }
         Insert: {
           actual_abv?: number | null
@@ -3093,8 +3202,8 @@ export type Database = {
           recipe_id?: string | null
           status?: string | null
           updated_at?: string | null
+          volume_bbl?: number | null
           volume_from_brews_bbl?: never
-          volume_gallons?: number | null
         }
         Update: {
           actual_abv?: number | null
@@ -3112,8 +3221,8 @@ export type Database = {
           recipe_id?: string | null
           status?: string | null
           updated_at?: string | null
+          volume_bbl?: number | null
           volume_from_brews_bbl?: never
-          volume_gallons?: number | null
         }
         Relationships: [
           {
@@ -3170,39 +3279,30 @@ export type Database = {
       }
       brew_log_metrics: {
         Row: {
-          actual_mash_ph: number | null
-          actual_og: number | null
-          allocated_volume_bbl: number | null
+          batch_count: number | null
           brew_date: string | null
-          brew_number: string | null
           id: string | null
-          pre_boil_gravity: number | null
+          phases_completed: Json | null
+          recipe_id: string | null
+          recipe_name: string | null
           status: string | null
-          volume_to_fermenter_bbl: number | null
         }
-        Insert: {
-          actual_mash_ph?: never
-          actual_og?: never
-          allocated_volume_bbl?: never
-          brew_date?: string | null
-          brew_number?: string | null
-          id?: string | null
-          pre_boil_gravity?: never
-          status?: string | null
-          volume_to_fermenter_bbl?: never
-        }
-        Update: {
-          actual_mash_ph?: never
-          actual_og?: never
-          allocated_volume_bbl?: never
-          brew_date?: string | null
-          brew_number?: string | null
-          id?: string | null
-          pre_boil_gravity?: never
-          status?: string | null
-          volume_to_fermenter_bbl?: never
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "brew_logs_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brew_logs_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       finished_goods_with_availability: {
         Row: {
@@ -3247,6 +3347,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_with_remaining_volume"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
           },
           {
             foreignKeyName: "finished_goods_brand_id_fkey"
@@ -3308,6 +3415,121 @@ export type Database = {
           },
         ]
       }
+      order_items_with_details: {
+        Row: {
+          batch_id: string | null
+          brand_abv: number | null
+          brand_id: string | null
+          brand_name: string | null
+          container_type: string | null
+          created_at: string | null
+          id: string | null
+          line_total: number | null
+          notes: string | null
+          order_id: string | null
+          package_id: string | null
+          package_type_id: string | null
+          package_type_name: string | null
+          quantity: number | null
+          unit_price: number | null
+          units_per_case: number | null
+          volume_oz: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "order_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_totals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_package_type_id_fkey"
+            columns: ["package_type_id"]
+            isOneToOne: false
+            referencedRelation: "package_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders_with_totals: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          customer_name: string | null
+          fulfilled_date: string | null
+          id: string | null
+          line_count: number | null
+          notes: string | null
+          order_date: string | null
+          order_number: string | null
+          order_total: number | null
+          requested_date: string | null
+          scheduled_date: string | null
+          shipping_address: Json | null
+          status: string | null
+          total_units: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_line_items_with_quantities: {
         Row: {
           catalog_id: string | null
@@ -3337,7 +3559,7 @@ export type Database = {
           chemicals_used: Json | null
           cleaned_at: string | null
           cleaned_by: string | null
-          cleaned_by_email: string | null
+          cleaned_by_name: string | null
           cleaning_type: Database["public"]["Enums"]["cleaning_type"] | null
           created_at: string | null
           duration_min: number | null
@@ -3386,6 +3608,7 @@ export type Database = {
           description: string | null
           development_notes: string | null
           est_abv: number | null
+          est_cogs: number | null
           est_fg: number | null
           est_ibu: number | null
           est_og: number | null
@@ -3461,6 +3684,7 @@ export type Database = {
       }
       vessels_with_batch: {
         Row: {
+          batch_id: string | null
           batch_name: string | null
           batch_number: string | null
           batch_status: string | null
@@ -3498,6 +3722,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_with_remaining_volume"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
           },
           {
             foreignKeyName: "vessels_location_id_fkey"
@@ -3673,9 +3904,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       cleaning_type: ["cip", "caustic", "acid", "sanitize", "manual", "rinse"],

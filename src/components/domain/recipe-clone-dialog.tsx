@@ -122,12 +122,15 @@ export function RecipeCloneDialog({
 
       if (cloneError) throw cloneError;
 
-      // 3. Clone junction tables (malts, hops, additions)
-      // Note: recipe_yeasts added via migration 00016, types may need regeneration
+      // 3. Clone all junction tables (ingredients)
       await Promise.all([
         cloneJunctionTable("recipe_malts", recipeId, cloned.id),
         cloneJunctionTable("recipe_hops", recipeId, cloned.id),
         cloneJunctionTable("recipe_additions", recipeId, cloned.id),
+        cloneJunctionTable("recipe_adjuncts", recipeId, cloned.id),
+        cloneJunctionTable("recipe_sugars", recipeId, cloned.id),
+        cloneJunctionTable("recipe_spices", recipeId, cloned.id),
+        cloneJunctionTable("recipe_fruits", recipeId, cloned.id),
       ]);
 
       return cloned.id;
@@ -140,13 +143,24 @@ export function RecipeCloneDialog({
     },
     onError: (error) => {
       console.error("Clone error:", error);
-      toast.error("Failed to clone recipe");
+      const message = error instanceof Error ? error.message : "Failed to clone recipe";
+      toast.error(message);
     },
   });
 
-  // Helper to clone junction tables
+  // All junction tables that need to be cloned
+  type JunctionTable =
+    | "recipe_malts"
+    | "recipe_hops"
+    | "recipe_additions"
+    | "recipe_adjuncts"
+    | "recipe_sugars"
+    | "recipe_spices"
+    | "recipe_fruits";
+
+  // Helper to clone junction tables - throws on error for proper error handling
   const cloneJunctionTable = async (
-    table: "recipe_malts" | "recipe_hops" | "recipe_additions",
+    table: JunctionTable,
     sourceRecipeId: string,
     targetRecipeId: string
   ) => {
@@ -156,8 +170,7 @@ export function RecipeCloneDialog({
       .eq("recipe_id", sourceRecipeId);
 
     if (fetchError) {
-      console.warn(`Could not clone ${table}:`, fetchError);
-      return;
+      throw new Error(`Failed to fetch ${table}: ${fetchError.message}`);
     }
 
     if (rows && rows.length > 0) {
@@ -169,7 +182,7 @@ export function RecipeCloneDialog({
 
       const { error: insertError } = await supabase.from(table).insert(newRows as never);
       if (insertError) {
-        console.warn(`Could not insert into ${table}:`, insertError);
+        throw new Error(`Failed to clone ${table}: ${insertError.message}`);
       }
     }
   };
