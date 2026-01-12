@@ -25,6 +25,8 @@ import {
   ClipboardList,
   Truck,
   Building2,
+  BarChart3,
+  Package,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -41,6 +43,14 @@ interface NavSection {
 }
 
 const navigation: NavSection[] = [
+  {
+    label: "Dashboards",
+    icon: LayoutDashboard,
+    items: [
+      { label: "Production", href: "/dashboard", icon: FlaskConical },
+      { label: "Inventory", href: "/dashboard/inventory", icon: Package },
+    ],
+  },
   {
     label: "Production",
     icon: Beaker,
@@ -73,6 +83,14 @@ const navigation: NavSection[] = [
       { label: "Customers", href: "/sales/customers", icon: Users },
     ],
   },
+  {
+    label: "Reports",
+    icon: BarChart3,
+    items: [
+      { label: "All Reports", href: "/reports", icon: FileText },
+      { label: "TTB Report", href: "/reports/ttb", icon: ClipboardList },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -103,18 +121,18 @@ export function AppSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {/* Dashboard */}
+        {/* Home */}
         <Link
-          href="/"
+          href="/dashboard"
           className={cn(
             "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-            pathname === "/"
+            pathname === "/" || pathname === "/dashboard"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
           <LayoutDashboard className="h-4 w-4" />
-          Dashboard
+          Home
         </Link>
 
         {/* Sections */}
