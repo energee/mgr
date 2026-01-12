@@ -110,21 +110,24 @@ Brewing recipes with all parameters. Ingredients are stored in junction tables f
 **mash_schedule** array:
 ```json
 [{
-  "step_type": "infusion|temperature|decoction",
-  "temperature_f": 152,
+  "id": "step_1234567890_abcde",
+  "step_type": "infusion|decoction|rest|mashout|acid_rest|protein_rest",
+  "name": "Single Infusion",
+  "temp_f": 152,
   "duration_min": 60,
-  "water_ratio": 1.25,
-  "position": 1
+  "notes": "Optional notes"
 }]
 ```
 
 **fermentation_schedule** array:
 ```json
 [{
-  "stage": "primary|secondary|diacetyl_rest|cold_crash|conditioning",
-  "temperature_f": 68,
+  "id": "stage_1234567890_abcde",
+  "stage": "primary|secondary|diacetyl|lagering|conditioning|dry_hop|cold_crash",
+  "name": "Primary Fermentation",
+  "temp_f": 68,
   "duration_days": 14,
-  "position": 1
+  "notes": "Optional notes"
 }]
 ```
 
