@@ -152,12 +152,13 @@ export function RecipeCOGSDisplay({ recipeId }: RecipeCOGSDisplayProps) {
     );
   }
 
-  const hasAnyCosts =
-    (cogs.malt_cost ?? 0) > 0 ||
-    (cogs.hop_cost ?? 0) > 0 ||
-    (cogs.yeast_cost ?? 0) > 0 ||
-    (cogs.adjunct_cost ?? 0) > 0 ||
-    (cogs.addition_cost ?? 0) > 0;
+  const hasAnyCosts = [
+    cogs.malt_cost,
+    cogs.hop_cost,
+    cogs.yeast_cost,
+    cogs.adjunct_cost,
+    cogs.addition_cost,
+  ].some((cost) => cost !== null && cost > 0);
 
   return (
     <Card>
