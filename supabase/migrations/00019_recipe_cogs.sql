@@ -55,9 +55,12 @@ adjunct_costs AS (
   GROUP BY ra.recipe_id
 ),
 addition_costs AS (
-  -- Note: cost_per_unit should be entered per the additive's typical_unit.
-  -- This calculation assumes the recipe amount matches that unit.
-  -- Example: If additive cost is per gram, recipe amounts should be in grams.
+  -- IMPORTANT: This calculation assumes recipe_additions.unit matches additives.unit.
+  -- No unit conversion is performed. Users must ensure recipe amounts use the same
+  -- unit as the catalog cost unit.
+  -- Example: If additive cost is $5.00 per lb, recipe amounts should be in lbs.
+  --          Using 10g when cost is per lb will produce incorrect results.
+  -- TODO: Consider adding unit conversion logic or validation in future.
   SELECT
     ra.recipe_id,
     SUM(ra.amount * COALESCE(ad.cost_per_unit, 0)) as addition_cost
@@ -98,11 +101,12 @@ SELECT
   ROUND(adjunct_cost::numeric, 2) as adjunct_cost,
   ROUND(addition_cost::numeric, 2) as addition_cost,
   ROUND((malt_cost + hop_cost + yeast_cost + adjunct_cost + addition_cost)::numeric, 2) as total_cogs,
+  -- COGS per BBL: Returns NULL if no batch size specified (avoids divide by zero)
   CASE
     WHEN COALESCE(batch_size_bbl, volume_bbl, 0) > 0 THEN
       ROUND((malt_cost + hop_cost + yeast_cost + adjunct_cost + addition_cost)
         / COALESCE(batch_size_bbl, volume_bbl)::numeric, 2)
-    ELSE NULL
+    ELSE NULL  -- No volume to divide by
   END as cogs_per_bbl,
   ROUND(total_grain_lbs::numeric, 1) as total_grain_lbs,
   ROUND(total_hop_oz::numeric, 1) as total_hop_oz
