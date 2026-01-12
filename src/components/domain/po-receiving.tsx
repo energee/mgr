@@ -73,6 +73,21 @@ interface POReceivingProps {
   onReceiveComplete?: () => void;
 }
 
+/**
+ * Map PO catalog_type to inventory_items category
+ */
+function mapCatalogTypeToCategory(catalogType: string): string {
+  const mapping: Record<string, string> = {
+    malt: "grain",
+    hop: "hops",
+    yeast: "yeast",
+    adjunct: "adjunct",
+    additive: "adjunct",
+    packaging: "packaging",
+  };
+  return mapping[catalogType] || "other";
+}
+
 export function POReceiving({ poId, poStatus, onReceiveComplete }: POReceivingProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [receiveEntries, setReceiveEntries] = useState<Record<string, ReceiveEntry>>({});
@@ -197,37 +212,29 @@ export function POReceiving({ poId, poStatus, onReceiveComplete }: POReceivingPr
         // Find the line item to get catalog info
         const lineItem = lineItems.find((li) => li.id === entry.line_item_id);
         if (lineItem) {
-          // Find or create inventory item for this catalog item
-          // First check if inventory_item exists
-          const { data: existingItem } = await (supabase as unknown as {
-            from: (table: string) => {
-              select: (fields: string) => {
-                eq: (field: string, value: string) => {
-                  eq: (field: string, value: string) => {
-                    single: () => Promise<{ data: { id: string } | null }>;
-                  };
-                };
-              };
-            };
-          })
+          // Find or create inventory item by name
+          // First check if inventory_item exists with same name and category
+          const category = mapCatalogTypeToCategory(lineItem.catalog_type);
+          const itemName = lineItem.item_name || "Unknown";
+
+          const { data: existingItem } = await supabase
             .from("inventory_items")
             .select("id")
-            .eq("catalog_type", lineItem.catalog_type)
-            .eq("catalog_id", lineItem.catalog_id)
+            .eq("name", itemName)
+            .eq("category", category)
             .single();
 
           let inventoryItemId = existingItem?.id;
 
           if (!inventoryItemId) {
-            // Create inventory item
+            // Create inventory item with required fields
             const { data: newItem, error: itemError } = await supabase
               .from("inventory_items")
               .insert({
-                name: lineItem.item_name || "Unknown",
-                catalog_type: lineItem.catalog_type,
-                catalog_id: lineItem.catalog_id,
+                name: itemName,
+                category: category,
                 unit: lineItem.unit,
-              } as never)
+              })
               .select("id")
               .single();
             if (itemError) throw itemError;
