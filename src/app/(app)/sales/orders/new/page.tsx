@@ -1,8 +1,7 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
-import { orderEntity } from "@/entities/order";
+import { OrderForm } from "@/components/domain/order-form";
 
 export default function NewOrderPage() {
-  return <EntityForm entity={orderEntity} basePath="/sales/orders" />;
+  return <OrderForm />;
 }
