@@ -17,6 +17,7 @@ import { brewLogEntity } from "./brew-log";
 import { recipeEntity } from "./recipe";
 import { vesselEntity } from "./vessel";
 import { vesselTransferEntity } from "./vessel-transfer";
+import { finishedGoodEntity } from "./finished-good";
 import { orderEntity } from "./order";
 import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
@@ -36,6 +37,7 @@ registerEntity(vesselTransferEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
+registerEntity(finishedGoodEntity);
 
 // Sales domain
 registerEntity(orderEntity);
@@ -65,6 +67,8 @@ export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
 export { supplierEntity } from "./supplier";
 export { purchaseOrderEntity } from "./purchase-order";
+export { finishedGoodEntity } from "./finished-good";
+export type { FinishedGoodFormValues } from "./finished-good";
 
 // =============================================================================
 // Helper Functions
