@@ -1,0 +1,247 @@
+/**
+ * Finished Good Entity Configuration
+ *
+ * Finished goods represent packaged products ready for sale.
+ * They are created through packaging sessions and tracked with lot numbers.
+ *
+ * This is a read-only entity view - finished goods are created by packaging sessions.
+ */
+
+import { z } from "zod";
+import type { EntityConfig } from "@/types/entity";
+import type { Database } from "@/types/supabase";
+
+// Use the view type for availability calculations
+type FinishedGoodView = Database["public"]["Views"]["finished_goods_with_availability"]["Row"];
+
+// =============================================================================
+// Zod Schema (for future edit support if needed)
+// =============================================================================
+
+export const finishedGoodSchema = z.object({
+  lot_number: z.string().min(1, "Lot number is required"),
+  brand_id: z.string().uuid(),
+  package_type_id: z.string().uuid(),
+  batch_id: z.string().uuid().nullable().optional(),
+  quantity: z.coerce.number().int().min(0),
+  production_date: z.string().nullable().optional(),
+  best_by_date: z.string().nullable().optional(),
+  expiration_date: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export type FinishedGoodFormValues = z.infer<typeof finishedGoodSchema>;
+
+// =============================================================================
+// Entity Configuration
+// =============================================================================
+
+export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
+  // ---------------------------------------------------------------------------
+  // Identity
+  // ---------------------------------------------------------------------------
+  name: "finished_good",
+  table: "finished_goods",
+  viewTable: "finished_goods_with_availability",
+  displayName: "Finished Good",
+  displayNamePlural: "Finished Goods",
+  description: "Packaged products ready for sale",
+  domain: "inventory",
+
+  // ---------------------------------------------------------------------------
+  // List View
+  // ---------------------------------------------------------------------------
+  listColumns: [
+    {
+      accessorKey: "lot_number",
+      header: "Lot Code",
+      sortable: true,
+    },
+    {
+      accessorKey: "brand_id",
+      header: "Brand",
+      sortable: true,
+      // TODO: Join brand name in view
+    },
+    {
+      accessorKey: "package_type_id",
+      header: "Package",
+      sortable: true,
+      // TODO: Join package type name in view
+    },
+    {
+      accessorKey: "quantity",
+      header: "Total",
+      sortable: true,
+    },
+    {
+      accessorKey: "available_quantity",
+      header: "Available",
+      sortable: true,
+    },
+    {
+      accessorKey: "production_date",
+      header: "Packaged",
+      sortable: true,
+    },
+  ],
+
+  listFilters: [
+    // Note: dynamicOptions not yet supported in EntityFilterDef type
+    // For now using basic filters, will add brand/package type when type supports it
+  ],
+
+  defaultSort: { column: "production_date", direction: "desc" },
+  searchableFields: ["lot_number", "notes"],
+
+  // ---------------------------------------------------------------------------
+  // Detail View
+  // ---------------------------------------------------------------------------
+  detailHeader: {
+    title: "lot_number",
+  },
+
+  detailSections: [
+    {
+      id: "overview",
+      title: "Product Information",
+      fields: [
+        { field: "lot_number", label: "Lot Code" },
+        { field: "brand_id", label: "Brand" },
+        { field: "package_type_id", label: "Package Type" },
+        { field: "batch_id", label: "Source Batch" },
+      ],
+    },
+    {
+      id: "inventory",
+      title: "Inventory",
+      fields: [
+        { field: "quantity", label: "Total Quantity" },
+        { field: "allocated_quantity", label: "Allocated" },
+        { field: "reserved_quantity", label: "Reserved" },
+        { field: "available_quantity", label: "Available" },
+      ],
+    },
+    {
+      id: "dates",
+      title: "Dates",
+      fields: [
+        { field: "production_date", label: "Production Date" },
+        { field: "best_by_date", label: "Best By" },
+        { field: "expiration_date", label: "Expiration" },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      fields: [
+        { field: "notes", label: "Notes", fullWidth: true },
+      ],
+      collapsible: true,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Form (read-only entity, minimal form for future use)
+  // ---------------------------------------------------------------------------
+  formSchema: finishedGoodSchema,
+
+  formFields: [
+    {
+      name: "lot_number",
+      label: "Lot Code",
+      type: "text",
+      required: true,
+      colSpan: 6,
+    },
+    {
+      name: "quantity",
+      label: "Quantity",
+      type: "number",
+      required: true,
+      colSpan: 6,
+    },
+    {
+      name: "brand_id",
+      label: "Brand",
+      type: "select",
+      required: true,
+      colSpan: 6,
+      dynamicOptions: {
+        table: "brands",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "name",
+      },
+    },
+    {
+      name: "package_type_id",
+      label: "Package Type",
+      type: "select",
+      required: true,
+      colSpan: 6,
+      dynamicOptions: {
+        table: "package_types",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "name",
+      },
+    },
+    {
+      name: "production_date",
+      label: "Production Date",
+      type: "date",
+      colSpan: 4,
+    },
+    {
+      name: "best_by_date",
+      label: "Best By Date",
+      type: "date",
+      colSpan: 4,
+    },
+    {
+      name: "expiration_date",
+      label: "Expiration Date",
+      type: "date",
+      colSpan: 4,
+    },
+    {
+      name: "notes",
+      label: "Notes",
+      type: "textarea",
+      colSpan: 12,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Relations
+  // ---------------------------------------------------------------------------
+  relations: [
+    {
+      name: "batch",
+      entity: "batch",
+      type: "belongsTo",
+      foreignKey: "batch_id",
+    },
+    {
+      name: "allocations",
+      entity: "allocation",
+      type: "hasMany",
+      foreignKey: "source_id",
+      showInDetail: true,
+      detailTab: "Allocations",
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // AI Context
+  // ---------------------------------------------------------------------------
+  queryExamples: [
+    "Show all finished goods for brand X",
+    "What FG has available inventory?",
+    "List finished goods expiring this month",
+    "Show allocation history for lot Y",
+  ],
+
+  keyFields: ["lot_number", "brand_id", "package_type_id", "quantity", "available_quantity"],
+};
