@@ -38,6 +38,8 @@ interface EntityDetailProps<T = Record<string, unknown>> {
   backUrl?: string;
   /** Show edit button */
   showEdit?: boolean;
+  /** Custom actions to display in header */
+  customActions?: React.ReactNode;
 }
 
 export function EntityDetail<T = Record<string, unknown>>({
@@ -46,6 +48,7 @@ export function EntityDetail<T = Record<string, unknown>>({
   basePath,
   backUrl,
   showEdit = true,
+  customActions,
 }: EntityDetailProps<T>) {
   const queryClient = useQueryClient();
   const supabase = createClient();
@@ -201,6 +204,8 @@ export function EntityDetail<T = Record<string, unknown>>({
               </Link>
             </Button>
           )}
+
+          {customActions}
 
           {(availableActions.length > 0 || (stateInfo && stateInfo.validTransitions.length > 0)) && (
             <DropdownMenu>
