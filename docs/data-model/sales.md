@@ -79,6 +79,61 @@ Order line items.
 
 ---
 
+## Views
+
+### `order_items_with_details`
+
+Order line items with joined brand and package type details for display. This view enriches order items with their associated product information.
+
+**Source:** `order_items`, `brands`, `package_types`
+
+**Key Columns:**
+- All columns from `order_items`
+- `brand_name` - Brand name
+- `brand_abv` - Brand ABV percentage
+- `package_type_name` - Package type name
+- `container_type` - Container type (bottle, can, keg, etc.)
+- `volume_oz` - Package volume in ounces
+- `units_per_case` - Units per case
+- `line_total` - Calculated line total (quantity × unit_price)
+
+**Usage:**
+```sql
+SELECT * FROM order_items_with_details
+WHERE order_id = :order_id
+ORDER BY created_at;
+```
+
+---
+
+### `orders_with_totals`
+
+Orders with calculated totals aggregated from line items. This view provides summary information for each order.
+
+**Source:** `orders`, `customers`, `order_items`
+
+**Key Columns:**
+- All columns from `orders`
+- `customer_name` - Customer name
+- `order_total` - Total order value (sum of all line totals)
+- `total_units` - Total quantity across all line items
+- `line_count` - Number of line items in the order
+
+**Usage:**
+```sql
+-- Get orders with totals for a customer
+SELECT * FROM orders_with_totals
+WHERE customer_id = :customer_id
+ORDER BY order_date DESC;
+
+-- Get orders by status with totals
+SELECT * FROM orders_with_totals
+WHERE status = 'confirmed'
+ORDER BY order_total DESC;
+```
+
+---
+
 ## `sales_channels`
 
 Sales channel definitions.

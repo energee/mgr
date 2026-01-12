@@ -241,7 +241,8 @@ export function OrderForm({ id }: OrderFormProps) {
             const { error } = await supabase
               .from("order_items")
               .update(itemData as never)
-              .eq("id", item.id);
+              .eq("id", item.id)
+              .eq("order_id", orderId);
             if (error) throw error;
           } else {
             // Insert new item
