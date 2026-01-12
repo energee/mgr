@@ -107,11 +107,17 @@ COMMENT ON VIEW recipes_with_cogs IS 'Recipe cost breakdown by ingredient catego
 
 -- =============================================================================
 -- Update Schema Registry
--- Add COGS fields to recipes key_fields for AI context
+-- Add schema registry entry for the COGS view to document it for AI context
 -- =============================================================================
 
-UPDATE _schema_registry
-SET
-  key_fields = COALESCE(key_fields, '[]'::jsonb) || '["total_cogs", "cogs_per_bbl"]'::jsonb,
-  updated_at = NOW()
-WHERE table_name = 'recipes';
+INSERT INTO _schema_registry (
+  table_name,
+  description,
+  domain,
+  key_fields
+) VALUES (
+  'recipes_with_cogs',
+  'Recipe cost breakdown by ingredient category with total COGS and per-BBL calculations',
+  'production',
+  '["total_cogs", "cogs_per_bbl", "malt_cost", "hop_cost", "yeast_cost", "adjunct_cost", "addition_cost"]'::jsonb
+);
