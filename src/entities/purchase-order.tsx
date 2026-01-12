@@ -36,7 +36,7 @@ export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 
 const purchaseOrderStateMachine: StateMachineConfig<PurchaseOrder> = {
   stateField: "status",
-  states: ["draft", "submitted", "confirmed", "partial", "fulfilled", "cancelled"],
+  states: ["draft", "submitted", "confirmed", "partial", "fulfilled", "cancelled", "closed"],
   initialState: "draft",
   transitions: {
     draft: ["submitted", "cancelled"],
