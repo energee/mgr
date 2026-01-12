@@ -269,6 +269,42 @@ est_cogs = SUM(ingredient costs from all junction tables)
 
 ---
 
+## `recipes_with_cogs` (View)
+
+Detailed recipe cost breakdown by ingredient category. Use this view when you need cost analysis with per-category breakdowns. For simple total COGS, use `recipes_with_estimates.est_cogs`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Recipe ID |
+| name | TEXT | Recipe name |
+| brand_id | UUID | FK to brands |
+| volume_bbl | DECIMAL(5,2) | Recipe volume in barrels |
+| batch_size_bbl | DECIMAL(5,2) | Target batch size in barrels |
+| malt_cost | DECIMAL(10,2) | Total malt/grain cost |
+| hop_cost | DECIMAL(10,2) | Total hop cost |
+| yeast_cost | DECIMAL(10,2) | Yeast cost (from yeasts.cost_per_unit) |
+| adjunct_cost | DECIMAL(10,2) | Total adjunct cost |
+| addition_cost | DECIMAL(10,2) | Total additive cost |
+| total_cogs | DECIMAL(10,2) | Sum of all ingredient costs |
+| cogs_per_bbl | DECIMAL(10,2) | Total COGS / batch_size_bbl (or volume_bbl) |
+| total_grain_lbs | DECIMAL(10,1) | Total grain weight for reference |
+| total_hop_oz | DECIMAL(10,1) | Total hop weight for reference |
+
+**Calculation notes:**
+- Malt cost: `weight_lbs * malts.cost_per_lb`
+- Hop cost: Converts oz to lbs (`weight_oz / 16.0 * hops.cost_per_lb`)
+- Adjunct cost: `amount_lbs * adjuncts.cost_per_lb`
+- Addition cost: `amount * additives.cost_per_unit` (units must match)
+- COGS per BBL: Uses `batch_size_bbl` if available, otherwise `volume_bbl`. Returns NULL if both are zero/null.
+- All costs default to 0 if ingredient has no cost data
+
+**Design note:**
+This view provides detailed cost breakdown. `recipes_with_estimates.est_cogs` is a placeholder that could be updated to use this view's `total_cogs` in the future. Currently kept separate because:
+- `recipes_with_estimates` focuses on brewing metrics (OG, FG, ABV, IBU, SRM)
+- This view focuses on cost analysis with detailed breakdowns
+
+---
+
 ## `recipe_collaborators`
 
 Users who collaborated on a recipe.

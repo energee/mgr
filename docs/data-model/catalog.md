@@ -119,6 +119,7 @@ Yeast strains catalog.
 | alcohol_tolerance | DECIMAL(3,1) | Max ABV tolerance % |
 | pitching_rate | DECIMAL(3,1) | Default pitching rate (million cells/mL/°P) |
 | description | TEXT | Flavor profile and notes |
+| cost_per_unit | DECIMAL(8,4) | Cost per yeast pack or vial |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
