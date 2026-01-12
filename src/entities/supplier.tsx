@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { Database, Json } from "@/types/supabase";
 
 type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
 
@@ -14,12 +14,25 @@ type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
 // Zod Schema
 // =============================================================================
 
+// Json-compatible Zod type for JSONB columns
+const jsonSchema: z.ZodType<Json> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.record(jsonSchema.optional()),
+    z.array(jsonSchema),
+  ])
+);
+
 export const supplierSchema = z.object({
   name: z.string().min(1, "Name is required"),
   contact_name: z.string().nullable().optional(),
   contact_email: z.string().email("Invalid email").nullable().optional(),
   contact_phone: z.string().nullable().optional(),
-  address: z.string().nullable().optional(),
+  // Address is JSONB in database - accepts string from textarea form input
+  address: jsonSchema.nullable().optional(),
   payment_terms: z.string().nullable().optional(),
   default_lead_time_days: z.coerce.number().int().nullable().optional(),
   notes: z.string().nullable().optional(),
