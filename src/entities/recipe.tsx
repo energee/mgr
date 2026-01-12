@@ -14,7 +14,11 @@ import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
 // Use view type to include calculated estimates
-type Recipe = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
+// Note: is_template added via migration 00018. After applying migration to remote DB,
+// regenerate types: npx supabase gen types typescript --project-id <project-id> > src/types/supabase.ts
+// Then remove the type intersection below.
+type RecipeView = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
+type Recipe = RecipeView & { is_template?: boolean }; // TODO: Remove after type regeneration
 
 // =============================================================================
 // Zod Schema
@@ -55,6 +59,7 @@ export const recipeSchema = z.object({
   // Flags
   use_default_additions: z.boolean().default(true),
   is_active: z.boolean().default(true),
+  is_template: z.boolean().default(false),
 });
 
 export type RecipeFormValues = z.infer<typeof recipeSchema>;
@@ -110,6 +115,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       render: (value) => value ? `${value} min` : "—",
     },
     {
+      accessorKey: "is_template",
+      header: "Template",
+      sortable: true,
+      render: (value) => value ? "Template" : "",
+    },
+    {
       accessorKey: "is_active",
       header: "Active",
       sortable: true,
@@ -123,13 +134,27 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "boolean",
       label: "Active Only",
     },
-    // TODO: Add dynamicOptions support to EntityFilterDef type
-    // {
-    //   field: "style_id",
-    //   type: "select",
-    //   label: "Style",
-    //   dynamicOptions: { table: "beer_styles", valueField: "id", labelField: "name" },
-    // },
+    {
+      field: "is_template",
+      type: "select",
+      label: "Type",
+      options: [
+        { value: "", label: "All Recipes" },
+        { value: "true", label: "Templates Only" },
+        { value: "false", label: "Hide Templates" },
+      ],
+    },
+    {
+      field: "style_id",
+      type: "select",
+      label: "Style",
+      dynamicOptions: {
+        table: "beer_styles",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "category,name",
+      },
+    },
   ],
 
   defaultSort: { column: "name", direction: "asc" },
@@ -153,6 +178,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
         { field: "style_id", label: "Style" },
         { field: "yeast_id", label: "Yeast" },
         { field: "water_profile_id", label: "Water Profile" },
+        { field: "is_template", label: "Template" },
         { field: "is_active", label: "Active" },
       ],
     },
@@ -288,6 +314,14 @@ export const recipeEntity: EntityConfig<Recipe> = {
         labelField: "name",
         orderBy: "name",
       },
+    },
+    {
+      name: "is_template",
+      label: "Template Recipe",
+      type: "switch",
+      description: "Template recipes can be cloned to create new recipes",
+      defaultValue: false,
+      colSpan: 6,
     },
     {
       name: "is_active",
@@ -455,5 +489,5 @@ export const recipeEntity: EntityConfig<Recipe> = {
     "Show grain bill for recipe X",
   ],
 
-  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_active"],
+  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_template", "is_active"],
 };
