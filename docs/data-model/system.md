@@ -18,7 +18,7 @@ Brewery settings (singleton table for single-tenant mode).
 | lot_format | TEXT | Lot code format: standard, julian, coded |
 | ttb_permit_number | TEXT | TTB permit number |
 | ttb_registry_number | TEXT | TTB registry number |
-| default_batch_size_bbl | DECIMAL(6,2) | Default batch size |
+| default_batch_size_gallons | DECIMAL(6,2) | Default batch size in gallons |
 | default_efficiency | DECIMAL(4,1) | Default mash efficiency |
 | default_water_profile_id | UUID | FK to water_profiles (brewery's source water - see below) |
 | fiscal_year_start_month | INTEGER | Fiscal year start month |

@@ -243,7 +243,7 @@ export default function BrewerySettingsPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="default_batch_size_gallons">Default Batch Size (BBL)</Label>
+                <Label htmlFor="default_batch_size_gallons">Default Batch Size (Gallons)</Label>
                 <Input
                   id="default_batch_size_gallons"
                   type="number"
