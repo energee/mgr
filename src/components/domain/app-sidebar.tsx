@@ -29,6 +29,8 @@ import {
   Package,
   Truck,
   Building2,
+  BarChart3,
+  Package,
 } from "lucide-react";
 import { useState } from "react";
 
