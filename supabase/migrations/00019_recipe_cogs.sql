@@ -51,7 +51,7 @@ adjunct_costs AS (
 addition_costs AS (
   SELECT
     ra.recipe_id,
-    SUM(ra.amount * COALESCE(ad.cost_per_lb, ad.cost_per_unit, 0)) as addition_cost
+    SUM(ra.amount * COALESCE(ad.cost_per_unit, 0)) as addition_cost
   FROM recipe_additions ra
   JOIN additives ad ON ad.id = ra.additive_id
   GROUP BY ra.recipe_id
