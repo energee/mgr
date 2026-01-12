@@ -1,6 +1,10 @@
 -- MGR Recipe Templates Migration
 --
 -- Adds template support to recipes for creating reusable recipe blueprints.
+--
+-- Security Note: RLS is already enabled on the recipes table with appropriate
+-- policies (see migrations 00001, 00002, 00013). This migration only adds a
+-- column to the existing secured table.
 
 -- =============================================================================
 -- Add is_template Column to Recipes
