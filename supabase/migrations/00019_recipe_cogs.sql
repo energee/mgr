@@ -107,10 +107,11 @@ COMMENT ON VIEW recipes_with_cogs IS 'Recipe cost breakdown by ingredient catego
 
 -- =============================================================================
 -- Update Schema Registry
+-- Add COGS fields to recipes key_fields for AI context
 -- =============================================================================
 
 UPDATE _schema_registry
 SET
-  key_fields = key_fields || '["total_cogs", "cogs_per_bbl"]'::jsonb,
+  key_fields = COALESCE(key_fields, '[]'::jsonb) || '["total_cogs", "cogs_per_bbl"]'::jsonb,
   updated_at = NOW()
 WHERE table_name = 'recipes';
