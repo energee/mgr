@@ -367,16 +367,21 @@ function renderFieldInput<T>(
         />
       );
 
-    case "textarea":
+    case "textarea": {
+      // Handle JSONB values - stringify objects for display
+      const textValue = typeof value === "object" && value !== null
+        ? JSON.stringify(value, null, 2)
+        : (value as string) || "";
       return (
         <Textarea
           id={field.name}
-          value={(value as string) || ""}
+          value={textValue}
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder}
           disabled={disabled}
         />
       );
+    }
 
     case "number":
       return (
