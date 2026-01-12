@@ -14,10 +14,11 @@ import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
 // Use view type to include calculated estimates
-// Note: is_template field added via migration 00018_recipe_templates.sql
-// Regenerate types with `npx supabase gen types` after running migrations
+// Note: is_template added via migration 00018. After applying migration to remote DB,
+// regenerate types: npx supabase gen types typescript --project-id <project-id> > src/types/supabase.ts
+// Then remove the type intersection below.
 type RecipeView = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
-type Recipe = RecipeView & { is_template?: boolean };
+type Recipe = RecipeView & { is_template?: boolean }; // TODO: Remove after type regeneration
 
 // =============================================================================
 // Zod Schema
