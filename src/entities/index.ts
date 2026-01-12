@@ -21,6 +21,7 @@ import { finishedGoodEntity } from "./finished-good";
 import { orderEntity } from "./order";
 import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
+import { supplierEntity } from "./supplier";
 
 // =============================================================================
 // Register All Entities
@@ -40,6 +41,9 @@ registerEntity(finishedGoodEntity);
 // Sales domain
 registerEntity(orderEntity);
 registerEntity(customerEntity);
+
+// Purchasing domain
+registerEntity(supplierEntity);
 
 // =============================================================================
 // Exports
@@ -61,6 +65,7 @@ export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
 export { finishedGoodEntity } from "./finished-good";
 export type { FinishedGoodFormValues } from "./finished-good";
+export { supplierEntity } from "./supplier";
 
 // =============================================================================
 // Helper Functions
