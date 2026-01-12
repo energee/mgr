@@ -4,7 +4,11 @@
  * Packaging sessions track kegging, canning, and bottling runs.
  * Each session can contain multiple line items (products from different batches).
  *
- * Lifecycle: planned → in_progress → completed → revised
+ * Lifecycle: planned → in_progress → completed → revised | cancelled
+ *
+ * Note: "revised" and "cancelled" are terminal states. "Revised" indicates
+ * the session was completed but later adjusted (e.g., quantity corrections).
+ * Historical record is preserved; to re-run packaging, create a new session.
  */
 
 import { z } from "zod";
@@ -19,7 +23,7 @@ type PackagingSession = Database["public"]["Tables"]["packaging_sessions"]["Row"
 // =============================================================================
 
 export const packagingSessionSchema = z.object({
-  session_date: z.string().nullable().optional(),
+  session_date: z.string().min(1, "Session date is required"),
   status: z.string().default("planned"),
   notes: z.string().nullable().optional(),
 });
@@ -173,6 +177,9 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
   // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------
+  // TODO: Create session_line_item entity config when implementing line item management.
+  // The database table exists (packaging_session_items) but the entity config is not yet created.
+  // Until then, the "Line Items" tab will not render properly on the detail page.
   relations: [
     {
       name: "line_items",
