@@ -64,7 +64,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       },
       render: (value) => {
         if (!value) return "Kettle (knockout)";
-        return value;
+        return String(value);
       },
     },
     {
@@ -105,16 +105,8 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       title: "Transfer Details",
       fields: [
         { field: "transferred_at", label: "Date/Time", format: "datetime" },
-        {
-          field: "from_vessel_id",
-          label: "From Vessel",
-          relation: { entity: "vessel", displayField: "name" },
-        },
-        {
-          field: "to_vessel_id",
-          label: "To Vessel",
-          relation: { entity: "vessel", displayField: "name" },
-        },
+        { field: "from_vessel_id", label: "From Vessel" },
+        { field: "to_vessel_id", label: "To Vessel" },
         { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
         { field: "notes", label: "Notes" },
       ],
@@ -131,8 +123,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       name: "batch_id",
       label: "Batch",
       type: "relation",
-      entity: "batch",
-      displayField: "batch_number",
+      relation: { entity: "batch", displayField: "batch_number" },
       description: "Batch being transferred",
       required: true,
     },
@@ -140,8 +131,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       name: "from_vessel_id",
       label: "From Vessel",
       type: "relation",
-      entity: "vessel",
-      displayField: "name",
+      relation: { entity: "vessel", displayField: "name" },
       description: "Source vessel (leave empty for knockout from kettle)",
       required: false,
     },
@@ -149,8 +139,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       name: "to_vessel_id",
       label: "To Vessel",
       type: "relation",
-      entity: "vessel",
-      displayField: "name",
+      relation: { entity: "vessel", displayField: "name" },
       description: "Destination vessel",
       required: true,
     },

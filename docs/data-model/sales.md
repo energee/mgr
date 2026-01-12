@@ -284,6 +284,63 @@ When `price_source = 'style_tier'`:
 
 ---
 
+## Views
+
+### `order_items_with_details`
+
+Denormalized view of order items with brand and package type details for display.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Order item ID |
+| order_id | UUID | FK to orders |
+| brand_id | UUID | FK to brands |
+| brand_name | TEXT | Brand name (joined) |
+| brand_abv | DECIMAL | Brand ABV (joined) |
+| package_type_id | UUID | FK to package_types |
+| package_type_name | TEXT | Package type name (joined) |
+| container_type | TEXT | Container type (joined) |
+| volume_oz | DECIMAL | Volume in oz (joined) |
+| units_per_case | INTEGER | Units per case (joined) |
+| package_id | UUID | FK to packages |
+| batch_id | UUID | FK to batches |
+| quantity | INTEGER | Quantity ordered |
+| unit_price | DECIMAL(10,2) | Unit price |
+| line_total | DECIMAL(10,2) | Line total (quantity × unit_price) |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+**Purpose:** Provides a single query to fetch order items with all display-relevant fields from related tables, avoiding multiple joins in application code.
+
+---
+
+### `orders_with_totals`
+
+Denormalized view of orders with customer name and calculated totals.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Order ID |
+| customer_id | UUID | FK to customers |
+| customer_name | TEXT | Customer name (joined) |
+| order_number | TEXT | Order number |
+| status | TEXT | Order status |
+| order_date | DATE | Order date |
+| requested_date | DATE | Requested delivery date |
+| scheduled_date | DATE | Scheduled delivery date |
+| fulfilled_date | DATE | Actual fulfillment date |
+| shipping_address | JSONB | Shipping address |
+| notes | TEXT | Notes |
+| line_count | INTEGER | Number of line items (calculated) |
+| total_units | INTEGER | Total units across all items (calculated) |
+| order_total | DECIMAL(10,2) | Sum of line totals (calculated) |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Purpose:** Provides order list display data with aggregated totals without needing subqueries or client-side calculation.
+
+---
+
 ## Indexes
 
 Performance indexes for sales domain tables:

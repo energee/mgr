@@ -144,17 +144,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
         { value: "false", label: "Hide Templates" },
       ],
     },
-    {
-      field: "style_id",
-      type: "select",
-      label: "Style",
-      dynamicOptions: {
-        table: "beer_styles",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "category,name",
-      },
-    },
+    // TODO: Add style filter when EntityFilterDef supports dynamicOptions
   ],
 
   defaultSort: { column: "name", direction: "asc" },
