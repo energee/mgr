@@ -18,7 +18,8 @@ import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
+ import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
+import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
 
 // Use generated type from Supabase
 type Batch = Database["public"]["Tables"]["batches"]["Row"];
@@ -155,6 +156,11 @@ export const batchEntity: EntityConfig<Batch> = {
   },
 
   detailSections: [
+    {
+      id: "quick-links",
+      title: "Quick Actions",
+      component: BatchQuickLinks,
+    },
     {
       id: "overview",
       title: "Overview",
