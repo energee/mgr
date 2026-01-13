@@ -28,6 +28,7 @@ import {
   Truck,
   Building2,
   ShoppingCart,
+  FlaskRound,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -60,6 +61,7 @@ const navigation: NavSection[] = [
       { label: "Recipes", href: "/production/recipes", icon: FileText },
       { label: "Vessels", href: "/production/vessels", icon: Container },
       { label: "Brew Logs", href: "/production/brew-logs", icon: ClipboardList },
+      { label: "Yeast", href: "/production/yeast", icon: FlaskRound },
     ],
   },
   {

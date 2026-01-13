@@ -6,6 +6,25 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Format a number as currency (USD).
+ */
+export function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(value);
+}
+
+/**
+ * Format a date string for display.
+ */
+export function formatDate(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString();
+}
+
+/**
  * Format a value for display based on its type.
  * Used by EntityList and EntityDetail for consistent formatting.
  */

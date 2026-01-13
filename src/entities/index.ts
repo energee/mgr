@@ -24,6 +24,7 @@ import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
 import { supplierEntity } from "./supplier";
 import { purchaseOrderEntity } from "./purchase-order";
+import { yeastPitchEntity } from "./yeast-pitch";
 
 // =============================================================================
 // Register All Entities
@@ -36,6 +37,7 @@ registerEntity(recipeEntity);
 registerEntity(vesselEntity);
 registerEntity(vesselTransferEntity);
 registerEntity(packagingSessionEntity);
+registerEntity(yeastPitchEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
@@ -73,6 +75,8 @@ export { finishedGoodEntity } from "./finished-good";
 export type { FinishedGoodFormValues } from "./finished-good";
 export { supplierEntity } from "./supplier";
 export { purchaseOrderEntity } from "./purchase-order";
+export { yeastPitchEntity } from "./yeast-pitch";
+export type { YeastPitchFormValues } from "./yeast-pitch";
 
 // =============================================================================
 // Helper Functions

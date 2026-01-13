@@ -1630,11 +1630,13 @@ Due to document length, phases 6-15 follow the same pattern. Key points for each
 - Location management: Warehouses, taproom
 - Integration settings: OAuth connections
 
-### Phase 9: Yeast Management
-- Yeast pitches table
-- Viability calculation
-- Lineage tracking
-- Cost spreading
+### Phase 9: Yeast Management [IN PROGRESS]
+- [x] Yeast pitches table (migration 00022)
+- [x] Viability calculation (`src/lib/yeast-calculations.ts`)
+- [x] Yeast pitch entity and CRUD pages
+- [x] Sidebar navigation added
+- [ ] Lineage tree visualization (future)
+- [ ] Cost spreading (future)
 
 ### Phase 10: Keg Management
 - Keg inventory by state
