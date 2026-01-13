@@ -25,6 +25,33 @@ export const CATALOG_TYPES = [
   { value: "other", label: "Other" },
 ] as const;
 
+/**
+ * Maps catalog types to their database table names.
+ * Note: "other" type uses free-text input (no catalog table).
+ */
+export const CATALOG_TABLES: Record<string, string> = {
+  malt: "malts",
+  hop: "hops",
+  yeast: "yeasts",
+  adjunct: "adjuncts",
+  additive: "additives",
+  packaging: "package_types",
+};
+
+/**
+ * Returns the human-readable label for a catalog type.
+ */
+export function getCatalogTypeLabel(type: string): string {
+  return CATALOG_TYPES.find((t) => t.value === type)?.label || type;
+}
+
+/**
+ * Returns true if the catalog type uses free-text input instead of a dropdown.
+ */
+export function isFreeTextCatalogType(type: string): boolean {
+  return type === "other";
+}
+
 // =============================================================================
 // Zod Schema
 // =============================================================================

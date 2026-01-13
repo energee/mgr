@@ -30,7 +30,12 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { CATALOG_TYPES } from "@/entities/po-line-item";
+import {
+  CATALOG_TYPES,
+  CATALOG_TABLES,
+  getCatalogTypeLabel,
+  isFreeTextCatalogType,
+} from "@/entities/po-line-item";
 
 // =============================================================================
 // Types
@@ -40,7 +45,7 @@ interface POLineItemRow {
   id: string;
   catalog_type: string;
   catalog_id: string;
-  catalog_name: string; // Resolved human-readable name
+  catalog_name: string;
   quantity: number;
   unit: string;
   unit_price: number | null;
@@ -63,20 +68,6 @@ interface CatalogItem {
   id: string;
   name: string;
 }
-
-// Catalog table mapping
-// Note: "other" type uses free-text input (no catalog table)
-const CATALOG_TABLES: Record<string, string> = {
-  malt: "malts",
-  hop: "hops",
-  yeast: "yeasts",
-  adjunct: "adjuncts",
-  additive: "additives",
-  packaging: "package_types",
-};
-
-// Check if catalog type uses free-text input instead of dropdown
-const isFreeTextType = (type: string): boolean => type === "other";
 
 // =============================================================================
 // Component
@@ -119,7 +110,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       const nameMap = new Map<string, string>();
       for (const [catalogType, typeItems] of itemsByType) {
         // For "other" type, use catalog_id directly as name (it's free text)
-        if (isFreeTextType(catalogType)) {
+        if (isFreeTextCatalogType(catalogType)) {
           typeItems.forEach((item) => {
             nameMap.set(`${catalogType}:${item.catalog_id}`, item.catalog_id);
           });
@@ -165,7 +156,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       if (error) throw error;
       return data as CatalogItem[];
     },
-    enabled: !!newItem.catalog_type && !isFreeTextType(newItem.catalog_type) && !!CATALOG_TABLES[newItem.catalog_type],
+    enabled: !!newItem.catalog_type && !isFreeTextCatalogType(newItem.catalog_type) && !!CATALOG_TABLES[newItem.catalog_type],
   });
 
   // Add item mutation
@@ -236,7 +227,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       return;
     }
     if (!newItem.catalog_id) {
-      toast.error(isFreeTextType(newItem.catalog_type) ? "Please enter item description" : "Please select an item");
+      toast.error(isFreeTextCatalogType(newItem.catalog_type) ? "Please enter item description" : "Please select an item");
       return;
     }
     if (newItem.quantity <= 0) {
@@ -249,10 +240,6 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     }
     addItem.mutate(newItem);
   };
-
-  // Get type label
-  const getTypeLabel = (type: string) =>
-    CATALOG_TYPES.find((t) => t.value === type)?.label || type;
 
   if (itemsLoading) {
     return (
@@ -289,7 +276,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
         <TableBody>
           {items?.map((item) => (
             <TableRow key={item.id}>
-              <TableCell>{getTypeLabel(item.catalog_type)}</TableCell>
+              <TableCell>{getCatalogTypeLabel(item.catalog_type)}</TableCell>
               <TableCell className="font-medium">
                 {item.catalog_name}
               </TableCell>
@@ -394,7 +381,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 </Select>
               </TableCell>
               <TableCell>
-                {isFreeTextType(newItem.catalog_type) ? (
+                {isFreeTextCatalogType(newItem.catalog_type) ? (
                   <Input
                     type="text"
                     value={newItem.catalog_id}

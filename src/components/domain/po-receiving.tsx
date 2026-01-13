@@ -35,7 +35,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Package, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { CATALOG_TYPES } from "@/entities/po-line-item";
+import {
+  CATALOG_TABLES,
+  getCatalogTypeLabel,
+  isFreeTextCatalogType,
+} from "@/entities/po-line-item";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 
 // =============================================================================
@@ -46,7 +50,7 @@ interface POLineItemWithReceived {
   id: string;
   catalog_type: string;
   catalog_id: string;
-  catalog_name: string; // Resolved human-readable name
+  catalog_name: string;
   quantity: number;
   unit: string;
   unit_price: number | null;
@@ -55,12 +59,7 @@ interface POLineItemWithReceived {
 
 interface ReceiveEntry {
   po_line_item_id: string;
-  catalog_type: string;
-  catalog_id: string;
-  catalog_name: string; // Resolved human-readable name for inventory lookup
   quantity: number;
-  unit: string;
-  unit_price: number | null;
   lot_number: string;
   expiration_date: string;
   notes: string;
@@ -72,20 +71,6 @@ interface POReceivingProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-// Catalog table mapping for looking up item names
-const CATALOG_TABLES: Record<string, string> = {
-  malt: "malts",
-  hop: "hops",
-  yeast: "yeasts",
-  adjunct: "adjuncts",
-  additive: "additives",
-  packaging: "package_types",
-};
 
 // =============================================================================
 // Helpers
@@ -160,7 +145,7 @@ export function POReceiving({
       const nameMap = new Map<string, string>();
       for (const [catalogType, typeItems] of itemsByType) {
         // For "other" type, use catalog_id directly as name (it's free text)
-        if (catalogType === "other") {
+        if (isFreeTextCatalogType(catalogType)) {
           typeItems.forEach((item) => {
             nameMap.set(`${catalogType}:${item.catalog_id}`, item.catalog_id);
           });
@@ -209,11 +194,10 @@ export function POReceiving({
         throw new Error("No quantities to receive");
       }
 
-      // Insert po_receives and get the inserted records
-      const { data: insertedReceives, error: receiveError } = await supabase
+      // Insert po_receives records
+      const { error: receiveError } = await supabase
         .from("po_receives")
-        .insert(receivesToInsert)
-        .select("id, po_line_item_id, quantity, lot_number, expiration_date");
+        .insert(receivesToInsert);
 
       if (receiveError) throw receiveError;
 
@@ -353,25 +337,12 @@ export function POReceiving({
 
   // Handle save
   const handleSave = () => {
-    const rawEntries = Object.values(receives).filter((e) => e.quantity > 0);
+    const entries = Object.values(receives).filter((e) => e.quantity > 0);
 
-    if (rawEntries.length === 0) {
+    if (entries.length === 0) {
       toast.error("Please enter at least one quantity to receive");
       return;
     }
-
-    // Enrich entries with catalog info from line items
-    const entries: ReceiveEntry[] = rawEntries.map((entry) => {
-      const lineItem = lineItems?.find((li) => li.id === entry.po_line_item_id);
-      return {
-        ...entry,
-        catalog_type: lineItem?.catalog_type || "",
-        catalog_id: lineItem?.catalog_id || "",
-        catalog_name: lineItem?.catalog_name || lineItem?.catalog_id || "",
-        unit: lineItem?.unit || "",
-        unit_price: lineItem?.unit_price || null,
-      };
-    });
 
     receiveMutation.mutate(entries);
   };
@@ -381,10 +352,6 @@ export function POReceiving({
     (sum, e) => sum + (e.quantity || 0),
     0
   );
-
-  // Get type label
-  const getTypeLabel = (type: string) =>
-    CATALOG_TYPES.find((t) => t.value === type)?.label || type;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -430,7 +397,7 @@ export function POReceiving({
                       key={item.id}
                       className={isFullyReceived ? "opacity-50" : ""}
                     >
-                      <TableCell>{getTypeLabel(item.catalog_type)}</TableCell>
+                      <TableCell>{getCatalogTypeLabel(item.catalog_type)}</TableCell>
                       <TableCell className="font-medium">
                         {item.catalog_name}
                       </TableCell>
