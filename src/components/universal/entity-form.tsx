@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
@@ -426,23 +427,23 @@ function renderFieldInput<T>(
 
     case "date":
       return (
-        <Input
+        <DatePicker
           id={field.name}
-          type="date"
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
+          value={(value as string) || undefined}
+          onChange={onChange}
           disabled={disabled}
+          placeholder={field.placeholder}
         />
       );
 
     case "datetime":
       return (
-        <Input
+        <DateTimePicker
           id={field.name}
-          type="datetime-local"
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
+          value={(value as string) || undefined}
+          onChange={onChange}
           disabled={disabled}
+          placeholder={field.placeholder}
         />
       );
 
