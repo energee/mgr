@@ -64,6 +64,7 @@ interface CatalogItem {
 }
 
 // Catalog table mapping
+// Note: "other" type uses free-text input (no catalog table)
 const CATALOG_TABLES: Record<string, string> = {
   malt: "malts",
   hop: "hops",
@@ -72,6 +73,9 @@ const CATALOG_TABLES: Record<string, string> = {
   additive: "additives",
   packaging: "package_types",
 };
+
+// Check if catalog type uses free-text input instead of dropdown
+const isFreeTextType = (type: string): boolean => type === "other";
 
 // =============================================================================
 // Component
@@ -105,7 +109,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     },
   });
 
-  // Fetch catalog items based on selected type
+  // Fetch catalog items based on selected type (not for free-text types)
   const { data: catalogItems } = useQuery({
     queryKey: ["catalog-items", newItem.catalog_type],
     queryFn: async () => {
@@ -121,7 +125,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       if (error) throw error;
       return data as CatalogItem[];
     },
-    enabled: !!newItem.catalog_type && !!CATALOG_TABLES[newItem.catalog_type],
+    enabled: !!newItem.catalog_type && !isFreeTextType(newItem.catalog_type) && !!CATALOG_TABLES[newItem.catalog_type],
   });
 
   // Add item mutation
@@ -187,8 +191,12 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
 
   // Handle add item
   const handleAdd = () => {
-    if (!newItem.catalog_type || !newItem.catalog_id) {
-      toast.error("Please select item type and item");
+    if (!newItem.catalog_type) {
+      toast.error("Please select item type");
+      return;
+    }
+    if (!newItem.catalog_id) {
+      toast.error(isFreeTextType(newItem.catalog_type) ? "Please enter item description" : "Please select an item");
       return;
     }
     if (newItem.quantity <= 0) {
@@ -346,22 +354,33 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 </Select>
               </TableCell>
               <TableCell>
-                <Select
-                  value={newItem.catalog_id}
-                  onValueChange={(value) => setNewItem({ ...newItem, catalog_id: value })}
-                  disabled={!newItem.catalog_type}
-                >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder={newItem.catalog_type ? "Select item" : "Select type first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {catalogItems?.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isFreeTextType(newItem.catalog_type) ? (
+                  <Input
+                    type="text"
+                    value={newItem.catalog_id}
+                    onChange={(e) => setNewItem({ ...newItem, catalog_id: e.target.value })}
+                    disabled={!newItem.catalog_type}
+                    className="h-8 w-full"
+                    placeholder="Enter item description"
+                  />
+                ) : (
+                  <Select
+                    value={newItem.catalog_id}
+                    onValueChange={(value) => setNewItem({ ...newItem, catalog_id: value })}
+                    disabled={!newItem.catalog_type}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder={newItem.catalog_type ? "Select item" : "Select type first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {catalogItems?.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </TableCell>
               <TableCell>
                 <Input

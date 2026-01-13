@@ -32,7 +32,8 @@ export const CATALOG_TYPES = [
 export const poLineItemSchema = z.object({
   po_id: z.string().uuid("Purchase order is required"),
   catalog_type: z.string().min(1, "Catalog type is required"),
-  catalog_id: z.string().uuid("Item is required"),
+  // catalog_id can be UUID (for catalog items) or free-text (for "other" type)
+  catalog_id: z.string().min(1, "Item is required"),
   quantity: z.coerce.number().positive("Quantity must be greater than zero"),
   unit: z.string().min(1, "Unit is required"),
   unit_price: z.coerce.number().nullable().optional(),
