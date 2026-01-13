@@ -3,6 +3,9 @@
  *
  * Customers include distributors, retailers, taproom sales,
  * and direct-to-consumer accounts.
+ *
+ * Note: Once migration 00021_pricing_tiers.sql is applied,
+ * add sales_channel_id field for price tier resolution.
  */
 
 import { z } from "zod";

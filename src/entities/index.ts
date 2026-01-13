@@ -24,6 +24,9 @@ import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
 import { supplierEntity } from "./supplier";
 import { purchaseOrderEntity } from "./purchase-order";
+import { salesChannelEntity } from "./sales-channel";
+import { priceTierEntity } from "./price-tier";
+import { tierPriceEntity } from "./tier-price";
 
 // =============================================================================
 // Register All Entities
@@ -44,6 +47,9 @@ registerEntity(finishedGoodEntity);
 // Sales domain
 registerEntity(orderEntity);
 registerEntity(customerEntity);
+registerEntity(salesChannelEntity);
+registerEntity(priceTierEntity);
+registerEntity(tierPriceEntity);
 
 // Purchasing domain
 registerEntity(supplierEntity);
@@ -73,6 +79,12 @@ export { finishedGoodEntity } from "./finished-good";
 export type { FinishedGoodFormValues } from "./finished-good";
 export { supplierEntity } from "./supplier";
 export { purchaseOrderEntity } from "./purchase-order";
+export { salesChannelEntity } from "./sales-channel";
+export type { SalesChannelFormValues } from "./sales-channel";
+export { priceTierEntity } from "./price-tier";
+export type { PriceTierFormValues } from "./price-tier";
+export { tierPriceEntity } from "./tier-price";
+export type { TierPriceFormValues } from "./tier-price";
 
 // =============================================================================
 // Helper Functions

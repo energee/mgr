@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, Link2, Settings } from "lucide-react";
+import { Bell, Building2, Link2, Settings, DollarSign, Store, Layers } from "lucide-react";
 
 const settingsLinks = [
   {
@@ -29,6 +29,27 @@ const settingsLinks = [
     href: "/settings/integrations",
     icon: Link2,
     available: true,
+  },
+];
+
+const pricingLinks = [
+  {
+    title: "Sales Channels",
+    description: "Configure sales channels (distributor, retail, taproom)",
+    href: "/settings/sales-channels",
+    icon: Store,
+  },
+  {
+    title: "Price Tiers",
+    description: "Define pricing tiers (wholesale, retail, premium)",
+    href: "/settings/price-tiers",
+    icon: Layers,
+  },
+  {
+    title: "Tier Prices",
+    description: "Set prices by tier, product, and package type",
+    href: "/settings/tier-prices",
+    icon: DollarSign,
   },
 ];
 
@@ -82,6 +103,32 @@ export default function SettingsPage() {
             </Link>
           );
         })}
+      </div>
+
+      {/* Pricing Settings */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <DollarSign className="h-5 w-5" />
+          Pricing Configuration
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {pricingLinks.map((setting) => {
+            const Icon = setting.icon;
+            return (
+              <Link key={setting.href} href={setting.href}>
+                <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Icon className="h-5 w-5" />
+                      {setting.title}
+                    </CardTitle>
+                    <CardDescription>{setting.description}</CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
