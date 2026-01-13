@@ -95,7 +95,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         .limit(50);
 
       if (error) {
-        console.error("Failed to fetch notifications:", error);
+        console.error("Failed to fetch notifications:", error.message, error.code, error.details);
         return [];
       }
 
