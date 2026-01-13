@@ -40,6 +40,7 @@ interface POLineItemRow {
   id: string;
   catalog_type: string;
   catalog_id: string;
+  catalog_name: string; // Resolved human-readable name
   quantity: number;
   unit: string;
   unit_price: number | null;
@@ -95,7 +96,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
   });
   const [showAddRow, setShowAddRow] = useState(false);
 
-  // Fetch PO line items
+  // Fetch PO line items with resolved catalog names
   const { data: items, isLoading: itemsLoading } = useQuery({
     queryKey: ["po-line-items", poId],
     queryFn: async () => {
@@ -105,7 +106,46 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
         .eq("po_id", poId)
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return data as POLineItemRow[];
+
+      // Resolve catalog item names
+      // Group items by catalog_type to batch queries
+      const itemsByType = new Map<string, typeof data>();
+      data.forEach((item) => {
+        const existing = itemsByType.get(item.catalog_type) || [];
+        itemsByType.set(item.catalog_type, [...existing, item]);
+      });
+
+      // Fetch names from each catalog table
+      const nameMap = new Map<string, string>();
+      for (const [catalogType, typeItems] of itemsByType) {
+        // For "other" type, use catalog_id directly as name (it's free text)
+        if (isFreeTextType(catalogType)) {
+          typeItems.forEach((item) => {
+            nameMap.set(`${catalogType}:${item.catalog_id}`, item.catalog_id);
+          });
+          continue;
+        }
+
+        const table = CATALOG_TABLES[catalogType];
+        if (!table) continue;
+
+        const catalogIds = typeItems.map((i) => i.catalog_id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: catalogData } = await (supabase as any)
+          .from(table)
+          .select("id, name")
+          .in("id", catalogIds);
+
+        catalogData?.forEach((ci: { id: string; name: string }) => {
+          nameMap.set(`${catalogType}:${ci.id}`, ci.name);
+        });
+      }
+
+      // Return items with resolved names
+      return data.map((item) => ({
+        ...item,
+        catalog_name: nameMap.get(`${item.catalog_type}:${item.catalog_id}`) || item.catalog_id,
+      })) as POLineItemRow[];
     },
   });
 
@@ -251,7 +291,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
             <TableRow key={item.id}>
               <TableCell>{getTypeLabel(item.catalog_type)}</TableCell>
               <TableCell className="font-medium">
-                {item.catalog_id}
+                {item.catalog_name}
               </TableCell>
               <TableCell>
                 {readOnly ? (
