@@ -24,6 +24,8 @@ import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
 import { supplierEntity } from "./supplier";
 import { purchaseOrderEntity } from "./purchase-order";
+import { orderItemEntity } from "./order-item";
+import { poLineItemEntity } from "./po-line-item";
 
 // =============================================================================
 // Register All Entities
@@ -44,10 +46,12 @@ registerEntity(finishedGoodEntity);
 // Sales domain
 registerEntity(orderEntity);
 registerEntity(customerEntity);
+registerEntity(orderItemEntity);
 
 // Purchasing domain
 registerEntity(supplierEntity);
 registerEntity(purchaseOrderEntity);
+registerEntity(poLineItemEntity);
 
 // =============================================================================
 // Exports
@@ -73,6 +77,10 @@ export { finishedGoodEntity } from "./finished-good";
 export type { FinishedGoodFormValues } from "./finished-good";
 export { supplierEntity } from "./supplier";
 export { purchaseOrderEntity } from "./purchase-order";
+export { orderItemEntity } from "./order-item";
+export type { OrderItemFormValues } from "./order-item";
+export { poLineItemEntity, CATALOG_TYPES } from "./po-line-item";
+export type { POLineItemFormValues } from "./po-line-item";
 
 // =============================================================================
 // Helper Functions
