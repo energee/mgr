@@ -217,43 +217,13 @@ export function POReceiving({
 
       if (receiveError) throw receiveError;
 
-      // Create inventory_lots for each receive
-      // Look up inventory_items by matching the resolved catalog name
-      const entriesWithReceiveIds = entries.filter((e) => e.quantity > 0);
-
-      for (const receive of insertedReceives || []) {
-        const entry = entriesWithReceiveIds.find(
-          (e) => e.po_line_item_id === receive.po_line_item_id
-        );
-        if (!entry) continue;
-
-        // Look up inventory_item by matching the resolved catalog item name
-        // inventory_items.name should match the catalog item's name (e.g., "Pilsner Malt")
-        const { data: inventoryItem } = await supabase
-          .from("inventory_items")
-          .select("id, unit")
-          .eq("name", entry.catalog_name) // Use resolved catalog name
-          .eq("is_active", true)
-          .maybeSingle();
-
-        if (inventoryItem) {
-          const { error: lotError } = await supabase.from("inventory_lots").insert({
-            inventory_item_id: inventoryItem.id,
-            po_receive_id: receive.id,
-            lot_number: receive.lot_number,
-            quantity: receive.quantity,
-            unit: entry.unit || inventoryItem.unit,
-            unit_cost: entry.unit_price,
-            received_date: new Date().toISOString().split("T")[0],
-            expiration_date: receive.expiration_date,
-          });
-
-          if (lotError) {
-            console.error("Failed to create inventory lot:", lotError);
-            // Continue - don't fail the whole receive for lot creation issues
-          }
-        }
-      }
+      // NOTE: Inventory lot creation is intentionally NOT done here.
+      // PO receiving records what was physically received (po_receives with lot_number/expiration).
+      // A separate inventory receiving workflow should create inventory_lots, allowing for:
+      // - QA/inspection steps between receipt and inventory acceptance
+      // - Proper mapping to inventory_items (which may not match catalog items 1:1)
+      // - User control over which items enter inventory tracking
+      // The po_receives.id can be linked via inventory_lots.po_receive_id when lots are created.
 
       // Get current PO status for state machine validation
       const { data: currentPO, error: poFetchError } = await supabase
