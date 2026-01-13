@@ -28,6 +28,8 @@ import {
   Truck,
   Building2,
   ShoppingCart,
+  ArrowRightLeft,
+  PackageCheck,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -59,7 +61,16 @@ const navigation: NavSection[] = [
       { label: "Batches", href: "/production/batches", icon: FlaskConical },
       { label: "Recipes", href: "/production/recipes", icon: FileText },
       { label: "Vessels", href: "/production/vessels", icon: Container },
+      { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: ArrowRightLeft },
       { label: "Brew Logs", href: "/production/brew-logs", icon: ClipboardList },
+    ],
+  },
+  {
+    label: "Packaging",
+    icon: PackageCheck,
+    items: [
+      { label: "Sessions", href: "/production/packaging", icon: Package },
+      { label: "Finished Goods", href: "/inventory/finished-goods", icon: BoxesIcon },
     ],
   },
   {
