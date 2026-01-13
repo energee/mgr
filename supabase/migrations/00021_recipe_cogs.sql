@@ -49,7 +49,7 @@ hop_costs AS (
 adjunct_costs AS (
   SELECT
     ra.recipe_id,
-    SUM(ra.amount_lbs * COALESCE(a.cost_per_lb, 0)) as adjunct_cost
+    SUM(ra.weight_lbs * COALESCE(a.cost_per_lb, 0)) as adjunct_cost
   FROM recipe_adjuncts ra
   JOIN adjuncts a ON a.id = ra.adjunct_id
   GROUP BY ra.recipe_id
