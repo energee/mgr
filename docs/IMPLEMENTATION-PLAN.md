@@ -17,6 +17,77 @@ This document tracks the implementation progress of MGR features based on the sp
 
 ---
 
+## Quick Reference: Key Patterns
+
+### Entity Configuration Pattern
+All entities follow the same structure. Reference: `src/entities/batch.tsx`
+
+```typescript
+export const entityEntity: EntityConfig<EntityType> = {
+  // Identity
+  name: "entity_name",
+  table: "table_name",
+  viewTable: "view_name",  // Optional: for computed fields
+  displayName: "Entity",
+  displayNamePlural: "Entities",
+  description: "...",
+  domain: "production" | "inventory" | "sales" | "purchasing",
+
+  // List View
+  listColumns: [...],
+  listFilters: [...],
+  defaultSort: { column: "...", direction: "asc" | "desc" },
+  searchableFields: [...],
+
+  // Detail View
+  detailHeader: { title: "field", subtitle: "field", badge: "status_field" },
+  detailSections: [...],
+
+  // Form
+  formSchema: zodSchema,
+  formFields: [...],
+
+  // State Machine (if applicable)
+  stateMachine: { stateField, states, transitions, stateDisplay },
+  actions: [...],
+
+  // Relations
+  relations: [...],
+
+  // AI Context
+  queryExamples: [...],
+  keyFields: [...],
+};
+```
+
+### Page Pattern
+All entity pages use universal components. Reference: `src/app/(app)/production/batches/`
+
+```
+/[domain]/[entity-plural]/
+  page.tsx         -> <EntityList entity={config} />
+  new/page.tsx     -> <EntityForm entity={config} />
+  [id]/page.tsx    -> <EntityDetail entity={config} id={id} />
+  [id]/edit/page.tsx -> <EntityForm entity={config} id={id} />
+```
+
+### Migration Naming
+Pattern: `00XXX_description.sql`
+Current highest: `00021`
+Next available: `00022`
+
+### Reference Files by Pattern
+
+| Pattern | Reference File |
+|---------|----------------|
+| Entity config with state machine | `src/entities/batch.tsx` |
+| Entity config with viewTable | `src/entities/vessel.tsx` |
+| Domain component (editor) | `src/components/domain/grain-bill-editor.tsx` |
+| Entity pages | `src/app/(app)/production/batches/` |
+| Catalog selector | `src/components/domain/hop-schedule-editor.tsx` |
+
+---
+
 ## Phase 1: Schema Foundation
 
 **Goal:** Establish core data model patterns that other features depend on.
@@ -1323,8 +1394,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00012
-- Next available: 00013
+- Current: 00001-00021
+- Next available: 00022
 
 ### Testing Strategy
 
@@ -1360,3 +1431,124 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-11 | Phase 1 complete: migrations applied, seed data for catalogs, ingredient UI components |
 | 2026-01-11 | Phase 1 migrations created: catalog tables, recipe junction tables, performance indexes |
 | 2026-01-11 | Initial plan created based on spec review |
+| 2026-01-13 | Consolidated expanded files into single plan, added Quick Reference and Appendices |
+
+---
+
+## Appendix A: File Reference Index
+
+### Entity Configurations
+```
+src/entities/
+├── batch.tsx              # State machine, viewTable example
+├── brew-log.tsx           # Events array, custom detail components
+├── customer.tsx           # Simple entity without state machine
+├── finished-good.tsx      # Read-only entity
+├── inventory-item.tsx     # Category-based display config
+├── order.tsx              # Complex state machine
+├── order-item.tsx         # Line item entity
+├── packaging-session.tsx  # Production state machine
+├── po-line-item.tsx       # Purchase order line items
+├── purchase-order.tsx     # Purchasing workflow
+├── recipe.tsx             # Many relations, junction tables
+├── supplier.tsx           # Purchasing domain
+├── vessel.tsx             # viewTable with joins
+├── vessel-transfer.tsx    # Production tracking
+└── index.ts               # Entity registry
+```
+
+### Universal Components
+```
+src/components/universal/
+├── entity-list.tsx        # TanStack Table, filtering, sorting
+├── entity-detail.tsx      # Sections, state machine display
+├── entity-form.tsx        # Zod validation, dynamic options
+└── status-badge.tsx       # Status display with colors
+```
+
+### Domain Components
+```
+src/components/domain/
+├── app-header.tsx         # User menu
+├── app-sidebar.tsx        # Navigation structure
+├── grain-bill-editor.tsx  # Catalog selector pattern
+├── hop-schedule-editor.tsx # Timing-based editor
+├── order-items-editor.tsx # Order line items
+├── po-line-items-editor.tsx # PO line items
+├── po-receiving.tsx       # Receiving workflow
+└── recipe-analysis.tsx    # Recipe AI analysis
+```
+
+### Libraries
+```
+src/lib/
+├── units.ts               # Unit conversion (complete)
+├── utils.ts               # General utilities
+├── supabase/
+│   ├── client.ts          # Browser client
+│   └── server.ts          # Server client
+└── ai/
+    ├── index.ts           # AI exports
+    ├── query-helpers.ts   # Common queries
+    ├── recipe-analyzer.ts # Style compliance
+    └── schema-context.ts  # Schema introspection
+```
+
+### Migrations
+```
+supabase/migrations/
+├── 00001_initial_schema.sql
+├── 00002_single_tenant.sql
+├── 00003_brands.sql
+├── 00004_brew_logs.sql
+├── 00005_batches_cleanup.sql
+├── 00006_vessels.sql
+├── 00007_vessel_types_foeder_barrel.sql
+├── 00008_ai_integration.sql
+├── 00009_user_preferences_and_units.sql
+├── 00010_unified_allocations.sql
+├── 00011_catalog_and_recipe_junction.sql
+├── 00012_performance_indexes.sql
+├── 00013_rls_performance_fix.sql
+├── 00014_security_fixes.sql
+├── 00015-00018 (various fixes)
+├── 00019_entity_revisions.sql
+├── 00020_notifications.sql
+└── 00021_recipe_cogs.sql
+```
+
+---
+
+## Appendix B: Completion Checklist Template
+
+For each implementation task, verify:
+
+### [Task Name]
+
+#### Files Created/Modified
+- [ ] File path 1
+- [ ] File path 2
+
+#### Database Changes
+- [ ] Migration created and applied
+- [ ] Types regenerated (`pnpm supabase gen types`)
+
+#### Functionality
+- [ ] Feature works as specified
+- [ ] Edge cases handled
+- [ ] Error messages user-friendly
+
+#### Testing
+- [ ] Manual testing completed
+- [ ] Unit tests written (if applicable)
+- [ ] E2E test written (if applicable)
+
+#### Code Quality
+- [ ] TypeScript compiles without errors
+- [ ] ESLint passes
+- [ ] No console.logs in production code
+- [ ] Follows existing patterns
+
+---
+
+*Document consolidated January 2026*
