@@ -46,6 +46,7 @@ interface POLineItemWithReceived {
   id: string;
   catalog_type: string;
   catalog_id: string;
+  catalog_name: string; // Resolved human-readable name
   quantity: number;
   unit: string;
   unit_price: number | null;
@@ -56,6 +57,7 @@ interface ReceiveEntry {
   po_line_item_id: string;
   catalog_type: string;
   catalog_id: string;
+  catalog_name: string; // Resolved human-readable name for inventory lookup
   quantity: number;
   unit: string;
   unit_price: number | null;
@@ -70,6 +72,20 @@ interface POReceivingProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+// Catalog table mapping for looking up item names
+const CATALOG_TABLES: Record<string, string> = {
+  malt: "malts",
+  hop: "hops",
+  yeast: "yeasts",
+  adjunct: "adjuncts",
+  additive: "additives",
+  packaging: "package_types",
+};
 
 // =============================================================================
 // Helpers
@@ -101,7 +117,7 @@ export function POReceiving({
   // Track receive quantities per line item
   const [receives, setReceives] = useState<Record<string, ReceiveEntry>>({});
 
-  // Fetch PO line items with received quantities
+  // Fetch PO line items with received quantities and resolved catalog names
   const { data: lineItems, isLoading } = useQuery({
     queryKey: ["po-line-items-for-receive", poId],
     queryFn: async () => {
@@ -132,9 +148,44 @@ export function POReceiving({
         receivedByItem.set(r.po_line_item_id, current + r.quantity);
       });
 
-      // Merge
+      // Resolve catalog item names
+      // Group items by catalog_type to batch queries
+      const itemsByType = new Map<string, typeof items>();
+      items.forEach((item) => {
+        const existing = itemsByType.get(item.catalog_type) || [];
+        itemsByType.set(item.catalog_type, [...existing, item]);
+      });
+
+      // Fetch names from each catalog table
+      const nameMap = new Map<string, string>();
+      for (const [catalogType, typeItems] of itemsByType) {
+        // For "other" type, use catalog_id directly as name (it's free text)
+        if (catalogType === "other") {
+          typeItems.forEach((item) => {
+            nameMap.set(`${catalogType}:${item.catalog_id}`, item.catalog_id);
+          });
+          continue;
+        }
+
+        const table = CATALOG_TABLES[catalogType];
+        if (!table) continue;
+
+        const catalogIds = typeItems.map((i) => i.catalog_id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: catalogItems } = await (supabase as any)
+          .from(table)
+          .select("id, name")
+          .in("id", catalogIds);
+
+        catalogItems?.forEach((ci: { id: string; name: string }) => {
+          nameMap.set(`${catalogType}:${ci.id}`, ci.name);
+        });
+      }
+
+      // Merge with resolved names
       return items.map((item) => ({
         ...item,
+        catalog_name: nameMap.get(`${item.catalog_type}:${item.catalog_id}`) || item.catalog_id,
         received_quantity: receivedByItem.get(item.id) || 0,
       })) as POLineItemWithReceived[];
     },
@@ -167,7 +218,7 @@ export function POReceiving({
       if (receiveError) throw receiveError;
 
       // Create inventory_lots for each receive
-      // First, look up inventory_items by catalog_type + catalog_id
+      // Look up inventory_items by matching the resolved catalog name
       const entriesWithReceiveIds = entries.filter((e) => e.quantity > 0);
 
       for (const receive of insertedReceives || []) {
@@ -176,12 +227,12 @@ export function POReceiving({
         );
         if (!entry) continue;
 
-        // Look up inventory_item by name matching catalog item
-        // Note: This requires inventory_items to be set up for the catalog items
+        // Look up inventory_item by matching the resolved catalog item name
+        // inventory_items.name should match the catalog item's name (e.g., "Pilsner Malt")
         const { data: inventoryItem } = await supabase
           .from("inventory_items")
           .select("id, unit")
-          .eq("name", entry.catalog_id) // catalog_id is stored as name for now
+          .eq("name", entry.catalog_name) // Use resolved catalog name
           .eq("is_active", true)
           .maybeSingle();
 
@@ -346,6 +397,7 @@ export function POReceiving({
         ...entry,
         catalog_type: lineItem?.catalog_type || "",
         catalog_id: lineItem?.catalog_id || "",
+        catalog_name: lineItem?.catalog_name || lineItem?.catalog_id || "",
         unit: lineItem?.unit || "",
         unit_price: lineItem?.unit_price || null,
       };
@@ -410,7 +462,7 @@ export function POReceiving({
                     >
                       <TableCell>{getTypeLabel(item.catalog_type)}</TableCell>
                       <TableCell className="font-medium">
-                        {item.catalog_id}
+                        {item.catalog_name}
                       </TableCell>
                       <TableCell className="text-right">
                         {item.quantity} {item.unit}
