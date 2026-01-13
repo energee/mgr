@@ -1624,11 +1624,12 @@ Due to document length, phases 6-15 follow the same pattern. Key points for each
 - Production dashboard: Vessel utilization, batch status
 - Inventory dashboard: Low stock, expiring lots
 
-### Phase 8: Settings & Administration
-- System settings: Brewery info, defaults
-- User management: CRUD, role assignment
-- Location management: Warehouses, taproom
-- Integration settings: OAuth connections
+### Phase 8: Settings & Administration [IN PROGRESS]
+- [x] System settings: Brewery info page (placeholder)
+- [x] User management: Users page (placeholder)
+- [x] Location management: Locations page (placeholder)
+- [x] Integration settings: OAuth connections page
+- [ ] Full CRUD implementation pending
 
 ### Phase 9: Yeast Management [IN PROGRESS]
 - [x] Yeast pitches table (migration 00022)
