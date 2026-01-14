@@ -4,7 +4,7 @@
  * EntityDetail - Universal Detail View Component
  *
  * Renders a detail view for any entity based on its configuration.
- * Supports: sections, tabs, custom components, actions, state badges.
+ * Supports: sections, tabs, custom components, actions, state badges, relations.
  */
 
 import { useMemo } from "react";
@@ -12,11 +12,20 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
-import type { EntityConfig, EntitySectionDef } from "@/types/entity";
+import type { EntityConfig, EntitySectionDef, EntityRelationDef } from "@/types/entity";
+import { entityRegistry } from "@/entities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { StatusBadge } from "@/components/universal/status-badge";
 import {
   DropdownMenu,
@@ -25,7 +34,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, MoreHorizontal, Pencil } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Pencil, Plus } from "lucide-react";
 
 interface EntityDetailProps<T = Record<string, unknown>> {
   /** Entity configuration */
@@ -130,6 +139,14 @@ export function EntityDetail<T = Record<string, unknown>>({
       defaultSections: noTab,
     };
   }, [entity.detailSections]);
+
+  // Get relations that should show as tabs
+  const relationTabs = useMemo(() => {
+    if (!entity.relations) return [];
+    return entity.relations.filter(
+      (rel) => rel.showInDetail && rel.detailTab && rel.type === "hasMany"
+    );
+  }, [entity.relations]);
 
   // Get available actions
   const availableActions = useMemo(() => {
@@ -251,30 +268,43 @@ export function EntityDetail<T = Record<string, unknown>>({
       </div>
 
       {/* Content */}
-      {tabs.length > 0 ? (
-        <Tabs defaultValue={tabs[0]?.[0] || "details"}>
+      {tabs.length > 0 || relationTabs.length > 0 ? (
+        <Tabs defaultValue="details">
           <TabsList>
-            {defaultSections.length > 0 && <TabsTrigger value="details">Details</TabsTrigger>}
+            <TabsTrigger value="details">Details</TabsTrigger>
             {tabs.map(([tabName]) => (
               <TabsTrigger key={tabName} value={tabName}>
                 {tabName}
               </TabsTrigger>
             ))}
+            {relationTabs.map((rel) => (
+              <TabsTrigger key={rel.name} value={rel.name}>
+                {rel.detailTab}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
-          {defaultSections.length > 0 && (
-            <TabsContent value="details" className="space-y-4">
-              {defaultSections.map((section) => (
-                <SectionCard key={section.id} section={section} data={data} />
-              ))}
-            </TabsContent>
-          )}
+          <TabsContent value="details" className="space-y-4">
+            {defaultSections.map((section) => (
+              <SectionCard key={section.id} section={section} data={data} />
+            ))}
+          </TabsContent>
 
           {tabs.map(([tabName, sections]) => (
             <TabsContent key={tabName} value={tabName} className="space-y-4">
               {sections.map((section) => (
                 <SectionCard key={section.id} section={section} data={data} />
               ))}
+            </TabsContent>
+          ))}
+
+          {relationTabs.map((rel) => (
+            <TabsContent key={rel.name} value={rel.name}>
+              <RelationTable
+                relation={rel}
+                parentId={id}
+                parentEntity={entity}
+              />
             </TabsContent>
           ))}
         </Tabs>
@@ -339,6 +369,135 @@ function SectionCard<T>({
             );
           })}
         </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Relation table component
+function RelationTable<T>({
+  relation,
+  parentId,
+}: {
+  relation: EntityRelationDef;
+  parentId: string;
+  parentEntity?: EntityConfig<T>;
+}) {
+  const supabase = createClient();
+  const relatedEntity = entityRegistry.get(relation.entity);
+
+  // Cast to any for dynamic table access - universal components work with any entity
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
+  // Fetch related records
+  const { data: items, isLoading } = useQuery({
+    queryKey: [relation.entity, "by", relation.foreignKey, parentId],
+    queryFn: async () => {
+      if (!relatedEntity) return [];
+      // Build select with relations for display fields
+      let selectClause = "*";
+      const joins: string[] = [];
+
+      relatedEntity.listColumns.forEach((col) => {
+        if (col.relation) {
+          const relEntity = entityRegistry.get(col.relation.entity);
+          if (relEntity) {
+            joins.push(`${col.relation.entity}:${col.accessorKey}(${col.relation.displayField})`);
+          }
+        }
+      });
+
+      if (joins.length > 0) {
+        selectClause = `*, ${joins.join(", ")}`;
+      }
+
+      const { data, error } = await db
+        .from(relatedEntity.table)
+        .select(selectClause)
+        .eq(relation.foreignKey, parentId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!relatedEntity,
+  });
+
+  if (!relatedEntity) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          Related entity &quot;{relation.entity}&quot; not found
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const columns = relatedEntity.listColumns.filter(
+    (col) => col.accessorKey && col.accessorKey !== relation.foreignKey
+  );
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>{relation.detailTab}</CardTitle>
+        <Button size="sm" variant="outline" asChild>
+          <Link href={`/${relatedEntity.domain}/${relatedEntity.name}s/new?${relation.foreignKey}=${parentId}`}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : !items || items.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">
+            No {relatedEntity.displayNamePlural.toLowerCase()} yet
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {columns.map((col) => (
+                  <TableHead key={col.accessorKey}>
+                    {typeof col.header === "string" ? col.header : col.accessorKey}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item: Record<string, unknown>) => (
+                <TableRow key={item.id as string}>
+                  {columns.map((col) => {
+                    const key = col.accessorKey;
+                    if (!key) return null;
+
+                    let value = item[key];
+
+                    // Handle relation display
+                    if (col.relation) {
+                      const relData = item[col.relation.entity] as Record<string, unknown> | null;
+                      value = relData?.[col.relation.displayField] ?? value;
+                    }
+
+                    return (
+                      <TableCell key={key}>
+                        {col.render
+                          ? col.render(value, item)
+                          : formatValue(value, col.format)}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );
