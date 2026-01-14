@@ -6,6 +6,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Get current date/time formatted for datetime-local input.
+ * Returns ISO string trimmed to minute precision (YYYY-MM-DDTHH:MM).
+ */
+export function getCurrentDateTimeLocal(): string {
+  return new Date().toISOString().slice(0, 16);
+}
+
+/**
  * Format a value for display based on its type.
  * Used by EntityList and EntityDetail for consistent formatting.
  */

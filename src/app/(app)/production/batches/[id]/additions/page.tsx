@@ -218,7 +218,7 @@ export default function BatchAdditionsPage({
                 <Skeleton key={i} className="h-20 w-full" />
               ))}
             </div>
-          ) : additions?.length === 0 ? (
+          ) : !additions || additions.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               No additions recorded yet. Add your first addition above.
             </p>
