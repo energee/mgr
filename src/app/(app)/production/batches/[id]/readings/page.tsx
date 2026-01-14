@@ -5,9 +5,9 @@
  *
  * Mobile-optimized page for viewing and recording fermentation readings.
  * Features:
- * - Touch-friendly reading entry form
+ * - Quick add reading form
  * - Chronological readings list
- * - Inline editing capability
+ * - Real-time updates
  */
 
 import { use, useState } from "react";
@@ -16,35 +16,25 @@ import { createClient } from "@/lib/supabase/client";
 import { BatchReadingForm } from "@/components/domain/batch-reading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, ArrowLeft, Thermometer, Droplets, Beaker, Gauge } from "lucide-react";
+import { ArrowLeft, Plus, Thermometer, Droplets, Beaker } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
+  type BatchReading,
+  type ReadingType,
   READING_TYPES,
   formatReadingValue,
-  type ReadingType,
-  type BatchReading,
 } from "@/lib/batch-readings";
-import { toast } from "sonner";
+import { format } from "date-fns";
+import type { Json } from "@/types/supabase";
 
-// Icon mapping for reading types
-const readingIcons: Record<ReadingType, React.ElementType> = {
-  gravity: Droplets,
-  temperature: Thermometer,
-  ph: Beaker,
-  pressure: Gauge,
-  dissolved_oxygen: Droplets,
-  diacetyl: Beaker,
-  clarity: Droplets,
-};
-
-interface BatchLogReading {
+interface BatchLog {
   id: string;
   batch_id: string;
   log_type: string;
-  data: BatchReading | Record<string, unknown>;
-  created_at: string | null;
+  data: BatchReading;
+  created_at: string;
   created_by: string | null;
 }
 
@@ -59,12 +49,12 @@ export default function BatchReadingsPage({
   const [showForm, setShowForm] = useState(false);
 
   // Fetch batch details
-  const { data: batch, isLoading: loadingBatch } = useQuery({
+  const { data: batch, isLoading: batchLoading } = useQuery({
     queryKey: ["batch", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
-        .select("*")
+        .select("id, batch_number, name, status, recipe_id")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -73,31 +63,34 @@ export default function BatchReadingsPage({
   });
 
   // Fetch readings from batch_logs
-  const { data: readings = [], isLoading: loadingReadings } = useQuery({
+  const { data: readings, isLoading: readingsLoading } = useQuery({
     queryKey: ["batch-readings", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batch_logs")
         .select("*")
         .eq("batch_id", id)
-        .eq("log_type", "reading")
+        .eq("log_type", "measurement")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as BatchLogReading[];
+      return (data as unknown) as BatchLog[];
     },
   });
 
   // Add reading mutation
   const addReading = useMutation({
     mutationFn: async (reading: BatchReading) => {
-      // Cast to Json type that supabase expects
-      const { error } = await supabase.from("batch_logs").insert({
-        batch_id: id,
-        log_type: "reading",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: reading as any,
-      });
+      const { data, error } = await supabase
+        .from("batch_logs")
+        .insert({
+          batch_id: id,
+          log_type: "measurement",
+          data: reading as unknown as Json,
+        })
+        .select()
+        .single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batch-readings", id] });
@@ -105,51 +98,48 @@ export default function BatchReadingsPage({
       toast.success("Reading saved");
     },
     onError: (error) => {
-      toast.error("Failed to save reading", {
-        description: error.message,
-      });
+      toast.error("Failed to save reading: " + error.message);
     },
   });
 
-  // Delete reading mutation
-  const deleteReading = useMutation({
-    mutationFn: async (readingId: string) => {
-      const { error } = await supabase
-        .from("batch_logs")
-        .delete()
-        .eq("id", readingId);
-      if (error) throw error;
+  // Group readings by type for summary
+  const readingsByType = readings?.reduce(
+    (acc, log) => {
+      const type = log.data.reading_type;
+      if (!acc[type]) acc[type] = [];
+      acc[type].push(log);
+      return acc;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batch-readings", id] });
-      toast.success("Reading deleted");
-    },
-    onError: (error) => {
-      toast.error("Failed to delete reading", {
-        description: error.message,
-      });
-    },
-  });
-
-  // Group readings by date for display
-  const groupedReadings = readings.reduce<Record<string, BatchLogReading[]>>(
-    (groups, reading) => {
-      const date = reading.created_at
-        ? new Date(reading.created_at).toLocaleDateString()
-        : "Unknown";
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(reading);
-      return groups;
-    },
-    {}
+    {} as Record<ReadingType, BatchLog[]>
   );
 
-  if (loadingBatch) {
+  // Get latest reading for each type
+  const latestByType = readingsByType
+    ? (Object.entries(readingsByType) as [ReadingType, BatchLog[]][]).reduce(
+        (acc, [type, logs]) => {
+          acc[type] = logs[0]; // Already sorted DESC
+          return acc;
+        },
+        {} as Record<ReadingType, BatchLog>
+      )
+    : {};
+
+  const getReadingIcon = (type: ReadingType) => {
+    switch (type) {
+      case "temperature":
+        return Thermometer;
+      case "gravity":
+        return Droplets;
+      default:
+        return Beaker;
+    }
+  };
+
+  if (batchLoading) {
     return (
-      <div className="container max-w-2xl py-6">
-        <Skeleton className="h-8 w-48 mb-4" />
-        <Skeleton className="h-4 w-32 mb-8" />
-        <Skeleton className="h-64 w-full" />
+      <div className="container max-w-2xl py-6 space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-32 w-full" />
       </div>
     );
   }
@@ -157,136 +147,124 @@ export default function BatchReadingsPage({
   return (
     <div className="container max-w-2xl py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Link
-            href={`/production/batches/${id}`}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Batch
-          </Link>
-          <h1 className="text-2xl font-bold">{batch?.name}</h1>
-          <p className="text-muted-foreground">
-            {batch?.batch_number} &bull; Fermentation Readings
-          </p>
+      <div className="flex items-center gap-4">
+        <Link href={`/production/batches/${id}`}>
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold">{batch?.name || batch?.batch_number}</h1>
+          <p className="text-muted-foreground">Fermentation Readings</p>
         </div>
         {!showForm && (
-          <Button size="lg" onClick={() => setShowForm(true)} className="h-12 gap-2">
-            <Plus className="h-5 w-5" />
-            <span className="hidden sm:inline">Add Reading</span>
+          <Button size="lg" onClick={() => setShowForm(true)}>
+            <Plus className="h-5 w-5 mr-2" />
+            Add Reading
           </Button>
         )}
       </div>
 
-      {/* Form */}
+      {/* Quick Add Form */}
       {showForm && (
         <BatchReadingForm
           batchId={id}
-          onSubmit={addReading.mutateAsync}
+          onSubmit={async (data) => { await addReading.mutateAsync(data); }}
           onCancel={() => setShowForm(false)}
           isSubmitting={addReading.isPending}
         />
       )}
 
-      {/* Readings List */}
-      {loadingReadings ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-24 w-full" />
-          ))}
-        </div>
-      ) : readings.length === 0 ? (
+      {/* Latest Readings Summary */}
+      {Object.keys(latestByType).length > 0 && (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Droplets className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No readings yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Start tracking fermentation by adding your first reading.
-            </p>
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Reading
-            </Button>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Current Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {(Object.entries(latestByType) as [ReadingType, BatchLog][]).map(
+                ([type, log]) => {
+                  const Icon = getReadingIcon(type);
+                  const config = READING_TYPES[type];
+                  return (
+                    <div
+                      key={type}
+                      className="flex items-center gap-3 rounded-lg border p-3"
+                    >
+                      <Icon className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          {config.label}
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {formatReadingValue(type, log.data.value, log.data.unit)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedReadings).map(([date, dateReadings]) => (
-            <div key={date}>
-              <h3 className="text-sm font-medium text-muted-foreground mb-3">
-                {date}
-              </h3>
-              <div className="space-y-3">
-                {dateReadings.map((reading) => (
-                  <ReadingCard
-                    key={reading.id}
-                    reading={reading}
-                    onDelete={() => {
-                      if (confirm("Delete this reading?")) {
-                        deleteReading.mutate(reading.id);
-                      }
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       )}
-    </div>
-  );
-}
 
-// Reading Card Component
-function ReadingCard({
-  reading,
-  onDelete,
-}: {
-  reading: BatchLogReading;
-  onDelete: () => void;
-}) {
-  const data = reading.data as BatchReading;
-  const type = data.reading_type as ReadingType;
-  const config = READING_TYPES[type];
-  const Icon = readingIcons[type] || Droplets;
-
-  const time = reading.created_at
-    ? new Date(reading.created_at).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
-
-  return (
-    <Card className="overflow-hidden">
-      <div className="flex items-center gap-4 p-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <Icon className="h-6 w-6 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline">{config?.label || type}</Badge>
-            <span className="text-sm text-muted-foreground">{time}</span>
-          </div>
-          <div className="text-2xl font-semibold">
-            {formatReadingValue(type, data.value, data.unit)}
-          </div>
-          {data.notes && (
-            <p className="text-sm text-muted-foreground mt-1 truncate">
-              {data.notes}
+      {/* Readings History */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {readingsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : readings?.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              No readings recorded yet. Add your first reading above.
             </p>
+          ) : (
+            <div className="space-y-3">
+              {readings?.map((log) => {
+                const config = READING_TYPES[log.data.reading_type];
+                const Icon = getReadingIcon(log.data.reading_type);
+                return (
+                  <div
+                    key={log.id}
+                    className="flex items-center gap-4 rounded-lg border p-4"
+                  >
+                    <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-medium">{config.label}</span>
+                        <span className="text-lg font-semibold">
+                          {formatReadingValue(
+                            log.data.reading_type,
+                            log.data.value,
+                            log.data.unit
+                          )}
+                        </span>
+                      </div>
+                      {log.data.notes && (
+                        <p className="text-sm text-muted-foreground truncate">
+                          {log.data.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right text-sm text-muted-foreground flex-shrink-0">
+                      <p>{format(new Date(log.created_at), "MMM d")}</p>
+                      <p>{format(new Date(log.created_at), "h:mm a")}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          Delete
-        </Button>
-      </div>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
