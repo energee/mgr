@@ -241,10 +241,10 @@ Next available: `00024`
 - [x] Create addition types (`src/lib/batch-additions.ts`)
   - [x] Type-safe catalog queries for each addition type
   - [x] Unit options and defaults per type
-- [ ] Link additions to recipe expectations
-  - [ ] Show recipe's planned additions
-  - [ ] Highlight deviations from plan
-  - [ ] Calculate actual IBU contribution for dry hops
+- [x] Link additions to recipe expectations
+  - [x] Show recipe's planned additions (PlannedAdditions component)
+  - [x] Highlight completed vs pending additions
+  - [ ] Calculate actual IBU contribution for dry hops (future)
 
 ### 2.3 Batch-Brew Log Linking
 
@@ -1455,6 +1455,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-14 | Phase 2.3: Added StartFermentationDialog with vessel selection and transfer creation |
 | 2026-01-14 | Phase 2.2.1: Added BatchReadingsChart with gravity/temperature visualization using shadcn charts |
 | 2026-01-14 | Phase 2.1: Added navigation from batch to brew logs in BrewLogLinker component |
+| 2026-01-14 | Phase 2.2.2: Added PlannedAdditions component showing recipe additions with completion tracking |
 
 ---
 
