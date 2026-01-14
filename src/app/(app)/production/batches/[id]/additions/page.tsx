@@ -25,8 +25,8 @@ import {
   type BatchAddition,
   type AdditionType,
   ADDITION_TYPES,
-  formatAddition,
 } from "@/lib/batch-additions";
+import { PlannedAdditions } from "@/components/domain/planned-additions";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
 
@@ -206,6 +206,14 @@ export default function BatchAdditionsPage({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Planned Additions from Recipe */}
+      {batch?.recipe_id && additions && (
+        <PlannedAdditions
+          recipeId={batch.recipe_id}
+          actualAdditions={additions}
+        />
       )}
 
       {/* Additions History */}
