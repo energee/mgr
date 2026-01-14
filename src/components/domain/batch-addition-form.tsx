@@ -51,13 +51,15 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { X, Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getCurrentDateTimeLocal } from "@/lib/utils";
 import {
   ADDITION_TYPES,
   UNIT_OPTIONS,
   type AdditionType,
   type BatchAddition,
+  type CatalogTable,
 } from "@/lib/batch-additions";
+import type { Database } from "@/types/supabase";
 
 const additionSchema = z.object({
   addition_type: z.enum(["dry_hop", "fruit", "adjunct", "fining", "spice", "other"]),
@@ -66,7 +68,7 @@ const additionSchema = z.object({
   quantity: z.coerce.number().positive("Quantity must be positive"),
   unit: z.string().min(1),
   timestamp: z.string(),
-  contact_time_hours: z.coerce.number().optional(),
+  contact_time_hours: z.coerce.number().positive("Contact time must be positive").optional(),
   notes: z.string().optional(),
 });
 
@@ -104,26 +106,50 @@ export function BatchAdditionForm({
       ingredient_name: "",
       quantity: 0,
       unit: config?.defaultUnit || "oz",
-      timestamp: new Date().toISOString().slice(0, 16),
+      timestamp: getCurrentDateTimeLocal(),
       contact_time_hours: undefined,
       notes: "",
     },
   });
+
+  // Type-safe catalog query helper
+  const queryCatalog = async (table: CatalogTable) => {
+    const queries: Record<CatalogTable, () => Promise<CatalogItem[]>> = {
+      hops: async () => {
+        const { data, error } = await supabase.from("hops").select("id, name, type").eq("is_active", true).order("name");
+        if (error) throw error;
+        return (data ?? []) as CatalogItem[];
+      },
+      fruits: async () => {
+        const { data, error } = await supabase.from("fruits").select("id, name, type").eq("is_active", true).order("name");
+        if (error) throw error;
+        return (data ?? []) as CatalogItem[];
+      },
+      adjuncts: async () => {
+        const { data, error } = await supabase.from("adjuncts").select("id, name, type").eq("is_active", true).order("name");
+        if (error) throw error;
+        return (data ?? []) as CatalogItem[];
+      },
+      additives: async () => {
+        const { data, error } = await supabase.from("additives").select("id, name, type").eq("is_active", true).order("name");
+        if (error) throw error;
+        return (data ?? []) as CatalogItem[];
+      },
+      spices: async () => {
+        const { data, error } = await supabase.from("spices").select("id, name, type").eq("is_active", true).order("name");
+        if (error) throw error;
+        return (data ?? []) as CatalogItem[];
+      },
+    };
+    return queries[table]();
+  };
 
   // Fetch catalog items based on selected type
   const { data: catalogItems = [], isLoading: loadingCatalog } = useQuery({
     queryKey: ["catalog", config.catalogTable],
     queryFn: async () => {
       if (!config.catalogTable) return [];
-      // Use type assertion for dynamic table access
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from(config.catalogTable)
-        .select("id, name, type")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as CatalogItem[];
+      return queryCatalog(config.catalogTable);
     },
     enabled: !!config.catalogTable,
   });
@@ -156,8 +182,20 @@ export function BatchAdditionForm({
       notes: values.notes,
     });
 
-    form.reset();
-    setSelectedType("dry_hop");
+    // Reset form with explicit initial values to avoid race condition with useEffect
+    const initialType: AdditionType = "dry_hop";
+    const initialConfig = ADDITION_TYPES[initialType];
+    form.reset({
+      addition_type: initialType,
+      ingredient_id: "",
+      ingredient_name: "",
+      quantity: 0,
+      unit: initialConfig.defaultUnit,
+      timestamp: getCurrentDateTimeLocal(),
+      contact_time_hours: undefined,
+      notes: "",
+    });
+    setSelectedType(initialType);
   };
 
   // Group catalog items by type
