@@ -402,9 +402,10 @@ function RelationTable<T>({
       relatedEntity.listColumns.forEach((col) => {
         if (col.relation) {
           const relEntity = entityRegistry.get(col.relation.entity);
-          if (relEntity) {
-            joins.push(`${col.relation.entity}:${col.accessorKey}(${col.relation.displayField})`);
-          }
+          // Supabase join syntax: table_name:foreign_key_column(fields)
+          // Use registered entity table name, or fallback to pluralized entity name
+          const tableName = relEntity?.table || `${col.relation.entity}s`;
+          joins.push(`${tableName}:${col.accessorKey}(${col.relation.displayField})`);
         }
       });
 
@@ -479,9 +480,11 @@ function RelationTable<T>({
 
                     let value = item[key];
 
-                    // Handle relation display
+                    // Handle relation display - data comes back keyed by table name
                     if (col.relation) {
-                      const relData = item[col.relation.entity] as Record<string, unknown> | null;
+                      const relEntity = entityRegistry.get(col.relation.entity);
+                      const tableKey = relEntity?.table || `${col.relation.entity}s`;
+                      const relData = item[tableKey] as Record<string, unknown> | null;
                       value = relData?.[col.relation.displayField] ?? value;
                     }
 
