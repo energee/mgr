@@ -301,9 +301,9 @@ export function EntityDetail<T = Record<string, unknown>>({
           {relationTabs.map((rel) => (
             <TabsContent key={rel.name} value={rel.name}>
               <RelationTable
+                key={rel.name}
                 relation={rel}
                 parentId={id}
-                parentEntity={entity}
               />
             </TabsContent>
           ))}
@@ -375,13 +375,12 @@ function SectionCard<T>({
 }
 
 // Relation table component
-function RelationTable<T>({
+function RelationTable({
   relation,
   parentId,
 }: {
   relation: EntityRelationDef;
   parentId: string;
-  parentEntity?: EntityConfig<T>;
 }) {
   const supabase = createClient();
   const relatedEntity = entityRegistry.get(relation.entity);
@@ -390,36 +389,48 @@ function RelationTable<T>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  // Fetch related records
-  const { data: items, isLoading } = useQuery({
-    queryKey: [relation.entity, "by", relation.foreignKey, parentId],
+  // Fetch related records with pagination limit
+  const { data: items, isLoading, error } = useQuery({
+    queryKey: [relatedEntity?.table || relation.entity, "by", relation.foreignKey, parentId],
     queryFn: async () => {
       if (!relatedEntity) return [];
-      // Build select with relations for display fields
-      let selectClause = "*";
-      const joins: string[] = [];
 
-      relatedEntity.listColumns.forEach((col) => {
-        if (col.relation) {
-          const relEntity = entityRegistry.get(col.relation.entity);
-          // Supabase join syntax: table_name:foreign_key_column(fields)
-          // Use registered entity table name, or fallback to pluralized entity name
-          const tableName = relEntity?.table || `${col.relation.entity}s`;
-          joins.push(`${tableName}:${col.accessorKey}(${col.relation.displayField})`);
+      try {
+        // Build select with relations for display fields
+        let selectClause = "*";
+        const joins: string[] = [];
+
+        relatedEntity.listColumns.forEach((col) => {
+          if (col.relation) {
+            const relEntity = entityRegistry.get(col.relation.entity);
+            // Supabase join syntax: table_name:foreign_key_column(fields)
+            // Use registered entity table name, or fallback to pluralized entity name
+            const tableName = relEntity?.table || `${col.relation.entity}s`;
+            joins.push(`${tableName}:${col.accessorKey}(${col.relation.displayField})`);
+          }
+        });
+
+        if (joins.length > 0) {
+          selectClause = `*, ${joins.join(", ")}`;
         }
-      });
 
-      if (joins.length > 0) {
-        selectClause = `*, ${joins.join(", ")}`;
+        // Use entity's defaultSort or fallback to created_at
+        const sortField = relatedEntity.defaultSort?.column || "created_at";
+        const sortAsc = relatedEntity.defaultSort?.direction === "asc";
+
+        const { data, error } = await db
+          .from(relatedEntity.table)
+          .select(selectClause)
+          .eq(relation.foreignKey, parentId)
+          .order(sortField, { ascending: sortAsc })
+          .limit(50);
+
+        if (error) throw error;
+        return data || [];
+      } catch (err) {
+        console.error(`Failed to load ${relatedEntity.displayNamePlural}:`, err);
+        throw err;
       }
-
-      const { data, error } = await db
-        .from(relatedEntity.table)
-        .select(selectClause)
-        .eq(relation.foreignKey, parentId)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
     },
     enabled: !!relatedEntity,
   });
@@ -438,19 +449,29 @@ function RelationTable<T>({
     (col) => col.accessorKey && col.accessorKey !== relation.foreignKey
   );
 
+  // Convert snake_case entity name to kebab-case for URL routes
+  const routeName = relatedEntity.name.replace(/_/g, "-");
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{relation.detailTab}</CardTitle>
         <Button size="sm" variant="outline" asChild>
-          <Link href={`/${relatedEntity.domain}/${relatedEntity.name}s/new?${relation.foreignKey}=${parentId}`}>
+          <Link
+            href={`/${relatedEntity.domain}/${routeName}s/new?${relation.foreignKey}=${parentId}`}
+            aria-label={`Add new ${relatedEntity.displayName.toLowerCase()}`}
+          >
             <Plus className="h-4 w-4 mr-1" />
             Add
           </Link>
         </Button>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {error ? (
+          <p className="text-center text-destructive py-8">
+            Failed to load {relatedEntity.displayNamePlural.toLowerCase()}
+          </p>
+        ) : isLoading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-12 w-full" />
@@ -476,7 +497,7 @@ function RelationTable<T>({
                 <TableRow key={item.id as string}>
                   {columns.map((col) => {
                     const key = col.accessorKey;
-                    if (!key) return null;
+                    if (!key) return <TableCell key={`empty-${Math.random()}`}>—</TableCell>;
 
                     let value = item[key];
 
@@ -485,7 +506,8 @@ function RelationTable<T>({
                       const relEntity = entityRegistry.get(col.relation.entity);
                       const tableKey = relEntity?.table || `${col.relation.entity}s`;
                       const relData = item[tableKey] as Record<string, unknown> | null;
-                      value = relData?.[col.relation.displayField] ?? value;
+                      // Use "—" as fallback if relation data not found (instead of raw UUID)
+                      value = relData?.[col.relation.displayField] ?? null;
                     }
 
                     return (
