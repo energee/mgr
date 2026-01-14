@@ -34,8 +34,9 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Link2, Plus, Trash2 } from "lucide-react";
+import { Link2, Plus, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface BrewLog {
   id: string;
@@ -272,14 +273,18 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
                 key={link.id}
                 className="flex items-center justify-between p-3 rounded-md border"
               >
-                <div>
+                <Link
+                  href={`/production/brew-logs/${link.brew_log_id}`}
+                  className="flex-1 group"
+                >
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">
+                    <span className="font-medium group-hover:text-primary transition-colors">
                       {link.brew_log.brew_number}
                     </span>
                     <Badge variant="outline" className="text-xs">
                       {link.volume_bbl} BBL
                     </Badge>
+                    <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {link.brew_log.recipe?.name || "No recipe"} &bull;{" "}
@@ -290,11 +295,12 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
                       {link.notes}
                     </div>
                   )}
-                </div>
+                </Link>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
                     if (confirm("Unlink this brew log?")) {
                       unlinkMutation.mutate(link.id);
                     }
