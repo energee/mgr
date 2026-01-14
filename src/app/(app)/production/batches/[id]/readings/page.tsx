@@ -27,6 +27,7 @@ import {
   READING_TYPES,
   formatReadingValue,
 } from "@/lib/batch-readings";
+import { BatchReadingsChart } from "@/components/domain/batch-readings-chart";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
 
@@ -210,6 +211,11 @@ export default function BatchReadingsPage({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Fermentation Chart */}
+      {readings && readings.length > 0 && (
+        <BatchReadingsChart readings={readings} />
       )}
 
       {/* Readings History */}
