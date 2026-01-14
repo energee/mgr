@@ -222,7 +222,7 @@ export default function BatchReadingsPage({
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : readings?.length === 0 ? (
+          ) : !readings || readings.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               No readings recorded yet. Add your first reading above.
             </p>

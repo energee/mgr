@@ -7,9 +7,12 @@
 
 export type AdditionType = "dry_hop" | "fruit" | "adjunct" | "fining" | "spice" | "other";
 
+/** Valid catalog table names for type-safe queries */
+export type CatalogTable = "hops" | "fruits" | "adjuncts" | "additives" | "spices";
+
 interface AdditionTypeConfig {
   label: string;
-  catalogTable: string | null;  // null for "other"
+  catalogTable: CatalogTable | null;  // null for "other"
   defaultUnit: string;
   showContactTime?: boolean;  // For dry hops
 }

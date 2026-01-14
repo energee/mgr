@@ -43,6 +43,7 @@ import {
   type ReadingType,
   type BatchReading,
 } from "@/lib/batch-readings";
+import { getCurrentDateTimeLocal } from "@/lib/utils";
 
 const readingSchema = z.object({
   reading_type: z.enum([
@@ -85,7 +86,7 @@ export function BatchReadingForm({
       reading_type: "gravity",
       value: "",
       unit: config?.defaultUnit || "",
-      timestamp: new Date().toISOString().slice(0, 16),
+      timestamp: getCurrentDateTimeLocal(),
       notes: "",
     },
   });
@@ -124,8 +125,17 @@ export function BatchReadingForm({
       notes: values.notes,
     });
 
-    form.reset();
-    setSelectedType("gravity");
+    // Reset form with explicit initial values to avoid race condition with useEffect
+    const initialType: ReadingType = "gravity";
+    const initialConfig = READING_TYPES[initialType];
+    form.reset({
+      reading_type: initialType,
+      value: "",
+      unit: initialConfig.defaultUnit,
+      timestamp: getCurrentDateTimeLocal(),
+      notes: "",
+    });
+    setSelectedType(initialType);
   };
 
   return (
