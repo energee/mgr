@@ -175,6 +175,8 @@ export function BatchReadingForm({
                           setSelectedType(type);
                           field.onChange(type);
                         }}
+                        aria-label={`Select ${READING_TYPES[type].label} reading type`}
+                        aria-pressed={selectedType === type}
                       >
                         {READING_TYPES[type].label}
                       </Button>

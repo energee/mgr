@@ -5,6 +5,9 @@
  * for fermentation metrics (gravity, temp, pH, pressure, DO, diacetyl, clarity).
  */
 
+/**
+ * Type of fermentation reading/measurement
+ */
 export type ReadingType =
   | "gravity"
   | "temperature"
@@ -102,6 +105,18 @@ export interface ValidationResult {
 
 /**
  * Validate a reading value against its type's constraints
+ *
+ * @param type - The type of reading being validated
+ * @param value - The value to validate (numeric or string for option-based readings)
+ * @returns ValidationResult with valid flag and optional warning message
+ * @example
+ * ```ts
+ * validateReading("gravity", 12.5)
+ * // Returns: { valid: true }
+ *
+ * validateReading("temperature", 100)
+ * // Returns: { valid: true, warning: "Value outside typical range (55-85)" }
+ * ```
  */
 export function validateReading(
   type: ReadingType,
@@ -156,7 +171,17 @@ export function validateReading(
 }
 
 /**
- * Convert gravity between SG and Plato
+ * Convert gravity between Specific Gravity (SG) and Plato (°P)
+ *
+ * @param value - The gravity value to convert
+ * @param from - The source unit ("sg" or "plato")
+ * @param to - The target unit ("sg" or "plato")
+ * @returns The converted gravity value
+ * @example
+ * ```ts
+ * convertGravity(1.050, "sg", "plato")
+ * // Returns: ~12.4 °P
+ * ```
  */
 export function convertGravity(value: number, from: "sg" | "plato", to: "sg" | "plato"): number {
   if (from === to) return value;
@@ -171,7 +196,17 @@ export function convertGravity(value: number, from: "sg" | "plato", to: "sg" | "
 }
 
 /**
- * Convert temperature between F and C
+ * Convert temperature between Fahrenheit and Celsius
+ *
+ * @param value - The temperature value to convert
+ * @param from - The source unit ("f" or "c")
+ * @param to - The target unit ("f" or "c")
+ * @returns The converted temperature value
+ * @example
+ * ```ts
+ * convertTemperature(68, "f", "c")
+ * // Returns: 20°C
+ * ```
  */
 export function convertTemperature(value: number, from: "f" | "c", to: "f" | "c"): number {
   if (from === to) return value;
@@ -184,7 +219,20 @@ export function convertTemperature(value: number, from: "f" | "c", to: "f" | "c"
 }
 
 /**
- * Format a reading value for display
+ * Format a reading value for display with appropriate precision and units
+ *
+ * @param type - The type of reading
+ * @param value - The reading value (numeric or string)
+ * @param unit - The unit of measurement
+ * @returns A formatted string with proper precision and unit display
+ * @example
+ * ```ts
+ * formatReadingValue("temperature", 68, "f")
+ * // Returns: "68.0°F"
+ *
+ * formatReadingValue("gravity", 1.050, "sg")
+ * // Returns: "1.050"
+ * ```
  */
 export function formatReadingValue(
   type: ReadingType,
@@ -219,7 +267,19 @@ export function formatReadingValue(
 }
 
 /**
- * Get unit label for display
+ * Get a human-readable unit label for display
+ *
+ * @param type - The type of reading
+ * @param unit - The unit code (e.g., "f", "sg", "psi")
+ * @returns The display label for the unit (e.g., "°F", "SG", "PSI")
+ * @example
+ * ```ts
+ * getUnitLabel("temperature", "f")
+ * // Returns: "°F"
+ *
+ * getUnitLabel("gravity", "plato")
+ * // Returns: "°P"
+ * ```
  */
 export function getUnitLabel(type: ReadingType, unit: string): string {
   switch (type) {
