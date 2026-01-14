@@ -219,10 +219,10 @@ Next available: `00024`
   - [x] `dissolved_oxygen`: ppb with threshold warnings
   - [x] `diacetyl`: present/absent/trace options
   - [x] `clarity`: scale options
-- [ ] Create readings chart visualization
-  - [ ] Gravity curve over time (with target FG line)
-  - [ ] Temperature profile (with fermentation schedule overlay)
-  - [ ] Multi-metric overlay option
+- [x] Create readings chart visualization
+  - [x] Gravity curve over time (with target FG line)
+  - [x] Temperature profile (toggle between metrics)
+  - [ ] Multi-metric overlay option (future enhancement)
 
 ### 2.2.2 Batch Additions UI
 
@@ -1453,6 +1453,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-14 | Phase 6.4: Added notification triggers migration (00022) for batch, order, PO status changes |
 | 2026-01-14 | Phase 2.4: Added vessel transfer trigger (00023), completed vessel/batch history views via relation tabs |
 | 2026-01-14 | Phase 2.3: Added StartFermentationDialog with vessel selection and transfer creation |
+| 2026-01-14 | Phase 2.2.1: Added BatchReadingsChart with gravity/temperature visualization using shadcn charts |
 
 ---
 
