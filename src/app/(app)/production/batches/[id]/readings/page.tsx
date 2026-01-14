@@ -17,6 +17,7 @@ import { BatchReadingForm } from "@/components/domain/batch-reading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ArrowLeft, Plus, Thermometer, Droplets, Beaker } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -145,7 +146,8 @@ export default function BatchReadingsPage({
   }
 
   return (
-    <div className="container max-w-2xl py-6 space-y-6">
+    <ErrorBoundary>
+      <div className="container max-w-2xl py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href={`/production/batches/${id}`}>
@@ -266,5 +268,6 @@ export default function BatchReadingsPage({
         </CardContent>
       </Card>
     </div>
+    </ErrorBoundary>
   );
 }

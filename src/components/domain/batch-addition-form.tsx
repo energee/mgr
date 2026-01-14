@@ -68,7 +68,7 @@ const additionSchema = z.object({
   quantity: z.coerce.number().positive("Quantity must be positive"),
   unit: z.string().min(1),
   timestamp: z.string(),
-  contact_time_hours: z.coerce.number().positive("Contact time must be positive").optional(),
+  contact_time_hours: z.coerce.number().nonnegative("Contact time cannot be negative").optional(),
   notes: z.string().optional(),
 });
 
@@ -104,7 +104,7 @@ export function BatchAdditionForm({
       addition_type: "dry_hop",
       ingredient_id: "",
       ingredient_name: "",
-      quantity: 0,
+      quantity: undefined,
       unit: config?.defaultUnit || "oz",
       timestamp: getCurrentDateTimeLocal(),
       contact_time_hours: undefined,
@@ -152,6 +152,7 @@ export function BatchAdditionForm({
       return queryCatalog(config.catalogTable);
     },
     enabled: !!config.catalogTable,
+    staleTime: 5 * 60 * 1000, // 5 minutes - catalog data rarely changes
   });
 
   // Update defaults when type changes
@@ -189,7 +190,7 @@ export function BatchAdditionForm({
       addition_type: initialType,
       ingredient_id: "",
       ingredient_name: "",
-      quantity: 0,
+      quantity: undefined,
       unit: initialConfig.defaultUnit,
       timestamp: getCurrentDateTimeLocal(),
       contact_time_hours: undefined,
@@ -246,6 +247,8 @@ export function BatchAdditionForm({
                           setSelectedType(type);
                           field.onChange(type);
                         }}
+                        aria-label={`Select ${ADDITION_TYPES[type].label} addition type`}
+                        aria-pressed={selectedType === type}
                       >
                         {ADDITION_TYPES[type].label}
                       </Button>
@@ -271,6 +274,7 @@ export function BatchAdditionForm({
                             variant="outline"
                             role="combobox"
                             aria-expanded={ingredientOpen}
+                            aria-label="Select ingredient from catalog or enter custom name"
                             className={cn(
                               "h-12 justify-between text-left font-normal",
                               !field.value && "text-muted-foreground"

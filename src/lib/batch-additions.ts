@@ -5,9 +5,14 @@
  * (dry hops, fruit, adjuncts, finings, etc.)
  */
 
+/**
+ * Type of addition made during fermentation
+ */
 export type AdditionType = "dry_hop" | "fruit" | "adjunct" | "fining" | "spice" | "other";
 
-/** Valid catalog table names for type-safe queries */
+/**
+ * Valid catalog table names for type-safe database queries
+ */
 export type CatalogTable = "hops" | "fruits" | "adjuncts" | "additives" | "spices";
 
 interface AdditionTypeConfig {
@@ -73,7 +78,21 @@ export const UNIT_OPTIONS = [
 ];
 
 /**
- * Format the addition for display
+ * Format a batch addition for display as a human-readable string
+ *
+ * @param addition - The batch addition to format
+ * @returns A formatted string like "2 oz Cascade (Dry Hop, 72h contact)"
+ * @example
+ * ```ts
+ * formatAddition({
+ *   addition_type: "dry_hop",
+ *   ingredient_name: "Cascade",
+ *   quantity: 2,
+ *   unit: "oz",
+ *   contact_time_hours: 72
+ * })
+ * // Returns: "2 oz Cascade (Dry Hop, 72h contact)"
+ * ```
  */
 export function formatAddition(addition: BatchAddition): string {
   const quantity = `${addition.quantity} ${addition.unit}`;
