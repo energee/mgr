@@ -1,0 +1,266 @@
+"use client";
+
+/**
+ * StartFermentationDialog - Begin fermentation for a batch
+ *
+ * When a batch is ready to start fermenting, this dialog:
+ * 1. Shows available vessels (ready_for_use status)
+ * 2. Captures the volume being transferred
+ * 3. Creates a vessel_transfer record (knockout from kettle)
+ * 4. Updates the batch status to 'fermenting'
+ *
+ * The vessel_transfer trigger automatically updates vessel status.
+ */
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, FlaskConical } from "lucide-react";
+import { toast } from "sonner";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+const startFermentationSchema = z.object({
+  vessel_id: z.string().uuid("Please select a vessel"),
+  volume_bbl: z.coerce.number().positive("Volume must be positive"),
+});
+
+type StartFermentationFormValues = z.infer<typeof startFermentationSchema>;
+
+interface StartFermentationDialogProps {
+  batchId: string;
+  batchNumber: string;
+  plannedVolume?: number | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export function StartFermentationDialog({
+  batchId,
+  batchNumber,
+  plannedVolume,
+  open,
+  onOpenChange,
+  onSuccess,
+}: StartFermentationDialogProps) {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  // Fetch available vessels (ready_for_use status)
+  const { data: vessels, isLoading: vesselsLoading } = useQuery({
+    queryKey: ["vessels", "available"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vessels")
+        .select("id, name, vessel_type, capacity_bbl")
+        .eq("status", "ready_for_use")
+        .eq("is_active", true)
+        .is("current_batch_id", null)
+        .in("vessel_type", ["fermenter", "unitank"])
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Form
+  const form = useForm<StartFermentationFormValues>({
+    resolver: zodResolver(startFermentationSchema),
+    defaultValues: {
+      vessel_id: "",
+      volume_bbl: plannedVolume || 0,
+    },
+  });
+
+  // Start fermentation mutation
+  const startMutation = useMutation({
+    mutationFn: async (values: StartFermentationFormValues) => {
+      const selectedVessel = vessels?.find((v) => v.id === values.vessel_id);
+      if (!selectedVessel) throw new Error("Vessel not found");
+
+      // 1. Create vessel transfer (knockout from kettle)
+      const { error: transferError } = await supabase
+        .from("vessel_transfers")
+        .insert({
+          batch_id: batchId,
+          from_vessel_id: null, // Knockout from kettle
+          to_vessel_id: values.vessel_id,
+          volume_bbl: values.volume_bbl,
+          transferred_at: new Date().toISOString(),
+          notes: "Knockout - start of fermentation",
+        });
+
+      if (transferError) throw transferError;
+
+      // 2. Update batch status and fermenter
+      const { error: batchError } = await supabase
+        .from("batches")
+        .update({
+          status: "fermenting",
+          fermenter: selectedVessel.name,
+          volume_bbl: values.volume_bbl,
+        })
+        .eq("id", batchId);
+
+      if (batchError) throw batchError;
+
+      return selectedVessel.name;
+    },
+    onSuccess: (vesselName) => {
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["vessels"] });
+      queryClient.invalidateQueries({ queryKey: ["vessel_transfers"] });
+      toast.success(`Fermentation started in ${vesselName}`);
+      onOpenChange(false);
+      onSuccess?.();
+    },
+    onError: (error) => {
+      console.error("Start fermentation error:", error);
+      const message = error instanceof Error ? error.message : "Failed to start fermentation";
+      toast.error(message);
+    },
+  });
+
+  const handleSubmit = form.handleSubmit((values) => {
+    startMutation.mutate(values);
+  });
+
+  const selectedVesselId = form.watch("vessel_id");
+  const selectedVessel = vessels?.find((v) => v.id === selectedVesselId);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5" />
+            Start Fermentation
+          </DialogTitle>
+          <DialogDescription>
+            Transfer batch {batchNumber} to a fermenter to begin fermentation.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="vessel_id">Fermenter</Label>
+            <Select
+              value={form.watch("vessel_id")}
+              onValueChange={(v) => form.setValue("vessel_id", v)}
+              disabled={vesselsLoading}
+            >
+              <SelectTrigger className="min-h-[44px]">
+                <SelectValue placeholder={vesselsLoading ? "Loading..." : "Select vessel..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {vessels?.length === 0 ? (
+                  <div className="p-2 text-sm text-muted-foreground text-center">
+                    No vessels available
+                  </div>
+                ) : (
+                  vessels?.map((vessel) => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      <span className="font-medium">{vessel.name}</span>
+                      <span className="text-muted-foreground ml-2">
+                        ({vessel.capacity_bbl} BBL)
+                      </span>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            {form.formState.errors.vessel_id && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.vessel_id.message}
+              </p>
+            )}
+            {selectedVessel && (
+              <p className="text-sm text-muted-foreground">
+                Capacity: {selectedVessel.capacity_bbl} BBL
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="volume_bbl">Volume (BBL)</Label>
+            <Input
+              id="volume_bbl"
+              type="number"
+              step="0.1"
+              {...form.register("volume_bbl")}
+              placeholder="e.g., 7"
+              className="min-h-[44px]"
+            />
+            {form.formState.errors.volume_bbl && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.volume_bbl.message}
+              </p>
+            )}
+            {selectedVessel && form.watch("volume_bbl") > selectedVessel.capacity_bbl && (
+              <p className="text-sm text-warning text-amber-600">
+                Volume exceeds vessel capacity ({selectedVessel.capacity_bbl} BBL)
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={startMutation.isPending || !vessels?.length}
+              className="min-h-[44px]"
+            >
+              {startMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <FlaskConical className="h-4 w-4 mr-2" />
+                  Start Fermentation
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

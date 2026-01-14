@@ -73,8 +73,8 @@ All entity pages use universal components. Reference: `src/app/(app)/production/
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00022`
-Next available: `00023`
+Current highest: `00023`
+Next available: `00024`
 
 ### Reference Files by Pattern
 
@@ -259,9 +259,9 @@ Next available: `00023`
   - [x] Display actual OG from brew log
   - [x] Display brew date
   - [x] Display brewer
-- [ ] Add "Start Fermentation" action to batch
-  - [ ] Prompt for vessel assignment
-  - [ ] Create vessel transfer record
+- [x] Add "Start Fermentation" action to batch
+  - [x] Prompt for vessel assignment (StartFermentationDialog)
+  - [x] Create vessel transfer record (knockout from kettle)
 
 ### 2.4 Vessel Transfers
 
@@ -272,9 +272,9 @@ Next available: `00023`
   - [x] `src/app/(app)/production/vessel-transfers/page.tsx` (list)
   - [x] `src/app/(app)/production/vessel-transfers/[id]/page.tsx` (detail)
   - [x] `src/app/(app)/production/vessel-transfers/new/page.tsx` (create)
-- [ ] Update vessel status based on transfers (automatic trigger)
-- [ ] Create vessel history view (what batches have used this vessel)
-- [ ] Create batch history view (what vessels has this batch used)
+- [x] Update vessel status based on transfers (automatic trigger - migration 00023)
+- [x] Create vessel history view (via EntityDetail relation tabs - transfers_to)
+- [x] Create batch history view (via EntityDetail relation tabs - vessel_transfers)
 
 ---
 
@@ -1412,8 +1412,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00021
-- Next available: 00022
+- Current: 00001-00023
+- Next available: 00024
 
 ### Testing Strategy
 
@@ -1451,6 +1451,8 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-11 | Initial plan created based on spec review |
 | 2026-01-13 | Consolidated expanded files into single plan, added Quick Reference and Appendices |
 | 2026-01-14 | Phase 6.4: Added notification triggers migration (00022) for batch, order, PO status changes |
+| 2026-01-14 | Phase 2.4: Added vessel transfer trigger (00023), completed vessel/batch history views via relation tabs |
+| 2026-01-14 | Phase 2.3: Added StartFermentationDialog with vessel selection and transfer creation |
 
 ---
 
@@ -1533,7 +1535,9 @@ supabase/migrations/
 ├── 00015-00018 (various fixes)
 ├── 00019_entity_revisions.sql
 ├── 00020_notifications.sql
-└── 00021_recipe_cogs.sql
+├── 00021_recipe_cogs.sql
+├── 00022_notification_triggers.sql
+└── 00023_vessel_transfer_trigger.sql
 ```
 
 ---
