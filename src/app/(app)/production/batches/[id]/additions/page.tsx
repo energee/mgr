@@ -5,9 +5,9 @@
  *
  * Track additions during fermentation (dry hops, fruit, adjuncts, finings).
  * Features:
- * - Touch-friendly addition entry
- * - Comparison to recipe's planned additions
- * - Chronological additions list
+ * - Quick add form with catalog search
+ * - Chronological additions history
+ * - Recipe comparison (planned vs actual)
  */
 
 import { use, useState } from "react";
@@ -16,52 +16,26 @@ import { createClient } from "@/lib/supabase/client";
 import { BatchAdditionForm } from "@/components/domain/batch-addition-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Plus,
-  ArrowLeft,
-  FlaskConical,
-  Leaf,
-  Cherry,
-  Sparkles,
-} from "lucide-react";
+import { ArrowLeft, Plus, Leaf, Apple, Beaker, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
-  ADDITION_TYPES,
-  type AdditionType,
   type BatchAddition,
+  type AdditionType,
+  ADDITION_TYPES,
+  formatAddition,
 } from "@/lib/batch-additions";
+import { format } from "date-fns";
+import type { Json } from "@/types/supabase";
 
-// Icon mapping
-const additionIcons: Record<AdditionType, React.ElementType> = {
-  dry_hop: Leaf,
-  fruit: Cherry,
-  adjunct: FlaskConical,
-  fining: Sparkles,
-  spice: FlaskConical,
-  other: FlaskConical,
-};
-
-interface BatchLogAddition {
+interface BatchLog {
   id: string;
   batch_id: string;
   log_type: string;
-  data: BatchAddition | Record<string, unknown>;
-  created_at: string | null;
+  data: BatchAddition;
+  created_at: string;
   created_by: string | null;
-}
-
-interface PlannedHop {
-  id: string;
-  hop_id: string;
-  weight_oz: number;
-  timing: string;
-  hop?: {
-    id: string;
-    name: string;
-  };
 }
 
 export default function BatchAdditionsPage({
@@ -74,13 +48,13 @@ export default function BatchAdditionsPage({
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
 
-  // Fetch batch with recipe
-  const { data: batch, isLoading: loadingBatch } = useQuery({
-    queryKey: ["batch-with-recipe", id],
+  // Fetch batch details
+  const { data: batch, isLoading: batchLoading } = useQuery({
+    queryKey: ["batch", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
-        .select("*, recipe:recipes(id, name)")
+        .select("id, batch_number, name, status, recipe_id")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -89,7 +63,7 @@ export default function BatchAdditionsPage({
   });
 
   // Fetch additions from batch_logs
-  const { data: additions = [], isLoading: loadingAdditions } = useQuery({
+  const { data: additions, isLoading: additionsLoading } = useQuery({
     queryKey: ["batch-additions", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -99,97 +73,64 @@ export default function BatchAdditionsPage({
         .eq("log_type", "addition")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as BatchLogAddition[];
+      return (data as unknown) as BatchLog[];
     },
-  });
-
-  // Fetch planned dry hops from recipe
-  const { data: plannedHops = [] } = useQuery({
-    queryKey: ["recipe-dry-hops", batch?.recipe?.id],
-    queryFn: async () => {
-      if (!batch?.recipe?.id) return [];
-      const { data, error } = await supabase
-        .from("recipe_hops")
-        .select("id, hop_id, weight_oz, timing, hop:hops(id, name)")
-        .eq("recipe_id", batch.recipe.id)
-        .eq("timing", "dry_hop");
-      if (error) throw error;
-      return (data ?? []) as unknown as PlannedHop[];
-    },
-    enabled: !!batch?.recipe?.id,
   });
 
   // Add addition mutation
   const addAddition = useMutation({
     mutationFn: async (addition: BatchAddition) => {
-      const { error } = await supabase.from("batch_logs").insert({
-        batch_id: id,
-        log_type: "addition",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: addition as any,
-      });
+      const { data, error } = await supabase
+        .from("batch_logs")
+        .insert({
+          batch_id: id,
+          log_type: "addition",
+          data: addition as unknown as Json,
+        })
+        .select()
+        .single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batch-additions", id] });
       setShowForm(false);
-      toast.success("Addition saved");
+      toast.success("Addition recorded");
     },
     onError: (error) => {
-      toast.error("Failed to save addition", { description: error.message });
+      toast.error("Failed to save: " + error.message);
     },
   });
 
-  // Delete addition mutation
-  const deleteAddition = useMutation({
-    mutationFn: async (additionId: string) => {
-      const { error } = await supabase
-        .from("batch_logs")
-        .delete()
-        .eq("id", additionId);
-      if (error) throw error;
+  // Group additions by type for summary
+  const additionsByType = additions?.reduce(
+    (acc, log) => {
+      const type = log.data.addition_type;
+      if (!acc[type]) acc[type] = [];
+      acc[type].push(log);
+      return acc;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batch-additions", id] });
-      toast.success("Addition deleted");
-    },
-    onError: (error) => {
-      toast.error("Failed to delete", { description: error.message });
-    },
-  });
+    {} as Record<AdditionType, BatchLog[]>
+  );
 
-  // Calculate variance for dry hops
-  const dryHopVariance = (() => {
-    const actualDryHops = additions
-      .filter((a) => (a.data as BatchAddition).addition_type === "dry_hop")
-      .reduce((sum, a) => {
-        const data = a.data as BatchAddition;
-        // Convert to oz for comparison
-        let oz = data.quantity;
-        if (data.unit === "lb") oz *= 16;
-        if (data.unit === "g") oz *= 0.035274;
-        if (data.unit === "kg") oz *= 35.274;
-        return sum + oz;
-      }, 0);
+  const getAdditionIcon = (type: AdditionType) => {
+    switch (type) {
+      case "dry_hop":
+        return Leaf;
+      case "fruit":
+        return Apple;
+      case "fining":
+        return Sparkles;
+      default:
+        return Beaker;
+    }
+  };
 
-    const plannedTotal = plannedHops.reduce(
-      (sum, h) => sum + (h.weight_oz || 0),
-      0
-    );
-
-    return {
-      actual: actualDryHops,
-      planned: plannedTotal,
-      variance: actualDryHops - plannedTotal,
-    };
-  })();
-
-  if (loadingBatch) {
+  if (batchLoading) {
     return (
-      <div className="container max-w-2xl py-6">
-        <Skeleton className="h-8 w-48 mb-4" />
-        <Skeleton className="h-4 w-32 mb-8" />
-        <Skeleton className="h-64 w-full" />
+      <div className="container max-w-2xl py-6 space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-32 w-full" />
       </div>
     );
   }
@@ -197,177 +138,133 @@ export default function BatchAdditionsPage({
   return (
     <div className="container max-w-2xl py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Link
-            href={`/production/batches/${id}`}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Batch
-          </Link>
-          <h1 className="text-2xl font-bold">{batch?.name}</h1>
-          <p className="text-muted-foreground">
-            {batch?.batch_number} &bull; Additions
-          </p>
+      <div className="flex items-center gap-4">
+        <Link href={`/production/batches/${id}`}>
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold">{batch?.name || batch?.batch_number}</h1>
+          <p className="text-muted-foreground">Fermentation Additions</p>
         </div>
         {!showForm && (
-          <Button size="lg" onClick={() => setShowForm(true)} className="h-12 gap-2">
-            <Plus className="h-5 w-5" />
-            <span className="hidden sm:inline">Add</span>
+          <Button size="lg" onClick={() => setShowForm(true)}>
+            <Plus className="h-5 w-5 mr-2" />
+            Add
           </Button>
         )}
       </div>
 
-      {/* Planned Dry Hops (from recipe) */}
-      {plannedHops.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center justify-between">
-              <span>Planned Dry Hops (from Recipe)</span>
-              {dryHopVariance.actual > 0 && (
-                <Badge
-                  variant={
-                    Math.abs(dryHopVariance.variance) > dryHopVariance.planned * 0.1
-                      ? "destructive"
-                      : "default"
-                  }
-                >
-                  {dryHopVariance.actual.toFixed(1)} / {dryHopVariance.planned.toFixed(1)} oz
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {plannedHops.map((hop) => (
-                <div
-                  key={hop.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span>{hop.hop?.name || "Unknown Hop"}</span>
-                  <span className="text-muted-foreground">
-                    {hop.weight_oz} oz
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Form */}
+      {/* Quick Add Form */}
       {showForm && (
         <BatchAdditionForm
           batchId={id}
-          onSubmit={addAddition.mutateAsync}
+          onSubmit={async (data) => { await addAddition.mutateAsync(data); }}
           onCancel={() => setShowForm(false)}
           isSubmitting={addAddition.isPending}
         />
       )}
 
-      {/* Additions List */}
-      {loadingAdditions ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-24 w-full" />
-          ))}
-        </div>
-      ) : additions.length === 0 ? (
+      {/* Additions Summary by Type */}
+      {additionsByType && Object.keys(additionsByType).length > 0 && (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <FlaskConical className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No additions yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Record dry hops, fruit, or other additions.
-            </p>
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Addition
-            </Button>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {(Object.entries(additionsByType) as [AdditionType, BatchLog[]][]).map(
+                ([type, logs]) => {
+                  const Icon = getAdditionIcon(type);
+                  const config = ADDITION_TYPES[type];
+                  const totalQty = logs.reduce((sum, log) => sum + log.data.quantity, 0);
+                  const unit = logs[0]?.data.unit || config.defaultUnit;
+                  return (
+                    <div
+                      key={type}
+                      className="flex items-center gap-3 rounded-lg border p-3"
+                    >
+                      <Icon className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          {config.label}
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {totalQty.toFixed(1)} {unit}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {logs.length} addition{logs.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Recorded Additions
-          </h3>
-          {additions.map((addition) => (
-            <AdditionCard
-              key={addition.id}
-              addition={addition}
-              onDelete={() => {
-                if (confirm("Delete this addition?")) {
-                  deleteAddition.mutate(addition.id);
-                }
-              }}
-            />
-          ))}
-        </div>
       )}
+
+      {/* Additions History */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {additionsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ) : additions?.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              No additions recorded yet. Add your first addition above.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {additions?.map((log) => {
+                const config = ADDITION_TYPES[log.data.addition_type];
+                const Icon = getAdditionIcon(log.data.addition_type);
+                return (
+                  <div
+                    key={log.id}
+                    className="flex items-start gap-4 rounded-lg border p-4"
+                  >
+                    <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="font-medium">{log.data.ingredient_name}</span>
+                        <span className="text-muted-foreground">
+                          {log.data.quantity} {log.data.unit}
+                        </span>
+                        <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                          {config.label}
+                        </span>
+                      </div>
+                      {log.data.contact_time_hours && (
+                        <p className="text-sm text-muted-foreground">
+                          Contact time: {log.data.contact_time_hours}h
+                        </p>
+                      )}
+                      {log.data.notes && (
+                        <p className="text-sm text-muted-foreground truncate">
+                          {log.data.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right text-sm text-muted-foreground flex-shrink-0">
+                      <p>{format(new Date(log.created_at), "MMM d")}</p>
+                      <p>{format(new Date(log.created_at), "h:mm a")}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
-  );
-}
-
-// Addition Card Component
-function AdditionCard({
-  addition,
-  onDelete,
-}: {
-  addition: BatchLogAddition;
-  onDelete: () => void;
-}) {
-  const data = addition.data as BatchAddition;
-  const type = data.addition_type as AdditionType;
-  const config = ADDITION_TYPES[type];
-  const Icon = additionIcons[type] || FlaskConical;
-
-  const dateStr = addition.created_at
-    ? new Date(addition.created_at).toLocaleDateString()
-    : "";
-  const timeStr = addition.created_at
-    ? new Date(addition.created_at).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
-
-  return (
-    <Card>
-      <div className="flex items-center gap-4 p-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <Icon className="h-6 w-6 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline">{config?.label || type}</Badge>
-            <span className="text-sm text-muted-foreground">
-              {dateStr} {timeStr}
-            </span>
-          </div>
-          <div className="text-lg font-semibold">
-            {data.quantity} {data.unit} {data.ingredient_name}
-          </div>
-          {data.contact_time_hours && (
-            <p className="text-sm text-muted-foreground">
-              {data.contact_time_hours}h contact time
-            </p>
-          )}
-          {data.notes && (
-            <p className="text-sm text-muted-foreground mt-1 truncate">
-              {data.notes}
-            </p>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          Delete
-        </Button>
-      </div>
-    </Card>
   );
 }
