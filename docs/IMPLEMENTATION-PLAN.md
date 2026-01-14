@@ -73,8 +73,8 @@ All entity pages use universal components. Reference: `src/app/(app)/production/
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00021`
-Next available: `00022`
+Current highest: `00022`
+Next available: `00023`
 
 ### Reference Files by Pattern
 
@@ -629,13 +629,23 @@ Next available: `00022`
 
 > Real-time notifications within MGR.
 
-- [ ] Create `notifications` table
-  - [ ] user_id, type, title, message, data, read_at
-- [ ] Implement Supabase Realtime subscription
-- [ ] Create notification bell component in header
-- [ ] Notification dropdown with unread count
-- [ ] Mark as read functionality
+- [x] Create `notifications` table (migration 00020)
+  - [x] user_id, type, title, message, entity_type, entity_id, priority, action_url, metadata
+  - [x] read_at, dismissed_at timestamps
+- [x] Implement Supabase Realtime subscription (NotificationsProvider context)
+- [x] Create notification bell component in header
+- [x] Notification dropdown with unread count
+- [x] Mark as read functionality
+- [x] Dismiss notification functionality
+- [x] Create notification triggers (migration 00022)
+  - [x] Batch status change notifications
+  - [x] Order status change notifications
+  - [x] New order notifications
+  - [x] PO status change notifications
+  - [x] Packaging session completion notifications
+  - [x] check_low_inventory() function for periodic checks
 - [ ] Notification list page for history
+- [ ] Notification preferences (opt-out by type)
 
 ### 6.5 Email Notifications
 
@@ -1432,6 +1442,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-11 | Phase 1 migrations created: catalog tables, recipe junction tables, performance indexes |
 | 2026-01-11 | Initial plan created based on spec review |
 | 2026-01-13 | Consolidated expanded files into single plan, added Quick Reference and Appendices |
+| 2026-01-14 | Phase 6.4: Added notification triggers migration (00022) for batch, order, PO status changes |
 
 ---
 
