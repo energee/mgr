@@ -194,7 +194,7 @@ Next available: `00024`
   - [ ] Phase tracking (mash, lauter, boil, whirlpool, knockout)
   - [ ] Metric recording (temps, gravities, pH)
   - [ ] Timeline visualization
-- [ ] Add navigation from batch detail to linked brew logs
+- [x] Add navigation from batch detail to linked brew logs (BrewLogLinker)
 
 ### 2.2.1 Batch Readings UI (Mobile-First)
 
@@ -1454,6 +1454,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-14 | Phase 2.4: Added vessel transfer trigger (00023), completed vessel/batch history views via relation tabs |
 | 2026-01-14 | Phase 2.3: Added StartFermentationDialog with vessel selection and transfer creation |
 | 2026-01-14 | Phase 2.2.1: Added BatchReadingsChart with gravity/temperature visualization using shadcn charts |
+| 2026-01-14 | Phase 2.1: Added navigation from batch to brew logs in BrewLogLinker component |
 
 ---
 
