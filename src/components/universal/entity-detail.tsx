@@ -47,6 +47,8 @@ interface EntityDetailProps<T = Record<string, unknown>> {
   backUrl?: string;
   /** Show edit button */
   showEdit?: boolean;
+  /** Custom action handler - return true if action was handled externally */
+  onAction?: (actionName: string, data: T) => boolean;
 }
 
 export function EntityDetail<T = Record<string, unknown>>({
@@ -55,6 +57,7 @@ export function EntityDetail<T = Record<string, unknown>>({
   basePath,
   backUrl,
   showEdit = true,
+  onAction,
 }: EntityDetailProps<T>) {
   const queryClient = useQueryClient();
   const supabase = createClient();
@@ -251,6 +254,11 @@ export function EntityDetail<T = Record<string, unknown>>({
                   <DropdownMenuItem
                     key={action.name}
                     onClick={() => {
+                      // Check if external handler wants to handle this action
+                      if (onAction && onAction(action.name, data)) {
+                        return; // Action was handled externally
+                      }
+                      // Default handling
                       if (action.toState) {
                         transitionMutation.mutate({ toState: action.toState });
                       } else {
