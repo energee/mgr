@@ -1400,9 +1400,9 @@ These are low-effort improvements that can be tackled between phases.
 
 ### Entity Config Enhancements
 
-- [ ] Add `queryExamples` to all entities for AI
-- [ ] Add `keyFields` to all entities for AI
-- [ ] Ensure all entities have proper `description`
+- [x] Add `queryExamples` to all entities for AI (15 entities)
+- [x] Add `keyFields` to all entities for AI (15 entities)
+- [x] Ensure all entities have proper `description` (all entities have description field)
 - [ ] Add computed columns where useful
 
 ### Developer Experience
