@@ -10,6 +10,7 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 // Use the view type for availability calculations
 type FinishedGoodView = Database["public"]["Views"]["finished_goods_with_availability"]["Row"];
@@ -137,6 +138,12 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       fields: [
         { field: "notes", label: "Notes", fullWidth: true },
       ],
+      collapsible: true,
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("finished_goods"),
       collapsible: true,
     },
   ],
