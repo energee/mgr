@@ -549,10 +549,10 @@ Next available: `00024`
 
 > Prevent concurrent modification conflicts.
 
-- [ ] Add `version` column to high-contention tables
-  - [ ] `finished_goods`
+- [x] Add `version` column to high-contention tables
+  - [x] `finished_goods` (migration 00010_unified_allocations.sql)
   - [ ] `bin_inventory`
-- [ ] Create `updateWithOptimisticLock` utility function
+- [x] Create `updateWithOptimisticLock` utility function (`src/lib/optimistic-lock.ts`)
 - [ ] Implement conflict detection in forms
 - [ ] Create "Record modified" error dialog with refresh option
 
