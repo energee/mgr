@@ -11,7 +11,7 @@
  * - Dry hop timing notes
  */
 
-import { useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -148,8 +148,23 @@ export function FermentationScheduleEditor({
   onChange,
   disabled = false,
 }: FermentationScheduleEditorProps) {
+  const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
+
   // Generate unique ID
   const generateId = () => `stage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  // Toggle expanded state
+  const toggleExpanded = (stageId: string) => {
+    setExpandedStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(stageId)) {
+        next.delete(stageId);
+      } else {
+        next.add(stageId);
+      }
+      return next;
+    });
+  };
 
   // Add a new stage
   const handleAddStage = useCallback(() => {
@@ -292,8 +307,16 @@ export function FermentationScheduleEditor({
         </div>
       ) : (
         <div className="space-y-2">
-          {stages.map((stage, index) => (
-            <Collapsible key={stage.id || index}>
+          {stages.map((stage, index) => {
+            const stageId = stage.id || `stage-${index}`;
+            const isExpanded = expandedStages.has(stageId);
+
+            return (
+            <Collapsible
+              key={stageId}
+              open={isExpanded}
+              onOpenChange={() => toggleExpanded(stageId)}
+            >
               <div className="border rounded-lg">
                 <div className="flex items-center gap-2 p-3">
                   {/* Reorder buttons */}
@@ -381,7 +404,7 @@ export function FermentationScheduleEditor({
                   {/* Expand/Notes toggle */}
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <ChevronRight className="h-4 w-4 transition-transform ui-expanded:rotate-90" />
+                      <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
                     </Button>
                   </CollapsibleTrigger>
 
@@ -412,7 +435,8 @@ export function FermentationScheduleEditor({
                 </CollapsibleContent>
               </div>
             </Collapsible>
-          ))}
+            );
+          })}
 
           {/* Summary */}
           <div className="flex justify-between items-center border-t pt-3 text-sm">
