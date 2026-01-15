@@ -262,17 +262,22 @@ export function NotificationBell() {
         </div>
 
         {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="border-t border-border px-4 py-2">
-            <Link
-              href="/settings/notifications"
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setOpen(false)}
-            >
-              Notification settings
-            </Link>
-          </div>
-        )}
+        <div className="border-t border-border px-4 py-2 flex items-center justify-between">
+          <Link
+            href="/notifications"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setOpen(false)}
+          >
+            View all notifications
+          </Link>
+          <Link
+            href="/settings/notifications"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setOpen(false)}
+          >
+            Settings
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   );
