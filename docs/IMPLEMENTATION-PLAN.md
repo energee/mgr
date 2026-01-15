@@ -527,7 +527,9 @@ Next available: `00024`
 - [x] Create migration for `entity_revisions` table (migration 00019)
 - [x] Implement revision triggers for key entities (batches, recipes, orders)
 - [x] Create revision history UI component (`revision-history.tsx`)
-- [ ] Add revision history to entity details (integration pending)
+- [x] Add revision history to entity details
+  - [x] Created `revision-history-display.tsx` wrapper for entity detail sections
+  - [x] Integrated into batches, recipes, orders, purchase_orders, finished_goods
 
 ### 5.2 Temporal Pricing (DEC-MP-003)
 
@@ -1489,6 +1491,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Verified Phase 6.4: Notification preferences page complete with per-type toggles |
 | 2026-01-15 | Verified Phase 11.2: User preferences table and hook complete |
 | 2026-01-15 | Verified Phase 11.3: UnitInput component with unit conversion complete |
+| 2026-01-15 | Phase 5.1: Integrated revision history into entity details (batches, recipes, orders, purchase_orders, finished_goods) |
 
 ---
 
