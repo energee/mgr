@@ -158,7 +158,7 @@ Next available: `00024`
 
 **Goal:** Complete the recipe → batch → brew log → vessel workflow.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (2.1-2.4 done, chart visualizations and recipe-addition linking pending)
+**Status:** Complete (2.1-2.4 done, brew log events UI complete)
 **Depends On:** Phase 1
 
 ### 2.1 Vessel Entity
@@ -190,10 +190,10 @@ Next available: `00024`
   - [x] `src/app/(app)/production/brew-logs/[id]/page.tsx` (detail)
   - [x] `src/app/(app)/production/brew-logs/[id]/edit/page.tsx` (edit)
   - [x] `src/app/(app)/production/brew-logs/new/page.tsx` (create)
-- [ ] Implement brew log events UI
-  - [ ] Phase tracking (mash, lauter, boil, whirlpool, knockout)
-  - [ ] Metric recording (temps, gravities, pH)
-  - [ ] Timeline visualization
+- [x] Implement brew log events UI
+  - [x] Phase tracking (mash, lauter, boil, whirlpool, knockout)
+  - [x] Metric recording (temps, gravities, pH)
+  - [x] Timeline visualization
 - [x] Add navigation from batch detail to linked brew logs (BrewLogLinker)
 
 ### 2.2.1 Batch Readings UI (Mobile-First)
