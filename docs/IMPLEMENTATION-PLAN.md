@@ -816,9 +816,12 @@ Next available: `00024`
 
 > Manage package formats, keg types, sales channels.
 
-- [ ] Create `src/app/(app)/settings/formats/page.tsx`
-  - [ ] Package types (12oz can, 16oz can, 1/6 BBL, 1/2 BBL, etc.)
-  - [ ] Volume, unit count per case
+- [x] Create `src/app/(app)/settings/formats/page.tsx`
+  - [x] Package types (12oz can, 16oz can, 1/6 BBL, 1/2 BBL, etc.)
+  - [x] Volume, unit count per case
+  - [x] Created entity config (`src/entities/package-type.tsx`)
+  - [x] Created full CRUD pages (list, detail, edit, new)
+  - [x] Added link in settings hub
 - [ ] Create `src/app/(app)/settings/keg-types/page.tsx`
   - [ ] Keg sizes and deposit amounts
   - [ ] Lifecycle states
@@ -1495,6 +1498,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 2.5.1: Created additions-editor.tsx for water chemistry, clarifiers, nutrients |
 | 2026-01-15 | Phase 6.4: Created notifications history page with filtering and bulk actions |
 | 2026-01-15 | Phase 5.4: Created conflict dialog component for optimistic locking |
+| 2026-01-15 | Phase 8.6: Created package types entity and settings pages for reference data management |
 
 ---
 

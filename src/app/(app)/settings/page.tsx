@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, Link2, MapPin, Settings, Users } from "lucide-react";
+import { Bell, Building2, Link2, MapPin, Package, Settings, Users } from "lucide-react";
 
 const settingsLinks = [
   {
@@ -42,6 +42,13 @@ const settingsLinks = [
     description: "Connect external services like Square, Slack, and QuickBooks",
     href: "/settings/integrations",
     icon: Link2,
+    available: true,
+  },
+  {
+    title: "Package Formats",
+    description: "Manage package types for cans, bottles, kegs, and more",
+    href: "/settings/formats",
+    icon: Package,
     available: true,
   },
 ];
