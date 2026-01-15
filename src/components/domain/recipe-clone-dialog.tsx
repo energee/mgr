@@ -131,6 +131,7 @@ export function RecipeCloneDialog({
         cloneJunctionTable("recipe_sugars", recipeId, cloned.id),
         cloneJunctionTable("recipe_spices", recipeId, cloned.id),
         cloneJunctionTable("recipe_fruits", recipeId, cloned.id),
+        cloneJunctionTable("recipe_yeasts", recipeId, cloned.id),
       ]);
 
       return cloned.id;
@@ -156,7 +157,8 @@ export function RecipeCloneDialog({
     | "recipe_adjuncts"
     | "recipe_sugars"
     | "recipe_spices"
-    | "recipe_fruits";
+    | "recipe_fruits"
+    | "recipe_yeasts";
 
   // Helper to clone junction tables - throws on error for proper error handling
   const cloneJunctionTable = async (
