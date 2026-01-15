@@ -398,7 +398,11 @@ Next available: `00024`
   - [x] Define form fields
 - [x] Register packaging session entity
 - [x] Create packaging session pages (`src/app/(app)/production/packaging/`)
-- [ ] Implement line items UI (multiple package formats per session)
+- [x] Implement line items UI (multiple package formats per session)
+  - [x] Create `src/entities/session-line-item.tsx` entity config
+  - [x] Create `src/components/domain/session-line-items-editor.tsx` inline editor
+  - [x] Create `src/components/domain/session-line-items-display.tsx` wrapper for detail view
+  - [x] Integrate with packaging session detail view via custom component section
 
 ### 3.3 Finished Goods Entity
 
