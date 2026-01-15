@@ -302,10 +302,10 @@ Next available: `00024`
 - [x] Create `src/components/domain/fruit-editor.tsx`
   - [x] Fruit selection from catalog
   - [x] Weight and timing
-- [ ] Create `src/components/domain/additions-editor.tsx`
-  - [ ] Water chemistry additions (gypsum, calcium chloride, etc.)
-  - [ ] Clarifiers (whirlfloc, irish moss)
-  - [ ] Nutrients
+- [x] Create `src/components/domain/additions-editor.tsx`
+  - [x] Water chemistry additions (gypsum, calcium chloride, etc.)
+  - [x] Clarifiers (whirlfloc, irish moss)
+  - [x] Nutrients
 
 ### 2.5.2 Mash Schedule Builder
 
@@ -1492,6 +1492,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Verified Phase 11.2: User preferences table and hook complete |
 | 2026-01-15 | Verified Phase 11.3: UnitInput component with unit conversion complete |
 | 2026-01-15 | Phase 5.1: Integrated revision history into entity details (batches, recipes, orders, purchase_orders, finished_goods) |
+| 2026-01-15 | Phase 2.5.1: Created additions-editor.tsx for water chemistry, clarifiers, nutrients |
 
 ---
 
