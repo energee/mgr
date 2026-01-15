@@ -382,8 +382,8 @@ export function FermentationScheduleEditor({
 
                   {/* Expand/Notes toggle */}
                   <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <ChevronRight className="h-4 w-4 transition-transform data-[state=open]:rotate-90" />
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 [&[data-state=open]>svg]:rotate-90">
+                      <ChevronRight className="h-4 w-4 transition-transform" />
                     </Button>
                   </CollapsibleTrigger>
 
