@@ -656,7 +656,10 @@ Next available: `00024`
   - [x] Packaging session completion notifications
   - [x] check_low_inventory() function for periodic checks
 - [ ] Notification list page for history
-- [ ] Notification preferences (opt-out by type)
+- [x] Notification preferences page (`settings/notifications/page.tsx`)
+  - [x] Per-type enable/disable toggles
+  - [x] Email digest frequency settings
+  - [x] Quiet hours configuration
 
 ### 6.5 Email Notifications
 
@@ -1470,6 +1473,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Verified Phase 3.4: Order allocation UI complete (order-allocation.tsx) |
 | 2026-01-15 | Verified Phase 5.1: Entity revisions migration and UI component complete |
 | 2026-01-15 | Verified Phase 5.5: Error handling patterns with error types and PostgreSQL mapping |
+| 2026-01-15 | Verified Phase 6.4: Notification preferences page complete with per-type toggles |
 
 ---
 
