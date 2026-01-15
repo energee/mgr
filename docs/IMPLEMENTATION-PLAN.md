@@ -804,13 +804,13 @@ Next available: `00024`
 
 > Per-user notification settings.
 
-- [x] Create `src/app/(app)/settings/notifications/page.tsx` (placeholder)
-- [ ] Create `notification_preferences` table
-- [ ] Per-notification-type settings:
-  - [ ] In-app toggle
-  - [ ] Email toggle
-  - [ ] Slack toggle (if user has Slack)
-- [ ] Notification types: low_inventory, batch_ready, order_due, po_delivery, packaging_scheduled, fg_expiring
+- [x] Create `src/app/(app)/settings/notifications/page.tsx`
+  - [x] Per-type enable/disable toggles (batch, inventory, order, system)
+  - [x] In-app toggle
+  - [x] Email toggle with digest frequency
+  - [x] Quiet hours configuration
+- [x] Create `notification_preferences` table (migration 00020)
+- [ ] Add Slack toggle (depends on Slack integration)
 
 ### 8.6 Reference Data Management
 
@@ -995,7 +995,7 @@ Next available: `00024`
   - [x] Display in user's preferred unit
   - [x] Convert on input back to canonical
   - [x] Optional inline unit switcher for recipe builder
-- [ ] Create `src/components/ui/unit-display.tsx` for read-only display
+- [x] Create `UnitDisplay` component for read-only display (included in unit-input.tsx)
 
 ### 11.4 Integration
 
