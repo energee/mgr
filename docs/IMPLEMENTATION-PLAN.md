@@ -311,24 +311,25 @@ Next available: `00024`
 
 > Multi-step mash with rest temps and times.
 
-- [ ] Create `src/components/domain/mash-schedule-editor.tsx`
-  - [ ] Add/remove/reorder mash steps
-  - [ ] Per-step: name, target temp, rest time
-  - [ ] Common presets (single infusion, step mash, decoction)
-  - [ ] Water volume calculations per step
-- [ ] Add `mash_schedule` JSONB column to recipes table (or create `recipe_mash_steps` junction)
+- [x] Create `src/components/domain/mash-schedule-editor.tsx`
+  - [x] Add/remove/reorder mash steps
+  - [x] Per-step: type, name, target temp, rest time
+  - [x] Common presets (single infusion, step mash, hochkurz, decoction)
+  - [x] Temperature reference guide
+- [x] `mash_schedule` JSONB column exists in recipes table (migration 00017)
 - [ ] Display mash schedule in recipe detail view
+- [ ] Water volume calculations per step (future)
 
 ### 2.5.3 Fermentation Schedule Builder
 
 > Temperature ramps and dry hop timing.
 
-- [ ] Create `src/components/domain/fermentation-schedule-editor.tsx`
-  - [ ] Add/remove/reorder fermentation steps
-  - [ ] Per-step: name, target temp, duration, notes
-  - [ ] Dry hop timing integration (link to hop schedule dry_hop entries)
-  - [ ] Cold crash and conditioning steps
-- [ ] Add `fermentation_schedule` JSONB column to recipes table (or create `recipe_fermentation_steps` junction)
+- [x] Create `src/components/domain/fermentation-schedule-editor.tsx`
+  - [x] Add/remove/reorder fermentation stages
+  - [x] Per-stage: type, name, target temp, duration, notes
+  - [x] Common presets (ale, lager, NEIPA, saison, belgian)
+  - [x] Collapsible notes for dry hop timing, ramp instructions
+- [x] `fermentation_schedule` JSONB column exists in recipes table (migration 00017)
 - [ ] Display fermentation schedule in recipe detail view
 
 ### 2.5.4 Water Chemistry Calculator
