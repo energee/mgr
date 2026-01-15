@@ -665,7 +665,7 @@ Next available: `00024`
   - [x] PO status change notifications
   - [x] Packaging session completion notifications
   - [x] check_low_inventory() function for periodic checks
-- [ ] Notification list page for history
+- [x] Notification list page for history (`/notifications`)
 - [x] Notification preferences page (`settings/notifications/page.tsx`)
   - [x] Per-type enable/disable toggles
   - [x] Email digest frequency settings
@@ -1493,6 +1493,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Verified Phase 11.3: UnitInput component with unit conversion complete |
 | 2026-01-15 | Phase 5.1: Integrated revision history into entity details (batches, recipes, orders, purchase_orders, finished_goods) |
 | 2026-01-15 | Phase 2.5.1: Created additions-editor.tsx for water chemistry, clarifiers, nutrients |
+| 2026-01-15 | Phase 6.4: Created notifications history page with filtering and bulk actions |
 
 ---
 
