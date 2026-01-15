@@ -27,9 +27,7 @@ import { ArrowLeft, Building2, Ruler, Save } from "lucide-react";
 import {
   useUnitPreferences,
   useUpdateUnitPreferences,
-  type UnitPreferences,
 } from "@/hooks/useUnitPreferences";
-import { getUnitLabel } from "@/lib/units";
 
 // =============================================================================
 // Schema
