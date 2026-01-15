@@ -723,14 +723,15 @@ Next available: `00024`
 ## Phase 8: Settings & Administration
 
 **Goal:** Complete system configuration, user management, and administrative functions.
-**Status:** Not Started
+**Status:** Partially Started (placeholder pages created for settings hub)
 **Depends On:** None (can be done in parallel)
 
 ### 8.1 System Settings
 
 > Brewery-wide configuration.
 
-- [ ] Create `src/app/(app)/settings/page.tsx` (settings hub)
+- [x] Create `src/app/(app)/settings/page.tsx` (settings hub)
+- [x] Create `src/app/(app)/settings/brewery/page.tsx` (placeholder)
 - [ ] Create `src/app/(app)/settings/system/page.tsx`
   - [ ] Brewery name, address, contact info
   - [ ] Default units (volume, weight, temperature, gravity)
@@ -744,7 +745,7 @@ Next available: `00024`
 
 > Create, edit, and manage user accounts and roles.
 
-- [ ] Create `src/app/(app)/settings/users/page.tsx` (list)
+- [x] Create `src/app/(app)/settings/users/page.tsx` (placeholder)
 - [ ] Create `src/app/(app)/settings/users/[id]/page.tsx` (detail)
 - [ ] Create `src/app/(app)/settings/users/[id]/edit/page.tsx` (edit)
 - [ ] Create `src/app/(app)/settings/users/new/page.tsx` (invite)
@@ -761,7 +762,7 @@ Next available: `00024`
 
 > Warehouses, taproom, production areas.
 
-- [ ] Create `src/app/(app)/settings/locations/page.tsx` (list)
+- [x] Create `src/app/(app)/settings/locations/page.tsx` (placeholder)
 - [ ] Create `src/app/(app)/settings/locations/[id]/page.tsx` (detail)
 - [ ] Create `src/app/(app)/settings/locations/new/page.tsx` (create)
 - [ ] Create `src/entities/location.tsx`
@@ -774,7 +775,7 @@ Next available: `00024`
 
 > OAuth connections and API configuration.
 
-- [ ] Create `src/app/(app)/settings/integrations/page.tsx`
+- [x] Create `src/app/(app)/settings/integrations/page.tsx` (placeholder)
 - [ ] Square integration settings
   - [ ] OAuth connection flow
   - [ ] Location mapping
@@ -793,7 +794,7 @@ Next available: `00024`
 
 > Per-user notification settings.
 
-- [ ] Create `src/app/(app)/settings/notifications/page.tsx`
+- [x] Create `src/app/(app)/settings/notifications/page.tsx` (placeholder)
 - [ ] Create `notification_preferences` table
 - [ ] Per-notification-type settings:
   - [ ] In-app toggle
