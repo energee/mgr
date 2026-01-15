@@ -2,7 +2,7 @@
 
 > Generated: January 2026
 > Status: Active
-> Last Updated: 2026-01-11
+> Last Updated: 2026-01-15
 
 ## Overview
 
@@ -146,10 +146,10 @@ Next available: `00024`
   - [x] Calculate IBU from hop schedule (Tinseth with timing-based utilization)
   - [x] Calculate SRM from grain bill (Morey equation)
   - [ ] Calculate COGS from ingredient costs (future enhancement)
-- [ ] Create `inventory_lots_with_quantities` view (in 00010 - pending commit)
-- [ ] Create `finished_goods_with_availability` view (in 00010 - pending commit)
-- [ ] Create `batches_with_brew_info` view
-  - [ ] Join brew log data (actual OG, brew date)
+- [x] Create `inventory_lots_with_quantities` view (migration 00014)
+- [x] Create `finished_goods_with_availability` view (migration 00014)
+- [x] Create `batches_with_brew_info` view (migration 00014)
+  - [x] Join brew log data (actual OG, brew date)
 - [x] Update recipe entity config to reference view data
 
 ---
@@ -158,7 +158,7 @@ Next available: `00024`
 
 **Goal:** Complete the recipe → batch → brew log → vessel workflow.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (2.1-2.4 done, chart visualizations and recipe-addition linking pending)
+**Status:** Complete (2.1-2.4 done, brew log events UI complete)
 **Depends On:** Phase 1
 
 ### 2.1 Vessel Entity
@@ -190,10 +190,10 @@ Next available: `00024`
   - [x] `src/app/(app)/production/brew-logs/[id]/page.tsx` (detail)
   - [x] `src/app/(app)/production/brew-logs/[id]/edit/page.tsx` (edit)
   - [x] `src/app/(app)/production/brew-logs/new/page.tsx` (create)
-- [ ] Implement brew log events UI
-  - [ ] Phase tracking (mash, lauter, boil, whirlpool, knockout)
-  - [ ] Metric recording (temps, gravities, pH)
-  - [ ] Timeline visualization
+- [x] Implement brew log events UI
+  - [x] Phase tracking (mash, lauter, boil, whirlpool, knockout)
+  - [x] Metric recording (temps, gravities, pH)
+  - [x] Timeline visualization
 - [x] Add navigation from batch detail to linked brew logs (BrewLogLinker)
 
 ### 2.2.1 Batch Readings UI (Mobile-First)
@@ -281,89 +281,92 @@ Next available: `00024`
 ## Phase 2.5: Recipe Builder Completion
 
 **Goal:** Complete the full recipe builder with all ingredient types, schedules, and water chemistry.
-**Status:** Not Started
+**Status:** Mostly Complete (ingredient editors, schedules, water chemistry, COGS done; recipe form integration pending)
 **Depends On:** Phase 1
 
 ### 2.5.1 Additional Ingredient Editors
 
 > Junction tables exist but need UI components similar to grain-bill-editor and hop-schedule-editor.
 
-- [ ] Create `src/components/domain/adjunct-editor.tsx`
-  - [ ] Searchable adjunct selector from catalog
-  - [ ] Timing selection (mash, boil, fermentation)
-  - [ ] Weight/quantity input
-- [ ] Create `src/components/domain/sugar-editor.tsx`
-  - [ ] Sugar type selection from catalog
-  - [ ] Weight input with gravity contribution calculation
-- [ ] Create `src/components/domain/spice-editor.tsx`
-  - [ ] Spice/herb selection from catalog
-  - [ ] Timing and quantity
-- [ ] Create `src/components/domain/fruit-editor.tsx`
-  - [ ] Fruit selection from catalog
-  - [ ] Weight and timing
-- [ ] Create `src/components/domain/additions-editor.tsx`
-  - [ ] Water chemistry additions (gypsum, calcium chloride, etc.)
-  - [ ] Clarifiers (whirlfloc, irish moss)
-  - [ ] Nutrients
+- [x] Create `src/components/domain/adjunct-editor.tsx`
+  - [x] Searchable adjunct selector from catalog
+  - [x] Timing selection (mash, boil, fermentation)
+  - [x] Weight/quantity input
+- [x] Create `src/components/domain/sugar-editor.tsx`
+  - [x] Sugar type selection from catalog
+  - [x] Weight input with PPG display
+- [x] Create `src/components/domain/spice-editor.tsx`
+  - [x] Spice/herb selection from catalog
+  - [x] Timing and quantity with unit selection
+  - [x] Boil time for boil additions
+- [x] Create `src/components/domain/fruit-editor.tsx`
+  - [x] Fruit selection from catalog
+  - [x] Weight and timing
+- [x] Create `src/components/domain/additions-editor.tsx`
+  - [x] Water chemistry additions (gypsum, calcium chloride, etc.)
+  - [x] Clarifiers (whirlfloc, irish moss)
+  - [x] Nutrients
 
 ### 2.5.2 Mash Schedule Builder
 
 > Multi-step mash with rest temps and times.
 
-- [ ] Create `src/components/domain/mash-schedule-editor.tsx`
-  - [ ] Add/remove/reorder mash steps
-  - [ ] Per-step: name, target temp, rest time
-  - [ ] Common presets (single infusion, step mash, decoction)
-  - [ ] Water volume calculations per step
-- [ ] Add `mash_schedule` JSONB column to recipes table (or create `recipe_mash_steps` junction)
-- [ ] Display mash schedule in recipe detail view
+- [x] Create `src/components/domain/mash-schedule-editor.tsx`
+  - [x] Add/remove/reorder mash steps
+  - [x] Per-step: type, name, target temp, rest time
+  - [x] Common presets (single infusion, step mash, hochkurz, decoction)
+  - [x] Temperature reference guide
+- [x] `mash_schedule` JSONB column exists in recipes table (migration 00017)
+- [x] Display mash schedule in recipe detail view
+- [ ] Water volume calculations per step (future)
 
 ### 2.5.3 Fermentation Schedule Builder
 
 > Temperature ramps and dry hop timing.
 
-- [ ] Create `src/components/domain/fermentation-schedule-editor.tsx`
-  - [ ] Add/remove/reorder fermentation steps
-  - [ ] Per-step: name, target temp, duration, notes
-  - [ ] Dry hop timing integration (link to hop schedule dry_hop entries)
-  - [ ] Cold crash and conditioning steps
-- [ ] Add `fermentation_schedule` JSONB column to recipes table (or create `recipe_fermentation_steps` junction)
-- [ ] Display fermentation schedule in recipe detail view
+- [x] Create `src/components/domain/fermentation-schedule-editor.tsx`
+  - [x] Add/remove/reorder fermentation stages
+  - [x] Per-stage: type, name, target temp, duration, notes
+  - [x] Common presets (ale, lager, NEIPA, saison, belgian)
+  - [x] Collapsible notes for dry hop timing, ramp instructions
+- [x] `fermentation_schedule` JSONB column exists in recipes table (migration 00017)
+- [x] Display fermentation schedule in recipe detail view
 
 ### 2.5.4 Water Chemistry Calculator
 
 > Target water profile and additions calculation.
 
-- [ ] Create `src/components/domain/water-chemistry-calculator.tsx`
-  - [ ] Source water profile input (or select from saved profiles)
-  - [ ] Target water profile selection
-  - [ ] Auto-calculate additions needed (gypsum, CaCl2, etc.)
-  - [ ] Display sulfate:chloride ratio
-  - [ ] Mash pH estimation
-- [ ] Create `src/lib/water-chemistry.ts` with calculation functions
+- [x] Create `src/components/domain/water-chemistry-calculator.tsx`
+  - [x] Source water profile input (or select from saved profiles)
+  - [x] Target water profile selection
+  - [x] Auto-calculate additions needed (gypsum, CaCl2, etc.)
+  - [x] Display sulfate:chloride ratio
+  - [x] Mash pH estimation
+- [x] Create `src/lib/water-chemistry.ts` with calculation functions
 - [ ] Integrate with recipe form (link to water_profile_id and recipe_additions)
 
 ### 2.5.5 Recipe Templates
 
 > Support for template recipes with variable ingredients.
 
-- [ ] Add `is_template` boolean column to recipes table
-- [ ] Add UI toggle for template mode in recipe form
-- [ ] Support null `ingredient_id` in junction tables for variable slots
-- [ ] Create "Clone from Template" action
-  - [ ] Copy all recipe data
-  - [ ] Prompt user to fill variable ingredient slots
-  - [ ] Link to brand
-- [ ] Filter template recipes separately in list view
+- [x] Add `is_template` boolean column to recipes table (migration 00018)
+- [x] Add UI toggle for template mode in recipe form
+- [ ] Support null `ingredient_id` in junction tables for variable slots (future)
+- [x] Create "Clone from Template" action
+  - [x] Copy all recipe data (RecipeCloneDialog component)
+  - [x] Prompt user to fill variable ingredient slots (via brand selection)
+  - [x] Link to brand
+- [x] Filter template recipes separately in list view
+- [x] Add Clone action to recipe detail page
 
 ### 2.5.6 Recipe COGS Calculation
 
 > Calculate estimated cost of goods sold.
 
-- [ ] Create `recipes_with_cogs` view or add to `recipes_with_estimates`
-  - [ ] Sum ingredient costs from catalog (malts, hops, yeast, adjuncts)
-  - [ ] Factor in typical usage rates
-- [ ] Display estimated COGS in recipe detail
+- [x] Create `recipes_with_cogs` view (migration 00021)
+  - [x] Sum ingredient costs from catalog (malts, hops, yeast, adjuncts)
+  - [x] Calculate per-BBL cost
+- [x] Display estimated COGS in recipe detail (`recipe-cogs-display.tsx`)
 - [ ] Compare actual vs estimated COGS when batch completes
 
 ---
@@ -395,7 +398,11 @@ Next available: `00024`
   - [x] Define form fields
 - [x] Register packaging session entity
 - [x] Create packaging session pages (`src/app/(app)/production/packaging/`)
-- [ ] Implement line items UI (multiple package formats per session)
+- [x] Implement line items UI (multiple package formats per session)
+  - [x] Create `src/entities/session-line-item.tsx` entity config
+  - [x] Create `src/components/domain/session-line-items-editor.tsx` inline editor
+  - [x] Create `src/components/domain/session-line-items-display.tsx` wrapper for detail view
+  - [x] Integrate with packaging session detail view via custom component section
 
 ### 3.3 Finished Goods Entity
 
@@ -412,9 +419,9 @@ Next available: `00024`
 
 > Allocate finished goods to orders.
 
-- [ ] Create allocation UI for orders
+- [x] Create allocation UI for orders (`order-allocation.tsx` with FIFO suggestion)
 - [ ] Implement pick list generation
-- [ ] Update inventory quantities on allocation
+- [x] Update inventory quantities on allocation (via allocation records)
 - [ ] Add approval workflow for allocations (optional)
 
 ---
@@ -423,7 +430,7 @@ Next available: `00024`
 
 **Goal:** Complete order fulfillment and purchasing workflows.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (entities and pages done, receiving workflow pending)
+**Status:** Mostly Complete (entities, pages, line items, receiving done; pricing tiers pending)
 **Depends On:** Phase 3
 
 ### 4.1 Order Line Items
@@ -431,9 +438,9 @@ Next available: `00024`
 > Currently only order headers exist.
 
 - [x] Create order items sub-entity config (`src/entities/order-item.tsx`)
-- [ ] Add line items UI to order form
-- [ ] Add line items display to order detail
-- [ ] Calculate order totals from line items
+- [x] Add line items UI to order form (`order-items-editor.tsx`)
+- [x] Add line items display to order detail
+- [x] Calculate order totals from line items
 
 ### 4.2 Supplier Entity
 
@@ -454,16 +461,16 @@ Next available: `00024`
 - [x] Create PO line items sub-entity config (`src/entities/po-line-item.tsx`)
 - [x] Register purchase order entity
 - [x] Create purchase order pages (`src/app/(app)/purchasing/pos/`)
-- [ ] Implement PO line items UI (inline editing)
+- [x] Implement PO line items UI (`po-line-items-editor.tsx`)
 
 ### 4.4 Receiving Workflow
 
 > Convert PO receipts to inventory lots.
 
-- [ ] Create receiving UI
-- [ ] Generate inventory lots from received items
-- [ ] Update PO status on receipt
-- [ ] Track partial receipts
+- [x] Create receiving UI (`po-receiving.tsx`)
+- [x] Generate inventory lots from received items
+- [x] Update PO status on receipt
+- [x] Track partial receipts
 
 ### 4.5 Customer Entity
 
@@ -511,16 +518,18 @@ Next available: `00024`
 
 **Goal:** Improve data quality and audit capabilities.
 **Timeline:** 1 week
-**Status:** Not Started
+**Status:** Partial (entity revisions and error handling complete)
 
 ### 5.1 Entity Revisions Table (DEC-MP-001)
 
 > Unified audit trail for all entities.
 
-- [ ] Create migration for `entity_revisions` table
-- [ ] Implement revision triggers for key entities
-- [ ] Create revision history UI component
-- [ ] Add revision history to entity details
+- [x] Create migration for `entity_revisions` table (migration 00019)
+- [x] Implement revision triggers for key entities (batches, recipes, orders)
+- [x] Create revision history UI component (`revision-history.tsx`)
+- [x] Add revision history to entity details
+  - [x] Created `revision-history-display.tsx` wrapper for entity detail sections
+  - [x] Integrated into batches, recipes, orders, purchase_orders, finished_goods
 
 ### 5.2 Temporal Pricing (DEC-MP-003)
 
@@ -542,24 +551,28 @@ Next available: `00024`
 
 > Prevent concurrent modification conflicts.
 
-- [ ] Add `version` column to high-contention tables
-  - [ ] `finished_goods`
+- [x] Add `version` column to high-contention tables
+  - [x] `finished_goods` (migration 00010_unified_allocations.sql)
   - [ ] `bin_inventory`
-- [ ] Create `updateWithOptimisticLock` utility function
+- [x] Create `updateWithOptimisticLock` utility function (`src/lib/optimistic-lock.ts`)
 - [ ] Implement conflict detection in forms
-- [ ] Create "Record modified" error dialog with refresh option
+- [x] Create "Record modified" error dialog with refresh option (`src/components/ui/conflict-dialog.tsx`)
 
 ### 5.5 Error Handling Patterns
 
 > Consistent error handling across the application.
 
-- [ ] Create `src/lib/errors.ts` with error types
-  - [ ] ValidationError, ConstraintError, ConcurrentModificationError
-  - [ ] Map PostgreSQL error codes to user-friendly messages
-- [ ] Create constraint message mapping (chk_quantity_positive, etc.)
-- [ ] Implement retry with exponential backoff for network errors
-- [ ] Create error boundary component for graceful failure
-- [ ] Add toast notifications for common error types
+- [x] Create `src/lib/errors.ts` with error types
+  - [x] ValidationError, ConstraintError, ConcurrentModificationError, NotFoundError
+  - [x] Map PostgreSQL error codes to user-friendly messages
+- [x] Create constraint message mapping (POSTGRES_ERROR_MAP)
+- [x] Implement retry with exponential backoff for network errors (`src/lib/retry.ts`)
+  - [x] `withRetry()` function with configurable options
+  - [x] `withRetryResult()` variant returning result object
+  - [x] Transient database error detection helpers
+  - [x] Jitter support to prevent thundering herd
+- [x] Create error boundary component for graceful failure (`src/components/ui/error-boundary.tsx`)
+- [x] Add toast notifications for common error types (via sonner integration)
 
 ### 5.6 Row Level Security
 
@@ -652,8 +665,11 @@ Next available: `00024`
   - [x] PO status change notifications
   - [x] Packaging session completion notifications
   - [x] check_low_inventory() function for periodic checks
-- [ ] Notification list page for history
-- [ ] Notification preferences (opt-out by type)
+- [x] Notification list page for history (`/notifications`)
+- [x] Notification preferences page (`settings/notifications/page.tsx`)
+  - [x] Per-type enable/disable toggles
+  - [x] Email digest frequency settings
+  - [x] Quiet hours configuration
 
 ### 6.5 Email Notifications
 
@@ -673,19 +689,23 @@ Next available: `00024`
 
 **Goal:** Business intelligence and regulatory compliance.
 **Timeline:** 2-3 weeks
-**Status:** Not Started
+**Status:** Partially Started (TTB report UI created, dashboards pending)
 **Depends On:** Phase 3 (allocations)
 
 ### 7.1 TTB Form 5130.9
 
 > Brewer's Report of Operations
 
+- [x] Create reports hub page (`src/app/(app)/reports/page.tsx`)
+- [x] Create TTB report page (`src/app/(app)/reports/ttb/page.tsx`)
+  - [x] Date range selection for reporting period
+  - [x] Production data queries from batches
+  - [x] Display production summary table
 - [ ] Implement required calculations
   - [ ] Beginning/ending inventory by tax class
   - [ ] Production by tax class
   - [ ] Removals (taxable, tax-free, export)
   - [ ] Losses
-- [ ] Create TTB report generation UI
 - [ ] Add report export (PDF, CSV)
 
 ### 7.2 Production Dashboard
@@ -713,14 +733,15 @@ Next available: `00024`
 ## Phase 8: Settings & Administration
 
 **Goal:** Complete system configuration, user management, and administrative functions.
-**Status:** Not Started
+**Status:** Partially Started (placeholder pages created for settings hub)
 **Depends On:** None (can be done in parallel)
 
 ### 8.1 System Settings
 
 > Brewery-wide configuration.
 
-- [ ] Create `src/app/(app)/settings/page.tsx` (settings hub)
+- [x] Create `src/app/(app)/settings/page.tsx` (settings hub)
+- [x] Create `src/app/(app)/settings/brewery/page.tsx` (placeholder)
 - [ ] Create `src/app/(app)/settings/system/page.tsx`
   - [ ] Brewery name, address, contact info
   - [ ] Default units (volume, weight, temperature, gravity)
@@ -734,7 +755,7 @@ Next available: `00024`
 
 > Create, edit, and manage user accounts and roles.
 
-- [ ] Create `src/app/(app)/settings/users/page.tsx` (list)
+- [x] Create `src/app/(app)/settings/users/page.tsx` (placeholder)
 - [ ] Create `src/app/(app)/settings/users/[id]/page.tsx` (detail)
 - [ ] Create `src/app/(app)/settings/users/[id]/edit/page.tsx` (edit)
 - [ ] Create `src/app/(app)/settings/users/new/page.tsx` (invite)
@@ -751,7 +772,7 @@ Next available: `00024`
 
 > Warehouses, taproom, production areas.
 
-- [ ] Create `src/app/(app)/settings/locations/page.tsx` (list)
+- [x] Create `src/app/(app)/settings/locations/page.tsx` (placeholder)
 - [ ] Create `src/app/(app)/settings/locations/[id]/page.tsx` (detail)
 - [ ] Create `src/app/(app)/settings/locations/new/page.tsx` (create)
 - [ ] Create `src/entities/location.tsx`
@@ -764,7 +785,7 @@ Next available: `00024`
 
 > OAuth connections and API configuration.
 
-- [ ] Create `src/app/(app)/settings/integrations/page.tsx`
+- [x] Create `src/app/(app)/settings/integrations/page.tsx` (placeholder)
 - [ ] Square integration settings
   - [ ] OAuth connection flow
   - [ ] Location mapping
@@ -783,21 +804,24 @@ Next available: `00024`
 
 > Per-user notification settings.
 
-- [ ] Create `src/app/(app)/settings/notifications/page.tsx`
-- [ ] Create `notification_preferences` table
-- [ ] Per-notification-type settings:
-  - [ ] In-app toggle
-  - [ ] Email toggle
-  - [ ] Slack toggle (if user has Slack)
-- [ ] Notification types: low_inventory, batch_ready, order_due, po_delivery, packaging_scheduled, fg_expiring
+- [x] Create `src/app/(app)/settings/notifications/page.tsx`
+  - [x] Per-type enable/disable toggles (batch, inventory, order, system)
+  - [x] In-app toggle
+  - [x] Email toggle with digest frequency
+  - [x] Quiet hours configuration
+- [x] Create `notification_preferences` table (migration 00020)
+- [ ] Add Slack toggle (depends on Slack integration)
 
 ### 8.6 Reference Data Management
 
 > Manage package formats, keg types, sales channels.
 
-- [ ] Create `src/app/(app)/settings/formats/page.tsx`
-  - [ ] Package types (12oz can, 16oz can, 1/6 BBL, 1/2 BBL, etc.)
-  - [ ] Volume, unit count per case
+- [x] Create `src/app/(app)/settings/formats/page.tsx`
+  - [x] Package types (12oz can, 16oz can, 1/6 BBL, 1/2 BBL, etc.)
+  - [x] Volume, unit count per case
+  - [x] Created entity config (`src/entities/package-type.tsx`)
+  - [x] Created full CRUD pages (list, detail, edit, new)
+  - [x] Added link in settings hub
 - [ ] Create `src/app/(app)/settings/keg-types/page.tsx`
   - [ ] Keg sizes and deposit amounts
   - [ ] Lifecycle states
@@ -817,11 +841,14 @@ Next available: `00024`
 
 > Reference data for yeast strains.
 
-- [ ] Verify `yeasts` catalog table exists with proper fields
-- [ ] Create `src/entities/yeast-strain.tsx`
-- [ ] Create yeast catalog management pages
-  - [ ] List with filtering by lab, type
-  - [ ] Detail with typical parameters (temp range, attenuation, flocculation)
+- [x] Verify `yeasts` catalog table exists with proper fields (migration 00011)
+- [x] Create `src/entities/yeast-strain.tsx`
+  - [x] Full entity config with form fields, list columns, detail sections
+  - [x] Attenuation, temperature range, flocculation, alcohol tolerance fields
+- [x] Create yeast catalog management pages (`/settings/yeasts/`)
+  - [x] List with filtering by type, form, manufacturer
+  - [x] Detail with fermentation characteristics
+  - [x] Full CRUD (new, edit, delete)
 
 ### 9.2 Yeast Pitch Tracking
 
@@ -938,7 +965,7 @@ Next available: `00024`
 ## Phase 11: Unit System & Preferences
 
 **Goal:** Implement user-configurable unit display and conversion.
-**Status:** Partial (conversion library and UnitInput component complete)
+**Status:** Partial (conversion library, user preferences, and UnitInput component complete)
 **Depends On:** Phase 8.1 (System Settings)
 
 ### 11.1 Conversion Library
@@ -957,21 +984,23 @@ Next available: `00024`
 
 > Per-user unit preferences.
 
-- [ ] Create/extend `user_preferences` table
-  - [ ] volume_unit, weight_unit, temperature_unit, gravity_unit
-- [ ] Create `src/hooks/useUnitPreferences.ts` (React Query hook)
-- [ ] Add unit preferences to user settings page
+- [x] Create/extend `user_preferences` table (migration 00009)
+  - [x] volume_unit, weight_unit, temperature_unit, gravity_unit
+- [x] Create `src/hooks/useUnitPreferences.ts` (React Query hook)
+- [x] Add unit preferences to brewery settings page
+  - [x] Volume, weight, temperature, gravity, retail volume settings
+  - [x] Form with save functionality using useUpdateUnitPreferences
 
 ### 11.3 Unit Input Component
 
 > Input field with optional unit switcher.
 
-- [ ] Create `src/components/ui/unit-input.tsx`
-  - [ ] Accept canonical value (always BBL, lbs, etc.)
-  - [ ] Display in user's preferred unit
-  - [ ] Convert on input back to canonical
-  - [ ] Optional inline unit switcher for recipe builder
-- [ ] Create `src/components/ui/unit-display.tsx` for read-only display
+- [x] Create `src/components/ui/unit-input.tsx`
+  - [x] Accept canonical value (always BBL, lbs, etc.)
+  - [x] Display in user's preferred unit
+  - [x] Convert on input back to canonical
+  - [x] Optional inline unit switcher for recipe builder
+- [x] Create `UnitDisplay` component for read-only display (included in unit-input.tsx)
 
 ### 11.4 Integration
 
@@ -1163,10 +1192,10 @@ Next available: `00024`
 
 > Add AI context to all entity configurations.
 
-- [ ] Add `queryExamples` to all entities
-  - [ ] Natural language query examples
-  - [ ] Common question patterns
-- [ ] Add `keyFields` to all entities
+- [x] Add `queryExamples` to all entities (15 entities have queryExamples)
+  - [x] Natural language query examples
+  - [x] Common question patterns
+- [x] Add `keyFields` to all entities (15 entities have keyFields)
   - [ ] Fields most relevant for AI queries
   - [ ] Search/filter priority fields
 - [ ] Add `aiActions` to relevant entities
@@ -1385,9 +1414,9 @@ These are low-effort improvements that can be tackled between phases.
 
 ### Entity Config Enhancements
 
-- [ ] Add `queryExamples` to all entities for AI
-- [ ] Add `keyFields` to all entities for AI
-- [ ] Ensure all entities have proper `description`
+- [x] Add `queryExamples` to all entities for AI (15 entities)
+- [x] Add `keyFields` to all entities for AI (15 entities)
+- [x] Ensure all entities have proper `description` (all entities have description field)
 - [ ] Add computed columns where useful
 
 ### Developer Experience
@@ -1456,6 +1485,27 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-14 | Phase 2.2.1: Added BatchReadingsChart with gravity/temperature visualization using shadcn charts |
 | 2026-01-14 | Phase 2.1: Added navigation from batch to brew logs in BrewLogLinker component |
 | 2026-01-14 | Phase 2.2.2: Added PlannedAdditions component showing recipe additions with completion tracking |
+| 2026-01-15 | Phase 2.5.2-2.5.3: Added mash and fermentation schedule display to recipe detail view |
+| 2026-01-15 | Phase 2.5.5: Added Clone action to recipe detail page via RecipeCloneDialog |
+| 2026-01-15 | Verified Phase 1.3: All calculated views exist in migration 00014 |
+| 2026-01-15 | Verified Phase 2.5.4: Water chemistry calculator and library complete |
+| 2026-01-15 | Verified Phase 2.5.6: Recipe COGS view and display component complete |
+| 2026-01-15 | Verified Phase 4.1: Order line items UI complete (order-items-editor.tsx) |
+| 2026-01-15 | Verified Phase 4.3: PO line items UI complete (po-line-items-editor.tsx) |
+| 2026-01-15 | Verified Phase 4.4: Receiving workflow complete (po-receiving.tsx) |
+| 2026-01-15 | Verified Phase 3.4: Order allocation UI complete (order-allocation.tsx) |
+| 2026-01-15 | Verified Phase 5.1: Entity revisions migration and UI component complete |
+| 2026-01-15 | Verified Phase 5.5: Error handling patterns with error types and PostgreSQL mapping |
+| 2026-01-15 | Verified Phase 6.4: Notification preferences page complete with per-type toggles |
+| 2026-01-15 | Verified Phase 11.2: User preferences table and hook complete |
+| 2026-01-15 | Verified Phase 11.3: UnitInput component with unit conversion complete |
+| 2026-01-15 | Phase 5.1: Integrated revision history into entity details (batches, recipes, orders, purchase_orders, finished_goods) |
+| 2026-01-15 | Phase 2.5.1: Created additions-editor.tsx for water chemistry, clarifiers, nutrients |
+| 2026-01-15 | Phase 6.4: Created notifications history page with filtering and bulk actions |
+| 2026-01-15 | Phase 5.4: Created conflict dialog component for optimistic locking |
+| 2026-01-15 | Phase 8.6: Created package types entity and settings pages for reference data management |
+| 2026-01-15 | Phase 11.2: Added unit preferences to brewery settings page |
+| 2026-01-15 | Phase 9.1: Created yeast strain entity and catalog management pages |
 
 ---
 

@@ -10,6 +10,7 @@ import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 type PurchaseOrder = Database["public"]["Tables"]["purchase_orders"]["Row"];
 
@@ -150,6 +151,12 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       id: "notes",
       title: "Notes",
       fields: [{ field: "notes", label: "Notes", fullWidth: true }],
+      collapsible: true,
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("purchase_orders"),
       collapsible: true,
     },
   ],

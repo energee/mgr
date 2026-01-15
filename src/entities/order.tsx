@@ -10,6 +10,7 @@ import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 type Order = Database["public"]["Tables"]["orders"]["Row"];
 
@@ -151,6 +152,12 @@ export const orderEntity: EntityConfig<Order> = {
       fields: [
         { field: "notes", label: "Notes", fullWidth: true },
       ],
+      collapsible: true,
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("orders"),
       collapsible: true,
     },
   ],

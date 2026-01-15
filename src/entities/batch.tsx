@@ -20,6 +20,7 @@ import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
 import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
+import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 // Use generated type from Supabase
 type Batch = Database["public"]["Tables"]["batches"]["Row"];
@@ -192,6 +193,12 @@ export const batchEntity: EntityConfig<Batch> = {
       fields: [
         { field: "notes", label: "Notes", fullWidth: true },
       ],
+      collapsible: true,
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("batches"),
       collapsible: true,
     },
   ],

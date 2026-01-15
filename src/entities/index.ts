@@ -26,6 +26,9 @@ import { supplierEntity } from "./supplier";
 import { purchaseOrderEntity } from "./purchase-order";
 import { orderItemEntity } from "./order-item";
 import { poLineItemEntity } from "./po-line-item";
+import { sessionLineItemEntity } from "./session-line-item";
+import { packageTypeEntity } from "./package-type";
+import { yeastStrainEntity } from "./yeast-strain";
 
 // =============================================================================
 // Register All Entities
@@ -38,10 +41,13 @@ registerEntity(recipeEntity);
 registerEntity(vesselEntity);
 registerEntity(vesselTransferEntity);
 registerEntity(packagingSessionEntity);
+registerEntity(sessionLineItemEntity);
+registerEntity(yeastStrainEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
 registerEntity(finishedGoodEntity);
+registerEntity(packageTypeEntity);
 
 // Sales domain
 registerEntity(orderEntity);
@@ -70,6 +76,8 @@ export { vesselTransferEntity } from "./vessel-transfer";
 export type { VesselTransferFormValues } from "./vessel-transfer";
 export { packagingSessionEntity } from "./packaging-session";
 export type { PackagingSessionFormValues } from "./packaging-session";
+export { sessionLineItemEntity } from "./session-line-item";
+export type { SessionLineItemFormValues } from "./session-line-item";
 export { orderEntity } from "./order";
 export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
@@ -81,6 +89,10 @@ export { orderItemEntity } from "./order-item";
 export type { OrderItemFormValues } from "./order-item";
 export { poLineItemEntity, CATALOG_TYPES } from "./po-line-item";
 export type { POLineItemFormValues } from "./po-line-item";
+export { packageTypeEntity } from "./package-type";
+export type { PackageTypeFormValues } from "./package-type";
+export { yeastStrainEntity } from "./yeast-strain";
+export type { YeastStrainFormValues } from "./yeast-strain";
 
 // =============================================================================
 // Helper Functions

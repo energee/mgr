@@ -12,6 +12,8 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
+import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 // Use view type to include calculated estimates
 // Note: is_template added via migration 00018. After applying migration to remote DB,
@@ -238,6 +240,16 @@ export const recipeEntity: EntityConfig<Recipe> = {
       ],
     },
     {
+      id: "mash_schedule",
+      title: "Mash Schedule",
+      component: MashScheduleDisplay,
+    },
+    {
+      id: "fermentation_schedule",
+      title: "Fermentation Schedule",
+      component: FermentationScheduleDisplay,
+    },
+    {
       id: "notes",
       title: "Notes",
       fields: [
@@ -245,6 +257,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
         { field: "tasting_notes", label: "Tasting Notes", fullWidth: true },
         { field: "development_notes", label: "Development Notes", fullWidth: true },
       ],
+      collapsible: true,
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("recipes"),
       collapsible: true,
     },
   ],
@@ -475,6 +493,19 @@ export const recipeEntity: EntityConfig<Recipe> = {
       entity: "water_profile",
       type: "belongsTo",
       foreignKey: "water_profile_id",
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "clone",
+      label: "Clone Recipe",
+      icon: "copy",
+      type: "button",
+      // Available for all recipes - custom handler needed
     },
   ],
 

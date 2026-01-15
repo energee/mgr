@@ -14,6 +14,8 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { BrewLogTimeline } from "@/components/domain/brew-log-timeline";
+import { BrewLogBatches } from "@/components/domain/brew-log-batches";
 
 // Use generated type from Supabase (will need regeneration after migration)
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
@@ -238,12 +240,12 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
     {
       id: "timeline",
       title: "Brew Day Timeline",
-      component: "BrewLogTimeline", // Custom component for events
+      component: BrewLogTimeline,
     },
     {
       id: "batches",
       title: "Linked Batches",
-      component: "BrewLogBatches", // Custom component for linked batches
+      component: BrewLogBatches,
     },
     {
       id: "notes",
