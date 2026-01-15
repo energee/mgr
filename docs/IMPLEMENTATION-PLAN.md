@@ -564,7 +564,11 @@ Next available: `00024`
   - [x] ValidationError, ConstraintError, ConcurrentModificationError, NotFoundError
   - [x] Map PostgreSQL error codes to user-friendly messages
 - [x] Create constraint message mapping (POSTGRES_ERROR_MAP)
-- [ ] Implement retry with exponential backoff for network errors
+- [x] Implement retry with exponential backoff for network errors (`src/lib/retry.ts`)
+  - [x] `withRetry()` function with configurable options
+  - [x] `withRetryResult()` variant returning result object
+  - [x] Transient database error detection helpers
+  - [x] Jitter support to prevent thundering herd
 - [x] Create error boundary component for graceful failure (`src/components/ui/error-boundary.tsx`)
 - [x] Add toast notifications for common error types (via sonner integration)
 
