@@ -281,26 +281,27 @@ Next available: `00024`
 ## Phase 2.5: Recipe Builder Completion
 
 **Goal:** Complete the full recipe builder with all ingredient types, schedules, and water chemistry.
-**Status:** Not Started
+**Status:** In Progress (ingredient editors complete)
 **Depends On:** Phase 1
 
 ### 2.5.1 Additional Ingredient Editors
 
 > Junction tables exist but need UI components similar to grain-bill-editor and hop-schedule-editor.
 
-- [ ] Create `src/components/domain/adjunct-editor.tsx`
-  - [ ] Searchable adjunct selector from catalog
-  - [ ] Timing selection (mash, boil, fermentation)
-  - [ ] Weight/quantity input
-- [ ] Create `src/components/domain/sugar-editor.tsx`
-  - [ ] Sugar type selection from catalog
-  - [ ] Weight input with gravity contribution calculation
-- [ ] Create `src/components/domain/spice-editor.tsx`
-  - [ ] Spice/herb selection from catalog
-  - [ ] Timing and quantity
-- [ ] Create `src/components/domain/fruit-editor.tsx`
-  - [ ] Fruit selection from catalog
-  - [ ] Weight and timing
+- [x] Create `src/components/domain/adjunct-editor.tsx`
+  - [x] Searchable adjunct selector from catalog
+  - [x] Timing selection (mash, boil, fermentation)
+  - [x] Weight/quantity input
+- [x] Create `src/components/domain/sugar-editor.tsx`
+  - [x] Sugar type selection from catalog
+  - [x] Weight input with PPG display
+- [x] Create `src/components/domain/spice-editor.tsx`
+  - [x] Spice/herb selection from catalog
+  - [x] Timing and quantity with unit selection
+  - [x] Boil time for boil additions
+- [x] Create `src/components/domain/fruit-editor.tsx`
+  - [x] Fruit selection from catalog
+  - [x] Weight and timing
 - [ ] Create `src/components/domain/additions-editor.tsx`
   - [ ] Water chemistry additions (gypsum, calcium chloride, etc.)
   - [ ] Clarifiers (whirlfloc, irish moss)
