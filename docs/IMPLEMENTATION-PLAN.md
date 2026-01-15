@@ -683,19 +683,23 @@ Next available: `00024`
 
 **Goal:** Business intelligence and regulatory compliance.
 **Timeline:** 2-3 weeks
-**Status:** Not Started
+**Status:** Partially Started (TTB report UI created, dashboards pending)
 **Depends On:** Phase 3 (allocations)
 
 ### 7.1 TTB Form 5130.9
 
 > Brewer's Report of Operations
 
+- [x] Create reports hub page (`src/app/(app)/reports/page.tsx`)
+- [x] Create TTB report page (`src/app/(app)/reports/ttb/page.tsx`)
+  - [x] Date range selection for reporting period
+  - [x] Production data queries from batches
+  - [x] Display production summary table
 - [ ] Implement required calculations
   - [ ] Beginning/ending inventory by tax class
   - [ ] Production by tax class
   - [ ] Removals (taxable, tax-free, export)
   - [ ] Losses
-- [ ] Create TTB report generation UI
 - [ ] Add report export (PDF, CSV)
 
 ### 7.2 Production Dashboard
