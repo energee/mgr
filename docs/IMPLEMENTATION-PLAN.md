@@ -944,7 +944,7 @@ Next available: `00024`
 ## Phase 11: Unit System & Preferences
 
 **Goal:** Implement user-configurable unit display and conversion.
-**Status:** Partial (conversion library and UnitInput component complete)
+**Status:** Partial (conversion library, user preferences, and UnitInput component complete)
 **Depends On:** Phase 8.1 (System Settings)
 
 ### 11.1 Conversion Library
@@ -963,20 +963,20 @@ Next available: `00024`
 
 > Per-user unit preferences.
 
-- [ ] Create/extend `user_preferences` table
-  - [ ] volume_unit, weight_unit, temperature_unit, gravity_unit
-- [ ] Create `src/hooks/useUnitPreferences.ts` (React Query hook)
+- [x] Create/extend `user_preferences` table (migration 00009)
+  - [x] volume_unit, weight_unit, temperature_unit, gravity_unit
+- [x] Create `src/hooks/useUnitPreferences.ts` (React Query hook)
 - [ ] Add unit preferences to user settings page
 
 ### 11.3 Unit Input Component
 
 > Input field with optional unit switcher.
 
-- [ ] Create `src/components/ui/unit-input.tsx`
-  - [ ] Accept canonical value (always BBL, lbs, etc.)
-  - [ ] Display in user's preferred unit
-  - [ ] Convert on input back to canonical
-  - [ ] Optional inline unit switcher for recipe builder
+- [x] Create `src/components/ui/unit-input.tsx`
+  - [x] Accept canonical value (always BBL, lbs, etc.)
+  - [x] Display in user's preferred unit
+  - [x] Convert on input back to canonical
+  - [x] Optional inline unit switcher for recipe builder
 - [ ] Create `src/components/ui/unit-display.tsx` for read-only display
 
 ### 11.4 Integration
@@ -1474,6 +1474,8 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Verified Phase 5.1: Entity revisions migration and UI component complete |
 | 2026-01-15 | Verified Phase 5.5: Error handling patterns with error types and PostgreSQL mapping |
 | 2026-01-15 | Verified Phase 6.4: Notification preferences page complete with per-type toggles |
+| 2026-01-15 | Verified Phase 11.2: User preferences table and hook complete |
+| 2026-01-15 | Verified Phase 11.3: UnitInput component with unit conversion complete |
 
 ---
 
