@@ -984,7 +984,9 @@ Next available: `00024`
 - [x] Create/extend `user_preferences` table (migration 00009)
   - [x] volume_unit, weight_unit, temperature_unit, gravity_unit
 - [x] Create `src/hooks/useUnitPreferences.ts` (React Query hook)
-- [ ] Add unit preferences to user settings page
+- [x] Add unit preferences to brewery settings page
+  - [x] Volume, weight, temperature, gravity, retail volume settings
+  - [x] Form with save functionality using useUpdateUnitPreferences
 
 ### 11.3 Unit Input Component
 
@@ -1499,6 +1501,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 6.4: Created notifications history page with filtering and bulk actions |
 | 2026-01-15 | Phase 5.4: Created conflict dialog component for optimistic locking |
 | 2026-01-15 | Phase 8.6: Created package types entity and settings pages for reference data management |
+| 2026-01-15 | Phase 11.2: Added unit preferences to brewery settings page |
 
 ---
 
