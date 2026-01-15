@@ -15,6 +15,7 @@ import { z } from "zod";
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { SessionLineItemsDisplay } from "@/components/domain/session-line-items-display";
 
 type PackagingSession = Database["public"]["Tables"]["packaging_sessions"]["Row"];
 
@@ -143,6 +144,11 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
       ],
       collapsible: true,
     },
+    {
+      id: "line_items",
+      title: "Line Items",
+      component: SessionLineItemsDisplay,
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -177,17 +183,15 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
   // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------
-  // TODO: Create session_line_item entity config when implementing line item management.
-  // The database table exists (packaging_session_items) but the entity config is not yet created.
-  // Until then, the "Line Items" tab will not render properly on the detail page.
+  // Note: Line items use inline editing via SessionLineItemsDisplay component,
+  // not the standard relation tab rendering. Relation kept for query/reference.
   relations: [
     {
       name: "line_items",
       entity: "session_line_item",
       type: "hasMany",
       foreignKey: "session_id",
-      showInDetail: true,
-      detailTab: "Line Items",
+      showInDetail: false, // Using custom component instead
     },
   ],
 
