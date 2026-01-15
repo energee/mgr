@@ -28,6 +28,7 @@ import { orderItemEntity } from "./order-item";
 import { poLineItemEntity } from "./po-line-item";
 import { sessionLineItemEntity } from "./session-line-item";
 import { packageTypeEntity } from "./package-type";
+import { yeastStrainEntity } from "./yeast-strain";
 
 // =============================================================================
 // Register All Entities
@@ -41,6 +42,7 @@ registerEntity(vesselEntity);
 registerEntity(vesselTransferEntity);
 registerEntity(packagingSessionEntity);
 registerEntity(sessionLineItemEntity);
+registerEntity(yeastStrainEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
@@ -89,6 +91,8 @@ export { poLineItemEntity, CATALOG_TYPES } from "./po-line-item";
 export type { POLineItemFormValues } from "./po-line-item";
 export { packageTypeEntity } from "./package-type";
 export type { PackageTypeFormValues } from "./package-type";
+export { yeastStrainEntity } from "./yeast-strain";
+export type { YeastStrainFormValues } from "./yeast-strain";
 
 // =============================================================================
 // Helper Functions
