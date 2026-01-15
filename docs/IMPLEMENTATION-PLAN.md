@@ -349,14 +349,15 @@ Next available: `00024`
 
 > Support for template recipes with variable ingredients.
 
-- [ ] Add `is_template` boolean column to recipes table
-- [ ] Add UI toggle for template mode in recipe form
-- [ ] Support null `ingredient_id` in junction tables for variable slots
-- [ ] Create "Clone from Template" action
-  - [ ] Copy all recipe data
-  - [ ] Prompt user to fill variable ingredient slots
-  - [ ] Link to brand
-- [ ] Filter template recipes separately in list view
+- [x] Add `is_template` boolean column to recipes table (migration 00018)
+- [x] Add UI toggle for template mode in recipe form
+- [ ] Support null `ingredient_id` in junction tables for variable slots (future)
+- [x] Create "Clone from Template" action
+  - [x] Copy all recipe data (RecipeCloneDialog component)
+  - [x] Prompt user to fill variable ingredient slots (via brand selection)
+  - [x] Link to brand
+- [x] Filter template recipes separately in list view
+- [x] Add Clone action to recipe detail page
 
 ### 2.5.6 Recipe COGS Calculation
 
@@ -1459,6 +1460,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-14 | Phase 2.1: Added navigation from batch to brew logs in BrewLogLinker component |
 | 2026-01-14 | Phase 2.2.2: Added PlannedAdditions component showing recipe additions with completion tracking |
 | 2026-01-15 | Phase 2.5.2-2.5.3: Added mash and fermentation schedule display to recipe detail view |
+| 2026-01-15 | Phase 2.5.5: Added Clone action to recipe detail page via RecipeCloneDialog |
 
 ---
 
