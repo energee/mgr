@@ -2,7 +2,7 @@
 
 > Generated: January 2026
 > Status: Active
-> Last Updated: 2026-01-11
+> Last Updated: 2026-01-15
 
 ## Overview
 
@@ -146,10 +146,10 @@ Next available: `00024`
   - [x] Calculate IBU from hop schedule (Tinseth with timing-based utilization)
   - [x] Calculate SRM from grain bill (Morey equation)
   - [ ] Calculate COGS from ingredient costs (future enhancement)
-- [ ] Create `inventory_lots_with_quantities` view (in 00010 - pending commit)
-- [ ] Create `finished_goods_with_availability` view (in 00010 - pending commit)
-- [ ] Create `batches_with_brew_info` view
-  - [ ] Join brew log data (actual OG, brew date)
+- [x] Create `inventory_lots_with_quantities` view (migration 00014)
+- [x] Create `finished_goods_with_availability` view (migration 00014)
+- [x] Create `batches_with_brew_info` view (migration 00014)
+  - [x] Join brew log data (actual OG, brew date)
 - [x] Update recipe entity config to reference view data
 
 ---
@@ -281,7 +281,7 @@ Next available: `00024`
 ## Phase 2.5: Recipe Builder Completion
 
 **Goal:** Complete the full recipe builder with all ingredient types, schedules, and water chemistry.
-**Status:** In Progress (ingredient editors, mash/fermentation schedules, recipe templates complete; water chemistry and COGS pending)
+**Status:** Mostly Complete (ingredient editors, schedules, water chemistry, COGS done; recipe form integration pending)
 **Depends On:** Phase 1
 
 ### 2.5.1 Additional Ingredient Editors
@@ -336,13 +336,13 @@ Next available: `00024`
 
 > Target water profile and additions calculation.
 
-- [ ] Create `src/components/domain/water-chemistry-calculator.tsx`
-  - [ ] Source water profile input (or select from saved profiles)
-  - [ ] Target water profile selection
-  - [ ] Auto-calculate additions needed (gypsum, CaCl2, etc.)
-  - [ ] Display sulfate:chloride ratio
-  - [ ] Mash pH estimation
-- [ ] Create `src/lib/water-chemistry.ts` with calculation functions
+- [x] Create `src/components/domain/water-chemistry-calculator.tsx`
+  - [x] Source water profile input (or select from saved profiles)
+  - [x] Target water profile selection
+  - [x] Auto-calculate additions needed (gypsum, CaCl2, etc.)
+  - [x] Display sulfate:chloride ratio
+  - [x] Mash pH estimation
+- [x] Create `src/lib/water-chemistry.ts` with calculation functions
 - [ ] Integrate with recipe form (link to water_profile_id and recipe_additions)
 
 ### 2.5.5 Recipe Templates
@@ -363,10 +363,10 @@ Next available: `00024`
 
 > Calculate estimated cost of goods sold.
 
-- [ ] Create `recipes_with_cogs` view or add to `recipes_with_estimates`
-  - [ ] Sum ingredient costs from catalog (malts, hops, yeast, adjuncts)
-  - [ ] Factor in typical usage rates
-- [ ] Display estimated COGS in recipe detail
+- [x] Create `recipes_with_cogs` view (migration 00021)
+  - [x] Sum ingredient costs from catalog (malts, hops, yeast, adjuncts)
+  - [x] Calculate per-BBL cost
+- [x] Display estimated COGS in recipe detail (`recipe-cogs-display.tsx`)
 - [ ] Compare actual vs estimated COGS when batch completes
 
 ---
@@ -426,7 +426,7 @@ Next available: `00024`
 
 **Goal:** Complete order fulfillment and purchasing workflows.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (entities and pages done, receiving workflow pending)
+**Status:** Mostly Complete (entities, pages, line items, receiving done; pricing tiers pending)
 **Depends On:** Phase 3
 
 ### 4.1 Order Line Items
@@ -434,9 +434,9 @@ Next available: `00024`
 > Currently only order headers exist.
 
 - [x] Create order items sub-entity config (`src/entities/order-item.tsx`)
-- [ ] Add line items UI to order form
-- [ ] Add line items display to order detail
-- [ ] Calculate order totals from line items
+- [x] Add line items UI to order form (`order-items-editor.tsx`)
+- [x] Add line items display to order detail
+- [x] Calculate order totals from line items
 
 ### 4.2 Supplier Entity
 
@@ -457,16 +457,16 @@ Next available: `00024`
 - [x] Create PO line items sub-entity config (`src/entities/po-line-item.tsx`)
 - [x] Register purchase order entity
 - [x] Create purchase order pages (`src/app/(app)/purchasing/pos/`)
-- [ ] Implement PO line items UI (inline editing)
+- [x] Implement PO line items UI (`po-line-items-editor.tsx`)
 
 ### 4.4 Receiving Workflow
 
 > Convert PO receipts to inventory lots.
 
-- [ ] Create receiving UI
-- [ ] Generate inventory lots from received items
-- [ ] Update PO status on receipt
-- [ ] Track partial receipts
+- [x] Create receiving UI (`po-receiving.tsx`)
+- [x] Generate inventory lots from received items
+- [x] Update PO status on receipt
+- [x] Track partial receipts
 
 ### 4.5 Customer Entity
 
@@ -1461,6 +1461,12 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-14 | Phase 2.2.2: Added PlannedAdditions component showing recipe additions with completion tracking |
 | 2026-01-15 | Phase 2.5.2-2.5.3: Added mash and fermentation schedule display to recipe detail view |
 | 2026-01-15 | Phase 2.5.5: Added Clone action to recipe detail page via RecipeCloneDialog |
+| 2026-01-15 | Verified Phase 1.3: All calculated views exist in migration 00014 |
+| 2026-01-15 | Verified Phase 2.5.4: Water chemistry calculator and library complete |
+| 2026-01-15 | Verified Phase 2.5.6: Recipe COGS view and display component complete |
+| 2026-01-15 | Verified Phase 4.1: Order line items UI complete (order-items-editor.tsx) |
+| 2026-01-15 | Verified Phase 4.3: PO line items UI complete (po-line-items-editor.tsx) |
+| 2026-01-15 | Verified Phase 4.4: Receiving workflow complete (po-receiving.tsx) |
 
 ---
 
