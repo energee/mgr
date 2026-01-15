@@ -11,7 +11,7 @@
  * - Dry hop timing notes
  */
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -44,7 +44,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Plus, Trash2, GripVertical, ChevronDown, FlaskConical, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 // Types for fermentation stages
 export interface FermentationStage {
@@ -148,23 +147,8 @@ export function FermentationScheduleEditor({
   onChange,
   disabled = false,
 }: FermentationScheduleEditorProps) {
-  const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
-
   // Generate unique ID
   const generateId = () => `stage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-  // Toggle expanded state
-  const toggleExpanded = (stageId: string) => {
-    setExpandedStages((prev) => {
-      const next = new Set(prev);
-      if (next.has(stageId)) {
-        next.delete(stageId);
-      } else {
-        next.add(stageId);
-      }
-      return next;
-    });
-  };
 
   // Add a new stage
   const handleAddStage = useCallback(() => {
@@ -309,14 +293,9 @@ export function FermentationScheduleEditor({
         <div className="space-y-2">
           {stages.map((stage, index) => {
             const stageId = stage.id || `stage-${index}`;
-            const isExpanded = expandedStages.has(stageId);
 
             return (
-            <Collapsible
-              key={stageId}
-              open={isExpanded}
-              onOpenChange={() => toggleExpanded(stageId)}
-            >
+            <Collapsible key={stageId}>
               <div className="border rounded-lg">
                 <div className="flex items-center gap-2 p-3">
                   {/* Reorder buttons */}
@@ -404,7 +383,7 @@ export function FermentationScheduleEditor({
                   {/* Expand/Notes toggle */}
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
+                      <ChevronRight className="h-4 w-4 transition-transform data-[state=open]:rotate-90" />
                     </Button>
                   </CollapsibleTrigger>
 
