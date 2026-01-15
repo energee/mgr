@@ -166,15 +166,18 @@ export default function NotificationsPage() {
   const totalCount = data?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // Mark as read mutation
+  // Mark as read mutation - uses RPC function for consistency with NotificationsProvider
   const markAsReadMutation = useMutation({
     mutationFn: async (ids: string[]) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
-      const { error } = await db
-        .from("notifications")
-        .update({ read_at: new Date().toISOString() })
-        .in("id", ids);
+      // Call RPC for each notification (RPC handles single IDs)
+      const results = await Promise.all(
+        ids.map((id) =>
+          db.rpc("mark_notification_read", { p_notification_id: id })
+        )
+      );
+      const error = results.find((r) => r.error)?.error;
       if (error) throw error;
     },
     onSuccess: () => {
@@ -187,15 +190,18 @@ export default function NotificationsPage() {
     },
   });
 
-  // Dismiss mutation
+  // Dismiss mutation - uses RPC function for consistency with NotificationsProvider
   const dismissMutation = useMutation({
     mutationFn: async (ids: string[]) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
-      const { error } = await db
-        .from("notifications")
-        .update({ dismissed_at: new Date().toISOString() })
-        .in("id", ids);
+      // Call RPC for each notification (RPC handles single IDs)
+      const results = await Promise.all(
+        ids.map((id) =>
+          db.rpc("dismiss_notification", { p_notification_id: id })
+        )
+      );
+      const error = results.find((r) => r.error)?.error;
       if (error) throw error;
     },
     onSuccess: () => {
