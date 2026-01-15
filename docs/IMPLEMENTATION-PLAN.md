@@ -841,11 +841,14 @@ Next available: `00024`
 
 > Reference data for yeast strains.
 
-- [ ] Verify `yeasts` catalog table exists with proper fields
-- [ ] Create `src/entities/yeast-strain.tsx`
-- [ ] Create yeast catalog management pages
-  - [ ] List with filtering by lab, type
-  - [ ] Detail with typical parameters (temp range, attenuation, flocculation)
+- [x] Verify `yeasts` catalog table exists with proper fields (migration 00011)
+- [x] Create `src/entities/yeast-strain.tsx`
+  - [x] Full entity config with form fields, list columns, detail sections
+  - [x] Attenuation, temperature range, flocculation, alcohol tolerance fields
+- [x] Create yeast catalog management pages (`/settings/yeasts/`)
+  - [x] List with filtering by type, form, manufacturer
+  - [x] Detail with fermentation characteristics
+  - [x] Full CRUD (new, edit, delete)
 
 ### 9.2 Yeast Pitch Tracking
 
@@ -1502,6 +1505,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 5.4: Created conflict dialog component for optimistic locking |
 | 2026-01-15 | Phase 8.6: Created package types entity and settings pages for reference data management |
 | 2026-01-15 | Phase 11.2: Added unit preferences to brewery settings page |
+| 2026-01-15 | Phase 9.1: Created yeast strain entity and catalog management pages |
 
 ---
 

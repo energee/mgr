@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, Link2, MapPin, Package, Settings, Users } from "lucide-react";
+import { Bell, Building2, FlaskConical, Link2, MapPin, Package, Settings, Users } from "lucide-react";
 
 const settingsLinks = [
   {
@@ -49,6 +49,13 @@ const settingsLinks = [
     description: "Manage package types for cans, bottles, kegs, and more",
     href: "/settings/formats",
     icon: Package,
+    available: true,
+  },
+  {
+    title: "Yeast Strains",
+    description: "Manage yeast strain catalog for recipe building",
+    href: "/settings/yeasts",
+    icon: FlaskConical,
     available: true,
   },
 ];
