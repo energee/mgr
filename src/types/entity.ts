@@ -428,6 +428,9 @@ export interface EntityRelationDef {
 
   /** Inline editing allowed */
   inlineEdit?: boolean;
+
+  /** Limit for related records query (default: 50) */
+  relationLimit?: number;
 }
 
 // =============================================================================
