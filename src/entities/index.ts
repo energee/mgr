@@ -27,6 +27,7 @@ import { purchaseOrderEntity } from "./purchase-order";
 import { orderItemEntity } from "./order-item";
 import { poLineItemEntity } from "./po-line-item";
 import { sessionLineItemEntity } from "./session-line-item";
+import { packageTypeEntity } from "./package-type";
 
 // =============================================================================
 // Register All Entities
@@ -44,6 +45,7 @@ registerEntity(sessionLineItemEntity);
 // Inventory domain
 registerEntity(inventoryItemEntity);
 registerEntity(finishedGoodEntity);
+registerEntity(packageTypeEntity);
 
 // Sales domain
 registerEntity(orderEntity);
@@ -85,6 +87,8 @@ export { orderItemEntity } from "./order-item";
 export type { OrderItemFormValues } from "./order-item";
 export { poLineItemEntity, CATALOG_TYPES } from "./po-line-item";
 export type { POLineItemFormValues } from "./po-line-item";
+export { packageTypeEntity } from "./package-type";
+export type { PackageTypeFormValues } from "./package-type";
 
 // =============================================================================
 // Helper Functions
