@@ -556,7 +556,7 @@ Next available: `00024`
   - [ ] `bin_inventory`
 - [x] Create `updateWithOptimisticLock` utility function (`src/lib/optimistic-lock.ts`)
 - [ ] Implement conflict detection in forms
-- [ ] Create "Record modified" error dialog with refresh option
+- [x] Create "Record modified" error dialog with refresh option (`src/components/ui/conflict-dialog.tsx`)
 
 ### 5.5 Error Handling Patterns
 
@@ -1494,6 +1494,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 5.1: Integrated revision history into entity details (batches, recipes, orders, purchase_orders, finished_goods) |
 | 2026-01-15 | Phase 2.5.1: Created additions-editor.tsx for water chemistry, clarifiers, nutrients |
 | 2026-01-15 | Phase 6.4: Created notifications history page with filtering and bulk actions |
+| 2026-01-15 | Phase 5.4: Created conflict dialog component for optimistic locking |
 
 ---
 
