@@ -415,9 +415,9 @@ Next available: `00024`
 
 > Allocate finished goods to orders.
 
-- [ ] Create allocation UI for orders
+- [x] Create allocation UI for orders (`order-allocation.tsx` with FIFO suggestion)
 - [ ] Implement pick list generation
-- [ ] Update inventory quantities on allocation
+- [x] Update inventory quantities on allocation (via allocation records)
 - [ ] Add approval workflow for allocations (optional)
 
 ---
@@ -514,16 +514,16 @@ Next available: `00024`
 
 **Goal:** Improve data quality and audit capabilities.
 **Timeline:** 1 week
-**Status:** Not Started
+**Status:** Partial (entity revisions and error handling complete)
 
 ### 5.1 Entity Revisions Table (DEC-MP-001)
 
 > Unified audit trail for all entities.
 
-- [ ] Create migration for `entity_revisions` table
-- [ ] Implement revision triggers for key entities
-- [ ] Create revision history UI component
-- [ ] Add revision history to entity details
+- [x] Create migration for `entity_revisions` table (migration 00019)
+- [x] Implement revision triggers for key entities (batches, recipes, orders)
+- [x] Create revision history UI component (`revision-history.tsx`)
+- [ ] Add revision history to entity details (integration pending)
 
 ### 5.2 Temporal Pricing (DEC-MP-003)
 
@@ -556,13 +556,13 @@ Next available: `00024`
 
 > Consistent error handling across the application.
 
-- [ ] Create `src/lib/errors.ts` with error types
-  - [ ] ValidationError, ConstraintError, ConcurrentModificationError
-  - [ ] Map PostgreSQL error codes to user-friendly messages
-- [ ] Create constraint message mapping (chk_quantity_positive, etc.)
+- [x] Create `src/lib/errors.ts` with error types
+  - [x] ValidationError, ConstraintError, ConcurrentModificationError, NotFoundError
+  - [x] Map PostgreSQL error codes to user-friendly messages
+- [x] Create constraint message mapping (POSTGRES_ERROR_MAP)
 - [ ] Implement retry with exponential backoff for network errors
 - [ ] Create error boundary component for graceful failure
-- [ ] Add toast notifications for common error types
+- [x] Add toast notifications for common error types (via sonner integration)
 
 ### 5.6 Row Level Security
 
@@ -1467,6 +1467,9 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Verified Phase 4.1: Order line items UI complete (order-items-editor.tsx) |
 | 2026-01-15 | Verified Phase 4.3: PO line items UI complete (po-line-items-editor.tsx) |
 | 2026-01-15 | Verified Phase 4.4: Receiving workflow complete (po-receiving.tsx) |
+| 2026-01-15 | Verified Phase 3.4: Order allocation UI complete (order-allocation.tsx) |
+| 2026-01-15 | Verified Phase 5.1: Entity revisions migration and UI component complete |
+| 2026-01-15 | Verified Phase 5.5: Error handling patterns with error types and PostgreSQL mapping |
 
 ---
 
