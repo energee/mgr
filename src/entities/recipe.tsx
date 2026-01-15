@@ -12,6 +12,7 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
 
 // Use view type to include calculated estimates
 // Note: is_template added via migration 00018. After applying migration to remote DB,
@@ -236,6 +237,16 @@ export const recipeEntity: EntityConfig<Recipe> = {
         { field: "fermentation_days", label: "Fermentation Days" },
         { field: "conditioning_days", label: "Conditioning Days" },
       ],
+    },
+    {
+      id: "mash_schedule",
+      title: "Mash Schedule",
+      component: MashScheduleDisplay,
+    },
+    {
+      id: "fermentation_schedule",
+      title: "Fermentation Schedule",
+      component: FermentationScheduleDisplay,
     },
     {
       id: "notes",

@@ -281,7 +281,7 @@ Next available: `00024`
 ## Phase 2.5: Recipe Builder Completion
 
 **Goal:** Complete the full recipe builder with all ingredient types, schedules, and water chemistry.
-**Status:** In Progress (ingredient editors complete)
+**Status:** In Progress (ingredient editors, mash schedule, fermentation schedule complete; water chemistry pending)
 **Depends On:** Phase 1
 
 ### 2.5.1 Additional Ingredient Editors
@@ -311,25 +311,26 @@ Next available: `00024`
 
 > Multi-step mash with rest temps and times.
 
-- [ ] Create `src/components/domain/mash-schedule-editor.tsx`
-  - [ ] Add/remove/reorder mash steps
-  - [ ] Per-step: name, target temp, rest time
-  - [ ] Common presets (single infusion, step mash, decoction)
-  - [ ] Water volume calculations per step
-- [ ] Add `mash_schedule` JSONB column to recipes table (or create `recipe_mash_steps` junction)
-- [ ] Display mash schedule in recipe detail view
+- [x] Create `src/components/domain/mash-schedule-editor.tsx`
+  - [x] Add/remove/reorder mash steps
+  - [x] Per-step: type, name, target temp, rest time
+  - [x] Common presets (single infusion, step mash, hochkurz, decoction)
+  - [x] Temperature reference guide
+- [x] `mash_schedule` JSONB column exists in recipes table (migration 00017)
+- [x] Display mash schedule in recipe detail view
+- [ ] Water volume calculations per step (future)
 
 ### 2.5.3 Fermentation Schedule Builder
 
 > Temperature ramps and dry hop timing.
 
-- [ ] Create `src/components/domain/fermentation-schedule-editor.tsx`
-  - [ ] Add/remove/reorder fermentation steps
-  - [ ] Per-step: name, target temp, duration, notes
-  - [ ] Dry hop timing integration (link to hop schedule dry_hop entries)
-  - [ ] Cold crash and conditioning steps
-- [ ] Add `fermentation_schedule` JSONB column to recipes table (or create `recipe_fermentation_steps` junction)
-- [ ] Display fermentation schedule in recipe detail view
+- [x] Create `src/components/domain/fermentation-schedule-editor.tsx`
+  - [x] Add/remove/reorder fermentation stages
+  - [x] Per-stage: type, name, target temp, duration, notes
+  - [x] Common presets (ale, lager, NEIPA, saison, belgian)
+  - [x] Collapsible notes for dry hop timing, ramp instructions
+- [x] `fermentation_schedule` JSONB column exists in recipes table (migration 00017)
+- [x] Display fermentation schedule in recipe detail view
 
 ### 2.5.4 Water Chemistry Calculator
 
@@ -1457,6 +1458,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-14 | Phase 2.2.1: Added BatchReadingsChart with gravity/temperature visualization using shadcn charts |
 | 2026-01-14 | Phase 2.1: Added navigation from batch to brew logs in BrewLogLinker component |
 | 2026-01-14 | Phase 2.2.2: Added PlannedAdditions component showing recipe additions with completion tracking |
+| 2026-01-15 | Phase 2.5.2-2.5.3: Added mash and fermentation schedule display to recipe detail view |
 
 ---
 
