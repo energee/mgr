@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
+import { UnitInput } from "@/components/ui/unit-input";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
@@ -444,6 +445,31 @@ function renderFieldInput<T>(
           onChange={onChange}
           disabled={disabled}
           placeholder={field.placeholder}
+        />
+      );
+
+    case "unit":
+      if (!field.unitType) {
+        console.warn(`Field ${field.name} has type "unit" but no unitType specified`);
+        return (
+          <Input
+            id={field.name}
+            type="number"
+            value={value !== undefined && value !== null ? String(value) : ""}
+            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+            placeholder={field.placeholder}
+            disabled={disabled}
+          />
+        );
+      }
+      return (
+        <UnitInput
+          value={value as number | null | undefined}
+          onChange={(v) => onChange(v)}
+          unitType={field.unitType}
+          allowSwitch={field.allowUnitSwitch}
+          placeholder={field.placeholder}
+          disabled={disabled}
         />
       );
 

@@ -353,15 +353,17 @@ export const recipeEntity: EntityConfig<Recipe> = {
     // Volumes
     {
       name: "volume_bbl",
-      label: "Recipe Volume (BBL)",
-      type: "number",
+      label: "Recipe Volume",
+      type: "unit",
+      unitType: "volume",
       placeholder: "e.g., 7",
       colSpan: 4,
     },
     {
       name: "batch_size_bbl",
-      label: "Batch Size (BBL)",
-      type: "number",
+      label: "Batch Size",
+      type: "unit",
+      unitType: "volume",
       placeholder: "e.g., 7",
       colSpan: 4,
     },
@@ -382,8 +384,9 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
     {
       name: "mash_temp_f",
-      label: "Mash Temp (°F)",
-      type: "number",
+      label: "Mash Temp",
+      type: "unit",
+      unitType: "temperature",
       placeholder: "e.g., 152",
       colSpan: 3,
     },
