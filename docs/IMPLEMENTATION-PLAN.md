@@ -565,7 +565,7 @@ Next available: `00024`
   - [x] Map PostgreSQL error codes to user-friendly messages
 - [x] Create constraint message mapping (POSTGRES_ERROR_MAP)
 - [ ] Implement retry with exponential backoff for network errors
-- [ ] Create error boundary component for graceful failure
+- [x] Create error boundary component for graceful failure (`src/components/ui/error-boundary.tsx`)
 - [x] Add toast notifications for common error types (via sonner integration)
 
 ### 5.6 Row Level Security
