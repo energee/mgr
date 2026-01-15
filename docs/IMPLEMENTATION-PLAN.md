@@ -281,7 +281,7 @@ Next available: `00024`
 ## Phase 2.5: Recipe Builder Completion
 
 **Goal:** Complete the full recipe builder with all ingredient types, schedules, and water chemistry.
-**Status:** In Progress (ingredient editors, mash schedule, fermentation schedule complete; water chemistry pending)
+**Status:** In Progress (ingredient editors, mash/fermentation schedules, recipe templates complete; water chemistry and COGS pending)
 **Depends On:** Phase 1
 
 ### 2.5.1 Additional Ingredient Editors
