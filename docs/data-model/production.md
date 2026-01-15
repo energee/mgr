@@ -500,13 +500,14 @@ Brewing vessels (fermenters, brite tanks, kettles, etc.).
 | vessel_type | TEXT | Type: fermenter, brite, kettle, mash_tun, hlt, unitank, foeder, barrel |
 | capacity_bbl | DECIMAL(8,2) | Capacity in barrels |
 | location_id | UUID | FK to locations |
+| current_batch_id | UUID | FK to batches - automatically maintained by trigger |
 | status | TEXT | Status: dirty, caustic_cleaned, ready_for_use, in_use, maintenance |
 | notes | TEXT | Notes |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**Current batch**: Derived from `vessel_transfers` via `vessels_with_current_batch` view (see below). No stored `current_batch_id` field - single source of truth is the transfer log.
+**Current batch**: The `current_batch_id` field is automatically maintained by the `handle_vessel_transfer()` trigger (migration 00023). When a vessel transfer is created, the trigger updates the destination vessel's `current_batch_id` and clears the source vessel's. The `vessels_with_current_batch` view provides additional batch details for display.
 
 ---
 
