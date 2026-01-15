@@ -21,8 +21,28 @@ export const packageTypeSchema = z.object({
   container_type: z.string().min(1, "Container type is required"),
   volume_oz: z.coerce.number().positive("Volume must be positive"),
   units_per_case: z.coerce.number().int().positive().nullable().optional(),
+  inner_pack_size: z.coerce.number().int().positive().nullable().optional(),
+  inner_packs_per_case: z.coerce.number().int().positive().nullable().optional(),
   is_active: z.boolean().default(true),
-});
+}).refine(
+  (data) => {
+    // If either inner pack field is set, both must be set and units_per_case must equal their product
+    const hasInnerPack = data.inner_pack_size != null || data.inner_packs_per_case != null;
+    if (!hasInnerPack) return true;
+
+    if (data.inner_pack_size == null || data.inner_packs_per_case == null) {
+      return false; // Both must be set if either is set
+    }
+
+    if (data.units_per_case == null) return true; // Allow if units_per_case not set
+
+    return data.units_per_case === data.inner_pack_size * data.inner_packs_per_case;
+  },
+  {
+    message: "When using inner packs, units per case must equal inner pack size × inner packs per case",
+    path: ["units_per_case"],
+  }
+);
 
 export type PackageTypeFormValues = z.infer<typeof packageTypeSchema>;
 
@@ -124,6 +144,8 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
         { field: "container_type", label: "Container Type" },
         { field: "volume_oz", label: "Volume (oz)" },
         { field: "units_per_case", label: "Units per Case" },
+        { field: "inner_pack_size", label: "Inner Pack Size" },
+        { field: "inner_packs_per_case", label: "Inner Packs per Case" },
         { field: "is_active", label: "Active" },
         { field: "created_at", label: "Created", format: "datetime" },
         { field: "updated_at", label: "Last Updated", format: "datetime" },
@@ -167,8 +189,24 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       label: "Units per Case",
       type: "number",
       placeholder: "e.g., 24, 4",
-      description: "For cans/bottles: how many per case",
-      colSpan: 6,
+      description: "Total units per case (auto-calculated if using inner packs)",
+      colSpan: 4,
+    },
+    {
+      name: "inner_pack_size",
+      label: "Inner Pack Size",
+      type: "number",
+      placeholder: "e.g., 6",
+      description: "Units per inner pack (e.g., 6-pack)",
+      colSpan: 4,
+    },
+    {
+      name: "inner_packs_per_case",
+      label: "Inner Packs/Case",
+      type: "number",
+      placeholder: "e.g., 4",
+      description: "Number of inner packs per case",
+      colSpan: 4,
     },
     {
       name: "is_active",
