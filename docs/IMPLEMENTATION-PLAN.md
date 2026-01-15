@@ -1178,10 +1178,10 @@ Next available: `00024`
 
 > Add AI context to all entity configurations.
 
-- [ ] Add `queryExamples` to all entities
-  - [ ] Natural language query examples
-  - [ ] Common question patterns
-- [ ] Add `keyFields` to all entities
+- [x] Add `queryExamples` to all entities (15 entities have queryExamples)
+  - [x] Natural language query examples
+  - [x] Common question patterns
+- [x] Add `keyFields` to all entities (15 entities have keyFields)
   - [ ] Fields most relevant for AI queries
   - [ ] Search/filter priority fields
 - [ ] Add `aiActions` to relevant entities
