@@ -108,7 +108,9 @@ export function StartFermentationDialog({
       if (!selectedVessel) throw new Error("Vessel not found");
 
       // Use atomic function to ensure both operations succeed or fail together
-      const { error } = await supabase.rpc("start_batch_fermentation", {
+      // Note: Type assertion needed until supabase types are regenerated with migration 00024
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)("start_batch_fermentation", {
         p_batch_id: batchId,
         p_vessel_id: values.vessel_id,
         p_volume_bbl: values.volume_bbl,

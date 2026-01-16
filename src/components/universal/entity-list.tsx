@@ -285,10 +285,39 @@ export function EntityList<T = Record<string, unknown>>({
                 </TableRow>
               ))
             ) : table.getRowModel().rows.length === 0 ? (
-              // Empty state
+              // Empty state with helpful prompt
               <TableRow>
-                <TableCell colSpan={columnsWithActions.length} className="h-24 text-center">
-                  No {entity.displayNamePlural.toLowerCase()} found.
+                <TableCell colSpan={columnsWithActions.length} className="h-48">
+                  <div className="flex flex-col items-center justify-center gap-3 text-center py-8">
+                    <div className="text-muted-foreground">
+                      {globalFilter ? (
+                        <>
+                          <p className="font-medium">No matching {entity.displayNamePlural.toLowerCase()}</p>
+                          <p className="text-sm">Try adjusting your search or filters</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium">No {entity.displayNamePlural.toLowerCase()} yet</p>
+                          <p className="text-sm">Get started by creating your first {entity.displayName.toLowerCase()}</p>
+                        </>
+                      )}
+                    </div>
+                    {showCreate && !globalFilter && (
+                      onCreateClick ? (
+                        <Button size="sm" onClick={onCreateClick}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Create {entity.displayName}
+                        </Button>
+                      ) : (
+                        <Button size="sm" asChild>
+                          <Link href={`${path}/new`}>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Create {entity.displayName}
+                          </Link>
+                        </Button>
+                      )
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
