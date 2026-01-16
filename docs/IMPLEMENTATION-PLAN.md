@@ -492,20 +492,22 @@ Next available: `00025`
 
 > Configure pricing by channel.
 
-- [ ] Create `src/entities/sales-channel.tsx`
-  - [ ] Types: distributor, retailer, taproom, export, etc.
-- [ ] Create `src/entities/price-tier.tsx`
-  - [ ] Link tier to sales channel
-  - [ ] Per-brand or per-style pricing
-- [ ] Create `src/entities/tier-price.tsx`
-  - [ ] brand_id (optional), style_id (optional), format_id
-  - [ ] Price per unit
-- [ ] Create pricing management pages
-  - [ ] Price tier list
-  - [ ] Price matrix editor (brand × format grid)
-- [ ] Implement price resolution logic
-  - [ ] Customer → Sales Channel → Price Tier
-  - [ ] Brand-specific price or fall back to style price
+- [x] Create `src/entities/sales-channel.tsx`
+  - [x] Types: distributor, retailer, taproom, export, etc.
+- [x] Create `src/entities/price-tier.tsx`
+  - [x] Link tier to sales channel
+  - [x] Per-brand or per-style pricing
+- [x] Create `src/entities/tier-price.tsx`
+  - [x] brand_id (optional), style_id (optional), format_id
+  - [x] Price per unit
+- [x] Create pricing management pages
+  - [x] Price tier list
+  - [ ] Price matrix editor (brand × format grid) - future enhancement
+- [x] Implement price resolution logic (migration 00025)
+  - [x] Customer → Sales Channel → Price Tier
+  - [x] Brand-specific price or fall back to style price
+- [x] Create migration 00025_sales_channels_and_pricing.sql
+- [x] Add sales_channel_id and price_tier_id to customers table
 
 ### 4.7 Order Pricing Integration
 
@@ -1531,6 +1533,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-16 | Phase 1: Marked JSONB migration items as N/A (no JSONB columns existed). Verified all components complete |
 | 2026-01-16 | Full verification pass: Phases 1-2 confirmed complete, Phases 2.5-11 status verified accurate |
 | 2026-01-16 | Phase 2.5.4: Created recipe additions editing page (/production/recipes/[id]/additions), Phase 2.5 now Complete |
+| 2026-01-16 | Phase 4.6: Implemented sales channels, price tiers, tier prices with migration, entities, and UI pages |
 
 ---
 
