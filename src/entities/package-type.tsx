@@ -94,8 +94,10 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
     },
     {
       accessorKey: "volume_oz",
-      header: "Volume (oz)",
+      header: "Volume",
       sortable: true,
+      format: "unit",
+      unitType: "retail_volume",
     },
     {
       accessorKey: "units_per_case",
@@ -142,7 +144,7 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       fields: [
         { field: "name", label: "Name" },
         { field: "container_type", label: "Container Type" },
-        { field: "volume_oz", label: "Volume (oz)" },
+        { field: "volume_oz", label: "Volume", format: "unit", unitType: "retail_volume" },
         { field: "units_per_case", label: "Units per Case" },
         { field: "inner_pack_size", label: "Inner Pack Size" },
         { field: "inner_packs_per_case", label: "Inner Packs per Case" },
