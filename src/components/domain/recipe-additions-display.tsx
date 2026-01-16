@@ -9,6 +9,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -18,8 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FlaskConical } from "lucide-react";
+import { FlaskConical, Pencil } from "lucide-react";
 
 // Timing labels
 const TIMING_LABELS: Record<string, string> = {
@@ -140,6 +142,12 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
         <p className="text-sm mt-1">
           Add water salts, clarifiers, nutrients, and other additions to this recipe
         </p>
+        <Button variant="outline" size="sm" className="mt-4" asChild>
+          <Link href={`/production/recipes/${recipeId}/additions`}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Add Additions
+          </Link>
+        </Button>
       </div>
     );
   }
@@ -154,6 +162,14 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/production/recipes/${recipeId}/additions`}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Edit Additions
+          </Link>
+        </Button>
+      </div>
       {Object.entries(groupedByTiming).map(([timing, items]) => (
         <div key={timing}>
           <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
