@@ -733,7 +733,7 @@ Next available: `00024`
 ## Phase 8: Settings & Administration
 
 **Goal:** Complete system configuration, user management, and administrative functions.
-**Status:** Partially Started (placeholder pages created for settings hub)
+**Status:** Partial (notification prefs, package formats, settings hub complete)
 **Depends On:** None (can be done in parallel)
 
 ### 8.1 System Settings
@@ -834,7 +834,7 @@ Next available: `00024`
 ## Phase 9: Yeast Management
 
 **Goal:** Track yeast inventory, pitches, harvests, and lineage.
-**Status:** Not Started
+**Status:** Partial (yeast strain catalog complete)
 **Depends On:** Phase 2 (Batches)
 
 ### 9.1 Yeast Strain Catalog
