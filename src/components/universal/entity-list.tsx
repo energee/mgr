@@ -383,7 +383,7 @@ export function EntityList<T = Record<string, unknown>>({
       {hasActiveQuickFilters && (
         <div className="flex flex-wrap gap-1">
           {Object.entries(quickFilters).map(([field, value]) => {
-            if (value === "" || value === undefined || (Array.isArray(value) && value.length === 0)) return null;
+            if (value === "" || value === undefined) return null;
             const filterDef = entity.listFilters?.find((f) => f.field === field);
             if (!filterDef) return null;
 
@@ -398,29 +398,9 @@ export function EntityList<T = Record<string, unknown>>({
               return option?.label || val;
             };
 
-            if (Array.isArray(value)) {
-              return value.map((v) => (
-                <Badge key={`${field}-${v}`} variant="secondary" className="text-xs">
-                  {filterDef.label}: {getLabel(v)}
-                  <button
-                    type="button"
-                    className="ml-1 hover:text-destructive"
-                    onClick={() =>
-                      setQuickFilters((prev) => ({
-                        ...prev,
-                        [field]: (prev[field] as string[]).filter((x) => x !== v),
-                      }))
-                    }
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ));
-            }
-
             return (
               <Badge key={field} variant="secondary" className="text-xs">
-                {filterDef.label}: {getLabel(value)}
+                {filterDef.label}: {getLabel(value as string)}
                 <button
                   type="button"
                   className="ml-1 hover:text-destructive"
