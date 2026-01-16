@@ -56,97 +56,102 @@ export function PlannedAdditions({
   const supabase = createClient();
 
   // Fetch planned additions from recipe
-  const { data: plannedAdditions, isLoading } = useQuery({
+  const { data: plannedAdditions, isLoading, error } = useQuery({
     queryKey: ["recipe-fermentation-additions", recipeId],
     queryFn: async () => {
-      const additions: PlannedAddition[] = [];
+      try {
+        const additions: PlannedAddition[] = [];
 
-      // Dry hops
-      const { data: dryHops } = await supabase
-        .from("recipe_hops")
-        .select("id, weight_oz, notes, hop:hops(name)")
-        .eq("recipe_id", recipeId)
-        .eq("timing", "dry_hop");
+        // Dry hops
+        const { data: dryHops } = await supabase
+          .from("recipe_hops")
+          .select("id, weight_oz, notes, hop:hops(name)")
+          .eq("recipe_id", recipeId)
+          .eq("timing", "dry_hop");
 
-      if (dryHops) {
-        dryHops.forEach((h) => {
-          const hop = h.hop as { name: string } | null;
-          additions.push({
-            id: h.id,
-            type: "dry_hop",
-            name: hop?.name || "Unknown hop",
-            amount: h.weight_oz,
-            unit: "oz",
-            notes: h.notes || undefined,
+        if (dryHops) {
+          dryHops.forEach((h) => {
+            const hop = h.hop as { name: string } | null;
+            additions.push({
+              id: h.id,
+              type: "dry_hop",
+              name: hop?.name || "Unknown hop",
+              amount: h.weight_oz,
+              unit: "oz",
+              notes: h.notes || undefined,
+            });
           });
-        });
-      }
+        }
 
-      // Fruits
-      const { data: fruits } = await supabase
-        .from("recipe_fruits")
-        .select("id, amount, unit, timing, notes, fruit:fruits(name)")
-        .eq("recipe_id", recipeId);
+        // Fruits
+        const { data: fruits } = await supabase
+          .from("recipe_fruits")
+          .select("id, amount, unit, timing, notes, fruit:fruits(name)")
+          .eq("recipe_id", recipeId);
 
-      if (fruits) {
-        fruits.forEach((f) => {
-          const fruit = f.fruit as { name: string } | null;
-          additions.push({
-            id: f.id,
-            type: "fruit",
-            name: fruit?.name || "Unknown fruit",
-            amount: f.amount,
-            unit: f.unit,
-            timing: f.timing || undefined,
-            notes: f.notes || undefined,
+        if (fruits) {
+          fruits.forEach((f) => {
+            const fruit = f.fruit as { name: string } | null;
+            additions.push({
+              id: f.id,
+              type: "fruit",
+              name: fruit?.name || "Unknown fruit",
+              amount: f.amount,
+              unit: f.unit,
+              timing: f.timing || undefined,
+              notes: f.notes || undefined,
+            });
           });
-        });
-      }
+        }
 
-      // Spices (fermentation/secondary timing)
-      const { data: spices } = await supabase
-        .from("recipe_spices")
-        .select("id, amount, unit, timing, notes, spice:spices(name)")
-        .eq("recipe_id", recipeId)
-        .in("timing", ["fermentation", "secondary"]);
+        // Spices (fermentation/secondary timing)
+        const { data: spices } = await supabase
+          .from("recipe_spices")
+          .select("id, amount, unit, timing, notes, spice:spices(name)")
+          .eq("recipe_id", recipeId)
+          .in("timing", ["fermentation", "secondary"]);
 
-      if (spices) {
-        spices.forEach((s) => {
-          const spice = s.spice as { name: string } | null;
-          additions.push({
-            id: s.id,
-            type: "spice",
-            name: spice?.name || "Unknown spice",
-            amount: s.amount,
-            unit: s.unit,
-            timing: s.timing || undefined,
-            notes: s.notes || undefined,
+        if (spices) {
+          spices.forEach((s) => {
+            const spice = s.spice as { name: string } | null;
+            additions.push({
+              id: s.id,
+              type: "spice",
+              name: spice?.name || "Unknown spice",
+              amount: s.amount,
+              unit: s.unit,
+              timing: s.timing || undefined,
+              notes: s.notes || undefined,
+            });
           });
-        });
-      }
+        }
 
-      // Adjuncts (fermentation timing)
-      const { data: adjuncts } = await supabase
-        .from("recipe_adjuncts")
-        .select("id, weight_lbs, notes, adjunct:adjuncts(name)")
-        .eq("recipe_id", recipeId)
-        .eq("timing", "fermentation");
+        // Adjuncts (fermentation timing)
+        const { data: adjuncts } = await supabase
+          .from("recipe_adjuncts")
+          .select("id, weight_lbs, notes, adjunct:adjuncts(name)")
+          .eq("recipe_id", recipeId)
+          .eq("timing", "fermentation");
 
-      if (adjuncts) {
-        adjuncts.forEach((a) => {
-          const adjunct = a.adjunct as { name: string } | null;
-          additions.push({
-            id: a.id,
-            type: "adjunct",
-            name: adjunct?.name || "Unknown adjunct",
-            amount: a.weight_lbs,
-            unit: "lbs",
-            notes: a.notes || undefined,
+        if (adjuncts) {
+          adjuncts.forEach((a) => {
+            const adjunct = a.adjunct as { name: string } | null;
+            additions.push({
+              id: a.id,
+              type: "adjunct",
+              name: adjunct?.name || "Unknown adjunct",
+              amount: a.weight_lbs,
+              unit: "lbs",
+              notes: a.notes || undefined,
+            });
           });
-        });
-      }
+        }
 
-      return additions;
+        return additions;
+      } catch (err) {
+        console.error("Failed to load planned additions:", err);
+        throw err;
+      }
     },
     enabled: !!recipeId,
   });
@@ -155,11 +160,16 @@ export function PlannedAdditions({
   const isAdditionLogged = (planned: PlannedAddition): boolean => {
     return actualAdditions.some((log) => {
       const actual = log.data;
-      // Match by type and similar name (case insensitive)
-      return (
-        actual.addition_type === planned.type &&
-        actual.ingredient_name.toLowerCase().includes(planned.name.toLowerCase().split(" ")[0])
-      );
+      // Match by type first
+      if (actual.addition_type !== planned.type) return false;
+
+      // If ingredient_id is available, use exact match
+      if (planned.id && actual.ingredient_id === planned.id) return true;
+
+      // Otherwise, use fuzzy name matching
+      const actualName = actual.ingredient_name.toLowerCase();
+      const plannedName = planned.name.toLowerCase();
+      return actualName.includes(plannedName) || plannedName.includes(actualName);
     });
   };
 
@@ -179,6 +189,16 @@ export function PlannedAdditions({
         return Beaker;
     }
   };
+
+  if (error) {
+    return (
+      <Card className={className}>
+        <CardContent className="py-8 text-center text-destructive">
+          Failed to load planned additions
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return null;

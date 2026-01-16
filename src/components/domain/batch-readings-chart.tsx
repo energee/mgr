@@ -56,6 +56,9 @@ type ChartMetric = "gravity" | "temperature";
 // Chart Configuration
 // =============================================================================
 
+const CHART_PADDING_PERCENT = 0.1;
+const CHART_MIN_PADDING = 2;
+
 const chartConfig: ChartConfig = {
   gravity: {
     label: "Gravity",
@@ -129,7 +132,7 @@ export function BatchReadingsChart({
     const max = Math.max(...values);
 
     // Add some padding
-    const padding = (max - min) * 0.1 || 2;
+    const padding = (max - min) * CHART_PADDING_PERCENT || CHART_MIN_PADDING;
 
     if (activeMetric === "gravity") {
       // For gravity, also consider target FG
