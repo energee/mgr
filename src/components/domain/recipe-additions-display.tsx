@@ -82,16 +82,7 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
   const supabase = createClient();
   const recipeId = data.id;
 
-  // Handle null recipe ID
-  if (!recipeId) {
-    return (
-      <div className="text-center text-muted-foreground py-6">
-        <FlaskConical className="h-10 w-10 mx-auto mb-3 opacity-40" />
-        <p>Recipe not saved yet</p>
-      </div>
-    );
-  }
-
+  // Hook must be called unconditionally - use enabled option to prevent query when no ID
   const { data: additions, isLoading } = useQuery({
     queryKey: ["recipe-additions", recipeId],
     queryFn: async () => {
@@ -112,7 +103,7 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
             description
           )
         `)
-        .eq("recipe_id", recipeId)
+        .eq("recipe_id", recipeId!)
         .order("position", { ascending: true });
 
       if (error) throw error;
@@ -120,6 +111,16 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
     },
     enabled: !!recipeId,
   });
+
+  // Handle null recipe ID (after hooks)
+  if (!recipeId) {
+    return (
+      <div className="text-center text-muted-foreground py-6">
+        <FlaskConical className="h-10 w-10 mx-auto mb-3 opacity-40" />
+        <p>Recipe not saved yet</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
