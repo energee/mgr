@@ -1413,10 +1413,10 @@ These are low-effort improvements that can be tackled between phases.
 ### UI/UX Improvements
 
 - [ ] Add bulk status change to batch list
-- [ ] Add quick filters to all entity lists
+- [ ] Add quick filters to all entity lists (configs exist in entities but not rendered in EntityList)
 - [ ] Add keyboard shortcuts for common actions
 - [ ] Add empty states with helpful prompts
-- [ ] Add loading skeletons to all pages
+- [x] Add loading skeletons to all pages (EntityList, EntityDetail, EntityForm all have skeleton loaders)
 
 ### Entity Config Enhancements
 
@@ -1515,6 +1515,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 11.4: Added UnitInput field type to EntityForm, updated recipe form with unit fields |
 | 2026-01-15 | Phase 11.4: Extended UnitInput to vessel, vessel-transfer, yeast-strain, package-type entities |
 | 2026-01-15 | Verified Phase 3.1: Unified allocations table complete (migration 00010) with polymorphic source/destination |
+| 2026-01-15 | Quick Wins: Verified loading skeletons complete in EntityList, EntityDetail, EntityForm |
 
 ---
 
