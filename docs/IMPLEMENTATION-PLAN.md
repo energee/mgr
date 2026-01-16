@@ -597,13 +597,14 @@ Next available: `00024`
 
 **Goal:** Connect to external systems.
 **Timeline:** Ongoing
-**Status:** Partial (Square done)
+**Status:** Partial (notifications done, integrations pending)
 
 ### 6.1 Square POS Integration
 
 > Sync taproom POS transactions to debit inventory.
 
-- [x] Basic webhook sync implemented
+- [x] Create integrations placeholder page (`/settings/integrations`)
+- [ ] Basic webhook sync implementation
 - [ ] Manual reconciliation UI
   - [ ] View unmapped Square items
   - [ ] Create item mappings (Square → MGR products)
@@ -1526,6 +1527,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Quick Wins: Verified empty states with helpful prompts complete (PR #84) |
 | 2026-01-15 | Phase 7.2-7.3: Verified production and inventory dashboards partially complete |
 | 2026-01-15 | Phase 2.5.4: Added RecipeAdditionsDisplay component for viewing recipe additions |
+| 2026-01-15 | Phase 6.1: Fixed Square status - webhook not implemented, only placeholder page exists |
 
 ---
 
