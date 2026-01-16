@@ -29,6 +29,9 @@ import { poLineItemEntity } from "./po-line-item";
 import { sessionLineItemEntity } from "./session-line-item";
 import { packageTypeEntity } from "./package-type";
 import { yeastStrainEntity } from "./yeast-strain";
+import { salesChannelEntity } from "./sales-channel";
+import { priceTierEntity } from "./price-tier";
+import { tierPriceEntity } from "./tier-price";
 
 // =============================================================================
 // Register All Entities
@@ -53,6 +56,9 @@ registerEntity(packageTypeEntity);
 registerEntity(orderEntity);
 registerEntity(customerEntity);
 registerEntity(orderItemEntity);
+registerEntity(salesChannelEntity);
+registerEntity(priceTierEntity);
+registerEntity(tierPriceEntity);
 
 // Purchasing domain
 registerEntity(supplierEntity);
@@ -93,6 +99,12 @@ export { packageTypeEntity } from "./package-type";
 export type { PackageTypeFormValues } from "./package-type";
 export { yeastStrainEntity } from "./yeast-strain";
 export type { YeastStrainFormValues } from "./yeast-strain";
+export { salesChannelEntity } from "./sales-channel";
+export type { SalesChannelFormValues } from "./sales-channel";
+export { priceTierEntity } from "./price-tier";
+export type { PriceTierFormValues } from "./price-tier";
+export { tierPriceEntity } from "./tier-price";
+export type { TierPriceFormValues } from "./tier-price";
 
 // =============================================================================
 // Helper Functions
