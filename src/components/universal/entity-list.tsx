@@ -44,12 +44,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
+  Filter,
   MoreHorizontal,
   Plus,
   Search,
+  X,
 } from "lucide-react";
 
 interface EntityListProps<T = Record<string, unknown>> {
@@ -87,19 +97,44 @@ export function EntityList<T = Record<string, unknown>>({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
 
+  // Quick filter state - maps field name to selected value(s)
+  const [quickFilters, setQuickFilters] = useState<Record<string, string | string[]>>({});
+
   // Fetch data - use viewTable if available (for views with joins), otherwise use base table
   const fetchTable = entity.viewTable || entity.table;
   const { data, isLoading, error } = useQuery({
-    queryKey: [fetchTable, filters],
+    queryKey: [fetchTable, filters, quickFilters],
     queryFn: async () => {
       let query = db.from(fetchTable).select("*");
 
-      // Apply additional filters
+      // Apply additional filters (from props)
       if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
           query = query.eq(key, value);
         });
       }
+
+      // Apply quick filters from UI
+      Object.entries(quickFilters).forEach(([field, value]) => {
+        if (value === "" || value === undefined || (Array.isArray(value) && value.length === 0)) return;
+
+        // Find the filter definition to determine the type
+        const filterDef = entity.listFilters?.find((f) => f.field === field);
+
+        if (Array.isArray(value)) {
+          // Multiselect filter - use "in" operator
+          query = query.in(field, value);
+        } else if (filterDef?.type === "search") {
+          // Search filter - use ilike for partial matching
+          query = query.ilike(field, `%${value}%`);
+        } else if (value === "true" || value === "false") {
+          // Boolean filter
+          query = query.eq(field, value === "true");
+        } else {
+          // Single value filter
+          query = query.eq(field, value);
+        }
+      });
 
       const { data, error } = await query;
       if (error) throw error;
@@ -168,6 +203,12 @@ export function EntityList<T = Record<string, unknown>>({
     ];
   }, [columns, entity.actions, path]);
 
+  // Check if any quick filters are active
+  const hasActiveQuickFilters = Object.values(quickFilters).some((v) =>
+    v !== "" && v !== undefined && !(Array.isArray(v) && v.length === 0)
+  );
+  const hasActiveFilters = globalFilter || hasActiveQuickFilters;
+
   // Initialize table
   const table = useReactTable({
     data: data || [],
@@ -219,16 +260,162 @@ export function EntityList<T = Record<string, unknown>>({
         )}
       </div>
 
-      {/* Search */}
-      {entity.searchableFields && entity.searchableFields.length > 0 && (
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-10"
-          />
+      {/* Search and Filters */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Search */}
+        {entity.searchableFields && entity.searchableFields.length > 0 && (
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        )}
+
+        {/* Quick Filters */}
+        {entity.listFilters && entity.listFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            {entity.listFilters.map((filter) => (
+              <div key={filter.field} className="min-w-[140px]">
+                {filter.type === "select" && filter.options && (
+                  <Select
+                    value={(quickFilters[filter.field] as string) || ""}
+                    onValueChange={(value) =>
+                      setQuickFilters((prev) => ({
+                        ...prev,
+                        [filter.field]: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder={filter.label} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filter.options.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {/* Multiselect rendered as single select for now - works with "in" operator */}
+                {filter.type === "multiselect" && filter.options && (
+                  <Select
+                    value={(quickFilters[filter.field] as string) || ""}
+                    onValueChange={(value) =>
+                      setQuickFilters((prev) => ({
+                        ...prev,
+                        [filter.field]: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder={filter.label} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All</SelectItem>
+                      {filter.options.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {/* Search filter as text input */}
+                {filter.type === "search" && (
+                  <Input
+                    placeholder={filter.label}
+                    value={(quickFilters[filter.field] as string) || ""}
+                    onChange={(e) =>
+                      setQuickFilters((prev) => ({
+                        ...prev,
+                        [filter.field]: e.target.value,
+                      }))
+                    }
+                    className="h-9 w-36"
+                  />
+                )}
+                {filter.type === "boolean" && (
+                  <Select
+                    value={(quickFilters[filter.field] as string) || ""}
+                    onValueChange={(value) =>
+                      setQuickFilters((prev) => ({
+                        ...prev,
+                        [filter.field]: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder={filter.label} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All</SelectItem>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            ))}
+            {/* Clear filters button */}
+            {hasActiveQuickFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setQuickFilters({})}
+                className="h-9"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Active filter badges */}
+      {hasActiveQuickFilters && (
+        <div className="flex flex-wrap gap-1">
+          {Object.entries(quickFilters).map(([field, value]) => {
+            if (value === "" || value === undefined) return null;
+            const filterDef = entity.listFilters?.find((f) => f.field === field);
+            if (!filterDef) return null;
+
+            const getLabel = (val: string) => {
+              if (filterDef.type === "boolean") {
+                return val === "true" ? "Yes" : "No";
+              }
+              if (filterDef.type === "search") {
+                return `"${val}"`;
+              }
+              const option = filterDef.options?.find((o) => o.value === val);
+              return option?.label || val;
+            };
+
+            return (
+              <Badge key={field} variant="secondary" className="text-xs">
+                {filterDef.label}: {getLabel(value as string)}
+                <button
+                  type="button"
+                  className="ml-1 hover:text-destructive"
+                  onClick={() =>
+                    setQuickFilters((prev) => ({
+                      ...prev,
+                      [field]: "",
+                    }))
+                  }
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
         </div>
       )}
 
@@ -290,7 +477,7 @@ export function EntityList<T = Record<string, unknown>>({
                 <TableCell colSpan={columnsWithActions.length} className="h-48">
                   <div className="flex flex-col items-center justify-center gap-3 text-center py-8">
                     <div className="text-muted-foreground">
-                      {globalFilter ? (
+                      {hasActiveFilters ? (
                         <>
                           <p className="font-medium">No matching {entity.displayNamePlural.toLowerCase()}</p>
                           <p className="text-sm">Try adjusting your search or filters</p>
@@ -302,7 +489,7 @@ export function EntityList<T = Record<string, unknown>>({
                         </>
                       )}
                     </div>
-                    {showCreate && !globalFilter && (
+                    {showCreate && !hasActiveFilters && (
                       onCreateClick ? (
                         <Button size="sm" onClick={onCreateClick}>
                           <Plus className="h-4 w-4 mr-1" />
