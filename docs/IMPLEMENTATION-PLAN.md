@@ -696,7 +696,7 @@ Next available: `00025`
 
 **Goal:** Business intelligence and regulatory compliance.
 **Timeline:** 2-3 weeks
-**Status:** Partial (TTB report UI, production dashboard, inventory dashboard created; sales dashboard pending)
+**Status:** Partial (TTB report UI, production dashboard, inventory dashboard, sales dashboard created; TTB calculations pending)
 **Depends On:** Phase 3 (allocations)
 
 ### 7.1 TTB Form 5130.9
@@ -735,9 +735,10 @@ Next available: `00025`
 
 ### 7.4 Sales Dashboard
 
-- [ ] Order pipeline
-- [ ] Revenue by customer/channel
-- [ ] Product mix analysis
+- [x] Create sales dashboard page (`src/app/(app)/dashboard/sales/page.tsx`)
+- [x] Order pipeline (orders by status with counts and links)
+- [x] Revenue by customer/channel (top customers with sales channel info)
+- [x] Product mix analysis (revenue breakdown by brand)
 
 ---
 
@@ -1534,6 +1535,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-16 | Full verification pass: Phases 1-2 confirmed complete, Phases 2.5-11 status verified accurate |
 | 2026-01-16 | Phase 2.5.4: Created recipe additions editing page (/production/recipes/[id]/additions), Phase 2.5 now Complete |
 | 2026-01-16 | Phase 4.6: Implemented sales channels, price tiers, tier prices with migration, entities, and UI pages |
+| 2026-01-16 | Phase 7.4: Created sales dashboard with order pipeline, revenue by customer/channel, and product mix analysis |
 
 ---
 
