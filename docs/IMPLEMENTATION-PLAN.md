@@ -2,7 +2,7 @@
 
 > Generated: January 2026
 > Status: Active
-> Last Updated: 2026-01-15
+> Last Updated: 2026-01-16
 
 ## Overview
 
@@ -73,8 +73,8 @@ All entity pages use universal components. Reference: `src/app/(app)/production/
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00023`
-Next available: `00024`
+Current highest: `00024`
+Next available: `00025`
 
 ### Reference Files by Pattern
 
@@ -117,8 +117,8 @@ Next available: `00024`
 - [x] Create ingredient management UI components (grain bill editor, hop schedule editor)
   - [x] `src/components/domain/grain-bill-editor.tsx` - Malt selection and weight management
   - [x] `src/components/domain/hop-schedule-editor.tsx` - Hop timing, weight, and IBU calculation
-- [ ] Create data migration script for existing JSONB data (if any)
-- [ ] Remove deprecated JSONB columns after verification
+- [x] Create data migration script for existing JSONB data (if any) - N/A: No JSONB columns existed
+- [x] Remove deprecated JSONB columns after verification - N/A: No JSONB columns existed
 
 ### 1.2 Database Indexes (DEC-HP-004)
 
@@ -597,13 +597,14 @@ Next available: `00024`
 
 **Goal:** Connect to external systems.
 **Timeline:** Ongoing
-**Status:** Partial (Square done)
+**Status:** Partial (notifications done, integrations pending)
 
 ### 6.1 Square POS Integration
 
 > Sync taproom POS transactions to debit inventory.
 
-- [x] Basic webhook sync implemented
+- [x] Create integrations placeholder page (`/settings/integrations`)
+- [ ] Basic webhook sync implementation
 - [ ] Manual reconciliation UI
   - [ ] View unmapped Square items
   - [ ] Create item mappings (Square → MGR products)
@@ -1526,6 +1527,9 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Quick Wins: Verified empty states with helpful prompts complete (PR #84) |
 | 2026-01-15 | Phase 7.2-7.3: Verified production and inventory dashboards partially complete |
 | 2026-01-15 | Phase 2.5.4: Added RecipeAdditionsDisplay component for viewing recipe additions |
+| 2026-01-15 | Phase 6.1: Fixed Square status - webhook not implemented, only placeholder page exists |
+| 2026-01-16 | Phase 1: Marked JSONB migration items as N/A (no JSONB columns existed). Verified all components complete |
+| 2026-01-16 | Full verification pass: Phases 1-2 confirmed complete, Phases 2.5-11 status verified accurate |
 
 ---
 
@@ -1605,12 +1609,15 @@ supabase/migrations/
 ├── 00012_performance_indexes.sql
 ├── 00013_rls_performance_fix.sql
 ├── 00014_security_fixes.sql
-├── 00015-00018 (various fixes)
+├── 00016_recipe_yeasts.sql
+├── 00017_mash_fermentation_schedules.sql
+├── 00018_recipe_templates.sql
 ├── 00019_entity_revisions.sql
 ├── 00020_notifications.sql
 ├── 00021_recipe_cogs.sql
 ├── 00022_notification_triggers.sql
-└── 00023_vessel_transfer_trigger.sql
+├── 00023_vessel_transfer_trigger.sql
+└── 00024_start_batch_fermentation.sql
 ```
 
 ---
