@@ -177,11 +177,12 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
     },
     {
       name: "volume_oz",
-      label: "Volume (oz)",
-      type: "number",
+      label: "Volume",
+      type: "unit",
+      unitType: "retail_volume",
       placeholder: "e.g., 16, 128, 1984",
       required: true,
-      description: "Volume in fluid ounces",
+      description: "Package volume",
       colSpan: 6,
     },
     {

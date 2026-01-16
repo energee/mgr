@@ -147,10 +147,10 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
     {
       name: "volume_bbl",
       label: "Volume",
-      type: "number",
-      description: "Volume transferred in barrels",
-      required: true,
+      type: "unit",
       unitType: "volume",
+      description: "Volume transferred",
+      required: true,
     },
     {
       name: "transferred_at",
