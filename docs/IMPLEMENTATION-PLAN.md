@@ -1416,7 +1416,7 @@ These are low-effort improvements that can be tackled between phases.
 - [ ] Add bulk status change to batch list
 - [ ] Add quick filters to all entity lists (configs exist in entities but not rendered in EntityList)
 - [ ] Add keyboard shortcuts for common actions
-- [ ] Add empty states with helpful prompts
+- [x] Add empty states with helpful prompts (EntityList shows contextual message + Create button)
 - [x] Add loading skeletons to all pages (EntityList, EntityDetail, EntityForm all have skeleton loaders)
 
 ### Entity Config Enhancements
@@ -1518,6 +1518,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Verified Phase 3.1: Unified allocations table complete (migration 00010) with polymorphic source/destination |
 | 2026-01-15 | Quick Wins: Verified loading skeletons complete in EntityList, EntityDetail, EntityForm |
 | 2026-01-15 | Phase 2.5.4: Verified water_profile_id integration in recipe form (AdditionsEditor pending) |
+| 2026-01-15 | Quick Wins: Verified empty states with helpful prompts complete (PR #84) |
 
 ---
 
