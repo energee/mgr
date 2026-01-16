@@ -268,8 +268,9 @@ export const vesselEntity: EntityConfig<Vessel> = {
     },
     {
       name: "capacity_bbl",
-      label: "Capacity (BBL)",
-      type: "number",
+      label: "Capacity",
+      type: "unit",
+      unitType: "volume",
       placeholder: "e.g., 7",
       required: true,
       colSpan: 6,
