@@ -692,7 +692,7 @@ Next available: `00024`
 
 **Goal:** Business intelligence and regulatory compliance.
 **Timeline:** 2-3 weeks
-**Status:** Partially Started (TTB report UI created, dashboards pending)
+**Status:** Partial (TTB report UI, production dashboard, inventory dashboard created; sales dashboard pending)
 **Depends On:** Phase 3 (allocations)
 
 ### 7.1 TTB Form 5130.9
@@ -713,15 +713,19 @@ Next available: `00024`
 
 ### 7.2 Production Dashboard
 
-- [ ] Vessel utilization chart
-- [ ] Batch status overview
+- [x] Create production dashboard page (`src/app/(app)/dashboard/page.tsx`)
+- [x] Batch status overview (counts by status with cards)
+- [x] Vessel utilization display (capacity chart, status breakdown)
+- [x] Active batches list with status badges
 - [ ] Upcoming brew schedule
-- [ ] Fermentation tracking
+- [ ] Fermentation tracking/monitoring
 
 ### 7.3 Inventory Dashboard
 
-- [ ] Low stock alerts
-- [ ] Expiring lots
+- [x] Create inventory dashboard page (`src/app/(app)/dashboard/inventory/page.tsx`)
+- [x] Low stock alerts (items below reorder point)
+- [x] Expiring lots (within 90 days, with days_until_expiry)
+- [x] Inventory summary by category
 - [ ] Ingredient usage trends
 - [ ] Reorder recommendations
 
@@ -1519,6 +1523,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Quick Wins: Verified loading skeletons complete in EntityList, EntityDetail, EntityForm |
 | 2026-01-15 | Phase 2.5.4: Verified water_profile_id integration in recipe form (AdditionsEditor pending) |
 | 2026-01-15 | Quick Wins: Verified empty states with helpful prompts complete (PR #84) |
+| 2026-01-15 | Phase 7.2-7.3: Verified production and inventory dashboards partially complete |
 
 ---
 
