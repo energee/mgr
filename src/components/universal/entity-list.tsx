@@ -51,6 +51,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   ChevronDown,
   ChevronUp,
@@ -303,29 +309,60 @@ export function EntityList<T = Record<string, unknown>>({
                     </SelectContent>
                   </Select>
                 )}
-                {/* Multiselect rendered as single select for now - works with "in" operator */}
+                {/* Multiselect with checkboxes */}
                 {filter.type === "multiselect" && filter.options && (
-                  <Select
-                    value={(quickFilters[filter.field] as string) || ""}
-                    onValueChange={(value) =>
-                      setQuickFilters((prev) => ({
-                        ...prev,
-                        [filter.field]: value,
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="h-9 text-sm">
-                      <SelectValue placeholder={filter.label} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All</SelectItem>
-                      {filter.options.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 border-dashed text-sm font-normal"
+                      >
+                        <Filter className="mr-2 h-4 w-4" />
+                        {filter.label}
+                        {(quickFilters[filter.field] as string[])?.length > 0 && (
+                          <>
+                            <div className="mx-2 h-4 w-px bg-border" />
+                            <Badge
+                              variant="secondary"
+                              className="rounded-sm px-1 font-normal"
+                            >
+                              {(quickFilters[filter.field] as string[]).length}
+                            </Badge>
+                          </>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0" align="start">
+                      <div className="max-h-64 overflow-auto">
+                        {filter.options.map((option) => {
+                          const isSelected = (
+                            quickFilters[filter.field] as string[] || []
+                          ).includes(option.value);
+                          return (
+                            <div
+                              key={option.value}
+                              className="flex items-center space-x-2 px-3 py-2 hover:bg-accent cursor-pointer"
+                              onClick={() => {
+                                const currentValues =
+                                  (quickFilters[filter.field] as string[]) || [];
+                                const newValues = isSelected
+                                  ? currentValues.filter((v) => v !== option.value)
+                                  : [...currentValues, option.value];
+                                setQuickFilters((prev) => ({
+                                  ...prev,
+                                  [filter.field]: newValues,
+                                }));
+                              }}
+                            >
+                              <Checkbox checked={isSelected} />
+                              <span className="text-sm">{option.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 )}
                 {/* Search filter as text input */}
                 {filter.type === "search" && (
@@ -383,11 +420,20 @@ export function EntityList<T = Record<string, unknown>>({
       {hasActiveQuickFilters && (
         <div className="flex flex-wrap gap-1">
           {Object.entries(quickFilters).map(([field, value]) => {
-            if (value === "" || value === undefined) return null;
+            if (value === "" || value === undefined || (Array.isArray(value) && value.length === 0)) return null;
             const filterDef = entity.listFilters?.find((f) => f.field === field);
             if (!filterDef) return null;
 
-            const getLabel = (val: string) => {
+            const getLabel = (val: string | string[]) => {
+              if (Array.isArray(val)) {
+                // Multiselect - show comma-separated labels
+                return val
+                  .map((v) => {
+                    const option = filterDef.options?.find((o) => o.value === v);
+                    return option?.label || v;
+                  })
+                  .join(", ");
+              }
               if (filterDef.type === "boolean") {
                 return val === "true" ? "Yes" : "No";
               }
@@ -400,14 +446,14 @@ export function EntityList<T = Record<string, unknown>>({
 
             return (
               <Badge key={field} variant="secondary" className="text-xs">
-                {filterDef.label}: {getLabel(value as string)}
+                {filterDef.label}: {getLabel(value as string | string[])}
                 <button
                   type="button"
                   className="ml-1 hover:text-destructive"
                   onClick={() =>
                     setQuickFilters((prev) => ({
                       ...prev,
-                      [field]: "",
+                      [field]: Array.isArray(value) ? [] : "",
                     }))
                   }
                 >
