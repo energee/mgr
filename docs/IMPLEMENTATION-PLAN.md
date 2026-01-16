@@ -281,7 +281,7 @@ Next available: `00025`
 ## Phase 2.5: Recipe Builder Completion
 
 **Goal:** Complete the full recipe builder with all ingredient types, schedules, and water chemistry.
-**Status:** Mostly Complete (ingredient editors, schedules, water chemistry, COGS done; recipe form integration pending)
+**Status:** Complete (ingredient editors, schedules, water chemistry, COGS, additions editing done)
 **Depends On:** Phase 1
 
 ### 2.5.1 Additional Ingredient Editors
@@ -345,7 +345,7 @@ Next available: `00025`
 - [x] Create `src/lib/water-chemistry.ts` with calculation functions
 - [x] Integrate water_profile_id with recipe form (dynamicOptions select field)
 - [x] Integrate recipe_additions display in recipe detail (RecipeAdditionsDisplay component)
-- [ ] Integrate AdditionsEditor in recipe edit form (allows editing additions)
+- [x] Integrate AdditionsEditor in recipe edit form (via dedicated `/production/recipes/[id]/additions` page)
 
 ### 2.5.5 Recipe Templates
 
@@ -1530,6 +1530,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 6.1: Fixed Square status - webhook not implemented, only placeholder page exists |
 | 2026-01-16 | Phase 1: Marked JSONB migration items as N/A (no JSONB columns existed). Verified all components complete |
 | 2026-01-16 | Full verification pass: Phases 1-2 confirmed complete, Phases 2.5-11 status verified accurate |
+| 2026-01-16 | Phase 2.5.4: Created recipe additions editing page (/production/recipes/[id]/additions), Phase 2.5 now Complete |
 
 ---
 
