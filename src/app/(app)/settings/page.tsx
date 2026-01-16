@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, FlaskConical, Link2, MapPin, Package, Settings, Users } from "lucide-react";
+import { Bell, Building2, DollarSign, FlaskConical, Link2, MapPin, Package, Settings, Store, Users } from "lucide-react";
 
 const settingsLinks = [
   {
@@ -56,6 +56,20 @@ const settingsLinks = [
     description: "Manage yeast strain catalog for recipe building",
     href: "/settings/yeasts",
     icon: FlaskConical,
+    available: true,
+  },
+  {
+    title: "Sales Channels",
+    description: "Configure sales channels for customer pricing tiers",
+    href: "/settings/sales-channels",
+    icon: Store,
+    available: true,
+  },
+  {
+    title: "Pricing",
+    description: "Manage price tiers and format pricing",
+    href: "/settings/pricing",
+    icon: DollarSign,
     available: true,
   },
 ];
