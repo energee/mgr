@@ -343,7 +343,8 @@ Next available: `00024`
   - [x] Display sulfate:chloride ratio
   - [x] Mash pH estimation
 - [x] Create `src/lib/water-chemistry.ts` with calculation functions
-- [ ] Integrate with recipe form (link to water_profile_id and recipe_additions)
+- [x] Integrate water_profile_id with recipe form (dynamicOptions select field)
+- [ ] Integrate recipe_additions with AdditionsEditor in recipe form
 
 ### 2.5.5 Recipe Templates
 
@@ -1516,6 +1517,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 11.4: Extended UnitInput to vessel, vessel-transfer, yeast-strain, package-type entities |
 | 2026-01-15 | Verified Phase 3.1: Unified allocations table complete (migration 00010) with polymorphic source/destination |
 | 2026-01-15 | Quick Wins: Verified loading skeletons complete in EntityList, EntityDetail, EntityForm |
+| 2026-01-15 | Phase 2.5.4: Verified water_profile_id integration in recipe form (AdditionsEditor pending) |
 
 ---
 
