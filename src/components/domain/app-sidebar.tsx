@@ -52,6 +52,7 @@ const navigation: NavSection[] = [
     items: [
       { label: "Production", href: "/dashboard", icon: FlaskConical },
       { label: "Inventory", href: "/dashboard/inventory", icon: Package },
+      { label: "Sales", href: "/dashboard/sales", icon: DollarSign },
     ],
   },
   {
