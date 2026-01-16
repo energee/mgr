@@ -107,31 +107,15 @@ export function StartFermentationDialog({
       const selectedVessel = vessels?.find((v) => v.id === values.vessel_id);
       if (!selectedVessel) throw new Error("Vessel not found");
 
-      // 1. Create vessel transfer (knockout from kettle)
-      const { error: transferError } = await supabase
-        .from("vessel_transfers")
-        .insert({
-          batch_id: batchId,
-          from_vessel_id: null, // Knockout from kettle
-          to_vessel_id: values.vessel_id,
-          volume_bbl: values.volume_bbl,
-          transferred_at: new Date().toISOString(),
-          notes: "Knockout - start of fermentation",
-        });
+      // Use atomic function to ensure both operations succeed or fail together
+      const { error } = await supabase.rpc("start_batch_fermentation", {
+        p_batch_id: batchId,
+        p_vessel_id: values.vessel_id,
+        p_volume_bbl: values.volume_bbl,
+        p_vessel_name: selectedVessel.name,
+      });
 
-      if (transferError) throw transferError;
-
-      // 2. Update batch status and fermenter
-      const { error: batchError } = await supabase
-        .from("batches")
-        .update({
-          status: "fermenting",
-          fermenter: selectedVessel.name,
-          volume_bbl: values.volume_bbl,
-        })
-        .eq("id", batchId);
-
-      if (batchError) throw batchError;
+      if (error) throw error;
 
       return selectedVessel.name;
     },
@@ -226,7 +210,7 @@ export function StartFermentationDialog({
               </p>
             )}
             {selectedVessel && form.watch("volume_bbl") > selectedVessel.capacity_bbl && (
-              <p className="text-sm text-warning text-amber-600">
+              <p className="text-sm text-amber-600">
                 Volume exceeds vessel capacity ({selectedVessel.capacity_bbl} BBL)
               </p>
             )}

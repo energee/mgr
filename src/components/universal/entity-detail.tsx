@@ -426,12 +426,15 @@ function RelationTable({
         const sortField = relatedEntity.defaultSort?.column || "created_at";
         const sortAsc = relatedEntity.defaultSort?.direction === "asc";
 
+        // Use configured limit or default to 50
+        const limit = relation.relationLimit || 50;
+
         const { data, error } = await db
           .from(relatedEntity.table)
           .select(selectClause)
           .eq(relation.foreignKey, parentId)
           .order(sortField, { ascending: sortAsc })
-          .limit(50);
+          .limit(limit);
 
         if (error) throw error;
         return data || [];
