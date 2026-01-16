@@ -375,18 +375,20 @@ Next available: `00024`
 
 **Goal:** Complete the batch → packaging → finished goods → inventory flow.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (entities and pages done, allocation workflow pending)
+**Status:** Mostly Complete (entities, pages, unified allocations done; pick list generation pending)
 **Depends On:** Phase 2
 
 ### 3.1 Unified Allocations Table (DEC-HP-001)
 
 > Merge `allocations` and `fg_allocations` into single polymorphic table.
 
-- [ ] Create migration for unified `allocations` table structure
-  - [ ] Migrate data from existing tables
-  - [ ] Update all views that reference allocations
-- [ ] Update inventory queries to use new structure
-- [ ] Update AI query helpers
+- [x] Create migration for unified `allocations` table structure (migration 00010)
+  - [x] Polymorphic source_type/destination_type architecture
+  - [x] Status tracking, approval workflow, reason codes
+  - [x] Migrate data from existing tables
+  - [x] Update all views that reference allocations
+- [x] Create supporting views (inventory_lots_with_quantities, finished_goods_with_availability, batches_with_remaining_volume)
+- [x] Update AI query helpers (schema-context.ts references unified allocations)
 
 ### 3.2 Packaging Session Entity
 
@@ -1512,6 +1514,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 9.1: Created yeast strain entity and catalog management pages |
 | 2026-01-15 | Phase 11.4: Added UnitInput field type to EntityForm, updated recipe form with unit fields |
 | 2026-01-15 | Phase 11.4: Extended UnitInput to vessel, vessel-transfer, yeast-strain, package-type entities |
+| 2026-01-15 | Verified Phase 3.1: Unified allocations table complete (migration 00010) with polymorphic source/destination |
 
 ---
 
