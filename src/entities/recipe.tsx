@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
+import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 // Use view type to include calculated estimates
@@ -248,6 +249,11 @@ export const recipeEntity: EntityConfig<Recipe> = {
       id: "fermentation_schedule",
       title: "Fermentation Schedule",
       component: FermentationScheduleDisplay,
+    },
+    {
+      id: "additions",
+      title: "Additions",
+      component: RecipeAdditionsDisplay,
     },
     {
       id: "notes",
