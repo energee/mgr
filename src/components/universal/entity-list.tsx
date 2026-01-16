@@ -118,9 +118,15 @@ export function EntityList<T = Record<string, unknown>>({
       Object.entries(quickFilters).forEach(([field, value]) => {
         if (value === "" || value === undefined || (Array.isArray(value) && value.length === 0)) return;
 
+        // Find the filter definition to determine the type
+        const filterDef = entity.listFilters?.find((f) => f.field === field);
+
         if (Array.isArray(value)) {
           // Multiselect filter - use "in" operator
           query = query.in(field, value);
+        } else if (filterDef?.type === "search") {
+          // Search filter - use ilike for partial matching
+          query = query.ilike(field, `%${value}%`);
         } else if (value === "true" || value === "false") {
           // Boolean filter
           query = query.eq(field, value === "true");
@@ -196,6 +202,12 @@ export function EntityList<T = Record<string, unknown>>({
       },
     ];
   }, [columns, entity.actions, path]);
+
+  // Check if any quick filters are active
+  const hasActiveQuickFilters = Object.values(quickFilters).some((v) =>
+    v !== "" && v !== undefined && !(Array.isArray(v) && v.length === 0)
+  );
+  const hasActiveFilters = globalFilter || hasActiveQuickFilters;
 
   // Initialize table
   const table = useReactTable({
@@ -291,24 +303,22 @@ export function EntityList<T = Record<string, unknown>>({
                     </SelectContent>
                   </Select>
                 )}
+                {/* Multiselect rendered as single select for now - works with "in" operator */}
                 {filter.type === "multiselect" && filter.options && (
                   <Select
-                    value={(quickFilters[filter.field] as string[])?.join(",") || ""}
+                    value={(quickFilters[filter.field] as string) || ""}
                     onValueChange={(value) =>
                       setQuickFilters((prev) => ({
                         ...prev,
-                        [filter.field]: value ? value.split(",") : [],
+                        [filter.field]: value,
                       }))
                     }
                   >
                     <SelectTrigger className="h-9 text-sm">
-                      <SelectValue placeholder={filter.label}>
-                        {(quickFilters[filter.field] as string[])?.length > 0
-                          ? `${(quickFilters[filter.field] as string[]).length} selected`
-                          : filter.label}
-                      </SelectValue>
+                      <SelectValue placeholder={filter.label} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">All</SelectItem>
                       {filter.options.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -316,6 +326,20 @@ export function EntityList<T = Record<string, unknown>>({
                       ))}
                     </SelectContent>
                   </Select>
+                )}
+                {/* Search filter as text input */}
+                {filter.type === "search" && (
+                  <Input
+                    placeholder={filter.label}
+                    value={(quickFilters[filter.field] as string) || ""}
+                    onChange={(e) =>
+                      setQuickFilters((prev) => ({
+                        ...prev,
+                        [filter.field]: e.target.value,
+                      }))
+                    }
+                    className="h-9 w-36"
+                  />
                 )}
                 {filter.type === "boolean" && (
                   <Select
@@ -340,10 +364,7 @@ export function EntityList<T = Record<string, unknown>>({
               </div>
             ))}
             {/* Clear filters button */}
-            {Object.keys(quickFilters).some((k) => {
-              const v = quickFilters[k];
-              return v !== "" && v !== undefined && !(Array.isArray(v) && v.length === 0);
-            }) && (
+            {hasActiveQuickFilters && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -359,13 +380,10 @@ export function EntityList<T = Record<string, unknown>>({
       </div>
 
       {/* Active filter badges */}
-      {Object.keys(quickFilters).some((k) => {
-        const v = quickFilters[k];
-        return v !== "" && v !== undefined && !(Array.isArray(v) && v.length === 0);
-      }) && (
+      {hasActiveQuickFilters && (
         <div className="flex flex-wrap gap-1">
           {Object.entries(quickFilters).map(([field, value]) => {
-            if (value === "" || value === undefined || (Array.isArray(value) && value.length === 0)) return null;
+            if (value === "" || value === undefined) return null;
             const filterDef = entity.listFilters?.find((f) => f.field === field);
             if (!filterDef) return null;
 
@@ -373,33 +391,16 @@ export function EntityList<T = Record<string, unknown>>({
               if (filterDef.type === "boolean") {
                 return val === "true" ? "Yes" : "No";
               }
+              if (filterDef.type === "search") {
+                return `"${val}"`;
+              }
               const option = filterDef.options?.find((o) => o.value === val);
               return option?.label || val;
             };
 
-            if (Array.isArray(value)) {
-              return value.map((v) => (
-                <Badge key={`${field}-${v}`} variant="secondary" className="text-xs">
-                  {filterDef.label}: {getLabel(v)}
-                  <button
-                    type="button"
-                    className="ml-1 hover:text-destructive"
-                    onClick={() =>
-                      setQuickFilters((prev) => ({
-                        ...prev,
-                        [field]: (prev[field] as string[]).filter((x) => x !== v),
-                      }))
-                    }
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ));
-            }
-
             return (
               <Badge key={field} variant="secondary" className="text-xs">
-                {filterDef.label}: {getLabel(value)}
+                {filterDef.label}: {getLabel(value as string)}
                 <button
                   type="button"
                   className="ml-1 hover:text-destructive"
@@ -476,7 +477,7 @@ export function EntityList<T = Record<string, unknown>>({
                 <TableCell colSpan={columnsWithActions.length} className="h-48">
                   <div className="flex flex-col items-center justify-center gap-3 text-center py-8">
                     <div className="text-muted-foreground">
-                      {globalFilter ? (
+                      {hasActiveFilters ? (
                         <>
                           <p className="font-medium">No matching {entity.displayNamePlural.toLowerCase()}</p>
                           <p className="text-sm">Try adjusting your search or filters</p>
@@ -488,7 +489,7 @@ export function EntityList<T = Record<string, unknown>>({
                         </>
                       )}
                     </div>
-                    {showCreate && !globalFilter && (
+                    {showCreate && !hasActiveFilters && (
                       onCreateClick ? (
                         <Button size="sm" onClick={onCreateClick}>
                           <Plus className="h-4 w-4 mr-1" />
