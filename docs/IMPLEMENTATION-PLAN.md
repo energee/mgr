@@ -1004,9 +1004,13 @@ Next available: `00024`
 
 ### 11.4 Integration
 
-- [ ] Update recipe form to use UnitInput
-- [ ] Update brew log forms to use UnitInput
-- [ ] Update batch forms to use UnitInput
+- [x] Update recipe form to use UnitInput (volume_bbl, batch_size_bbl, mash_temp_f)
+- [x] Update batch forms to use UnitInput (volume_bbl already uses unit type)
+- [x] Update vessel forms to use UnitInput (capacity_bbl)
+- [x] Update vessel-transfer forms to use UnitInput (volume_bbl)
+- [x] Update yeast-strain forms to use UnitInput (temp_min_f, temp_ideal_f, temp_max_f)
+- [x] Update package-type forms to use UnitInput (volume_oz)
+- [ ] Update brew log forms to use UnitInput (events measurements - more complex)
 - [ ] Reports always show canonical units (BBL for TTB compliance)
 
 ---
@@ -1506,6 +1510,8 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 8.6: Created package types entity and settings pages for reference data management |
 | 2026-01-15 | Phase 11.2: Added unit preferences to brewery settings page |
 | 2026-01-15 | Phase 9.1: Created yeast strain entity and catalog management pages |
+| 2026-01-15 | Phase 11.4: Added UnitInput field type to EntityForm, updated recipe form with unit fields |
+| 2026-01-15 | Phase 11.4: Extended UnitInput to vessel, vessel-transfer, yeast-strain, package-type entities |
 
 ---
 
