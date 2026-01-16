@@ -344,7 +344,8 @@ Next available: `00024`
   - [x] Mash pH estimation
 - [x] Create `src/lib/water-chemistry.ts` with calculation functions
 - [x] Integrate water_profile_id with recipe form (dynamicOptions select field)
-- [ ] Integrate recipe_additions with AdditionsEditor in recipe form
+- [x] Integrate recipe_additions display in recipe detail (RecipeAdditionsDisplay component)
+- [ ] Integrate AdditionsEditor in recipe edit form (allows editing additions)
 
 ### 2.5.5 Recipe Templates
 
@@ -1524,6 +1525,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-15 | Phase 2.5.4: Verified water_profile_id integration in recipe form (AdditionsEditor pending) |
 | 2026-01-15 | Quick Wins: Verified empty states with helpful prompts complete (PR #84) |
 | 2026-01-15 | Phase 7.2-7.3: Verified production and inventory dashboards partially complete |
+| 2026-01-15 | Phase 2.5.4: Added RecipeAdditionsDisplay component for viewing recipe additions |
 
 ---
 
