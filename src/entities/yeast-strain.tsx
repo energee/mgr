@@ -192,9 +192,9 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
       id: "temperature",
       title: "Temperature Range",
       fields: [
-        { field: "temp_min_f", label: "Min Temp (°F)" },
-        { field: "temp_ideal_f", label: "Ideal Temp (°F)" },
-        { field: "temp_max_f", label: "Max Temp (°F)" },
+        { field: "temp_min_f", label: "Min Temp", format: "unit", unitType: "temperature" },
+        { field: "temp_ideal_f", label: "Ideal Temp", format: "unit", unitType: "temperature" },
+        { field: "temp_max_f", label: "Max Temp", format: "unit", unitType: "temperature" },
       ],
     },
     {

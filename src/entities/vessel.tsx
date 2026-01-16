@@ -140,8 +140,10 @@ export const vesselEntity: EntityConfig<Vessel> = {
     },
     {
       accessorKey: "capacity_bbl",
-      header: "Capacity (BBL)",
+      header: "Capacity",
       sortable: true,
+      format: "unit",
+      unitType: "volume",
     },
     {
       accessorKey: "status",
@@ -216,7 +218,7 @@ export const vesselEntity: EntityConfig<Vessel> = {
       fields: [
         { field: "name", label: "Name" },
         { field: "vessel_type", label: "Type" },
-        { field: "capacity_bbl", label: "Capacity (BBL)" },
+        { field: "capacity_bbl", label: "Capacity", format: "unit", unitType: "volume" },
         { field: "status", label: "Status" },
         { field: "is_active", label: "Active" },
       ],
