@@ -567,7 +567,7 @@ Next available: `00029`
   - [x] `finished_goods` (migration 00010_unified_allocations.sql)
   - [x] `bin_inventory` (migration 00028)
 - [x] Create `updateWithOptimisticLock` utility function (`src/lib/optimistic-lock.ts`)
-- [ ] Implement conflict detection in forms
+- [x] Implement conflict detection in forms (EntityForm auto-detects versioned records)
 - [x] Create "Record modified" error dialog with refresh option (`src/components/ui/conflict-dialog.tsx`)
 
 ### 5.5 Error Handling Patterns
@@ -1548,6 +1548,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-17 | Phase 3.3: Created packaging completion trigger (migration 00026) - auto-creates FG and allocations on session completion |
 | 2026-01-17 | Phase 4.5: Enhanced customer entity with sales channel/price tier fields, order summary view (migration 00027), Phase 4 now Complete |
 | 2026-01-17 | Phase 5.2/5.4: Created migration 00028 with temporal pricing (get_price_for_customer update, tier_prices_with_status view) and bin_inventory optimistic locking |
+| 2026-01-17 | Phase 5.4: Added conflict detection to EntityForm - auto-detects versioned records and shows ConflictDialog on concurrent modification |
 
 ---
 
