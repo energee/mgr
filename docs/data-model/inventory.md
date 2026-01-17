@@ -233,6 +233,7 @@ Finished goods quantities per bin.
 | finished_good_id | UUID | FK to finished_goods |
 | bin_id | UUID | FK to bins |
 | quantity | INTEGER | Current quantity in bin |
+| version | INTEGER | Optimistic locking version (auto-incremented on update) |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 

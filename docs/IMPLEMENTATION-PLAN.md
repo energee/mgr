@@ -73,8 +73,8 @@ All entity pages use universal components. Reference: `src/app/(app)/production/
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00024`
-Next available: `00025`
+Current highest: `00028`
+Next available: `00029`
 
 ### Reference Files by Pattern
 
@@ -547,9 +547,9 @@ Next available: `00025`
 
 > Price history with effective dates.
 
-- [ ] Add `valid_from`, `valid_to` to `tier_prices`
-- [ ] Update pricing queries to respect date ranges
-- [ ] Add price history UI
+- [x] Add `effective_from`, `effective_to` to `tier_prices` (already in migration 00025)
+- [x] Update pricing queries to respect date ranges (migration 00028)
+- [x] Add price history view (`tier_prices_with_status` with validity_status)
 
 ### 5.3 Enum Registry (DEC-MP-005)
 
@@ -565,7 +565,7 @@ Next available: `00025`
 
 - [x] Add `version` column to high-contention tables
   - [x] `finished_goods` (migration 00010_unified_allocations.sql)
-  - [ ] `bin_inventory`
+  - [x] `bin_inventory` (migration 00028)
 - [x] Create `updateWithOptimisticLock` utility function (`src/lib/optimistic-lock.ts`)
 - [ ] Implement conflict detection in forms
 - [x] Create "Record modified" error dialog with refresh option (`src/components/ui/conflict-dialog.tsx`)
@@ -1463,8 +1463,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00027
-- Next available: 00028
+- Current: 00001-00028
+- Next available: 00029
 
 ### Testing Strategy
 
@@ -1547,6 +1547,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-17 | Quick Wins: Merged PR #93 - Added quick filters to EntityList (select, multiselect, search, boolean types) |
 | 2026-01-17 | Phase 3.3: Created packaging completion trigger (migration 00026) - auto-creates FG and allocations on session completion |
 | 2026-01-17 | Phase 4.5: Enhanced customer entity with sales channel/price tier fields, order summary view (migration 00027), Phase 4 now Complete |
+| 2026-01-17 | Phase 5.2/5.4: Created migration 00028 with temporal pricing (get_price_for_customer update, tier_prices_with_status view) and bin_inventory optimistic locking |
 
 ---
 
