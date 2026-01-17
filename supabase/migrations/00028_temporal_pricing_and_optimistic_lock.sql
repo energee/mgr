@@ -32,14 +32,38 @@ CREATE TRIGGER on_bin_inventory_update_version
   EXECUTE FUNCTION increment_bin_inventory_version();
 
 -- =============================================================================
--- 2. INDEX FOR EFFICIENT TEMPORAL PRICING QUERIES
+-- 2. UPDATE UNIQUE CONSTRAINT FOR TEMPORAL PRICING
+-- =============================================================================
+
+-- Drop the old UNIQUE constraint that doesn't support temporal pricing
+-- (prevents multiple prices for same tier/format/brand/style with different dates)
+ALTER TABLE tier_prices
+  DROP CONSTRAINT IF EXISTS tier_prices_price_tier_id_format_id_coalesce_coalesce1_key;
+
+-- Enable btree_gist extension for exclusion constraint with UUID and daterange
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+-- Add exclusion constraint to allow non-overlapping date ranges for same product
+-- This enables temporal pricing: same tier/format/brand/style can have multiple
+-- prices as long as their effective date ranges don't overlap
+ALTER TABLE tier_prices
+  ADD CONSTRAINT tier_prices_no_overlap EXCLUDE USING gist (
+    price_tier_id WITH =,
+    format_id WITH =,
+    COALESCE(brand_id, '00000000-0000-0000-0000-000000000000'::uuid) WITH =,
+    COALESCE(style_id, '00000000-0000-0000-0000-000000000000'::uuid) WITH =,
+    daterange(effective_from, COALESCE(effective_to, 'infinity'::date), '[]') WITH &&
+  );
+
+-- =============================================================================
+-- 3. INDEX FOR EFFICIENT TEMPORAL PRICING QUERIES
 -- =============================================================================
 
 CREATE INDEX IF NOT EXISTS idx_tier_prices_effective_dates
   ON tier_prices(price_tier_id, format_id, effective_from, effective_to);
 
 -- =============================================================================
--- 3. UPDATE PRICE RESOLUTION FUNCTION FOR TEMPORAL PRICING
+-- 4. UPDATE PRICE RESOLUTION FUNCTION FOR TEMPORAL PRICING
 -- =============================================================================
 
 -- Drop existing function to recreate with new signature
@@ -121,7 +145,7 @@ $$;
 COMMENT ON FUNCTION get_price_for_customer IS 'Resolves price for customer/format with temporal validity support. Pass p_effective_date for historical price lookup.';
 
 -- =============================================================================
--- 4. PRICE HISTORY VIEW
+-- 5. PRICE HISTORY VIEW
 -- =============================================================================
 
 CREATE OR REPLACE VIEW tier_prices_with_status
@@ -149,7 +173,7 @@ LEFT JOIN beer_styles bs ON tp.style_id = bs.id;
 COMMENT ON VIEW tier_prices_with_status IS 'Tier prices with temporal status (active/expired/future) and joined display names';
 
 -- =============================================================================
--- 5. SCHEMA REGISTRY UPDATES
+-- 6. SCHEMA REGISTRY UPDATES
 -- =============================================================================
 
 INSERT INTO _schema_registry (table_name, description, domain, relationships, key_fields, query_examples)
