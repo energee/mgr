@@ -377,7 +377,7 @@ Next available: `00025`
 
 **Goal:** Complete the batch → packaging → finished goods → inventory flow.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (entities, pages, unified allocations done; pick list generation pending)
+**Status:** Mostly Complete (entities, pages, unified allocations, pick list generation done; packaging-to-FG link pending)
 **Depends On:** Phase 2
 
 ### 3.1 Unified Allocations Table (DEC-HP-001)
@@ -424,7 +424,11 @@ Next available: `00025`
 > Allocate finished goods to orders.
 
 - [x] Create allocation UI for orders (`order-allocation.tsx` with FIFO suggestion)
-- [ ] Implement pick list generation
+- [x] Implement pick list generation
+  - [x] Create `OrderPickList` component with bin locations and print support
+  - [x] Create pick list page (`/sales/orders/[id]/pick-list`)
+  - [x] Create allocations page (`/sales/orders/[id]/allocations`)
+  - [x] Add `OrderQuickLinks` component to order detail
 - [x] Update inventory quantities on allocation (via allocation records)
 - [ ] Add approval workflow for allocations (optional)
 
@@ -1536,6 +1540,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-16 | Phase 2.5.4: Created recipe additions editing page (/production/recipes/[id]/additions), Phase 2.5 now Complete |
 | 2026-01-16 | Phase 4.6: Implemented sales channels, price tiers, tier prices with migration, entities, and UI pages |
 | 2026-01-16 | Phase 7.4: Created sales dashboard with order pipeline, revenue by customer/channel, and product mix analysis |
+| 2026-01-16 | Phase 3.4: Implemented pick list generation with OrderPickList, allocations page, and quick links |
 
 ---
 
