@@ -10,7 +10,7 @@
  * TanStack Virtual for virtualizing large lists.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   useReactTable,
@@ -106,9 +106,15 @@ export function EntityList<T = Record<string, unknown>>({
   // Quick filter state - maps field name to selected value(s)
   const [quickFilters, setQuickFilters] = useState<Record<string, string | string[]>>({});
 
+  // Reset filters when navigating between entities
+  useEffect(() => {
+    setQuickFilters({});
+    setGlobalFilter("");
+  }, [entity.name]);
+
   // Fetch data - use viewTable if available (for views with joins), otherwise use base table
   const fetchTable = entity.viewTable || entity.table;
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error } = useQuery({
     queryKey: [fetchTable, filters, quickFilters],
     queryFn: async () => {
       let query = db.from(fetchTable).select("*");
@@ -301,6 +307,7 @@ export function EntityList<T = Record<string, unknown>>({
                       <SelectValue placeholder={filter.label} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">All</SelectItem>
                       {filter.options.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -466,7 +473,13 @@ export function EntityList<T = Record<string, unknown>>({
       )}
 
       {/* Table */}
-      <div className="border rounded-lg">
+      <div className={`border rounded-lg relative ${isFetching && !isLoading ? "opacity-60" : ""}`}>
+        {/* Refetch indicator */}
+        {isFetching && !isLoading && (
+          <div className="absolute top-2 right-2 z-10">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        )}
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
