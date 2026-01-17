@@ -377,7 +377,7 @@ Next available: `00025`
 
 **Goal:** Complete the batch → packaging → finished goods → inventory flow.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (entities, pages, unified allocations, pick list generation done; packaging-to-FG link pending)
+**Status:** Complete (entities, pages, unified allocations, pick list generation, packaging-to-FG trigger done)
 **Depends On:** Phase 2
 
 ### 3.1 Unified Allocations Table (DEC-HP-001)
@@ -417,7 +417,7 @@ Next available: `00025`
   - [x] Define detail sections
 - [x] Register finished good entity
 - [x] Create finished goods pages (`src/app/(app)/inventory/finished-goods/`)
-- [ ] Link packaging session completion to FG creation
+- [x] Link packaging session completion to FG creation (migration 00026 with trigger)
 
 ### 3.4 Inventory Allocation Workflow
 
@@ -1461,8 +1461,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00023
-- Next available: 00024
+- Current: 00001-00026
+- Next available: 00027
 
 ### Testing Strategy
 
@@ -1543,6 +1543,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-16 | Phase 3.4: Implemented pick list generation with OrderPickList, allocations page, and quick links |
 | 2026-01-17 | Phase 4.7: Integrated tier pricing into order items editor with auto-pricing and tier name display |
 | 2026-01-17 | Quick Wins: Merged PR #93 - Added quick filters to EntityList (select, multiselect, search, boolean types) |
+| 2026-01-17 | Phase 3.3: Created packaging completion trigger (migration 00026) - auto-creates FG and allocations on session completion |
 
 ---
 
@@ -1630,7 +1631,9 @@ supabase/migrations/
 ├── 00021_recipe_cogs.sql
 ├── 00022_notification_triggers.sql
 ├── 00023_vessel_transfer_trigger.sql
-└── 00024_start_batch_fermentation.sql
+├── 00024_start_batch_fermentation.sql
+├── 00025_sales_channels_and_pricing.sql
+└── 00026_packaging_completion_trigger.sql
 ```
 
 ---
