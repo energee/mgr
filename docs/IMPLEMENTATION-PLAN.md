@@ -1427,7 +1427,7 @@ These are low-effort improvements that can be tackled between phases.
 ### UI/UX Improvements
 
 - [ ] Add bulk status change to batch list
-- [ ] Add quick filters to all entity lists (configs exist in entities but not rendered in EntityList)
+- [x] Add quick filters to all entity lists (EntityList renders listFilters with select, multiselect, search, boolean types)
 - [ ] Add keyboard shortcuts for common actions
 - [x] Add empty states with helpful prompts (EntityList shows contextual message + Create button)
 - [x] Add loading skeletons to all pages (EntityList, EntityDetail, EntityForm all have skeleton loaders)
@@ -1542,6 +1542,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-16 | Phase 7.4: Created sales dashboard with order pipeline, revenue by customer/channel, and product mix analysis |
 | 2026-01-16 | Phase 3.4: Implemented pick list generation with OrderPickList, allocations page, and quick links |
 | 2026-01-17 | Phase 4.7: Integrated tier pricing into order items editor with auto-pricing and tier name display |
+| 2026-01-17 | Quick Wins: Merged PR #93 - Added quick filters to EntityList (select, multiselect, search, boolean types) |
 
 ---
 
