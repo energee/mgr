@@ -438,7 +438,7 @@ Next available: `00025`
 
 **Goal:** Complete order fulfillment and purchasing workflows.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (entities, pages, line items, receiving done; pricing tiers pending)
+**Status:** Mostly Complete (entities, pages, line items, receiving, pricing tiers, order pricing integration done)
 **Depends On:** Phase 3
 
 ### 4.1 Order Line Items
@@ -517,10 +517,10 @@ Next available: `00025`
 
 > Auto-price order lines from tiers.
 
-- [ ] Look up customer's sales channel on line add
-- [ ] Find tier price for brand + format
-- [ ] Apply price with override option
-- [ ] Display price source (tier name or "manual")
+- [x] Look up customer's sales channel on line add
+- [x] Find tier price for brand + format (uses `get_price_for_customer` RPC)
+- [x] Apply price with override option (auto-fill on selection, refresh button for existing)
+- [x] Display price source (tier name badge on new items)
 
 ---
 
@@ -1541,6 +1541,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-16 | Phase 4.6: Implemented sales channels, price tiers, tier prices with migration, entities, and UI pages |
 | 2026-01-16 | Phase 7.4: Created sales dashboard with order pipeline, revenue by customer/channel, and product mix analysis |
 | 2026-01-16 | Phase 3.4: Implemented pick list generation with OrderPickList, allocations page, and quick links |
+| 2026-01-17 | Phase 4.7: Integrated tier pricing into order items editor with auto-pricing and tier name display |
 
 ---
 

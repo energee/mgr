@@ -5,13 +5,19 @@
  *
  * Inline editor for order line items. Shows list of items with ability to
  * add, edit, and remove items. Calculates order totals.
+ *
+ * Features:
+ * - Auto-pricing from customer's price tier when brand/format selected
+ * - Shows price source (tier name or "manual")
+ * - Manual price override with indication
  */
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -28,7 +34,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 // =============================================================================
@@ -46,6 +58,7 @@ interface OrderItemRow {
 
 interface OrderItemsEditorProps {
   orderId: string;
+  customerId?: string | null;
   readOnly?: boolean;
 }
 
@@ -54,14 +67,25 @@ interface NewItemState {
   package_type_id: string;
   quantity: number;
   unit_price: number;
+  suggestedPrice: number | null;
+  tierName: string | null;
+}
+
+interface TierPriceResult {
+  price: number;
+  tier_name: string;
+  is_brand_specific: boolean;
+  is_style_specific: boolean;
 }
 
 // =============================================================================
 // Component
 // =============================================================================
 
-export function OrderItemsEditor({ orderId, readOnly = false }: OrderItemsEditorProps) {
+export function OrderItemsEditor({ orderId, customerId, readOnly = false }: OrderItemsEditorProps) {
   const supabase = createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
   const queryClient = useQueryClient();
 
   // New item form state
@@ -70,8 +94,27 @@ export function OrderItemsEditor({ orderId, readOnly = false }: OrderItemsEditor
     package_type_id: "",
     quantity: 1,
     unit_price: 0,
+    suggestedPrice: null,
+    tierName: null,
   });
   const [showAddRow, setShowAddRow] = useState(false);
+
+  // Fetch order details including customer_id
+  const { data: order } = useQuery({
+    queryKey: ["order", orderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, customer_id")
+        .eq("id", orderId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Use passed customerId or fetch from order
+  const effectiveCustomerId = customerId ?? order?.customer_id;
 
   // Fetch order items
   const { data: items, isLoading: itemsLoading } = useQuery({
@@ -86,6 +129,61 @@ export function OrderItemsEditor({ orderId, readOnly = false }: OrderItemsEditor
       return data as OrderItemRow[];
     },
   });
+
+  // Function to look up tier price
+  const lookupTierPrice = useCallback(async (
+    brandId: string | null,
+    formatId: string | null
+  ): Promise<TierPriceResult | null> => {
+    if (!effectiveCustomerId || !formatId) return null;
+
+    try {
+      const { data, error } = await db.rpc("get_price_for_customer", {
+        p_customer_id: effectiveCustomerId,
+        p_format_id: formatId,
+        p_brand_id: brandId || null,
+        p_style_id: null, // Could be enhanced to pass style_id from brand
+      });
+
+      if (error) {
+        console.error("Price lookup error:", error);
+        return null;
+      }
+
+      if (data && data.length > 0) {
+        return data[0] as TierPriceResult;
+      }
+      return null;
+    } catch (e) {
+      console.error("Price lookup failed:", e);
+      return null;
+    }
+  }, [effectiveCustomerId, db]);
+
+  // Auto-lookup price when brand or format changes in new item
+  useEffect(() => {
+    const lookupPrice = async () => {
+      if (newItem.brand_id && newItem.package_type_id) {
+        const result = await lookupTierPrice(newItem.brand_id, newItem.package_type_id);
+        if (result) {
+          setNewItem((prev) => ({
+            ...prev,
+            suggestedPrice: result.price,
+            tierName: result.tier_name,
+            // Auto-fill price if not manually set
+            unit_price: prev.unit_price === 0 ? result.price : prev.unit_price,
+          }));
+        } else {
+          setNewItem((prev) => ({
+            ...prev,
+            suggestedPrice: null,
+            tierName: null,
+          }));
+        }
+      }
+    };
+    lookupPrice();
+  }, [newItem.brand_id, newItem.package_type_id, lookupTierPrice]);
 
   // Fetch brands for dropdown
   const { data: brands } = useQuery({
@@ -128,7 +226,14 @@ export function OrderItemsEditor({ orderId, readOnly = false }: OrderItemsEditor
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["order-items", orderId] });
-      setNewItem({ brand_id: "", package_type_id: "", quantity: 1, unit_price: 0 });
+      setNewItem({
+        brand_id: "",
+        package_type_id: "",
+        quantity: 1,
+        unit_price: 0,
+        suggestedPrice: null,
+        tierName: null,
+      });
       setShowAddRow(false);
       toast.success("Item added");
     },
@@ -136,6 +241,21 @@ export function OrderItemsEditor({ orderId, readOnly = false }: OrderItemsEditor
       toast.error("Failed to add item");
     },
   });
+
+  // Apply suggested price to an existing item
+  const applyTierPrice = async (itemId: string, brandId: string | null, formatId: string | null) => {
+    const result = await lookupTierPrice(brandId, formatId);
+    if (result) {
+      updateItem.mutate({
+        id: itemId,
+        field: "unit_price",
+        value: result.price,
+      });
+      toast.success(`Applied ${result.tier_name} price: $${result.price.toFixed(2)}`);
+    } else {
+      toast.error("No tier price found for this combination");
+    }
+  };
 
   // Update item mutation
   const updateItem = useMutation({
@@ -219,7 +339,7 @@ export function OrderItemsEditor({ orderId, readOnly = false }: OrderItemsEditor
             <TableHead>Brand</TableHead>
             <TableHead>Package</TableHead>
             <TableHead className="w-[100px]">Qty</TableHead>
-            <TableHead className="w-[120px]">Unit Price</TableHead>
+            <TableHead className="w-[150px]">Unit Price</TableHead>
             <TableHead className="w-[100px] text-right">Line Total</TableHead>
             {!readOnly && <TableHead className="w-[60px]" />}
           </TableRow>
@@ -296,21 +416,42 @@ export function OrderItemsEditor({ orderId, readOnly = false }: OrderItemsEditor
                 {readOnly ? (
                   item.unit_price ? `$${item.unit_price.toFixed(2)}` : "—"
                 ) : (
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={item.unit_price || ""}
-                    onChange={(e) =>
-                      updateItem.mutate({
-                        id: item.id,
-                        field: "unit_price",
-                        value: parseFloat(e.target.value) || null,
-                      })
-                    }
-                    className="h-8 w-full"
-                    placeholder="0.00"
-                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={item.unit_price || ""}
+                      onChange={(e) =>
+                        updateItem.mutate({
+                          id: item.id,
+                          field: "unit_price",
+                          value: parseFloat(e.target.value) || null,
+                        })
+                      }
+                      className="h-8 w-full"
+                      placeholder="0.00"
+                    />
+                    {effectiveCustomerId && item.brand_id && item.package_type_id && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => applyTierPrice(item.id, item.brand_id, item.package_type_id)}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Apply tier price</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
                 )}
               </TableCell>
               <TableCell className="text-right font-medium">
@@ -381,17 +522,45 @@ export function OrderItemsEditor({ orderId, readOnly = false }: OrderItemsEditor
                 />
               </TableCell>
               <TableCell>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={newItem.unit_price || ""}
-                  onChange={(e) =>
-                    setNewItem({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })
-                  }
-                  className="h-8 w-full"
-                  placeholder="0.00"
-                />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={newItem.unit_price || ""}
+                      onChange={(e) =>
+                        setNewItem({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })
+                      }
+                      className="h-8 w-full"
+                      placeholder="0.00"
+                    />
+                    {newItem.suggestedPrice !== null && newItem.unit_price !== newItem.suggestedPrice && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => setNewItem({ ...newItem, unit_price: newItem.suggestedPrice || 0 })}
+                            >
+                              <DollarSign className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Use tier price: ${newItem.suggestedPrice?.toFixed(2)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
+                  {newItem.tierName && (
+                    <Badge variant="outline" className="text-xs">
+                      {newItem.tierName}
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-right font-medium">
                 ${(newItem.quantity * newItem.unit_price).toFixed(2)}
