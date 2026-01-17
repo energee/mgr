@@ -438,7 +438,7 @@ Next available: `00025`
 
 **Goal:** Complete order fulfillment and purchasing workflows.
 **Timeline:** 1-2 weeks
-**Status:** Mostly Complete (entities, pages, line items, receiving, pricing tiers, order pricing integration done)
+**Status:** Complete (entities, pages, line items, receiving, pricing tiers, order pricing, customer balance tracking done)
 **Depends On:** Phase 3
 
 ### 4.1 Order Line Items
@@ -488,9 +488,11 @@ Next available: `00025`
   - [x] List columns: name, sales channel, balance, last order
   - [x] Form fields: name, contact, address, sales channel, notes
 - [x] Create customer pages (`src/app/(app)/sales/customers/`)
-- [ ] Customer balance tracking
-  - [ ] Detail with order history, keg balance
-- [ ] Link customer to sales channel for pricing
+- [x] Customer balance tracking
+  - [x] Detail with order history (via relations tab)
+  - [x] Order totals (view migration 00027 with total_orders, total_revenue, pending_orders)
+  - [ ] Keg balance (depends on Phase 10: Keg Management)
+- [x] Link customer to sales channel for pricing (sales_channel_id, price_tier_id fields)
 
 ### 4.6 Sales Channel & Price Tiers
 
@@ -1461,8 +1463,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00026
-- Next available: 00027
+- Current: 00001-00027
+- Next available: 00028
 
 ### Testing Strategy
 
@@ -1544,6 +1546,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-17 | Phase 4.7: Integrated tier pricing into order items editor with auto-pricing and tier name display |
 | 2026-01-17 | Quick Wins: Merged PR #93 - Added quick filters to EntityList (select, multiselect, search, boolean types) |
 | 2026-01-17 | Phase 3.3: Created packaging completion trigger (migration 00026) - auto-creates FG and allocations on session completion |
+| 2026-01-17 | Phase 4.5: Enhanced customer entity with sales channel/price tier fields, order summary view (migration 00027), Phase 4 now Complete |
 
 ---
 
@@ -1633,7 +1636,8 @@ supabase/migrations/
 ├── 00023_vessel_transfer_trigger.sql
 ├── 00024_start_batch_fermentation.sql
 ├── 00025_sales_channels_and_pricing.sql
-└── 00026_packaging_completion_trigger.sql
+├── 00026_packaging_completion_trigger.sql
+└── 00027_customer_order_summary.sql
 ```
 
 ---
