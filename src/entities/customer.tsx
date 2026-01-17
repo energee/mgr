@@ -23,6 +23,8 @@ export const customerSchema = z.object({
   email: z.string().email().nullable().optional().or(z.literal("")),
   phone: z.string().nullable().optional(),
   address: z.any().nullable().optional(), // JSONB
+  sales_channel_id: z.string().uuid().nullable().optional(),
+  price_tier_id: z.string().uuid().nullable().optional(),
   notes: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
 });
@@ -44,6 +46,7 @@ const customerTypeDisplay: Record<string, { label: string; color: "default" | "s
 export const customerEntity: EntityConfig<Customer> = {
   name: "customer",
   table: "customers",
+  viewTable: "customers_with_order_summary",
   displayName: "Customer",
   displayNamePlural: "Customers",
   description: "Distributors, retailers, and direct customers",
@@ -70,19 +73,27 @@ export const customerEntity: EntityConfig<Customer> = {
       ),
     },
     {
-      accessorKey: "contact_name",
-      header: "Contact",
+      accessorKey: "sales_channel_name",
+      header: "Channel",
       sortable: true,
     },
     {
-      accessorKey: "email",
-      header: "Email",
+      accessorKey: "total_orders",
+      header: "Orders",
       sortable: true,
+      format: "number",
     },
     {
-      accessorKey: "phone",
-      header: "Phone",
+      accessorKey: "total_revenue",
+      header: "Revenue",
       sortable: true,
+      format: "currency",
+    },
+    {
+      accessorKey: "last_order_date",
+      header: "Last Order",
+      sortable: true,
+      format: "date",
     },
     {
       accessorKey: "is_active",
@@ -130,6 +141,25 @@ export const customerEntity: EntityConfig<Customer> = {
         { field: "name", label: "Company Name" },
         { field: "customer_type", label: "Customer Type" },
         { field: "is_active", label: "Active" },
+      ],
+    },
+    {
+      id: "pricing",
+      title: "Pricing",
+      fields: [
+        { field: "sales_channel_name", label: "Sales Channel" },
+        { field: "price_tier_name", label: "Price Tier" },
+      ],
+    },
+    {
+      id: "order_summary",
+      title: "Order Summary",
+      fields: [
+        { field: "total_orders", label: "Total Orders", format: "number" },
+        { field: "total_revenue", label: "Total Revenue", format: "currency" },
+        { field: "pending_orders", label: "Pending Orders", format: "number" },
+        { field: "pending_revenue", label: "Pending Revenue", format: "currency" },
+        { field: "last_order_date", label: "Last Order", format: "date" },
       ],
     },
     {
@@ -205,6 +235,31 @@ export const customerEntity: EntityConfig<Customer> = {
       type: "switch",
       description: "Inactive customers won't appear in order selection",
       defaultValue: true,
+      colSpan: 6,
+    },
+    {
+      name: "sales_channel_id",
+      label: "Sales Channel",
+      type: "select",
+      description: "Determines default pricing tier",
+      dynamicOptions: {
+        table: "sales_channels",
+        valueField: "id",
+        labelField: "name",
+        filter: { is_active: true },
+      },
+      colSpan: 6,
+    },
+    {
+      name: "price_tier_id",
+      label: "Price Tier Override",
+      type: "select",
+      description: "Override default tier pricing (optional)",
+      dynamicOptions: {
+        table: "price_tiers",
+        valueField: "id",
+        labelField: "name",
+      },
       colSpan: 6,
     },
     {
