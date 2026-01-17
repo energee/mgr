@@ -11,6 +11,7 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
+import { OrderQuickLinks } from "@/components/domain/order-quick-links";
 
 type Order = Database["public"]["Tables"]["orders"]["Row"];
 
@@ -134,6 +135,11 @@ export const orderEntity: EntityConfig<Order> = {
   },
 
   detailSections: [
+    {
+      id: "quick-links",
+      title: "Quick Actions",
+      component: OrderQuickLinks,
+    },
     {
       id: "overview",
       title: "Overview",
