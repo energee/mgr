@@ -109,8 +109,8 @@ BEGIN
     )
   ORDER BY
     -- Prefer brand-specific over style-specific over generic
-    CASE WHEN tp.brand_id IS NOT NULL THEN 1
-         WHEN tp.style_id IS NOT NULL THEN 2
+    CASE WHEN tp.brand_id = p_brand_id THEN 1
+         WHEN tp.style_id = p_style_id THEN 2
          ELSE 3 END,
     -- For same specificity, prefer most recently effective
     tp.effective_from DESC

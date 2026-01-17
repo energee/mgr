@@ -139,8 +139,8 @@ Prices by tier, product, and package type. Supports temporal pricing with valid 
 | brand_id | UUID | FK to brands (overrides style) |
 | package_type_id | UUID | FK to package_types |
 | price | DECIMAL(10,2) | Price |
-| valid_from | DATE | Price effective from (defaults to creation date) |
-| valid_to | DATE | Price effective until (NULL = current/no end) |
+| effective_from | DATE | Price effective from (defaults to creation date) |
+| effective_to | DATE | Price effective until (NULL = current/no end) |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
@@ -157,8 +157,8 @@ SELECT * FROM tier_prices
 WHERE tier_id = :tier
   AND package_type_id = :package
   AND (brand_id = :brand OR (brand_id IS NULL AND style_id = :style))
-  AND valid_from <= :order_date
-  AND (valid_to IS NULL OR valid_to >= :order_date)
+  AND effective_from <= :order_date
+  AND (effective_to IS NULL OR effective_to >= :order_date)
 ORDER BY brand_id NULLS LAST  -- prefer brand over style
 LIMIT 1;
 ```
@@ -216,9 +216,9 @@ async function resolvePrice(
     .eq('tier_id', tierId)
     .eq('brand_id', brandId)
     .eq('package_type_id', packageTypeId)
-    .lte('valid_from', orderDate)
-    .or(`valid_to.is.null,valid_to.gte.${orderDate}`)
-    .order('valid_from', { ascending: false })
+    .lte('effective_from', orderDate)
+    .or(`effective_to.is.null,effective_to.gte.${orderDate}`)
+    .order('effective_from', { ascending: false })
     .limit(1)
     .single();
 
@@ -235,9 +235,9 @@ async function resolvePrice(
     .eq('style_id', brand.style_id)
     .is('brand_id', null)
     .eq('package_type_id', packageTypeId)
-    .lte('valid_from', orderDate)
-    .or(`valid_to.is.null,valid_to.gte.${orderDate}`)
-    .order('valid_from', { ascending: false })
+    .lte('effective_from', orderDate)
+    .or(`effective_to.is.null,effective_to.gte.${orderDate}`)
+    .order('effective_from', { ascending: false })
     .limit(1)
     .single();
 
@@ -263,11 +263,11 @@ async function resolvePrice(
 
 ```sql
 -- Price effective during order date
-WHERE valid_from <= :order_date
-  AND (valid_to IS NULL OR valid_to >= :order_date)
+WHERE effective_from <= :order_date
+  AND (effective_to IS NULL OR effective_to >= :order_date)
 
 -- If multiple prices match (shouldn't happen, but handle gracefully)
-ORDER BY valid_from DESC  -- Most recent start date wins
+ORDER BY effective_from DESC  -- Most recent start date wins
 LIMIT 1
 ```
 
@@ -300,10 +300,10 @@ CREATE INDEX idx_order_items_brand_package ON order_items(brand_id, package_type
 CREATE INDEX idx_order_items_allocation ON order_items(allocation_id) WHERE allocation_id IS NOT NULL;
 
 -- Price tier lookups (pricing resolution)
-CREATE INDEX idx_tier_prices_tier ON tier_prices(price_tier_id, valid_from, valid_to);
-CREATE INDEX idx_tier_prices_brand_package ON tier_prices(brand_id, package_type_id, valid_from, valid_to);
-CREATE INDEX idx_tier_prices_style_package ON tier_prices(style_id, package_type_id, valid_from, valid_to) WHERE style_id IS NOT NULL;
-CREATE INDEX idx_tier_prices_temporal ON tier_prices(valid_from, valid_to);
+CREATE INDEX idx_tier_prices_tier ON tier_prices(price_tier_id, effective_from, effective_to);
+CREATE INDEX idx_tier_prices_brand_package ON tier_prices(brand_id, package_type_id, effective_from, effective_to);
+CREATE INDEX idx_tier_prices_style_package ON tier_prices(style_id, package_type_id, effective_from, effective_to) WHERE style_id IS NOT NULL;
+CREATE INDEX idx_tier_prices_temporal ON tier_prices(effective_from, effective_to);
 
 -- Customer lookups
 CREATE INDEX idx_customers_type_active ON customers(customer_type, is_active);
