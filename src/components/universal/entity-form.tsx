@@ -8,7 +8,7 @@
  * Supports dynamicOptions for select fields that fetch from database tables.
  */
 
-import { useState, useMemo, type FormEvent } from "react";
+import { useState, useMemo, useRef, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
@@ -30,6 +30,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { UnitInput } from "@/components/ui/unit-input";
+import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dialog";
+import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
@@ -127,6 +129,11 @@ export function EntityForm<T = Record<string, unknown>>({
   const path = basePath || `/${entity.domain}/${entity.name}s`;
   const isEdit = Boolean(id);
 
+  // Conflict dialog for optimistic locking
+  const conflictDialog = useConflictDialog();
+  // Track the loaded version for optimistic locking
+  const loadedVersionRef = useRef<number | null>(null);
+
   // Form state
   const [values, setValues] = useState<Partial<T>>(() => {
     // Initialize with default values from field configs
@@ -161,6 +168,11 @@ export function EntityForm<T = Record<string, unknown>>({
   useMemo(() => {
     if (existingData && isEdit) {
       setValues((prev) => ({ ...prev, ...existingData }));
+      // Store the loaded version for optimistic locking
+      const record = existingData as Record<string, unknown>;
+      if (typeof record.version === "number") {
+        loadedVersionRef.current = record.version;
+      }
     }
   }, [existingData, isEdit]);
 
@@ -212,19 +224,47 @@ export function EntityForm<T = Record<string, unknown>>({
     setIsSubmitting(true);
     try {
       if (isEdit && id) {
-        // Update existing record
-        const { data, error } = await db
-          .from(entity.table)
-          .update(result.data)
-          .eq("id", id)
-          .select()
-          .single();
-        if (error) throw error;
-        toast.success(`${entity.displayName} updated successfully`);
-        queryClient.invalidateQueries({ queryKey: [entity.table, id] });
-        queryClient.invalidateQueries({ queryKey: [entity.table] });
-        onSuccess?.(data as T);
-        router.push(`${path}/${id}`);
+        // Check if we have a loaded version (record supports optimistic locking)
+        if (loadedVersionRef.current !== null) {
+          // Use optimistic locking for versioned records
+          const lockResult = await updateWithOptimisticLock(
+            supabase,
+            entity.table,
+            id,
+            result.data,
+            loadedVersionRef.current
+          );
+
+          if (!lockResult.success) {
+            if (lockResult.conflicted) {
+              // Show conflict dialog instead of error toast
+              conflictDialog.showConflict();
+              setIsSubmitting(false);
+              return;
+            }
+            throw new Error(lockResult.error);
+          }
+
+          toast.success(`${entity.displayName} updated successfully`);
+          queryClient.invalidateQueries({ queryKey: [entity.table, id] });
+          queryClient.invalidateQueries({ queryKey: [entity.table] });
+          onSuccess?.(lockResult.data as T);
+          router.push(`${path}/${id}`);
+        } else {
+          // Standard update for records without version
+          const { data, error } = await db
+            .from(entity.table)
+            .update(result.data)
+            .eq("id", id)
+            .select()
+            .single();
+          if (error) throw error;
+          toast.success(`${entity.displayName} updated successfully`);
+          queryClient.invalidateQueries({ queryKey: [entity.table, id] });
+          queryClient.invalidateQueries({ queryKey: [entity.table] });
+          onSuccess?.(data as T);
+          router.push(`${path}/${id}`);
+        }
       } else {
         // Create new record
         const { data, error } = await db
@@ -244,6 +284,34 @@ export function EntityForm<T = Record<string, unknown>>({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle conflict refresh - reload data and reset form
+  const handleConflictRefresh = async () => {
+    conflictDialog.setIsRefreshing(true);
+    try {
+      // Refetch the data
+      await queryClient.invalidateQueries({ queryKey: [entity.table, id] });
+      const { data } = await db.from(entity.table).select("*").eq("id", id).single();
+      if (data) {
+        setValues(data);
+        const record = data as Record<string, unknown>;
+        if (typeof record.version === "number") {
+          loadedVersionRef.current = record.version;
+        }
+        toast.info("Data refreshed. Please re-apply your changes.");
+      }
+    } catch {
+      toast.error("Failed to refresh data");
+    } finally {
+      conflictDialog.hideConflict();
+    }
+  };
+
+  // Handle conflict discard - go back to detail page
+  const handleConflictDiscard = () => {
+    conflictDialog.hideConflict();
+    router.push(`${path}/${id}`);
   };
 
   if (isEdit && isLoading) {
@@ -306,6 +374,15 @@ export function EntityForm<T = Record<string, unknown>>({
           </Button>
         </div>
       </form>
+
+      {/* Conflict Dialog for optimistic locking */}
+      <ConflictDialog
+        open={conflictDialog.isOpen}
+        onOpenChange={conflictDialog.setIsOpen}
+        onRefresh={handleConflictRefresh}
+        onDiscard={handleConflictDiscard}
+        isRefreshing={conflictDialog.isRefreshing}
+      />
     </div>
   );
 }
