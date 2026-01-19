@@ -32,6 +32,7 @@ import { yeastStrainEntity } from "./yeast-strain";
 import { salesChannelEntity } from "./sales-channel";
 import { priceTierEntity } from "./price-tier";
 import { tierPriceEntity } from "./tier-price";
+import { kegTypeEntity } from "./keg-type";
 
 // =============================================================================
 // Register All Entities
@@ -51,6 +52,7 @@ registerEntity(yeastStrainEntity);
 registerEntity(inventoryItemEntity);
 registerEntity(finishedGoodEntity);
 registerEntity(packageTypeEntity);
+registerEntity(kegTypeEntity);
 
 // Sales domain
 registerEntity(orderEntity);
@@ -97,6 +99,8 @@ export { poLineItemEntity, CATALOG_TYPES } from "./po-line-item";
 export type { POLineItemFormValues } from "./po-line-item";
 export { packageTypeEntity } from "./package-type";
 export type { PackageTypeFormValues } from "./package-type";
+export { kegTypeEntity } from "./keg-type";
+export type { KegTypeFormValues } from "./keg-type";
 export { yeastStrainEntity } from "./yeast-strain";
 export type { YeastStrainFormValues } from "./yeast-strain";
 export { salesChannelEntity } from "./sales-channel";
