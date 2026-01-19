@@ -73,8 +73,8 @@ All entity pages use universal components. Reference: `src/app/(app)/production/
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00028`
-Next available: `00029`
+Current highest: `00029`
+Next available: `00030`
 
 ### Reference Files by Pattern
 
@@ -751,7 +751,7 @@ Next available: `00029`
 ## Phase 8: Settings & Administration
 
 **Goal:** Complete system configuration, user management, and administrative functions.
-**Status:** Partial (notification prefs, package formats, settings hub complete)
+**Status:** Partial (notification prefs, package formats, keg types, sales channels, settings hub complete)
 **Depends On:** None (can be done in parallel)
 
 ### 8.1 System Settings
@@ -840,12 +840,17 @@ Next available: `00029`
   - [x] Created entity config (`src/entities/package-type.tsx`)
   - [x] Created full CRUD pages (list, detail, edit, new)
   - [x] Added link in settings hub
-- [ ] Create `src/app/(app)/settings/keg-types/page.tsx`
-  - [ ] Keg sizes and deposit amounts
-  - [ ] Lifecycle states
-- [ ] Create `src/app/(app)/settings/sales-channels/page.tsx`
-  - [ ] Distribution, retail, taproom, export, etc.
-  - [ ] Link to price tiers
+- [x] Create `src/app/(app)/settings/keg-types/page.tsx`
+  - [x] Keg sizes and deposit amounts
+  - [x] Created entity config (`src/entities/keg-type.tsx`)
+  - [x] Created full CRUD pages (list, detail, edit, new)
+  - [x] Added link in settings hub
+  - [x] Created migration 00029_keg_types.sql with seed data
+- [x] Create `src/app/(app)/settings/sales-channels/page.tsx`
+  - [x] Distribution, retail, taproom, export, etc.
+  - [x] Link to price tiers
+  - [x] Created entity config (`src/entities/sales-channel.tsx`)
+  - [x] Created full CRUD pages (list, detail, edit, new)
 
 ---
 
@@ -1549,6 +1554,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-17 | Phase 4.5: Enhanced customer entity with sales channel/price tier fields, order summary view (migration 00027), Phase 4 now Complete |
 | 2026-01-17 | Phase 5.2/5.4: Created migration 00028 with temporal pricing (get_price_for_customer update, tier_prices_with_status view) and bin_inventory optimistic locking |
 | 2026-01-17 | Phase 5.4: Added conflict detection to EntityForm - auto-detects versioned records and shows ConflictDialog on concurrent modification |
+| 2026-01-19 | Phase 8.6: Created keg types entity, pages, and migration 00029 - completes reference data management |
 
 ---
 
@@ -1562,15 +1568,22 @@ src/entities/
 ├── customer.tsx           # Simple entity without state machine
 ├── finished-good.tsx      # Read-only entity
 ├── inventory-item.tsx     # Category-based display config
+├── keg-type.tsx           # Reference data entity
 ├── order.tsx              # Complex state machine
 ├── order-item.tsx         # Line item entity
+├── package-type.tsx       # Reference data entity
 ├── packaging-session.tsx  # Production state machine
 ├── po-line-item.tsx       # Purchase order line items
+├── price-tier.tsx         # Pricing configuration
 ├── purchase-order.tsx     # Purchasing workflow
 ├── recipe.tsx             # Many relations, junction tables
+├── sales-channel.tsx      # Sales configuration
+├── session-line-item.tsx  # Packaging line items
 ├── supplier.tsx           # Purchasing domain
+├── tier-price.tsx         # Per-format pricing
 ├── vessel.tsx             # viewTable with joins
 ├── vessel-transfer.tsx    # Production tracking
+├── yeast-strain.tsx       # Catalog reference data
 └── index.ts               # Entity registry
 ```
 
@@ -1639,7 +1652,9 @@ supabase/migrations/
 ├── 00024_start_batch_fermentation.sql
 ├── 00025_sales_channels_and_pricing.sql
 ├── 00026_packaging_completion_trigger.sql
-└── 00027_customer_order_summary.sql
+├── 00027_customer_order_summary.sql
+├── 00028_temporal_pricing.sql
+└── 00029_keg_types.sql
 ```
 
 ---

@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * Sales Channels Settings Page
+ * Keg Types Settings Page
  *
- * Manage sales channels used for customer categorization and pricing.
- * Uses the universal EntityList component with the salesChannelEntity config.
+ * Manage keg sizes used for packaging and inventory tracking.
+ * Uses the universal EntityList component with the kegTypeEntity config.
  */
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Store } from "lucide-react";
+import { ArrowLeft, Container } from "lucide-react";
 import { EntityList } from "@/components/universal/entity-list";
-import { salesChannelEntity } from "@/entities/sales-channel";
+import { kegTypeEntity } from "@/entities/keg-type";
 
-export default function SalesChannelsPage() {
+export default function KegTypesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -25,19 +25,19 @@ export default function SalesChannelsPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Store className="h-6 w-6" />
-            Sales Channels
+            <Container className="h-6 w-6" />
+            Keg Types
           </h1>
           <p className="text-muted-foreground">
-            Manage sales channels for customer categorization and pricing
+            Manage keg sizes for inventory and deposit tracking
           </p>
         </div>
       </div>
 
       {/* Entity List */}
       <EntityList
-        entity={salesChannelEntity}
-        basePath="/settings/sales-channels"
+        entity={kegTypeEntity}
+        basePath="/settings/keg-types"
       />
     </div>
   );
