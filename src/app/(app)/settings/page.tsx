@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, DollarSign, FlaskConical, Link2, MapPin, Package, Settings, Store, Users } from "lucide-react";
+import { Bell, Building2, Container, DollarSign, FlaskConical, Link2, MapPin, Package, Settings, Store, Users } from "lucide-react";
 
 const settingsLinks = [
   {
@@ -49,6 +49,13 @@ const settingsLinks = [
     description: "Manage package types for cans, bottles, kegs, and more",
     href: "/settings/formats",
     icon: Package,
+    available: true,
+  },
+  {
+    title: "Keg Types",
+    description: "Manage keg sizes for inventory and deposit tracking",
+    href: "/settings/keg-types",
+    icon: Container,
     available: true,
   },
   {
