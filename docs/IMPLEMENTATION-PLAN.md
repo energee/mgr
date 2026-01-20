@@ -2,7 +2,7 @@
 
 > Generated: January 2026
 > Status: Active
-> Last Updated: 2026-01-16
+> Last Updated: 2026-01-19
 
 ## Overview
 
@@ -1448,8 +1448,8 @@ These are low-effort improvements that can be tackled between phases.
 
 ### Entity Config Enhancements
 
-- [x] Add `queryExamples` to all entities for AI (15 entities)
-- [x] Add `keyFields` to all entities for AI (15 entities)
+- [x] Add `queryExamples` to all entities for AI (23 entities)
+- [x] Add `keyFields` to all entities for AI (23 entities)
 - [x] Ensure all entities have proper `description` (all entities have description field)
 - [ ] Add computed columns where useful
 
@@ -1475,8 +1475,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00028
-- Next available: 00029
+- Current: 00001-00029
+- Next available: 00030
 
 ### Testing Strategy
 
