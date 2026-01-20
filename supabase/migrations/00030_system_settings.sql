@@ -1,5 +1,10 @@
 -- System Settings Table
 -- Phase 8.1: Brewery-wide configuration settings
+--
+-- NOTE: This table complements the existing `settings` singleton table:
+-- - `settings` (00002): Operational defaults (batch size, date format, features)
+-- - `system_settings` (this): Extensible key-value store for tax, compliance, etc.
+-- Future migration may consolidate these tables.
 
 -- =============================================================================
 -- 1. SYSTEM_SETTINGS TABLE
@@ -27,11 +32,12 @@ ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "system_settings_select" ON system_settings
   FOR SELECT TO authenticated USING (true);
 
--- RLS Policy: Only authenticated users can update (admin check would go in app layer)
+-- RLS Policy: Authenticated users can update/insert (single-tenant, no user_id)
+-- Note: WITH CHECK (true) is acceptable for single-tenant reference data per DEC-SEC-006
+-- Admin-level access control is enforced in the application layer
 CREATE POLICY "system_settings_update" ON system_settings
   FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
--- RLS Policy: Only authenticated users can insert
 CREATE POLICY "system_settings_insert" ON system_settings
   FOR INSERT TO authenticated WITH CHECK (true);
 
