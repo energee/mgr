@@ -226,14 +226,14 @@ export function RecipeCloneDialog({
           <div className="space-y-2">
             <Label htmlFor="brand_id">Brand (optional)</Label>
             <Select
-              value={form.watch("brand_id") || ""}
-              onValueChange={(v) => form.setValue("brand_id", v || null)}
+              value={form.watch("brand_id") || "_keep_original"}
+              onValueChange={(v) => form.setValue("brand_id", v === "_keep_original" ? null : v)}
             >
               <SelectTrigger className="min-h-[44px]">
                 <SelectValue placeholder="Keep original brand" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Keep original brand</SelectItem>
+                <SelectItem value="_keep_original">Keep original brand</SelectItem>
                 {brands?.map((brand) => (
                   <SelectItem key={brand.id} value={brand.id}>
                     {brand.name}
