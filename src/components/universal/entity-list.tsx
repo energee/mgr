@@ -217,7 +217,7 @@ export function EntityList<T = Record<string, unknown>>({
 
   // Check if any quick filters are active
   const hasActiveQuickFilters = Object.values(quickFilters).some((v) =>
-    v !== "" && v !== undefined && !(Array.isArray(v) && v.length === 0)
+    v !== "" && v !== "_all" && v !== undefined && !(Array.isArray(v) && v.length === 0)
   );
   const hasActiveFilters = globalFilter || hasActiveQuickFilters;
 
@@ -295,11 +295,11 @@ export function EntityList<T = Record<string, unknown>>({
               <div key={filter.field} className="min-w-[140px]">
                 {filter.type === "select" && filter.options && (
                   <Select
-                    value={(quickFilters[filter.field] as string) || ""}
+                    value={(quickFilters[filter.field] as string) || "_all"}
                     onValueChange={(value) =>
                       setQuickFilters((prev) => ({
                         ...prev,
-                        [filter.field]: value,
+                        [filter.field]: value === "_all" ? "" : value,
                       }))
                     }
                   >
@@ -307,7 +307,7 @@ export function EntityList<T = Record<string, unknown>>({
                       <SelectValue placeholder={filter.label} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All</SelectItem>
+                      <SelectItem value="_all">All</SelectItem>
                       {filter.options.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -387,11 +387,11 @@ export function EntityList<T = Record<string, unknown>>({
                 )}
                 {filter.type === "boolean" && (
                   <Select
-                    value={(quickFilters[filter.field] as string) || ""}
+                    value={(quickFilters[filter.field] as string) || "_all"}
                     onValueChange={(value) =>
                       setQuickFilters((prev) => ({
                         ...prev,
-                        [filter.field]: value,
+                        [filter.field]: value === "_all" ? "" : value,
                       }))
                     }
                   >
@@ -399,7 +399,7 @@ export function EntityList<T = Record<string, unknown>>({
                       <SelectValue placeholder={filter.label} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All</SelectItem>
+                      <SelectItem value="_all">All</SelectItem>
                       <SelectItem value="true">Yes</SelectItem>
                       <SelectItem value="false">No</SelectItem>
                     </SelectContent>
