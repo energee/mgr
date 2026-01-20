@@ -765,14 +765,14 @@ Next available: `00030`
 
 - [x] Create `src/app/(app)/settings/page.tsx` (settings hub)
 - [x] Create `src/app/(app)/settings/brewery/page.tsx` (placeholder)
-- [ ] Create `src/app/(app)/settings/system/page.tsx`
-  - [ ] Brewery name, address, contact info
-  - [ ] Default units (volume, weight, temperature, gravity)
-  - [ ] Timezone settings
-  - [ ] Tax rates (federal, state)
-  - [ ] Fiscal year settings
-- [ ] Create `system_settings` table for key-value config
-- [ ] Create settings entity config and form
+- [x] Create `src/app/(app)/settings/system/page.tsx`
+  - [x] Brewery name, address, contact info
+  - [x] Default units (volume, weight, temperature, gravity)
+  - [x] Timezone settings
+  - [x] Tax rates (federal, state)
+  - [x] Fiscal year settings
+- [x] Create `system_settings` table for key-value config (migration 00030)
+- [x] Create settings entity config and form (direct implementation in page)
 
 ### 8.2 User Management
 
