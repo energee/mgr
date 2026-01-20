@@ -6,9 +6,16 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, Container, DollarSign, FlaskConical, Link2, MapPin, Package, Settings, Store, Users } from "lucide-react";
+import { Bell, Building2, Cog, Container, DollarSign, FlaskConical, Link2, MapPin, Package, Settings, Store, Users } from "lucide-react";
 
 const settingsLinks = [
+  {
+    title: "System Settings",
+    description: "Configure brewery info, tax rates, and compliance settings",
+    href: "/settings/system",
+    icon: Cog,
+    available: true,
+  },
   {
     title: "Brewery Settings",
     description: "Configure brewery name, units, and general preferences",
