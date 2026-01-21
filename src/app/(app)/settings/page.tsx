@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, Cog, Container, DollarSign, FlaskConical, Link2, MapPin, Package, Settings, Store, Users } from "lucide-react";
+import { Bell, Building2, Cog, Container, DollarSign, FlaskConical, Link2, List, MapPin, Package, Settings, Store, Users } from "lucide-react";
 
 const settingsLinks = [
   {
@@ -84,6 +84,13 @@ const settingsLinks = [
     description: "Manage price tiers and format pricing",
     href: "/settings/pricing",
     icon: DollarSign,
+    available: true,
+  },
+  {
+    title: "Enum Registry",
+    description: "Manage system enums and dropdown values (admin only)",
+    href: "/settings/enums",
+    icon: List,
     available: true,
   },
 ];
