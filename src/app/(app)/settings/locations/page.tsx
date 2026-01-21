@@ -1,21 +1,21 @@
+"use client";
+
 /**
  * Locations Settings Page
  *
- * Manage physical locations (warehouses, taproom, storage).
- * This is a placeholder that will be expanded to include:
- * - Location CRUD
- * - Storage zones within locations
- * - Default location for inventory operations
+ * Manage physical locations (breweries, warehouses, taprooms, storage).
+ * Uses the universal EntityList component with the locationEntity config.
  */
 
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Warehouse } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
+import { EntityList } from "@/components/universal/entity-list";
+import { locationEntity } from "@/entities/location";
 
-export default function LocationsSettingsPage() {
+export default function LocationsPage() {
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/settings">
@@ -34,38 +34,11 @@ export default function LocationsSettingsPage() {
         </div>
       </div>
 
-      {/* Coming Soon Notice */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Warehouse className="h-5 w-5" />
-            Location Management
-          </CardTitle>
-          <CardDescription>
-            Location management is coming soon. This page will allow you to:
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-              Create and manage physical locations (brewery, warehouse, taproom)
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-              Define storage zones within each location
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-              Set default locations for different inventory operations
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-              Track inventory by location for multi-site operations
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
+      {/* Entity List */}
+      <EntityList
+        entity={locationEntity}
+        basePath="/settings/locations"
+      />
     </div>
   );
 }
