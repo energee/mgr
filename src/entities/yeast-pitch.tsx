@@ -237,6 +237,44 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
   },
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "use",
+      label: "Use for Batch",
+      icon: "flask",
+      type: "button",
+      fromStates: ["in_stock"],
+      toState: "in_use",
+    },
+    {
+      name: "harvest",
+      label: "Harvest Yeast",
+      icon: "download",
+      type: "button",
+      fromStates: ["in_use"],
+      // No toState - handled by custom action handler
+    },
+    {
+      name: "mark_depleted",
+      label: "Mark Depleted",
+      icon: "x",
+      type: "button",
+      fromStates: ["in_use"],
+      toState: "depleted",
+    },
+    {
+      name: "discard",
+      label: "Discard",
+      icon: "trash",
+      type: "button",
+      fromStates: ["in_stock", "in_use"],
+      toState: "discarded",
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Detail View
   // ---------------------------------------------------------------------------
   detailHeader: {
@@ -425,7 +463,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
         table: "locations",
         labelField: "name",
         valueField: "id",
-        filter: { field: "is_active", value: true },
+        filter: { is_active: true },
       },
     },
     {
