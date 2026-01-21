@@ -133,7 +133,7 @@ export { locationEntity, LOCATION_TYPES } from "./location";
 export type { LocationFormValues } from "./location";
 export { userProfileEntity } from "./user-profile";
 export type { UserProfileFormValues, UserRole, UserStatus } from "./user-profile";
-export { enumValueEntity, ENUM_COLORS } from "./enum-value";
+export { enumValueEntity, ENUM_COLORS, fetchEnumTypes } from "./enum-value";
 export type { EnumValueFormValues } from "./enum-value";
 
 // =============================================================================

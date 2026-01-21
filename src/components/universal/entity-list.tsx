@@ -10,7 +10,7 @@
  * TanStack Virtual for virtualizing large lists.
  */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   useReactTable,
@@ -106,11 +106,54 @@ export function EntityList<T = Record<string, unknown>>({
   // Quick filter state - maps field name to selected value(s)
   const [quickFilters, setQuickFilters] = useState<Record<string, string | string[]>>({});
 
+  // Dynamic filter options - maps field name to fetched options
+  const [dynamicFilterOptions, setDynamicFilterOptions] = useState<
+    Record<string, { value: string; label: string }[]>
+  >({});
+
   // Reset filters when navigating between entities
   useEffect(() => {
     setQuickFilters({});
     setGlobalFilter("");
+    setDynamicFilterOptions({});
   }, [entity.name]);
+
+  // Fetch dynamic filter options
+  useEffect(() => {
+    const fetchDynamicOptions = async () => {
+      const filtersWithFetchOptions = entity.listFilters?.filter((f) => f.fetchOptions) || [];
+      if (filtersWithFetchOptions.length === 0) return;
+
+      const results = await Promise.all(
+        filtersWithFetchOptions.map(async (filter) => {
+          try {
+            const options = await filter.fetchOptions!();
+            return { field: filter.field, options };
+          } catch (error) {
+            console.error(`Failed to fetch options for filter ${filter.field}:`, error);
+            return { field: filter.field, options: [] };
+          }
+        })
+      );
+
+      const optionsMap = results.reduce(
+        (acc, { field, options }) => ({ ...acc, [field]: options }),
+        {} as Record<string, { value: string; label: string }[]>
+      );
+
+      setDynamicFilterOptions(optionsMap);
+    };
+
+    fetchDynamicOptions();
+  }, [entity.listFilters]);
+
+  // Get options for a filter (static or dynamic)
+  const getFilterOptions = useCallback(
+    (filter: { field: string; options?: { value: string; label: string }[] }) => {
+      return dynamicFilterOptions[filter.field] || filter.options || [];
+    },
+    [dynamicFilterOptions]
+  );
 
   // Fetch data - use viewTable if available (for views with joins), otherwise use base table
   const fetchTable = entity.viewTable || entity.table;
@@ -291,9 +334,11 @@ export function EntityList<T = Record<string, unknown>>({
         {entity.listFilters && entity.listFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            {entity.listFilters.map((filter) => (
+            {entity.listFilters.map((filter) => {
+              const filterOptions = getFilterOptions(filter);
+              return (
               <div key={filter.field} className="min-w-[140px]">
-                {filter.type === "select" && filter.options && (
+                {filter.type === "select" && (filter.options || filter.fetchOptions) && (
                   <Select
                     value={(quickFilters[filter.field] as string) || "_all"}
                     onValueChange={(value) =>
@@ -309,7 +354,7 @@ export function EntityList<T = Record<string, unknown>>({
                     <SelectContent>
                       <SelectItem value="_all">All</SelectItem>
                       {/* Filter out empty string values - Radix Select doesn't allow them (reserved for "no selection") */}
-                      {filter.options
+                      {filterOptions
                         .filter((option) => option.value !== "")
                         .map((option) => (
                           <SelectItem key={option.value} value={option.value}>
@@ -320,7 +365,7 @@ export function EntityList<T = Record<string, unknown>>({
                   </Select>
                 )}
                 {/* Multiselect with checkboxes */}
-                {filter.type === "multiselect" && filter.options && (
+                {filter.type === "multiselect" && (filter.options || filter.fetchOptions) && (
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -345,7 +390,7 @@ export function EntityList<T = Record<string, unknown>>({
                     </PopoverTrigger>
                     <PopoverContent className="w-[200px] p-0" align="start">
                       <div className="max-h-64 overflow-auto">
-                        {filter.options.map((option) => {
+                        {filterOptions.map((option) => {
                           const isSelected = (
                             quickFilters[filter.field] as string[] || []
                           ).includes(option.value);
@@ -409,7 +454,8 @@ export function EntityList<T = Record<string, unknown>>({
                   </Select>
                 )}
               </div>
-            ))}
+            );
+            })}
             {/* Clear filters button */}
             {hasActiveQuickFilters && (
               <Button
@@ -434,12 +480,15 @@ export function EntityList<T = Record<string, unknown>>({
             const filterDef = entity.listFilters?.find((f) => f.field === field);
             if (!filterDef) return null;
 
+            // Get options from dynamic state or static definition
+            const options = dynamicFilterOptions[field] || filterDef.options || [];
+
             const getLabel = (val: string | string[]) => {
               if (Array.isArray(val)) {
                 // Multiselect - show comma-separated labels
                 return val
                   .map((v) => {
-                    const option = filterDef.options?.find((o) => o.value === v);
+                    const option = options.find((o) => o.value === v);
                     return option?.label || v;
                   })
                   .join(", ");
@@ -450,7 +499,7 @@ export function EntityList<T = Record<string, unknown>>({
               if (filterDef.type === "search") {
                 return `"${val}"`;
               }
-              const option = filterDef.options?.find((o) => o.value === val);
+              const option = options.find((o) => o.value === val);
               return option?.label || val;
             };
 
