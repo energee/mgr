@@ -38,6 +38,7 @@ import { kegInventoryEntity } from "./keg-inventory";
 import { kegTransactionEntity } from "./keg-transaction";
 import { locationEntity } from "./location";
 import { userProfileEntity } from "./user-profile";
+import { enumValueEntity } from "./enum-value";
 
 // =============================================================================
 // Register All Entities
@@ -78,6 +79,7 @@ registerEntity(poLineItemEntity);
 // Settings domain
 registerEntity(locationEntity);
 registerEntity(userProfileEntity);
+registerEntity(enumValueEntity);
 
 // =============================================================================
 // Exports
@@ -131,6 +133,8 @@ export { locationEntity, LOCATION_TYPES } from "./location";
 export type { LocationFormValues } from "./location";
 export { userProfileEntity } from "./user-profile";
 export type { UserProfileFormValues, UserRole, UserStatus } from "./user-profile";
+export { enumValueEntity, ENUM_COLORS } from "./enum-value";
+export type { EnumValueFormValues } from "./enum-value";
 
 // =============================================================================
 // Helper Functions
