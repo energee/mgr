@@ -13,8 +13,10 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/universal/status-badge";
 import { cn } from "@/lib/utils";
 import { shouldReplaceYeast } from "@/lib/yeast-calculations";
+import { yeastPitchEntity } from "@/entities/yeast-pitch";
 
 interface YeastLineageDisplayProps {
   pitchId: string;
@@ -261,18 +263,10 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
                 </Link>
 
                 {/* Status */}
-                <Badge
-                  variant={
-                    pitch.status === "in_stock"
-                      ? "default"
-                      : pitch.status === "in_use"
-                        ? "secondary"
-                        : "outline"
-                  }
-                  className="text-xs"
-                >
-                  {pitch.status.replace("_", " ")}
-                </Badge>
+                <StatusBadge
+                  status={pitch.status}
+                  config={yeastPitchEntity.stateMachine?.stateDisplay}
+                />
 
                 {/* Batch if in use */}
                 {pitch.batch_name && (

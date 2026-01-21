@@ -463,7 +463,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
         table: "locations",
         labelField: "name",
         valueField: "id",
-        filter: { field: "is_active", value: true },
+        filter: { is_active: true },
       },
     },
     {
