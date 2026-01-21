@@ -1,26 +1,14 @@
-/**
- * Enum Value Detail Page
- */
-
 "use client";
 
 import { use } from "react";
 import { EntityDetail } from "@/components/universal/entity-detail";
 import { enumValueEntity } from "@/entities/enum-value";
 
-interface PageProps {
+export default function EnumValueDetailPage({
+  params,
+}: {
   params: Promise<{ id: string }>;
-}
-
-export default function EnumValueDetailPage({ params }: PageProps) {
-  const resolvedParams = use(params);
-
-  return (
-    <EntityDetail
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      entity={enumValueEntity as any}
-      id={resolvedParams.id}
-      basePath="/settings/enums"
-    />
-  );
+}) {
+  const { id } = use(params);
+  return <EntityDetail entity={enumValueEntity} id={id} basePath="/settings/enums" />;
 }

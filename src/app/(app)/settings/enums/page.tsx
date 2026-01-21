@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Enum Registry Settings Page
  *
@@ -5,13 +7,11 @@
  * Admin-only management of system dropdowns and statuses.
  */
 
-"use client";
-
 import Link from "next/link";
 import { EntityList } from "@/components/universal/entity-list";
 import { enumValueEntity } from "@/entities/enum-value";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, List } from "lucide-react";
 
 export default function EnumRegistryPage() {
   return (
@@ -24,7 +24,10 @@ export default function EnumRegistryPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Enum Registry</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <List className="h-6 w-6" />
+            Enum Registry
+          </h1>
           <p className="text-muted-foreground">
             Manage system enums and dropdown values
           </p>
@@ -33,8 +36,7 @@ export default function EnumRegistryPage() {
 
       {/* Entity List */}
       <EntityList
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        entity={enumValueEntity as any}
+        entity={enumValueEntity}
         basePath="/settings/enums"
       />
     </div>
