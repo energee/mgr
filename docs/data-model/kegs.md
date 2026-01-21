@@ -90,26 +90,64 @@ Track kegs out to customers.
 
 ---
 
-## Future: `keg_transactions`
+## `keg_transactions`
 
-Audit log for all keg movements.
+Audit log for all keg state transitions and movements.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
+| transaction_type | keg_transaction_type | Transaction type (enum) |
 | keg_type_id | UUID | FK to keg_types |
-| transaction_type | TEXT | fill, ship, return, clean, receive, adjust |
-| quantity | INTEGER | Quantity (+/-) |
-| from_state | keg_state | State before transaction |
+| quantity | INTEGER | Quantity (always positive) |
+| from_state | keg_state | State before transaction (NULL for receive) |
 | to_state | keg_state | State after transaction |
+| from_location_id | UUID | FK to locations (optional) |
+| to_location_id | UUID | FK to locations (optional) |
 | order_id | UUID | FK to orders (for ship) |
 | customer_id | UUID | FK to customers (for ship/return) |
 | packaging_session_id | UUID | FK to packaging_sessions (for fill) |
-| notes | TEXT | Notes |
-| created_by | UUID | FK to auth.users |
+| batch_id | UUID | FK to batches (for fill) |
+| finished_good_id | UUID | FK to finished_goods (for fill) |
+| notes | TEXT | Optional notes |
+| created_by_name | TEXT | Cached user name |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
-**Phase:** 10.3
+**Migration:** `00032_keg_transactions.sql`
+
+---
+
+## `keg_transaction_type` Enum
+
+| Value | Description |
+|-------|-------------|
+| fill | Fill empty kegs from a batch (empty -> filled) |
+| ship | Ship filled kegs to customer (filled -> shipped) |
+| return | Customer returns kegs (shipped -> returned_dirty) |
+| clean | Clean dirty kegs (returned_dirty/cleaning -> empty) |
+| receive | Receive new kegs into inventory (-> empty) |
+| adjust | Manual inventory adjustment |
+| retire | Retire kegs from service (-> retired) |
+| maintain | Send kegs for repair (-> maintenance) |
+
+---
+
+## `keg_transactions_with_details` View
+
+Keg transactions with joined display names.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| (all keg_transactions columns) | | Base transaction data |
+| keg_type_name | TEXT | Keg type display name |
+| keg_type_code | TEXT | Keg type code |
+| volume_bbl | DECIMAL | Volume in barrels |
+| customer_name | TEXT | Customer name |
+| order_number | TEXT | Order number |
+| batch_number | TEXT | Batch number |
+| finished_good_name | TEXT | Finished good name |
+| from_location_name | TEXT | From location name |
+| to_location_name | TEXT | To location name |
 
 ---
 
