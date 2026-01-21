@@ -778,17 +778,24 @@ Next available: `00036`
 
 > Create, edit, and manage user accounts and roles.
 
-- [x] Create `src/app/(app)/settings/users/page.tsx` (placeholder)
-- [ ] Create `src/app/(app)/settings/users/[id]/page.tsx` (detail)
-- [ ] Create `src/app/(app)/settings/users/[id]/edit/page.tsx` (edit)
-- [ ] Create `src/app/(app)/settings/users/new/page.tsx` (invite)
-- [ ] Create `src/entities/user.tsx`
-  - [ ] List columns: name, email, roles, last active, status
-  - [ ] Form fields: name, email, roles (multi-select)
-  - [ ] Role assignment UI (Admin, Production Manager, Brewer, Sales)
-- [ ] Implement user invitation flow (email invite)
-- [ ] Implement avatar upload
-- [ ] Implement password reset (admin-initiated)
+- [x] Create `src/app/(app)/settings/users/page.tsx` (list with EntityList)
+- [x] Create `src/app/(app)/settings/users/[id]/page.tsx` (detail)
+- [x] Create `src/app/(app)/settings/users/[id]/edit/page.tsx` (edit)
+- [x] Create `src/app/(app)/settings/users/new/page.tsx` (invite)
+- [x] Create `src/entities/user-profile.tsx`
+  - [x] List columns: name, email, role, last active, status
+  - [x] Form fields: display_name, role, status, avatar_url
+  - [x] Role assignment UI (Admin, Production Manager, Brewer, Sales, Viewer)
+- [x] Create `user_profiles` table (migration 00036)
+  - [x] Caches auth.users info per CLAUDE.md guidelines
+  - [x] Role and status tracking
+  - [x] Last active tracking
+  - [x] Invitation tracking (invited_at, invited_by)
+- [x] Create `user_profiles_with_details` view
+- [x] Helper functions: `get_user_role()`, `is_admin()`, `update_last_active()`
+- [ ] Implement user invitation flow (email invite) - requires email service
+- [ ] Implement avatar upload - requires file storage
+- [ ] Implement password reset (admin-initiated) - requires auth integration
 - [ ] Add role-based access control checks to all entity operations
 
 ### 8.3 Location Management
@@ -970,14 +977,18 @@ Next available: `00036`
 
 > Record keg lifecycle events.
 
-- [ ] Create `keg_transactions` table
-  - [ ] transaction_type: fill, ship, return, clean, receive, adjust
-  - [ ] keg_type_id, quantity
-  - [ ] from_state, to_state
-  - [ ] related entity (order, batch, customer)
-- [ ] Create state transition recording UI
-- [ ] Auto-create transactions from packaging sessions (fill)
-- [ ] Auto-create transactions from order shipments (ship)
+- [x] Create `keg_transactions` table (migration 00032)
+  - [x] transaction_type: fill, ship, return, clean, receive, adjust, retire, maintain
+  - [x] keg_type_id, quantity
+  - [x] from_state, to_state
+  - [x] related entity (order, batch, customer, packaging_session, finished_good)
+- [x] Create state transition recording UI
+  - [x] `src/entities/keg-transaction.tsx` entity config
+  - [x] Transaction list page (`/inventory/kegs/transactions/`)
+  - [x] Transaction detail page
+  - [x] New transaction page with URL parameter support
+- [ ] Auto-create transactions from packaging sessions (fill) - future automation
+- [ ] Auto-create transactions from order shipments (ship) - future automation
 
 ### 10.4 Customer Keg Balances
 
@@ -1507,8 +1518,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00029
-- Next available: 00030
+- Current: 00001-00036
+- Next available: 00037
 
 ### Testing Strategy
 
@@ -1599,6 +1610,8 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-21 | Phase 10.5: Created keg reports (migration 00034) with fleet summary, turnover metrics, aging alerts, and reports dashboard. Phase 10 now Complete |
 | 2026-01-21 | Phase 9.2: Created yeast pitch tracking (migration 00035) with lineage, viability decay, and cost spreading views. Added entity config and pages |
 | 2026-01-21 | Phase 9.3-9.5: Added yeast-calculations.ts library, YeastHarvestDialog, YeastLineageDisplay, harvest action. Phase 9 now Complete |
+| 2026-01-21 | Phase 10.3: Verified keg_transactions complete - updated status to reflect existing implementation |
+| 2026-01-21 | Phase 8.2: Created user management (migration 00036 user_profiles table, entity config, pages). Caches auth.users per CLAUDE.md guidelines |
 
 ---
 
@@ -1621,6 +1634,7 @@ src/entities/
 ├── packaging-session.tsx  # Production state machine
 ├── po-line-item.tsx       # Purchase order line items
 ├── price-tier.tsx         # Pricing configuration
+├── user-profile.tsx       # User management with roles
 ├── purchase-order.tsx     # Purchasing workflow
 ├── recipe.tsx             # Many relations, junction tables
 ├── sales-channel.tsx      # Sales configuration

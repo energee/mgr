@@ -35,7 +35,9 @@ import { priceTierEntity } from "./price-tier";
 import { tierPriceEntity } from "./tier-price";
 import { kegTypeEntity } from "./keg-type";
 import { kegInventoryEntity } from "./keg-inventory";
+import { kegTransactionEntity } from "./keg-transaction";
 import { locationEntity } from "./location";
+import { userProfileEntity } from "./user-profile";
 
 // =============================================================================
 // Register All Entities
@@ -58,6 +60,7 @@ registerEntity(finishedGoodEntity);
 registerEntity(packageTypeEntity);
 registerEntity(kegTypeEntity);
 registerEntity(kegInventoryEntity);
+registerEntity(kegTransactionEntity);
 
 // Sales domain
 registerEntity(orderEntity);
@@ -74,6 +77,7 @@ registerEntity(poLineItemEntity);
 
 // Settings domain
 registerEntity(locationEntity);
+registerEntity(userProfileEntity);
 
 // =============================================================================
 // Exports
@@ -111,6 +115,8 @@ export { kegTypeEntity } from "./keg-type";
 export type { KegTypeFormValues } from "./keg-type";
 export { kegInventoryEntity, KEG_STATES } from "./keg-inventory";
 export type { KegInventoryFormValues, KegState } from "./keg-inventory";
+export { kegTransactionEntity } from "./keg-transaction";
+export type { KegTransactionType } from "./keg-transaction";
 export { yeastStrainEntity } from "./yeast-strain";
 export type { YeastStrainFormValues } from "./yeast-strain";
 export { yeastPitchEntity } from "./yeast-pitch";
@@ -123,6 +129,8 @@ export { tierPriceEntity } from "./tier-price";
 export type { TierPriceFormValues } from "./tier-price";
 export { locationEntity, LOCATION_TYPES } from "./location";
 export type { LocationFormValues } from "./location";
+export { userProfileEntity } from "./user-profile";
+export type { UserProfileFormValues, UserRole, UserStatus } from "./user-profile";
 
 // =============================================================================
 // Helper Functions
