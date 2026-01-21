@@ -1,20 +1,23 @@
 /**
- * Supabase Middleware
+ * Supabase Proxy Helpers
  *
- * Handles session refresh and auth redirects.
- * Called by Next.js middleware on every request.
+ * Handles session refresh only. Auth redirects are handled by layouts.
+ * Called by Next.js proxy on every request.
+ *
+ * Note: Next.js 16 deprecated middleware in favor of proxy.
+ * Auth checks should be in layouts, not proxy (CVE-2025-29927).
  */
 
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/supabase";
 
 /**
- * Update the Supabase session in middleware.
- * This refreshes expired sessions and handles auth state.
+ * Refresh the Supabase session.
+ * Only handles token refresh - auth redirects are in layouts.
  */
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+export async function refreshSession(request: NextRequest) {
+  let response = NextResponse.next({
     request,
   });
 
@@ -27,49 +30,22 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          supabaseResponse = NextResponse.next({
+          response = NextResponse.next({
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            response.cookies.set(name, value, options)
           );
         },
       },
     }
   );
 
-  // IMPORTANT: Do not write any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make your app
-  // vulnerable to security issues.
+  // Refresh session - this updates cookies if token is refreshed
+  await supabase.auth.getUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
-
-  // Auth routes - redirect to app if logged in
-  if (pathname.startsWith("/login") || pathname.startsWith("/signup")) {
-    if (user) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/";
-      return NextResponse.redirect(url);
-    }
-    return supabaseResponse;
-  }
-
-  // Protected routes - redirect to login if not logged in
-  // All routes under (app) group are protected
-  // Allow API routes through (they handle their own auth)
-  if (!user && !pathname.startsWith("/login") && !pathname.startsWith("/signup") && !pathname.startsWith("/api/")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  return supabaseResponse;
+  return response;
 }
