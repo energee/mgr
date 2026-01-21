@@ -1,8 +1,9 @@
 /**
  * Keg Transaction Entity Configuration
  *
- * Audit log for all keg state transitions and movements.
- * Transactions are immutable records that track the keg lifecycle.
+ * Immutable audit log for all keg state transitions.
+ * Following the allocations pattern: transactions are immutable records,
+ * and keg inventory quantities are CALCULATED from these transactions via views.
  */
 
 import { z } from "zod";
@@ -14,11 +15,11 @@ import { KEG_STATES, type KegState } from "./keg-inventory";
 // =============================================================================
 
 export type KegTransactionType =
+  | "receive"
   | "fill"
   | "ship"
   | "return"
   | "clean"
-  | "receive"
   | "adjust"
   | "retire"
   | "maintain";
@@ -30,8 +31,7 @@ interface KegTransaction {
   quantity: number;
   from_state: KegState | null;
   to_state: KegState;
-  from_location_id: string | null;
-  to_location_id: string | null;
+  location_id: string | null;
   order_id: string | null;
   customer_id: string | null;
   packaging_session_id: string | null;
@@ -48,8 +48,7 @@ interface KegTransaction {
   order_number?: string;
   batch_number?: string;
   finished_good_name?: string;
-  from_location_name?: string;
-  to_location_name?: string;
+  location_name?: string;
 }
 
 // =============================================================================
@@ -127,11 +126,11 @@ export const TRANSACTION_TYPES: {
 
 export const kegTransactionSchema = z.object({
   transaction_type: z.enum([
+    "receive",
     "fill",
     "ship",
     "return",
     "clean",
-    "receive",
     "adjust",
     "retire",
     "maintain",
@@ -151,8 +150,7 @@ export const kegTransactionSchema = z.object({
     "maintenance",
     "retired",
   ]),
-  from_location_id: z.string().uuid().nullable().optional(),
-  to_location_id: z.string().uuid().nullable().optional(),
+  location_id: z.string().uuid().nullable().optional(),
   order_id: z.string().uuid().nullable().optional(),
   customer_id: z.string().uuid().nullable().optional(),
   packaging_session_id: z.string().uuid().nullable().optional(),
@@ -176,7 +174,7 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
   table: "keg_transactions",
   displayName: "Keg Transaction",
   displayNamePlural: "Keg Transactions",
-  description: "Audit log for keg state transitions and movements",
+  description: "Immutable audit log for keg state transitions (inventory calculated from these records)",
   domain: "inventory",
 
   // Use the view for list display (includes joined names)
@@ -277,8 +275,7 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
         { field: "quantity", label: "Quantity" },
         { field: "from_state", label: "From State" },
         { field: "to_state", label: "To State" },
-        { field: "from_location_name", label: "From Location" },
-        { field: "to_location_name", label: "To Location" },
+        { field: "location_name", label: "Location" },
       ],
     },
     {
@@ -354,15 +351,8 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
       colSpan: 4,
     },
     {
-      name: "from_location_id",
-      label: "From Location",
-      type: "relation",
-      relation: { entity: "location", displayField: "name" },
-      colSpan: 6,
-    },
-    {
-      name: "to_location_id",
-      label: "To Location",
+      name: "location_id",
+      label: "Location",
       type: "relation",
       relation: { entity: "location", displayField: "name" },
       colSpan: 6,
