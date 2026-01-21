@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { createClient } from "@/lib/supabase/client";
 
 type EnumValue = Database["public"]["Tables"]["enum_values"]["Row"];
 
@@ -43,6 +44,37 @@ export const ENUM_COLORS = [
   { value: "error", label: "Error (Red)" },
   { value: "info", label: "Info (Blue)" },
 ] as const;
+
+// =============================================================================
+// Dynamic Options Fetcher
+// =============================================================================
+
+/**
+ * Fetches all distinct enum types from the database.
+ * Used for dynamic filter options in EntityList.
+ */
+export async function fetchEnumTypes(): Promise<{ value: string; label: string }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("enum_values")
+    .select("enum_type")
+    .order("enum_type");
+
+  if (error) {
+    console.error("Failed to fetch enum types:", error);
+    return [];
+  }
+
+  // Get unique enum_types and format them
+  const uniqueTypes = [...new Set(data?.map((d) => d.enum_type) || [])];
+  return uniqueTypes.map((type) => ({
+    value: type,
+    label: type
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" "),
+  }));
+}
 
 // =============================================================================
 // Entity Configuration
@@ -120,33 +152,8 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
       field: "enum_type",
       type: "select",
       label: "Type",
-      options: [
-        { value: "batch_status", label: "Batch Status" },
-        { value: "order_status", label: "Order Status" },
-        { value: "po_status", label: "PO Status" },
-        { value: "vessel_status", label: "Vessel Status" },
-        { value: "vessel_type", label: "Vessel Type" },
-        { value: "yeast_pitch_status", label: "Yeast Pitch Status" },
-        { value: "yeast_source_type", label: "Yeast Source Type" },
-        { value: "yeast_type", label: "Yeast Type" },
-        { value: "yeast_form", label: "Yeast Form" },
-        { value: "user_role", label: "User Role" },
-        { value: "user_status", label: "User Status" },
-        { value: "notification_status", label: "Notification Status" },
-        { value: "notification_severity", label: "Notification Severity" },
-        { value: "location_type", label: "Location Type" },
-        { value: "package_container_type", label: "Package Container Type" },
-        { value: "keg_state", label: "Keg State" },
-        { value: "keg_transaction_type", label: "Keg Transaction Type" },
-        { value: "catalog_type", label: "Catalog Type" },
-        { value: "volume_unit", label: "Volume Unit" },
-        { value: "weight_unit", label: "Weight Unit" },
-        { value: "temperature_unit", label: "Temperature Unit" },
-        { value: "gravity_unit", label: "Gravity Unit" },
-        { value: "fermentation_stage", label: "Fermentation Stage" },
-        { value: "mash_step_type", label: "Mash Step Type" },
-        { value: "packaging_session_status", label: "Packaging Session Status" },
-      ],
+      // Dynamic options fetched from database - automatically includes all enum types
+      fetchOptions: fetchEnumTypes,
     },
     {
       field: "is_active",
