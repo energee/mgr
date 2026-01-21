@@ -1,16 +1,15 @@
 /**
- * Next.js Middleware
+ * Next.js 16 Proxy
  *
- * Handles:
- * - Supabase session refresh
- * - Auth redirects (protected routes → login, auth routes → app if logged in)
+ * Replaces deprecated middleware. Only handles session refresh.
+ * Auth redirects are handled by layouts (CVE-2025-29927).
  */
 
 import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { refreshSession } from "@/lib/supabase/middleware";
 
-export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+export async function proxy(request: NextRequest) {
+  return await refreshSession(request);
 }
 
 export const config = {
@@ -20,8 +19,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
-     * - API routes that don't need auth
+     * - public folder assets
      */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
