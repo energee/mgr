@@ -207,7 +207,7 @@ CREATE POLICY yeast_pitches_access ON yeast_pitches
 CREATE TRIGGER set_yeast_pitches_updated_at
   BEFORE UPDATE ON yeast_pitches
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION update_updated_at();
 
 -- Auto-increment generation when harvesting
 CREATE OR REPLACE FUNCTION increment_yeast_generation()
