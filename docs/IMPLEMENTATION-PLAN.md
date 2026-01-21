@@ -795,14 +795,15 @@ Next available: `00030`
 
 > Warehouses, taproom, production areas.
 
-- [x] Create `src/app/(app)/settings/locations/page.tsx` (placeholder)
-- [ ] Create `src/app/(app)/settings/locations/[id]/page.tsx` (detail)
-- [ ] Create `src/app/(app)/settings/locations/new/page.tsx` (create)
-- [ ] Create `src/entities/location.tsx`
-  - [ ] Types: warehouse, taproom, production, cold_storage, external
-  - [ ] Address fields
-  - [ ] Default for certain operations flag
-- [ ] Link locations to bins, vessels, finished goods
+- [x] Create `src/app/(app)/settings/locations/page.tsx` (EntityList)
+- [x] Create `src/app/(app)/settings/locations/[id]/page.tsx` (detail)
+- [x] Create `src/app/(app)/settings/locations/[id]/edit/page.tsx` (edit)
+- [x] Create `src/app/(app)/settings/locations/new/page.tsx` (create)
+- [x] Create `src/entities/location.tsx`
+  - [x] Types: brewery, warehouse, taproom, cold_storage, offsite
+  - [x] Primary location flag
+  - [ ] Address fields (future enhancement)
+- [ ] Link locations to bins, vessels, finished goods (existing via location_id FK)
 
 ### 8.4 Integration Settings
 
