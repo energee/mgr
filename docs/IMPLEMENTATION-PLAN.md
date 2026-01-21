@@ -73,8 +73,8 @@ All entity pages use universal components. Reference: `src/app/(app)/production/
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00033`
-Next available: `00034`
+Current highest: `00034`
+Next available: `00035`
 
 ### Reference Files by Pattern
 
@@ -931,7 +931,7 @@ Next available: `00034`
 ## Phase 10: Keg Management
 
 **Goal:** Track keg inventory, lifecycle, and customer balances.
-**Status:** Mostly Complete (keg types, inventory, transactions, customer balances done; keg reports pending)
+**Status:** Complete (keg types, inventory, transactions, customer balances, and reports all done)
 **Depends On:** Phase 4 (Sales)
 
 ### 10.1 Keg Type Configuration
@@ -990,10 +990,27 @@ Next available: `00034`
 
 ### 10.5 Keg Reports
 
-- [ ] Keg inventory summary by state
-- [ ] Kegs out by customer
-- [ ] Keg turnover rate
-- [ ] Aging kegs (out too long)
+> Analytics views and reports dashboard for keg fleet management.
+
+- [x] Create `keg_fleet_summary` view (migration 00034)
+  - [x] Inventory counts by state (empty, filled, shipped, dirty, etc.)
+  - [x] Utilization percentage per keg type
+  - [x] Outstanding deposit value
+- [x] Create `keg_turnover_metrics` view
+  - [x] Average cycle days (ship to return)
+  - [x] Annual turnover rate
+  - [x] Min/max cycle times
+- [x] Create `keg_aging_report` view
+  - [x] Days out with customer
+  - [x] Aging status (normal, attention, warning, critical)
+  - [x] Deposit at risk
+- [x] Create keg reports dashboard (`/inventory/kegs/reports`)
+  - [x] Summary cards (fleet total, out with customers, utilization, deposits)
+  - [x] Fleet summary by type table
+  - [x] Turnover metrics table
+  - [x] Top customers by kegs out
+  - [x] Aging kegs alert table
+- [x] Add Reports button to keg inventory page
 
 ---
 
@@ -1571,6 +1588,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-19 | Phase 8.6: Created keg types entity, pages, and migration 00029 - completes reference data management |
 | 2026-01-19 | Verification: Updated all phase checkboxes to reflect verified implementation status. Updated Phase 5.6 (RLS implemented), Phase 10.1 (keg types), Phase 13.1/13.5 (schema registry and entity config) |
 | 2026-01-21 | Phase 10.4: Created customer keg balances (migration 00033) with calculated views, CustomerKegBalances component, and return recording UI |
+| 2026-01-21 | Phase 10.5: Created keg reports (migration 00034) with fleet summary, turnover metrics, aging alerts, and reports dashboard. Phase 10 now Complete |
 
 ---
 
@@ -1676,7 +1694,8 @@ supabase/migrations/
 ├── 00030_system_settings.sql
 ├── 00031_keg_inventory.sql (superseded by 00032)
 ├── 00032_keg_transactions.sql
-└── 00033_customer_keg_balances.sql
+├── 00033_customer_keg_balances.sql
+└── 00034_keg_reports.sql
 ```
 
 ---
