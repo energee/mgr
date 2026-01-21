@@ -33,6 +33,7 @@ import { salesChannelEntity } from "./sales-channel";
 import { priceTierEntity } from "./price-tier";
 import { tierPriceEntity } from "./tier-price";
 import { kegTypeEntity } from "./keg-type";
+import { locationEntity } from "./location";
 
 // =============================================================================
 // Register All Entities
@@ -66,6 +67,9 @@ registerEntity(tierPriceEntity);
 registerEntity(supplierEntity);
 registerEntity(purchaseOrderEntity);
 registerEntity(poLineItemEntity);
+
+// Settings domain
+registerEntity(locationEntity);
 
 // =============================================================================
 // Exports
@@ -109,6 +113,8 @@ export { priceTierEntity } from "./price-tier";
 export type { PriceTierFormValues } from "./price-tier";
 export { tierPriceEntity } from "./tier-price";
 export type { TierPriceFormValues } from "./tier-price";
+export { locationEntity, LOCATION_TYPES } from "./location";
+export type { LocationFormValues } from "./location";
 
 // =============================================================================
 // Helper Functions
