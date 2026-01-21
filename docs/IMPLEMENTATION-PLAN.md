@@ -949,14 +949,14 @@ Next available: `00030`
 
 > Track individual kegs or keg quantities by state.
 
-- [ ] Create `kegs` or `keg_inventory` table
-  - [ ] keg_type_id, state, location_id
-  - [ ] Optional: individual keg tracking with serial numbers
-  - [ ] Batch/content tracking when filled
-- [ ] Create `src/entities/keg.tsx`
-- [ ] Create keg inventory pages
-  - [ ] List: by type, state, location
-  - [ ] Summary view: counts by type/state
+- [x] Create `keg_inventory` table (migration 00031)
+  - [x] keg_type_id, state (enum), location_id
+  - [x] Batch/finished_good tracking when filled
+  - [x] Summary view (keg_inventory_summary)
+- [x] Create `src/entities/keg-inventory.tsx`
+- [x] Create keg inventory pages (`/inventory/kegs/`)
+  - [x] List: by type, state, location
+  - [ ] Summary dashboard view (future enhancement)
 
 ### 10.3 Keg State Transitions
 
