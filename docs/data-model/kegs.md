@@ -155,17 +155,55 @@ Aggregated view of keg inventory by type and state.
 
 ---
 
-## Future: `customer_keg_balances`
+## `customer_keg_balances` View (Calculated)
 
-Track kegs out to customers.
+**This is a calculated VIEW, not a table.** Tracks kegs out to customers derived from `keg_transactions`.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | customer_id | UUID | FK to customers |
+| customer_name | TEXT | Customer name |
 | keg_type_id | UUID | FK to keg_types |
-| balance | INTEGER | Kegs out (positive = customer owes kegs) |
+| keg_type_name | TEXT | Keg type name |
+| keg_type_code | TEXT | Keg type code |
+| volume_bbl | DECIMAL | Volume in barrels |
+| deposit_amount | DECIMAL | Deposit amount per keg |
+| kegs_out | INTEGER | Kegs currently out (shipped - returned) |
+| deposit_value | DECIMAL | Total deposit value (kegs_out * deposit_amount) |
 
-**Phase:** 10.4
+**Calculation Logic:**
+- Kegs shipped to customer (ship transactions) add to kegs_out
+- Kegs returned from customer (return transactions) subtract from kegs_out
+- Only rows with non-zero balances are shown
+
+**Migration:** `00033_customer_keg_balances.sql`
+
+---
+
+## `customer_keg_balance_summary` View
+
+Aggregated totals per customer (all keg types combined).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| customer_id | UUID | FK to customers |
+| customer_name | TEXT | Customer name |
+| total_kegs_out | INTEGER | Total kegs out (all types) |
+| total_deposit_value | DECIMAL | Total deposit value |
+| keg_type_count | INTEGER | Number of distinct keg types |
+
+---
+
+## `customer_keg_transaction_history` View
+
+Keg transaction history filtered to customer-related transactions (ship/return).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| (all keg_transactions columns) | | Base transaction data |
+| keg_type_name | TEXT | Keg type name |
+| customer_name | TEXT | Customer name |
+| order_number | TEXT | Order number |
 
 ---
 

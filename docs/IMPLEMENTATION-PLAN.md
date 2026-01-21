@@ -2,7 +2,7 @@
 
 > Generated: January 2026
 > Status: Active
-> Last Updated: 2026-01-19
+> Last Updated: 2026-01-21
 
 ## Overview
 
@@ -73,8 +73,8 @@ All entity pages use universal components. Reference: `src/app/(app)/production/
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00029`
-Next available: `00030`
+Current highest: `00033`
+Next available: `00034`
 
 ### Reference Files by Pattern
 
@@ -931,7 +931,7 @@ Next available: `00030`
 ## Phase 10: Keg Management
 
 **Goal:** Track keg inventory, lifecycle, and customer balances.
-**Status:** Partial (keg types table and UI complete via Phase 8.6)
+**Status:** Mostly Complete (keg types, inventory, transactions, customer balances done; keg reports pending)
 **Depends On:** Phase 4 (Sales)
 
 ### 10.1 Keg Type Configuration
@@ -973,14 +973,20 @@ Next available: `00030`
 
 ### 10.4 Customer Keg Balances
 
-> Track kegs out with customers.
+> Track kegs out with customers following the calculated view pattern.
 
-- [ ] Create `customer_keg_balances` view or table
-  - [ ] Kegs shipped minus kegs returned per customer
-  - [ ] By keg type
-- [ ] Add keg balance display to customer detail
-- [ ] Create keg return recording UI
-- [ ] Keg deposit tracking (optional: integrate with invoicing)
+- [x] Create `customer_keg_balances` view (migration 00033)
+  - [x] Kegs shipped minus kegs returned per customer (from keg_transactions)
+  - [x] By keg type with deposit value calculation
+  - [x] `customer_keg_balance_summary` view for aggregated totals
+- [x] Update `customers_with_order_summary` view to include keg balance fields
+- [x] Add keg balance display to customer detail
+  - [x] Summary fields in customer entity (total_kegs_out, total_deposit_value)
+  - [x] CustomerKegBalances component with detailed breakdown by keg type
+- [x] Create keg return recording UI
+  - [x] Updated new transaction page with URL parameter support
+  - [x] Link from CustomerKegBalances to pre-fill return form
+- [ ] Keg deposit tracking (optional: integrate with invoicing) - future
 
 ### 10.5 Keg Reports
 
@@ -1564,6 +1570,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-17 | Phase 5.4: Added conflict detection to EntityForm - auto-detects versioned records and shows ConflictDialog on concurrent modification |
 | 2026-01-19 | Phase 8.6: Created keg types entity, pages, and migration 00029 - completes reference data management |
 | 2026-01-19 | Verification: Updated all phase checkboxes to reflect verified implementation status. Updated Phase 5.6 (RLS implemented), Phase 10.1 (keg types), Phase 13.1/13.5 (schema registry and entity config) |
+| 2026-01-21 | Phase 10.4: Created customer keg balances (migration 00033) with calculated views, CustomerKegBalances component, and return recording UI |
 
 ---
 
@@ -1577,6 +1584,8 @@ src/entities/
 ├── customer.tsx           # Simple entity without state machine
 ├── finished-good.tsx      # Read-only entity
 ├── inventory-item.tsx     # Category-based display config
+├── keg-inventory.tsx      # Read-only calculated view entity
+├── keg-transaction.tsx    # Immutable audit log entity
 ├── keg-type.tsx           # Reference data entity
 ├── order.tsx              # Complex state machine
 ├── order-item.tsx         # Line item entity
@@ -1663,7 +1672,11 @@ supabase/migrations/
 ├── 00026_packaging_completion_trigger.sql
 ├── 00027_customer_order_summary.sql
 ├── 00028_temporal_pricing.sql
-└── 00029_keg_types.sql
+├── 00029_keg_types.sql
+├── 00030_system_settings.sql
+├── 00031_keg_inventory.sql (superseded by 00032)
+├── 00032_keg_transactions.sql
+└── 00033_customer_keg_balances.sql
 ```
 
 ---

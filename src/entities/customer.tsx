@@ -10,7 +10,28 @@ import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 
-type Customer = Database["public"]["Tables"]["customers"]["Row"];
+// Base type from customers table
+type CustomerBase = Database["public"]["Tables"]["customers"]["Row"];
+
+// Extended type for list/detail view (includes fields from customers_with_order_summary view)
+// Note: View fields are added here since they may not be in generated types yet
+interface Customer extends CustomerBase {
+  // Foreign key fields (added in migration 00025 but may not be in generated types)
+  sales_channel_id?: string | null;
+  price_tier_id?: string | null;
+  // Fields from sales_channels and price_tiers joins
+  sales_channel_name?: string | null;
+  price_tier_name?: string | null;
+  // Calculated order summary fields
+  total_orders?: number | null;
+  total_revenue?: number | null;
+  pending_orders?: number | null;
+  pending_revenue?: number | null;
+  last_order_date?: string | null;
+  // Keg balance summary fields (from customer_keg_balance_summary)
+  total_kegs_out?: number | null;
+  total_deposit_value?: number | null;
+}
 
 // =============================================================================
 // Zod Schema
@@ -160,6 +181,14 @@ export const customerEntity: EntityConfig<Customer> = {
         { field: "pending_orders", label: "Pending Orders", format: "number" },
         { field: "pending_revenue", label: "Pending Revenue", format: "currency" },
         { field: "last_order_date", label: "Last Order", format: "date" },
+      ],
+    },
+    {
+      id: "keg_balance",
+      title: "Keg Balance",
+      fields: [
+        { field: "total_kegs_out", label: "Total Kegs Out", format: "number" },
+        { field: "total_deposit_value", label: "Deposit Value", format: "currency" },
       ],
     },
     {
