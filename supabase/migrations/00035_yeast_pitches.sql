@@ -194,26 +194,10 @@ COMMENT ON VIEW yeast_lineage_summary IS 'Summary of yeast lineages showing tota
 
 ALTER TABLE yeast_pitches ENABLE ROW LEVEL SECURITY;
 
--- All authenticated users can read
-CREATE POLICY yeast_pitches_select ON yeast_pitches
-  FOR SELECT TO authenticated
-  USING (true);
-
--- All authenticated users can insert
-CREATE POLICY yeast_pitches_insert ON yeast_pitches
-  FOR INSERT TO authenticated
-  WITH CHECK (true);
-
--- All authenticated users can update
-CREATE POLICY yeast_pitches_update ON yeast_pitches
-  FOR UPDATE TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
--- All authenticated users can delete
-CREATE POLICY yeast_pitches_delete ON yeast_pitches
-  FOR DELETE TO authenticated
-  USING (true);
+-- All authenticated users can access (matches codebase pattern from 00025)
+CREATE POLICY yeast_pitches_access ON yeast_pitches
+  FOR ALL
+  USING (auth.uid() IS NOT NULL);
 
 -- =============================================================================
 -- 5. TRIGGERS
