@@ -1,85 +1,96 @@
 # Kegs Domain
 
-Keg inventory tracking with support for different keg types (owned, rented, one-way) and customer balance tracking.
+Keg inventory tracking with support for different keg types and customer balance tracking.
 
 ## `keg_types`
 
-Keg type definitions with lifecycle rules.
+Keg type definitions with size and deposit information.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| name | TEXT | Type name (e.g., "House Kegs", "Microstar", "Unikeg") |
-| description | TEXT | Description |
-| is_reusable | BOOLEAN | Whether kegs are returned and reused |
-| track_customer_balance | BOOLEAN | Track kegs out to customers |
-| valid_states | JSONB | Valid states for this keg type |
-| deposit_amount | DECIMAL(10,2) | Deposit amount per keg (if applicable) |
+| name | TEXT | Display name (e.g., "1/2 Barrel", "1/6 Barrel") |
+| code | TEXT | Short code (e.g., "half", "sixth") |
+| volume_bbl | DECIMAL(10,4) | Volume in barrels |
+| deposit_amount | DECIMAL(10,2) | Deposit amount per keg |
+| description | TEXT | Optional description |
 | is_active | BOOLEAN | Active flag |
+| position | INTEGER | Display order |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**valid_states examples:**
-- Reusable (House): `["empty", "clean", "full", "dirty"]`
-- Microstar (arrives dirty): `["dirty", "clean", "full"]`
-- One-way (Unikeg): `["unpurged", "purged", "full"]`
-
----
-
-## `keg_sizes`
-
-Keg size definitions.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| name | TEXT | Size name (e.g., "1/6 BBL", "1/2 BBL", "50L") |
-| volume_bbl | DECIMAL(6,4) | Volume in barrels |
-| volume_gal | DECIMAL(6,2) | Volume in gallons |
-| is_active | BOOLEAN | Active flag |
-| created_at | TIMESTAMPTZ | Created timestamp |
-| updated_at | TIMESTAMPTZ | Updated timestamp |
+**Migration:** `00029_keg_types.sql`
 
 ---
 
 ## `keg_inventory`
 
-Current keg inventory by type, size, and state.
+Current keg inventory by type, state, and location.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
 | keg_type_id | UUID | FK to keg_types |
-| keg_size_id | UUID | FK to keg_sizes |
-| state | TEXT | Current state (from keg_type.valid_states) |
-| location | TEXT | Location identifier |
+| state | keg_state | Current state (enum) |
+| location_id | UUID | FK to locations (optional) |
 | quantity | INTEGER | Current quantity |
+| batch_id | UUID | FK to batches (for filled kegs) |
+| finished_good_id | UUID | FK to finished_goods (for filled kegs) |
+| notes | TEXT | Optional notes |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**Unique constraint:** (keg_type_id, keg_size_id, state, location)
+**Unique constraint:** (keg_type_id, state, location_id, batch_id, finished_good_id)
+
+**Migration:** `00031_keg_inventory.sql`
 
 ---
 
-## `customer_keg_balances`
+## `keg_state` Enum
 
-Track kegs out to customers (for keg types with track_customer_balance).
+| Value | Description |
+|-------|-------------|
+| empty | Clean, empty kegs ready to be filled |
+| filled | Filled with beer, in inventory |
+| shipped | Out with a customer |
+| returned_dirty | Returned from customer, needs cleaning |
+| cleaning | In the cleaning process |
+| maintenance | Out for repair/inspection |
+| retired | No longer in service |
+
+---
+
+## `keg_inventory_summary` View
+
+Aggregated view of keg inventory by type and state.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| id | UUID | Primary key |
+| keg_type_id | UUID | Keg type ID |
+| keg_type_name | TEXT | Keg type display name |
+| keg_type_code | TEXT | Keg type code |
+| volume_bbl | DECIMAL | Volume in barrels |
+| state | keg_state | Current state |
+| total_quantity | INTEGER | Sum of kegs in this state |
+| location_count | INTEGER | Number of distinct locations |
+
+---
+
+## Future: `customer_keg_balances`
+
+Track kegs out to customers.
+
+| Column | Type | Description |
+|--------|------|-------------|
 | customer_id | UUID | FK to customers |
 | keg_type_id | UUID | FK to keg_types |
-| keg_size_id | UUID | FK to keg_sizes |
 | balance | INTEGER | Kegs out (positive = customer owes kegs) |
-| created_at | TIMESTAMPTZ | Created timestamp |
-| updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**Unique constraint:** (customer_id, keg_type_id, keg_size_id)
+**Phase:** 10.4
 
 ---
 
-## `keg_transactions`
+## Future: `keg_transactions`
 
 Audit log for all keg movements.
 
@@ -87,39 +98,25 @@ Audit log for all keg movements.
 |--------|------|-------------|
 | id | UUID | Primary key |
 | keg_type_id | UUID | FK to keg_types |
-| keg_size_id | UUID | FK to keg_sizes |
-| transaction_type | TEXT | Type: fill, ship, return, clean, receive, transfer, adjust |
+| transaction_type | TEXT | fill, ship, return, clean, receive, adjust |
 | quantity | INTEGER | Quantity (+/-) |
-| from_state | TEXT | State before transaction |
-| to_state | TEXT | State after transaction |
-| location | TEXT | Location |
-| order_id | UUID | FK to orders (for ship transactions) |
+| from_state | keg_state | State before transaction |
+| to_state | keg_state | State after transaction |
+| order_id | UUID | FK to orders (for ship) |
 | customer_id | UUID | FK to customers (for ship/return) |
 | packaging_session_id | UUID | FK to packaging_sessions (for fill) |
 | notes | TEXT | Notes |
 | created_by | UUID | FK to auth.users |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
----
-
-## Transaction Types
-
-| Type | Description | State Change |
-|------|-------------|--------------|
-| receive | New kegs received | -> initial state |
-| clean | Kegs cleaned/sanitized | dirty -> clean |
-| fill | Kegs filled at packaging | clean -> full |
-| ship | Kegs shipped to customer | full -> (out) |
-| return | Kegs returned from customer | (out) -> dirty |
-| transfer | Move between locations | same state |
-| adjust | Manual adjustment | any |
+**Phase:** 10.3
 
 ---
 
-## Keg Flow Example (House Kegs)
+## Keg Flow
 
 ```
-receive -> dirty -> clean -> full -> ship -> return -> dirty (cycle repeats)
-              ^                                  |
-              |__________________________________|
+empty -> filled -> shipped -> returned_dirty -> cleaning -> empty (cycle repeats)
+  ^                                                   |
+  |___________________________________________________|
 ```
