@@ -29,6 +29,7 @@ import { poLineItemEntity } from "./po-line-item";
 import { sessionLineItemEntity } from "./session-line-item";
 import { packageTypeEntity } from "./package-type";
 import { yeastStrainEntity } from "./yeast-strain";
+import { yeastPitchEntity } from "./yeast-pitch";
 import { salesChannelEntity } from "./sales-channel";
 import { priceTierEntity } from "./price-tier";
 import { tierPriceEntity } from "./tier-price";
@@ -49,6 +50,7 @@ registerEntity(vesselTransferEntity);
 registerEntity(packagingSessionEntity);
 registerEntity(sessionLineItemEntity);
 registerEntity(yeastStrainEntity);
+registerEntity(yeastPitchEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
@@ -111,6 +113,8 @@ export { kegInventoryEntity, KEG_STATES } from "./keg-inventory";
 export type { KegInventoryFormValues, KegState } from "./keg-inventory";
 export { yeastStrainEntity } from "./yeast-strain";
 export type { YeastStrainFormValues } from "./yeast-strain";
+export { yeastPitchEntity } from "./yeast-pitch";
+export type { YeastPitchFormValues } from "./yeast-pitch";
 export { salesChannelEntity } from "./sales-channel";
 export type { SalesChannelFormValues } from "./sales-channel";
 export { priceTierEntity } from "./price-tier";

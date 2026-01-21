@@ -73,8 +73,8 @@ All entity pages use universal components. Reference: `src/app/(app)/production/
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00034`
-Next available: `00035`
+Current highest: `00035`
+Next available: `00036`
 
 ### Reference Files by Pattern
 
@@ -863,7 +863,7 @@ Next available: `00035`
 ## Phase 9: Yeast Management
 
 **Goal:** Track yeast inventory, pitches, harvests, and lineage.
-**Status:** Partial (yeast strain catalog complete)
+**Status:** Partial (yeast strain catalog and pitch tracking complete)
 **Depends On:** Phase 2 (Batches)
 
 ### 9.1 Yeast Strain Catalog
@@ -883,16 +883,22 @@ Next available: `00035`
 
 > Track individual pitches from purchase through repitching.
 
-- [ ] Create migration for `yeast_pitches` table
-  - [ ] source_type: purchase, harvest
-  - [ ] strain_id, generation, viability
-  - [ ] parent_pitch_id (for lineage)
-  - [ ] cost, date_received
-- [ ] Create `src/entities/yeast-pitch.tsx`
-- [ ] Create yeast pitch pages
-  - [ ] List: strain, generation, viability, status
-  - [ ] Detail: lineage tree, usage history
-  - [ ] Create: new purchase or harvest
+- [x] Create migration for `yeast_pitches` table (migration 00035)
+  - [x] source_type: purchase, harvest
+  - [x] strain_id, generation, viability
+  - [x] parent_pitch_id (for lineage)
+  - [x] cost, date_received
+  - [x] `yeast_pitches_with_details` view with calculated viability
+  - [x] `yeast_lineage_summary` view for cost spreading
+- [x] Create `src/entities/yeast-pitch.tsx`
+  - [x] State machine (in_stock, in_use, harvested, depleted, discarded)
+  - [x] Dynamic options for strain and batch selection
+  - [x] Viability status display in list view
+- [x] Create yeast pitch pages (`/production/yeast-pitches/`)
+  - [x] List: strain, generation, viability, status, age
+  - [x] Detail: strain info, viability, dates, cost, usage
+  - [x] Full CRUD with form validation
+- [x] Add navigation to sidebar (Production section)
 
 ### 9.3 Yeast Harvest Recording
 
@@ -1589,6 +1595,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-19 | Verification: Updated all phase checkboxes to reflect verified implementation status. Updated Phase 5.6 (RLS implemented), Phase 10.1 (keg types), Phase 13.1/13.5 (schema registry and entity config) |
 | 2026-01-21 | Phase 10.4: Created customer keg balances (migration 00033) with calculated views, CustomerKegBalances component, and return recording UI |
 | 2026-01-21 | Phase 10.5: Created keg reports (migration 00034) with fleet summary, turnover metrics, aging alerts, and reports dashboard. Phase 10 now Complete |
+| 2026-01-21 | Phase 9.2: Created yeast pitch tracking (migration 00035) with lineage, viability decay, and cost spreading views. Added entity config and pages |
 
 ---
 
@@ -1695,7 +1702,8 @@ supabase/migrations/
 ├── 00031_keg_inventory.sql (superseded by 00032)
 ├── 00032_keg_transactions.sql
 ├── 00033_customer_keg_balances.sql
-└── 00034_keg_reports.sql
+├── 00034_keg_reports.sql
+└── 00035_yeast_pitches.sql
 ```
 
 ---

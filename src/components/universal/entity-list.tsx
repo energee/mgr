@@ -308,11 +308,14 @@ export function EntityList<T = Record<string, unknown>>({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_all">All</SelectItem>
-                      {filter.options.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                      {/* Filter out empty string values - Radix Select doesn't allow them (reserved for "no selection") */}
+                      {filter.options
+                        .filter((option) => option.value !== "")
+                        .map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 )}
