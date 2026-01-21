@@ -530,7 +530,7 @@ Next available: `00036`
 
 **Goal:** Improve data quality and audit capabilities.
 **Timeline:** 1 week
-**Status:** Partial (5.1 revisions, 5.2 temporal pricing, 5.4 optimistic locking, 5.5 error handling complete; 5.3 enum registry and 5.6 RLS audit pending)
+**Status:** Partial (5.1 revisions, 5.2 temporal pricing, 5.3 enum registry, 5.4 optimistic locking, 5.5 error handling complete; 5.6 RLS audit pending)
 
 ### 5.1 Entity Revisions Table (DEC-MP-001)
 
@@ -555,9 +555,10 @@ Next available: `00036`
 
 > Centralized enum management.
 
-- [ ] Create `enum_values` table
-- [ ] Migrate hardcoded enums to table
-- [ ] Create enum management UI (admin)
+- [x] Create `enum_values` table (migration 00037)
+- [x] Migrate hardcoded enums to table (migration 00038)
+- [x] Create enum management UI (admin) - `/settings/enums/` pages
+- [x] Add validation triggers (migration 00040)
 
 ### 5.4 Optimistic Locking
 
@@ -1518,8 +1519,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00036
-- Next available: 00037
+- Current: 00001-00040
+- Next available: 00041
 
 ### Testing Strategy
 
