@@ -461,13 +461,83 @@ CONSTRAINT uq_enum_type_value UNIQUE (enum_type, value)
 | mash_step_type | Mash schedule step types | No |
 | packaging_session_status | Packaging lifecycle | Yes |
 
-### State Machine Metadata
+### Metadata Structures
 
-Stateful enums store next valid states in the `metadata` JSONB column:
+The `metadata` JSONB column stores type-specific data. Different enum types use different structures:
+
+#### State Machine Transitions
+Used by: `batch_status`, `order_status`, `po_status`, `yeast_pitch_status`, `keg_state`, `packaging_session_status`
 
 ```json
 {
   "next_states": ["brewing", "cancelled"]
+}
+```
+
+#### Yeast Viability Decay
+Used by: `yeast_form`
+
+```json
+{
+  "viability_decay_per_day": 2
+}
+```
+- `liquid`: 2% per day
+- `dry`: 0.5% per day
+- `slurry`: 3% per day
+
+#### Unit Conversions
+Used by: `volume_unit`, `weight_unit`
+
+```json
+{
+  "to_liters": 117.347765
+}
+```
+```json
+{
+  "to_kg": 0.453592
+}
+```
+
+#### Vessel Typical Uses
+Used by: `vessel_type`
+
+```json
+{
+  "typical_uses": ["fermentation", "conditioning"]
+}
+```
+
+#### User Role Permissions
+Used by: `user_role`
+
+```json
+{
+  "permissions": ["production", "inventory", "purchasing"]
+}
+```
+- `admin`: `["all"]`
+- `production_manager`: `["production", "inventory", "purchasing"]`
+- `brewer`: `["recipes", "batches", "brewing"]`
+- `sales`: `["orders", "customers"]`
+- `viewer`: `["read"]`
+
+#### Mash Step Temperature Ranges
+Used by: `mash_step_type`
+
+```json
+{
+  "temp_range_f": [148, 158]
+}
+```
+
+#### Transaction Inventory Impact
+Used by: `keg_transaction_type`
+
+```json
+{
+  "affects_inventory": true
 }
 ```
 
