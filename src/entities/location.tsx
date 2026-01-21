@@ -115,7 +115,6 @@ export const locationEntity: EntityConfig<Location> = {
       fields: [
         { field: "name", label: "Name" },
         { field: "location_type", label: "Type" },
-        { field: "address", label: "Address" },
         { field: "is_primary", label: "Primary Location" },
         { field: "is_active", label: "Active" },
         { field: "created_at", label: "Created", format: "datetime" },
