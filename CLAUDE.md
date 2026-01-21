@@ -59,6 +59,29 @@ ORDER BY domain, table_name;
 5. Add `_schema_registry` entries in migrations for new tables
 6. Document new architecture decisions in `docs/spec/decisions.md` or `docs/spec/architecture.md`
 
+## UI Component Rules (MUST FOLLOW)
+
+See `docs/spec/architecture.md` for full details on DEC-007 and DEC-008.
+
+### Status labels from entity configs (DEC-007)
+```typescript
+// CORRECT: Use helper functions
+import { getStateLabel } from "@/types/entity";
+<Badge>{getStateLabel(vesselEntity, status)}</Badge>
+
+// WRONG: Hardcoded status labels in components
+const labels = { available: "Available" };
+```
+
+### No empty strings in Select options (DEC-008)
+```typescript
+// WRONG: Radix Select reserves "" for "no selection"
+{ value: "", label: "All" }
+
+// CORRECT: Don't add "All" options - entity-list.tsx adds them automatically
+// For "None" options, use sentinel: { value: "_none", label: "None" }
+```
+
 ## Database Security Rules (MUST FOLLOW)
 
 When writing SQL migrations, always follow these rules. See `docs/spec/architecture.md` for full details.

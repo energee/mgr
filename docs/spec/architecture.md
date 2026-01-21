@@ -546,6 +546,74 @@ The project includes CI checks that run `supabase db lint` on every PR. All ERRO
 
 ---
 
+## UI Component Governance
+
+### DEC-007: Status Labels from Entity Configs
+**Status**: Enforced (January 2026)
+
+All status/enum display labels MUST come from entity configuration `stateMachine.stateDisplay`, never hardcoded in components.
+
+**Pattern**:
+```typescript
+import { vesselEntity } from "@/entities";
+import { getStateLabel, getStateColor } from "@/types/entity";
+
+// CORRECT: Use entity config helpers
+<Badge>{getStateLabel(vesselEntity, status)}</Badge>
+
+// WRONG: Hardcoded status config in component
+const statusConfig = { available: "Available", in_use: "In Use" };
+<Badge>{statusConfig[status]}</Badge>
+```
+
+**Helper functions** (`src/types/entity.ts`):
+- `getStateLabel(entity, state)` - Returns display label from entity config, falls back to formatted state
+- `getStateColor(entity, state)` - Returns color from entity config
+- `formatStateLabel(state)` - Converts snake_case to Title Case (fallback)
+
+**Rationale**: Single source of truth for status labels prevents inconsistencies when new statuses are added to the database. Entity configs are the canonical source.
+
+### DEC-008: Radix Select Empty String Constraint
+**Status**: Enforced (January 2026)
+
+Radix UI's Select component reserves empty string (`""`) for "no selection" state. Entity configs and filter options MUST NOT use empty strings as option values.
+
+**Problem**:
+```typescript
+// WRONG: Empty string causes React error
+<SelectItem value="">All</SelectItem>
+
+// Error: A <Select.Item /> must have a value prop that is not an empty string.
+```
+
+**Solution** (implemented in `entity-list.tsx`):
+```typescript
+// Filter out empty strings and use sentinel value "_all"
+<Select value={filterValue || "_all"} onValueChange={(v) => setFilter(v === "_all" ? "" : v)}>
+  <SelectContent>
+    <SelectItem value="_all">All</SelectItem>
+    {/* Filter out empty string values - Radix Select doesn't allow them */}
+    {options
+      .filter((option) => option.value !== "")
+      .map((option) => (
+        <SelectItem key={option.value} value={option.value}>
+          {option.label}
+        </SelectItem>
+      ))}
+  </SelectContent>
+</Select>
+```
+
+**Entity config guidance**:
+- For filter "All" options: Don't include `{ value: "", label: "All" }` - the component adds it
+- For form "None" options: Use a sentinel like `{ value: "_none", label: "None" }` or omit
+
+**Affected files**:
+- `src/components/universal/entity-list.tsx` - Filters empty strings defensively
+- `src/components/universal/entity-form.tsx` - Maps `_none` sentinel for optional selects
+
+---
+
 ## Related Documents
 
 - [Decisions](./decisions.md) - Schema review decisions

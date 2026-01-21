@@ -64,6 +64,7 @@ const navigation: NavSection[] = [
       { label: "Vessels", href: "/production/vessels", icon: Container },
       { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: ArrowRightLeft },
       { label: "Brew Logs", href: "/production/brew-logs", icon: ClipboardList },
+      { label: "Yeast Pitches", href: "/production/yeast-pitches", icon: Beaker },
     ],
   },
   {
