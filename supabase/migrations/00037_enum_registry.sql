@@ -56,27 +56,25 @@ COMMENT ON COLUMN enum_values.metadata IS 'Additional type-specific data (e.g., 
 -- 2. Seed enum values from codebase
 -- =============================================================================
 
--- Batch Status (state machine)
+-- Batch Status (matches batch.tsx state machine - cold-side lifecycle only)
+-- Note: Hot-side brew day operations are tracked in brew_logs, not batch status
 INSERT INTO enum_values (enum_type, value, label, description, color, sort_order, is_default, metadata) VALUES
-  ('batch_status', 'planned', 'Planned', 'Batch is scheduled but not started', 'default', 10, TRUE, '{"next_states": ["brewing"]}'::jsonb),
-  ('batch_status', 'brewing', 'Brewing', 'Currently in brew day', 'info', 20, FALSE, '{"next_states": ["fermenting", "cancelled"]}'::jsonb),
-  ('batch_status', 'fermenting', 'Fermenting', 'In primary or secondary fermentation', 'warning', 30, FALSE, '{"next_states": ["conditioning", "cancelled"]}'::jsonb),
-  ('batch_status', 'conditioning', 'Conditioning', 'Conditioning/lagering phase', 'warning', 40, FALSE, '{"next_states": ["ready", "cancelled"]}'::jsonb),
-  ('batch_status', 'ready', 'Ready', 'Ready for packaging', 'success', 50, FALSE, '{"next_states": ["packaging", "cancelled"]}'::jsonb),
-  ('batch_status', 'packaging', 'Packaging', 'Being packaged', 'info', 60, FALSE, '{"next_states": ["completed", "cancelled"]}'::jsonb),
-  ('batch_status', 'completed', 'Completed', 'Batch is complete', 'success', 70, FALSE, '{"next_states": []}'::jsonb),
-  ('batch_status', 'cancelled', 'Cancelled', 'Batch was cancelled', 'error', 80, FALSE, '{"next_states": []}'::jsonb);
+  ('batch_status', 'planned', 'Planned', 'Batch is scheduled but not started', 'default', 10, TRUE, '{"next_states": ["fermenting", "cancelled"]}'::jsonb),
+  ('batch_status', 'fermenting', 'Fermenting', 'In primary or secondary fermentation', 'info', 20, FALSE, '{"next_states": ["conditioning", "cancelled"]}'::jsonb),
+  ('batch_status', 'conditioning', 'Conditioning', 'Conditioning/lagering phase', 'info', 30, FALSE, '{"next_states": ["packaging", "cancelled"]}'::jsonb),
+  ('batch_status', 'packaging', 'Packaging', 'Being packaged', 'warning', 40, FALSE, '{"next_states": ["completed", "cancelled"]}'::jsonb),
+  ('batch_status', 'completed', 'Completed', 'Batch is complete', 'success', 50, FALSE, '{"next_states": []}'::jsonb),
+  ('batch_status', 'cancelled', 'Cancelled', 'Batch was cancelled', 'error', 60, FALSE, '{"next_states": []}'::jsonb);
 
--- Order Status (state machine)
+-- Order Status (matches order.tsx state machine)
 INSERT INTO enum_values (enum_type, value, label, description, color, sort_order, is_default, metadata) VALUES
-  ('order_status', 'draft', 'Draft', 'Order being prepared', 'default', 10, TRUE, '{"next_states": ["confirmed"]}'::jsonb),
-  ('order_status', 'confirmed', 'Confirmed', 'Order confirmed with customer', 'info', 20, FALSE, '{"next_states": ["picking", "cancelled"]}'::jsonb),
-  ('order_status', 'picking', 'Picking', 'Order being picked/prepared', 'warning', 30, FALSE, '{"next_states": ["ready", "cancelled"]}'::jsonb),
-  ('order_status', 'ready', 'Ready', 'Ready for delivery/pickup', 'success', 40, FALSE, '{"next_states": ["delivered", "cancelled"]}'::jsonb),
-  ('order_status', 'delivered', 'Delivered', 'Order delivered to customer', 'success', 50, FALSE, '{"next_states": ["invoiced"]}'::jsonb),
-  ('order_status', 'invoiced', 'Invoiced', 'Invoice sent to customer', 'info', 60, FALSE, '{"next_states": ["paid"]}'::jsonb),
-  ('order_status', 'paid', 'Paid', 'Payment received', 'success', 70, FALSE, '{"next_states": []}'::jsonb),
-  ('order_status', 'cancelled', 'Cancelled', 'Order was cancelled', 'error', 80, FALSE, '{"next_states": []}'::jsonb);
+  ('order_status', 'draft', 'Draft', 'Order being prepared', 'default', 10, TRUE, '{"next_states": ["confirmed", "cancelled"]}'::jsonb),
+  ('order_status', 'confirmed', 'Confirmed', 'Order confirmed with customer', 'info', 20, FALSE, '{"next_states": ["scheduled", "cancelled"]}'::jsonb),
+  ('order_status', 'scheduled', 'Scheduled', 'Delivery date scheduled', 'info', 30, FALSE, '{"next_states": ["picking", "cancelled"]}'::jsonb),
+  ('order_status', 'picking', 'Picking', 'Order being picked/prepared', 'warning', 40, FALSE, '{"next_states": ["packed", "cancelled"]}'::jsonb),
+  ('order_status', 'packed', 'Packed', 'Order packed and ready', 'warning', 50, FALSE, '{"next_states": ["fulfilled", "cancelled"]}'::jsonb),
+  ('order_status', 'fulfilled', 'Fulfilled', 'Order delivered to customer', 'success', 60, FALSE, '{"next_states": []}'::jsonb),
+  ('order_status', 'cancelled', 'Cancelled', 'Order was cancelled', 'error', 70, FALSE, '{"next_states": []}'::jsonb);
 
 -- Purchase Order Status (matches purchase-order.tsx state machine)
 INSERT INTO enum_values (enum_type, value, label, description, color, sort_order, is_default, metadata) VALUES
