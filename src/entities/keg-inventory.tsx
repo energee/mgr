@@ -1,15 +1,18 @@
 /**
  * Keg Inventory Entity Configuration
  *
- * Tracks keg quantities by type, state, and location.
- * Kegs move through states: empty → filled → shipped → returned_dirty → cleaning → empty
+ * READ-ONLY calculated view of keg quantities by type, state, and location.
+ * Quantities are derived from keg_transactions - following the allocations pattern
+ * where balances are calculated, never stored as mutable values.
+ *
+ * To modify inventory, record a keg transaction instead.
  */
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 
 // =============================================================================
-// Types (until Supabase types are regenerated)
+// Types
 // =============================================================================
 
 export type KegState =
@@ -29,12 +32,10 @@ interface KegInventory {
   quantity: number;
   batch_id: string | null;
   finished_good_id: string | null;
-  notes: string | null;
-  created_at: string | null;
-  updated_at: string | null;
   // Joined fields from view
   keg_type_name?: string;
   keg_type_code?: string;
+  volume_bbl?: number;
   location_name?: string;
   batch_number?: string;
   finished_good_name?: string;
@@ -55,17 +56,16 @@ export const KEG_STATES: { value: KegState; label: string; description: string }
 ];
 
 // =============================================================================
-// Zod Schema
+// Zod Schema (minimal - view is read-only)
 // =============================================================================
 
 export const kegInventorySchema = z.object({
-  keg_type_id: z.string().uuid("Select a keg type"),
+  keg_type_id: z.string().uuid(),
   state: z.enum(["empty", "filled", "shipped", "returned_dirty", "cleaning", "maintenance", "retired"]),
   location_id: z.string().uuid().nullable().optional(),
-  quantity: z.coerce.number().int().min(0, "Quantity must be 0 or more"),
+  quantity: z.number().int(),
   batch_id: z.string().uuid().nullable().optional(),
   finished_good_id: z.string().uuid().nullable().optional(),
-  notes: z.string().nullable().optional(),
 });
 
 export type KegInventoryFormValues = z.infer<typeof kegInventorySchema>;
@@ -80,9 +80,10 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
   // ---------------------------------------------------------------------------
   name: "keg_inventory",
   table: "keg_inventory",
+  viewTable: "keg_inventory_with_details",
   displayName: "Keg Inventory",
   displayNamePlural: "Keg Inventory",
-  description: "Track keg quantities by type, state, and location",
+  description: "Calculated view of keg quantities by type, state, and location (derived from transactions)",
   domain: "inventory",
 
   // ---------------------------------------------------------------------------
@@ -90,10 +91,9 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
   // ---------------------------------------------------------------------------
   listColumns: [
     {
-      accessorKey: "keg_type_id",
+      accessorKey: "keg_type_name",
       header: "Keg Type",
       sortable: true,
-      // Will show keg_type_name from joined data
     },
     {
       accessorKey: "state",
@@ -110,10 +110,16 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
       sortable: true,
     },
     {
-      accessorKey: "location_id",
+      accessorKey: "location_name",
       header: "Location",
       sortable: true,
-      // Will show location_name from joined data
+      render: (value: unknown) => (value ? String(value) : "—"),
+    },
+    {
+      accessorKey: "batch_number",
+      header: "Batch",
+      sortable: false,
+      render: (value: unknown) => (value ? String(value) : "—"),
     },
   ],
 
@@ -127,13 +133,13 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
   ],
 
   defaultSort: { column: "state", direction: "asc" },
-  searchableFields: [],
+  searchableFields: ["keg_type_name", "location_name"],
 
   // ---------------------------------------------------------------------------
   // Detail View
   // ---------------------------------------------------------------------------
   detailHeader: {
-    title: "keg_type_id",
+    title: "keg_type_name",
     subtitle: "state",
   },
 
@@ -142,80 +148,23 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
       id: "overview",
       title: "Keg Inventory Details",
       fields: [
-        { field: "keg_type_id", label: "Keg Type" },
+        { field: "keg_type_name", label: "Keg Type" },
+        { field: "keg_type_code", label: "Code" },
         { field: "state", label: "State" },
         { field: "quantity", label: "Quantity" },
-        { field: "location_id", label: "Location" },
-        { field: "batch_id", label: "Batch" },
-        { field: "finished_good_id", label: "Finished Good" },
-        { field: "notes", label: "Notes" },
-        { field: "created_at", label: "Created", format: "datetime" },
-        { field: "updated_at", label: "Last Updated", format: "datetime" },
+        { field: "location_name", label: "Location" },
+        { field: "batch_number", label: "Batch" },
+        { field: "finished_good_name", label: "Finished Good" },
       ],
     },
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
+  // Form - READ ONLY (inventory is calculated from transactions)
   // ---------------------------------------------------------------------------
+  // Note: This is a calculated view. To modify inventory, record a keg transaction.
   formSchema: kegInventorySchema,
-
-  formFields: [
-    {
-      name: "keg_type_id",
-      label: "Keg Type",
-      type: "relation",
-      relation: { entity: "keg_type", displayField: "name" },
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "state",
-      label: "State",
-      type: "select",
-      options: KEG_STATES.map((s) => ({ value: s.value, label: s.label })),
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "quantity",
-      label: "Quantity",
-      type: "number",
-      placeholder: "0",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "location_id",
-      label: "Location",
-      type: "relation",
-      relation: { entity: "location", displayField: "name" },
-      colSpan: 6,
-    },
-    {
-      name: "batch_id",
-      label: "Batch (for filled kegs)",
-      type: "relation",
-      relation: { entity: "batch", displayField: "batch_number" },
-      description: "Only applicable for filled kegs",
-      colSpan: 6,
-    },
-    {
-      name: "finished_good_id",
-      label: "Finished Good (for filled kegs)",
-      type: "relation",
-      relation: { entity: "finished_good", displayField: "name" },
-      description: "Only applicable for filled kegs",
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Optional notes about this inventory",
-      colSpan: 12,
-    },
-  ],
+  formFields: [], // Empty - no direct editing of calculated view
 
   // ---------------------------------------------------------------------------
   // AI Context
