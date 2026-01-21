@@ -863,7 +863,7 @@ Next available: `00036`
 ## Phase 9: Yeast Management
 
 **Goal:** Track yeast inventory, pitches, harvests, and lineage.
-**Status:** Partial (yeast strain catalog and pitch tracking complete)
+**Status:** Complete (strain catalog, pitch tracking, harvest recording, viability calculations, lineage/cost display)
 **Depends On:** Phase 2 (Batches)
 
 ### 9.1 Yeast Strain Catalog
@@ -904,33 +904,35 @@ Next available: `00036`
 
 > Record harvests from batches.
 
-- [ ] Create harvest recording UI
-  - [ ] Link to source batch
-  - [ ] Volume harvested, cell count estimate
-  - [ ] Auto-increment generation
-  - [ ] Calculate viability decay
-- [ ] Create `yeast_harvests` table or extend pitches
-- [ ] Link harvest to new pitch record
+- [x] Create harvest recording UI
+  - [x] Link to source batch
+  - [x] Volume harvested, cell count estimate
+  - [x] Auto-increment generation
+  - [x] Calculate viability decay
+- [x] Pitches table handles harvest records (source_type='harvest', parent_pitch_id)
+- [x] Link harvest to new pitch record (YeastHarvestDialog component)
 
 ### 9.4 Yeast Viability Calculation
 
 > Auto-calculate viability decay over time.
 
-- [ ] Create `src/lib/yeast-calculations.ts`
-  - [ ] Viability decay formula (typically ~2-4% per day)
-  - [ ] Cell count estimation
-  - [ ] Pitching rate calculator (cells/mL/°P)
-- [ ] Display current estimated viability on pitch records
-- [ ] Warn when viability below threshold
+- [x] Create `src/lib/yeast-calculations.ts`
+  - [x] Viability decay formula (typically ~2-4% per day)
+  - [x] Cell count estimation (from package, from slurry)
+  - [x] Pitching rate calculator (cells/mL/°P)
+  - [x] Post-harvest viability estimation
+  - [x] Generation limit warnings
+- [x] Display current estimated viability on pitch records (view calculates)
+- [x] Warn when viability below threshold (viability_status in view)
 
 ### 9.5 Yeast Cost Spreading
 
 > Spread yeast cost across all batches in lineage.
 
-- [ ] Create yeast lineage cost calculation
-  - [ ] Original cost / total batches using that lineage
-  - [ ] Update COGS calculations to include yeast cost
-- [ ] Display cost-per-batch in lineage view
+- [x] Create yeast lineage cost calculation (yeast_lineage_summary view)
+  - [x] Original cost / total batches using that lineage
+  - [ ] Update COGS calculations to include yeast cost (future)
+- [x] Display cost-per-batch in lineage view (YeastLineageDisplay component)
 
 ---
 
@@ -1596,6 +1598,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-21 | Phase 10.4: Created customer keg balances (migration 00033) with calculated views, CustomerKegBalances component, and return recording UI |
 | 2026-01-21 | Phase 10.5: Created keg reports (migration 00034) with fleet summary, turnover metrics, aging alerts, and reports dashboard. Phase 10 now Complete |
 | 2026-01-21 | Phase 9.2: Created yeast pitch tracking (migration 00035) with lineage, viability decay, and cost spreading views. Added entity config and pages |
+| 2026-01-21 | Phase 9.3-9.5: Added yeast-calculations.ts library, YeastHarvestDialog, YeastLineageDisplay, harvest action. Phase 9 now Complete |
 
 ---
 
