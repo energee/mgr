@@ -33,6 +33,7 @@ import { salesChannelEntity } from "./sales-channel";
 import { priceTierEntity } from "./price-tier";
 import { tierPriceEntity } from "./tier-price";
 import { kegTypeEntity } from "./keg-type";
+import { kegInventoryEntity } from "./keg-inventory";
 import { locationEntity } from "./location";
 
 // =============================================================================
@@ -54,6 +55,7 @@ registerEntity(inventoryItemEntity);
 registerEntity(finishedGoodEntity);
 registerEntity(packageTypeEntity);
 registerEntity(kegTypeEntity);
+registerEntity(kegInventoryEntity);
 
 // Sales domain
 registerEntity(orderEntity);
@@ -105,6 +107,8 @@ export { packageTypeEntity } from "./package-type";
 export type { PackageTypeFormValues } from "./package-type";
 export { kegTypeEntity } from "./keg-type";
 export type { KegTypeFormValues } from "./keg-type";
+export { kegInventoryEntity, KEG_STATES } from "./keg-inventory";
+export type { KegInventoryFormValues, KegState } from "./keg-inventory";
 export { yeastStrainEntity } from "./yeast-strain";
 export type { YeastStrainFormValues } from "./yeast-strain";
 export { salesChannelEntity } from "./sales-channel";
