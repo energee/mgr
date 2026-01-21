@@ -227,7 +227,7 @@ CREATE POLICY user_profiles_insert_admin ON user_profiles
 CREATE TRIGGER update_user_profiles_updated_at
   BEFORE UPDATE ON user_profiles
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION update_updated_at();
 
 -- =============================================================================
 -- 8. Helper function to check user role
@@ -292,7 +292,7 @@ INSERT INTO _schema_registry (
   '{"belongs_to": [], "has_many": [{"name": "preferences", "table": "user_preferences"}]}'::jsonb,
   '["display_name", "email", "role", "status", "last_active_at"]'::jsonb,
   '["List all users", "Show admins", "Find inactive users", "Who was last active?"]'::jsonb,
-  'User management entity. Contains cached auth info (email, name) to avoid joining auth.users directly. Role-based access: admin, production_manager, brewer, sales, viewer.'::text,
+  '"User management entity. Contains cached auth info (email, name) to avoid joining auth.users directly. Role-based access: admin, production_manager, brewer, sales, viewer."'::jsonb,
   '["days_since_active", "role_display", "status_display"]'::jsonb
 )
 ON CONFLICT (table_name) DO UPDATE SET

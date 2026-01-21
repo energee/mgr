@@ -77,7 +77,7 @@ ON CONFLICT (key) DO NOTHING;
 CREATE TRIGGER set_system_settings_updated_at
   BEFORE UPDATE ON system_settings
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION update_updated_at();
 
 -- =============================================================================
 -- 4. HELPER FUNCTION TO GET SETTING VALUE

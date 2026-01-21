@@ -62,7 +62,7 @@ ON CONFLICT (code) DO NOTHING;
 CREATE TRIGGER set_keg_types_updated_at
   BEFORE UPDATE ON keg_types
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION update_updated_at();
 
 -- =============================================================================
 -- 4. SCHEMA REGISTRY
