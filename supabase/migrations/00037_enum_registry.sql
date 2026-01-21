@@ -78,15 +78,15 @@ INSERT INTO enum_values (enum_type, value, label, description, color, sort_order
   ('order_status', 'paid', 'Paid', 'Payment received', 'success', 70, FALSE, '{"next_states": []}'::jsonb),
   ('order_status', 'cancelled', 'Cancelled', 'Order was cancelled', 'error', 80, FALSE, '{"next_states": []}'::jsonb);
 
--- Purchase Order Status
+-- Purchase Order Status (matches purchase-order.tsx state machine)
 INSERT INTO enum_values (enum_type, value, label, description, color, sort_order, is_default, metadata) VALUES
-  ('po_status', 'draft', 'Draft', 'PO being prepared', 'default', 10, TRUE, '{"next_states": ["submitted"]}'::jsonb),
+  ('po_status', 'draft', 'Draft', 'PO being prepared', 'default', 10, TRUE, '{"next_states": ["submitted", "cancelled"]}'::jsonb),
   ('po_status', 'submitted', 'Submitted', 'Sent to supplier', 'info', 20, FALSE, '{"next_states": ["confirmed", "cancelled"]}'::jsonb),
-  ('po_status', 'confirmed', 'Confirmed', 'Supplier confirmed', 'info', 30, FALSE, '{"next_states": ["shipped", "cancelled"]}'::jsonb),
-  ('po_status', 'shipped', 'Shipped', 'In transit', 'warning', 40, FALSE, '{"next_states": ["partial", "received"]}'::jsonb),
-  ('po_status', 'partial', 'Partial', 'Partially received', 'warning', 50, FALSE, '{"next_states": ["received"]}'::jsonb),
-  ('po_status', 'received', 'Received', 'Fully received', 'success', 60, FALSE, '{"next_states": []}'::jsonb),
-  ('po_status', 'cancelled', 'Cancelled', 'PO was cancelled', 'error', 70, FALSE, '{"next_states": []}'::jsonb);
+  ('po_status', 'confirmed', 'Confirmed', 'Supplier confirmed', 'info', 30, FALSE, '{"next_states": ["partial", "fulfilled", "cancelled"]}'::jsonb),
+  ('po_status', 'partial', 'Partial', 'Partially received', 'warning', 40, FALSE, '{"next_states": ["fulfilled", "cancelled"]}'::jsonb),
+  ('po_status', 'fulfilled', 'Fulfilled', 'Fully received', 'success', 50, FALSE, '{"next_states": ["closed"]}'::jsonb),
+  ('po_status', 'cancelled', 'Cancelled', 'PO was cancelled', 'error', 60, FALSE, '{"next_states": []}'::jsonb),
+  ('po_status', 'closed', 'Closed', 'PO completed and closed', 'default', 70, FALSE, '{"next_states": []}'::jsonb);
 
 -- Vessel Status
 INSERT INTO enum_values (enum_type, value, label, description, color, sort_order, is_default, metadata) VALUES
