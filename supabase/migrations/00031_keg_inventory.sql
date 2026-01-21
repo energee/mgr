@@ -47,7 +47,10 @@ COMMENT ON COLUMN keg_inventory.finished_good_id IS 'For filled kegs, the finish
 -- Enable RLS
 ALTER TABLE keg_inventory ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies (single-tenant, all authenticated users have access)
+-- RLS Policies
+-- Note: Single-tenant application - all authenticated users have full access.
+-- This follows the pattern established in other inventory tables (keg_types, locations, etc.)
+-- Admin-level access control is enforced in the application layer.
 CREATE POLICY "keg_inventory_select" ON keg_inventory
   FOR SELECT TO authenticated USING (true);
 
