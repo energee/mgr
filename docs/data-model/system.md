@@ -405,6 +405,250 @@ const canonicalVolume = parseVolumeInput(userInput, prefs.volume_unit);
 
 ---
 
+## `enum_values`
+
+Centralized registry for all enum values in the system. Enables dynamic enum management without code changes and provides AI-queryable metadata.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| enum_type | TEXT | Enum category (e.g., batch_status, vessel_type) |
+| value | TEXT | Actual value stored in database columns |
+| label | TEXT | Human-readable display label |
+| description | TEXT | Optional description |
+| color | TEXT | UI color: success, warning, error, info, default |
+| icon | TEXT | Lucide icon name (optional) |
+| sort_order | INTEGER | Display order (lower = first) |
+| group_name | TEXT | Optional grouping within enum type |
+| is_default | BOOLEAN | Default value for new records |
+| is_active | BOOLEAN | Inactive values hidden from dropdowns |
+| metadata | JSONB | Type-specific data (e.g., state machine transitions) |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+### Constraints
+
+```sql
+CONSTRAINT uq_enum_type_value UNIQUE (enum_type, value)
+```
+
+### Enum Types
+
+| enum_type | Description | Has State Machine |
+|-----------|-------------|-------------------|
+| batch_status | Batch lifecycle states | Yes |
+| order_status | Order lifecycle states | Yes |
+| po_status | Purchase order states | Yes |
+| vessel_status | Vessel availability | No |
+| vessel_type | Vessel categories | No |
+| yeast_pitch_status | Yeast pitch lifecycle | Yes |
+| yeast_type | Yeast categories | No |
+| yeast_form | Yeast form (liquid, dry, slurry) | No |
+| user_role | User permission roles | No |
+| user_status | User account status | No |
+| notification_status | Notification read state | No |
+| notification_severity | Alert level | No |
+| location_type | Location categories | No |
+| package_container_type | Package formats | No |
+| keg_state | Keg lifecycle states | Yes |
+| keg_transaction_type | Keg movement types | No |
+| catalog_type | Inventory item categories | No |
+| volume_unit | Volume measurement units | No |
+| weight_unit | Weight measurement units | No |
+| temperature_unit | Temperature units | No |
+| gravity_unit | Gravity measurement units | No |
+| fermentation_stage | Fermentation phases | No |
+| mash_step_type | Mash schedule step types | No |
+| packaging_session_status | Packaging lifecycle | Yes |
+
+### Metadata Structures
+
+The `metadata` JSONB column stores type-specific data. Different enum types use different structures:
+
+#### State Machine Transitions
+Used by: `batch_status`, `order_status`, `po_status`, `yeast_pitch_status`, `keg_state`, `packaging_session_status`
+
+```json
+{
+  "next_states": ["brewing", "cancelled"]
+}
+```
+
+#### Yeast Viability Decay
+Used by: `yeast_form`
+
+```json
+{
+  "viability_decay_per_day": 2
+}
+```
+- `liquid`: 2% per day
+- `dry`: 0.5% per day
+- `slurry`: 3% per day
+
+#### Unit Conversions
+Used by: `volume_unit`, `weight_unit`
+
+```json
+{
+  "to_liters": 117.347765
+}
+```
+```json
+{
+  "to_kg": 0.453592
+}
+```
+
+#### Vessel Typical Uses
+Used by: `vessel_type`
+
+```json
+{
+  "typical_uses": ["fermentation", "conditioning"]
+}
+```
+
+#### User Role Permissions
+Used by: `user_role`
+
+```json
+{
+  "permissions": ["production", "inventory", "purchasing"]
+}
+```
+- `admin`: `["all"]`
+- `production_manager`: `["production", "inventory", "purchasing"]`
+- `brewer`: `["recipes", "batches", "brewing"]`
+- `sales`: `["orders", "customers"]`
+- `viewer`: `["read"]`
+
+#### Mash Step Temperature Ranges
+Used by: `mash_step_type`
+
+```json
+{
+  "temp_range_f": [148, 158]
+}
+```
+
+#### Transaction Inventory Impact
+Used by: `keg_transaction_type`
+
+```json
+{
+  "affects_inventory": true
+}
+```
+
+### Helper Functions
+
+```sql
+-- Get all values for an enum type
+SELECT * FROM get_enum_values('batch_status');
+
+-- Get default value
+SELECT get_enum_default('batch_status');  -- Returns 'planned'
+
+-- Validate enum value
+SELECT is_valid_enum('batch_status', 'brewing');  -- Returns true
+
+-- Get display label
+SELECT get_enum_label('batch_status', 'fermenting');  -- Returns 'Fermenting'
+
+-- List all enum types
+SELECT * FROM get_enum_types();
+```
+
+### Query Examples
+
+```sql
+-- All batch status options with colors
+SELECT value, label, color, sort_order
+FROM enum_values
+WHERE enum_type = 'batch_status' AND is_active = true
+ORDER BY sort_order;
+
+-- Find state machine transitions for a status
+SELECT metadata->>'next_states' AS next_states
+FROM enum_values
+WHERE enum_type = 'batch_status' AND value = 'brewing';
+```
+
+### RLS Policies
+
+- All authenticated users can read enum values
+- Only admins can modify enum values (checked via `user_profiles.role = 'admin'`)
+
+---
+
+## `user_profiles`
+
+User profiles with cached auth info and role assignment. Caches user information from `auth.users` to avoid direct joins per security guidelines.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key (matches auth.users.id) |
+| email | TEXT | Cached email from auth.users |
+| display_name | TEXT | User's display name |
+| avatar_url | TEXT | Profile avatar URL |
+| role | TEXT | User role: admin, production_manager, brewer, sales, viewer |
+| status | TEXT | Account status: active, inactive, pending |
+| last_active_at | TIMESTAMPTZ | Last activity timestamp |
+| invited_at | TIMESTAMPTZ | When user was invited |
+| invited_by | UUID | FK to auth.users (who invited them) |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+### Constraints
+
+```sql
+CONSTRAINT chk_user_role CHECK (role IN ('admin', 'production_manager', 'brewer', 'sales', 'viewer'))
+CONSTRAINT chk_user_status CHECK (status IN ('active', 'inactive', 'pending'))
+```
+
+### User Roles
+
+| Role | Description | Access Level |
+|------|-------------|--------------|
+| admin | Full system access | All features |
+| production_manager | Production/inventory/purchasing | Production domain |
+| brewer | Recipes/batches/brewing | Brewing operations |
+| sales | Orders/customers | Sales domain |
+| viewer | Read-only access | View only |
+
+### Auto-Creation Trigger
+
+User profiles are automatically created when users sign up via `auth.users` trigger:
+
+```sql
+CREATE TRIGGER on_auth_user_created_profile
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION create_user_profile();
+```
+
+### Helper Functions
+
+```sql
+-- Get current user's role
+SELECT get_user_role();  -- Uses auth.uid() by default
+
+-- Check if current user is admin
+SELECT is_admin();  -- Returns boolean
+
+-- Update last active timestamp
+SELECT update_last_active();
+```
+
+### RLS Policies
+
+- All authenticated users can view profiles (needed for displaying names)
+- Users can update their own profile (name, avatar only)
+- Admins can update any profile (role, status changes)
+- Admins can insert profiles (for invitations)
+
+---
+
 ## Future: Multi-Tenant Support
 
 The following tables would be added for multi-tenant SaaS deployment:
