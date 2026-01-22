@@ -7,46 +7,10 @@
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
+import type { Database } from "@/types/supabase";
 
-// Type definition for yeast pitch with view details
-// Note: Table is new and not in generated types yet
-interface YeastPitch {
-  id: string;
-  strain_id: string;
-  source_type: "purchase" | "harvest";
-  parent_pitch_id: string | null;
-  generation: number;
-  status: "in_stock" | "in_use" | "harvested" | "depleted" | "discarded";
-  volume_ml: number | null;
-  cell_count_billion: number | null;
-  initial_viability: number | null;
-  current_viability: number | null;
-  cost: number | null;
-  cost_per_batch: number | null;
-  received_date: string | null;
-  harvest_date: string | null;
-  use_by_date: string | null;
-  batch_id: string | null;
-  pitched_at: string | null;
-  location_id: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-  // View fields
-  strain_name?: string;
-  strain_manufacturer?: string;
-  strain_code?: string;
-  strain_type?: string;
-  strain_form?: string;
-  strain_attenuation?: number;
-  location_name?: string;
-  batch_number?: string;
-  batch_name?: string;
-  days_old?: number;
-  estimated_viability?: number;
-  viability_status?: "excellent" | "good" | "marginal" | "low" | "inactive";
-}
+// Use the view type since entity uses viewTable for queries
+type YeastPitch = Database["public"]["Views"]["yeast_pitches_with_details"]["Row"];
 
 // =============================================================================
 // Zod Schema

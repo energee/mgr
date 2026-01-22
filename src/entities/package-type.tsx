@@ -123,7 +123,7 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 

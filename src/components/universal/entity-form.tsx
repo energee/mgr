@@ -13,6 +13,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { entityKeys, dynamicOptionsKeys } from "@/lib/query-keys";
+import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityFieldDef } from "@/types/entity";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,17 +37,20 @@ import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
-// Hook to fetch dynamic options for fields
+// Hook to fetch dynamic options for fields (handles both dynamicOptions and relation types)
 function useDynamicOptions<T>(fields: EntityFieldDef<T>[]) {
   const supabase = createClient();
 
   // Get all fields that have dynamicOptions
   const dynamicFields = fields.filter((f) => f.dynamicOptions);
 
+  // Get all relation fields (type: "relation" with field.relation config)
+  const relationFields = fields.filter((f) => f.type === "relation" && f.relation);
+
   // Create queries for each dynamic field
-  const queries = useQueries({
+  const dynamicQueries = useQueries({
     queries: dynamicFields.map((field) => ({
-      queryKey: ["dynamic-options", field.dynamicOptions!.table, field.name],
+      queryKey: dynamicOptionsKeys.field(field.dynamicOptions!.table, field.name as string),
       queryFn: async () => {
         const { table, valueField, labelField, filter, orderBy } = field.dynamicOptions!;
 
@@ -76,9 +81,50 @@ function useDynamicOptions<T>(fields: EntityFieldDef<T>[]) {
           })),
         };
       },
-      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+      staleTime: CACHE_DURATIONS.STATIC_DATA,
     })),
   });
+
+  // Create queries for relation fields
+  // Import entityRegistry lazily to avoid circular dependency issues at module load time
+  const relationQueries = useQueries({
+    queries: relationFields.map((field) => {
+      const relation = field.relation!;
+
+      return {
+        queryKey: dynamicOptionsKeys.field(relation.entity, field.name as string),
+        queryFn: async () => {
+          // Dynamically import to avoid circular dependency
+          const { entityRegistry } = await import("@/entities");
+          const relatedEntity = entityRegistry.get(relation.entity);
+          const tableName = relatedEntity?.table || `${relation.entity}s`;
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data, error } = await supabase
+            .from(tableName as any)
+            .select(`id, ${relation.displayField}`)
+            .order(relation.displayField);
+
+          if (error) {
+            console.error(`Failed to fetch options for ${field.name}:`, error);
+            return { fieldName: field.name, options: [] };
+          }
+
+          const rows = data as unknown as Record<string, unknown>[] | null;
+          return {
+            fieldName: field.name,
+            options: (rows || []).map((row) => ({
+              value: String(row.id),
+              label: String(row[relation.displayField]),
+            })),
+          };
+        },
+        staleTime: CACHE_DURATIONS.STATIC_DATA,
+      };
+    }),
+  });
+
+  const queries = [...dynamicQueries, ...relationQueries];
 
   // Combine results into a map of fieldName -> options
   const optionsMap = useMemo(() => {
@@ -136,11 +182,29 @@ export function EntityForm<T = Record<string, unknown>>({
 
   // Form state
   const [values, setValues] = useState<Partial<T>>(() => {
-    // Initialize with default values from field configs
+    // Initialize all fields with appropriate empty values to avoid controlled/uncontrolled issues
     const initial: Partial<T> = {};
     entity.formFields.forEach((field) => {
+      const rec = initial as Record<string, unknown>;
       if (field.defaultValue !== undefined) {
-        (initial as Record<string, unknown>)[field.name] = field.defaultValue;
+        rec[field.name] = field.defaultValue;
+      } else {
+        // Initialize based on field type to avoid undefined -> value transitions
+        switch (field.type) {
+          case "switch":
+          case "checkbox":
+            rec[field.name] = false;
+            break;
+          case "number":
+          case "unit":
+          case "relation":
+            // Nullable fields use null
+            rec[field.name] = null;
+            break;
+          default:
+            // Text, select, date, etc. use empty string
+            rec[field.name] = "";
+        }
       }
     });
     return { ...initial, ...defaultValues };
@@ -150,7 +214,8 @@ export function EntityForm<T = Record<string, unknown>>({
 
   // Fetch existing record for edit mode
   const { data: existingData, isLoading } = useQuery({
-    queryKey: [entity.table, id],
+    queryKey: entityKeys.detail(entity.table, id || ""),
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     queryFn: async () => {
       if (!id) return null;
       const { data, error } = await db
@@ -161,7 +226,7 @@ export function EntityForm<T = Record<string, unknown>>({
       if (error) throw error;
       return data as T;
     },
-    enabled: isEdit,
+    enabled: isEdit && !!id,
   });
 
   // Merge existing data into form values once loaded
@@ -209,8 +274,19 @@ export function EntityForm<T = Record<string, unknown>>({
     e.preventDefault();
     setErrors({});
 
+    // Pre-process values: convert empty strings to null for optional/nullable fields
+    const processedValues = { ...values };
+    entity.formFields.forEach((field) => {
+      const key = field.name as string;
+      const val = (processedValues as Record<string, unknown>)[key];
+      // Convert empty strings to null for non-required fields (likely nullable in DB)
+      if (val === "" && !field.required) {
+        (processedValues as Record<string, unknown>)[key] = null;
+      }
+    });
+
     // Validate with Zod schema
-    const result = entity.formSchema.safeParse(values);
+    const result = entity.formSchema.safeParse(processedValues);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       result.error.errors.forEach((err) => {
@@ -246,8 +322,8 @@ export function EntityForm<T = Record<string, unknown>>({
           }
 
           toast.success(`${entity.displayName} updated successfully`);
-          queryClient.invalidateQueries({ queryKey: [entity.table, id] });
-          queryClient.invalidateQueries({ queryKey: [entity.table] });
+          queryClient.invalidateQueries({ queryKey: entityKeys.detail(entity.table, id) });
+          queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.table) });
           onSuccess?.(lockResult.data as T);
           router.push(`${path}/${id}`);
         } else {
@@ -260,8 +336,8 @@ export function EntityForm<T = Record<string, unknown>>({
             .single();
           if (error) throw error;
           toast.success(`${entity.displayName} updated successfully`);
-          queryClient.invalidateQueries({ queryKey: [entity.table, id] });
-          queryClient.invalidateQueries({ queryKey: [entity.table] });
+          queryClient.invalidateQueries({ queryKey: entityKeys.detail(entity.table, id) });
+          queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.table) });
           onSuccess?.(data as T);
           router.push(`${path}/${id}`);
         }
@@ -274,13 +350,20 @@ export function EntityForm<T = Record<string, unknown>>({
           .single();
         if (error) throw error;
         toast.success(`${entity.displayName} created successfully`);
-        queryClient.invalidateQueries({ queryKey: [entity.table] });
+        queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.table) });
         onSuccess?.(data as T);
         router.push(`${path}/${(data as Record<string, unknown>).id}`);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "An unexpected error occurred";
+      // Extract message from various error formats (Supabase PostgrestError, Error, etc.)
+      let message = "An unexpected error occurred";
+      if (err && typeof err === "object") {
+        if ("message" in err && typeof err.message === "string") {
+          message = err.message;
+        }
+      }
       toast.error(message);
+      console.error("Form submission error:", err);
     } finally {
       setIsSubmitting(false);
     }
@@ -291,7 +374,7 @@ export function EntityForm<T = Record<string, unknown>>({
     conflictDialog.setIsRefreshing(true);
     try {
       // Refetch the data
-      await queryClient.invalidateQueries({ queryKey: [entity.table, id] });
+      await queryClient.invalidateQueries({ queryKey: entityKeys.detail(entity.table, id || "") });
       const { data } = await db.from(entity.table).select("*").eq("id", id).single();
       if (data) {
         setValues(data);
@@ -482,6 +565,36 @@ function renderFieldInput<T>(
             <SelectValue placeholder={field.placeholder || "Select..."} />
           </SelectTrigger>
           <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    case "relation": {
+      // Relation fields use dynamicOptions fetched from the related entity
+      const options = dynamicOptions || [];
+      // Use _none sentinel for "no selection" since Radix Select reserves empty string
+      const selectValue = value ? String(value) : "_none";
+      return (
+        <Select
+          value={selectValue}
+          onValueChange={(v) => onChange(v === "_none" ? null : v)}
+          disabled={disabled}
+        >
+          <SelectTrigger id={field.name}>
+            <SelectValue placeholder={field.placeholder || "Select..."} />
+          </SelectTrigger>
+          <SelectContent>
+            {!field.required && (
+              <SelectItem value="_none">
+                <span className="text-muted-foreground">None</span>
+              </SelectItem>
+            )}
             {options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}

@@ -6,7 +6,8 @@
  */
 
 import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
+import { valuesAsOptions, getValueDisplay } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 
@@ -49,12 +50,18 @@ export const customerSchema = z.object({
 
 export type CustomerFormValues = z.infer<typeof customerSchema>;
 
-// Customer type display config
-const customerTypeDisplay: Record<string, { label: string; color: "default" | "success" | "warning" | "error" | "info" }> = {
-  distributor: { label: "Distributor", color: "info" },
-  retail: { label: "Retail", color: "success" },
-  taproom: { label: "Taproom", color: "warning" },
-  direct: { label: "Direct", color: "default" },
+// =============================================================================
+// Value Display Configuration
+// =============================================================================
+
+const customerTypeDisplayConfig: ValueDisplayConfig = {
+  field: "customer_type",
+  display: {
+    distributor: { label: "Distributor", color: "info" },
+    retail: { label: "Retail", color: "success" },
+    taproom: { label: "Taproom", color: "warning" },
+    direct: { label: "Direct", color: "default" },
+  },
 };
 
 // =============================================================================
@@ -83,12 +90,15 @@ export const customerEntity: EntityConfig<Customer> = {
       accessorKey: "customer_type",
       header: "Type",
       sortable: true,
-      render: (value) => (
-        <StatusBadge
-          status={value as string}
-          config={customerTypeDisplay}
-        />
-      ),
+      render: (value) => {
+        const display = getValueDisplay(customerEntity, "customer_type", value as string);
+        return (
+          <StatusBadge
+            status={value as string}
+            config={display ? { [value as string]: { label: display.label, color: display.color || "default" } } : undefined}
+          />
+        );
+      },
     },
     {
       accessorKey: "sales_channel_name",
@@ -126,17 +136,12 @@ export const customerEntity: EntityConfig<Customer> = {
       field: "customer_type",
       type: "multiselect",
       label: "Type",
-      options: [
-        { value: "distributor", label: "Distributor" },
-        { value: "retail", label: "Retail" },
-        { value: "taproom", label: "Taproom" },
-        { value: "direct", label: "Direct" },
-      ],
+      options: valuesAsOptions(customerTypeDisplayConfig),
     },
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 
@@ -226,12 +231,7 @@ export const customerEntity: EntityConfig<Customer> = {
       label: "Customer Type",
       type: "select",
       required: true,
-      options: [
-        { value: "distributor", label: "Distributor" },
-        { value: "retail", label: "Retail" },
-        { value: "taproom", label: "Taproom" },
-        { value: "direct", label: "Direct" },
-      ],
+      options: valuesAsOptions(customerTypeDisplayConfig),
       colSpan: 6,
     },
     {
@@ -296,6 +296,11 @@ export const customerEntity: EntityConfig<Customer> = {
       colSpan: 12,
     },
   ],
+
+  // ---------------------------------------------------------------------------
+  // Value Display
+  // ---------------------------------------------------------------------------
+  valueDisplay: [customerTypeDisplayConfig],
 
   // ---------------------------------------------------------------------------
   // Relations

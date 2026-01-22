@@ -19,6 +19,7 @@ import {
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { notificationKeys } from "@/lib/query-keys";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
@@ -83,7 +84,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["notifications", "unread"],
+    queryKey: notificationKeys.unread(),
     queryFn: async () => {
       // Use type assertion for view not in types yet
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,7 +139,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
             }
 
             // Refetch to update the list
-            queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
+            queryClient.invalidateQueries({ queryKey: notificationKeys.unread() });
           }
         )
         .on(
@@ -151,7 +152,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
           },
           () => {
             // Notification was read/dismissed, refetch
-            queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
+            queryClient.invalidateQueries({ queryKey: notificationKeys.unread() });
           }
         )
         .subscribe();
@@ -181,7 +182,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.unread() });
     },
   });
 
@@ -194,7 +195,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.unread() });
     },
   });
 
@@ -209,7 +210,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.unread() });
     },
   });
 

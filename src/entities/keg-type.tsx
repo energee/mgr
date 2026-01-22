@@ -7,21 +7,9 @@
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
+import type { Database } from "@/types/supabase";
 
-// KegType interface - defined here since table may not be in generated types yet
-// (added in migration 00029_keg_types.sql)
-interface KegType {
-  id: string;
-  name: string;
-  code: string;
-  volume_bbl: number;
-  deposit_amount: number | null;
-  description: string | null;
-  is_active: boolean | null;
-  position: number | null;
-  created_at: string | null;
-  updated_at: string | null;
-}
+type KegType = Database["public"]["Tables"]["keg_types"]["Row"];
 
 // =============================================================================
 // Zod Schema
@@ -93,7 +81,7 @@ export const kegTypeEntity: EntityConfig<KegType> = {
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 
