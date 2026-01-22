@@ -24,15 +24,16 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     redirect("/login");
   }
 
-  // Get brewery settings (single-tenant)
+  // Get brewery name from system_settings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-  const { data: settings } = await db
-    .from("settings")
-    .select("brewery_name")
+  const { data: setting } = await db
+    .from("system_settings")
+    .select("value")
+    .eq("key", "brewery_name")
     .single();
 
-  const breweryName = settings?.brewery_name || "My Brewery";
+  const breweryName = (setting?.value as string) || "My Brewery";
 
   return (
     <AppProviders>
