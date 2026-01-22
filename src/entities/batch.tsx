@@ -20,6 +20,7 @@ import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
 import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
+import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-info";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 // Use generated type from Supabase
@@ -196,6 +197,11 @@ export const batchEntity: EntityConfig<Batch> = {
       collapsible: true,
     },
     {
+      id: "cancellation",
+      title: "Cancellation Details",
+      component: BatchCancellationInfo,
+    },
+    {
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("batches"),
@@ -334,7 +340,7 @@ export const batchEntity: EntityConfig<Batch> = {
       variant: "destructive",
       fromStates: ["planned", "fermenting", "conditioning", "packaging"],
       toState: "cancelled",
-      confirm: true,
+      // Note: Uses BatchCancellationDialog instead of simple confirm
     },
   ],
 

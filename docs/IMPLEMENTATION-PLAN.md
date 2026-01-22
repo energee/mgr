@@ -1366,16 +1366,21 @@ Next available: `00036`
 
 > Handle batch cancellation with proper cleanup.
 
-- [ ] Create cancellation dialog
-  - [ ] Reason code selection (quality, equipment, other)
-  - [ ] Loss quantity recording
-  - [ ] Notes field
-- [ ] Implement cancellation logic
-  - [ ] Create loss allocation record
-  - [ ] Release vessel assignment
-  - [ ] Update inventory if materials consumed
-  - [ ] Trigger notifications
-- [ ] Create cancellation audit trail
+- [x] Create cancellation dialog
+  - [x] Reason code selection (quality, equipment, contamination, scheduling, other)
+  - [x] Loss quantity recording
+  - [x] Notes field
+  - [x] Two-step confirmation
+- [x] Implement cancellation logic (migration 00042)
+  - [x] `cancel_batch()` RPC function with atomic operations
+  - [x] Create loss allocation record in allocations table
+  - [x] Release vessel assignment and mark dirty
+  - [x] Cancel pending allocations from the batch
+  - [x] Trigger notifications to admins/production managers
+- [x] Create cancellation audit trail
+  - [x] `cancelled_at`, `cancelled_by`, `cancellation_reason`, `cancellation_notes` columns
+  - [x] `batches_with_brew_info` view includes cancellation display info
+  - [x] `BatchCancellationInfo` component for detail view
 
 ---
 
@@ -1526,8 +1531,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00041
-- Next available: 00042
+- Current: 00001-00042
+- Next available: 00043
 
 ### Testing Strategy
 
@@ -1623,6 +1628,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-21 | Phase 5.3: Marked enum registry complete (migrations 00037-00040, entity, pages) |
 | 2026-01-21 | Phase 7.1: Implemented TTB calculations (migration 00041 with tax class mapping, inventory, production, removals functions) |
 | 2026-01-21 | Phase 7.1: Added TTB report export functionality (CSV and print-friendly PDF via src/lib/report-export.ts). Phase 7 now Complete |
+| 2026-01-21 | Phase 14.5: Implemented batch cancellation workflow (migration 00042, BatchCancellationDialog, BatchCancellationInfo) |
 
 ---
 
@@ -1731,7 +1737,14 @@ supabase/migrations/
 ├── 00032_keg_transactions.sql
 ├── 00033_customer_keg_balances.sql
 ├── 00034_keg_reports.sql
-└── 00035_yeast_pitches.sql
+├── 00035_yeast_pitches.sql
+├── 00036_user_profiles.sql
+├── 00037_enum_values.sql
+├── 00038_enum_data.sql
+├── 00039_enum_ui_config.sql
+├── 00040_enum_validation.sql
+├── 00041_ttb_reporting.sql
+└── 00042_batch_cancellation.sql
 ```
 
 ---
