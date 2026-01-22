@@ -27,9 +27,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FileText, Download, Printer, Calendar, AlertCircle, Beer, Package, Boxes } from "lucide-react";
+import { ArrowLeft, FileText, Download, Printer, Calendar, AlertCircle, Beer, Package, Boxes, FileSpreadsheet } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import {
+  exportTTBReportToCSV,
+  exportBatchDetailsToCSV,
+  openTTBPrintView,
+  type TTBReportData,
+} from "@/lib/report-export";
 
 // =============================================================================
 // Types
@@ -253,14 +266,66 @@ export default function TTBReportPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!reportData || reportData.length === 0}
+            onClick={() => {
+              if (reportData && reportData.length > 0) {
+                openTTBPrintView(reportData as TTBReportData[], totals, year, month);
+              }
+            }}
+          >
             <Printer className="h-4 w-4 mr-2" />
             Print
           </Button>
-          <Button variant="outline" size="sm" disabled>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!reportData || reportData.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => {
+                  if (reportData && reportData.length > 0) {
+                    exportTTBReportToCSV(reportData as TTBReportData[], year, month);
+                  }
+                }}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Report (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  if (batchData?.completedBatches) {
+                    exportBatchDetailsToCSV(batchData.completedBatches, year, month, "completed");
+                  }
+                }}
+                disabled={!batchData?.completedBatches?.length}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Completed Batches (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (batchData?.inProgressBatches) {
+                    exportBatchDetailsToCSV(batchData.inProgressBatches, year, month, "in-process");
+                  }
+                }}
+                disabled={!batchData?.inProgressBatches?.length}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export In-Process Batches (CSV)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

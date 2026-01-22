@@ -708,7 +708,7 @@ Next available: `00036`
 
 **Goal:** Business intelligence and regulatory compliance.
 **Timeline:** 2-3 weeks
-**Status:** Partial (TTB report UI with calculations, production dashboard, inventory dashboard, sales dashboard created; export pending)
+**Status:** Complete (TTB 7.1 complete including export; dashboards 7.2-7.4 complete except optional enhancements)
 **Depends On:** Phase 3 (allocations)
 
 ### 7.1 TTB Form 5130.9
@@ -729,7 +729,10 @@ Next available: `00036`
   - [x] `get_ttb_tax_class()` function to map container_type to tax class
   - [x] `finished_goods_with_ttb_class` view
   - [x] `ttb_in_process_beer` view for cellar tracking
-- [ ] Add report export (PDF, CSV)
+- [x] Add report export (PDF, CSV)
+  - [x] CSV export for report data, completed batches, and in-process batches
+  - [x] Print-friendly HTML view for PDF export via browser print
+  - [x] `src/lib/report-export.ts` utility library for reusable exports
 
 ### 7.2 Production Dashboard
 
@@ -1624,6 +1627,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-21 | Phase 8.2: Created user management (migration 00036 user_profiles table, entity config, pages). Caches auth.users per CLAUDE.md guidelines |
 | 2026-01-21 | Phase 5.3: Marked enum registry complete (migrations 00037-00040, entity, pages) |
 | 2026-01-21 | Phase 7.1: Implemented TTB calculations (migration 00041 with tax class mapping, inventory, production, removals functions) |
+| 2026-01-21 | Phase 7.1: Added TTB report export functionality (CSV and print-friendly PDF via src/lib/report-export.ts). Phase 7 now Complete |
 | 2026-01-21 | Phase 14.5: Implemented batch cancellation workflow (migration 00042, BatchCancellationDialog, BatchCancellationInfo) |
 
 ---
