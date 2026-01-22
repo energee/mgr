@@ -491,7 +491,7 @@ Next available: `00036`
 - [x] Customer balance tracking
   - [x] Detail with order history (via relations tab)
   - [x] Order totals (view migration 00027 with total_orders, total_revenue, pending_orders)
-  - [ ] Keg balance (depends on Phase 10: Keg Management)
+  - [x] Keg balance (implemented in Phase 10.4 - CustomerKegBalances component)
 - [x] Link customer to sales channel for pricing (sales_channel_id, price_tier_id fields)
 
 ### 4.6 Sales Channel & Price Tiers
@@ -708,7 +708,7 @@ Next available: `00036`
 
 **Goal:** Business intelligence and regulatory compliance.
 **Timeline:** 2-3 weeks
-**Status:** Partial (TTB report UI, production dashboard, inventory dashboard, sales dashboard created; TTB calculations pending)
+**Status:** Partial (TTB report UI with calculations, production dashboard, inventory dashboard, sales dashboard created; export pending)
 **Depends On:** Phase 3 (allocations)
 
 ### 7.1 TTB Form 5130.9
@@ -720,11 +720,15 @@ Next available: `00036`
   - [x] Date range selection for reporting period
   - [x] Production data queries from batches
   - [x] Display production summary table
-- [ ] Implement required calculations
-  - [ ] Beginning/ending inventory by tax class
-  - [ ] Production by tax class
-  - [ ] Removals (taxable, tax-free, export)
-  - [ ] Losses
+- [x] Implement required calculations (migration 00041)
+  - [x] Beginning/ending inventory by tax class (cellar, keg, bottled)
+  - [x] Production by tax class
+  - [x] Removals (taxable domestic, export, samples, losses, destroyed)
+  - [x] Losses tracking via allocations
+  - [x] `get_ttb_report(year, month)` function for comprehensive report
+  - [x] `get_ttb_tax_class()` function to map container_type to tax class
+  - [x] `finished_goods_with_ttb_class` view
+  - [x] `ttb_in_process_beer` view for cellar tracking
 - [ ] Add report export (PDF, CSV)
 
 ### 7.2 Production Dashboard
@@ -1519,8 +1523,8 @@ All major decisions reference the specification document:
 ### Migration Naming
 
 Migrations follow the pattern: `00XXX_description.sql`
-- Current: 00001-00040
-- Next available: 00041
+- Current: 00001-00041
+- Next available: 00042
 
 ### Testing Strategy
 
@@ -1613,6 +1617,8 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-21 | Phase 9.3-9.5: Added yeast-calculations.ts library, YeastHarvestDialog, YeastLineageDisplay, harvest action. Phase 9 now Complete |
 | 2026-01-21 | Phase 10.3: Verified keg_transactions complete - updated status to reflect existing implementation |
 | 2026-01-21 | Phase 8.2: Created user management (migration 00036 user_profiles table, entity config, pages). Caches auth.users per CLAUDE.md guidelines |
+| 2026-01-21 | Phase 5.3: Marked enum registry complete (migrations 00037-00040, entity, pages) |
+| 2026-01-21 | Phase 7.1: Implemented TTB calculations (migration 00041 with tax class mapping, inventory, production, removals functions) |
 
 ---
 
