@@ -27,6 +27,7 @@ import {
   Beaker,
   PackageCheck,
 } from "lucide-react";
+import { InventoryAlerts } from "@/components/domain/inventory-alerts";
 
 // =============================================================================
 // Types
@@ -419,6 +420,9 @@ export default function InventoryDashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AI-Powered Inventory Overview */}
+      <InventoryAlerts autoExpandOnAlerts={false} />
     </div>
   );
 }

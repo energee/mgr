@@ -47,8 +47,15 @@ import {
 // =============================================================================
 
 interface RecipeAnalysisProps {
-  recipeId: string;
+  /** Direct recipe ID (for standalone usage) */
+  recipeId?: string;
   recipeName?: string;
+  /** Entity data prop (for EntityDetail integration) */
+  data?: {
+    id: string | null;
+    name: string | null;
+    [key: string]: unknown;
+  };
 }
 
 // =============================================================================
@@ -139,11 +146,16 @@ function SuggestionItem({
 // Main Component
 // =============================================================================
 
-export function RecipeAnalysis({ recipeId, recipeName }: RecipeAnalysisProps) {
+export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeName, data }: RecipeAnalysisProps) {
+  // Support both direct props and entity data prop
+  const recipeId = propRecipeId || data?.id;
+  const recipeName = propRecipeName || data?.name;
+
   const [isOpen, setIsOpen] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
   // Fetch style compliance
+  // Note: Hooks must be called before any early returns (Rules of Hooks)
   const {
     data: complianceData,
     isLoading: complianceLoading,
@@ -151,8 +163,11 @@ export function RecipeAnalysis({ recipeId, recipeName }: RecipeAnalysisProps) {
     refetch: refetchCompliance,
   } = useQuery({
     queryKey: ["recipe-style-compliance", recipeId],
-    queryFn: () => analyzeStyleCompliance(recipeId),
-    enabled: hasAnalyzed,
+    queryFn: () => {
+      if (!recipeId) return null;
+      return analyzeStyleCompliance(recipeId);
+    },
+    enabled: hasAnalyzed && !!recipeId,
     retry: false,
   });
 
@@ -164,10 +179,18 @@ export function RecipeAnalysis({ recipeId, recipeName }: RecipeAnalysisProps) {
     refetch: refetchSuggestions,
   } = useQuery({
     queryKey: ["recipe-suggestions", recipeId],
-    queryFn: () => getRecipeSuggestions(recipeId),
-    enabled: hasAnalyzed,
+    queryFn: () => {
+      if (!recipeId) return null;
+      return getRecipeSuggestions(recipeId);
+    },
+    enabled: hasAnalyzed && !!recipeId,
     retry: false,
   });
+
+  // Don't render if no recipe ID available
+  if (!recipeId) {
+    return null;
+  }
 
   const handleAnalyze = () => {
     setHasAnalyzed(true);
