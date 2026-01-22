@@ -148,7 +148,12 @@ export function AppSidebar() {
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
+        <div
+          className={cn(
+            "h-16 flex items-center border-b border-sidebar-border",
+            isCollapsed ? "justify-center px-2" : "justify-between px-4"
+          )}
+        >
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center flex-shrink-0">
               <span className="text-sidebar-primary-foreground font-bold text-sm">M</span>
@@ -157,20 +162,15 @@ export function AppSidebar() {
               <span className="text-lg font-semibold tracking-tight">MGR</span>
             )}
           </Link>
-          <button
-            onClick={toggle}
-            className={cn(
-              "p-1.5 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors",
-              isCollapsed && "mx-auto"
-            )}
-            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
+          {!isCollapsed && (
+            <button
+              onClick={toggle}
+              className="p-1.5 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              aria-label="Collapse sidebar"
+            >
               <ChevronLeft className="h-4 w-4" />
-            )}
-          </button>
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
@@ -275,25 +275,39 @@ export function AppSidebar() {
           })}
         </nav>
 
-        {/* Settings */}
-        <div className="px-2 py-4 border-t border-sidebar-border">
+        {/* Settings & Toggle */}
+        <div className="px-2 py-4 border-t border-sidebar-border space-y-2">
           {isCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/settings"
-                  className={cn(
-                    "flex items-center justify-center p-2.5 rounded-md transition-all duration-200",
-                    pathname.startsWith("/settings")
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                  )}
-                >
-                  <Settings className="h-5 w-5" />
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href="/settings"
+                    className={cn(
+                      "flex items-center justify-center p-2.5 rounded-md transition-all duration-200",
+                      pathname.startsWith("/settings")
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                        : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                    )}
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">Settings</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={toggle}
+                    className="flex items-center justify-center w-full p-2.5 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                    aria-label="Expand sidebar"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Expand sidebar</TooltipContent>
+              </Tooltip>
+            </>
           ) : (
             <Link
               href="/settings"
