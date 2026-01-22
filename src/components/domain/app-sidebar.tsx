@@ -6,8 +6,7 @@
  * Main navigation sidebar for the application.
  * Organized by domain: Production, Packaging, Inventory, Purchasing, Sales.
  *
- * Design: Rich dark sidebar with warm copper accents
- * Supports collapsed mode (icons only) with tooltips
+ * Design: Fixed icon bar with floating expanded menu on hover
  */
 
 import Link from "next/link";
@@ -119,17 +118,14 @@ export function AppSidebar() {
   const { isCollapsed, toggle } = useSidebar();
   const [isHovered, setIsHovered] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(
-    // Expand section that contains current path
     navigation
       .filter((section) => section.items.some((item) => pathname.startsWith(item.href)))
       .map((section) => section.label)
   );
 
-  // Show expanded UI if not collapsed OR if hovered while collapsed
-  const showExpanded = !isCollapsed || isHovered;
+  const showExpandedPanel = isCollapsed && isHovered;
 
   const toggleSection = (label: string) => {
-    if (!showExpanded) return;
     setExpandedSections((prev) =>
       prev.includes(label)
         ? prev.filter((l) => l !== label)
@@ -137,142 +133,235 @@ export function AppSidebar() {
     );
   };
 
-  return (
-    <aside
-      className={cn(
-        "bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border transition-all duration-200 ease-in-out",
-        showExpanded ? "w-64" : "w-16"
-      )}
-      onMouseEnter={() => isCollapsed && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Logo */}
-      <div
-        className={cn(
-          "h-16 flex items-center border-b border-sidebar-border",
-          showExpanded ? "justify-between px-4" : "justify-center px-2"
-        )}
-      >
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-            <span className="text-sidebar-primary-foreground font-bold text-sm">M</span>
-          </div>
-          {showExpanded && (
-            <span className="text-lg font-semibold tracking-tight whitespace-nowrap">MGR</span>
-          )}
-        </Link>
-        {showExpanded && (
+  // When not collapsed, show normal expanded sidebar
+  if (!isCollapsed) {
+    return (
+      <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
+        {/* Logo */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center">
+              <span className="text-sidebar-primary-foreground font-bold text-sm">M</span>
+            </div>
+            <span className="text-lg font-semibold tracking-tight">MGR</span>
+          </Link>
           <button
             onClick={toggle}
             className="p-1.5 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-            aria-label={isCollapsed ? "Pin sidebar open" : "Collapse sidebar"}
+            aria-label="Collapse sidebar"
           >
-            {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
+            <ChevronLeft className="h-4 w-4" />
           </button>
-        )}
-      </div>
+        </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
-        {navigation.map((section) => {
-          const isSectionExpanded = expandedSections.includes(section.label);
-          const isActive = section.items.some((item) => pathname.startsWith(item.href));
+        {/* Navigation */}
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+          {navigation.map((section) => {
+            const isSectionExpanded = expandedSections.includes(section.label);
+            const isActive = section.items.some((item) => pathname.startsWith(item.href));
 
-          if (!showExpanded) {
-            // Collapsed mode: just icons
             return (
-              <div key={section.label} className="mb-2">
-                <Link
-                  href={section.items[0].href}
+              <div key={section.label} className="mt-3 first:mt-0">
+                <button
+                  onClick={() => toggleSection(section.label)}
                   className={cn(
-                    "flex items-center justify-center w-full p-2.5 rounded-md transition-all duration-200",
+                    "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      ? "text-sidebar-foreground"
                       : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                   )}
                 >
-                  <section.icon className="h-5 w-5" />
-                </Link>
+                  <span className="flex items-center gap-3">
+                    <section.icon className={cn("h-5 w-5", isActive && "text-sidebar-primary")} />
+                    {section.label}
+                  </span>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", isSectionExpanded && "rotate-180")} />
+                </button>
+
+                {isSectionExpanded && (
+                  <div className="mt-1 ml-3 pl-4 border-l border-sidebar-border/50 space-y-0.5">
+                    {section.items.map((item) => {
+                      const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                            isItemActive
+                              ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                              : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                          )}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
-          }
+          })}
+        </nav>
 
-          // Expanded mode: collapsible sections
-          return (
-            <div key={section.label} className="mt-3 first:mt-0">
-              <button
-                onClick={() => toggleSection(section.label)}
+        {/* Settings */}
+        <div className="px-2 py-4 border-t border-sidebar-border">
+          <Link
+            href="/settings"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              pathname.startsWith("/settings")
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            )}
+          >
+            <Settings className="h-5 w-5" />
+            Settings
+          </Link>
+        </div>
+      </aside>
+    );
+  }
+
+  // Collapsed mode: icon bar + floating panel on hover
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Icon bar - always visible */}
+      <aside className="w-16 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border h-full">
+        {/* Logo */}
+        <div className="h-16 flex items-center justify-center border-b border-sidebar-border">
+          <Link href="/">
+            <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center">
+              <span className="text-sidebar-primary-foreground font-bold text-sm">M</span>
+            </div>
+          </Link>
+        </div>
+
+        {/* Navigation icons */}
+        <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
+          {navigation.map((section) => {
+            const isActive = section.items.some((item) => pathname.startsWith(item.href));
+            return (
+              <Link
+                key={section.label}
+                href={section.items[0].href}
                 className={cn(
-                  "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                  "flex items-center justify-center p-2.5 rounded-md transition-colors",
                   isActive
-                    ? "text-sidebar-foreground"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
                     : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                 )}
               >
-                <span className="flex items-center gap-3 whitespace-nowrap">
-                  <section.icon className={cn(
-                    "h-4 w-4 flex-shrink-0 transition-colors",
-                    isActive && "text-sidebar-primary"
-                  )} />
-                  {section.label}
-                </span>
-                <ChevronDown
-                  className={cn(
-                    "h-4 w-4 flex-shrink-0 transition-transform duration-200",
-                    isSectionExpanded && "rotate-180"
+                <section.icon className="h-5 w-5" />
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Settings icon */}
+        <div className="px-2 py-4 border-t border-sidebar-border">
+          <Link
+            href="/settings"
+            className={cn(
+              "flex items-center justify-center p-2.5 rounded-md transition-colors",
+              pathname.startsWith("/settings")
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            )}
+          >
+            <Settings className="h-5 w-5" />
+          </Link>
+        </div>
+      </aside>
+
+      {/* Floating expanded panel */}
+      {showExpandedPanel && (
+        <div className="absolute top-0 left-16 h-full w-56 bg-sidebar border-r border-sidebar-border shadow-xl z-50">
+          {/* Header */}
+          <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
+            <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">MGR</span>
+            <button
+              onClick={toggle}
+              className="p-1.5 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              aria-label="Pin sidebar open"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto max-h-[calc(100%-8rem)]">
+            {navigation.map((section) => {
+              const isSectionExpanded = expandedSections.includes(section.label);
+              const isActive = section.items.some((item) => pathname.startsWith(item.href));
+
+              return (
+                <div key={section.label} className="mt-3 first:mt-0">
+                  <button
+                    onClick={() => toggleSection(section.label)}
+                    className={cn(
+                      "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                      isActive
+                        ? "text-sidebar-foreground"
+                        : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                    )}
+                  >
+                    <span className="flex items-center gap-3">
+                      <section.icon className={cn("h-5 w-5", isActive && "text-sidebar-primary")} />
+                      {section.label}
+                    </span>
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", isSectionExpanded && "rotate-180")} />
+                  </button>
+
+                  {isSectionExpanded && (
+                    <div className="mt-1 ml-3 pl-4 border-l border-sidebar-border/50 space-y-0.5">
+                      {section.items.map((item) => {
+                        const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                              "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                              isItemActive
+                                ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                                : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                            )}
+                          >
+                            <item.icon className="h-4 w-4" />
+                            {item.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
                   )}
-                />
-              </button>
-
-              {isSectionExpanded && (
-                <div className="mt-1 ml-3 pl-4 border-l border-sidebar-border/50 space-y-0.5">
-                  {section.items.map((item) => {
-                    const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 whitespace-nowrap",
-                          isItemActive
-                            ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
-                            : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                        )}
-                      >
-                        <item.icon className="h-4 w-4 flex-shrink-0" />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
+              );
+            })}
+          </nav>
 
-      {/* Settings */}
-      <div className="px-2 py-4 border-t border-sidebar-border">
-        <Link
-          href="/settings"
-          className={cn(
-            "flex items-center rounded-md transition-all duration-200",
-            showExpanded
-              ? "gap-3 px-3 py-2 text-sm font-medium"
-              : "justify-center p-2.5",
-            pathname.startsWith("/settings")
-              ? "bg-sidebar-primary text-sidebar-primary-foreground"
-              : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-          )}
-        >
-          <Settings className={showExpanded ? "h-4 w-4 flex-shrink-0" : "h-5 w-5"} />
-          {showExpanded && <span className="whitespace-nowrap">Settings</span>}
-        </Link>
-      </div>
-    </aside>
+          {/* Settings */}
+          <div className="absolute bottom-0 left-0 right-0 px-2 py-4 border-t border-sidebar-border bg-sidebar">
+            <Link
+              href="/settings"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                pathname.startsWith("/settings")
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+              )}
+            >
+              <Settings className="h-5 w-5" />
+              Settings
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
