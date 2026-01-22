@@ -26,7 +26,13 @@ export const vesselTransferSchema = z.object({
   volume_bbl: z.coerce.number().positive("Volume must be positive"),
   transferred_at: z.string().min(1, "Transfer date/time is required"),
   notes: z.string().nullable().optional(),
-});
+}).refine(
+  (data) => !data.from_vessel_id || data.from_vessel_id !== data.to_vessel_id,
+  {
+    message: "Cannot transfer to the same vessel",
+    path: ["to_vessel_id"],
+  }
+);
 
 export type VesselTransferFormValues = z.infer<typeof vesselTransferSchema>;
 

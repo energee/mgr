@@ -6,7 +6,8 @@
  */
 
 import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
+import { valuesAsOptions, getValueLabel } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
 type Yeast = Database["public"]["Tables"]["yeasts"]["Row"];
@@ -37,27 +38,36 @@ export const yeastStrainSchema = z.object({
 export type YeastStrainFormValues = z.infer<typeof yeastStrainSchema>;
 
 // =============================================================================
-// Constants
+// Value Display Configurations
 // =============================================================================
 
-const TYPE_OPTIONS = [
-  { value: "ale", label: "Ale" },
-  { value: "lager", label: "Lager" },
-  { value: "wild", label: "Wild/Brett" },
-  { value: "hybrid", label: "Hybrid" },
-];
+const typeDisplayConfig: ValueDisplayConfig = {
+  field: "type",
+  display: {
+    ale: { label: "Ale" },
+    lager: { label: "Lager" },
+    wild: { label: "Wild/Brett" },
+    hybrid: { label: "Hybrid" },
+  },
+};
 
-const FORM_OPTIONS = [
-  { value: "liquid", label: "Liquid" },
-  { value: "dry", label: "Dry" },
-];
+const formDisplayConfig: ValueDisplayConfig = {
+  field: "form",
+  display: {
+    liquid: { label: "Liquid" },
+    dry: { label: "Dry" },
+  },
+};
 
-const FLOCCULATION_OPTIONS = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-  { value: "very_high", label: "Very High" },
-];
+const flocculationDisplayConfig: ValueDisplayConfig = {
+  field: "flocculation",
+  display: {
+    low: { label: "Low" },
+    medium: { label: "Medium" },
+    high: { label: "High" },
+    very_high: { label: "Very High" },
+  },
+};
 
 // =============================================================================
 // Entity Configuration
@@ -99,19 +109,13 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
       accessorKey: "type",
       header: "Type",
       sortable: true,
-      render: (value) => {
-        const option = TYPE_OPTIONS.find((o) => o.value === value);
-        return option?.label || String(value);
-      },
+      render: (value) => getValueLabel(yeastStrainEntity, "type", value as string),
     },
     {
       accessorKey: "form",
       header: "Form",
       sortable: true,
-      render: (value) => {
-        const option = FORM_OPTIONS.find((o) => o.value === value);
-        return option?.label || String(value);
-      },
+      render: (value) => getValueLabel(yeastStrainEntity, "form", value as string),
     },
     {
       accessorKey: "attenuation_typical",
@@ -132,13 +136,13 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
       field: "type",
       type: "select",
       label: "Type",
-      options: [{ value: "", label: "All Types" }, ...TYPE_OPTIONS],
+      options: valuesAsOptions(typeDisplayConfig),
     },
     {
       field: "form",
       type: "select",
       label: "Form",
-      options: [{ value: "", label: "All Forms" }, ...FORM_OPTIONS],
+      options: valuesAsOptions(formDisplayConfig),
     },
     {
       field: "manufacturer",
@@ -148,7 +152,7 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 
@@ -237,7 +241,7 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
       name: "type",
       label: "Type",
       type: "select",
-      options: TYPE_OPTIONS,
+      options: valuesAsOptions(typeDisplayConfig),
       required: true,
       colSpan: 4,
     },
@@ -245,7 +249,7 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
       name: "form",
       label: "Form",
       type: "select",
-      options: FORM_OPTIONS,
+      options: valuesAsOptions(formDisplayConfig),
       colSpan: 4,
     },
     {
@@ -300,7 +304,7 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
       name: "flocculation",
       label: "Flocculation",
       type: "select",
-      options: [{ value: "", label: "Not specified" }, ...FLOCCULATION_OPTIONS],
+      options: [{ value: "_none", label: "Not specified" }, ...valuesAsOptions(flocculationDisplayConfig)],
       colSpan: 4,
     },
     {
@@ -335,6 +339,11 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
       colSpan: 12,
     },
   ],
+
+  // ---------------------------------------------------------------------------
+  // Value Display
+  // ---------------------------------------------------------------------------
+  valueDisplay: [typeDisplayConfig, formDisplayConfig, flocculationDisplayConfig],
 
   // ---------------------------------------------------------------------------
   // AI Context

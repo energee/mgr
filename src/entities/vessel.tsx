@@ -12,11 +12,12 @@
  */
 
 import { z } from "zod";
-import type { EntityConfig, StateMachineConfig } from "@/types/entity";
-import { statesAsOptions } from "@/types/entity";
+import type { EntityConfig, StateMachineConfig, ValueDisplayConfig } from "@/types/entity";
+import { statesAsOptions, valuesAsOptions, getValueLabel } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Badge } from "@/components/ui/badge";
+import { VesselCurrentBatch } from "@/components/domain/vessel-current-batch";
 
 // Base type from vessels table
 type Vessel = Database["public"]["Tables"]["vessels"]["Row"];
@@ -25,18 +26,33 @@ type Vessel = Database["public"]["Tables"]["vessels"]["Row"];
 type VesselWithBatch = Database["public"]["Views"]["vessels_with_batch"]["Row"];
 
 // =============================================================================
-// Constants
+// Value Display Configuration
 // =============================================================================
 
+const vesselTypeDisplayConfig: ValueDisplayConfig = {
+  field: "vessel_type",
+  display: {
+    fermenter: { label: "Fermenter" },
+    brite: { label: "Brite Tank" },
+    kettle: { label: "Kettle" },
+    mash_tun: { label: "Mash Tun" },
+    hlt: { label: "HLT" },
+    unitank: { label: "Unitank" },
+    foeder: { label: "Foeder" },
+    barrel: { label: "Barrel" },
+  },
+};
+
+// Vessel type values for type extraction
 export const VESSEL_TYPES = [
-  { value: "fermenter", label: "Fermenter", icon: "flask" },
-  { value: "brite", label: "Brite Tank", icon: "container" },
-  { value: "kettle", label: "Kettle", icon: "flame" },
-  { value: "mash_tun", label: "Mash Tun", icon: "grain" },
-  { value: "hlt", label: "HLT", icon: "thermometer" },
-  { value: "unitank", label: "Unitank", icon: "cylinder" },
-  { value: "foeder", label: "Foeder", icon: "wine" },
-  { value: "barrel", label: "Barrel", icon: "package" },
+  { value: "fermenter", label: "Fermenter" },
+  { value: "brite", label: "Brite Tank" },
+  { value: "kettle", label: "Kettle" },
+  { value: "mash_tun", label: "Mash Tun" },
+  { value: "hlt", label: "HLT" },
+  { value: "unitank", label: "Unitank" },
+  { value: "foeder", label: "Foeder" },
+  { value: "barrel", label: "Barrel" },
 ] as const;
 
 export type VesselType = (typeof VESSEL_TYPES)[number]["value"];
@@ -94,11 +110,8 @@ const vesselStateMachine: StateMachineConfig<Vessel> = {
 // Derive status options from state machine
 const statusOptions = statesAsOptions(vesselStateMachine);
 
-// Vessel type options for form
-const vesselTypeOptions = VESSEL_TYPES.map((t) => ({
-  value: t.value,
-  label: t.label,
-}));
+// Vessel type options - derived from valueDisplay config
+const vesselTypeOptions = valuesAsOptions(vesselTypeDisplayConfig);
 
 // =============================================================================
 // Entity Configuration
@@ -129,14 +142,11 @@ export const vesselEntity: EntityConfig<Vessel> = {
       accessorKey: "vessel_type",
       header: "Type",
       sortable: true,
-      render: (value) => {
-        const type = VESSEL_TYPES.find((t) => t.value === value);
-        return (
-          <Badge variant="outline">
-            {type?.label || String(value)}
-          </Badge>
-        );
-      },
+      render: (value) => (
+        <Badge variant="outline">
+          {getValueLabel(vesselEntity, "vessel_type", value as string)}
+        </Badge>
+      ),
     },
     {
       accessorKey: "capacity_bbl",
@@ -196,7 +206,7 @@ export const vesselEntity: EntityConfig<Vessel> = {
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 
@@ -226,8 +236,7 @@ export const vesselEntity: EntityConfig<Vessel> = {
     {
       id: "current_batch",
       title: "Current Batch",
-      // Uses VesselCurrentBatch component to render batch info from view
-      component: "VesselCurrentBatch",
+      component: VesselCurrentBatch,
     },
     {
       id: "location",
@@ -314,6 +323,11 @@ export const vesselEntity: EntityConfig<Vessel> = {
   // State Machine
   // ---------------------------------------------------------------------------
   stateMachine: vesselStateMachine,
+
+  // ---------------------------------------------------------------------------
+  // Value Display
+  // ---------------------------------------------------------------------------
+  valueDisplay: [vesselTypeDisplayConfig],
 
   // ---------------------------------------------------------------------------
   // Actions

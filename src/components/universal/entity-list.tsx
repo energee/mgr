@@ -10,7 +10,7 @@
  * TanStack Virtual for virtualizing large lists.
  */
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, memo } from "react";
 import Link from "next/link";
 import {
   useReactTable,
@@ -25,7 +25,10 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
+import { entityKeys } from "@/lib/query-keys";
+import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityColumnDef } from "@/types/entity";
+import { EntityErrorBoundary } from "./entity-error-boundary";
 import {
   Table,
   TableBody,
@@ -68,7 +71,7 @@ import {
   X,
 } from "lucide-react";
 
-interface EntityListProps<T = Record<string, unknown>> {
+export interface EntityListProps<T = Record<string, unknown>> {
   /** Entity configuration */
   entity: EntityConfig<T>;
   /** Base path for detail links (defaults to entity name) */
@@ -118,17 +121,58 @@ export function EntityList<T = Record<string, unknown>>({
     setDynamicFilterOptions({});
   }, [entity.name]);
 
-  // Fetch dynamic filter options
+  // Fetch dynamic filter options (from fetchOptions or dynamicOptions)
   useEffect(() => {
     const fetchDynamicOptions = async () => {
-      const filtersWithFetchOptions = entity.listFilters?.filter((f) => f.fetchOptions) || [];
-      if (filtersWithFetchOptions.length === 0) return;
+      const filtersWithDynamicOptions = entity.listFilters?.filter(
+        (f) => f.fetchOptions || f.dynamicOptions
+      ) || [];
+      if (filtersWithDynamicOptions.length === 0) return;
 
       const results = await Promise.all(
-        filtersWithFetchOptions.map(async (filter) => {
+        filtersWithDynamicOptions.map(async (filter) => {
           try {
-            const options = await filter.fetchOptions!();
-            return { field: filter.field, options };
+            // Handle legacy fetchOptions
+            if (filter.fetchOptions) {
+              const options = await filter.fetchOptions();
+              return { field: filter.field, options };
+            }
+
+            // Handle dynamicOptions (fetch from database)
+            if (filter.dynamicOptions) {
+              const { table, valueField, labelField, filter: queryFilter, orderBy } = filter.dynamicOptions;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              let query = (supabase as any).from(table).select(`${valueField}, ${labelField}`);
+
+              // Apply filter if specified
+              if (queryFilter) {
+                Object.entries(queryFilter).forEach(([key, value]) => {
+                  query = query.eq(key, value as string | number | boolean);
+                });
+              }
+
+              // Apply ordering if specified
+              if (orderBy) {
+                const orderFields = orderBy.split(",").map(f => f.trim());
+                orderFields.forEach(field => {
+                  query = query.order(field, { ascending: true });
+                });
+              } else {
+                query = query.order(labelField, { ascending: true });
+              }
+
+              const { data, error } = await query;
+              if (error) throw error;
+
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const options = (data || []).map((row: any) => ({
+                value: String(row[valueField]),
+                label: String(row[labelField]),
+              }));
+              return { field: filter.field, options };
+            }
+
+            return { field: filter.field, options: [] };
           } catch (error) {
             console.error(`Failed to fetch options for filter ${filter.field}:`, error);
             return { field: filter.field, options: [] };
@@ -145,7 +189,7 @@ export function EntityList<T = Record<string, unknown>>({
     };
 
     fetchDynamicOptions();
-  }, [entity.listFilters]);
+  }, [entity.listFilters, supabase]);
 
   // Get options for a filter (static or dynamic)
   const getFilterOptions = useCallback(
@@ -158,7 +202,8 @@ export function EntityList<T = Record<string, unknown>>({
   // Fetch data - use viewTable if available (for views with joins), otherwise use base table
   const fetchTable = entity.viewTable || entity.table;
   const { data, isLoading, isFetching, error } = useQuery({
-    queryKey: [fetchTable, filters, quickFilters],
+    queryKey: entityKeys.list(fetchTable, { ...filters, ...quickFilters }),
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     queryFn: async () => {
       let query = db.from(fetchTable).select("*");
 
@@ -338,7 +383,7 @@ export function EntityList<T = Record<string, unknown>>({
               const filterOptions = getFilterOptions(filter);
               return (
               <div key={filter.field} className="min-w-[140px]">
-                {filter.type === "select" && (filter.options || filter.fetchOptions) && (
+                {filter.type === "select" && (filter.options || filter.fetchOptions || filter.dynamicOptions) && (
                   <Select
                     value={(quickFilters[filter.field] as string) || "_all"}
                     onValueChange={(value) =>
@@ -365,7 +410,7 @@ export function EntityList<T = Record<string, unknown>>({
                   </Select>
                 )}
                 {/* Multiselect with checkboxes */}
-                {filter.type === "multiselect" && (filter.options || filter.fetchOptions) && (
+                {filter.type === "multiselect" && (filter.options || filter.fetchOptions || filter.dynamicOptions) && (
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -434,24 +479,27 @@ export function EntityList<T = Record<string, unknown>>({
                   />
                 )}
                 {filter.type === "boolean" && (
-                  <Select
-                    value={(quickFilters[filter.field] as string) || "_all"}
-                    onValueChange={(value) =>
-                      setQuickFilters((prev) => ({
-                        ...prev,
-                        [filter.field]: value === "_all" ? "" : value,
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="h-9 text-sm">
-                      <SelectValue placeholder={filter.label} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_all">All</SelectItem>
-                      <SelectItem value="true">Yes</SelectItem>
-                      <SelectItem value="false">No</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{filter.label}:</span>
+                    <Select
+                      value={(quickFilters[filter.field] as string) || "_all"}
+                      onValueChange={(value) =>
+                        setQuickFilters((prev) => ({
+                          ...prev,
+                          [filter.field]: value === "_all" ? "" : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_all">All</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
               </div>
             );
@@ -619,15 +667,9 @@ export function EntityList<T = Record<string, unknown>>({
                 </TableCell>
               </TableRow>
             ) : (
-              // Data rows
+              // Data rows - uses memoized row component
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                <MemoizedTableRow key={row.id} row={row} />
               ))
             )}
           </TableBody>
@@ -661,5 +703,48 @@ export function EntityList<T = Record<string, unknown>>({
         </div>
       )}
     </div>
+  );
+}
+
+// =============================================================================
+// Memoized Components
+// =============================================================================
+
+/**
+ * Memoized table row to prevent unnecessary re-renders.
+ * Only re-renders when the row data actually changes.
+ */
+const MemoizedTableRow = memo(function MemoizedTableRow({
+  row,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  row: any;
+}) {
+  return (
+    <TableRow>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      {row.getVisibleCells().map((cell: any) => (
+        <TableCell key={cell.id}>
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+});
+
+// =============================================================================
+// Wrapped Export with Error Boundary
+// =============================================================================
+
+/**
+ * EntityList wrapped with error boundary for production resilience.
+ */
+export function EntityListWithErrorBoundary<T = Record<string, unknown>>(
+  props: EntityListProps<T>
+) {
+  return (
+    <EntityErrorBoundary entity={props.entity as EntityConfig<Record<string, unknown>>}>
+      <EntityList {...props} />
+    </EntityErrorBoundary>
   );
 }

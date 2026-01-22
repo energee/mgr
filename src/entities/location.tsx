@@ -6,7 +6,8 @@
  */
 
 import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
+import { valuesAsOptions, getValueLabel } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
 type Location = Database["public"]["Tables"]["locations"]["Row"];
@@ -25,16 +26,24 @@ export const locationSchema = z.object({
 export type LocationFormValues = z.infer<typeof locationSchema>;
 
 // =============================================================================
-// Location Type Options
+// Value Display Configuration
 // =============================================================================
 
-export const LOCATION_TYPES = [
-  { value: "brewery", label: "Brewery" },
-  { value: "warehouse", label: "Warehouse" },
-  { value: "taproom", label: "Taproom" },
-  { value: "cold_storage", label: "Cold Storage" },
-  { value: "offsite", label: "Offsite" },
-];
+const locationTypeDisplayConfig: ValueDisplayConfig = {
+  field: "location_type",
+  display: {
+    brewery: { label: "Brewery" },
+    warehouse: { label: "Warehouse" },
+    taproom: { label: "Taproom" },
+    cold_storage: { label: "Cold Storage" },
+    dry_storage: { label: "Dry Storage" },
+    production: { label: "Production" },
+    offsite: { label: "Offsite" },
+  },
+};
+
+// Export for backwards compatibility (some components may reference this)
+export const LOCATION_TYPES = valuesAsOptions(locationTypeDisplayConfig);
 
 // =============================================================================
 // Entity Configuration
@@ -64,10 +73,7 @@ export const locationEntity: EntityConfig<Location> = {
       accessorKey: "location_type",
       header: "Type",
       sortable: true,
-      render: (value: unknown) => {
-        const type = LOCATION_TYPES.find((t) => t.value === value);
-        return type?.label || String(value);
-      },
+      render: (value: unknown) => getValueLabel(locationEntity, "location_type", value as string),
     },
     {
       accessorKey: "is_primary",
@@ -88,12 +94,12 @@ export const locationEntity: EntityConfig<Location> = {
       field: "location_type",
       type: "select",
       label: "Type",
-      options: LOCATION_TYPES,
+      options: valuesAsOptions(locationTypeDisplayConfig),
     },
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 
@@ -141,7 +147,14 @@ export const locationEntity: EntityConfig<Location> = {
       name: "location_type",
       label: "Type",
       type: "select",
-      options: LOCATION_TYPES,
+      options: valuesAsOptions(locationTypeDisplayConfig), // Fallback if dynamicOptions fails
+      dynamicOptions: {
+        table: "enum_values",
+        valueField: "value",
+        labelField: "label",
+        filter: { enum_type: "location_type" },
+        orderBy: "sort_order",
+      },
       required: true,
       colSpan: 6,
     },
@@ -161,6 +174,11 @@ export const locationEntity: EntityConfig<Location> = {
       colSpan: 6,
     },
   ],
+
+  // ---------------------------------------------------------------------------
+  // Value Display
+  // ---------------------------------------------------------------------------
+  valueDisplay: [locationTypeDisplayConfig],
 
   // ---------------------------------------------------------------------------
   // AI Context

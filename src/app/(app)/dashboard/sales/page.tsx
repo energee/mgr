@@ -11,6 +11,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dashboardKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -117,7 +118,7 @@ export default function SalesDashboardPage() {
 
   // Fetch order status counts
   const { data: orderCounts = { draft: 0, confirmed: 0, scheduled: 0, picking: 0, packed: 0, fulfilled: 0, cancelled: 0 } } = useQuery({
-    queryKey: ["dashboard", "sales", "order-counts"],
+    queryKey: dashboardKeys.sales.orderCounts(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -149,7 +150,7 @@ export default function SalesDashboardPage() {
 
   // Fetch recent orders with totals
   const { data: recentOrders = [] } = useQuery({
-    queryKey: ["dashboard", "sales", "recent-orders"],
+    queryKey: dashboardKeys.sales.recentOrders(),
     queryFn: async () => {
       // Get recent orders
       const { data: orders, error: ordersError } = await supabase
@@ -194,7 +195,7 @@ export default function SalesDashboardPage() {
 
   // Fetch revenue by customer (top 10)
   const { data: customerRevenue = [] } = useQuery({
-    queryKey: ["dashboard", "sales", "customer-revenue"],
+    queryKey: dashboardKeys.sales.customerRevenue(),
     queryFn: async () => {
       // Get fulfilled orders with customer info
       const { data: orders, error: ordersError } = await supabase
@@ -265,7 +266,7 @@ export default function SalesDashboardPage() {
 
   // Fetch product mix (revenue by brand)
   const { data: productMix = [] } = useQuery({
-    queryKey: ["dashboard", "sales", "product-mix"],
+    queryKey: dashboardKeys.sales.productMix(),
     queryFn: async () => {
       // Get fulfilled order IDs
       const { data: fulfilledOrders, error: ordersError } = await supabase

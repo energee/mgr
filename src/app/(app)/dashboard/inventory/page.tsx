@@ -11,6 +11,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dashboardKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,7 +93,7 @@ export default function InventoryDashboardPage() {
   // Fetch low stock items
   // Note: This requires aggregating from inventory_lots since inventory_items is a catalog
   const { data: lowStockItems = [] } = useQuery({
-    queryKey: ["dashboard", "low-stock"],
+    queryKey: dashboardKeys.lowStock(),
     queryFn: async () => {
       // Get items with reorder points
       const { data: items, error: itemsError } = await supabase
@@ -137,7 +138,7 @@ export default function InventoryDashboardPage() {
 
   // Fetch expiring lots (lots expiring within 90 days)
   const { data: expiringLots = [] } = useQuery({
-    queryKey: ["dashboard", "expiring-lots"],
+    queryKey: dashboardKeys.expiringLots(),
     queryFn: async () => {
       const ninetyDaysFromNow = new Date();
       ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
@@ -190,7 +191,7 @@ export default function InventoryDashboardPage() {
 
   // Fetch inventory summary by category
   const { data: inventorySummary = [] } = useQuery({
-    queryKey: ["dashboard", "inventory-summary"],
+    queryKey: dashboardKeys.inventorySummary(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("inventory_items")

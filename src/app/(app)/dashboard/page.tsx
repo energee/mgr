@@ -11,6 +11,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dashboardKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,7 @@ export default function DashboardPage() {
 
   // Fetch batch status counts
   const { data: batchCounts = { planned: 0, fermenting: 0, conditioning: 0, packaging: 0, completed: 0 } } = useQuery({
-    queryKey: ["dashboard", "batch-counts"],
+    queryKey: dashboardKeys.batchCounts(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
@@ -112,7 +113,7 @@ export default function DashboardPage() {
 
   // Fetch active batches (not completed or cancelled)
   const { data: activeBatches = [] } = useQuery({
-    queryKey: ["dashboard", "active-batches"],
+    queryKey: dashboardKeys.activeBatches(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
@@ -141,7 +142,7 @@ export default function DashboardPage() {
 
   // Fetch vessel status
   const { data: vessels = [] } = useQuery({
-    queryKey: ["dashboard", "vessels"],
+    queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
       // Use vessels_with_batch view if available, otherwise base table
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

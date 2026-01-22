@@ -6,7 +6,8 @@
  */
 
 import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
+import { valuesAsOptions, getValueDisplay } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 
@@ -30,14 +31,20 @@ export const inventoryItemSchema = z.object({
 
 export type InventoryItemFormValues = z.infer<typeof inventoryItemSchema>;
 
-// Category display config
-const categoryDisplay: Record<string, { label: string; color: "default" | "success" | "warning" | "error" | "info" }> = {
-  grain: { label: "Grain", color: "default" },
-  hops: { label: "Hops", color: "success" },
-  yeast: { label: "Yeast", color: "info" },
-  adjunct: { label: "Adjunct", color: "warning" },
-  packaging: { label: "Packaging", color: "default" },
-  other: { label: "Other", color: "default" },
+// =============================================================================
+// Value Display Configuration
+// =============================================================================
+
+const categoryDisplayConfig: ValueDisplayConfig = {
+  field: "category",
+  display: {
+    grain: { label: "Grain", color: "default" },
+    hops: { label: "Hops", color: "success" },
+    yeast: { label: "Yeast", color: "info" },
+    adjunct: { label: "Adjunct", color: "warning" },
+    packaging: { label: "Packaging", color: "default" },
+    other: { label: "Other", color: "default" },
+  },
 };
 
 // =============================================================================
@@ -65,12 +72,15 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       accessorKey: "category",
       header: "Category",
       sortable: true,
-      render: (value) => (
-        <StatusBadge
-          status={value as string}
-          config={categoryDisplay}
-        />
-      ),
+      render: (value) => {
+        const display = getValueDisplay(inventoryItemEntity, "category", value as string);
+        return (
+          <StatusBadge
+            status={value as string}
+            config={display ? { [value as string]: { label: display.label, color: display.color || "default" } } : undefined}
+          />
+        );
+      },
     },
     {
       accessorKey: "sku",
@@ -105,19 +115,12 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       field: "category",
       type: "multiselect",
       label: "Category",
-      options: [
-        { value: "grain", label: "Grain" },
-        { value: "hops", label: "Hops" },
-        { value: "yeast", label: "Yeast" },
-        { value: "adjunct", label: "Adjunct" },
-        { value: "packaging", label: "Packaging" },
-        { value: "other", label: "Other" },
-      ],
+      options: valuesAsOptions(categoryDisplayConfig),
     },
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 
@@ -182,14 +185,7 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       label: "Category",
       type: "select",
       required: true,
-      options: [
-        { value: "grain", label: "Grain" },
-        { value: "hops", label: "Hops" },
-        { value: "yeast", label: "Yeast" },
-        { value: "adjunct", label: "Adjunct" },
-        { value: "packaging", label: "Packaging" },
-        { value: "other", label: "Other" },
-      ],
+      options: valuesAsOptions(categoryDisplayConfig),
       colSpan: 6,
     },
     {
@@ -254,6 +250,11 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       colSpan: 12,
     },
   ],
+
+  // ---------------------------------------------------------------------------
+  // Value Display
+  // ---------------------------------------------------------------------------
+  valueDisplay: [categoryDisplayConfig],
 
   // ---------------------------------------------------------------------------
   // Relations

@@ -100,6 +100,13 @@ export interface EntityConfig<T = Record<string, unknown>> {
   stateMachine?: StateMachineConfig<T>;
 
   // ---------------------------------------------------------------------------
+  // Value Display (for non-state enum fields)
+  // ---------------------------------------------------------------------------
+
+  /** Display configuration for enum/type fields (mirrors stateDisplay pattern) */
+  valueDisplay?: ValueDisplayConfig[];
+
+  // ---------------------------------------------------------------------------
   // Actions & Dialogs
   // ---------------------------------------------------------------------------
 
@@ -167,10 +174,19 @@ export interface EntityFilterDef {
   /** Display label */
   label: string;
 
-  /** Options for select/multiselect */
+  /** Options for select/multiselect (static) */
   options?: { value: string; label: string }[];
 
-  /** Function to fetch options dynamically */
+  /** Dynamic options from database table */
+  dynamicOptions?: {
+    table: string;
+    valueField: string;
+    labelField: string;
+    filter?: Record<string, unknown>;
+    orderBy?: string;
+  };
+
+  /** Function to fetch options dynamically (deprecated, use dynamicOptions) */
   fetchOptions?: () => Promise<{ value: string; label: string }[]>;
 }
 
@@ -295,6 +311,25 @@ export interface EntityFieldDef<T> {
 
   /** Allow inline unit switching (for recipe builder, brew log) */
   allowUnitSwitch?: boolean;
+}
+
+// =============================================================================
+// Value Display Types (for non-state enum fields)
+// =============================================================================
+
+/**
+ * Configuration for displaying enum values (like category, type, etc.).
+ * Mirrors stateDisplay pattern but for non-state fields.
+ */
+export interface ValueDisplayConfig {
+  field: string;
+  display: Record<
+    string,
+    {
+      label: string;
+      color?: "default" | "success" | "warning" | "error" | "info";
+    }
+  >;
 }
 
 // =============================================================================
@@ -521,5 +556,64 @@ export function getStateColor<T>(
 ): string {
   if (!state) return "default";
   const display = entity.stateMachine?.stateDisplay?.[state];
+  return display?.color || "default";
+}
+
+// =============================================================================
+// Value Display Helpers
+// =============================================================================
+
+/**
+ * Convert a ValueDisplayConfig to select options.
+ * Eliminates duplication of options across display config, filters, and form fields.
+ */
+export function valuesAsOptions(
+  config: ValueDisplayConfig
+): { value: string; label: string }[] {
+  return Object.entries(config.display).map(([value, { label }]) => ({
+    value,
+    label,
+  }));
+}
+
+/**
+ * Get the display info for a value from an entity config.
+ * Returns the full display object (label and color).
+ */
+export function getValueDisplay<T>(
+  entity: EntityConfig<T>,
+  field: string,
+  value: string | null | undefined
+): { label: string; color?: "default" | "success" | "warning" | "error" | "info" } | undefined {
+  if (!value) return undefined;
+  const config = entity.valueDisplay?.find((vd) => vd.field === field);
+  return config?.display[value];
+}
+
+/**
+ * Get the display label for a value from an entity config.
+ * Falls back to formatted value name if not defined.
+ */
+export function getValueLabel<T>(
+  entity: EntityConfig<T>,
+  field: string,
+  value: string | null | undefined
+): string {
+  if (!value) return "";
+  const display = getValueDisplay(entity, field, value);
+  return display?.label || formatStateLabel(value);
+}
+
+/**
+ * Get the color for a value from an entity config.
+ * Falls back to "default" if not defined.
+ */
+export function getValueColor<T>(
+  entity: EntityConfig<T>,
+  field: string,
+  value: string | null | undefined
+): "default" | "success" | "warning" | "error" | "info" {
+  if (!value) return "default";
+  const display = getValueDisplay(entity, field, value);
   return display?.color || "default";
 }

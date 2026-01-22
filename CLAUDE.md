@@ -26,6 +26,43 @@ MGR is a professional brewery management system following an **AI-first, minimal
 Each entity has one config file defining list columns, form schema, state machine, dialogs, relations.
 Universal components render from these configs.
 
+### Form Field Types
+Entity forms support these field types:
+- `text`, `textarea`, `number` - Basic inputs
+- `select` - Dropdown with static `options` or `dynamicOptions`
+- `relation` - Dropdown that auto-fetches from related entity table
+- `switch`, `checkbox` - Boolean toggles
+- `date`, `datetime` - Date pickers
+- `unit` - Number input with unit conversion (requires `unitType`)
+
+For foreign key fields, use `type: "relation"`:
+```typescript
+{
+  name: "location_id",
+  label: "Location",
+  type: "relation",
+  relation: {
+    entity: "location",      // Entity name from registry
+    displayField: "name",    // Field to show in dropdown
+  },
+}
+```
+
+### Zod Schema Validation
+For cross-field validation, use `.refine()`:
+```typescript
+export const transferSchema = z.object({
+  from_vessel_id: z.string().uuid().nullable(),
+  to_vessel_id: z.string().uuid(),
+}).refine(
+  (data) => !data.from_vessel_id || data.from_vessel_id !== data.to_vessel_id,
+  {
+    message: "Cannot transfer to the same vessel",
+    path: ["to_vessel_id"],  // Show error on this field
+  }
+);
+```
+
 ### Universal Components (`src/components/universal/`)
 - `EntityList` - Renders any entity list from config
 - `EntityDetail` - Renders any entity detail from config
@@ -39,6 +76,39 @@ All inventory movements via unified `allocations` table. Quantities calculated v
 
 ### Calculated Fields
 Recipe estimates (OG, FG, ABV, IBU, SRM) are calculated on read via `recipes_with_estimates` view. Vessel current batch derived via `vessels_with_current_batch` view.
+
+### Centralized Query Keys (`src/lib/query-keys.ts`)
+All React Query cache keys must use factory functions from `query-keys.ts`. Never use hardcoded arrays.
+
+```typescript
+// CORRECT: Use centralized query key factories
+import { entityKeys, dashboardKeys } from "@/lib/query-keys";
+
+useQuery({
+  queryKey: entityKeys.list("batches", filters),
+  // ...
+});
+
+useQuery({
+  queryKey: dashboardKeys.batchCounts(),
+  // ...
+});
+
+// WRONG: Hardcoded query key arrays
+useQuery({
+  queryKey: ["batches", "list", filters],  // Don't do this
+  // ...
+});
+```
+
+Available key factories:
+- `entityKeys` - Generic CRUD operations (list, detail, options)
+- `dashboardKeys` - Dashboard metrics and summaries
+- `notificationKeys` - User notifications
+- `catalogKeys` - Catalog/lookup data
+- `recipeKeys`, `batchKeys`, `orderKeys` - Domain-specific queries
+
+When adding new queries, add a key factory to `query-keys.ts` first.
 
 ## Schema Registry
 

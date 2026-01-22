@@ -12,12 +12,12 @@ import { AlertTriangle } from "lucide-react";
 
 interface BatchCancellationInfoProps {
   data: {
-    status?: string;
-    cancellation_reason?: string;
-    cancellation_reason_display?: string;
-    cancelled_at?: string;
-    cancelled_by_name?: string;
-    cancellation_notes?: string;
+    status?: string | null;
+    cancellation_reason?: string | null;
+    cancellation_reason_display?: string | null;
+    cancelled_at?: string | null;
+    cancelled_by_name?: string | null;
+    cancellation_notes?: string | null;
   };
 }
 
@@ -71,7 +71,7 @@ export function BatchCancellationInfo({ data }: BatchCancellationInfoProps) {
   );
 }
 
-function formatReason(reason?: string): string {
+function formatReason(reason?: string | null): string {
   if (!reason) return "";
 
   const reasonMap: Record<string, string> = {
