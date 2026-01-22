@@ -20,6 +20,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { batchEntity } from "@/entities/batch";
 import {
   Collapsible,
   CollapsibleContent,
@@ -356,9 +358,10 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
                 {/* Status */}
                 <div className="flex items-center justify-between text-sm pt-2 border-t">
                   <span className="text-muted-foreground">Batch Status</span>
-                  <Badge variant="outline" className="capitalize">
-                    {performance.status}
-                  </Badge>
+                  <StatusBadge
+                    status={performance.status}
+                    config={batchEntity.stateMachine?.stateDisplay}
+                  />
                 </div>
               </>
             ) : null}

@@ -8,6 +8,7 @@
  * Uses the get_inventory_overview database function.
  */
 
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -34,7 +35,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { batchEntity } from "@/entities/batch";
 
 // =============================================================================
 // Types
@@ -78,7 +80,13 @@ interface InventoryAlertsProps {
 // Helper Components
 // =============================================================================
 
-function FinishedGoodsSection({ goods }: { goods: FinishedGood[] }) {
+function FinishedGoodsSection({
+  goods,
+  lowStockThreshold = 24,
+}: {
+  goods: FinishedGood[];
+  lowStockThreshold?: number;
+}) {
   // Sort by available quantity to show low stock first
   const sortedGoods = [...goods].sort(
     (a, b) => a.available_quantity - b.available_quantity
@@ -92,7 +100,7 @@ function FinishedGoodsSection({ goods }: { goods: FinishedGood[] }) {
       </h4>
       <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
         {sortedGoods.map((item, idx) => {
-          const isLowStock = item.available_quantity < 24;
+          const isLowStock = item.available_quantity < lowStockThreshold;
           const hasAllocations = item.available_quantity < item.total_quantity;
 
           return (
@@ -199,9 +207,10 @@ function BatchesInProgressSection({ batches }: { batches: BatchInProgress[] }) {
                 {batch.recipe_name}
               </span>
             </div>
-            <Badge variant="outline" className="capitalize">
-              {batch.status}
-            </Badge>
+            <StatusBadge
+              status={batch.status}
+              config={batchEntity.stateMachine?.stateDisplay}
+            />
           </div>
         ))}
       </div>
@@ -245,7 +254,14 @@ export function InventoryAlerts({
 
   // Auto-expand if there are alerts
   const hasAlerts = lowStockCount > 0;
-  const [isOpen, setIsOpen] = useState(autoExpandOnAlerts && hasAlerts);
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Auto-expand when alerts are detected (after data loads)
+  useEffect(() => {
+    if (autoExpandOnAlerts && hasAlerts) {
+      setIsOpen(true);
+    }
+  }, [autoExpandOnAlerts, hasAlerts]);
 
   return (
     <Card>
@@ -315,7 +331,10 @@ export function InventoryAlerts({
               <>
                 {/* Finished Goods */}
                 {overview.finished_goods && overview.finished_goods.length > 0 && (
-                  <FinishedGoodsSection goods={overview.finished_goods} />
+                  <FinishedGoodsSection
+                    goods={overview.finished_goods}
+                    lowStockThreshold={lowStockThreshold}
+                  />
                 )}
 
                 {/* Batches In Progress */}
