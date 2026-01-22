@@ -26,6 +26,8 @@ import {
   ArrowRight,
   Activity,
 } from "lucide-react";
+import { vesselEntity } from "@/entities/vessel";
+import { getStateLabel } from "@/types/entity";
 
 // =============================================================================
 // Types
@@ -70,12 +72,6 @@ const statusConfig = {
   completed: { label: "Completed", icon: CheckCircle, color: "bg-green-500" },
 };
 
-const vesselStatusConfig = {
-  available: { label: "Available", color: "default" as const },
-  in_use: { label: "In Use", color: "secondary" as const },
-  cleaning: { label: "Cleaning", color: "outline" as const },
-  maintenance: { label: "Maintenance", color: "destructive" as const },
-};
 
 // =============================================================================
 // Component
@@ -170,13 +166,16 @@ export default function DashboardPage() {
   });
 
   // Calculate vessel utilization
+  // Vessel statuses: dirty, caustic_cleaned, ready_for_use, in_use, maintenance
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vesselArray = vessels as any[];
   const vesselStats = {
     total: vesselArray.length,
     inUse: vesselArray.filter((v) => v.status === "in_use").length,
-    available: vesselArray.filter((v) => v.status === "available").length,
-    maintenance: vesselArray.filter((v) => v.status === "maintenance" || v.status === "cleaning").length,
+    available: vesselArray.filter((v) => v.status === "ready_for_use").length,
+    maintenance: vesselArray.filter((v) =>
+      v.status === "maintenance" || v.status === "dirty" || v.status === "caustic_cleaned"
+    ).length,
   };
 
   const utilizationPercent = vesselStats.total > 0
@@ -351,10 +350,8 @@ export default function DashboardPage() {
                         {vessel.current_batch_name}
                       </span>
                     )}
-                    <Badge
-                      variant={vesselStatusConfig[vessel.status as keyof typeof vesselStatusConfig]?.color || "default"}
-                    >
-                      {vesselStatusConfig[vessel.status as keyof typeof vesselStatusConfig]?.label || vessel.status}
+                    <Badge variant="outline">
+                      {getStateLabel(vesselEntity, vessel.status)}
                     </Badge>
                   </div>
                 </Link>

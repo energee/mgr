@@ -141,16 +141,16 @@ function useUpdateSystemSettings() {
       // Type assertion for table not yet in generated types
       const client = supabase as unknown as {
         from: (table: string) => {
-          update: (data: { value: string }) => {
+          update: (data: { value: unknown }) => {
             eq: (col: string, val: string) => Promise<{ error: Error | null }>;
           };
         };
       };
-      // Update each setting
+      // Update each setting - value column is JSONB, Supabase handles serialization
       for (const [key, value] of Object.entries(updates)) {
         const { error } = await client
           .from("system_settings")
-          .update({ value: JSON.stringify(value) })
+          .update({ value })
           .eq("key", key);
 
         if (error) throw error;

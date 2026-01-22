@@ -15,18 +15,23 @@ const supabase = createClient(
 async function seed() {
   console.log("Seeding database...\n");
 
-  // Update settings
-  console.log("Updating settings...");
-  const { error: settingsError } = await supabase
-    .from("settings")
-    .update({
-      brewery_name: "Demo Brewing Co",
-      timezone: "America/New_York",
-      default_batch_size_gallons: 10.0,
-    })
-    .eq("id", "00000000-0000-0000-0000-000000000001");
-  if (settingsError) console.error("Settings error:", settingsError.message);
-  else console.log("✓ Settings updated");
+  // Update system settings
+  console.log("Updating system settings...");
+  const settingsToUpdate = [
+    { key: "brewery_name", value: "Demo Brewing Co" },
+    { key: "timezone", value: "America/New_York" },
+    { key: "default_batch_size_gallons", value: 10.0 },
+  ];
+  for (const { key, value } of settingsToUpdate) {
+    const { error } = await supabase
+      .from("system_settings")
+      .update({ value })
+      .eq("key", key);
+    if (error) {
+      console.error(`Settings error (${key}):`, error.message);
+    }
+  }
+  console.log("✓ System settings updated");
 
   // Create recipes
   console.log("Creating recipes...");

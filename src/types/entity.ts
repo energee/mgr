@@ -275,9 +275,6 @@ export interface EntityFieldDef<T> {
     orderBy?: string;
   };
 
-  /** Related entity (for relation type) - deprecated, use relation instead */
-  relationEntity?: string;
-
   /** Related entity configuration (for relation type fields) */
   relation?: {
     entity: string;
@@ -494,9 +491,35 @@ export function statesAsOptions<T>(
  * Format a state string as a human-readable label.
  * Converts snake_case/kebab-case to Title Case.
  */
-function formatStateLabel(state: string): string {
+export function formatStateLabel(state: string): string {
   return state
     .split(/[_-]/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
+}
+
+/**
+ * Get the display label for a state from an entity config.
+ * Falls back to formatted state name if not defined.
+ */
+export function getStateLabel<T>(
+  entity: EntityConfig<T>,
+  state: string | null | undefined
+): string {
+  if (!state) return "";
+  const display = entity.stateMachine?.stateDisplay?.[state];
+  return display?.label || formatStateLabel(state);
+}
+
+/**
+ * Get the color for a state from an entity config.
+ * Falls back to "default" if not defined.
+ */
+export function getStateColor<T>(
+  entity: EntityConfig<T>,
+  state: string | null | undefined
+): string {
+  if (!state) return "default";
+  const display = entity.stateMachine?.stateDisplay?.[state];
+  return display?.color || "default";
 }

@@ -3,14 +3,12 @@
 -- Note: This bypasses RLS since it runs with admin credentials.
 
 -- =============================================================================
--- Update Settings
+-- Update System Settings
 -- =============================================================================
 
-UPDATE settings SET
-  brewery_name = 'Demo Brewing Co',
-  timezone = 'America/New_York',
-  default_batch_size_gallons = 10.0
-WHERE id = '00000000-0000-0000-0000-000000000001';
+UPDATE system_settings SET value = '"Demo Brewing Co"' WHERE key = 'brewery_name';
+UPDATE system_settings SET value = '"America/New_York"' WHERE key = 'timezone';
+UPDATE system_settings SET value = '10.0' WHERE key = 'default_batch_size_gallons';
 
 -- =============================================================================
 -- Recipes
