@@ -121,42 +121,45 @@ AS $$
       make_date(p_year, p_month, 1) AS period_start,
       (make_date(p_year, p_month, 1) + INTERVAL '1 month' - INTERVAL '1 day')::DATE AS period_end
   ),
-  -- Finished goods created in the period
-  fg_in_period AS (
+  -- Finished goods (packaged beer) created in the period, aggregated by tax class
+  fg_summary AS (
     SELECT
-      fg.id,
-      fg.quantity,
-      fg.production_date,
-      pt.container_type,
-      pt.volume_oz,
       get_ttb_tax_class(pt.container_type) AS tax_class,
-      (fg.quantity * pt.volume_oz / 3968.0)::DECIMAL(10,4) AS volume_bbl
+      SUM((fg.quantity * pt.volume_oz / 3968.0)::DECIMAL(10,4)) AS packaged_bbl,
+      COUNT(*) AS fg_count
     FROM finished_goods fg
     JOIN package_types pt ON fg.package_type_id = pt.id
     CROSS JOIN period_dates pd
     WHERE fg.production_date >= pd.period_start
       AND fg.production_date <= pd.period_end
+    GROUP BY get_ttb_tax_class(pt.container_type)
   ),
-  -- Batches that completed in the period (for production tracking)
-  batches_completed AS (
+  -- Batches that completed in the period (beer brewed/produced to cellar)
+  batch_summary AS (
     SELECT
-      b.id,
-      b.volume_bbl,
-      'cellar' AS tax_class  -- Production goes to cellar first
+      'cellar' AS tax_class,
+      SUM(b.volume_bbl) AS produced_bbl
     FROM batches b
     CROSS JOIN period_dates pd
     WHERE b.status = 'completed'
       AND DATE(b.updated_at) >= pd.period_start
       AND DATE(b.updated_at) <= pd.period_end
+    GROUP BY 1
+  ),
+  -- Combine all tax classes
+  all_classes AS (
+    SELECT tax_class FROM fg_summary
+    UNION
+    SELECT tax_class FROM batch_summary
   )
   SELECT
-    COALESCE(fg.tax_class, bc.tax_class, 'bottled') AS ttb_tax_class,
-    COALESCE(SUM(bc.volume_bbl), 0) AS beer_produced_bbl,
-    COALESCE(SUM(fg.volume_bbl), 0) AS beer_packaged_bbl,
-    COUNT(DISTINCT fg.id) AS finished_goods_count
-  FROM fg_in_period fg
-  FULL OUTER JOIN batches_completed bc ON FALSE  -- Join for aggregation
-  GROUP BY COALESCE(fg.tax_class, bc.tax_class, 'bottled');
+    ac.tax_class AS ttb_tax_class,
+    COALESCE(bs.produced_bbl, 0) AS beer_produced_bbl,
+    COALESCE(fs.packaged_bbl, 0) AS beer_packaged_bbl,
+    COALESCE(fs.fg_count, 0) AS finished_goods_count
+  FROM all_classes ac
+  LEFT JOIN batch_summary bs ON bs.tax_class = ac.tax_class
+  LEFT JOIN fg_summary fs ON fs.tax_class = ac.tax_class;
 $$;
 
 COMMENT ON FUNCTION get_ttb_production_summary IS 'Returns TTB production summary by tax class for a given month';
@@ -185,31 +188,79 @@ AS $$
   WITH period_dates AS (
     SELECT
       make_date(p_year, p_month, 1) AS period_start,
-      (make_date(p_year, p_month, 1) + INTERVAL '1 month' - INTERVAL '1 day')::DATE AS period_end
+      (make_date(p_year, p_month, 1) + INTERVAL '1 month')::TIMESTAMPTZ AS period_end_ts
   ),
-  -- Finished goods inventory at start of period
-  fg_beginning AS (
+  -- Calculate finished goods produced before period start
+  fg_produced_before AS (
     SELECT
+      fg.id,
       get_ttb_tax_class(pt.container_type) AS tax_class,
-      SUM((fg.quantity * pt.volume_oz / 3968.0)::DECIMAL(10,4)) AS volume_bbl
+      (fg.quantity * pt.volume_oz / 3968.0)::DECIMAL(10,4) AS produced_bbl
     FROM finished_goods fg
     JOIN package_types pt ON fg.package_type_id = pt.id
     CROSS JOIN period_dates pd
     WHERE fg.production_date < pd.period_start
-    GROUP BY get_ttb_tax_class(pt.container_type)
   ),
-  -- Finished goods inventory at end of period
-  fg_ending AS (
+  -- Calculate allocations (removals) completed before period start
+  alloc_before AS (
     SELECT
+      a.source_id AS fg_id,
       get_ttb_tax_class(pt.container_type) AS tax_class,
-      SUM((fg.quantity * pt.volume_oz / 3968.0)::DECIMAL(10,4)) AS volume_bbl
+      COALESCE(a.volume_bbl, 0) AS removed_bbl
+    FROM allocations a
+    JOIN finished_goods fg ON a.source_type = 'finished_good' AND a.source_id = fg.id
+    JOIN package_types pt ON fg.package_type_id = pt.id
+    CROSS JOIN period_dates pd
+    WHERE a.status = 'completed'
+      AND a.created_at < pd.period_start
+  ),
+  -- Beginning inventory = produced - allocated (before period start)
+  fg_beginning AS (
+    SELECT
+      tax_class,
+      GREATEST(0, SUM(produced_bbl) - COALESCE(
+        (SELECT SUM(removed_bbl) FROM alloc_before ab WHERE ab.tax_class = fpb.tax_class),
+        0
+      )) AS volume_bbl
+    FROM fg_produced_before fpb
+    GROUP BY tax_class
+  ),
+  -- Calculate finished goods produced up to period end
+  fg_produced_end AS (
+    SELECT
+      fg.id,
+      get_ttb_tax_class(pt.container_type) AS tax_class,
+      (fg.quantity * pt.volume_oz / 3968.0)::DECIMAL(10,4) AS produced_bbl
     FROM finished_goods fg
     JOIN package_types pt ON fg.package_type_id = pt.id
     CROSS JOIN period_dates pd
-    WHERE fg.production_date <= pd.period_end
-    GROUP BY get_ttb_tax_class(pt.container_type)
+    WHERE fg.production_date < pd.period_end_ts::DATE
   ),
-  -- In-process batches at start of period
+  -- Calculate allocations (removals) completed up to period end
+  alloc_end AS (
+    SELECT
+      a.source_id AS fg_id,
+      get_ttb_tax_class(pt.container_type) AS tax_class,
+      COALESCE(a.volume_bbl, 0) AS removed_bbl
+    FROM allocations a
+    JOIN finished_goods fg ON a.source_type = 'finished_good' AND a.source_id = fg.id
+    JOIN package_types pt ON fg.package_type_id = pt.id
+    CROSS JOIN period_dates pd
+    WHERE a.status = 'completed'
+      AND a.created_at < pd.period_end_ts
+  ),
+  -- Ending inventory = produced - allocated (up to period end)
+  fg_ending AS (
+    SELECT
+      tax_class,
+      GREATEST(0, SUM(produced_bbl) - COALESCE(
+        (SELECT SUM(removed_bbl) FROM alloc_end ae WHERE ae.tax_class = fpe.tax_class),
+        0
+      )) AS volume_bbl
+    FROM fg_produced_end fpe
+    GROUP BY tax_class
+  ),
+  -- In-process batches at start of period (batches in fermenting/conditioning/packaging before period)
   ip_beginning AS (
     SELECT
       'cellar' AS tax_class,
@@ -217,16 +268,15 @@ AS $$
     FROM batches b
     CROSS JOIN period_dates pd
     WHERE b.status IN ('fermenting', 'conditioning', 'packaging')
-      AND DATE(b.created_at) < pd.period_start
+      AND b.created_at < pd.period_start
     GROUP BY 1
   ),
-  -- In-process batches at end of period
+  -- In-process batches at end of period (current in-process batches)
   ip_ending AS (
     SELECT
       'cellar' AS tax_class,
       SUM(b.volume_bbl) AS volume_bbl
     FROM batches b
-    CROSS JOIN period_dates pd
     WHERE b.status IN ('fermenting', 'conditioning', 'packaging')
     GROUP BY 1
   )
@@ -402,11 +452,21 @@ AS $$
     COALESCE(i.ttb_tax_class, p.ttb_tax_class, r.ttb_tax_class) AS ttb_tax_class,
     -- Beginning inventory
     COALESCE(i.beginning_inventory_bbl, 0) AS beginning_inventory_bbl,
-    -- Production
-    COALESCE(p.beer_packaged_bbl, 0) AS beer_produced_bbl,
+    -- Production: use beer_produced for cellar (batches brewed), beer_packaged for kegs/bottles
+    CASE
+      WHEN COALESCE(i.ttb_tax_class, p.ttb_tax_class, r.ttb_tax_class) = 'cellar'
+        THEN COALESCE(p.beer_produced_bbl, 0)
+      ELSE COALESCE(p.beer_packaged_bbl, 0)
+    END AS beer_produced_bbl,
     0::DECIMAL(10,4) AS beer_received_bbl,  -- Future: track transfers in
     -- Total available
-    (COALESCE(i.beginning_inventory_bbl, 0) + COALESCE(p.beer_packaged_bbl, 0))::DECIMAL(10,4) AS total_available_bbl,
+    (COALESCE(i.beginning_inventory_bbl, 0) +
+      CASE
+        WHEN COALESCE(i.ttb_tax_class, p.ttb_tax_class, r.ttb_tax_class) = 'cellar'
+          THEN COALESCE(p.beer_produced_bbl, 0)
+        ELSE COALESCE(p.beer_packaged_bbl, 0)
+      END
+    )::DECIMAL(10,4) AS total_available_bbl,
     -- Removals
     COALESCE(r.taxpaid_domestic_bbl, 0) AS taxpaid_domestic_bbl,
     COALESCE(r.taxpaid_export_bbl, 0) AS taxpaid_export_bbl,
