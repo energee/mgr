@@ -14,7 +14,23 @@
 -- - bottled: Canned/Bottled beer in cases - Form Column F
 
 -- =============================================================================
--- 1. TTB TAX CLASS MAPPING FUNCTION
+-- 1. ADD IS_EXPORT COLUMN TO ORDERS (must be done before functions reference it)
+-- =============================================================================
+-- Check and add is_export column for export order tracking
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'orders' AND column_name = 'is_export'
+  ) THEN
+    ALTER TABLE orders ADD COLUMN is_export BOOLEAN DEFAULT FALSE;
+    COMMENT ON COLUMN orders.is_export IS 'Whether this order is for export (tax-free TTB removal)';
+  END IF;
+END $$;
+
+-- =============================================================================
+-- 2. TTB TAX CLASS MAPPING FUNCTION
 -- =============================================================================
 -- Maps package_types.container_type to TTB reporting categories
 
@@ -528,23 +544,7 @@ FROM batches b;
 COMMENT ON VIEW ttb_current_month_summary IS 'Quick summary of TTB-relevant data for current month';
 
 -- =============================================================================
--- 9. ADD IS_EXPORT COLUMN TO ORDERS IF NOT EXISTS
--- =============================================================================
--- Check and add is_export column for export order tracking
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'orders' AND column_name = 'is_export'
-  ) THEN
-    ALTER TABLE orders ADD COLUMN is_export BOOLEAN DEFAULT FALSE;
-    COMMENT ON COLUMN orders.is_export IS 'Whether this order is for export (tax-free TTB removal)';
-  END IF;
-END $$;
-
--- =============================================================================
--- 10. SCHEMA REGISTRY
+-- 9. SCHEMA REGISTRY
 -- =============================================================================
 
 INSERT INTO _schema_registry (table_name, description, domain, relationships, key_fields, query_examples, ai_context)
