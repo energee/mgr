@@ -88,7 +88,7 @@ export const priceTierEntity: EntityConfig<PriceTier> = {
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
     {
       field: "is_default",

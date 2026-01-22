@@ -133,11 +133,11 @@ export function UnitInput({
   // Get unit options for switcher
   const unitOptions = getUnitOptions(unitType);
 
-  // Don't render until preferences loaded (prevents flash)
+  // While preferences load, show disabled input with empty value (keeps it controlled)
   if (prefsLoading) {
     return (
       <div className={cn("flex gap-2", wrapperClassName)}>
-        <Input disabled className={cn("animate-pulse", className)} />
+        <Input disabled value="" className={cn("animate-pulse", className)} />
       </div>
     );
   }

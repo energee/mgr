@@ -43,6 +43,8 @@ import {
   openTTBPrintView,
   type TTBReportData,
 } from "@/lib/report-export";
+import { batchEntity } from "@/entities/batch";
+import { getStateLabel } from "@/types/entity";
 
 // =============================================================================
 // Types
@@ -764,7 +766,7 @@ export default function TTBReportPage() {
                   <TableRow key={batch.id}>
                     <TableCell className="font-mono">{batch.batch_number}</TableCell>
                     <TableCell>{batch.name}</TableCell>
-                    <TableCell className="capitalize">{batch.status.replace("_", " ")}</TableCell>
+                    <TableCell>{getStateLabel(batchEntity, batch.status)}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatBbl(batch.volume_bbl)}
                     </TableCell>

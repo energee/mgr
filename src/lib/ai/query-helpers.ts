@@ -274,12 +274,35 @@ export const AIQueryHelpers = {
   },
 
   /**
-   * Get yeast inventory and viability
-   * TODO: Implement when yeast_brinks table is created
+   * Get yeast inventory and viability from yeast pitches
    */
   async getYeastInventory() {
-    // yeast_brinks table not yet implemented
-    return [];
+    const { data, error } = await supabase
+      .from("yeast_pitches_with_details")
+      .select(
+        `
+        id,
+        strain_name,
+        strain_code,
+        strain_manufacturer,
+        strain_type,
+        source_type,
+        generation,
+        status,
+        volume_ml,
+        cell_count_billion,
+        estimated_viability,
+        viability_status,
+        days_old,
+        use_by_date,
+        location_name
+      `
+      )
+      .in("status", ["in_stock", "in_use"])
+      .order("estimated_viability", { ascending: false });
+
+    if (error) throw error;
+    return data;
   },
 
   /**

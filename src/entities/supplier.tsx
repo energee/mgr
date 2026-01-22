@@ -82,7 +82,7 @@ export const supplierEntity: EntityConfig<Supplier> = {
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 

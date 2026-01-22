@@ -7,13 +7,17 @@
  * Supports: sections, tabs, custom components, actions, state badges, relations.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
+import { entityKeys } from "@/lib/query-keys";
+import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntitySectionDef, EntityRelationDef } from "@/types/entity";
+import { getStateLabel } from "@/types/entity";
 import { entityRegistry } from "@/entities";
+import { EntityErrorBoundary } from "./entity-error-boundary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,21 +40,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ArrowLeft, MoreHorizontal, Pencil, Plus } from "lucide-react";
 
-interface EntityDetailProps<T = Record<string, unknown>> {
-  /** Entity configuration */
-  entity: EntityConfig<T>;
-  /** Record ID */
-  id: string;
-  /** Base path for navigation */
-  basePath?: string;
-  /** Custom back URL */
-  backUrl?: string;
-  /** Show edit button */
-  showEdit?: boolean;
-  /** Custom action handler - return true if action was handled externally */
-  onAction?: (actionName: string, data: T) => boolean;
-}
-
 export function EntityDetail<T = Record<string, unknown>>({
   entity,
   id,
@@ -67,12 +56,16 @@ export function EntityDetail<T = Record<string, unknown>>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
+  // Use viewTable if available (includes computed/joined fields), otherwise base table
+  const fetchTable = entity.viewTable || entity.table;
+
   // Fetch record
   const { data, isLoading, error } = useQuery({
-    queryKey: [entity.table, id],
+    queryKey: entityKeys.detail(fetchTable, id),
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     queryFn: async () => {
       const { data, error } = await db
-        .from(entity.table)
+        .from(fetchTable)
         .select("*")
         .eq("id", id)
         .single();
@@ -93,7 +86,17 @@ export function EntityDetail<T = Record<string, unknown>>({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [entity.table, id] });
+      // Invalidate both the view table (if used) and base table to ensure cache is cleared
+      queryClient.invalidateQueries({ queryKey: entityKeys.detail(fetchTable, id) });
+      if (entity.viewTable) {
+        // Also invalidate the base table in case any queries use it directly
+        queryClient.invalidateQueries({ queryKey: entityKeys.detail(entity.table, id) });
+      }
+      // Also invalidate list queries to update status badges
+      queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.table) });
+      if (entity.viewTable) {
+        queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.viewTable) });
+      }
     },
   });
 
@@ -277,49 +280,18 @@ export function EntityDetail<T = Record<string, unknown>>({
 
       {/* Content */}
       {tabs.length > 0 || relationTabs.length > 0 ? (
-        <Tabs defaultValue="details">
-          <TabsList>
-            <TabsTrigger value="details">Details</TabsTrigger>
-            {tabs.map(([tabName]) => (
-              <TabsTrigger key={tabName} value={tabName}>
-                {tabName}
-              </TabsTrigger>
-            ))}
-            {relationTabs.map((rel) => (
-              <TabsTrigger key={rel.name} value={rel.name}>
-                {rel.detailTab}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <TabsContent value="details" className="space-y-4">
-            {defaultSections.map((section) => (
-              <SectionCard key={section.id} section={section} data={data} />
-            ))}
-          </TabsContent>
-
-          {tabs.map(([tabName, sections]) => (
-            <TabsContent key={tabName} value={tabName} className="space-y-4">
-              {sections.map((section) => (
-                <SectionCard key={section.id} section={section} data={data} />
-              ))}
-            </TabsContent>
-          ))}
-
-          {relationTabs.map((rel) => (
-            <TabsContent key={rel.name} value={rel.name}>
-              <RelationTable
-                key={rel.name}
-                relation={rel}
-                parentId={id}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
+        <TabsWithRelations
+          tabs={tabs}
+          relationTabs={relationTabs}
+          defaultSections={defaultSections}
+          data={data}
+          entity={entity}
+          parentId={id}
+        />
       ) : (
         <div className="space-y-4">
           {defaultSections.map((section) => (
-            <SectionCard key={section.id} section={section} data={data} />
+            <SectionCard key={section.id} section={section} data={data} entity={entity} />
           ))}
         </div>
       )}
@@ -327,13 +299,77 @@ export function EntityDetail<T = Record<string, unknown>>({
   );
 }
 
+// Tabs with relations - tracks active tab for conditional fetching
+function TabsWithRelations<T>({
+  tabs,
+  relationTabs,
+  defaultSections,
+  data,
+  entity,
+  parentId,
+}: {
+  tabs: [string, EntitySectionDef<T>[]][];
+  relationTabs: EntityRelationDef[];
+  defaultSections: EntitySectionDef<T>[];
+  data: T;
+  entity: EntityConfig<T>;
+  parentId: string;
+}) {
+  const [activeTab, setActiveTab] = useState("details");
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList>
+        <TabsTrigger value="details">Details</TabsTrigger>
+        {tabs.map(([tabName]) => (
+          <TabsTrigger key={tabName} value={tabName}>
+            {tabName}
+          </TabsTrigger>
+        ))}
+        {relationTabs.map((rel) => (
+          <TabsTrigger key={rel.name} value={rel.name}>
+            {rel.detailTab}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      <TabsContent value="details" className="space-y-4">
+        {defaultSections.map((section) => (
+          <SectionCard key={section.id} section={section} data={data} entity={entity} />
+        ))}
+      </TabsContent>
+
+      {tabs.map(([tabName, sections]) => (
+        <TabsContent key={tabName} value={tabName} className="space-y-4">
+          {sections.map((section) => (
+            <SectionCard key={section.id} section={section} data={data} entity={entity} />
+          ))}
+        </TabsContent>
+      ))}
+
+      {relationTabs.map((rel) => (
+        <TabsContent key={rel.name} value={rel.name}>
+          <RelationTable
+            key={rel.name}
+            relation={rel}
+            parentId={parentId}
+            enabled={activeTab === rel.name}
+          />
+        </TabsContent>
+      ))}
+    </Tabs>
+  );
+}
+
 // Section card component
 function SectionCard<T>({
   section,
   data,
+  entity,
 }: {
   section: EntitySectionDef<T>;
   data: T;
+  entity: EntityConfig<T>;
 }) {
   // Custom component takes precedence
   if (section.component) {
@@ -360,6 +396,16 @@ function SectionCard<T>({
         <dl className="grid grid-cols-2 gap-4">
           {section.fields?.map((field) => {
             const value = data[field.field as keyof T];
+            // Check if this field is the state field and format using entity config
+            const isStateField = entity.stateMachine?.stateField === field.field;
+            let displayValue;
+            if (field.render) {
+              displayValue = field.render(value, data);
+            } else if (isStateField && typeof value === "string") {
+              displayValue = getStateLabel(entity, value);
+            } else {
+              displayValue = formatValue(value, field.format);
+            }
             return (
               <div
                 key={field.field}
@@ -368,11 +414,7 @@ function SectionCard<T>({
                 <dt className="text-sm font-medium text-muted-foreground">
                   {field.label}
                 </dt>
-                <dd className="mt-1">
-                  {field.render
-                    ? field.render(value, data)
-                    : formatValue(value, field.format)}
-                </dd>
+                <dd className="mt-1">{displayValue}</dd>
               </div>
             );
           })}
@@ -386,9 +428,12 @@ function SectionCard<T>({
 function RelationTable({
   relation,
   parentId,
+  enabled = true,
 }: {
   relation: EntityRelationDef;
   parentId: string;
+  /** When false, delays fetching until tab is active (performance optimization) */
+  enabled?: boolean;
 }) {
   const supabase = createClient();
   const relatedEntity = entityRegistry.get(relation.entity);
@@ -397,9 +442,11 @@ function RelationTable({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  // Fetch related records with pagination limit
+  // Fetch related records with pagination limit - only fetch when tab is active
   const { data: items, isLoading, error } = useQuery({
-    queryKey: [relatedEntity?.table || relation.entity, "by", relation.foreignKey, parentId],
+    queryKey: entityKeys.related(relatedEntity?.table || relation.entity, relation.foreignKey, parentId),
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
+    enabled: enabled && !!relatedEntity,
     queryFn: async () => {
       if (!relatedEntity) return [];
 
@@ -411,10 +458,12 @@ function RelationTable({
         relatedEntity.listColumns.forEach((col) => {
           if (col.relation) {
             const relEntity = entityRegistry.get(col.relation.entity);
-            // Supabase join syntax: table_name:foreign_key_column(fields)
             // Use registered entity table name, or fallback to pluralized entity name
             const tableName = relEntity?.table || `${col.relation.entity}s`;
-            joins.push(`${tableName}:${col.accessorKey}(${col.relation.displayField})`);
+            // Use unique alias based on column accessor to avoid conflicts when joining same table multiple times
+            // Syntax: alias:table_name!foreign_key(fields)
+            const alias = col.accessorKey?.replace(/_id$/, "") || col.relation.entity;
+            joins.push(`${alias}:${tableName}!${col.accessorKey}(${col.relation.displayField})`);
           }
         });
 
@@ -443,7 +492,6 @@ function RelationTable({
         throw err;
       }
     },
-    enabled: !!relatedEntity,
   });
 
   if (!relatedEntity) {
@@ -512,11 +560,10 @@ function RelationTable({
 
                     let value = item[key];
 
-                    // Handle relation display - data comes back keyed by table name
+                    // Handle relation display - data comes back keyed by alias (accessor without _id suffix)
                     if (col.relation) {
-                      const relEntity = entityRegistry.get(col.relation.entity);
-                      const tableKey = relEntity?.table || `${col.relation.entity}s`;
-                      const relData = item[tableKey] as Record<string, unknown> | null;
+                      const alias = key.replace(/_id$/, "");
+                      const relData = item[alias] as Record<string, unknown> | null;
                       // Use "—" as fallback if relation data not found (instead of raw UUID)
                       value = relData?.[col.relation.displayField] ?? null;
                     }
@@ -564,5 +611,31 @@ function EntityDetailSkeleton<T>({ entity }: { entity: EntityConfig<T> }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// =============================================================================
+// Wrapped Export with Error Boundary
+// =============================================================================
+
+export interface EntityDetailProps<T = Record<string, unknown>> {
+  entity: EntityConfig<T>;
+  id: string;
+  basePath?: string;
+  backUrl?: string;
+  showEdit?: boolean;
+  onAction?: (actionName: string, data: T) => boolean;
+}
+
+/**
+ * EntityDetail wrapped with error boundary for production resilience.
+ */
+export function EntityDetailWithErrorBoundary<T = Record<string, unknown>>(
+  props: EntityDetailProps<T>
+) {
+  return (
+    <EntityErrorBoundary entity={props.entity as EntityConfig<Record<string, unknown>>}>
+      <EntityDetail {...props} />
+    </EntityErrorBoundary>
   );
 }

@@ -7,17 +7,9 @@
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
+import type { Database } from "@/types/supabase";
 
-interface SalesChannel {
-  id: string;
-  name: string;
-  code: string;
-  description: string | null;
-  is_active: boolean;
-  position: number | null;
-  created_at: string;
-  updated_at: string;
-}
+type SalesChannel = Database["public"]["Tables"]["sales_channels"]["Row"];
 
 // =============================================================================
 // Zod Schema
@@ -75,7 +67,7 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
   ],
 

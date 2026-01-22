@@ -18,11 +18,7 @@ import { createRevisionHistoryDisplay } from "@/components/domain/revision-histo
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
 
 // Use view type to include calculated estimates
-// Note: is_template added via migration 00018. After applying migration to remote DB,
-// regenerate types: npx supabase gen types typescript --project-id <project-id> > src/types/supabase.ts
-// Then remove the type intersection below.
-type RecipeView = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
-type Recipe = RecipeView & { is_template?: boolean }; // TODO: Remove after type regeneration
+type Recipe = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
 
 // =============================================================================
 // Zod Schema
@@ -136,7 +132,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
     {
       field: "is_active",
       type: "boolean",
-      label: "Active Only",
+      label: "Active",
     },
     {
       field: "is_template",
@@ -148,18 +144,17 @@ export const recipeEntity: EntityConfig<Recipe> = {
         { value: "false", label: "Hide Templates" },
       ],
     },
-    // TODO: Add dynamicOptions support to EntityFilterDef type
-    // {
-    //   field: "style_id",
-    //   type: "select",
-    //   label: "Style",
-    //   dynamicOptions: {
-    //     table: "beer_styles",
-    //     valueField: "id",
-    //     labelField: "name",
-    //     orderBy: "category,name",
-    //   },
-    // },
+    {
+      field: "style_id",
+      type: "select",
+      label: "Style",
+      dynamicOptions: {
+        table: "beer_styles",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "category,name",
+      },
+    },
   ],
 
   defaultSort: { column: "name", direction: "asc" },

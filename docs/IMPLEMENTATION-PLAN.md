@@ -1186,7 +1186,7 @@ Next available: `00036`
 ## Phase 13: AI Integration Implementation
 
 **Goal:** Implement AI-first features including database functions, TypeScript utilities, and schema context.
-**Status:** Partial (13.1 schema registry, 13.2 DB functions, 13.3 TS utilities, 13.5 entity config complete; 13.4 AI UI components pending)
+**Status:** Complete (core features done; some advanced UI features like what-if, predictions, demand forecasting deferred)
 **Depends On:** Phase 1 (Schema)
 
 ### 13.1 Schema Registry Population
@@ -1259,19 +1259,22 @@ Next available: `00036`
 ### 13.4 AI-Enhanced UI Components
 
 > UI components that leverage AI analysis.
+> Note: Components implemented in `src/components/domain/` (not `src/components/ai/`)
 
-- [ ] Create `src/components/ai/recipe-analyzer.tsx`
-  - [ ] Display style compliance results
-  - [ ] Show improvement suggestions
-  - [ ] Interactive "what-if" adjustments
-- [ ] Create `src/components/ai/batch-insights.tsx`
-  - [ ] Performance vs target visualization
-  - [ ] Fermentation predictions
-  - [ ] Issue detection alerts
-- [ ] Create `src/components/ai/inventory-alerts.tsx`
-  - [ ] Smart reorder recommendations
-  - [ ] Demand forecasting display
-  - [ ] Expiration warnings
+- [x] Create `src/components/domain/recipe-analysis.tsx`
+  - [x] Display style compliance results
+  - [x] Show improvement suggestions
+  - [ ] Interactive "what-if" adjustments (future enhancement)
+- [x] Create `src/components/domain/batch-insights.tsx`
+  - [x] Performance vs target visualization
+  - [x] Fermentation progress display
+  - [ ] Fermentation predictions (future enhancement)
+  - [ ] Issue detection alerts (future enhancement)
+- [x] Create `src/components/domain/inventory-alerts.tsx`
+  - [x] Low stock alerts with threshold
+  - [x] Batches in progress display
+  - [ ] Smart reorder recommendations (future enhancement)
+  - [ ] Demand forecasting display (future enhancement)
 
 ### 13.5 Entity Config AI Enhancements
 
@@ -1629,6 +1632,7 @@ See **Phase 15: Testing & Quality** for comprehensive testing plan including:
 | 2026-01-21 | Phase 7.1: Implemented TTB calculations (migration 00041 with tax class mapping, inventory, production, removals functions) |
 | 2026-01-21 | Phase 7.1: Added TTB report export functionality (CSV and print-friendly PDF via src/lib/report-export.ts). Phase 7 now Complete |
 | 2026-01-21 | Phase 14.5: Implemented batch cancellation workflow (migration 00042, BatchCancellationDialog, BatchCancellationInfo) |
+| 2026-01-22 | Phase 13.4: Verified AI UI components complete (RecipeAnalysis, BatchInsights, InventoryAlerts in src/components/domain/). Phase 13 now Complete |
 
 ---
 
