@@ -6,8 +6,9 @@
  */
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { FlaskConical } from "lucide-react";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { batchEntity } from "@/entities/batch";
 
 interface VesselWithBatchData {
   current_batch_id?: string | null;
@@ -21,14 +22,6 @@ interface VesselCurrentBatchProps {
   data: VesselWithBatchData;
 }
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
-  planned: { label: "Planned", variant: "secondary" },
-  fermenting: { label: "Fermenting", variant: "default" },
-  conditioning: { label: "Conditioning", variant: "default" },
-  packaging: { label: "Packaging", variant: "outline" },
-  completed: { label: "Completed", variant: "secondary" },
-};
-
 export function VesselCurrentBatch({ data }: VesselCurrentBatchProps) {
   if (!data.current_batch_id) {
     return (
@@ -39,8 +32,6 @@ export function VesselCurrentBatch({ data }: VesselCurrentBatchProps) {
     );
   }
 
-  const status = statusConfig[data.batch_status || ""] || { label: data.batch_status, variant: "outline" as const };
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -50,7 +41,12 @@ export function VesselCurrentBatch({ data }: VesselCurrentBatchProps) {
         >
           {data.batch_number || data.batch_name || "View Batch"}
         </Link>
-        <Badge variant={status.variant}>{status.label}</Badge>
+        {data.batch_status && (
+          <StatusBadge
+            status={data.batch_status}
+            config={batchEntity.stateMachine?.stateDisplay}
+          />
+        )}
       </div>
       {data.recipe_name && (
         <div className="text-sm text-muted-foreground">
