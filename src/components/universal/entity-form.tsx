@@ -555,10 +555,16 @@ function renderFieldInput<T>(
     case "select": {
       // Use dynamic options if available, otherwise fall back to static options
       const options = dynamicOptions || field.options || [];
+      // Check if any option uses _none sentinel (for nullable selects)
+      const hasNoneSentinel = options.some((opt) => opt.value === "_none");
+      // Use _none sentinel for null values if the options include it
+      const selectValue = hasNoneSentinel && (value === null || value === undefined || value === "")
+        ? "_none"
+        : ((value as string) || "");
       return (
         <Select
-          value={(value as string) || ""}
-          onValueChange={onChange}
+          value={selectValue}
+          onValueChange={(v) => onChange(v === "_none" ? null : v)}
           disabled={disabled}
         >
           <SelectTrigger id={field.name}>

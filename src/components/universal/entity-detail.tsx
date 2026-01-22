@@ -86,9 +86,17 @@ export function EntityDetail<T = Record<string, unknown>>({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: entityKeys.detail(entity.table, id) });
+      // Invalidate both the view table (if used) and base table to ensure cache is cleared
+      queryClient.invalidateQueries({ queryKey: entityKeys.detail(fetchTable, id) });
+      if (entity.viewTable) {
+        // Also invalidate the base table in case any queries use it directly
+        queryClient.invalidateQueries({ queryKey: entityKeys.detail(entity.table, id) });
+      }
       // Also invalidate list queries to update status badges
       queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.table) });
+      if (entity.viewTable) {
+        queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.viewTable) });
+      }
     },
   });
 
