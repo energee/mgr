@@ -21,6 +21,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
 import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
 import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-info";
+import { BatchInsights } from "@/components/domain/batch-insights";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 // Use generated type from Supabase
@@ -187,6 +188,11 @@ export const batchEntity: EntityConfig<Batch> = {
         { field: "actual_fg", label: "Final Gravity" },
         { field: "actual_abv", label: "ABV %" },
       ],
+    },
+    {
+      id: "ai-insights",
+      title: "AI Insights",
+      component: BatchInsights,
     },
     {
       id: "notes",
