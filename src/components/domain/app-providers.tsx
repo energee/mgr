@@ -4,16 +4,21 @@
  * App Providers
  *
  * Client providers for authenticated app routes.
- * Includes notifications and other authenticated-only contexts.
+ * Includes notifications, sidebar state, and other authenticated-only contexts.
  */
 
 import type { ReactNode } from "react";
 import { NotificationsProvider } from "@/contexts/notifications";
+import { SidebarProvider } from "@/contexts/sidebar";
 
 interface AppProvidersProps {
   children: ReactNode;
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
-  return <NotificationsProvider>{children}</NotificationsProvider>;
+  return (
+    <SidebarProvider>
+      <NotificationsProvider>{children}</NotificationsProvider>
+    </SidebarProvider>
+  );
 }
