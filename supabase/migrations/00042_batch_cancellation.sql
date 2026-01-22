@@ -75,25 +75,11 @@ BEGIN
   WHERE id = p_batch_id;
 
   -- 2. Release vessel if assigned
+  -- Note: We don't create a vessel_transfer record for dumps because:
+  -- - vessel_transfers.to_vessel_id has NOT NULL constraint
+  -- - Loss is already recorded in allocations table below
   IF v_batch.vessel_id IS NOT NULL THEN
-    -- Create a vessel transfer record for the release
-    INSERT INTO vessel_transfers (
-      batch_id,
-      from_vessel_id,
-      to_vessel_id,
-      transfer_type,
-      volume_bbl,
-      notes
-    ) VALUES (
-      p_batch_id,
-      v_batch.vessel_id,
-      NULL,  -- No destination vessel
-      'dump',
-      COALESCE(p_loss_volume_bbl, v_batch.volume_bbl, 0),
-      'Batch cancelled: ' || p_reason
-    );
-
-    -- Update vessel status to dirty
+    -- Update vessel status to dirty and release batch assignment
     UPDATE vessels
     SET
       status = 'dirty',
@@ -173,16 +159,60 @@ COMMENT ON FUNCTION cancel_batch IS 'Cancels a batch with proper cleanup: releas
 DROP VIEW IF EXISTS batches_with_brew_info CASCADE;
 
 -- Recreate with cancellation fields
+-- Note: actual_og is computed from events JSON, brewer name from user_profiles
 CREATE OR REPLACE VIEW batches_with_brew_info
 WITH (security_invoker = true)
 AS
 SELECT
   b.*,
-  -- Brew log info (may have multiple, take the most recent)
-  bl.brew_date,
-  bl.actual_og,
-  bl.brewer,
-  bl.brew_log_id,
+  -- Get brew date from linked brew log (use earliest if multiple)
+  (
+    SELECT MIN(bl.brew_date)
+    FROM brew_log_batches blb
+    JOIN brew_logs bl ON bl.id = blb.brew_log_id
+    WHERE blb.batch_id = b.id
+  ) AS brew_date,
+  -- Get OG from linked brew log (weighted average if multiple)
+  -- Extracted from events JSONB, not a direct column
+  (
+    SELECT
+      CASE
+        WHEN SUM(blb.volume_bbl) > 0 THEN
+          SUM(
+            blb.volume_bbl * (
+              SELECT (m->>'value')::DECIMAL(4,1)
+              FROM jsonb_array_elements(bl.events) e,
+                   jsonb_array_elements(e->'measurements') m
+              WHERE e->>'phase' IN ('ko_end', 'boil_end')
+                AND m->>'metric' = 'gravity_plato'
+              LIMIT 1
+            )
+          ) / SUM(blb.volume_bbl)
+        ELSE NULL
+      END
+    FROM brew_log_batches blb
+    JOIN brew_logs bl ON bl.id = blb.brew_log_id
+    WHERE blb.batch_id = b.id
+  ) AS actual_og,
+  -- Get brewer name from linked brew log (via user_profiles)
+  (
+    SELECT brewer_up.display_name
+    FROM brew_log_batches blb
+    JOIN brew_logs bl ON bl.id = blb.brew_log_id
+    LEFT JOIN user_profiles brewer_up ON brewer_up.id = bl.brewer_id
+    WHERE blb.batch_id = b.id
+    ORDER BY bl.brew_date DESC NULLS LAST
+    LIMIT 1
+  ) AS brewer,
+  -- Get brew log id for linking
+  (
+    SELECT bl.id
+    FROM brew_log_batches blb
+    JOIN brew_logs bl ON bl.id = blb.brew_log_id
+    WHERE blb.batch_id = b.id
+    ORDER BY bl.brew_date DESC NULLS LAST
+    LIMIT 1
+  ) AS brew_log_id,
   -- Cancellation display
   CASE b.cancellation_reason
     WHEN 'quality' THEN 'Quality Issue'
@@ -194,21 +224,9 @@ SELECT
   -- User who cancelled (from profiles)
   up.display_name AS cancelled_by_name
 FROM batches b
-LEFT JOIN LATERAL (
-  SELECT
-    bl.brew_date,
-    bl.actual_og,
-    bl.brewer,
-    bl.id AS brew_log_id
-  FROM brew_logs bl
-  JOIN brew_log_batches blb ON blb.brew_log_id = bl.id
-  WHERE blb.batch_id = b.id
-  ORDER BY bl.brew_date DESC NULLS LAST
-  LIMIT 1
-) bl ON true
 LEFT JOIN user_profiles up ON up.id = b.cancelled_by;
 
-COMMENT ON VIEW batches_with_brew_info IS 'Batches with linked brew log data (brew_date, actual_og, brewer) and cancellation info';
+COMMENT ON VIEW batches_with_brew_info IS 'Batches with derived fields from linked brew_logs (brew_date, actual_og, brewer) and cancellation info';
 
 -- =============================================================================
 -- 4. Create notification trigger for batch cancellation
