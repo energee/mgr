@@ -154,12 +154,8 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
   const [isOpen, setIsOpen] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
-  // Don't render if no recipe ID available
-  if (!recipeId) {
-    return null;
-  }
-
   // Fetch style compliance
+  // Note: Hooks must be called before any early returns (Rules of Hooks)
   const {
     data: complianceData,
     isLoading: complianceLoading,
@@ -167,8 +163,11 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
     refetch: refetchCompliance,
   } = useQuery({
     queryKey: ["recipe-style-compliance", recipeId],
-    queryFn: () => analyzeStyleCompliance(recipeId),
-    enabled: hasAnalyzed,
+    queryFn: () => {
+      if (!recipeId) return null;
+      return analyzeStyleCompliance(recipeId);
+    },
+    enabled: hasAnalyzed && !!recipeId,
     retry: false,
   });
 
@@ -180,10 +179,18 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
     refetch: refetchSuggestions,
   } = useQuery({
     queryKey: ["recipe-suggestions", recipeId],
-    queryFn: () => getRecipeSuggestions(recipeId),
-    enabled: hasAnalyzed,
+    queryFn: () => {
+      if (!recipeId) return null;
+      return getRecipeSuggestions(recipeId);
+    },
+    enabled: hasAnalyzed && !!recipeId,
     retry: false,
   });
+
+  // Don't render if no recipe ID available
+  if (!recipeId) {
+    return null;
+  }
 
   const handleAnalyze = () => {
     setHasAnalyzed(true);

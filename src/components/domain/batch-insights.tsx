@@ -195,12 +195,8 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const supabase = createClient();
 
-  // Don't render if no batch ID available
-  if (!batchId) {
-    return null;
-  }
-
   // Fetch batch performance analysis
+  // Note: Hook must be called before any early returns (Rules of Hooks)
   const {
     data: performanceData,
     isLoading,
@@ -209,6 +205,7 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
   } = useQuery({
     queryKey: ["batch-performance", batchId],
     queryFn: async () => {
+      if (!batchId) return null;
       // Note: Type assertion needed until supabase types are regenerated
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)("analyze_batch_performance", {
@@ -218,9 +215,14 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
       if (error) throw error;
       return data as BatchPerformanceResult;
     },
-    enabled: hasAnalyzed,
+    enabled: hasAnalyzed && !!batchId,
     retry: false,
   });
+
+  // Don't render if no batch ID available
+  if (!batchId) {
+    return null;
+  }
 
   const handleAnalyze = () => {
     setHasAnalyzed(true);
