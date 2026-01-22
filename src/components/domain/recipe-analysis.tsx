@@ -154,11 +154,6 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
   const [isOpen, setIsOpen] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
-  // Don't render if no recipe ID available
-  if (!recipeId) {
-    return null;
-  }
-
   // Fetch style compliance
   // Note: Hooks must be called before any early returns (Rules of Hooks)
   const {
