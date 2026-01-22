@@ -15,6 +15,7 @@ import type { Database } from "@/types/supabase";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
+import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
 
 // Use view type to include calculated estimates
 // Note: is_template added via migration 00018. After applying migration to remote DB,
@@ -197,6 +198,11 @@ export const recipeEntity: EntityConfig<Recipe> = {
         { field: "est_ibu", label: "Est. IBU" },
         { field: "est_srm", label: "Est. SRM" },
       ],
+    },
+    {
+      id: "ai-analysis",
+      title: "AI Analysis",
+      component: RecipeAnalysis,
     },
     {
       id: "volumes",

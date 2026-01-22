@@ -47,8 +47,15 @@ import {
 // =============================================================================
 
 interface RecipeAnalysisProps {
-  recipeId: string;
+  /** Direct recipe ID (for standalone usage) */
+  recipeId?: string;
   recipeName?: string;
+  /** Entity data prop (for EntityDetail integration) */
+  data?: {
+    id: string | null;
+    name: string | null;
+    [key: string]: unknown;
+  };
 }
 
 // =============================================================================
@@ -139,9 +146,18 @@ function SuggestionItem({
 // Main Component
 // =============================================================================
 
-export function RecipeAnalysis({ recipeId, recipeName }: RecipeAnalysisProps) {
+export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeName, data }: RecipeAnalysisProps) {
+  // Support both direct props and entity data prop
+  const recipeId = propRecipeId || data?.id;
+  const recipeName = propRecipeName || data?.name;
+
   const [isOpen, setIsOpen] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+
+  // Don't render if no recipe ID available
+  if (!recipeId) {
+    return null;
+  }
 
   // Fetch style compliance
   const {
