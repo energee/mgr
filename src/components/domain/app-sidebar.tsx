@@ -6,13 +6,12 @@
  * Main navigation sidebar for the application.
  * Organized by domain: Production, Packaging, Inventory, Purchasing, Sales.
  *
- * Design: Icon bar that expands on hover to show labels (overlay style)
+ * Design: Rich dark sidebar with warm copper accents
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useSidebar } from "@/contexts/sidebar";
 import {
   Beaker,
   Warehouse,
@@ -24,8 +23,6 @@ import {
   BoxesIcon,
   Users,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Container,
   ClipboardList,
   BarChart3,
@@ -115,16 +112,12 @@ const navigation: NavSection[] = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { isCollapsed, toggle } = useSidebar();
-  const [isHovered, setIsHovered] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(
+    // Expand section that contains current path
     navigation
       .filter((section) => section.items.some((item) => pathname.startsWith(item.href)))
       .map((section) => section.label)
   );
-
-  // Show expanded when: not collapsed OR hovering while collapsed
-  const showExpanded = !isCollapsed || isHovered;
 
   const toggleSection = (label: string) => {
     setExpandedSections((prev) =>
@@ -135,80 +128,51 @@ export function AppSidebar() {
   };
 
   return (
-    <aside
-      className={cn(
-        "bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border h-full transition-all duration-200 ease-out",
-        // When collapsed, use absolute positioning to overlay content on hover
-        isCollapsed ? "absolute z-50" : "relative",
-        showExpanded ? "w-64 shadow-xl" : "w-16"
-      )}
-      onMouseEnter={() => isCollapsed && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
       {/* Logo */}
-      <div className="h-16 flex items-center gap-3 px-4 border-b border-sidebar-border">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center flex-shrink-0">
+      <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
+        <Link href="/" className="flex items-center gap-2 group">
+          <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center">
             <span className="text-sidebar-primary-foreground font-bold text-sm">M</span>
           </div>
-          {showExpanded && (
-            <span className="text-lg font-semibold tracking-tight whitespace-nowrap">MGR</span>
-          )}
+          <span className="text-lg font-semibold tracking-tight">MGR</span>
         </Link>
-        {showExpanded && (
-          <button
-            onClick={toggle}
-            className="ml-auto p-1.5 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-            aria-label={isCollapsed ? "Pin sidebar open" : "Collapse sidebar"}
-          >
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
-        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navigation.map((section) => {
-          const isSectionExpanded = expandedSections.includes(section.label);
+          const isExpanded = expandedSections.includes(section.label);
           const isActive = section.items.some((item) => pathname.startsWith(item.href));
 
           return (
-            <div key={section.label} className="mt-2 first:mt-0">
-              {showExpanded ? (
-                // Expanded: clickable section header with chevron
-                <button
-                  onClick={() => toggleSection(section.label)}
+            <div key={section.label} className="mt-3 first:mt-0">
+              <button
+                onClick={() => toggleSection(section.label)}
+                className={cn(
+                  "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "text-sidebar-foreground"
+                    : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                <span className="flex items-center gap-3">
+                  <section.icon className={cn(
+                    "h-4 w-4 transition-colors",
+                    isActive && "text-sidebar-primary"
+                  )} />
+                  {section.label}
+                </span>
+                <ChevronDown
                   className={cn(
-                    "flex items-center justify-between w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                    isActive
-                      ? "text-sidebar-foreground"
-                      : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                    "h-4 w-4 transition-transform duration-200",
+                    isExpanded && "rotate-180"
                   )}
-                >
-                  <span className="flex items-center gap-3">
-                    <section.icon className={cn("h-5 w-5 flex-shrink-0", isActive && "text-sidebar-primary")} />
-                    <span className="whitespace-nowrap">{section.label}</span>
-                  </span>
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", isSectionExpanded && "rotate-180")} />
-                </button>
-              ) : (
-                // Collapsed: just icon linking to first item
-                <Link
-                  href={section.items[0].href}
-                  className={cn(
-                    "flex items-center justify-center p-2.5 rounded-md transition-colors",
-                    isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                  )}
-                >
-                  <section.icon className="h-5 w-5" />
-                </Link>
-              )}
+                />
+              </button>
 
-              {/* Sub-items (only when expanded) */}
-              {showExpanded && isSectionExpanded && (
-                <div className="mt-1 ml-4 pl-4 border-l border-sidebar-border/50 space-y-0.5">
+              {isExpanded && (
+                <div className="mt-1 ml-3 pl-4 border-l border-sidebar-border/50 space-y-0.5">
                   {section.items.map((item) => {
                     const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
                     return (
@@ -216,13 +180,13 @@ export function AppSidebar() {
                         key={item.href}
                         href={item.href}
                         className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap",
+                          "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200",
                           isItemActive
                             ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
                             : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                         )}
                       >
-                        <item.icon className="h-4 w-4 flex-shrink-0" />
+                        <item.icon className="h-4 w-4" />
                         {item.label}
                       </Link>
                     );
@@ -235,19 +199,18 @@ export function AppSidebar() {
       </nav>
 
       {/* Settings */}
-      <div className="px-2 py-4 border-t border-sidebar-border">
+      <div className="px-3 py-4 border-t border-sidebar-border">
         <Link
           href="/settings"
           className={cn(
-            "flex items-center rounded-md transition-colors",
-            showExpanded ? "gap-3 px-3 py-2.5" : "justify-center p-2.5",
+            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
             pathname.startsWith("/settings")
               ? "bg-sidebar-primary text-sidebar-primary-foreground"
               : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
           )}
         >
-          <Settings className="h-5 w-5 flex-shrink-0" />
-          {showExpanded && <span className="text-sm font-medium whitespace-nowrap">Settings</span>}
+          <Settings className="h-4 w-4" />
+          Settings
         </Link>
       </div>
     </aside>
