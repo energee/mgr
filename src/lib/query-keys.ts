@@ -219,3 +219,20 @@ export const revisionKeys = {
   forEntityCompact: (entityType: string, entityId: string) =>
     ["entity_revisions", entityType, entityId, "compact"] as const,
 };
+
+// =============================================================================
+// Production Planning Keys
+// =============================================================================
+
+export const planningKeys = {
+  all: () => ["planning"] as const,
+  shortfalls: (options?: { includeDrafts?: boolean; horizonWeeks?: number }) =>
+    options
+      ? (["planning", "shortfalls", options] as const)
+      : (["planning", "shortfalls"] as const),
+  demandByProduct: () => ["planning", "demand-by-product"] as const,
+  supplyByProduct: () => ["planning", "supply-by-product"] as const,
+  batchesInProduction: () => ["planning", "batches-in-production"] as const,
+  demandDetail: (brandId: string, packageTypeId: string, week: string) =>
+    ["planning", "demand-detail", brandId, packageTypeId, week] as const,
+};

@@ -32,6 +32,7 @@ import {
   ShoppingCart,
   ArrowRightLeft,
   PackageCheck,
+  CalendarClock,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -61,6 +62,7 @@ const navigation: NavSection[] = [
     label: "Production",
     icon: Beaker,
     items: [
+      { label: "Planning", href: "/production/planning", icon: CalendarClock },
       { label: "Batches", href: "/production/batches", icon: FlaskConical },
       { label: "Recipes", href: "/production/recipes", icon: FileText },
       { label: "Vessels", href: "/production/vessels", icon: Container },
