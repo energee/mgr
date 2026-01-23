@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { recipeKeys, batchKeys } from "@/lib/query-keys";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +74,7 @@ export function CreateBatchFromShortfall({
 
   // Fetch recipes for this brand
   const { data: recipes, isLoading: recipesLoading } = useQuery({
-    queryKey: ["recipes", "by-brand", shortfall.brand_id],
+    queryKey: recipeKeys.byBrand(shortfall.brand_id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipes")
@@ -89,7 +90,7 @@ export function CreateBatchFromShortfall({
 
   // Fetch next batch number
   const { data: nextBatchNumber } = useQuery({
-    queryKey: ["batches", "next-number"],
+    queryKey: batchKeys.nextNumber(),
     queryFn: async () => {
       const year = new Date().getFullYear();
       const { data, error } = await supabase

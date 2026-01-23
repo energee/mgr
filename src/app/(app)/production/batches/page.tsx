@@ -11,6 +11,7 @@ import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { EntityList } from "@/components/universal/entity-list";
 import { batchEntity } from "@/entities/batch";
+import { batchKeys } from "@/lib/query-keys";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import type { Database } from "@/types/supabase";
 
@@ -33,7 +34,7 @@ export default function BatchesPage() {
   }, []);
 
   const handleDialogSuccess = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["batches"] });
+    queryClient.invalidateQueries({ queryKey: batchKeys.all() });
   }, [queryClient]);
 
   return (
