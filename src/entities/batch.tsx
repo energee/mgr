@@ -53,15 +53,17 @@ export type BatchFormValues = z.infer<typeof batchSchema>;
 
 const batchStateMachine: StateMachineConfig<Batch> = {
   stateField: "status",
-  states: ["planned", "fermenting", "conditioning", "packaging", "completed", "cancelled"],
+  states: ["planned", "fermenting", "conditioning", "packaging", "completed", "cancelled", "archived"],
   initialState: "planned",
   transitions: {
-    planned: ["fermenting", "cancelled"],
-    fermenting: ["conditioning", "cancelled"],
-    conditioning: ["packaging", "cancelled"],
-    packaging: ["completed", "cancelled"],
+    // Note: cancelled/archived are handled via custom actions with dialogs, not direct transitions
+    planned: ["fermenting"],
+    fermenting: ["conditioning"],
+    conditioning: ["packaging"],
+    packaging: ["completed"],
     completed: [],
     cancelled: [],
+    archived: [],
   },
   stateDisplay: {
     planned: { label: "Planned", color: "default" },
@@ -69,7 +71,8 @@ const batchStateMachine: StateMachineConfig<Batch> = {
     conditioning: { label: "Conditioning", color: "info" },
     packaging: { label: "Packaging", color: "warning" },
     completed: { label: "Completed", color: "success" },
-    cancelled: { label: "Cancelled", color: "error" },
+    cancelled: { label: "Cancelled", color: "default" },
+    archived: { label: "Archived", color: "error" },
   },
 };
 
@@ -344,9 +347,19 @@ export const batchEntity: EntityConfig<Batch> = {
       icon: "x",
       type: "dropdown",
       variant: "destructive",
-      fromStates: ["planned", "fermenting", "conditioning", "packaging"],
+      fromStates: ["planned"],
       toState: "cancelled",
-      // Note: Uses BatchCancellationDialog instead of simple confirm
+      // Simple cancel for planned batches - no loss to record
+    },
+    {
+      name: "archive",
+      label: "Archive Batch",
+      icon: "archive",
+      type: "dropdown",
+      variant: "destructive",
+      fromStates: ["fermenting", "conditioning", "packaging"],
+      toState: "archived",
+      // Uses BatchArchiveDialog for in-progress batches - records loss
     },
   ],
 
