@@ -6,6 +6,7 @@ MGR is a professional brewery management system following an **AI-first, minimal
 
 **Key Docs**:
 - `README.md` - Setup, commands, project structure
+- `.beads/` - Task tracking (source of truth for work items and status)
 - `docs/spec/` - Technical specification (see `docs/spec/README.md` for navigation)
   - `docs/spec/decisions.md` - Schema review decisions (DEC-*)
   - `docs/spec/architecture.md` - Tech stack and design patterns
@@ -25,6 +26,70 @@ MGR is a professional brewery management system following an **AI-first, minimal
 ### Entity Configuration (`src/entities/`)
 Each entity has one config file defining list columns, form schema, state machine, dialogs, relations.
 Universal components render from these configs.
+
+```typescript
+export const entityEntity: EntityConfig<EntityType> = {
+  // Identity
+  name: "entity_name",
+  table: "table_name",
+  viewTable: "view_name",  // Optional: for computed fields
+  displayName: "Entity",
+  displayNamePlural: "Entities",
+  description: "...",
+  domain: "production" | "inventory" | "sales" | "purchasing",
+
+  // List View
+  listColumns: [...],
+  listFilters: [...],
+  defaultSort: { column: "...", direction: "asc" | "desc" },
+  searchableFields: [...],
+
+  // Detail View
+  detailHeader: { title: "field", subtitle: "field", badge: "status_field" },
+  detailSections: [...],
+
+  // Form
+  formSchema: zodSchema,
+  formFields: [...],
+
+  // State Machine (if applicable)
+  stateMachine: { stateField, states, transitions, stateDisplay },
+  actions: [...],
+
+  // Relations
+  relations: [...],
+
+  // AI Context
+  queryExamples: [...],
+  keyFields: [...],
+};
+```
+
+### Page Pattern
+All entity pages use universal components:
+
+```
+/[domain]/[entity-plural]/
+  page.tsx         -> <EntityList entity={config} />
+  new/page.tsx     -> <EntityForm entity={config} />
+  [id]/page.tsx    -> <EntityDetail entity={config} id={id} />
+  [id]/edit/page.tsx -> <EntityForm entity={config} id={id} />
+```
+
+### Migration Naming
+Pattern: `00XXX_description.sql`
+Current highest: `00052`
+Next available: `00053`
+
+### Reference Files by Pattern
+
+| Pattern | Reference File |
+|---------|----------------|
+| Entity config with state machine | `src/entities/batch.tsx` |
+| Entity config with viewTable | `src/entities/vessel.tsx` |
+| Domain component (editor) | `src/components/domain/grain-bill-editor.tsx` |
+| Entity pages | `src/app/(app)/production/batches/` |
+| Catalog selector | `src/components/domain/hop-schedule-editor.tsx` |
 
 ### Form Field Types
 Entity forms support these field types:
