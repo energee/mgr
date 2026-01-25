@@ -5,6 +5,8 @@
  *
  * Main navigation sidebar for the application.
  * Organized by domain: Production, Packaging, Inventory, Purchasing, Sales.
+ *
+ * Design: Rich dark sidebar with warm copper accents
  */
 
 import Link from "next/link";
@@ -30,6 +32,7 @@ import {
   ShoppingCart,
   ArrowRightLeft,
   PackageCheck,
+  CalendarClock,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -59,6 +62,7 @@ const navigation: NavSection[] = [
     label: "Production",
     icon: Beaker,
     items: [
+      { label: "Planning", href: "/production/planning", icon: CalendarClock },
       { label: "Batches", href: "/production/batches", icon: FlaskConical },
       { label: "Recipes", href: "/production/recipes", icon: FileText },
       { label: "Vessels", href: "/production/vessels", icon: Container },
@@ -126,61 +130,69 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="w-64 border-r bg-card flex flex-col">
+    <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b">
-        <Link href="/" className="text-xl font-bold">
-          MGR
+      <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
+        <Link href="/" className="flex items-center gap-2 group">
+          <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center">
+            <span className="text-sidebar-primary-foreground font-bold text-sm">M</span>
+          </div>
+          <span className="text-lg font-semibold tracking-tight">MGR</span>
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {/* Sections */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navigation.map((section) => {
           const isExpanded = expandedSections.includes(section.label);
           const isActive = section.items.some((item) => pathname.startsWith(item.href));
 
           return (
-            <div key={section.label} className="mt-4">
+            <div key={section.label} className="mt-3 first:mt-0">
               <button
                 onClick={() => toggleSection(section.label)}
                 className={cn(
-                  "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-sidebar-foreground"
+                    : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
                 )}
               >
                 <span className="flex items-center gap-3">
-                  <section.icon className="h-4 w-4" />
+                  <section.icon className={cn(
+                    "h-4 w-4 transition-colors",
+                    isActive && "text-sidebar-primary"
+                  )} />
                   {section.label}
                 </span>
                 <ChevronDown
                   className={cn(
-                    "h-4 w-4 transition-transform",
+                    "h-4 w-4 transition-transform duration-200",
                     isExpanded && "rotate-180"
                   )}
                 />
               </button>
 
               {isExpanded && (
-                <div className="mt-1 ml-4 pl-4 border-l space-y-1">
-                  {section.items.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                        pathname === item.href || pathname.startsWith(item.href + "/")
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      )}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                    </Link>
-                  ))}
+                <div className="mt-1 ml-3 pl-4 border-l border-sidebar-border/50 space-y-0.5">
+                  {section.items.map((item) => {
+                    const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200",
+                          isItemActive
+                            ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                            : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                        )}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -189,14 +201,14 @@ export function AppSidebar() {
       </nav>
 
       {/* Settings */}
-      <div className="p-4 border-t">
+      <div className="px-3 py-4 border-t border-sidebar-border">
         <Link
           href="/settings"
           className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
             pathname.startsWith("/settings")
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
           )}
         >
           <Settings className="h-4 w-4" />

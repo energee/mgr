@@ -1,69 +1,92 @@
 "use client";
 
 /**
- * BatchCancellationInfo - Display cancellation details for a cancelled batch
+ * BatchCancellationInfo - Display termination details for cancelled/archived batches
  *
- * Shows cancellation reason, timestamp, who cancelled, and notes.
- * Only rendered when batch status is 'cancelled'.
+ * Shows termination reason, timestamp, who terminated, and notes.
+ * Rendered when batch status is 'cancelled' or 'archived'.
+ *
+ * - Cancelled: For planned batches that never started
+ * - Archived: For in-progress batches that were terminated (with loss)
  */
 
 import { format } from "date-fns";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Archive, XCircle } from "lucide-react";
 
 interface BatchCancellationInfoProps {
   data: {
     status?: string | null;
+    // Cancellation fields (for planned batches)
     cancellation_reason?: string | null;
     cancellation_reason_display?: string | null;
     cancelled_at?: string | null;
     cancelled_by_name?: string | null;
     cancellation_notes?: string | null;
+    // Archive fields (for in-progress batches)
+    archive_reason?: string | null;
+    archive_reason_display?: string | null;
+    archived_at?: string | null;
+    archived_by_name?: string | null;
+    archive_notes?: string | null;
   };
 }
 
 export function BatchCancellationInfo({ data }: BatchCancellationInfoProps) {
-  // Only show for cancelled batches
-  if (data?.status !== "cancelled") {
+  const isCancelled = data?.status === "cancelled";
+  const isArchived = data?.status === "archived";
+
+  // Only show for terminated batches
+  if (!isCancelled && !isArchived) {
     return null;
   }
 
-  const reasonDisplay =
-    data.cancellation_reason_display ||
-    formatReason(data.cancellation_reason);
+  const isArchiveDisplay = isArchived;
+  const Icon = isArchiveDisplay ? Archive : XCircle;
+  const title = isArchiveDisplay ? "Archive Details" : "Cancellation Details";
+  const borderColor = isArchiveDisplay ? "border-destructive/20" : "border-muted";
+  const bgColor = isArchiveDisplay ? "bg-destructive/5" : "bg-muted/30";
+
+  // Get the appropriate fields based on status
+  const reason = isArchiveDisplay
+    ? (data.archive_reason_display || formatArchiveReason(data.archive_reason))
+    : (data.cancellation_reason_display || formatCancelReason(data.cancellation_reason));
+  const timestamp = isArchiveDisplay ? data.archived_at : data.cancelled_at;
+  const byName = isArchiveDisplay ? data.archived_by_name : data.cancelled_by_name;
+  const notes = isArchiveDisplay ? data.archive_notes : data.cancellation_notes;
 
   return (
-    <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 space-y-3">
-      <div className="flex items-center gap-2 text-destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <span className="font-medium">Cancellation Details</span>
+    <div className={`rounded-lg border ${borderColor} ${bgColor} p-4 space-y-3`}>
+      <div className={`flex items-center gap-2 ${isArchiveDisplay ? "text-destructive" : "text-muted-foreground"}`}>
+        <Icon className="h-4 w-4" />
+        <span className="font-medium">{title}</span>
       </div>
 
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-muted-foreground">Reason</dt>
-          <dd className="font-medium">{reasonDisplay || "Not specified"}</dd>
+          <dd className="font-medium">{reason || "Not specified"}</dd>
         </div>
 
-        {data.cancelled_at && (
+        {timestamp && (
           <div>
-            <dt className="text-muted-foreground">Cancelled At</dt>
+            <dt className="text-muted-foreground">{isArchiveDisplay ? "Archived At" : "Cancelled At"}</dt>
             <dd className="font-medium">
-              {format(new Date(data.cancelled_at), "PPp")}
+              {format(new Date(timestamp), "PPp")}
             </dd>
           </div>
         )}
 
-        {data.cancelled_by_name && (
+        {byName && (
           <div>
-            <dt className="text-muted-foreground">Cancelled By</dt>
-            <dd className="font-medium">{data.cancelled_by_name}</dd>
+            <dt className="text-muted-foreground">{isArchiveDisplay ? "Archived By" : "Cancelled By"}</dt>
+            <dd className="font-medium">{byName}</dd>
           </div>
         )}
 
-        {data.cancellation_notes && (
+        {notes && (
           <div className="sm:col-span-2">
             <dt className="text-muted-foreground">Notes</dt>
-            <dd className="mt-1">{data.cancellation_notes}</dd>
+            <dd className="mt-1">{notes}</dd>
           </div>
         )}
       </dl>
@@ -71,7 +94,20 @@ export function BatchCancellationInfo({ data }: BatchCancellationInfoProps) {
   );
 }
 
-function formatReason(reason?: string | null): string {
+function formatCancelReason(reason?: string | null): string {
+  if (!reason) return "";
+
+  const reasonMap: Record<string, string> = {
+    scheduling: "Schedule Change",
+    recipe_change: "Recipe Change",
+    capacity: "Capacity Issue",
+    other: "Other",
+  };
+
+  return reasonMap[reason] || reason;
+}
+
+function formatArchiveReason(reason?: string | null): string {
   if (!reason) return "";
 
   const reasonMap: Record<string, string> = {

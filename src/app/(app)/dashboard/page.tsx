@@ -11,7 +11,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { dashboardKeys } from "@/lib/query-keys";
+import { dashboardKeys, planningKeys } from "@/lib/query-keys";
+import type { ProductionShortfall } from "@/types/planning";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
   Container,
   ArrowRight,
   Activity,
+  CalendarClock,
 } from "lucide-react";
 import { vesselEntity } from "@/entities/vessel";
 import { getStateLabel } from "@/types/entity";
@@ -166,6 +168,23 @@ export default function DashboardPage() {
     refetchInterval: 30000,
   });
 
+  // Fetch production shortfalls
+  const { data: shortfalls = [] } = useQuery({
+    queryKey: planningKeys.shortfalls({ includeDrafts: true, horizonWeeks: 8 }),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)("calculate_production_shortfalls", {
+        p_include_drafts: true,
+        p_horizon_weeks: 8,
+      });
+      if (error) return [];
+      return (data || []) as ProductionShortfall[];
+    },
+    refetchInterval: 60000,
+  });
+
+  const urgentShortfalls = shortfalls.filter((s) => s.is_urgent);
+
   // Calculate vessel utilization
   // Vessel statuses: dirty, caustic_cleaned, ready_for_use, in_use, maintenance
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,6 +239,41 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* Production Planning Alert */}
+      {shortfalls.length > 0 && (
+        <Card className={urgentShortfalls.length > 0 ? "border-destructive" : "border-amber-500"}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarClock className={`h-5 w-5 ${urgentShortfalls.length > 0 ? "text-destructive" : "text-amber-500"}`} />
+                <CardTitle className="text-base">Production Planning</CardTitle>
+              </div>
+              <Link href="/production/planning">
+                <Button variant={urgentShortfalls.length > 0 ? "destructive" : "outline"} size="sm">
+                  View Planning
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              <div>
+                <span className="text-2xl font-bold">{shortfalls.length}</span>
+                <span className="text-sm text-muted-foreground ml-2">shortfalls</span>
+              </div>
+              {urgentShortfalls.length > 0 && (
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium">{urgentShortfalls.length} urgent</span>
+                  <span className="text-sm">- need immediate action</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Active Batches */}

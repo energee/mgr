@@ -46,7 +46,8 @@ export default function BatchDetailPage({
       setShowStartFermentation(true);
       return true; // Indicates action was handled
     }
-    if (actionName === "cancel") {
+    // Both cancel and archive use the same dialog (it adapts based on status)
+    if (actionName === "cancel" || actionName === "archive") {
       setShowCancellation(true);
       return true; // Indicates action was handled
     }

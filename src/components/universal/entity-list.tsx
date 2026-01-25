@@ -82,6 +82,8 @@ export interface EntityListProps<T = Record<string, unknown>> {
   showCreate?: boolean;
   /** Custom create handler (instead of link) */
   onCreateClick?: () => void;
+  /** Custom action handler - return true if handled externally */
+  onAction?: (actionName: string, record: T) => boolean;
 }
 
 export function EntityList<T = Record<string, unknown>>({
@@ -90,6 +92,7 @@ export function EntityList<T = Record<string, unknown>>({
   filters,
   showCreate = true,
   onCreateClick,
+  onAction,
 }: EntityListProps<T>) {
   const supabase = createClient();
   // Cast to any for dynamic table access - universal components work with any entity
@@ -286,10 +289,23 @@ export function EntityList<T = Record<string, unknown>>({
                 </DropdownMenuItem>
                 {entity.actions?.map((action) => {
                   if (action.showWhen && !action.showWhen(record)) return null;
+                  // Check fromStates if defined
+                  if (action.fromStates) {
+                    const stateField = entity.stateMachine?.stateField;
+                    const currentState = stateField ? (record as Record<string, unknown>)[stateField] as string : null;
+                    if (!currentState || !action.fromStates.includes(currentState)) return null;
+                  }
                   return (
                     <DropdownMenuItem
                       key={action.name}
-                      onClick={() => action.handler?.(record)}
+                      onClick={() => {
+                        // Check if external handler wants to handle this action
+                        if (onAction && onAction(action.name, record)) {
+                          return; // Action was handled externally
+                        }
+                        // Default: call the action's handler if defined
+                        action.handler?.(record);
+                      }}
                     >
                       {action.label}
                     </DropdownMenuItem>
@@ -301,7 +317,7 @@ export function EntityList<T = Record<string, unknown>>({
         },
       },
     ];
-  }, [columns, entity.actions, path]);
+  }, [columns, entity.actions, entity.stateMachine, path, onAction]);
 
   // Check if any quick filters are active
   const hasActiveQuickFilters = Object.values(quickFilters).some((v) =>
