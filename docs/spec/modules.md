@@ -307,6 +307,73 @@ interface YeastLineage {
 
 ---
 
+## Production Planning Module
+
+Backward planning from order due dates to determine when batches need to start brewing.
+
+### Features
+- Aggregate demand from orders (including drafts) by brand + package type + week
+- Compare demand against available finished goods inventory
+- Track batches in production with estimated ready dates
+- Calculate production shortfalls with recommended brew start dates
+- Quick batch creation from identified shortfalls
+- Configurable planning horizon (4/8/12 weeks)
+
+### Yield Calculation
+
+The `calculate_units_per_bbl()` function dynamically calculates yield for any package type:
+
+```sql
+-- 1 BBL = 3968 oz (31 gallons × 128 oz/gallon)
+-- For cans/bottles: (3968 / volume_oz) / units_per_case = cases per BBL
+-- For kegs: 3968 / volume_oz = kegs per BBL
+
+-- Examples:
+-- 16oz can, 24/case: (3968/16)/24 = 10.33 cases/BBL
+-- Half barrel (1984 oz): 3968/1984 = 2 kegs/BBL
+-- Sixtel (661 oz): 3968/661 = 6 sixtels/BBL
+```
+
+Package types can have an optional `units_per_bbl_override` for manual adjustment (e.g., accounting for packaging losses).
+
+### Lead Time Calculation
+
+```
+recommended_brew_start = demand_week
+                       - fermentation_days (from recipe)
+                       - conditioning_days (from recipe)
+                       - packaging_buffer_days (default: 2)
+```
+
+### Shortfall Detection
+
+A shortfall exists when:
+```
+demand_quantity > available_quantity + in_production_units
+```
+
+Shortfalls are marked **urgent** when the recommended brew start is within 7 days of today.
+
+### Database Objects
+
+| Object | Type | Description |
+|--------|------|-------------|
+| `calculate_units_per_bbl()` | Function | Calculates yield per BBL from package dimensions |
+| `order_demand_by_product` | View | Aggregates demand by brand/package/week |
+| `finished_goods_supply_by_product` | View | Aggregates available inventory |
+| `batches_in_production_by_brand` | View | Active batches with ready dates |
+| `calculate_production_shortfalls()` | Function | Returns shortfalls with brew recommendations |
+
+### UI Components
+
+| Component | Path | Description |
+|-----------|------|-------------|
+| Planning Page | `/production/planning` | Dashboard with filters, summary cards, shortfall table |
+| Create Batch Dialog | (embedded) | Pre-filled batch form from shortfall data |
+| Dashboard Alert | `/dashboard` | Shows shortfall count and urgent items |
+
+---
+
 ## Customer & Pricing Module
 
 ### Features

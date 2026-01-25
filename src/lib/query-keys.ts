@@ -52,6 +52,7 @@ export const recipeKeys = {
   list: (filters?: Record<string, unknown>) =>
     filters ? (["recipes", "list", filters] as const) : (["recipes", "list"] as const),
   detail: (id: string) => ["recipes", id] as const,
+  byBrand: (brandId: string) => ["recipes", "by-brand", brandId] as const,
   summary: (id: string) => ["recipes", id, "summary"] as const,
   estimates: (id: string) => ["recipes", id, "estimates"] as const,
   grainBill: (id: string) => ["recipes", id, "grain-bill"] as const,
@@ -69,6 +70,7 @@ export const batchKeys = {
   list: (filters?: Record<string, unknown>) =>
     filters ? (["batches", "list", filters] as const) : (["batches", "list"] as const),
   detail: (id: string) => ["batches", id] as const,
+  nextNumber: () => ["batches", "next-number"] as const,
   logs: (id: string) => ["batches", id, "logs"] as const,
   readings: (id: string) => ["batches", id, "readings"] as const,
   allocations: (id: string) => ["batches", id, "allocations"] as const,
@@ -218,4 +220,21 @@ export const revisionKeys = {
     ["entity_revisions", entityType, entityId] as const,
   forEntityCompact: (entityType: string, entityId: string) =>
     ["entity_revisions", entityType, entityId, "compact"] as const,
+};
+
+// =============================================================================
+// Production Planning Keys
+// =============================================================================
+
+export const planningKeys = {
+  all: () => ["planning"] as const,
+  shortfalls: (options?: { includeDrafts?: boolean; horizonWeeks?: number }) =>
+    options
+      ? (["planning", "shortfalls", options] as const)
+      : (["planning", "shortfalls"] as const),
+  demandByProduct: () => ["planning", "demand-by-product"] as const,
+  supplyByProduct: () => ["planning", "supply-by-product"] as const,
+  batchesInProduction: () => ["planning", "batches-in-production"] as const,
+  demandDetail: (brandId: string, packageTypeId: string, week: string) =>
+    ["planning", "demand-detail", brandId, packageTypeId, week] as const,
 };

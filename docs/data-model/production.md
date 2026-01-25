@@ -987,6 +987,166 @@ Any state can transition to maintenance, which returns to dirty.
 
 ---
 
+## Production Planning
+
+Views and functions for backward production planning from order due dates.
+
+### `calculate_units_per_bbl()` (Function)
+
+Calculates yield (units or cases) per BBL from package dimensions. Works for any package type.
+
+```sql
+calculate_units_per_bbl(p_volume_oz DECIMAL, p_units_per_case INTEGER) RETURNS DECIMAL
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| p_volume_oz | Package volume in ounces |
+| p_units_per_case | Units per case (NULL for kegs) |
+
+**Calculation:**
+- 1 BBL = 3968 oz (31 gallons × 128 oz/gallon)
+- Cans/bottles: `(3968 / volume_oz) / units_per_case` = cases per BBL
+- Kegs: `3968 / volume_oz` = kegs per BBL
+
+**Examples:**
+| Package | volume_oz | units_per_case | Result |
+|---------|-----------|----------------|--------|
+| 16oz can (24-pack) | 16 | 24 | 10.33 cases/BBL |
+| 12oz can (24-pack) | 12 | 24 | 13.78 cases/BBL |
+| Half barrel | 1984 | 1 | 2 kegs/BBL |
+| Sixth barrel | 661 | 1 | 6 sixtels/BBL |
+
+---
+
+### `package_types.units_per_bbl_override` (Column)
+
+Optional manual override for yield calculation.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| units_per_bbl_override | DECIMAL(6,2) | If set, used instead of calculated value |
+
+Useful for accounting for packaging losses or non-standard yields.
+
+---
+
+### `order_demand_by_product` (View)
+
+Aggregates order demand by brand, package type, and week.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| brand_id | UUID | FK to brands |
+| package_type_id | UUID | FK to package_types |
+| demand_week | DATE | Week start date (Monday) |
+| total_quantity | INTEGER | Sum of order item quantities |
+| order_count | INTEGER | Number of orders |
+| earliest_due_date | DATE | Earliest order due date in bucket |
+| latest_due_date | DATE | Latest order due date in bucket |
+| order_ids | UUID[] | Array of contributing order IDs |
+| order_statuses | TEXT[] | Array of order statuses |
+
+**Filters:**
+- Excludes `fulfilled` and `cancelled` orders
+- Requires `brand_id`, `package_type_id`, and due date to be set
+
+---
+
+### `finished_goods_supply_by_product` (View)
+
+Aggregates available finished goods inventory by brand and package type.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| brand_id | UUID | FK to brands |
+| package_type_id | UUID | FK to package_types |
+| total_quantity | INTEGER | Total inventory quantity |
+| available_quantity | INTEGER | Available (unallocated) quantity |
+| allocated_quantity | INTEGER | Already allocated to orders |
+| reserved_quantity | INTEGER | Reserved for other purposes |
+
+---
+
+### `batches_in_production_by_brand` (View)
+
+Active batches with estimated packaging-ready dates.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| brand_id | UUID | FK to brands (via recipe) |
+| batch_id | UUID | FK to batches |
+| batch_number | TEXT | Batch identifier |
+| batch_name | TEXT | Batch name |
+| status | TEXT | Batch status |
+| planned_start_date | DATE | Planned fermentation start |
+| volume_bbl | DECIMAL | Batch volume |
+| recipe_id | UUID | FK to recipes |
+| recipe_name | TEXT | Recipe name |
+| fermentation_days | INTEGER | From recipe |
+| conditioning_days | INTEGER | From recipe |
+| estimated_ready_date | DATE | Calculated packaging-ready date |
+
+**estimated_ready_date calculation:**
+```sql
+planned_start_date + fermentation_days + conditioning_days
+```
+
+**Filters:**
+- Only batches with status `planned`, `fermenting`, or `conditioning`
+- Only recipes with `brand_id` set
+
+---
+
+### `calculate_production_shortfalls()` (Function)
+
+Returns production shortfalls with recommended brew start dates.
+
+```sql
+calculate_production_shortfalls(
+  p_include_drafts BOOLEAN DEFAULT true,
+  p_horizon_weeks INTEGER DEFAULT 8
+) RETURNS TABLE (...)
+```
+
+**Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| p_include_drafts | true | Include draft orders in demand |
+| p_horizon_weeks | 8 | Planning horizon in weeks |
+
+**Returns:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| brand_id | UUID | FK to brands |
+| brand_name | TEXT | Brand name |
+| package_type_id | UUID | FK to package_types |
+| package_type_name | TEXT | Package type name |
+| demand_week | DATE | Week start date |
+| demand_quantity | INTEGER | Total demand |
+| available_quantity | INTEGER | Available inventory |
+| in_production_bbl | NUMERIC | BBL in production |
+| in_production_cases | INTEGER | Estimated units from production |
+| shortfall_quantity | INTEGER | Demand - available - in_production |
+| recommended_brew_start | DATE | When to start brewing |
+| lead_time_days | INTEGER | Total lead time |
+| recipe_id | UUID | Preferred recipe ID |
+| recipe_name | TEXT | Preferred recipe name |
+| is_urgent | BOOLEAN | True if brew should start within 7 days |
+
+**Lead time calculation:**
+```
+lead_time = fermentation_days + conditioning_days + packaging_buffer (2 days)
+recommended_brew_start = demand_week - lead_time
+```
+
+**Preferred recipe selection:**
+- Most recently updated active recipe for the brand
+
+---
+
 ## Indexes
 
 Performance indexes for production domain tables:
@@ -1036,4 +1196,14 @@ CREATE INDEX idx_yeast_pitches_parent ON yeast_pitches(parent_pitch_id, generati
 CREATE INDEX idx_vessels_status ON vessels(status, type);
 CREATE INDEX idx_vessel_transfers_source ON vessel_transfers(source_vessel_id, transfer_date);
 CREATE INDEX idx_vessel_transfers_dest ON vessel_transfers(destination_vessel_id, transfer_date);
+
+-- Production planning
+CREATE INDEX idx_order_items_brand_package ON order_items(brand_id, package_type_id)
+  WHERE brand_id IS NOT NULL AND package_type_id IS NOT NULL;
+CREATE INDEX idx_orders_planning ON orders(status, scheduled_date, requested_date)
+  WHERE status NOT IN ('fulfilled', 'cancelled');
+CREATE INDEX idx_batches_planning ON batches(status, recipe_id)
+  WHERE status IN ('planned', 'fermenting', 'conditioning');
+CREATE INDEX idx_recipes_brand_active ON recipes(brand_id, updated_at DESC)
+  WHERE brand_id IS NOT NULL AND is_active = true;
 ```
