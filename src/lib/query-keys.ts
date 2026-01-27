@@ -188,6 +188,18 @@ export const catalogKeys = {
 };
 
 // =============================================================================
+// Supplier Keys
+// =============================================================================
+
+export const supplierKeys = {
+  all: () => ["suppliers"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters ? (["suppliers", "list", filters] as const) : (["suppliers", "list"] as const),
+  active: () => ["suppliers", "active"] as const,
+  detail: (id: string) => ["suppliers", id] as const,
+};
+
+// =============================================================================
 // Purchase Order Keys
 // =============================================================================
 
@@ -196,6 +208,7 @@ export const purchaseOrderKeys = {
   detail: (id: string) => ["purchase-order", id] as const,
   lineItems: (poId: string) => ["po-line-items", poId] as const,
   lineItemsForReceive: (poId: string) => ["po-line-items-for-receive", poId] as const,
+  nextNumber: () => ["purchase-orders", "next-number"] as const,
 };
 
 // =============================================================================

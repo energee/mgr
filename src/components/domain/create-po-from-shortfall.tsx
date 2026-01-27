@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { supplierKeys, purchaseOrderKeys } from "@/lib/query-keys";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,7 @@ import { Loader2, ShoppingCart, Calendar, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { IngredientShortfall } from "@/lib/purchasing/demand-calculator";
 import { getCatalogTypeDisplay, formatQuantityWithUnit } from "@/lib/purchasing/demand-calculator";
-import { generateNextPONumber, createDraftPOFromShortfall } from "@/lib/purchasing/po-generator";
+import { generateNextPONumber } from "@/lib/purchasing/po-generator";
 
 // =============================================================================
 // Types
@@ -75,7 +76,7 @@ export function CreatePOFromShortfall({
 
   // Fetch suppliers
   const { data: suppliers, isLoading: suppliersLoading } = useQuery({
-    queryKey: ["suppliers", "active"],
+    queryKey: supplierKeys.active(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")
@@ -90,7 +91,7 @@ export function CreatePOFromShortfall({
 
   // Generate next PO number
   const { data: nextPONumber } = useQuery({
-    queryKey: ["po-number", "next"],
+    queryKey: purchaseOrderKeys.nextNumber(),
     queryFn: async () => generateNextPONumber(),
     enabled: open,
   });
