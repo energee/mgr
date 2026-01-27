@@ -83,6 +83,7 @@ export interface PlanningFilters {
   includeDrafts: boolean;
   horizonWeeks: number;
   brandId?: string;
+  recipeId?: string;
 }
 
 export const DEFAULT_PLANNING_FILTERS: PlanningFilters = {

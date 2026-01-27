@@ -33,6 +33,7 @@ import {
   ArrowRightLeft,
   PackageCheck,
   CalendarClock,
+  TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -90,6 +91,7 @@ const navigation: NavSection[] = [
     label: "Purchasing",
     icon: Truck,
     items: [
+      { label: "Ingredient Demand", href: "/purchasing/demand", icon: TrendingUp },
       { label: "Suppliers", href: "/purchasing/suppliers", icon: Building2 },
       { label: "Purchase Orders", href: "/purchasing/pos", icon: ShoppingCart },
     ],
