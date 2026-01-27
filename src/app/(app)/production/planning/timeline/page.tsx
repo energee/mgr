@@ -13,7 +13,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { planningKeys, batchKeys, entityKeys } from "@/lib/query-keys";
+import { planningKeys, batchKeys, entityKeys, recipeKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import {
   addDays,
@@ -73,6 +73,7 @@ interface TimelineBatch {
   fermenter: string | null;
   recipe_id: string | null;
   recipe_name?: string;
+  brand_id?: string;
   brand_name?: string;
   fermentation_days?: number;
   conditioning_days?: number;
@@ -121,6 +122,10 @@ export default function ProductionTimelinePage() {
   const [startDate, setStartDate] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [selectedShortfall, setSelectedShortfall] = useState<ProductionShortfall | null>(null);
 
+  // Filter state
+  const [brandFilter, setBrandFilter] = useState<string>("_all");
+  const [recipeFilter, setRecipeFilter] = useState<string>("_all");
+
   // Calculate date range
   const endDate = addWeeks(startDate, weeksToShow);
   const days = eachDayOfInterval({ start: startDate, end: endDate });
@@ -142,6 +147,7 @@ export default function ProductionTimelinePage() {
           recipe_id,
           recipes:recipe_id (
             name,
+            brand_id,
             fermentation_days,
             conditioning_days,
             brands:brand_id (name)
@@ -155,7 +161,7 @@ export default function ProductionTimelinePage() {
       if (error) throw error;
 
       return (data || []).map((b) => {
-        const recipe = b.recipes as { name: string; fermentation_days: number; conditioning_days: number; brands: { name: string } } | null;
+        const recipe = b.recipes as { name: string; brand_id: string; fermentation_days: number; conditioning_days: number; brands: { name: string } } | null;
         const fermDays = recipe?.fermentation_days || 14;
         const condDays = recipe?.conditioning_days || 7;
         const startDt = b.planned_start_date ? parseISO(b.planned_start_date) : null;
@@ -163,6 +169,7 @@ export default function ProductionTimelinePage() {
         return {
           ...b,
           recipe_name: recipe?.name,
+          brand_id: recipe?.brand_id,
           brand_name: recipe?.brands?.name,
           fermentation_days: fermDays,
           conditioning_days: condDays,
@@ -190,6 +197,41 @@ export default function ProductionTimelinePage() {
     },
   });
 
+  // Fetch brands for filtering
+  const { data: brands = [] } = useQuery({
+    queryKey: entityKeys.list("brands"),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("brands")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch recipes for filtering (filtered by brand if selected)
+  const { data: recipes = [] } = useQuery({
+    queryKey: brandFilter !== "_all" ? recipeKeys.byBrand(brandFilter) : recipeKeys.list(),
+    queryFn: async () => {
+      let query = supabase
+        .from("recipes")
+        .select("id, name, brand_id")
+        .eq("is_active", true)
+        .order("name");
+
+      if (brandFilter !== "_all") {
+        query = query.eq("brand_id", brandFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   // Fetch shortfalls for demand markers
   const { data: shortfalls = [] } = useQuery({
     queryKey: planningKeys.shortfalls({ includeDrafts: true, horizonWeeks: weeksToShow + 2 }),
@@ -204,14 +246,23 @@ export default function ProductionTimelinePage() {
     },
   });
 
-  // Group batches by vessel
+  // Filter and group batches by vessel
   const batchesByVessel = useMemo(() => {
     const map = new Map<string, TimelineBatch[]>();
     map.set("unassigned", []);
 
     vessels.forEach((v) => map.set(v.name, []));
 
-    batches.forEach((b) => {
+    // Apply filters
+    const filteredBatches = batches.filter((b) => {
+      // Brand filter - use brand_id from the batch
+      if (brandFilter !== "_all" && b.brand_id !== brandFilter) return false;
+      // Recipe filter
+      if (recipeFilter !== "_all" && b.recipe_id !== recipeFilter) return false;
+      return true;
+    });
+
+    filteredBatches.forEach((b) => {
       const key = b.fermenter || "unassigned";
       const list = map.get(key) || [];
       list.push(b);
@@ -219,7 +270,7 @@ export default function ProductionTimelinePage() {
     });
 
     return map;
-  }, [batches, vessels]);
+  }, [batches, vessels, brandFilter, recipeFilter]);
 
   // Navigation
   const goToPrevious = () => setStartDate((d) => addWeeks(d, -weeksToShow));
@@ -289,6 +340,43 @@ export default function ProductionTimelinePage() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Brand filter */}
+              <Select
+                value={brandFilter}
+                onValueChange={(v) => {
+                  setBrandFilter(v);
+                  // Reset recipe filter when brand changes
+                  setRecipeFilter("_all");
+                }}
+              >
+                <SelectTrigger className="w-[140px] h-8">
+                  <SelectValue placeholder="All Brands" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">All Brands</SelectItem>
+                  {brands.map((brand) => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Recipe filter */}
+              <Select value={recipeFilter} onValueChange={setRecipeFilter}>
+                <SelectTrigger className="w-[160px] h-8">
+                  <SelectValue placeholder="All Recipes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">All Recipes</SelectItem>
+                  {recipes.map((recipe) => (
+                    <SelectItem key={recipe.id} value={recipe.id}>
+                      {recipe.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               {/* Time range selector */}
               <Select value={weeksToShow.toString()} onValueChange={(v) => setWeeksToShow(parseInt(v))}>
                 <SelectTrigger className="w-[120px] h-8">

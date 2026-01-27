@@ -238,3 +238,20 @@ export const planningKeys = {
   demandDetail: (brandId: string, packageTypeId: string, week: string) =>
     ["planning", "demand-detail", brandId, packageTypeId, week] as const,
 };
+
+// =============================================================================
+// Purchasing/Demand Keys
+// =============================================================================
+
+export const purchasingKeys = {
+  all: () => ["purchasing"] as const,
+  ingredientDemand: (options?: { horizonWeeks?: number }) =>
+    options
+      ? (["purchasing", "ingredient-demand", options] as const)
+      : (["purchasing", "ingredient-demand"] as const),
+  ingredientShortfalls: (options?: { horizonWeeks?: number }) =>
+    options
+      ? (["purchasing", "ingredient-shortfalls", options] as const)
+      : (["purchasing", "ingredient-shortfalls"] as const),
+  demandSummary: () => ["purchasing", "demand-summary"] as const,
+};
