@@ -82,7 +82,7 @@ recipe_hops:
 **Rationale**: Enables queries like "all recipes using Citra hops", database-level constraints, proper indexing.
 
 ### DEC-HP-003: Brew Log to Batch Linking
-**Status**: Documented (data model updated)
+**Status**: Implemented (migration 00004, brew_log_batches table and UI components)
 
 **Core principle:** Batches represent fermentation slots and are created during planning. Brew logs capture hot-side execution. The two are linked when wort is allocated to fermenter(s).
 
@@ -119,7 +119,7 @@ recipe_hops:
 | Batch already fermenting, add another brew | Allowed (blend scenario); batch volume_bbl updated |
 
 ### DEC-HP-004: Database Constraints
-**Status**: Pending implementation
+**Status**: Implemented (migrations 00060/00061 indexes, CHECK constraints in various migrations)
 
 **Indexes**:
 ```sql
@@ -172,7 +172,7 @@ ALTER TABLE finished_goods ADD CONSTRAINT chk_fg_entry_point CHECK (
 ```
 
 ### DEC-HP-005: Remove Redundant Calculated Fields
-**Status**: Documented (data model updated, migration pending)
+**Status**: Implemented (recipes_with_estimates view, inventory_lot_quantities view; redundant columns never on base tables)
 
 | Remove | Calculate From |
 |--------|---------------|
@@ -188,7 +188,7 @@ ALTER TABLE finished_goods ADD CONSTRAINT chk_fg_entry_point CHECK (
 ## Medium Priority Decisions
 
 ### DEC-MP-001: Unified Entity Revisions
-**Status**: Documented (data model updated, migration pending)
+**Status**: Implemented (migration 00019, entity_revisions table)
 
 Single `entity_revisions` table for all audit tracking.
 
@@ -209,7 +209,7 @@ entity_revisions:
 **Rationale**: Consistent audit trail across all entities, replaces scattered JSONB revision arrays.
 
 ### DEC-MP-002: Water Profile Consolidation
-**Status**: Documented (data model updated, migration pending)
+**Status**: Implemented (water_profiles table exists; default_water_* fields never added)
 
 Remove `default_water_*` fields from system_settings; always use `water_profiles` table.
 
@@ -218,7 +218,7 @@ Remove `default_water_*` fields from system_settings; always use `water_profiles
 - Single source of truth for water chemistry
 
 ### DEC-MP-003: Temporal Pricing
-**Status**: Documented (data model updated, migration pending)
+**Status**: Implemented (migration 00028, effective_from/effective_to with exclusion constraint)
 
 Add `valid_from` and `valid_to` dates to `tier_prices`.
 
@@ -244,7 +244,7 @@ tier_prices:
 3. Flag for manual entry (no match)
 
 ### DEC-MP-004: Derive Vessel Current Batch
-**Status**: Documented (data model updated, migration pending)
+**Status**: Implemented (vessels_with_current_batch view)
 
 Remove `vessels.current_batch_id`; derive from `vessel_transfers`.
 

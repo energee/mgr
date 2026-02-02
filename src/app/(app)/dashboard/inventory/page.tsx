@@ -14,20 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import {
-  Package,
-  AlertTriangle,
-  Calendar,
-  TrendingDown,
-  ArrowRight,
-  Boxes,
-  Wheat,
-  Hop,
-  Beaker,
-  PackageCheck,
-} from "lucide-react";
 import { InventoryAlerts } from "@/components/domain/inventory-alerts";
 
 // =============================================================================
@@ -58,18 +45,6 @@ interface InventorySummary {
   item_count: number;
   total_value: number;
 }
-
-// =============================================================================
-// Category Configuration
-// =============================================================================
-
-const categoryConfig: Record<string, { icon: typeof Package; color: string }> = {
-  malt: { icon: Wheat, color: "bg-amber-500" },
-  hops: { icon: Hop, color: "bg-green-500" },
-  yeast: { icon: Beaker, color: "bg-purple-500" },
-  adjuncts: { icon: Boxes, color: "bg-blue-500" },
-  packaging: { icon: PackageCheck, color: "bg-slate-500" },
-};
 
 // =============================================================================
 // Helper Functions
@@ -223,22 +198,13 @@ export default function InventoryDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Package className="h-6 w-6" />
-          Inventory Dashboard
-        </h1>
-        <p className="text-muted-foreground">
-          Inventory alerts and status overview
-        </p>
-      </div>
+      <h1 className="text-2xl font-bold">Inventory Dashboard</h1>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
-            <AlertTriangle className={`h-5 w-5 ${lowStockCount > 0 ? "text-amber-500" : "text-muted-foreground"}`} />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{lowStockCount}</div>
@@ -251,7 +217,6 @@ export default function InventoryDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
-            <Calendar className={`h-5 w-5 ${expiringCount > 0 ? "text-red-500" : "text-muted-foreground"}`} />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{expiringCount}</div>
@@ -264,7 +229,6 @@ export default function InventoryDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-            <Boxes className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalItems}</div>
@@ -281,31 +245,25 @@ export default function InventoryDashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingDown className="h-5 w-5 text-amber-500" />
-                  Low Stock Items
-                </CardTitle>
+                <CardTitle>Low Stock Items</CardTitle>
                 <CardDescription>Items below reorder point</CardDescription>
               </div>
-              <Link href="/inventory/items">
-                <Button variant="outline" size="sm">
-                  View All
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+              <Link
+                href="/inventory/items"
+                className="text-sm text-muted-foreground hover:text-foreground underline"
+              >
+                View All
               </Link>
             </div>
           </CardHeader>
           <CardContent>
             {lowStockItems.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
-                <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>All items are stocked</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {lowStockItems.slice(0, 8).map((item) => {
-                  const config = categoryConfig[item.category] || { icon: Package, color: "bg-slate-500" };
-                  const Icon = config.icon;
                   const percentOfReorder = Math.round((item.current_qty / item.reorder_point) * 100);
 
                   return (
@@ -314,15 +272,10 @@ export default function InventoryDashboardPage() {
                       href={`/inventory/items/${item.id}`}
                       className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${config.color}`}>
-                          <Icon className="h-4 w-4 text-white" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{item.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Reorder at: {item.reorder_point} {item.unit}
-                          </div>
+                      <div>
+                        <div className="font-medium">{item.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Reorder at: {item.reorder_point} {item.unit}
                         </div>
                       </div>
                       <div className="text-right">
@@ -346,10 +299,7 @@ export default function InventoryDashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-red-500" />
-                  Expiring Lots
-                </CardTitle>
+                <CardTitle>Expiring Lots</CardTitle>
                 <CardDescription>Lots approaching expiration</CardDescription>
               </div>
             </div>
@@ -357,7 +307,6 @@ export default function InventoryDashboardPage() {
           <CardContent>
             {expiringLots.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
-                <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No lots expiring soon</p>
               </div>
             ) : (
@@ -398,26 +347,13 @@ export default function InventoryDashboardPage() {
           <CardDescription>Item distribution across categories</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-5">
-            {inventorySummary.map((summary) => {
-              const config = categoryConfig[summary.category] || { icon: Package, color: "bg-slate-500" };
-              const Icon = config.icon;
-
-              return (
-                <div
-                  key={summary.category}
-                  className="flex flex-col items-center p-4 rounded-lg border text-center"
-                >
-                  <div className={`p-3 rounded-full ${config.color} mb-2`}>
-                    <Icon className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="text-2xl font-bold">{summary.item_count}</div>
-                  <div className="text-sm text-muted-foreground capitalize">
-                    {summary.category}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            {inventorySummary.map((summary) => (
+              <span key={summary.category} className="text-sm">
+                <span className="font-bold">{summary.item_count}</span>
+                <span className="text-muted-foreground ml-1 capitalize">{summary.category}</span>
+              </span>
+            ))}
           </div>
         </CardContent>
       </Card>
