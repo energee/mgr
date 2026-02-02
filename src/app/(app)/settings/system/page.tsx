@@ -194,10 +194,10 @@ function GlobalApiKeySection() {
         throw new Error(data.error || "Failed to save");
       }
     },
-    onSuccess: () => {
-      setHasExistingKey(!!apiKey);
+    onSuccess: (_data, key) => {
+      setHasExistingKey(!!key);
       setApiKey("");
-      toast.success(apiKey ? "Global API key saved" : "Global API key removed");
+      toast.success(key ? "Global API key saved" : "Global API key removed");
     },
     onError: () => {
       toast.error("Failed to save API key");

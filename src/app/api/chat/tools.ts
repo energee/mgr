@@ -2,6 +2,11 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** Escape LIKE/ILIKE wildcard characters so they match literally. */
+function escapeLike(value: string): string {
+  return value.replace(/[%_\\]/g, "\\$&");
+}
+
 /**
  * Create chat tools bound to an authenticated Supabase client.
  * All tools are read-only — the assistant cannot modify data.
@@ -100,7 +105,7 @@ export function createChatTools(supabase: SupabaseClient) {
         const { data, error } = await supabase
           .from("recipes_with_estimates")
           .select("*, style:beer_styles(id, name, category)")
-          .ilike("name", `%${query}%`)
+          .ilike("name", `%${escapeLike(query)}%`)
           .limit(limit);
         if (error) throw new Error(error.message);
         return data;
