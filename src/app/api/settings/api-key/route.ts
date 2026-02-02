@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
+// Pending type generation — anthropic_api_key is added by migration 00064
+// but not yet in generated Supabase types. Remove after next `supabase gen types`.
+interface UserPrefsApiKeyRow {
+  anthropic_api_key: string | null;
+}
+
 /**
  * GET /api/settings/api-key?scope=global|user
  *
@@ -22,11 +28,15 @@ export async function GET(req: Request): Promise<Response> {
 
   if (scope === "global") {
     const admin = await createAdminClient();
-    const { data } = await admin
+    const { data, error } = await admin
       .from("system_settings")
       .select("value")
       .eq("key", "anthropic_api_key")
       .single();
+
+    if (error) {
+      console.error("[api-key] Failed to check global key:", error.message);
+    }
 
     const value = data?.value;
     const hasKey = typeof value === "string" && value !== "null" && value.length > 0;
@@ -34,13 +44,15 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   if (scope === "user") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabase as any;
-    const { data } = await db
+    const { data, error } = await supabase
       .from("user_preferences")
-      .select("anthropic_api_key")
+      .select("anthropic_api_key" as string)
       .eq("user_id", user.id)
-      .single();
+      .single<UserPrefsApiKeyRow>();
+
+    if (error) {
+      console.error("[api-key] Failed to check user key:", error.message);
+    }
 
     return NextResponse.json({ hasKey: !!data?.anthropic_api_key });
   }
@@ -75,23 +87,23 @@ export async function POST(req: Request): Promise<Response> {
       .eq("key", "anthropic_api_key");
 
     if (error) {
+      console.error("[api-key] Failed to save global key:", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true });
   }
 
   if (scope === "user") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabase as any;
-    const { error } = await db
+    const { error } = await supabase
       .from("user_preferences")
       .update({
         anthropic_api_key: key || null,
         updated_at: new Date().toISOString(),
-      })
+      } as Record<string, unknown>)
       .eq("user_id", user.id);
 
     if (error) {
+      console.error("[api-key] Failed to save user key:", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true });

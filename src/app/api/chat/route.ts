@@ -14,6 +14,12 @@ You have deep knowledge of:
 You are integrated into the MGR brewery management system. Be concise and practical.
 When discussing recipes, batches, or other entities, reference specifics when you have them.`;
 
+// Pending type generation — anthropic_api_key is added by migration 00064
+// but not yet in generated Supabase types. Remove after next `supabase gen types`.
+interface UserPrefsApiKeyRow {
+  anthropic_api_key: string | null;
+}
+
 /**
  * Resolve the Anthropic API key for the current user.
  * Checks user preferences first, then falls back to the global system setting.
@@ -22,15 +28,16 @@ async function resolveApiKey(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string | null> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-
-  // Try user's personal key first
-  const { data: prefs } = await db
+  // User's personal key (anthropic_api_key not yet in generated types)
+  const { data: prefs, error: prefsError } = await supabase
     .from("user_preferences")
-    .select("anthropic_api_key")
+    .select("anthropic_api_key" as string)
     .eq("user_id", userId)
-    .single();
+    .single<UserPrefsApiKeyRow>();
+
+  if (prefsError) {
+    console.error("[chat] Failed to read user API key:", prefsError.message);
+  }
 
   if (prefs?.anthropic_api_key) {
     return prefs.anthropic_api_key;
@@ -39,11 +46,15 @@ async function resolveApiKey(
   // Fall back to global key from system_settings.
   // Uses admin client to bypass RLS (SELECT policy excludes api_key rows).
   const adminDb = await createAdminClient();
-  const { data: setting } = await adminDb
+  const { data: setting, error: settingError } = await adminDb
     .from("system_settings")
     .select("value")
     .eq("key", "anthropic_api_key")
     .single();
+
+  if (settingError) {
+    console.error("[chat] Failed to read global API key:", settingError.message);
+  }
 
   const globalKey = setting?.value;
   if (typeof globalKey === "string" && globalKey !== "null") {
