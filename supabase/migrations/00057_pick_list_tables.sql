@@ -173,26 +173,35 @@ BEGIN
 
     -- Find available finished goods (FIFO by production_date)
     -- Location derived from bin_inventory → bins → locations
+    -- Subquery deduplicates FGs that appear in multiple bins (picks first bin)
     FOR v_fg IN
       SELECT
-        fga.id AS finished_good_id,
-        fga.available_quantity,
-        fga.production_date,
-        l.id AS location_id
-      FROM finished_goods_with_availability fga
-      LEFT JOIN bin_inventory bi ON bi.finished_good_id = fga.id
-      LEFT JOIN bins b ON b.id = bi.bin_id
-      LEFT JOIN locations l ON l.id = b.location_id
-      WHERE fga.available_quantity > 0
-        AND (
-          fga.id = v_order_item.specific_fg_id
-          OR (
-            v_order_item.specific_fg_id IS NULL
-            AND fga.brand_id = v_order_item.brand_id
-            AND fga.package_type_id = v_order_item.package_type_id
+        fg_loc.finished_good_id,
+        fg_loc.available_quantity,
+        fg_loc.production_date,
+        fg_loc.location_id
+      FROM (
+        SELECT DISTINCT ON (fga.id)
+          fga.id AS finished_good_id,
+          fga.available_quantity,
+          fga.production_date,
+          l.id AS location_id
+        FROM finished_goods_with_availability fga
+        LEFT JOIN bin_inventory bi ON bi.finished_good_id = fga.id
+        LEFT JOIN bins b ON b.id = bi.bin_id
+        LEFT JOIN locations l ON l.id = b.location_id
+        WHERE fga.available_quantity > 0
+          AND (
+            fga.id = v_order_item.specific_fg_id
+            OR (
+              v_order_item.specific_fg_id IS NULL
+              AND fga.brand_id = v_order_item.brand_id
+              AND fga.package_type_id = v_order_item.package_type_id
+            )
           )
-        )
-      ORDER BY fga.production_date ASC NULLS LAST
+        ORDER BY fga.id, bi.quantity DESC NULLS LAST
+      ) fg_loc
+      ORDER BY fg_loc.production_date ASC NULLS LAST
     LOOP
       EXIT WHEN v_remaining <= 0;
 

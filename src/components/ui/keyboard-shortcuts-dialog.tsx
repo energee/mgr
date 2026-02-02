@@ -23,7 +23,6 @@ interface KeyboardShortcutsDialogProps {
 const shortcuts = [
   { key: "?", description: "Show this help dialog" },
   { key: "/", description: "Focus search input" },
-  { key: "n", description: "Create new item (on list pages)" },
   { key: "Esc", description: "Close dialog / clear focus" },
 ];
 
