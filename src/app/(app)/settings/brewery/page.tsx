@@ -7,12 +7,14 @@
  * Unit preferences are stored per-user in the user_preferences table.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,10 +26,11 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Bot, Building2, Ruler, Save } from "lucide-react";
+import { ArrowLeft, Bot, Building2, Check, Ruler, Save } from "lucide-react";
 import {
   useUnitPreferences,
   useUpdateUnitPreferences,
+  userPreferencesKeys,
 } from "@/hooks/useUnitPreferences";
 
 // =============================================================================
@@ -40,7 +43,6 @@ const unitPreferencesSchema = z.object({
   temperature_unit: z.enum(["f", "c"]),
   gravity_unit: z.enum(["plato", "sg"]),
   retail_volume_unit: z.enum(["oz", "ml"]),
-  anthropic_api_key: z.string(),
 });
 
 type UnitPreferencesForm = z.infer<typeof unitPreferencesSchema>;
@@ -77,6 +79,138 @@ const RETAIL_VOLUME_OPTIONS = [
 ];
 
 // =============================================================================
+// API Key Section (separate from unit preferences)
+// =============================================================================
+
+function ApiKeySection() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+  const [apiKey, setApiKey] = useState("");
+  const [hasExistingKey, setHasExistingKey] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load current key status (masked — just check if one exists)
+  useEffect(() => {
+    async function checkKey() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any;
+      const { data } = await db
+        .from("user_preferences")
+        .select("anthropic_api_key")
+        .eq("user_id", user.id)
+        .single();
+
+      if (data?.anthropic_api_key) {
+        setHasExistingKey(true);
+      }
+      setLoaded(true);
+    }
+    checkKey();
+  }, [supabase]);
+
+  const saveKey = useMutation({
+    mutationFn: async (key: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any;
+      const { error } = await db
+        .from("user_preferences")
+        .update({
+          anthropic_api_key: key || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userPreferencesKeys.all });
+      setHasExistingKey(!!apiKey);
+      setApiKey("");
+      toast.success(apiKey ? "API key saved" : "API key removed");
+    },
+    onError: () => {
+      toast.error("Failed to save API key");
+    },
+  });
+
+  if (!loaded) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bot className="h-5 w-5" />
+          AI Assistant
+        </CardTitle>
+        <CardDescription>
+          Set your personal API key for the AI brewery assistant.
+          This overrides the global key set in System Settings.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {hasExistingKey && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Check className="h-4 w-4 text-green-600" />
+            Personal API key is configured
+          </div>
+        )}
+        <div className="grid gap-2">
+          <Label htmlFor="anthropic_api_key">
+            {hasExistingKey ? "Replace API Key" : "Anthropic API Key"}
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="anthropic_api_key"
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-ant-..."
+              autoComplete="off"
+            />
+            <Button
+              type="button"
+              onClick={() => saveKey.mutate(apiKey)}
+              disabled={!apiKey || saveKey.isPending}
+            >
+              {saveKey.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Optional. Get your key from{" "}
+            <a
+              href="https://console.anthropic.com/settings/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              console.anthropic.com
+            </a>
+            . Leave blank to use the brewery&apos;s global key.
+          </p>
+        </div>
+        {hasExistingKey && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => saveKey.mutate("")}
+            disabled={saveKey.isPending}
+          >
+            Remove personal key
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -92,7 +226,6 @@ export default function BrewerySettingsPage() {
       temperature_unit: "f",
       gravity_unit: "plato",
       retail_volume_unit: "oz",
-      anthropic_api_key: "",
     },
   });
 
@@ -105,7 +238,6 @@ export default function BrewerySettingsPage() {
         temperature_unit: preferences.temperature_unit,
         gravity_unit: preferences.gravity_unit,
         retail_volume_unit: preferences.retail_volume_unit,
-        anthropic_api_key: preferences.anthropic_api_key || "",
       });
     }
   }, [preferences, form]);
@@ -288,44 +420,6 @@ export default function BrewerySettingsPage() {
             </CardContent>
           </Card>
 
-          {/* AI Assistant */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bot className="h-5 w-5" />
-                AI Assistant
-              </CardTitle>
-              <CardDescription>
-                Set your personal API key for the AI brewery assistant.
-                This overrides the global key set in System Settings.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="anthropic_api_key">Anthropic API Key</Label>
-                <Input
-                  id="anthropic_api_key"
-                  type="password"
-                  {...form.register("anthropic_api_key")}
-                  placeholder="sk-ant-..."
-                  autoComplete="off"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Optional. Get your key from{" "}
-                  <a
-                    href="https://console.anthropic.com/settings/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    console.anthropic.com
-                  </a>
-                  . Leave blank to use the brewery&apos;s global key.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Submit */}
           <div className="flex justify-end">
             <Button type="submit" disabled={updatePreferences.isPending}>
@@ -335,6 +429,9 @@ export default function BrewerySettingsPage() {
           </div>
         </form>
       )}
+
+      {/* API Key — separate from the unit preferences form */}
+      <ApiKeySection />
     </div>
   );
 }

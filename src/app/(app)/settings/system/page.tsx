@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Bot, Building2, Calculator, Calendar, FileText, Save } from "lucide-react";
+import { ArrowLeft, Bot, Building2, Calculator, Calendar, Check, FileText, Save } from "lucide-react";
 
 // =============================================================================
 // Schema
@@ -63,9 +63,6 @@ const systemSettingsSchema = z.object({
   ttb_brewery_number: z.string(),
   ttb_permit_number: z.string(),
   abc_license_number: z.string(),
-
-  // Integrations
-  anthropic_api_key: z.string(),
 });
 
 type SystemSettingsForm = z.infer<typeof systemSettingsSchema>;
@@ -166,6 +163,113 @@ function useUpdateSystemSettings() {
 }
 
 // =============================================================================
+// Global API Key Section (write-only — key is never read back to the client)
+// =============================================================================
+
+function GlobalApiKeySection() {
+  const supabase = createClient();
+  const [apiKey, setApiKey] = useState("");
+  const [hasExistingKey, setHasExistingKey] = useState(false);
+
+  // Check if a global key exists via a server-side function
+  // Since RLS blocks SELECT on api_key rows, we check indirectly:
+  // the chat route will fail if no key exists, so we just show
+  // a save form and let users set/replace the key.
+
+  const saveKey = useMutation({
+    mutationFn: async (key: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client = supabase as unknown as {
+        from: (table: string) => {
+          update: (data: { value: unknown }) => {
+            eq: (col: string, val: string) => Promise<{ error: Error | null }>;
+          };
+        };
+      };
+      const { error } = await client
+        .from("system_settings")
+        .update({ value: key || null })
+        .eq("key", "anthropic_api_key");
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setHasExistingKey(!!apiKey);
+      setApiKey("");
+      toast.success(apiKey ? "Global API key saved" : "Global API key removed");
+    },
+    onError: () => {
+      toast.error("Failed to save API key");
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>AI Integration</CardTitle>
+        <CardDescription>
+          Configure the AI brewery assistant. This key is used as a fallback
+          when individual users don&apos;t have their own key configured.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {hasExistingKey && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Check className="h-4 w-4 text-green-600" />
+            Global API key is configured
+          </div>
+        )}
+        <div className="grid gap-2">
+          <Label htmlFor="global_api_key">
+            {hasExistingKey ? "Replace API Key" : "Anthropic API Key (Global)"}
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="global_api_key"
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-ant-..."
+              autoComplete="off"
+            />
+            <Button
+              type="button"
+              onClick={() => saveKey.mutate(apiKey)}
+              disabled={!apiKey || saveKey.isPending}
+            >
+              {saveKey.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Get your API key from{" "}
+            <a
+              href="https://console.anthropic.com/settings/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              console.anthropic.com
+            </a>
+            . Users can override this with their own key in Brewery Settings.
+          </p>
+        </div>
+        {hasExistingKey && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => saveKey.mutate("")}
+            disabled={saveKey.isPending}
+          >
+            Remove global key
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -196,7 +300,6 @@ export default function SystemSettingsPage() {
       ttb_brewery_number: "",
       ttb_permit_number: "",
       abc_license_number: "",
-      anthropic_api_key: "",
     },
   });
 
@@ -224,7 +327,6 @@ export default function SystemSettingsPage() {
         ttb_brewery_number: (settings.ttb_brewery_number as string) || "",
         ttb_permit_number: (settings.ttb_permit_number as string) || "",
         abc_license_number: (settings.abc_license_number as string) || "",
-        anthropic_api_key: (settings.anthropic_api_key as string) || "",
       });
     }
   }, [settings, form]);
@@ -253,7 +355,6 @@ export default function SystemSettingsPage() {
         ttb_brewery_number: values.ttb_brewery_number,
         ttb_permit_number: values.ttb_permit_number,
         abc_license_number: values.abc_license_number,
-        anthropic_api_key: values.anthropic_api_key,
       });
       toast.success("System settings saved");
     } catch (error) {
@@ -621,39 +722,7 @@ export default function SystemSettingsPage() {
 
             {/* Integrations Tab */}
             <TabsContent value="integrations">
-              <Card>
-                <CardHeader>
-                  <CardTitle>AI Integration</CardTitle>
-                  <CardDescription>
-                    Configure the AI brewery assistant. This key is used as a fallback
-                    when individual users don&apos;t have their own key configured.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="anthropic_api_key">Anthropic API Key (Global)</Label>
-                    <Input
-                      id="anthropic_api_key"
-                      type="password"
-                      {...form.register("anthropic_api_key")}
-                      placeholder="sk-ant-..."
-                      autoComplete="off"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Get your API key from{" "}
-                      <a
-                        href="https://console.anthropic.com/settings/keys"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline"
-                      >
-                        console.anthropic.com
-                      </a>
-                      . Users can override this with their own key in Brewery Settings.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <GlobalApiKeySection />
             </TabsContent>
           </Tabs>
 
