@@ -10,7 +10,7 @@
  * - Diacetyl rest, dry hop timing
  */
 
-import { useState } from "react";
+import { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -80,7 +80,8 @@ export function FermentationScheduleBuilder({
   disabled = false,
 }: FermentationScheduleBuilderProps) {
   // Generate unique ID
-  const generateId = () => `stage_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const idCounter = useRef(0);
+  const generateId = useCallback(() => `stage_${++idCounter.current}_${crypto.randomUUID().slice(0, 7)}`, []);
 
   // Add stage from preset
   const handleAddPreset = (preset: typeof STAGE_PRESETS[number]) => {
@@ -166,7 +167,6 @@ export function FermentationScheduleBuilder({
           </TableHeader>
           <TableBody>
             {stages.map((stage) => {
-              const stageType = STAGE_TYPES.find((t) => t.value === stage.stage);
               return (
                 <TableRow key={stage.id}>
                   <TableCell>

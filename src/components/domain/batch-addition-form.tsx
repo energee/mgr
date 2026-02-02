@@ -59,7 +59,6 @@ import {
   type BatchAddition,
   type CatalogTable,
 } from "@/lib/batch-additions";
-import type { Database } from "@/types/supabase";
 
 const additionSchema = z.object({
   addition_type: z.enum(["dry_hop", "fruit", "adjunct", "fining", "spice", "other"]),

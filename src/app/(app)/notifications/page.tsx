@@ -26,7 +26,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Bell,
   Check,
-  CheckCheck,
   Trash2,
   ExternalLink,
   Search,
@@ -232,11 +231,6 @@ export default function NotificationsPage() {
       setSelectedIds(new Set(notifications.map((n) => n.id)));
     }
   };
-
-  // Get unique notification types for filter
-  const notificationTypes = Array.from(
-    new Set(notifications.map((n) => n.type))
-  );
 
   return (
     <div className="space-y-6">

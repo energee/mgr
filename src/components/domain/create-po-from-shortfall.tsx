@@ -192,7 +192,6 @@ export function CreatePOFromShortfall({
     createMutation.mutate(values);
   });
 
-  const selectedSupplier = suppliers?.find((s) => s.id === form.watch("supplier_id"));
   const quantity = form.watch("quantity");
   const unitPrice = form.watch("unit_price");
   const estimatedTotal = quantity && unitPrice ? quantity * unitPrice : null;

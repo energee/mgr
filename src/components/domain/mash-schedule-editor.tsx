@@ -122,8 +122,7 @@ export function MashScheduleEditor({
   onChange,
   disabled = false,
 }: MashScheduleEditorProps) {
-  const [editingId, setEditingId] = useState<string | null>(null);
-
+  const [, setEditingId] = useState<string | null>(null);
   // Generate unique ID
   const generateId = () => `step-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 

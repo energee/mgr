@@ -8,7 +8,7 @@
  * Uses the get_inventory_overview database function.
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -255,13 +255,16 @@ export function InventoryAlerts({
   // Auto-expand if there are alerts
   const hasAlerts = lowStockCount > 0;
   const [isOpen, setIsOpen] = useState(false);
+  const [prevHasAlerts, setPrevHasAlerts] = useState(hasAlerts);
 
-  // Auto-expand when alerts are detected (after data loads)
-  useEffect(() => {
+  // Auto-expand when alerts are first detected (React recommended pattern:
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders)
+  if (hasAlerts !== prevHasAlerts) {
+    setPrevHasAlerts(hasAlerts);
     if (autoExpandOnAlerts && hasAlerts) {
       setIsOpen(true);
     }
-  }, [autoExpandOnAlerts, hasAlerts]);
+  }
 
   return (
     <Card>

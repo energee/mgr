@@ -20,8 +20,6 @@ import {
   toCanonicalValue,
   getUnitOptions,
   getUnitLabel,
-  VOLUME_CONVERSIONS,
-  WEIGHT_CONVERSIONS,
 } from "../units";
 
 // =============================================================================
