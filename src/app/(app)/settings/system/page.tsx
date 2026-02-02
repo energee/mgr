@@ -194,13 +194,33 @@ function GlobalApiKeySection() {
         throw new Error(data.error || "Failed to save");
       }
     },
-    onSuccess: () => {
-      setHasExistingKey(!!apiKey);
+    onSuccess: (_data, key) => {
+      setHasExistingKey(!!key);
       setApiKey("");
-      toast.success(apiKey ? "Global API key saved" : "Global API key removed");
+      toast.success(key ? "Global API key saved" : "Global API key removed");
     },
     onError: () => {
       toast.error("Failed to save API key");
+    },
+  });
+
+  const testKey = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/settings/api-key/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "global" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Test failed");
+      }
+    },
+    onSuccess: () => {
+      toast.success("API key is valid");
+    },
+    onError: (err: Error) => {
+      toast.error(`API key test failed: ${err.message}`);
     },
   });
 
@@ -257,15 +277,26 @@ function GlobalApiKeySection() {
           </p>
         </div>
         {hasExistingKey && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => saveKey.mutate("")}
-            disabled={saveKey.isPending}
-          >
-            Remove global key
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => testKey.mutate()}
+              disabled={testKey.isPending}
+            >
+              {testKey.isPending ? "Testing..." : "Test Key"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => saveKey.mutate("")}
+              disabled={saveKey.isPending}
+            >
+              Remove global key
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>
