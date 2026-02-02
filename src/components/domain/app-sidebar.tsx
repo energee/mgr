@@ -17,6 +17,7 @@ import {
   Warehouse,
   DollarSign,
   Settings,
+  HelpCircle,
   LayoutDashboard,
   FlaskConical,
   FileText,
@@ -203,8 +204,20 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Settings */}
-      <div className="px-3 py-4 border-t border-sidebar-border">
+      {/* Footer links */}
+      <div className="px-3 py-4 border-t border-sidebar-border space-y-0.5">
+        <Link
+          href="/help"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+            pathname.startsWith("/help")
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+          )}
+        >
+          <HelpCircle className="h-4 w-4" />
+          Help
+        </Link>
         <Link
           href="/settings"
           className={cn(
