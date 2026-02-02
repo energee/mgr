@@ -37,14 +37,25 @@ export const POST = withAuth(async (request, { supabase, params }) => {
     );
   }
 
+  // Optimistic lock: only update if status hasn't changed since we read it
   const { data, error } = await supabase
     .from("batches")
     .update({ status: to_status })
     .eq("id", id)
+    .eq("status", batch.status)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === "PGRST116") {
+      throw new ApiError(
+        "CONFLICT",
+        "Batch status was modified concurrently. Please refresh and try again.",
+        409
+      );
+    }
+    throw error;
+  }
 
   return successResponse(data);
 });

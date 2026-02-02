@@ -41,7 +41,10 @@ export const GET = withAuth(async (request, { supabase }) => {
     query = query.eq("recipe_id", recipe_id);
   }
   if (search) {
-    query = query.or(`batch_number.ilike.%${search}%,name.ilike.%${search}%`);
+    // Strip PostgREST filter metacharacters (dots, commas, parens, backslashes)
+    // to prevent filter injection via the .or() string
+    const sanitized = search.replace(/[.,()\\]/g, "");
+    query = query.or(`batch_number.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
   }
 
   query = query
