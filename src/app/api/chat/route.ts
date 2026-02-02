@@ -1,6 +1,7 @@
 import { streamText, type UIMessage, convertToModelMessages } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 const SYSTEM_PROMPT = `You are the MGR Brewery Assistant. You help brewers manage their brewery operations.
 
@@ -44,8 +45,11 @@ async function resolveApiKey(
   }
 
   // Fall back to global key from system_settings.
-  // Uses admin client to bypass RLS (SELECT policy excludes api_key rows).
-  const adminDb = await createAdminClient();
+  // Uses service role client (no cookie auth) to bypass RLS.
+  const adminDb = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
   const { data: setting, error: settingError } = await adminDb
     .from("system_settings")
     .select("value")
