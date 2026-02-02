@@ -9,7 +9,6 @@
  * - Allocations (manage inventory allocations)
  */
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
@@ -30,7 +29,6 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
   const supabase = createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-  const [isGenerating, setIsGenerating] = useState(false);
 
   // Show generate pick list for confirmed/allocated orders
   const canGenerate = ["confirmed", "scheduled"].includes(data.status);
@@ -40,7 +38,6 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
   // Generate pick list mutation
   const generateMutation = useMutation({
     mutationFn: async () => {
-      setIsGenerating(true);
       const { data: pickListId, error } = await db
         .rpc("generate_pick_list", { p_order_id: data.id });
 
@@ -53,7 +50,6 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
     },
     onError: (error) => {
       toast.error(`Failed to generate pick list: ${error.message}`);
-      setIsGenerating(false);
     },
   });
 
@@ -99,10 +95,10 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
               variant="outline"
               className="h-auto flex-col items-start gap-1 p-4"
               onClick={link.action}
-              disabled={isGenerating}
+              disabled={generateMutation.isPending}
             >
               <div className="flex w-full items-center justify-between">
-                {isGenerating ? (
+                {generateMutation.isPending ? (
                   <Loader2 className="h-5 w-5 text-primary animate-spin" />
                 ) : (
                   <link.icon className="h-5 w-5 text-primary" />
