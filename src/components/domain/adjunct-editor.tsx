@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Types for adjunct entries
 export interface AdjunctItem {
@@ -104,7 +105,7 @@ export function AdjunctEditor({
 
   // Fetch adjunct catalog
   const { data: adjunctCatalog = [], isLoading } = useQuery({
-    queryKey: ["adjuncts-catalog"],
+    queryKey: catalogKeys.adjuncts(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("adjuncts")

@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Types for fruit entries
 export interface FruitItem {
@@ -122,7 +123,7 @@ export function FruitEditor({
 
   // Fetch fruit catalog
   const { data: fruitCatalog = [], isLoading } = useQuery({
-    queryKey: ["fruits-catalog"],
+    queryKey: catalogKeys.fruits(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("fruits")

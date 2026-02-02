@@ -38,6 +38,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
+import { batchKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -205,7 +206,7 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
     error,
     refetch,
   } = useQuery({
-    queryKey: ["batch-performance", batchId],
+    queryKey: batchKeys.performance(batchId!),
     queryFn: async () => {
       if (!batchId) return null;
       // Note: Type assertion needed until supabase types are regenerated

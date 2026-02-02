@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 export interface YeastItem {
   id?: string;
@@ -93,7 +94,7 @@ export function YeastSelector({
 
   // Fetch yeast catalog
   const { data: yeastCatalog = [], isLoading: loadingYeasts } = useQuery({
-    queryKey: ["yeasts-catalog"],
+    queryKey: catalogKeys.yeasts(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("yeasts")

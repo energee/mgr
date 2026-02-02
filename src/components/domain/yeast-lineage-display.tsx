@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { yeastKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,7 +41,7 @@ interface PitchNode {
 export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
   // Find the root of the lineage (the original purchase)
   const { data: root, isLoading: rootLoading } = useQuery({
-    queryKey: ["yeast-lineage-root", pitchId],
+    queryKey: yeastKeys.lineageRoot(pitchId),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const supabase = createClient() as any;
@@ -78,7 +79,7 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
 
   // Get all pitches in the lineage with a single query
   const { data: lineage, isLoading: lineageLoading } = useQuery({
-    queryKey: ["yeast-lineage", root?.id],
+    queryKey: yeastKeys.lineage(root?.id),
     queryFn: async () => {
       if (!root?.id || !root?.strain_id) return [];
 
@@ -125,7 +126,7 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
 
   // Get lineage summary for cost info
   const { data: summary } = useQuery({
-    queryKey: ["yeast-lineage-summary", root?.id],
+    queryKey: yeastKeys.lineageSummary(root?.id),
     queryFn: async () => {
       if (!root?.id) return null;
 

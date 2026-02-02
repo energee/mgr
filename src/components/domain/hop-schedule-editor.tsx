@@ -49,6 +49,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Hop timing options
 export const HOP_TIMINGS = [
@@ -114,7 +115,7 @@ export function HopScheduleEditor({
 
   // Fetch hop catalog
   const { data: hopCatalog = [], isLoading: loadingHops } = useQuery({
-    queryKey: ["hops-catalog"],
+    queryKey: catalogKeys.hops(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("hops")

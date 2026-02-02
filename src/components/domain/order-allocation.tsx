@@ -35,6 +35,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Package, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { brandKeys, packageTypeKeys, orderKeys, inventoryKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -78,7 +79,7 @@ export function OrderAllocation({
 
   // Fetch order details
   const { isLoading: orderLoading } = useQuery({
-    queryKey: ["order", orderId],
+    queryKey: orderKeys.detail(orderId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -93,7 +94,7 @@ export function OrderAllocation({
 
   // Fetch available finished goods (sorted by production date - FIFO)
   const { data: finishedGoods, isLoading: fgLoading } = useQuery({
-    queryKey: ["finished-goods-available"],
+    queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
       // Note: Using type assertion since view may not be in generated types
       const { data, error } = await (supabase as unknown as {
@@ -117,7 +118,7 @@ export function OrderAllocation({
 
   // Fetch brands for display
   const { data: brands } = useQuery({
-    queryKey: ["brands"],
+    queryKey: brandKeys.all(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brands")
@@ -130,7 +131,7 @@ export function OrderAllocation({
 
   // Fetch package types for display
   const { data: packageTypes } = useQuery({
-    queryKey: ["package-types"],
+    queryKey: packageTypeKeys.all(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("package_types")
@@ -166,9 +167,9 @@ export function OrderAllocation({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["order", orderId] });
-      queryClient.invalidateQueries({ queryKey: ["finished-goods"] });
-      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: orderKeys.detail(orderId) });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.finishedGoods() });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.allocations() });
       toast.success("Inventory allocated successfully");
       setAllocations({});
       onOpenChange(false);

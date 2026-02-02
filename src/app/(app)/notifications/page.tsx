@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { notificationKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,7 +124,7 @@ export default function NotificationsPage() {
 
   // Fetch all notifications
   const { data, isLoading, error } = useQuery({
-    queryKey: ["notifications", "all", page, filterType, filterStatus, filterPriority, search],
+    queryKey: [...notificationKeys.all(), "all", page, filterType, filterStatus, filterPriority, search],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
@@ -180,7 +181,7 @@ export default function NotificationsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all() });
       setSelectedIds(new Set());
       toast.success("Marked as read");
     },
@@ -204,7 +205,7 @@ export default function NotificationsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all() });
       setSelectedIds(new Set());
       toast.success("Notifications dismissed");
     },

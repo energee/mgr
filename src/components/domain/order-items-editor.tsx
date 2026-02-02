@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { brandKeys, packageTypeKeys, orderKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -101,7 +102,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
 
   // Fetch order details including customer_id
   const { data: order } = useQuery({
-    queryKey: ["order", orderId],
+    queryKey: orderKeys.detail(orderId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -118,7 +119,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
 
   // Fetch order items
   const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["order-items", orderId],
+    queryKey: orderKeys.items(orderId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("order_items")
@@ -187,7 +188,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
 
   // Fetch brands for dropdown
   const { data: brands } = useQuery({
-    queryKey: ["brands"],
+    queryKey: brandKeys.all(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brands")
@@ -201,7 +202,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
 
   // Fetch package types for dropdown
   const { data: packageTypes } = useQuery({
-    queryKey: ["package-types"],
+    queryKey: packageTypeKeys.all(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("package_types")
@@ -225,7 +226,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["order-items", orderId] });
+      queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
       setNewItem({
         brand_id: "",
         package_type_id: "",
@@ -267,7 +268,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["order-items", orderId] });
+      queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
     },
     onError: () => {
       toast.error("Failed to update item");
@@ -281,7 +282,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["order-items", orderId] });
+      queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
       toast.success("Item removed");
     },
     onError: () => {

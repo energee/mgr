@@ -14,6 +14,7 @@ import { yeastPitchEntity } from "@/entities/yeast-pitch";
 import { YeastHarvestDialog } from "@/components/domain/yeast-harvest-dialog";
 import { YeastLineageDisplay } from "@/components/domain/yeast-lineage-display";
 import { createClient } from "@/lib/supabase/client";
+import { entityKeys } from "@/lib/query-keys";
 
 interface YeastPitchDetailPageProps {
   params: Promise<{ id: string }>;
@@ -33,7 +34,7 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
 
   // Fetch locations for the harvest dialog
   const { data: locations = [] } = useQuery({
-    queryKey: ["locations"],
+    queryKey: entityKeys.all("locations"),
     queryFn: async () => {
       const supabase = createClient();
       const { data } = await supabase

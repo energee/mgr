@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { catalogKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -145,7 +146,7 @@ export function BatchAdditionForm({
 
   // Fetch catalog items based on selected type
   const { data: catalogItems = [], isLoading: loadingCatalog } = useQuery({
-    queryKey: ["catalog", config.catalogTable],
+    queryKey: catalogKeys.table(config.catalogTable),
     queryFn: async () => {
       if (!config.catalogTable) return [];
       return queryCatalog(config.catalogTable);

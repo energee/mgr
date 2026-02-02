@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { brandKeys, recipeKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -72,7 +73,7 @@ export function RecipeCloneDialog({
 
   // Fetch brands for selection
   const { data: brands } = useQuery({
-    queryKey: ["brands"],
+    queryKey: brandKeys.all(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brands")
@@ -137,7 +138,7 @@ export function RecipeCloneDialog({
       return cloned.id;
     },
     onSuccess: (newId) => {
-      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+      queryClient.invalidateQueries({ queryKey: recipeKeys.all() });
       toast.success("Recipe cloned successfully");
       onOpenChange(false);
       onSuccess?.(newId);

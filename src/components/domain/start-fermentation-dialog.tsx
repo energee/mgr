@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
+import { batchKeys, vesselKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -75,7 +76,7 @@ export function StartFermentationDialog({
 
   // Fetch available vessels (ready_for_use status)
   const { data: vessels, isLoading: vesselsLoading } = useQuery({
-    queryKey: ["vessels", "available"],
+    queryKey: vesselKeys.available(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vessels")
@@ -121,9 +122,9 @@ export function StartFermentationDialog({
       return selectedVessel.name;
     },
     onSuccess: (vesselName) => {
-      queryClient.invalidateQueries({ queryKey: ["batches"] });
-      queryClient.invalidateQueries({ queryKey: ["vessels"] });
-      queryClient.invalidateQueries({ queryKey: ["vessel_transfers"] });
+      queryClient.invalidateQueries({ queryKey: batchKeys.all() });
+      queryClient.invalidateQueries({ queryKey: vesselKeys.all() });
+      queryClient.invalidateQueries({ queryKey: vesselKeys.transfers() });
       toast.success(`Fermentation started in ${vesselName}`);
       onOpenChange(false);
       onSuccess?.();

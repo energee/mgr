@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Types for sugar entries
 export interface SugarItem {
@@ -107,7 +108,7 @@ export function SugarEditor({
 
   // Fetch sugar catalog
   const { data: sugarCatalog = [], isLoading } = useQuery({
-    queryKey: ["sugars-catalog"],
+    queryKey: catalogKeys.sugars(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sugars")

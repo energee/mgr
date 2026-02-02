@@ -9,6 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { brewLogKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -34,7 +35,7 @@ export function BrewLogBatches({ data }: BrewLogBatchesProps) {
   const supabase = createClient();
 
   const { data: linkedBatches, isLoading } = useQuery({
-    queryKey: ["brew_log_batches", data.id],
+    queryKey: brewLogKeys.batches(data.id),
     queryFn: async () => {
       const { data: links, error } = await supabase
         .from("brew_log_batches")

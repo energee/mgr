@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { brandKeys, packageTypeKeys, sessionLineItemKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -89,7 +90,7 @@ export function SessionLineItemsEditor({
 
   // Fetch session line items with resolved names
   const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["session-line-items", sessionId],
+    queryKey: sessionLineItemKeys.all(sessionId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("session_line_items")
@@ -113,7 +114,7 @@ export function SessionLineItemsEditor({
 
   // Fetch brands
   const { data: brands } = useQuery({
-    queryKey: ["brands"],
+    queryKey: brandKeys.all(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brands")
@@ -127,7 +128,7 @@ export function SessionLineItemsEditor({
 
   // Fetch package types
   const { data: packageTypes } = useQuery({
-    queryKey: ["package-types"],
+    queryKey: packageTypeKeys.all(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("package_types")
@@ -152,7 +153,7 @@ export function SessionLineItemsEditor({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["session-line-items", sessionId] });
+      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
       setNewItem({
         brand_id: "",
         package_type_id: "",
@@ -185,7 +186,7 @@ export function SessionLineItemsEditor({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["session-line-items", sessionId] });
+      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
     },
     onError: () => {
       toast.error("Failed to update line item");
@@ -202,7 +203,7 @@ export function SessionLineItemsEditor({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["session-line-items", sessionId] });
+      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
       toast.success("Line item removed");
     },
     onError: () => {

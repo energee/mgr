@@ -42,6 +42,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Types for grain bill entries
 export interface GrainBillItem {
@@ -91,7 +92,7 @@ export function GrainBillEditor({
 
   // Fetch malt catalog
   const { data: maltCatalog = [], isLoading: loadingMalts } = useQuery({
-    queryKey: ["malts-catalog"],
+    queryKey: catalogKeys.malts(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("malts")

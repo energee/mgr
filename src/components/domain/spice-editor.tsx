@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Types for spice entries
 export interface SpiceItem {
@@ -114,7 +115,7 @@ export function SpiceEditor({
 
   // Fetch spice catalog
   const { data: spiceCatalog = [], isLoading } = useQuery({
-    queryKey: ["spices-catalog"],
+    queryKey: catalogKeys.spices(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("spices")

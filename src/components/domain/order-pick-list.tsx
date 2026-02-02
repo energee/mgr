@@ -10,6 +10,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { orderKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -76,7 +77,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
 
   // Fetch order details
   const { data: order, isLoading: orderLoading } = useQuery({
-    queryKey: ["order-pick-list", orderId, "order"],
+    queryKey: orderKeys.pickList(orderId, "order"),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -106,7 +107,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
 
   // Fetch allocations for this order
   const { data: pickItems = [], isLoading: itemsLoading } = useQuery({
-    queryKey: ["order-pick-list", orderId, "items"],
+    queryKey: orderKeys.pickList(orderId, "items"),
     queryFn: async () => {
       // Get allocations where destination is this order
       const { data: allocations, error: allocError } = await supabase

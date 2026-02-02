@@ -30,6 +30,7 @@ import {
 import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch-readings-chart-lazy";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
+import { batchKeys } from "@/lib/query-keys";
 
 interface BatchLog {
   id: string;
@@ -52,7 +53,7 @@ export default function BatchReadingsPage({
 
   // Fetch batch details
   const { data: batch, isLoading: batchLoading } = useQuery({
-    queryKey: ["batch", id],
+    queryKey: batchKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
@@ -66,7 +67,7 @@ export default function BatchReadingsPage({
 
   // Fetch readings from batch_logs
   const { data: readings, isLoading: readingsLoading } = useQuery({
-    queryKey: ["batch-readings", id],
+    queryKey: batchKeys.readings(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batch_logs")
@@ -95,7 +96,7 @@ export default function BatchReadingsPage({
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batch-readings", id] });
+      queryClient.invalidateQueries({ queryKey: batchKeys.readings(id) });
       setShowForm(false);
       toast.success("Reading saved");
     },

@@ -9,6 +9,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { recipeKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import {
   Table,
@@ -86,7 +87,7 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
 
   // Hook must be called unconditionally - use enabled option to prevent query when no ID
   const { data: additions, isLoading } = useQuery({
-    queryKey: ["recipe-additions", recipeId],
+    queryKey: recipeKeys.additions(recipeId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipe_additions")
