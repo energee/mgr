@@ -50,11 +50,9 @@ export const recipeEntity: EntityConfig<Recipe> = {
       sortable: true,
     },
     {
-      accessorKey: "style_id",
+      accessorKey: "style_name",
       header: "Style",
       sortable: true,
-      // TODO: View needs to join beer_styles for style_name
-      render: () => "—",
     },
     {
       accessorKey: "volume_bbl",

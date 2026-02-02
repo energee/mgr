@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
-import type { EntityConfig, EntitySectionDef, EntityRelationDef } from "@/types/entity";
+import type { EntityConfig, EntitySectionDef, EntityRelationDef, EntityFieldDisplay } from "@/types/entity";
 import { getStateLabel } from "@/types/entity";
 import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
@@ -358,6 +358,61 @@ function TabsWithRelations<T>({
   );
 }
 
+// Hook to fetch relation display values for fields with relation config
+function useRelationDisplayValues<T>(
+  fields: EntityFieldDisplay<T>[] | undefined,
+  data: T
+) {
+  const supabase = createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
+  // Collect all relation fields that have a UUID value
+  const relationQueries = useMemo(() => {
+    if (!fields) return [];
+    return fields
+      .filter((f) => f.relation && data[f.field as keyof T])
+      .map((f) => {
+        const relEntity = entityRegistry.get(f.relation!.entity);
+        const table = relEntity?.table || `${f.relation!.entity}s`;
+        return {
+          field: f.field,
+          table,
+          displayField: f.relation!.displayField,
+          id: data[f.field as keyof T] as string,
+        };
+      });
+  }, [fields, data]);
+
+  const { data: relationMap = {} } = useQuery({
+    queryKey: ["relation-display", ...relationQueries.map((q) => `${q.table}:${q.id}`)],
+    enabled: relationQueries.length > 0,
+    staleTime: CACHE_DURATIONS.STATIC_DATA,
+    queryFn: async () => {
+      const results: Record<string, string> = {};
+      await Promise.all(
+        relationQueries.map(async (q) => {
+          try {
+            const { data: row } = await db
+              .from(q.table)
+              .select(q.displayField)
+              .eq("id", q.id)
+              .single();
+            if (row) {
+              results[q.field] = row[q.displayField] as string;
+            }
+          } catch {
+            // Silently ignore lookup failures
+          }
+        })
+      );
+      return results;
+    },
+  });
+
+  return relationMap;
+}
+
 // Section card component
 function SectionCard<T>({
   section,
@@ -383,6 +438,9 @@ function SectionCard<T>({
     );
   }
 
+  // Fetch relation display values for FK fields
+  const relationDisplayValues = useRelationDisplayValues(section.fields, data);
+
   // Render fields
   return (
     <Card>
@@ -400,6 +458,8 @@ function SectionCard<T>({
               displayValue = field.render(value, data);
             } else if (isStateField && typeof value === "string") {
               displayValue = getStateLabel(entity, value);
+            } else if (field.relation && relationDisplayValues[field.field]) {
+              displayValue = relationDisplayValues[field.field];
             } else {
               displayValue = formatValue(value, field.format);
             }

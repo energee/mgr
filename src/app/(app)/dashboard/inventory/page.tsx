@@ -168,23 +168,42 @@ export default function InventoryDashboardPage() {
   const { data: inventorySummary = [] } = useQuery({
     queryKey: dashboardKeys.inventorySummary(),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: items, error: itemsError } = await supabase
         .from("inventory_items")
-        .select("category, id");
+        .select("id, category");
 
-      if (error) throw error;
+      if (itemsError) throw itemsError;
 
-      // Group by category
-      const categoryMap = new Map<string, number>();
-      (data || []).forEach((item) => {
-        const category = item.category || "other";
-        categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
+      // Get lot values: quantity * unit_cost
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any;
+      const { data: lotsData } = await db
+        .from("inventory_lots")
+        .select("inventory_item_id, quantity, unit_cost");
+
+      // Build value map by item_id
+      const valueByItem = new Map<string, number>();
+      (lotsData || []).forEach((lot: { inventory_item_id: string; quantity: number; unit_cost: number | null }) => {
+        if (lot.unit_cost != null && lot.quantity > 0) {
+          const current = valueByItem.get(lot.inventory_item_id) || 0;
+          valueByItem.set(lot.inventory_item_id, current + lot.quantity * lot.unit_cost);
+        }
       });
 
-      return Array.from(categoryMap.entries()).map(([category, count]) => ({
+      // Group by category
+      const categoryMap = new Map<string, { count: number; value: number }>();
+      (items || []).forEach((item) => {
+        const category = item.category || "other";
+        const existing = categoryMap.get(category) || { count: 0, value: 0 };
+        existing.count += 1;
+        existing.value += valueByItem.get(item.id) || 0;
+        categoryMap.set(category, existing);
+      });
+
+      return Array.from(categoryMap.entries()).map(([category, { count, value }]) => ({
         category,
         item_count: count,
-        total_value: 0, // TODO: Calculate from inventory_lots
+        total_value: Math.round(value * 100) / 100,
       })) as InventorySummary[];
     },
     refetchInterval: 60000,
@@ -352,6 +371,11 @@ export default function InventoryDashboardPage() {
               <span key={summary.category} className="text-sm">
                 <span className="font-bold">{summary.item_count}</span>
                 <span className="text-muted-foreground ml-1 capitalize">{summary.category}</span>
+                {summary.total_value > 0 && (
+                  <span className="text-muted-foreground ml-1">
+                    (${summary.total_value.toLocaleString()})
+                  </span>
+                )}
               </span>
             ))}
           </div>

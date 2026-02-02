@@ -4566,6 +4566,7 @@ export type Database = {
           batch_id: string | null
           best_by_date: string | null
           brand_id: string | null
+          brand_name: string | null
           created_at: string | null
           created_by: string | null
           expiration_date: string | null
@@ -4573,6 +4574,7 @@ export type Database = {
           lot_number: string | null
           notes: string | null
           package_type_id: string | null
+          package_type_name: string | null
           production_date: string | null
           quantity: number | null
           reserved_quantity: number | null
@@ -5467,6 +5469,7 @@ export type Database = {
           sparge_water_volume_gal: number | null
           style: string | null
           style_id: string | null
+          style_name: string | null
           target_abv: number | null
           target_attenuation: number | null
           target_fg: number | null
