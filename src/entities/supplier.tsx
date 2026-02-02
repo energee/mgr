@@ -195,14 +195,6 @@ export const supplierEntity: EntityConfig<Supplier> = {
   // ---------------------------------------------------------------------------
   relations: [
     {
-      name: "supplier_catalog",
-      entity: "supplier_catalog",
-      type: "hasMany",
-      foreignKey: "supplier_id",
-      showInDetail: true,
-      detailTab: "Catalog",
-    },
-    {
       name: "purchase_orders",
       entity: "purchase_order",
       type: "hasMany",

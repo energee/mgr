@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Circle, Leaf, Apple, Sparkles, Beaker } from "lucide-react";
 import type { BatchAddition, AdditionType } from "@/lib/batch-additions";
+import { recipeKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -57,7 +58,7 @@ export function PlannedAdditions({
 
   // Fetch planned additions from recipe
   const { data: plannedAdditions, isLoading, error } = useQuery({
-    queryKey: ["recipe-fermentation-additions", recipeId],
+    queryKey: recipeKeys.fermentationAdditions(recipeId),
     queryFn: async () => {
       try {
         const additions: PlannedAddition[] = [];

@@ -12,7 +12,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
   Dialog,
@@ -34,6 +34,8 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { recipeKeys } from "@/lib/query-keys";
+import { useBrands } from "@/hooks/use-catalog";
 
 // =============================================================================
 // Types
@@ -71,17 +73,7 @@ export function RecipeCloneDialog({
   const queryClient = useQueryClient();
 
   // Fetch brands for selection
-  const { data: brands } = useQuery({
-    queryKey: ["brands"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brands")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: brands } = useBrands();
 
   // Form
   const form = useForm<CloneFormValues>({
@@ -137,7 +129,7 @@ export function RecipeCloneDialog({
       return cloned.id;
     },
     onSuccess: (newId) => {
-      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+      queryClient.invalidateQueries({ queryKey: recipeKeys.all() });
       toast.success("Recipe cloned successfully");
       onOpenChange(false);
       onSuccess?.(newId);

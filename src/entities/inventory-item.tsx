@@ -259,16 +259,7 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "allocations",
-      entity: "allocation",
-      type: "hasMany",
-      foreignKey: "inventory_item_id",
-      showInDetail: true,
-      detailTab: "Movements",
-    },
-  ],
+  relations: [],
 
   // ---------------------------------------------------------------------------
   // AI Context

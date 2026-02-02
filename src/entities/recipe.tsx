@@ -428,40 +428,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
       showInDetail: true,
       detailTab: "Batches",
     },
-    {
-      name: "malts",
-      entity: "recipe_malt",
-      type: "hasMany",
-      foreignKey: "recipe_id",
-      showInDetail: true,
-      detailTab: "Grain Bill",
-    },
-    {
-      name: "hops",
-      entity: "recipe_hop",
-      type: "hasMany",
-      foreignKey: "recipe_id",
-      showInDetail: true,
-      detailTab: "Hop Schedule",
-    },
-    {
-      name: "style",
-      entity: "beer_style",
-      type: "belongsTo",
-      foreignKey: "style_id",
-    },
-    {
-      name: "yeast",
-      entity: "yeast",
-      type: "belongsTo",
-      foreignKey: "yeast_id",
-    },
-    {
-      name: "water_profile",
-      entity: "water_profile",
-      type: "belongsTo",
-      foreignKey: "water_profile_id",
-    },
   ],
 
   // ---------------------------------------------------------------------------

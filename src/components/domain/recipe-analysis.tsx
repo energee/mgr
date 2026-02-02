@@ -41,6 +41,7 @@ import {
   type RecipeSuggestionsResult,
   type ParameterAnalysis,
 } from "@/lib/ai/recipe-analyzer";
+import { recipeKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -149,7 +150,7 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
     error: complianceError,
     refetch: refetchCompliance,
   } = useQuery({
-    queryKey: ["recipe-style-compliance", recipeId],
+    queryKey: recipeKeys.styleCompliance(recipeId!),
     queryFn: () => {
       if (!recipeId) return null;
       return analyzeStyleCompliance(recipeId);
@@ -165,7 +166,7 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
     error: suggestionsError,
     refetch: refetchSuggestions,
   } = useQuery({
-    queryKey: ["recipe-suggestions", recipeId],
+    queryKey: recipeKeys.suggestions(recipeId!),
     queryFn: () => {
       if (!recipeId) return null;
       return getRecipeSuggestions(recipeId);

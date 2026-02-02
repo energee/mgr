@@ -12,8 +12,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -47,6 +46,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Types for adjunct entries
 export interface AdjunctItem {
@@ -100,22 +100,9 @@ export function AdjunctEditor({
 }: AdjunctEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch adjunct catalog
-  const { data: adjunctCatalog = [], isLoading } = useQuery({
-    queryKey: ["adjuncts-catalog"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("adjuncts")
-        .select("id, name, type, color_lovibond, potential_ppg, requires_mash")
-        .eq("is_active", true)
-        .order("type")
-        .order("name");
-      if (error) throw error;
-      return data as AdjunctCatalogItem[];
-    },
-  });
+  const { data: adjunctCatalog = [], isLoading } = useCatalog<AdjunctCatalogItem>(catalogKeys.adjuncts(), "adjuncts", "id, name, type, color_lovibond, potential_ppg, requires_mash", ["type", "name"]);
 
   // Calculate totals
   const totals = useMemo(() => {

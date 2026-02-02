@@ -15,6 +15,7 @@ import { batchEntity } from "@/entities/batch";
 import { StartFermentationDialog } from "@/components/domain/start-fermentation-dialog";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
+import { batchKeys } from "@/lib/query-keys";
 
 export default function BatchDetailPage({
   params,
@@ -30,7 +31,7 @@ export default function BatchDetailPage({
 
   // Fetch batch data for the dialogs
   const { data: batch } = useQuery({
-    queryKey: ["batches", id],
+    queryKey: batchKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
@@ -61,7 +62,7 @@ export default function BatchDetailPage({
   }, []);
 
   const handleDialogSuccess = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["batches", id] });
+    queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
   }, [queryClient, id]);
 
   return (

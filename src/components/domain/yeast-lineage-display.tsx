@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { yeastKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +18,21 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { cn } from "@/lib/utils";
 import { shouldReplaceYeast } from "@/lib/yeast-calculations";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
+
+function viabilityColor(status: string | undefined): string {
+  switch (status) {
+    case "excellent":
+      return "text-green-600";
+    case "good":
+      return "text-green-500";
+    case "marginal":
+      return "text-yellow-500";
+    case "low":
+      return "text-orange-500";
+    default:
+      return "text-red-500";
+  }
+}
 
 interface YeastLineageDisplayProps {
   pitchId: string;
@@ -40,7 +56,7 @@ interface PitchNode {
 export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
   // Find the root of the lineage (the original purchase)
   const { data: root, isLoading: rootLoading } = useQuery({
-    queryKey: ["yeast-lineage-root", pitchId],
+    queryKey: yeastKeys.lineageRoot(pitchId),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const supabase = createClient() as any;
@@ -76,40 +92,48 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
     },
   });
 
-  // Get all pitches in the lineage
+  // Get all pitches in the lineage with a single query
   const { data: lineage, isLoading: lineageLoading } = useQuery({
-    queryKey: ["yeast-lineage", root?.id],
+    queryKey: yeastKeys.lineage(root?.id),
     queryFn: async () => {
-      if (!root?.id) return [];
+      if (!root?.id || !root?.strain_id) return [];
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const supabase = createClient() as any;
 
-      // Get all descendants including root
+      // Fetch ALL pitches for this strain in one query
+      const { data: allPitches } = await supabase
+        .from("yeast_pitches_with_details")
+        .select("*")
+        .eq("strain_id", root.strain_id);
+
+      if (!allPitches || allPitches.length === 0) return [];
+
+      // Build a children map: parent_id -> children[]
+      const childrenMap = new Map<string | null, PitchNode[]>();
+      for (const pitch of allPitches as PitchNode[]) {
+        const parentId = (pitch as PitchNode & { parent_pitch_id?: string | null }).parent_pitch_id ?? null;
+        if (!childrenMap.has(parentId)) {
+          childrenMap.set(parentId, []);
+        }
+        childrenMap.get(parentId)!.push(pitch);
+      }
+
+      // DFS traversal starting from root to produce depth-first order
       const result: PitchNode[] = [];
-
-      async function getDescendants(parentId: string | null, depth: number = 0) {
-        const query = parentId
-          ? supabase
-              .from("yeast_pitches_with_details")
-              .select("*")
-              .eq("parent_pitch_id", parentId)
-          : supabase
-              .from("yeast_pitches_with_details")
-              .select("*")
-              .eq("id", root!.id);
-
-        const { data: pitches } = await query;
-
-        if (pitches) {
-          for (const pitch of pitches) {
-            result.push(pitch as PitchNode);
-            await getDescendants(pitch.id, depth + 1);
-          }
+      function dfs(nodeId: string) {
+        const node = (allPitches as (PitchNode & { parent_pitch_id?: string | null })[]).find(
+          (p) => p.id === nodeId
+        );
+        if (!node) return;
+        result.push(node);
+        const children = childrenMap.get(nodeId) || [];
+        for (const child of children) {
+          dfs(child.id);
         }
       }
 
-      await getDescendants(null);
+      dfs(root.id);
       return result;
     },
     enabled: !!root?.id,
@@ -117,7 +141,7 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
 
   // Get lineage summary for cost info
   const { data: summary } = useQuery({
-    queryKey: ["yeast-lineage-summary", root?.id],
+    queryKey: yeastKeys.lineageSummary(root?.id),
     queryFn: async () => {
       if (!root?.id) return null;
 
@@ -276,20 +300,11 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
                 )}
 
                 {/* Viability */}
-                {pitch.estimated_viability !== null &&
-                  pitch.estimated_viability !== undefined && (
+                {pitch.estimated_viability != null && (
                     <span
                       className={cn(
                         "ml-auto text-xs",
-                        pitch.viability_status === "excellent"
-                          ? "text-green-600"
-                          : pitch.viability_status === "good"
-                            ? "text-green-500"
-                            : pitch.viability_status === "marginal"
-                              ? "text-yellow-500"
-                              : pitch.viability_status === "low"
-                                ? "text-orange-500"
-                                : "text-red-500"
+                        viabilityColor(pitch.viability_status)
                       )}
                     >
                       {Math.round(pitch.estimated_viability)}%

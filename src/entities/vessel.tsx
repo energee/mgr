@@ -411,14 +411,6 @@ export const vesselEntity: EntityConfig<Vessel> = {
       showInDetail: true,
       detailTab: "Transfer History",
     },
-    {
-      name: "cleanings",
-      entity: "vessel_cleaning",
-      type: "hasMany",
-      foreignKey: "vessel_id",
-      showInDetail: true,
-      detailTab: "Cleaning History",
-    },
   ],
 
   // ---------------------------------------------------------------------------

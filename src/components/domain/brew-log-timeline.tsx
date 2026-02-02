@@ -10,6 +10,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { brewLogKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
 import { BrewEventTimeline } from "./brew-event-timeline";
@@ -40,7 +41,7 @@ export function BrewLogTimeline({ data }: BrewLogTimelineProps) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["brew_logs", data.id] });
+      queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(data.id) });
     },
   });
 
