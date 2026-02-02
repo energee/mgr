@@ -118,7 +118,7 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       field: "container_type",
       type: "select",
       label: "Container Type",
-      options: [{ value: "", label: "All" }, ...CONTAINER_TYPE_OPTIONS],
+      options: CONTAINER_TYPE_OPTIONS,
     },
     {
       field: "is_active",
