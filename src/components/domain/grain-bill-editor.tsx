@@ -276,7 +276,7 @@ export function GrainBillEditor({
       {items.length === 0 ? (
         <div className="border rounded-md p-8 text-center text-muted-foreground">
           <p>No malts added yet.</p>
-          <p className="text-sm mt-1">Click "Add Malt" to build your grain bill.</p>
+          <p className="text-sm mt-1">Click &quot;Add Malt&quot; to build your grain bill.</p>
         </div>
       ) : (
         <Table>

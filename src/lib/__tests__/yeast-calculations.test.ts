@@ -9,7 +9,6 @@ import {
   shouldReplaceYeast,
   estimateHarvestVolume,
   estimatePostHarvestViability,
-  MAX_RECOMMENDED_GENERATIONS,
 } from "../yeast-calculations";
 
 // =============================================================================

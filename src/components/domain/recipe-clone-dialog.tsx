@@ -9,7 +9,6 @@
  * - Setting as non-template if cloning from a template
  */
 
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -105,8 +104,9 @@ export function RecipeCloneDialog({
 
       if (sourceError) throw sourceError;
 
-      // 2. Create new recipe (excluding id, created_at, updated_at)
+      // 2. Create new recipe (excluding server-managed fields)
       const { id, created_at, updated_at, ...recipeData } = source;
+      void id; void created_at; void updated_at;
       const newRecipe = {
         ...recipeData,
         name: values.name,
@@ -202,7 +202,7 @@ export function RecipeCloneDialog({
             Clone {isTemplate ? "Template" : "Recipe"}
           </DialogTitle>
           <DialogDescription>
-            Create a copy of "{recipeName}" with a new name.
+            Create a copy of &quot;{recipeName}&quot; with a new name.
             {isTemplate && " The cloned recipe will not be a template."}
           </DialogDescription>
         </DialogHeader>

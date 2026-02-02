@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -78,7 +77,7 @@ export function OrderAllocation({
   const [allocations, setAllocations] = useState<Record<string, number>>({});
 
   // Fetch order details
-  const { data: order, isLoading: orderLoading } = useQuery({
+  const { isLoading: orderLoading } = useQuery({
     queryKey: ["order", orderId],
     queryFn: async () => {
       const { data, error } = await supabase

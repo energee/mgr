@@ -7,7 +7,7 @@
  * Uses the AdditionsEditor component for inline editing of recipe_additions.
  */
 
-import { use, useState, useEffect } from "react";
+import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { AdditionsEditor, type AdditionItem } from "@/components/domain/additions-editor";
@@ -74,10 +74,13 @@ export default function RecipeAdditionsPage({
     },
   });
 
-  // Initialize items from fetched data
-  useEffect(() => {
-    if (additions) {
-      const mapped = additions.map((a) => ({
+  // Sync fetched data to local editable state (React recommended pattern:
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders)
+  const [prevAdditions, setPrevAdditions] = useState(additions);
+  if (additions && additions !== prevAdditions) {
+    setPrevAdditions(additions);
+    setItems(
+      additions.map((a) => ({
         id: a.id,
         additive_id: a.additive_id,
         amount: a.amount,
@@ -86,11 +89,10 @@ export default function RecipeAdditionsPage({
         target: a.target || undefined,
         position: a.position,
         additive: a.additives,
-      }));
-      setItems(mapped);
-      setHasChanges(false);
-    }
-  }, [additions]);
+      }))
+    );
+    setHasChanges(false);
+  }
 
   // Handle items change
   const handleChange = (newItems: AdditionItem[]) => {

@@ -82,19 +82,6 @@ function ParameterRow({
     }
   };
 
-  const getStatusText = () => {
-    switch (analysis.status) {
-      case "in_range":
-        return "In range";
-      case "below_range":
-        return "Below range";
-      case "above_range":
-        return "Above range";
-      default:
-        return "Unknown";
-    }
-  };
-
   return (
     <div className="flex items-center justify-between py-2 border-b last:border-b-0">
       <div className="flex items-center gap-2">

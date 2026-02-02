@@ -65,7 +65,7 @@ interface WaterChemistryCalculatorProps {
 
 function ProfileDisplay({ profile, label }: { profile: WaterProfile; label: string }) {
   const ratio = calculateSulfateChlorideRatio(profile.sulfate_ppm, profile.chloride_ppm);
-  const { label: ratioLabel, character } = getRatioDescription(ratio);
+  const { label: ratioLabel } = getRatioDescription(ratio);
 
   return (
     <div className="space-y-2">

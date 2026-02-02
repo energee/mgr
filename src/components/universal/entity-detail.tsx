@@ -175,7 +175,7 @@ export function EntityDetail<T = Record<string, unknown>>({
   }
 
   if (isLoading) {
-    return <EntityDetailSkeleton entity={entity} />;
+    return <EntityDetailSkeleton />;
   }
 
   if (!data) {
@@ -587,7 +587,7 @@ function RelationTable({
 }
 
 // Loading skeleton
-function EntityDetailSkeleton<T>({ entity }: { entity: EntityConfig<T> }) {
+function EntityDetailSkeleton() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">

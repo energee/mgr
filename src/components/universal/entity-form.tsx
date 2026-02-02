@@ -99,9 +99,9 @@ function useDynamicOptions<T>(fields: EntityFieldDef<T>[]) {
           const relatedEntity = entityRegistry.get(relation.entity);
           const tableName = relatedEntity?.table || `${relation.entity}s`;
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data, error } = await supabase
-            .from(tableName as any)
+            // @ts-expect-error -- dynamic table name from entity registry
+            .from(tableName)
             .select(`id, ${relation.displayField}`)
             .order(relation.displayField);
 
@@ -127,15 +127,12 @@ function useDynamicOptions<T>(fields: EntityFieldDef<T>[]) {
   const queries = [...dynamicQueries, ...relationQueries];
 
   // Combine results into a map of fieldName -> options
-  const optionsMap = useMemo(() => {
-    const map: Record<string, { value: string; label: string }[]> = {};
-    queries.forEach((query) => {
-      if (query.data) {
-        map[query.data.fieldName as string] = query.data.options;
-      }
-    });
-    return map;
-  }, [queries]);
+  const optionsMap: Record<string, { value: string; label: string }[]> = {};
+  for (const query of queries) {
+    if (query.data) {
+      optionsMap[query.data.fieldName as string] = query.data.options;
+    }
+  }
 
   return {
     optionsMap,
@@ -398,7 +395,7 @@ export function EntityForm<T = Record<string, unknown>>({
   };
 
   if (isEdit && isLoading) {
-    return <EntityFormSkeleton entity={entity} />;
+    return <EntityFormSkeleton />;
   }
 
   return (
@@ -684,7 +681,7 @@ function renderFieldInput<T>(
 }
 
 // Loading skeleton
-function EntityFormSkeleton<T>({ entity }: { entity: EntityConfig<T> }) {
+function EntityFormSkeleton() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">

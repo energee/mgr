@@ -29,7 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import type { ReadingType, BatchReading } from "@/lib/batch-readings";
+import type { BatchReading } from "@/lib/batch-readings";
 import { convertGravity } from "@/lib/batch-readings";
 
 // =============================================================================

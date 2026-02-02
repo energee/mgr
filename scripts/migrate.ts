@@ -20,7 +20,7 @@ async function migrate() {
   console.log(`Project ID: ${projectId}\n`);
 
   const migrationPath = join(process.cwd(), "supabase/migrations/00002_single_tenant.sql");
-  const sql = readFileSync(migrationPath, "utf-8");
+  readFileSync(migrationPath, "utf-8");
 
   try {
     // Use supabase CLI to run the migration

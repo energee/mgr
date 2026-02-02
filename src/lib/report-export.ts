@@ -220,8 +220,6 @@ export function exportBatchDetailsToCSV(
   month: number,
   type: "completed" | "in-process"
 ): void {
-  const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
-
   const rows = batches.map((b) => ({
     "Batch #": b.batch_number,
     Name: b.name,
