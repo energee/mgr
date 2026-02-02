@@ -83,8 +83,8 @@
   --muted: oklch(0.955 0.008 85);
   --muted-foreground: oklch(0.50 0.015 60);
 
-  /* Accent: Copper/amber - the signature color */
-  --accent: oklch(0.72 0.12 55);
+  /* Accent: Neutral warm gray for hover states (ghost buttons, etc.) */
+  --accent: oklch(0.95 0.008 85);
   --accent-foreground: oklch(0.18 0.02 60);
 
   /* Destructive: Warm red */
@@ -144,9 +144,9 @@
   --muted: oklch(0.26 0.02 60);
   --muted-foreground: oklch(0.65 0.015 60);
 
-  /* Accent: Brighter copper for dark mode */
-  --accent: oklch(0.75 0.14 55);
-  --accent-foreground: oklch(0.15 0.02 60);
+  /* Accent: Neutral warm gray for hover states */
+  --accent: oklch(0.26 0.02 60);
+  --accent-foreground: oklch(0.92 0.01 85);
 
   /* Destructive */
   --destructive: oklch(0.65 0.20 25);
