@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 // Pending type generation — anthropic_api_key is added by migration 00064
 // but not yet in generated Supabase types. Remove after next `supabase gen types`.
 interface UserPrefsApiKeyRow {
   anthropic_api_key: string | null;
+}
+
+function createAdminDb() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
 }
 
 /**
@@ -27,7 +35,7 @@ export async function GET(req: Request): Promise<Response> {
   const scope = searchParams.get("scope");
 
   if (scope === "global") {
-    const admin = await createAdminClient();
+    const admin = createAdminDb();
     const { data, error } = await admin
       .from("system_settings")
       .select("value")
@@ -80,7 +88,7 @@ export async function POST(req: Request): Promise<Response> {
   const { scope, key } = (await req.json()) as { scope: string; key: string };
 
   if (scope === "global") {
-    const admin = await createAdminClient();
+    const admin = createAdminDb();
     const { error } = await admin
       .from("system_settings")
       .update({ value: key || null })
