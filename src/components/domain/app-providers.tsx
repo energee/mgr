@@ -10,6 +10,7 @@
 import type { ReactNode } from "react";
 import { NotificationsProvider } from "@/contexts/notifications";
 import { KeyboardShortcutsProvider } from "@/components/domain/keyboard-shortcuts-provider";
+import { ChatProvider } from "@/contexts/chat-context";
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -18,7 +19,9 @@ interface AppProvidersProps {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <NotificationsProvider>
-      <KeyboardShortcutsProvider>{children}</KeyboardShortcutsProvider>
+      <KeyboardShortcutsProvider>
+        <ChatProvider>{children}</ChatProvider>
+      </KeyboardShortcutsProvider>
     </NotificationsProvider>
   );
 }

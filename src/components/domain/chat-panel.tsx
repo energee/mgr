@@ -1,19 +1,17 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { useChat } from "@ai-sdk/react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, X, Bot, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useChatContext } from "@/contexts/chat-context";
 
-interface ChatPanelProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-export function ChatPanel({ open, onClose }: ChatPanelProps) {
-  const { messages, sendMessage, status } = useChat();
+export function ChatPanel() {
+  const { isOpen, close, chat } = useChatContext();
+  const { messages, status } = chat;
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const isStreaming = status === "streaming";
@@ -27,7 +25,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();
     if (!input.trim()) return;
-    sendMessage({ text: input.trim() });
+    chat.sendMessage({ text: input.trim() });
     setInput("");
   }
 
@@ -38,7 +36,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
     }
   }
 
-  if (!open) return null;
+  if (!isOpen) return null;
 
   return (
     <div className="w-96 border-l bg-background flex flex-col h-full">
@@ -47,7 +45,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
           <Bot className="h-4 w-4 text-accent" />
           <span className="font-medium text-sm">Brewery Assistant</span>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
+        <Button variant="ghost" size="icon" onClick={close} className="h-7 w-7">
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -83,9 +81,30 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
             >
               {message.parts.map((part, i) => {
                 if (part.type === "text") {
+                  if (message.role === "assistant") {
+                    return (
+                      <div key={`${message.id}-${i}`} className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {part.text}
+                        </ReactMarkdown>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={`${message.id}-${i}`} className="whitespace-pre-wrap">
                       {part.text}
+                    </div>
+                  );
+                }
+                if (part.type === "tool-invocation") {
+                  return (
+                    <div
+                      key={`${message.id}-${i}`}
+                      className="text-xs text-muted-foreground italic"
+                    >
+                      {part.toolInvocation.state === "result"
+                        ? null
+                        : `Looking up data...`}
                     </div>
                   );
                 }
