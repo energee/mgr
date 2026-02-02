@@ -436,7 +436,7 @@ export function EntityList<T = Record<string, unknown>>({
         },
       },
     ];
-  }, [columns, entity.actions, entity.stateMachine, path, onAction]);
+  }, [columns, entity.actions, entity.stateMachine, path, onAction, hasBulkActions]);
 
   // Check if any quick filters are active
   const hasActiveQuickFilters = Object.values(quickFilters).some((v) =>

@@ -323,8 +323,6 @@ export const WaterChemistry = {
     styleCategory: string
   ): { suitable: boolean; recommendation: string } {
     const recommended = this.getRecommendedProfile(styleCategory);
-    const ratio = this.sulfateChlorideRatio(profile.sulfate_ppm, profile.chloride_ppm);
-
     const sulfateInRange =
       profile.sulfate_ppm >= recommended.sulfate[0] &&
       profile.sulfate_ppm <= recommended.sulfate[1];

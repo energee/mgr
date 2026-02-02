@@ -406,9 +406,14 @@ export function estimateMashPH(
 
   const weightedColor = grainBill.reduce((sum, g) => sum + g.color_srm * g.weight_lb, 0) / totalWeight;
 
+  // Water-to-grain ratio affects buffering capacity
+  // Thinner mashes (higher ratio) are less affected by grain acidity
+  const waterToGrainRatio = mashVolumeGal / totalWeight;
+  const ratioFactor = Math.min(1.5, Math.max(0.5, 1.25 / waterToGrainRatio));
+
   // Grain acidity contribution (darker grains lower pH)
-  // Approximately -0.01 pH per SRM
-  const grainContribution = -weightedColor * 0.01;
+  // Approximately -0.01 pH per SRM, modulated by water-to-grain ratio
+  const grainContribution = -weightedColor * 0.01 * ratioFactor;
 
   // Water residual alkalinity contribution
   // Higher RA raises pH, approximately +0.03 pH per 10 ppm RA

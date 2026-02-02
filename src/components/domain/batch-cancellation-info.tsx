@@ -11,7 +11,7 @@
  */
 
 import { format } from "date-fns";
-import { AlertTriangle, Archive, XCircle } from "lucide-react";
+import { Archive, XCircle } from "lucide-react";
 
 interface BatchCancellationInfoProps {
   data: {

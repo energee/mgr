@@ -35,7 +35,6 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import {
   estimateCellsFromSlurry,
-  estimatePostHarvestViability,
 } from "@/lib/yeast-calculations";
 
 // Schema for harvest form

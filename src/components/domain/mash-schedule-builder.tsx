@@ -11,7 +11,7 @@
  * - Common step presets
  */
 
-import { useState } from "react";
+import { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -80,7 +80,8 @@ export function MashScheduleBuilder({
   disabled = false,
 }: MashScheduleBuilderProps) {
   // Generate unique ID
-  const generateId = () => `step_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const idCounter = useRef(0);
+  const generateId = useCallback(() => `step_${++idCounter.current}_${crypto.randomUUID().slice(0, 7)}`, []);
 
   // Add step from preset
   const handleAddPreset = (preset: typeof STEP_PRESETS[number]) => {
@@ -166,8 +167,7 @@ export function MashScheduleBuilder({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {steps.map((step, index) => {
-              const stepType = STEP_TYPES.find((t) => t.value === step.step_type);
+            {steps.map((step) => {
               return (
                 <TableRow key={step.id}>
                   <TableCell className="text-muted-foreground">

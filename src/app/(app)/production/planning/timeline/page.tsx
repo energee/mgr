@@ -18,14 +18,11 @@ import Link from "next/link";
 import {
   addDays,
   startOfWeek,
-  endOfWeek,
   eachDayOfInterval,
   format,
   isToday,
-  isSameDay,
   differenceInDays,
   addWeeks,
-  isWithinInterval,
   parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -131,7 +128,7 @@ export default function ProductionTimelinePage() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
 
   // Fetch batches with recipe info
-  const { data: batches = [], isLoading: batchesLoading } = useQuery({
+  const { data: batches = [] } = useQuery({
     queryKey: [...entityKeys.list("batches_with_brew_info"), "timeline", startDate.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -294,7 +291,6 @@ export default function ProductionTimelinePage() {
 
     const batchStart = parseISO(batch.planned_start_date);
     const totalDays = (batch.fermentation_days || 14) + (batch.conditioning_days || 7);
-    const batchEnd = addDays(batchStart, totalDays);
 
     const startOffset = differenceInDays(batchStart, startDate);
     const duration = totalDays;

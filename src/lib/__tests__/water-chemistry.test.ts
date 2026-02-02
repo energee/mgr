@@ -4,12 +4,10 @@ import {
   getRatioDescription,
   calculateIonContribution,
   calculateResultingProfile,
-  calculateAdditions,
   calculateResidualAlkalinity,
   estimateMashPH,
   getIonRecommendations,
   COMMON_PROFILES,
-  SALT_CONTRIBUTIONS,
   type WaterProfile,
   type SaltAdditions,
 } from "../water-chemistry";

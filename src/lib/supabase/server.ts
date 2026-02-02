@@ -5,7 +5,7 @@
  * and Server Actions. Uses @supabase/ssr for proper cookie handling.
  */
 
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/types/supabase";
 

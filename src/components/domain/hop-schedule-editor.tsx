@@ -47,7 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, GripVertical, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Hop timing options
@@ -307,7 +307,7 @@ export function HopScheduleEditor({
       {items.length === 0 ? (
         <div className="border rounded-md p-8 text-center text-muted-foreground">
           <p>No hops added yet.</p>
-          <p className="text-sm mt-1">Click "Add Hop" to build your hop schedule.</p>
+          <p className="text-sm mt-1">Click &quot;Add Hop&quot; to build your hop schedule.</p>
         </div>
       ) : (
         <Table>

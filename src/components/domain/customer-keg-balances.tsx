@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, Plus, RotateCcw } from "lucide-react";
+import { Package, RotateCcw } from "lucide-react";
 
 interface CustomerKegBalance {
   customer_id: string;

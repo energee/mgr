@@ -17,8 +17,7 @@ export default function PurchaseOrderDetailPage({
   const queryClient = useQueryClient();
 
   const handleAction = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (actionName: string, _data: any): boolean => {
+    (actionName: string): boolean => {
       if (actionName === "calculate_landed_cost") {
         const run = async () => {
           try {
