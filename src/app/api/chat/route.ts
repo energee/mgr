@@ -1,8 +1,9 @@
-import { streamText, type UIMessage, convertToModelMessages } from "ai";
+import { streamText, stepCountIs, type UIMessage, convertToModelMessages } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createChatTools } from "./tools";
+import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 
 const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant. You help brewers manage their brewery operations.
 
@@ -15,7 +16,10 @@ You have deep knowledge of:
 
 You are integrated into the MGR brewery management system. You have access to tools that let you query live brewery data — use them when the user asks about specific recipes, batches, inventory, vessels, or production schedules.
 
-Be concise and practical. When you use a tool, summarize the results clearly. Format data in tables when appropriate.`;
+Be concise and practical. When you use a tool, summarize the results clearly. Format data in tables when appropriate.
+When users ask how to do something in MGR, give specific navigation instructions using the guide below.
+
+${getHelpContentForSystemPrompt()}`;
 
 // Pending type generation — anthropic_api_key is added by migration 00064
 // but not yet in generated Supabase types. Remove after next `supabase gen types`.
@@ -123,7 +127,7 @@ export async function POST(req: Request): Promise<Response> {
     system: buildSystemPrompt(pageContext),
     messages: await convertToModelMessages(messages),
     tools,
-    maxSteps: 5,
+    stopWhen: stepCountIs(5),
   });
 
   return result.toUIMessageStreamResponse();
