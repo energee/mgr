@@ -190,20 +190,35 @@ export function PickListItems({ data }: PickListItemsProps) {
     }
   };
 
-  // Complete all items
+  // Complete all items in a single batch update per unique quantity
   const completeAllMutation = useMutation({
     mutationFn: async () => {
       const unpicked = items.filter((i: PickListItemRow) => i.quantity_picked < i.quantity_requested);
+      if (unpicked.length === 0) return;
+
+      // Group by quantity_requested so we can batch updates
+      const byQuantity = new Map<number, string[]>();
       for (const item of unpicked) {
-        const { error } = await db
+        const ids = byQuantity.get(item.quantity_requested) || [];
+        ids.push(item.id);
+        byQuantity.set(item.quantity_requested, ids);
+      }
+
+      const now = new Date().toISOString();
+      const updates = Array.from(byQuantity.entries()).map(([qty, ids]) =>
+        db
           .from("pick_list_items")
           .update({
-            quantity_picked: item.quantity_requested,
-            picked_at: new Date().toISOString(),
+            quantity_picked: qty,
+            picked_at: now,
           })
-          .eq("id", item.id);
-        if (error) throw error;
-      }
+          .in("id", ids)
+          .then(({ error }: { error: Error | null }) => {
+            if (error) throw error;
+          })
+      );
+
+      await Promise.all(updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: pickListKeys.items(pickListId) });
