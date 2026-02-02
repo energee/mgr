@@ -19,6 +19,7 @@ import {
   revisionKeys,
   planningKeys,
   purchasingKeys,
+  pickListKeys,
 } from "../query-keys";
 
 // =============================================================================
@@ -291,5 +292,26 @@ describe("Key factory consistency", () => {
       "ingredient-demand",
       { horizonWeeks: 8 },
     ]);
+  });
+
+  it("pickListKeys produces consistent keys", () => {
+    expect(pickListKeys.all()).toEqual(["pick-lists"]);
+    expect(pickListKeys.list()).toEqual(["pick-lists", "list"]);
+    expect(pickListKeys.list({ status: "draft" })).toEqual([
+      "pick-lists",
+      "list",
+      { status: "draft" },
+    ]);
+    expect(pickListKeys.detail("pl1")).toEqual(["pick-lists", "pl1"]);
+    expect(pickListKeys.items("pl1")).toEqual(["pick-lists", "pl1", "items"]);
+    expect(pickListKeys.forOrder("o1")).toEqual([
+      "pick-lists",
+      "for-order",
+      "o1",
+    ]);
+  });
+
+  it("pickListKeys detail and items are distinct", () => {
+    expect(pickListKeys.detail("pl1")).not.toEqual(pickListKeys.items("pl1"));
   });
 });

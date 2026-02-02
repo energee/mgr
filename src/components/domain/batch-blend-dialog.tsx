@@ -136,12 +136,12 @@ export function BatchBlendDialog({
   };
 
   // Update volume for a selected batch
-  const updateVolume = (batchId: string, volume: number) => {
+  const updateVolume = (sourceBatchId: string, volume: number) => {
     setSelections((prev) => {
       const next = new Map(prev);
-      const existing = next.get(batchId);
+      const existing = next.get(sourceBatchId);
       if (existing) {
-        next.set(batchId, { ...existing, volumeBbl: volume });
+        next.set(sourceBatchId, { ...existing, volumeBbl: volume });
       }
       return next;
     });
