@@ -36,6 +36,7 @@ import {
 import { ArrowLeft, Plus, Package, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { OrderAllocation } from "@/components/domain/order-allocation";
+import { orderKeys, inventoryKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -69,7 +70,7 @@ export default function OrderAllocationsPage({
 
   // Fetch order details
   const { data: order, isLoading: orderLoading } = useQuery({
-    queryKey: ["order", id],
+    queryKey: orderKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -83,7 +84,7 @@ export default function OrderAllocationsPage({
 
   // Fetch allocations for this order
   const { data: allocations = [], isLoading: allocationsLoading } = useQuery({
-    queryKey: ["order-allocations", id],
+    queryKey: orderKeys.allocations(id),
     queryFn: async () => {
       // Get allocations
       const { data: allocs, error: allocError } = await supabase
@@ -147,8 +148,8 @@ export default function OrderAllocationsPage({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["order-allocations", id] });
-      queryClient.invalidateQueries({ queryKey: ["finished-goods"] });
+      queryClient.invalidateQueries({ queryKey: orderKeys.allocations(id) });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.finishedGoods() });
       toast.success("Allocation removed");
       setDeleteId(null);
     },
@@ -282,7 +283,7 @@ export default function OrderAllocationsPage({
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["order-allocations", id] });
+          queryClient.invalidateQueries({ queryKey: orderKeys.allocations(id) });
         }}
       />
 

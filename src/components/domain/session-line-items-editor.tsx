@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { sessionLineItemKeys } from "@/lib/query-keys";
+import { useBrands, usePackageTypes } from "@/hooks/use-catalog";
 
 // =============================================================================
 // Types
@@ -89,7 +91,7 @@ export function SessionLineItemsEditor({
 
   // Fetch session line items with resolved names
   const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["session-line-items", sessionId],
+    queryKey: sessionLineItemKeys.all(sessionId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("session_line_items")
@@ -111,33 +113,9 @@ export function SessionLineItemsEditor({
     },
   });
 
-  // Fetch brands
-  const { data: brands } = useQuery({
-    queryKey: ["brands"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brands")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data as Brand[];
-    },
-  });
-
-  // Fetch package types
-  const { data: packageTypes } = useQuery({
-    queryKey: ["package-types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("package_types")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data as PackageType[];
-    },
-  });
+  // Fetch brands and package types
+  const { data: brands } = useBrands();
+  const { data: packageTypes } = usePackageTypes();
 
   // Add item mutation
   const addItem = useMutation({
@@ -152,7 +130,7 @@ export function SessionLineItemsEditor({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["session-line-items", sessionId] });
+      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
       setNewItem({
         brand_id: "",
         package_type_id: "",
@@ -185,7 +163,7 @@ export function SessionLineItemsEditor({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["session-line-items", sessionId] });
+      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
     },
     onError: () => {
       toast.error("Failed to update line item");
@@ -202,7 +180,7 @@ export function SessionLineItemsEditor({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["session-line-items", sessionId] });
+      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
       toast.success("Line item removed");
     },
     onError: () => {

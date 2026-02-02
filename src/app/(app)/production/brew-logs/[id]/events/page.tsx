@@ -11,6 +11,7 @@ import { use } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { brewLogKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { BrewEventTimeline } from "@/components/domain/brew-event-timeline";
@@ -27,7 +28,7 @@ export default function BrewLogEventsPage({ params }: BrewLogEventsPageProps) {
 
   // Fetch brew log with events
   const { data: brewLog, isLoading } = useQuery({
-    queryKey: ["brew_logs", id],
+    queryKey: brewLogKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_logs")
@@ -51,7 +52,7 @@ export default function BrewLogEventsPage({ params }: BrewLogEventsPageProps) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["brew_logs", id] });
+      queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
     },
   });
 

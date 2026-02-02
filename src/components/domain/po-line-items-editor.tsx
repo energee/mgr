@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { purchaseOrderKeys, catalogKeys } from "@/lib/query-keys";
 import {
   CATALOG_TYPES,
   CATALOG_TABLES,
@@ -89,7 +90,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
 
   // Fetch PO line items with resolved catalog names
   const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["po-line-items", poId],
+    queryKey: purchaseOrderKeys.lineItems(poId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("po_line_items")
@@ -142,7 +143,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
 
   // Fetch catalog items based on selected type (not for free-text types)
   const { data: catalogItems } = useQuery({
-    queryKey: ["catalog-items", newItem.catalog_type],
+    queryKey: catalogKeys.items(newItem.catalog_type),
     queryFn: async () => {
       if (!newItem.catalog_type || !CATALOG_TABLES[newItem.catalog_type]) {
         return [];
@@ -173,7 +174,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["po-line-items", poId] });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
       setNewItem({ catalog_type: "", catalog_id: "", quantity: 1, unit: "lb", unit_price: 0 });
       setShowAddRow(false);
       toast.success("Item added");
@@ -193,7 +194,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["po-line-items", poId] });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
     },
     onError: () => {
       toast.error("Failed to update item");
@@ -207,7 +208,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["po-line-items", poId] });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
       toast.success("Item removed");
     },
     onError: () => {

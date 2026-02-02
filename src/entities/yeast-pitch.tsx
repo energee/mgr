@@ -165,13 +165,13 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       field: "status",
       type: "select",
       label: "Status",
-      options: [{ value: "", label: "All Statuses" }, ...STATUS_OPTIONS],
+      options: STATUS_OPTIONS,
     },
     {
       field: "source_type",
       type: "select",
       label: "Source",
-      options: [{ value: "", label: "All Sources" }, ...SOURCE_TYPE_OPTIONS],
+      options: SOURCE_TYPE_OPTIONS,
     },
     {
       field: "strain_name",

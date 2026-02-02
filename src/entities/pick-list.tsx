@@ -283,12 +283,6 @@ export const pickListEntity: EntityConfig<PickListView> = {
       foreignKey: "order_id",
       showInDetail: true,
     },
-    {
-      name: "pick_list_items",
-      entity: "pick_list_item",
-      type: "hasMany",
-      foreignKey: "pick_list_id",
-    },
   ],
 
   // ---------------------------------------------------------------------------

@@ -29,8 +29,8 @@ import { ArrowLeft, Bot, Building2, Check, Ruler, Save } from "lucide-react";
 import {
   useUnitPreferences,
   useUpdateUnitPreferences,
-  userPreferencesKeys,
 } from "@/hooks/useUnitPreferences";
+import { userKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Schema
@@ -110,7 +110,7 @@ function ApiKeySection() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userPreferencesKeys.all });
+      queryClient.invalidateQueries({ queryKey: userKeys.preferences() });
       setHasExistingKey(!!apiKey);
       setApiKey("");
       toast.success(apiKey ? "API key saved" : "API key removed");

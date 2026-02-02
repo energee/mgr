@@ -29,6 +29,7 @@ import {
 import { PlannedAdditions } from "@/components/domain/planned-additions";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
+import { batchKeys } from "@/lib/query-keys";
 
 interface BatchLog {
   id: string;
@@ -51,7 +52,7 @@ export default function BatchAdditionsPage({
 
   // Fetch batch details
   const { data: batch, isLoading: batchLoading } = useQuery({
-    queryKey: ["batch", id],
+    queryKey: batchKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
@@ -65,7 +66,7 @@ export default function BatchAdditionsPage({
 
   // Fetch additions from batch_logs
   const { data: additions, isLoading: additionsLoading } = useQuery({
-    queryKey: ["batch-additions", id],
+    queryKey: batchKeys.additions(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batch_logs")
@@ -94,7 +95,7 @@ export default function BatchAdditionsPage({
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batch-additions", id] });
+      queryClient.invalidateQueries({ queryKey: batchKeys.additions(id) });
       setShowForm(false);
       toast.success("Addition recorded");
     },

@@ -41,6 +41,7 @@ import {
   isFreeTextCatalogType,
 } from "@/entities/po-line-item";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
+import { purchaseOrderKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -104,7 +105,7 @@ export function POReceiving({
 
   // Fetch PO line items with received quantities and resolved catalog names
   const { data: lineItems, isLoading } = useQuery({
-    queryKey: ["po-line-items-for-receive", poId],
+    queryKey: purchaseOrderKeys.lineItemsForReceive(poId),
     queryFn: async () => {
       // Get line items
       const { data: items, error: itemsError } = await supabase
@@ -276,9 +277,9 @@ export function POReceiving({
       if (statusError) throw statusError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["po-line-items", poId] });
-      queryClient.invalidateQueries({ queryKey: ["po-line-items-for-receive", poId] });
-      queryClient.invalidateQueries({ queryKey: ["purchase-order", poId] });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItemsForReceive(poId) });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.detail(poId) });
       toast.success("Items received successfully");
       setReceives({});
       onOpenChange(false);

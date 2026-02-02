@@ -11,6 +11,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { userKeys } from "@/lib/query-keys";
 import type {
   VolumeUnit,
   WeightUnit,
@@ -53,16 +54,6 @@ const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 };
 
 // =============================================================================
-// Query Keys
-// =============================================================================
-
-export const userPreferencesKeys = {
-  all: ["user-preferences"] as const,
-  units: () => [...userPreferencesKeys.all, "units"] as const,
-  full: () => [...userPreferencesKeys.all, "full"] as const,
-};
-
-// =============================================================================
 // Hooks
 // =============================================================================
 
@@ -74,7 +65,7 @@ export function useUnitPreferences() {
   const supabase = createClient();
 
   return useQuery({
-    queryKey: userPreferencesKeys.units(),
+    queryKey: userKeys.units(),
     queryFn: async (): Promise<UnitPreferences> => {
       const {
         data: { user },
@@ -114,7 +105,7 @@ export function useUserPreferences() {
   const supabase = createClient();
 
   return useQuery({
-    queryKey: userPreferencesKeys.full(),
+    queryKey: userKeys.full(),
     queryFn: async (): Promise<UserPreferences | null> => {
       const {
         data: { user },
@@ -162,7 +153,7 @@ export function useUpdateUnitPreferences() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userPreferencesKeys.all });
+      queryClient.invalidateQueries({ queryKey: userKeys.preferences() });
     },
   });
 }
@@ -195,7 +186,7 @@ export function useUpdateUserPreferences() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userPreferencesKeys.all });
+      queryClient.invalidateQueries({ queryKey: userKeys.preferences() });
     },
   });
 }

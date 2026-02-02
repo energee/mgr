@@ -169,12 +169,6 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
       foreignKey: "session_id",
     },
     {
-      name: "brand",
-      entity: "brand",
-      type: "belongsTo",
-      foreignKey: "brand_id",
-    },
-    {
       name: "package_type",
       entity: "package_type",
       type: "belongsTo",

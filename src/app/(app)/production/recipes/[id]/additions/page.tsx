@@ -18,6 +18,7 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { recipeKeys } from "@/lib/query-keys";
 
 export default function RecipeAdditionsPage({
   params,
@@ -32,7 +33,7 @@ export default function RecipeAdditionsPage({
 
   // Fetch recipe details
   const { data: recipe, isLoading: recipeLoading } = useQuery({
-    queryKey: ["recipe", id],
+    queryKey: recipeKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipes")
@@ -46,7 +47,7 @@ export default function RecipeAdditionsPage({
 
   // Fetch existing additions with additive details
   const { data: additions, isLoading: additionsLoading } = useQuery({
-    queryKey: ["recipe-additions", id],
+    queryKey: recipeKeys.additions(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipe_additions")
@@ -129,8 +130,8 @@ export default function RecipeAdditionsPage({
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["recipe-additions", id] });
-      queryClient.invalidateQueries({ queryKey: ["recipe", id] });
+      queryClient.invalidateQueries({ queryKey: recipeKeys.additions(id) });
+      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(id) });
       setHasChanges(false);
       toast.success("Additions saved");
     },

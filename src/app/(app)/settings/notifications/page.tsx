@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { settingsKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,7 +77,7 @@ export default function NotificationPreferencesPage() {
 
   // Fetch preferences
   const { data: preferences, isLoading } = useQuery({
-    queryKey: ["notification-preferences"],
+    queryKey: settingsKeys.notificationPreferences(),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
@@ -143,7 +144,7 @@ export default function NotificationPreferencesPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
+      queryClient.invalidateQueries({ queryKey: settingsKeys.notificationPreferences() });
       toast.success("Preferences saved");
     },
     onError: (error) => {

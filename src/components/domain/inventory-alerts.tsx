@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { inventoryKeys } from "@/lib/query-keys";
 import {
   Card,
   CardContent,
@@ -230,7 +231,7 @@ export function InventoryAlerts({
 
   // Fetch inventory overview
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["inventory-overview"],
+    queryKey: inventoryKeys.overview(),
     queryFn: async () => {
       // Note: Type assertion needed until supabase types are regenerated
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
