@@ -13,7 +13,8 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-type VesselTransfer = Database["public"]["Tables"]["vessel_transfers"]["Row"];
+// Use the view type since entity uses viewTable for queries
+type VesselTransfer = Database["public"]["Views"]["vessel_transfers_with_details"]["Row"];
 
 // =============================================================================
 // Zod Schema
@@ -46,6 +47,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
   // ---------------------------------------------------------------------------
   name: "vessel_transfer",
   table: "vessel_transfers",
+  viewTable: "vessel_transfers_with_details",
   displayName: "Vessel Transfer",
   displayNamePlural: "Vessel Transfers",
   description: "Batch movements between vessels from knockout through packaging",
@@ -62,24 +64,16 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       format: "datetime",
     },
     {
-      accessorKey: "from_vessel_id",
+      accessorKey: "from_vessel_name",
       header: "From",
-      relation: {
-        entity: "vessel",
-        displayField: "name",
-      },
       render: (value) => {
         if (!value) return "Kettle (knockout)";
         return String(value);
       },
     },
     {
-      accessorKey: "to_vessel_id",
+      accessorKey: "to_vessel_name",
       header: "To",
-      relation: {
-        entity: "vessel",
-        displayField: "name",
-      },
     },
     {
       accessorKey: "volume_bbl",
@@ -101,7 +95,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
   // Detail View
   // ---------------------------------------------------------------------------
   detailHeader: {
-    title: "to_vessel_id",
+    title: "to_vessel_name",
     subtitle: "transferred_at",
   },
 
