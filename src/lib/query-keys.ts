@@ -284,3 +284,12 @@ export const purchasingKeys = {
       : (["purchasing", "ingredient-shortfalls"] as const),
   demandSummary: () => ["purchasing", "demand-summary"] as const,
 };
+
+// =============================================================================
+// Chat Keys
+// =============================================================================
+
+export const chatKeys = {
+  all: () => ["chat"] as const,
+  messages: () => ["chat", "messages"] as const,
+};
