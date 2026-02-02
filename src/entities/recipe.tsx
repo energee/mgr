@@ -9,7 +9,6 @@
  * recipes_with_estimates view.
  */
 
-import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
@@ -17,52 +16,13 @@ import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-dis
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
 
+import { recipeSchema } from "@/lib/schemas/recipe";
+
+// Re-export schema so existing client-side imports keep working
+export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
+
 // Use view type to include calculated estimates
 type Recipe = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
-
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const recipeSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  brand_id: z.string().uuid().nullable().optional(),
-  style_id: z.string().uuid().nullable().optional(),
-  yeast_id: z.string().uuid().nullable().optional(),
-  water_profile_id: z.string().uuid().nullable().optional(),
-  description: z.string().nullable().optional(),
-  // Volumes
-  volume_bbl: z.coerce.number().nullable().optional(),
-  batch_size_bbl: z.coerce.number().nullable().optional(),
-  preboil_volume_bbl: z.coerce.number().nullable().optional(),
-  target_ko_volume_bbl: z.coerce.number().nullable().optional(),
-  mash_water_volume_gal: z.coerce.number().nullable().optional(),
-  sparge_water_volume_gal: z.coerce.number().nullable().optional(),
-  // Times
-  boil_time_min: z.coerce.number().int().nullable().optional(),
-  fermentation_days: z.coerce.number().int().nullable().optional(),
-  conditioning_days: z.coerce.number().int().nullable().optional(),
-  // Whirlpool
-  whirlpool_time_min: z.coerce.number().int().nullable().optional(),
-  whirlpool_temp_f: z.coerce.number().int().nullable().optional(),
-  // Mash
-  mash_temp_f: z.coerce.number().int().nullable().optional(),
-  target_mash_ph: z.coerce.number().nullable().optional(),
-  mash_efficiency: z.coerce.number().nullable().optional(),
-  // Yeast
-  target_attenuation: z.coerce.number().nullable().optional(),
-  target_pitching_rate: z.coerce.number().nullable().optional(),
-  // Notes
-  brew_day_notes: z.string().nullable().optional(),
-  tasting_notes: z.string().nullable().optional(),
-  development_notes: z.string().nullable().optional(),
-  // Flags
-  use_default_additions: z.boolean().default(true),
-  is_active: z.boolean().default(true),
-  is_template: z.boolean().default(false),
-});
-
-export type RecipeFormValues = z.infer<typeof recipeSchema>;
 
 // =============================================================================
 // Entity Configuration

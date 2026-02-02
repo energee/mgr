@@ -5,7 +5,7 @@ import {
   validateBody,
   validateSearchParams,
 } from "@/lib/api";
-import { batchSchema } from "@/entities/batch";
+import { batchSchema } from "@/lib/schemas/batch";
 import { successResponse } from "@/lib/api/response";
 
 const listParamsSchema = z.object({
@@ -41,9 +41,7 @@ export const GET = withAuth(async (request, { supabase }) => {
     query = query.eq("recipe_id", recipe_id);
   }
   if (search) {
-    query = query.or(
-      `batch_number.ilike.%${search}%,name.ilike.%${search}%`
-    );
+    query = query.or(`batch_number.ilike.%${search}%,name.ilike.%${search}%`);
   }
 
   query = query

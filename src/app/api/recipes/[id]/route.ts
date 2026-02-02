@@ -4,7 +4,7 @@ import {
   errorResponse,
   validateBody,
 } from "@/lib/api";
-import { recipeSchema } from "@/entities/recipe";
+import { recipeSchema } from "@/lib/schemas/recipe";
 
 export const GET = withAuth(async (request, { supabase, params }) => {
   const id = params?.id;

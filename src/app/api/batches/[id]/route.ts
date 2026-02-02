@@ -4,7 +4,7 @@ import {
   errorResponse,
   validateBody,
 } from "@/lib/api";
-import { batchSchema } from "@/entities/batch";
+import { batchSchema } from "@/lib/schemas/batch";
 
 export const GET = withAuth(async (request, { supabase, params }) => {
   const id = params?.id;

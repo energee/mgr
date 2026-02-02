@@ -5,7 +5,7 @@ import {
   validateBody,
   validateSearchParams,
 } from "@/lib/api";
-import { recipeSchema } from "@/entities/recipe";
+import { recipeSchema } from "@/lib/schemas/recipe";
 import { successResponse } from "@/lib/api/response";
 
 const listParamsSchema = z.object({
