@@ -9,7 +9,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { entityKeys } from "@/lib/query-keys";
+import { entityKeys, batchKeys } from "@/lib/query-keys";
 import {
   Table,
   TableBody,
@@ -64,6 +64,20 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
         .select("*")
         .eq("source_batch_id", batchId)
         .order("blended_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch blend info (weighted estimates, available volume)
+  const { data: blendInfo } = useQuery({
+    queryKey: batchKeys.blendInfo(batchId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("batches_with_blend_info")
+        .select("*")
+        .eq("id", batchId)
+        .single();
       if (error) throw error;
       return data;
     },
@@ -156,6 +170,51 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
         </div>
       )}
 
+      {/* Blended estimates summary */}
+      {hasBlendSources && blendInfo && (
+        <div className="rounded-md border bg-muted/30 p-4 space-y-2">
+          <h4 className="font-medium text-sm">Blended Estimates</h4>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 text-sm">
+            {blendInfo.blended_og != null && (
+              <div>
+                <span className="text-muted-foreground">OG:</span>{" "}
+                <span className="font-medium">{Number(blendInfo.blended_og).toFixed(3)}</span>
+              </div>
+            )}
+            {blendInfo.blended_fg != null && (
+              <div>
+                <span className="text-muted-foreground">FG:</span>{" "}
+                <span className="font-medium">{Number(blendInfo.blended_fg).toFixed(3)}</span>
+              </div>
+            )}
+            {blendInfo.blended_abv != null && (
+              <div>
+                <span className="text-muted-foreground">ABV:</span>{" "}
+                <span className="font-medium">{Number(blendInfo.blended_abv).toFixed(1)}%</span>
+              </div>
+            )}
+            {blendInfo.blended_ibu != null && (
+              <div>
+                <span className="text-muted-foreground">IBU:</span>{" "}
+                <span className="font-medium">{Number(blendInfo.blended_ibu)}</span>
+              </div>
+            )}
+            {blendInfo.blended_srm != null && (
+              <div>
+                <span className="text-muted-foreground">SRM:</span>{" "}
+                <span className="font-medium">{Number(blendInfo.blended_srm).toFixed(1)}</span>
+              </div>
+            )}
+          </div>
+          {blendInfo.blend_source_recipes?.length > 0 && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Source Recipes:</span>{" "}
+              <span className="font-medium">{blendInfo.blend_source_recipes.join(", ")}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Used as source (this batch was blended INTO other batches) */}
       {isUsedAsSource && (
         <div className="space-y-2">
@@ -163,6 +222,12 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
             <GitMerge className="h-4 w-4 rotate-180" />
             Used as Source In
           </div>
+          {blendInfo && Number(blendInfo.volume_blended_away_bbl) > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {Number(blendInfo.volume_blended_away_bbl).toFixed(2)} BBL blended away
+              {" "}({Number(blendInfo.available_volume_bbl).toFixed(2)} BBL remaining)
+            </p>
+          )}
           <div className="border rounded-md">
             <Table>
               <TableHeader>
