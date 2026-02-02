@@ -1,9 +1,10 @@
-import { streamText, type UIMessage, convertToModelMessages } from "ai";
+import { streamText, stepCountIs, type UIMessage, convertToModelMessages } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 import { createChatTools } from "./tools";
+import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 
 const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant. You help brewers manage their brewery operations.
 
@@ -127,7 +128,7 @@ export async function POST(req: Request): Promise<Response> {
     system: buildSystemPrompt(pageContext),
     messages: await convertToModelMessages(messages),
     tools,
-    maxSteps: 5,
+    stopWhen: stepCountIs(5),
   });
 
   return result.toUIMessageStreamResponse();

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useChat, type UseChatHelpers } from "@ai-sdk/react";
+import { type UIMessage, DefaultChatTransport } from "ai";
 import { usePathname } from "next/navigation";
 
 // ---------------------------------------------------------------------------
@@ -78,7 +79,7 @@ interface ChatContextValue {
   isOpen: boolean;
   toggle: () => void;
   close: () => void;
-  chat: UseChatHelpers;
+  chat: UseChatHelpers<UIMessage>;
   pageContext: PageContext | undefined;
 }
 
@@ -104,7 +105,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const pageContext = parsePageContext(pathname);
 
   const chat = useChat({
-    body: { pageContext },
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: { pageContext },
+    }),
   });
 
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);

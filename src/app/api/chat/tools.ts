@@ -15,7 +15,7 @@ export function createChatTools(supabase: SupabaseClient) {
     analyzeRecipe: tool({
       description:
         "Analyze a recipe against its target BJCP style guidelines. Returns compliance status for OG, FG, ABV, IBU, SRM.",
-      parameters: z.object({
+      inputSchema: z.object({
         recipeId: z.string().uuid().describe("The recipe UUID"),
       }),
       execute: async ({ recipeId }) => {
@@ -31,7 +31,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getRecipeSummary: tool({
       description:
         "Get a comprehensive recipe summary including grain bill, hop schedule, yeast, water profile, mash/fermentation schedules, and calculated estimates.",
-      parameters: z.object({
+      inputSchema: z.object({
         recipeId: z.string().uuid().describe("The recipe UUID"),
       }),
       execute: async ({ recipeId }) => {
@@ -46,7 +46,7 @@ export function createChatTools(supabase: SupabaseClient) {
     suggestImprovements: tool({
       description:
         "Get improvement suggestions for a recipe based on brewing best practices, style compliance, yeast health, grain bill composition, and water chemistry.",
-      parameters: z.object({
+      inputSchema: z.object({
         recipeId: z.string().uuid().describe("The recipe UUID"),
       }),
       execute: async ({ recipeId }) => {
@@ -62,7 +62,7 @@ export function createChatTools(supabase: SupabaseClient) {
     analyzeBatch: tool({
       description:
         "Analyze batch performance by comparing actual measurements (OG, FG, ABV) against recipe targets. Includes fermentation timeline and latest readings.",
-      parameters: z.object({
+      inputSchema: z.object({
         batchId: z.string().uuid().describe("The batch UUID"),
       }),
       execute: async ({ batchId }) => {
@@ -78,7 +78,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getInventoryOverview: tool({
       description:
         "Get a snapshot of current inventory: finished goods, raw materials with available quantities, and batches in progress.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const { data, error } = await supabase.rpc("get_inventory_overview");
         if (error) throw new Error(error.message);
@@ -92,7 +92,7 @@ export function createChatTools(supabase: SupabaseClient) {
 
     searchRecipes: tool({
       description: "Search recipes by name. Returns recipe details with style info.",
-      parameters: z.object({
+      inputSchema: z.object({
         query: z.string().describe("Search term to match against recipe names"),
         limit: z.number().optional().default(10).describe("Max results to return"),
       }),
@@ -110,7 +110,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getBatchStatus: tool({
       description:
         "Get a summary of all batches grouped by status (planned, fermenting, conditioning, etc.). Useful for production overview.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const { data, error } = await supabase
           .from("batches")
@@ -128,7 +128,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getVesselAvailability: tool({
       description:
         "Get vessel utilization: which vessels are available, which are in use, and their current batch assignments.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const { data, error } = await supabase
           .from("vessels_with_batch")
@@ -158,7 +158,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getProductionSchedule: tool({
       description:
         "Get batches scheduled within a date range. Includes recipe name and volume.",
-      parameters: z.object({
+      inputSchema: z.object({
         startDate: z.string().describe("Start date (YYYY-MM-DD)"),
         endDate: z.string().describe("End date (YYYY-MM-DD)"),
       }),
@@ -180,7 +180,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getIngredientInventory: tool({
       description:
         "Get raw ingredient inventory levels with lot quantities and expiration dates. Optionally filter by category (malt, hop, yeast, adjunct, chemical).",
-      parameters: z.object({
+      inputSchema: z.object({
         category: z
           .string()
           .optional()
@@ -225,7 +225,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getBatchLogs: tool({
       description:
         "Get the event log for a batch: gravity readings, status changes, measurements, and notes. Ordered chronologically.",
-      parameters: z.object({
+      inputSchema: z.object({
         batchId: z.string().uuid().describe("The batch UUID"),
       }),
       execute: async ({ batchId }) => {
@@ -242,7 +242,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getVesselCleanings: tool({
       description:
         "Get cleaning history for a vessel: cleaning type (CIP, caustic, acid, sanitize), chemicals used, duration, and dates.",
-      parameters: z.object({
+      inputSchema: z.object({
         vesselId: z.string().uuid().describe("The vessel UUID"),
       }),
       execute: async ({ vesselId }) => {
@@ -262,7 +262,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getBatchTransfers: tool({
       description:
         "Get the transfer history for a batch: which vessels it moved between, volumes, and dates.",
-      parameters: z.object({
+      inputSchema: z.object({
         batchId: z.string().uuid().describe("The batch UUID"),
       }),
       execute: async ({ batchId }) => {
@@ -281,7 +281,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getRecipeCost: tool({
       description:
         "Get the cost breakdown (COGS) for a recipe including ingredient costs per batch.",
-      parameters: z.object({
+      inputSchema: z.object({
         recipeId: z.string().uuid().describe("The recipe UUID"),
       }),
       execute: async ({ recipeId }) => {
@@ -298,7 +298,7 @@ export function createChatTools(supabase: SupabaseClient) {
     getLotExpiration: tool({
       description:
         "Get ingredient lots expiring within a given number of days. Useful for identifying inventory that needs to be used soon.",
-      parameters: z.object({
+      inputSchema: z.object({
         daysAhead: z
           .number()
           .optional()

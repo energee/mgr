@@ -96,13 +96,13 @@ export function ChatPanel() {
                     </div>
                   );
                 }
-                if (part.type === "tool-invocation") {
+                if (part.type.startsWith("tool-")) {
                   return (
                     <div
                       key={`${message.id}-${i}`}
                       className="text-xs text-muted-foreground italic"
                     >
-                      {part.toolInvocation.state === "result"
+                      {(part as { state: string }).state === "result"
                         ? null
                         : `Looking up data...`}
                     </div>
