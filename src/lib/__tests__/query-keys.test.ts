@@ -20,6 +20,12 @@ import {
   planningKeys,
   purchasingKeys,
   pickListKeys,
+  brandKeys,
+  packageTypeKeys,
+  kegKeys,
+  brewLogKeys,
+  sessionLineItemKeys,
+  vesselKeys,
 } from "../query-keys";
 
 // =============================================================================
@@ -313,5 +319,188 @@ describe("Key factory consistency", () => {
 
   it("pickListKeys detail and items are distinct", () => {
     expect(pickListKeys.detail("pl1")).not.toEqual(pickListKeys.items("pl1"));
+  });
+
+  it("catalogKeys spices/sugars/additives produce consistent keys", () => {
+    expect(catalogKeys.spices()).toEqual(["spices-catalog"]);
+    expect(catalogKeys.sugars()).toEqual(["sugars-catalog"]);
+    expect(catalogKeys.additives()).toEqual(["additives-catalog"]);
+  });
+
+  it("recipeKeys styleCompliance/suggestions/cogs/fermentationAdditions", () => {
+    expect(recipeKeys.styleCompliance("r1")).toEqual([
+      "recipe-style-compliance",
+      "r1",
+    ]);
+    expect(recipeKeys.suggestions("r1")).toEqual(["recipe-suggestions", "r1"]);
+    expect(recipeKeys.cogs("r1")).toEqual(["recipe-cogs", "r1"]);
+    expect(recipeKeys.fermentationAdditions("r1")).toEqual([
+      "recipe-fermentation-additions",
+      "r1",
+    ]);
+  });
+
+  it("batchKeys additions/performance/brewLogs/availableBrewLogs", () => {
+    expect(batchKeys.additions("b1")).toEqual(["batch-additions", "b1"]);
+    expect(batchKeys.performance("b1")).toEqual(["batch-performance", "b1"]);
+    expect(batchKeys.brewLogs("b1")).toEqual(["batch-brew-logs", "b1"]);
+    expect(batchKeys.availableBrewLogs("b1")).toEqual([
+      "available-brew-logs",
+      "b1",
+    ]);
+  });
+
+  it("orderKeys allocations and pickList", () => {
+    expect(orderKeys.allocations("o1")).toEqual(["order-allocations", "o1"]);
+    expect(orderKeys.pickList("o1")).toEqual(["order-pick-list", "o1"]);
+    expect(orderKeys.pickList("o1", "items")).toEqual([
+      "order-pick-list",
+      "o1",
+      "items",
+    ]);
+  });
+
+  it("inventoryKeys overview/finishedGoods/finishedGoodsAvailable", () => {
+    expect(inventoryKeys.overview()).toEqual(["inventory-overview"]);
+    expect(inventoryKeys.finishedGoods()).toEqual(["finished-goods"]);
+    expect(inventoryKeys.finishedGoodsAvailable()).toEqual([
+      "finished-goods-available",
+    ]);
+  });
+
+  it("userKeys units and full", () => {
+    expect(userKeys.units()).toEqual(["user", "preferences", "units"]);
+    expect(userKeys.full()).toEqual(["user", "preferences", "full"]);
+  });
+
+  it("settingsKeys systemSettings/pricingStats/notificationPreferences", () => {
+    expect(settingsKeys.systemSettings()).toEqual(["system-settings"]);
+    expect(settingsKeys.pricingStats()).toEqual(["pricing-stats"]);
+    expect(settingsKeys.notificationPreferences()).toEqual([
+      "notification-preferences",
+    ]);
+  });
+
+  it("reportKeys ttbBatches", () => {
+    expect(reportKeys.ttbBatches(2024, 6)).toEqual(["ttb-batches", 2024, 6]);
+  });
+});
+
+// =============================================================================
+// brandKeys
+// =============================================================================
+
+describe("brandKeys", () => {
+  it("all() returns ['brands']", () => {
+    expect(brandKeys.all()).toEqual(["brands"]);
+  });
+
+  it("list() without filters returns ['brands', 'list']", () => {
+    expect(brandKeys.list()).toEqual(["brands", "list"]);
+  });
+
+  it("list() with filters includes them", () => {
+    expect(brandKeys.list({ active: true })).toEqual([
+      "brands",
+      "list",
+      { active: true },
+    ]);
+  });
+});
+
+// =============================================================================
+// packageTypeKeys
+// =============================================================================
+
+describe("packageTypeKeys", () => {
+  it("all() returns ['package-types']", () => {
+    expect(packageTypeKeys.all()).toEqual(["package-types"]);
+  });
+
+  it("list() without filters returns ['package-types', 'list']", () => {
+    expect(packageTypeKeys.list()).toEqual(["package-types", "list"]);
+  });
+
+  it("list() with filters includes them", () => {
+    expect(packageTypeKeys.list({ category: "keg" })).toEqual([
+      "package-types",
+      "list",
+      { category: "keg" },
+    ]);
+  });
+});
+
+// =============================================================================
+// kegKeys
+// =============================================================================
+
+describe("kegKeys", () => {
+  it("fleetSummary() returns consistent key", () => {
+    expect(kegKeys.fleetSummary()).toEqual(["keg_fleet_summary"]);
+  });
+
+  it("turnoverMetrics() returns consistent key", () => {
+    expect(kegKeys.turnoverMetrics()).toEqual(["keg_turnover_metrics"]);
+  });
+
+  it("agingReport() returns consistent key", () => {
+    expect(kegKeys.agingReport()).toEqual(["keg_aging_report"]);
+  });
+
+  it("customerBalances() without customerId", () => {
+    expect(kegKeys.customerBalances()).toEqual(["customer_keg_balances"]);
+  });
+
+  it("customerBalances() with customerId", () => {
+    expect(kegKeys.customerBalances("c1")).toEqual([
+      "customer_keg_balances",
+      "c1",
+    ]);
+  });
+});
+
+// =============================================================================
+// brewLogKeys
+// =============================================================================
+
+describe("brewLogKeys", () => {
+  it("all() returns ['brew_logs']", () => {
+    expect(brewLogKeys.all()).toEqual(["brew_logs"]);
+  });
+
+  it("detail() returns brew log detail key", () => {
+    expect(brewLogKeys.detail("bl1")).toEqual(["brew_logs", "bl1"]);
+  });
+
+  it("batches() returns brew log batches key", () => {
+    expect(brewLogKeys.batches("bl1")).toEqual(["brew_log_batches", "bl1"]);
+  });
+});
+
+// =============================================================================
+// sessionLineItemKeys
+// =============================================================================
+
+describe("sessionLineItemKeys", () => {
+  it("all() returns key with sessionId", () => {
+    expect(sessionLineItemKeys.all("s1")).toEqual(["session-line-items", "s1"]);
+  });
+});
+
+// =============================================================================
+// vesselKeys
+// =============================================================================
+
+describe("vesselKeys", () => {
+  it("all() returns ['vessels']", () => {
+    expect(vesselKeys.all()).toEqual(["vessels"]);
+  });
+
+  it("available() returns ['vessels', 'available']", () => {
+    expect(vesselKeys.available()).toEqual(["vessels", "available"]);
+  });
+
+  it("transfers() returns ['vessel_transfers']", () => {
+    expect(vesselKeys.transfers()).toEqual(["vessel_transfers"]);
   });
 });

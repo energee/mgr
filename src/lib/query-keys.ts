@@ -59,6 +59,11 @@ export const recipeKeys = {
   hopSchedule: (id: string) => ["recipes", id, "hop-schedule"] as const,
   yeasts: (id: string) => ["recipes", id, "yeasts"] as const,
   additions: (id: string) => ["recipes", id, "additions"] as const,
+  styleCompliance: (id: string) => ["recipe-style-compliance", id] as const,
+  suggestions: (id: string) => ["recipe-suggestions", id] as const,
+  cogs: (id: string) => ["recipe-cogs", id] as const,
+  fermentationAdditions: (id: string) =>
+    ["recipe-fermentation-additions", id] as const,
 };
 
 // =============================================================================
@@ -76,6 +81,10 @@ export const batchKeys = {
   allocations: (id: string) => ["batches", id, "allocations"] as const,
   blends: (id: string) => ["batches", id, "blends"] as const,
   blendInfo: (id: string) => ["batches", id, "blend-info"] as const,
+  additions: (id: string) => ["batch-additions", id] as const,
+  performance: (id: string) => ["batch-performance", id] as const,
+  brewLogs: (id: string) => ["batch-brew-logs", id] as const,
+  availableBrewLogs: (id: string) => ["available-brew-logs", id] as const,
 };
 
 // =============================================================================
@@ -88,6 +97,11 @@ export const orderKeys = {
     filters ? (["orders", "list", filters] as const) : (["orders", "list"] as const),
   detail: (id: string) => ["orders", id] as const,
   items: (id: string) => ["orders", id, "items"] as const,
+  allocations: (id: string) => ["order-allocations", id] as const,
+  pickList: (id: string, subKey?: string) =>
+    subKey
+      ? (["order-pick-list", id, subKey] as const)
+      : (["order-pick-list", id] as const),
 };
 
 // =============================================================================
@@ -100,6 +114,9 @@ export const inventoryKeys = {
   lots: () => ["inventory", "lots"] as const,
   allocations: () => ["allocations"] as const,
   summary: () => ["inventory", "summary"] as const,
+  overview: () => ["inventory-overview"] as const,
+  finishedGoods: () => ["finished-goods"] as const,
+  finishedGoodsAvailable: () => ["finished-goods-available"] as const,
 };
 
 // =============================================================================
@@ -123,6 +140,8 @@ export const userKeys = {
   current: () => ["user", "current"] as const,
   preferences: () => ["user", "preferences"] as const,
   brewery: () => ["user", "brewery"] as const,
+  units: () => ["user", "preferences", "units"] as const,
+  full: () => ["user", "preferences", "full"] as const,
 };
 
 export const settingsKeys = {
@@ -130,6 +149,9 @@ export const settingsKeys = {
   system: () => ["settings", "system"] as const,
   enums: () => ["settings", "enums"] as const,
   enumValues: (enumType: string) => ["settings", "enums", enumType] as const,
+  systemSettings: () => ["system-settings"] as const,
+  pricingStats: () => ["pricing-stats"] as const,
+  notificationPreferences: () => ["notification-preferences"] as const,
 };
 
 // =============================================================================
@@ -141,6 +163,8 @@ export const reportKeys = {
     period ? (["reports", "ttb", period] as const) : (["reports", "ttb"] as const),
   inventory: () => ["reports", "inventory"] as const,
   production: () => ["reports", "production"] as const,
+  ttbBatches: (year: number, month: number) =>
+    ["ttb-batches", year, month] as const,
 };
 
 // =============================================================================
@@ -185,6 +209,9 @@ export const catalogKeys = {
   yeasts: () => ["yeasts-catalog"] as const,
   adjuncts: () => ["adjuncts-catalog"] as const,
   fruits: () => ["fruits-catalog"] as const,
+  spices: () => ["spices-catalog"] as const,
+  sugars: () => ["sugars-catalog"] as const,
+  additives: () => ["additives-catalog"] as const,
   table: (table: string) => ["catalog", table] as const,
   items: (type: string) => ["catalog-items", type] as const,
 };
@@ -283,4 +310,70 @@ export const purchasingKeys = {
       ? (["purchasing", "ingredient-shortfalls", options] as const)
       : (["purchasing", "ingredient-shortfalls"] as const),
   demandSummary: () => ["purchasing", "demand-summary"] as const,
+};
+
+// =============================================================================
+// Brand Keys
+// =============================================================================
+
+export const brandKeys = {
+  all: () => ["brands"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["brands", "list", filters] as const)
+      : (["brands", "list"] as const),
+};
+
+// =============================================================================
+// Package Type Keys
+// =============================================================================
+
+export const packageTypeKeys = {
+  all: () => ["package-types"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["package-types", "list", filters] as const)
+      : (["package-types", "list"] as const),
+};
+
+// =============================================================================
+// Keg Keys
+// =============================================================================
+
+export const kegKeys = {
+  fleetSummary: () => ["keg_fleet_summary"] as const,
+  turnoverMetrics: () => ["keg_turnover_metrics"] as const,
+  agingReport: () => ["keg_aging_report"] as const,
+  customerBalances: (customerId?: string) =>
+    customerId
+      ? (["customer_keg_balances", customerId] as const)
+      : (["customer_keg_balances"] as const),
+};
+
+// =============================================================================
+// Brew Log Keys
+// =============================================================================
+
+export const brewLogKeys = {
+  all: () => ["brew_logs"] as const,
+  detail: (id: string) => ["brew_logs", id] as const,
+  batches: (id: string) => ["brew_log_batches", id] as const,
+};
+
+// =============================================================================
+// Session Line Item Keys
+// =============================================================================
+
+export const sessionLineItemKeys = {
+  all: (sessionId: string) => ["session-line-items", sessionId] as const,
+};
+
+// =============================================================================
+// Vessel Keys
+// =============================================================================
+
+export const vesselKeys = {
+  all: () => ["vessels"] as const,
+  available: () => ["vessels", "available"] as const,
+  transfers: () => ["vessel_transfers"] as const,
 };
