@@ -65,10 +65,7 @@ import {
 import {
   ChevronDown,
   ChevronUp,
-  ChevronsUpDown,
-  Filter,
   MoreHorizontal,
-  Plus,
   Search,
   X,
 } from "lucide-react";
@@ -476,20 +473,13 @@ export function EntityList<T = Record<string, unknown>>({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{entity.displayNamePlural}</h1>
-          <p className="text-muted-foreground">{entity.description}</p>
-        </div>
+        <h1 className="text-2xl font-bold">{entity.displayNamePlural}</h1>
         {showCreate && (
           <Button asChild={!onCreateClick} onClick={onCreateClick}>
             {onCreateClick ? (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                New {entity.displayName}
-              </>
+              `New ${entity.displayName}`
             ) : (
               <Link href={`${path}/new`}>
-                <Plus className="h-4 w-4 mr-2" />
                 New {entity.displayName}
               </Link>
             )}
@@ -515,7 +505,6 @@ export function EntityList<T = Record<string, unknown>>({
         {/* Quick Filters */}
         {entity.listFilters && entity.listFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
             {entity.listFilters.map((filter) => {
               const filterOptions = getFilterOptions(filter);
               return (
@@ -555,7 +544,6 @@ export function EntityList<T = Record<string, unknown>>({
                         size="sm"
                         className="h-9 border-dashed text-sm font-normal"
                       >
-                        <Filter className="mr-2 h-4 w-4" />
                         {filter.label}
                         {(quickFilters[filter.field] as string[])?.length > 0 && (
                           <>
@@ -643,15 +631,13 @@ export function EntityList<T = Record<string, unknown>>({
             })}
             {/* Clear filters button */}
             {hasActiveQuickFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => setQuickFilters({})}
-                className="h-9"
+                className="text-sm text-muted-foreground hover:text-foreground underline"
               >
-                <X className="h-4 w-4 mr-1" />
-                Clear
-              </Button>
+                Clear filters
+              </button>
             )}
           </div>
         )}
@@ -733,14 +719,12 @@ export function EntityList<T = Record<string, unknown>>({
                           onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
-                          {canSort && (
+                          {canSort && header.column.getIsSorted() && (
                             <span className="text-muted-foreground">
                               {header.column.getIsSorted() === "asc" ? (
                                 <ChevronUp className="h-4 w-4" />
-                              ) : header.column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-4 w-4" />
                               ) : (
-                                <ChevronsUpDown className="h-4 w-4" />
+                                <ChevronDown className="h-4 w-4" />
                               )}
                             </span>
                           )}
@@ -788,13 +772,11 @@ export function EntityList<T = Record<string, unknown>>({
                     {showCreate && !hasActiveFilters && (
                       onCreateClick ? (
                         <Button size="sm" onClick={onCreateClick}>
-                          <Plus className="h-4 w-4 mr-1" />
                           Create {entity.displayName}
                         </Button>
                       ) : (
                         <Button size="sm" asChild>
                           <Link href={`${path}/new`}>
-                            <Plus className="h-4 w-4 mr-1" />
                             Create {entity.displayName}
                           </Link>
                         </Button>
