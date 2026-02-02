@@ -172,6 +172,7 @@ BEGIN
     v_remaining := v_order_item.quantity;
 
     -- Find available finished goods (FIFO by production_date)
+    -- Location derived from bin_inventory → bins → locations
     FOR v_fg IN
       SELECT
         fga.id AS finished_good_id,
@@ -179,7 +180,9 @@ BEGIN
         fga.production_date,
         l.id AS location_id
       FROM finished_goods_with_availability fga
-      LEFT JOIN locations l ON l.name = 'Warehouse'
+      LEFT JOIN bin_inventory bi ON bi.finished_good_id = fga.id
+      LEFT JOIN bins b ON b.id = bi.bin_id
+      LEFT JOIN locations l ON l.id = b.location_id
       WHERE fga.available_quantity > 0
         AND (
           fga.id = v_order_item.specific_fg_id

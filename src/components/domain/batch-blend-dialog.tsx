@@ -178,6 +178,19 @@ export function BatchBlendDialog({
       const entries = Array.from(selections.values());
       if (entries.length === 0) throw new Error("Select at least one source batch");
 
+      // Validate volumes don't exceed source batch capacity
+      for (const entry of entries) {
+        const sourceBatch = filteredBatches.find((b) => b.id === entry.batchId);
+        if (sourceBatch?.volume_bbl && entry.volumeBbl > sourceBatch.volume_bbl) {
+          throw new Error(
+            `Volume for ${sourceBatch.batch_number} (${entry.volumeBbl} BBL) exceeds available volume (${sourceBatch.volume_bbl} BBL)`
+          );
+        }
+        if (entry.volumeBbl <= 0) {
+          throw new Error(`Volume must be greater than 0 for all selected batches`);
+        }
+      }
+
       // Insert all blend records
       const records = entries.map((entry) => ({
         blend_batch_id: batchId,
@@ -293,6 +306,7 @@ export function BatchBlendDialog({
                               type="number"
                               step="0.01"
                               min="0.01"
+                              max={batch.volume_bbl ?? undefined}
                               value={selection?.volumeBbl ?? ""}
                               onChange={(e) =>
                                 updateVolume(batch.id, parseFloat(e.target.value) || 0)
