@@ -20,12 +20,20 @@ COMMENT ON COLUMN batch_blends.volume_bbl IS 'Volume contributed from the source
 
 ALTER TABLE batch_blends ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view batch blends"
+CREATE POLICY "Authenticated users can view batch blends"
   ON batch_blends FOR SELECT
-  USING (true);
+  USING (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Authenticated users can manage batch blends"
-  ON batch_blends FOR ALL
+CREATE POLICY "Authenticated users can insert batch blends"
+  ON batch_blends FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can update batch blends"
+  ON batch_blends FOR UPDATE
+  USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can delete batch blends"
+  ON batch_blends FOR DELETE
   USING (auth.uid() IS NOT NULL);
 
 INSERT INTO _schema_registry (table_name, description, domain, relationships)
