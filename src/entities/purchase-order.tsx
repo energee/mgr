@@ -284,6 +284,15 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       toState: "cancelled",
       confirm: true,
     },
+    {
+      name: "calculate_landed_cost",
+      label: "Calculate Landed Cost",
+      icon: "calculator",
+      type: "button",
+      variant: "outline",
+      fromStates: ["partial", "fulfilled", "closed"],
+      confirm: true,
+    },
   ],
 
   // ---------------------------------------------------------------------------
