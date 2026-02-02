@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 import { createChatTools } from "./tools";
-import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 
 const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant. You help brewers manage their brewery operations.
 
