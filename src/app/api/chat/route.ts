@@ -2,6 +2,7 @@ import { streamText, type UIMessage, convertToModelMessages } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 
 const SYSTEM_PROMPT = `You are the MGR Brewery Assistant. You help brewers manage their brewery operations.
 
@@ -13,7 +14,10 @@ You have deep knowledge of:
 - Recipe formulation and optimization
 
 You are integrated into the MGR brewery management system. Be concise and practical.
-When discussing recipes, batches, or other entities, reference specifics when you have them.`;
+When discussing recipes, batches, or other entities, reference specifics when you have them.
+When users ask how to do something in MGR, give specific navigation instructions using the guide below.
+
+${getHelpContentForSystemPrompt()}`;
 
 // Pending type generation — anthropic_api_key is added by migration 00064
 // but not yet in generated Supabase types. Remove after next `supabase gen types`.
