@@ -180,13 +180,11 @@ export function BrewEventForm({
   };
 
   const addMeasurement = () => {
-    // Default measurement based on phase
     let defaultMetric: BrewMeasurement["metric"] = "temp_f";
-    if (selectedPhase === "mash_in") defaultMetric = "temp_f";
-    if (selectedPhase.includes("gravity") || selectedPhase === "boil_end" || selectedPhase === "ko_end") {
+
+    if (selectedPhase === "boil_end" || selectedPhase === "ko_end") {
       defaultMetric = "gravity_plato";
-    }
-    if (selectedPhase === "hop_addition" || selectedPhase === "adjunct_addition") {
+    } else if (selectedPhase === "hop_addition" || selectedPhase === "adjunct_addition") {
       defaultMetric = "amount_oz";
     }
 
@@ -356,6 +354,7 @@ export function BrewEventForm({
                         const metricKey = form.watch(`measurements.${index}.metric`) as keyof typeof metricConfig;
                         const config = metricConfig[metricKey];
                         const unitType = config && "unitType" in config ? config.unitType : undefined;
+                        const decimals = config && "decimals" in config ? config.decimals : 2;
 
                         return (
                           <FormItem>
@@ -365,7 +364,7 @@ export function BrewEventForm({
                                   value={typeof field.value === "number" ? field.value : null}
                                   onChange={(val) => field.onChange(val ?? "")}
                                   unitType={unitType}
-                                  decimals={metricKey === "gravity_plato" ? 1 : metricKey === "temp_f" ? 1 : 2}
+                                  decimals={decimals}
                                 />
                               ) : (
                                 <div className="flex items-center gap-1">

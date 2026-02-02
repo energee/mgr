@@ -20,7 +20,6 @@ const listParamsSchema = z.object({
 });
 
 export const GET = withAuth(async (request, { supabase }) => {
-  const params = validateSearchParams(listParamsSchema, request);
   const {
     page = 1,
     per_page = 25,
@@ -30,7 +29,7 @@ export const GET = withAuth(async (request, { supabase }) => {
     sort = "name",
     direction = "asc",
     search,
-  } = params;
+  } = validateSearchParams(listParamsSchema, request);
 
   let query = supabase
     .from("recipes_with_estimates")
@@ -39,7 +38,10 @@ export const GET = withAuth(async (request, { supabase }) => {
   if (brand_id) query = query.eq("brand_id", brand_id);
   if (style_id) query = query.eq("style_id", style_id);
   if (is_active !== undefined) query = query.eq("is_active", is_active === "true");
-  if (search) query = query.ilike("name", `%${search}%`);
+  if (search) {
+    const sanitized = search.replace(/[.,()\\]/g, "");
+    query = query.ilike("name", `%${sanitized}%`);
+  }
 
   query = query
     .order(sort, { ascending: direction === "asc" })

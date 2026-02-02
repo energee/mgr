@@ -53,9 +53,8 @@ export const recipeEntity: EntityConfig<Recipe> = {
       accessorKey: "style_id",
       header: "Style",
       sortable: true,
-      // Note: view needs to be updated to join beer_styles for style_name
-      // For now, this shows the UUID. Future migration will add style_name.
-      render: (value) => value ? "—" : "—",
+      // TODO: View needs to join beer_styles for style_name
+      render: () => "—",
     },
     {
       accessorKey: "volume_bbl",
@@ -99,7 +98,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "select",
       label: "Type",
       options: [
-        { value: "", label: "All Recipes" },
         { value: "true", label: "Templates Only" },
         { value: "false", label: "Hide Templates" },
       ],

@@ -19,7 +19,6 @@ const listParamsSchema = z.object({
 });
 
 export const GET = withAuth(async (request, { supabase }) => {
-  const params = validateSearchParams(listParamsSchema, request);
   const {
     page = 1,
     per_page = 25,
@@ -28,7 +27,7 @@ export const GET = withAuth(async (request, { supabase }) => {
     sort = "created_at",
     direction = "desc",
     search,
-  } = params;
+  } = validateSearchParams(listParamsSchema, request);
 
   let query = supabase
     .from("batches_with_brew_info")

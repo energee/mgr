@@ -345,6 +345,7 @@ export function BrewEventTimeline({
                                 {event.measurements.map((m, mIndex) => {
                                   const config = metricConfig[m.metric as keyof typeof metricConfig];
                                   const unitType = config && "unitType" in config ? config.unitType : undefined;
+                                  const decimals = config && "decimals" in config ? config.decimals : 2;
                                   const label = m.metric === "other"
                                     ? m.custom_metric || "Other"
                                     : config?.label || m.metric;
@@ -361,7 +362,7 @@ export function BrewEventTimeline({
                                           <UnitDisplay
                                             value={m.value}
                                             unitType={unitType}
-                                            decimals={m.metric === "gravity_plato" ? 1 : m.metric === "temp_f" ? 1 : 2}
+                                            decimals={decimals}
                                           />
                                         ) : (
                                           <>

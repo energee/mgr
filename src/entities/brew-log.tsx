@@ -135,14 +135,14 @@ export const phaseConfig = {
 // =============================================================================
 
 export const metricConfig = {
-  temp_f: { label: "Temperature", unit: "°F", unitType: "temperature" as const },
+  temp_f: { label: "Temperature", unit: "°F", unitType: "temperature" as const, decimals: 1 },
   ph: { label: "pH", unit: "" },
-  volume_bbl: { label: "Volume (BBL)", unit: "BBL", unitType: "volume" as const },
-  volume_l: { label: "Volume (L)", unit: "L", unitType: "volume" as const },
-  gravity_plato: { label: "Gravity", unit: "°P", unitType: "gravity" as const },
+  volume_bbl: { label: "Volume (BBL)", unit: "BBL", unitType: "volume" as const, decimals: 2 },
+  volume_l: { label: "Volume (L)", unit: "L", unitType: "volume" as const, decimals: 2 },
+  gravity_plato: { label: "Gravity", unit: "°P", unitType: "gravity" as const, decimals: 1 },
   flow_rate: { label: "Flow Rate", unit: "" },
   pump_speed: { label: "Pump Speed", unit: "" },
-  amount_lbs: { label: "Amount (lbs)", unit: "lbs", unitType: "weight" as const },
+  amount_lbs: { label: "Amount (lbs)", unit: "lbs", unitType: "weight" as const, decimals: 2 },
   amount_oz: { label: "Amount (oz)", unit: "oz" },
   amount_g: { label: "Amount (g)", unit: "g" },
   viability: { label: "Viability", unit: "%" },
