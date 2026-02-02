@@ -76,40 +76,48 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
     },
   });
 
-  // Get all pitches in the lineage
+  // Get all pitches in the lineage with a single query
   const { data: lineage, isLoading: lineageLoading } = useQuery({
     queryKey: ["yeast-lineage", root?.id],
     queryFn: async () => {
-      if (!root?.id) return [];
+      if (!root?.id || !root?.strain_id) return [];
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const supabase = createClient() as any;
 
-      // Get all descendants including root
+      // Fetch ALL pitches for this strain in one query
+      const { data: allPitches } = await supabase
+        .from("yeast_pitches_with_details")
+        .select("*")
+        .eq("strain_id", root.strain_id);
+
+      if (!allPitches || allPitches.length === 0) return [];
+
+      // Build a children map: parent_id -> children[]
+      const childrenMap = new Map<string | null, PitchNode[]>();
+      for (const pitch of allPitches as PitchNode[]) {
+        const parentId = (pitch as PitchNode & { parent_pitch_id?: string | null }).parent_pitch_id ?? null;
+        if (!childrenMap.has(parentId)) {
+          childrenMap.set(parentId, []);
+        }
+        childrenMap.get(parentId)!.push(pitch);
+      }
+
+      // DFS traversal starting from root to produce depth-first order
       const result: PitchNode[] = [];
-
-      async function getDescendants(parentId: string | null, depth: number = 0) {
-        const query = parentId
-          ? supabase
-              .from("yeast_pitches_with_details")
-              .select("*")
-              .eq("parent_pitch_id", parentId)
-          : supabase
-              .from("yeast_pitches_with_details")
-              .select("*")
-              .eq("id", root!.id);
-
-        const { data: pitches } = await query;
-
-        if (pitches) {
-          for (const pitch of pitches) {
-            result.push(pitch as PitchNode);
-            await getDescendants(pitch.id, depth + 1);
-          }
+      function dfs(nodeId: string) {
+        const node = (allPitches as (PitchNode & { parent_pitch_id?: string | null })[]).find(
+          (p) => p.id === nodeId
+        );
+        if (!node) return;
+        result.push(node);
+        const children = childrenMap.get(nodeId) || [];
+        for (const child of children) {
+          dfs(child.id);
         }
       }
 
-      await getDescendants(null);
+      dfs(root.id);
       return result;
     },
     enabled: !!root?.id,
