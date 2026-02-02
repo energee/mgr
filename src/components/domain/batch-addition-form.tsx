@@ -146,7 +146,7 @@ export function BatchAdditionForm({
 
   // Fetch catalog items based on selected type
   const { data: catalogItems = [], isLoading: loadingCatalog } = useQuery({
-    queryKey: catalogKeys.table(config.catalogTable),
+    queryKey: catalogKeys.table(config.catalogTable!),
     queryFn: async () => {
       if (!config.catalogTable) return [];
       return queryCatalog(config.catalogTable);

@@ -87,7 +87,7 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
 
   // Hook must be called unconditionally - use enabled option to prevent query when no ID
   const { data: additions, isLoading } = useQuery({
-    queryKey: recipeKeys.additions(recipeId),
+    queryKey: recipeKeys.additions(recipeId!),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipe_additions")

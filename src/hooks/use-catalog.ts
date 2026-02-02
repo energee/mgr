@@ -18,7 +18,8 @@ export function useCatalog<T>(
   return useQuery({
     queryKey,
     queryFn: async () => {
-      let query = supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = (supabase as any)
         .from(table)
         .select(select)
         .eq("is_active", true);
