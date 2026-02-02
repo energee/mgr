@@ -74,6 +74,7 @@ export const batchKeys = {
   logs: (id: string) => ["batches", id, "logs"] as const,
   readings: (id: string) => ["batches", id, "readings"] as const,
   allocations: (id: string) => ["batches", id, "allocations"] as const,
+  blends: (id: string) => ["batches", id, "blends"] as const,
 };
 
 // =============================================================================
@@ -209,6 +210,7 @@ export const purchaseOrderKeys = {
   lineItems: (poId: string) => ["po-line-items", poId] as const,
   lineItemsForReceive: (poId: string) => ["po-line-items-for-receive", poId] as const,
   nextNumber: () => ["purchase-orders", "next-number"] as const,
+  landedCost: (poId: string) => ["purchase-order", poId, "landed-cost"] as const,
 };
 
 // =============================================================================
@@ -250,6 +252,19 @@ export const planningKeys = {
   batchesInProduction: () => ["planning", "batches-in-production"] as const,
   demandDetail: (brandId: string, packageTypeId: string, week: string) =>
     ["planning", "demand-detail", brandId, packageTypeId, week] as const,
+};
+
+// =============================================================================
+// Pick List Keys
+// =============================================================================
+
+export const pickListKeys = {
+  all: () => ["pick-lists"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters ? (["pick-lists", "list", filters] as const) : (["pick-lists", "list"] as const),
+  detail: (id: string) => ["pick-lists", id] as const,
+  items: (pickListId: string) => ["pick-lists", pickListId, "items"] as const,
+  forOrder: (orderId: string) => ["pick-lists", "for-order", orderId] as const,
 };
 
 // =============================================================================
