@@ -7,6 +7,11 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 
+import { PG_ERROR_CODES, PG_ERROR_MESSAGES } from "./pg-error-codes";
+
+// Re-export for backwards compatibility
+export { PG_ERROR_CODES, PG_ERROR_MESSAGES };
+
 // =============================================================================
 // Custom Error Types
 // =============================================================================
@@ -67,47 +72,6 @@ export class PermissionError extends Error {
   }
 }
 
-// =============================================================================
-// PostgreSQL Error Code Mapping
-// =============================================================================
-
-/**
- * Map PostgreSQL error codes to user-friendly messages.
- * @see https://www.postgresql.org/docs/current/errcodes-appendix.html
- */
-export const PG_ERROR_MESSAGES: Record<string, string> = {
-  // Class 23 - Integrity Constraint Violation
-  "23000": "Data integrity violation",
-  "23001": "Restriction violation",
-  "23502": "Required field cannot be empty",
-  "23503": "Cannot delete: this record is referenced by other data",
-  "23505": "A record with this value already exists",
-  "23514": "Value does not meet requirements",
-
-  // Class 22 - Data Exception
-  "22000": "Invalid data format",
-  "22001": "Value is too long for this field",
-  "22003": "Number out of range",
-  "22007": "Invalid date/time format",
-  "22012": "Cannot divide by zero",
-  "22P02": "Invalid number format",
-
-  // Class 42 - Syntax/Access Error
-  "42501": "You don't have permission to perform this action",
-  "42601": "Invalid query syntax",
-  "42703": "Unknown field",
-  "42P01": "Table not found",
-
-  // Class 40 - Transaction Rollback
-  "40001": "Transaction conflict. Please try again.",
-  "40P01": "Deadlock detected. Please try again.",
-
-  // Class 53 - Insufficient Resources
-  "53000": "Server resources temporarily unavailable",
-  "53100": "Disk full",
-  "53200": "Out of memory",
-};
-
 /**
  * Map specific constraint names to user-friendly messages.
  * Add entries here as constraints are created in migrations.
@@ -152,7 +116,7 @@ export const CONSTRAINT_MESSAGES: Record<string, string> = {
  */
 export function parsePostgresError(error: PostgrestError): string {
   // Check for specific constraint violation
-  if (error.code === "23505" && error.message) {
+  if (error.code === PG_ERROR_CODES.UNIQUE_VIOLATION && error.message) {
     // Extract constraint name from message if available
     const match = error.message.match(/constraint "(\w+)"/);
     if (match && CONSTRAINT_MESSAGES[match[1]]) {
@@ -162,7 +126,7 @@ export function parsePostgresError(error: PostgrestError): string {
   }
 
   // Check for foreign key violation
-  if (error.code === "23503" && error.message) {
+  if (error.code === PG_ERROR_CODES.FOREIGN_KEY_VIOLATION && error.message) {
     const match = error.message.match(/constraint "(\w+)"/);
     if (match && CONSTRAINT_MESSAGES[match[1]]) {
       return CONSTRAINT_MESSAGES[match[1]];
@@ -171,7 +135,7 @@ export function parsePostgresError(error: PostgrestError): string {
   }
 
   // Check for check constraint violation
-  if (error.code === "23514" && error.message) {
+  if (error.code === PG_ERROR_CODES.CHECK_VIOLATION && error.message) {
     const match = error.message.match(/constraint "(\w+)"/);
     if (match && CONSTRAINT_MESSAGES[match[1]]) {
       return CONSTRAINT_MESSAGES[match[1]];
@@ -185,7 +149,7 @@ export function parsePostgresError(error: PostgrestError): string {
   }
 
   // Check for RLS/permission issues
-  if (error.message?.includes("row-level security") || error.code === "42501") {
+  if (error.message?.includes("row-level security") || error.code === PG_ERROR_CODES.INSUFFICIENT_PRIVILEGE) {
     return "You don't have permission to perform this action";
   }
 
@@ -218,19 +182,19 @@ export function isNotFoundError(error: unknown): error is NotFoundError {
  * Check if a Postgrest error indicates a unique constraint violation.
  */
 export function isUniqueViolation(error: PostgrestError): boolean {
-  return error.code === "23505";
+  return error.code === PG_ERROR_CODES.UNIQUE_VIOLATION;
 }
 
 /**
  * Check if a Postgrest error indicates a foreign key violation.
  */
 export function isForeignKeyViolation(error: PostgrestError): boolean {
-  return error.code === "23503";
+  return error.code === PG_ERROR_CODES.FOREIGN_KEY_VIOLATION;
 }
 
 /**
  * Check if a Postgrest error indicates a check constraint violation.
  */
 export function isCheckViolation(error: PostgrestError): boolean {
-  return error.code === "23514";
+  return error.code === PG_ERROR_CODES.CHECK_VIOLATION;
 }
