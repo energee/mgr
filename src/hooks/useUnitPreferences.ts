@@ -54,17 +54,6 @@ const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 };
 
 // =============================================================================
-// Query Keys (re-exported from centralized query-keys)
-// =============================================================================
-
-/** @deprecated Use userKeys from @/lib/query-keys directly */
-export const userPreferencesKeys = {
-  all: ["user", "preferences"] as const,
-  units: () => userKeys.units(),
-  full: () => userKeys.full(),
-};
-
-// =============================================================================
 // Hooks
 // =============================================================================
 

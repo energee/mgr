@@ -19,6 +19,21 @@ import { cn } from "@/lib/utils";
 import { shouldReplaceYeast } from "@/lib/yeast-calculations";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
 
+function viabilityColor(status: string | undefined): string {
+  switch (status) {
+    case "excellent":
+      return "text-green-600";
+    case "good":
+      return "text-green-500";
+    case "marginal":
+      return "text-yellow-500";
+    case "low":
+      return "text-orange-500";
+    default:
+      return "text-red-500";
+  }
+}
+
 interface YeastLineageDisplayProps {
   pitchId: string;
 }
@@ -285,20 +300,11 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
                 )}
 
                 {/* Viability */}
-                {pitch.estimated_viability !== null &&
-                  pitch.estimated_viability !== undefined && (
+                {pitch.estimated_viability != null && (
                     <span
                       className={cn(
                         "ml-auto text-xs",
-                        pitch.viability_status === "excellent"
-                          ? "text-green-600"
-                          : pitch.viability_status === "good"
-                            ? "text-green-500"
-                            : pitch.viability_status === "marginal"
-                              ? "text-yellow-500"
-                              : pitch.viability_status === "low"
-                                ? "text-orange-500"
-                                : "text-red-500"
+                        viabilityColor(pitch.viability_status)
                       )}
                     >
                       {Math.round(pitch.estimated_viability)}%

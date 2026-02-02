@@ -112,35 +112,33 @@ export const CONSTRAINT_MESSAGES: Record<string, string> = {
 // =============================================================================
 
 /**
+ * Extract a constraint name from a Postgres error message, if present.
+ */
+function extractConstraintMessage(errorMessage: string | undefined): string | null {
+  if (!errorMessage) return null;
+  const match = errorMessage.match(/constraint "(\w+)"/);
+  if (match && CONSTRAINT_MESSAGES[match[1]]) {
+    return CONSTRAINT_MESSAGES[match[1]];
+  }
+  return null;
+}
+
+/** Error codes that carry constraint names in their messages. */
+const CONSTRAINT_ERROR_CODES: ReadonlySet<string> = new Set([
+  PG_ERROR_CODES.UNIQUE_VIOLATION,
+  PG_ERROR_CODES.FOREIGN_KEY_VIOLATION,
+  PG_ERROR_CODES.CHECK_VIOLATION,
+]);
+
+/**
  * Parse a PostgreSQL/Postgrest error into a user-friendly message.
  */
 export function parsePostgresError(error: PostgrestError): string {
-  // Check for specific constraint violation
-  if (error.code === PG_ERROR_CODES.UNIQUE_VIOLATION && error.message) {
-    // Extract constraint name from message if available
-    const match = error.message.match(/constraint "(\w+)"/);
-    if (match && CONSTRAINT_MESSAGES[match[1]]) {
-      return CONSTRAINT_MESSAGES[match[1]];
-    }
-    return "A record with this value already exists";
-  }
-
-  // Check for foreign key violation
-  if (error.code === PG_ERROR_CODES.FOREIGN_KEY_VIOLATION && error.message) {
-    const match = error.message.match(/constraint "(\w+)"/);
-    if (match && CONSTRAINT_MESSAGES[match[1]]) {
-      return CONSTRAINT_MESSAGES[match[1]];
-    }
-    return "Cannot delete: this record is referenced by other data";
-  }
-
-  // Check for check constraint violation
-  if (error.code === PG_ERROR_CODES.CHECK_VIOLATION && error.message) {
-    const match = error.message.match(/constraint "(\w+)"/);
-    if (match && CONSTRAINT_MESSAGES[match[1]]) {
-      return CONSTRAINT_MESSAGES[match[1]];
-    }
-    return "Value does not meet requirements";
+  // Check for constraint violations (unique, foreign key, check)
+  if (error.code && CONSTRAINT_ERROR_CODES.has(error.code)) {
+    const constraintMsg = extractConstraintMessage(error.message);
+    if (constraintMsg) return constraintMsg;
+    // Fall through to standard message mapping for the error code
   }
 
   // Use standard message mapping

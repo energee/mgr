@@ -92,7 +92,7 @@ export function CreatePOFromShortfall({
   // Generate next PO number
   const { data: nextPONumber } = useQuery({
     queryKey: purchaseOrderKeys.nextNumber(),
-    queryFn: async () => generateNextPONumber(),
+    queryFn: generateNextPONumber,
     enabled: open,
   });
 
