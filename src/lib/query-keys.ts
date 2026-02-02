@@ -75,6 +75,7 @@ export const batchKeys = {
   readings: (id: string) => ["batches", id, "readings"] as const,
   allocations: (id: string) => ["batches", id, "allocations"] as const,
   blends: (id: string) => ["batches", id, "blends"] as const,
+  blendInfo: (id: string) => ["batches", id, "blend-info"] as const,
 };
 
 // =============================================================================
