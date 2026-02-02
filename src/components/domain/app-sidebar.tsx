@@ -101,6 +101,7 @@ const navigation: NavSection[] = [
     icon: DollarSign,
     items: [
       { label: "Orders", href: "/sales/orders", icon: FileText },
+      { label: "Pick Lists", href: "/sales/pick-lists", icon: ClipboardList },
       { label: "Customers", href: "/sales/customers", icon: Users },
     ],
   },
