@@ -46,6 +46,13 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
       handler: focusSearch,
     },
     {
+      key: ".",
+      label: "⌘.",
+      description: "Toggle AI assistant",
+      modifiers: { meta: true },
+      handler: () => {}, // Handled by ChatProvider
+    },
+    {
       key: "Escape",
       label: "Esc",
       description: "Close dialog / clear focus",
