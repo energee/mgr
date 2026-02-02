@@ -13,7 +13,6 @@
  * Lifecycle: planned → fermenting → conditioning → packaging → completed
  */
 
-import { z } from "zod";
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
@@ -24,29 +23,13 @@ import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-in
 import { BatchInsights } from "@/components/domain/batch-insights";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { BatchBlendHistory } from "@/components/domain/batch-blend-history";
+import { batchSchema, batchStates, batchTransitions } from "@/lib/schemas/batch";
+
+// Re-export schema so existing client-side imports keep working
+export { batchSchema, type BatchFormValues } from "@/lib/schemas/batch";
 
 // Use generated type from Supabase
 type Batch = Database["public"]["Tables"]["batches"]["Row"];
-
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const batchSchema = z.object({
-  batch_number: z.string().min(1, "Batch number is required"),
-  name: z.string().min(1, "Name is required"),
-  status: z.string().default("planned"),
-  recipe_id: z.string().uuid().nullable().optional(),
-  planned_start_date: z.string().nullable().optional(),  // Planned fermentation start
-  volume_bbl: z.coerce.number().nullable().optional(),   // Stored in BBL (canonical unit)
-  fermenter: z.string().nullable().optional(),
-  // Note: actual_og and actual brew_date come from linked brew_logs
-  actual_fg: z.coerce.number().nullable().optional(),
-  actual_abv: z.coerce.number().nullable().optional(),
-  notes: z.string().nullable().optional(),
-});
-
-export type BatchFormValues = z.infer<typeof batchSchema>;
 
 // =============================================================================
 // State Machine (defined separately to derive options)
@@ -54,18 +37,9 @@ export type BatchFormValues = z.infer<typeof batchSchema>;
 
 const batchStateMachine: StateMachineConfig<Batch> = {
   stateField: "status",
-  states: ["planned", "fermenting", "conditioning", "packaging", "completed", "cancelled", "archived"],
+  states: [...batchStates],
   initialState: "planned",
-  transitions: {
-    // Note: cancelled/archived are handled via custom actions with dialogs, not direct transitions
-    planned: ["fermenting"],
-    fermenting: ["conditioning"],
-    conditioning: ["packaging"],
-    packaging: ["completed"],
-    completed: [],
-    cancelled: [],
-    archived: [],
-  },
+  transitions: batchTransitions,
   stateDisplay: {
     planned: { label: "Planned", color: "default" },
     fermenting: { label: "Fermenting", color: "info" },

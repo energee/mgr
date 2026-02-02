@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Trash2, X } from "lucide-react";
+import { UnitInput } from "@/components/ui/unit-input";
 import {
   phaseConfig,
   metricConfig,
@@ -179,13 +180,11 @@ export function BrewEventForm({
   };
 
   const addMeasurement = () => {
-    // Default measurement based on phase
     let defaultMetric: BrewMeasurement["metric"] = "temp_f";
-    if (selectedPhase === "mash_in") defaultMetric = "temp_f";
-    if (selectedPhase.includes("gravity") || selectedPhase === "boil_end" || selectedPhase === "ko_end") {
+
+    if (selectedPhase === "boil_end" || selectedPhase === "ko_end") {
       defaultMetric = "gravity_plato";
-    }
-    if (selectedPhase === "hop_addition" || selectedPhase === "adjunct_addition") {
+    } else if (selectedPhase === "hop_addition" || selectedPhase === "adjunct_addition") {
       defaultMetric = "amount_oz";
     }
 
@@ -351,27 +350,41 @@ export function BrewEventForm({
                     <FormField
                       control={form.control}
                       name={`measurements.${index}.value`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <div className="flex items-center gap-1">
-                              <Input
-                                type="number"
-                                step="any"
-                                placeholder="Value"
-                                className="h-10"
-                                {...field}
-                              />
-                              <span className="text-sm text-muted-foreground min-w-[40px]">
-                                {metricConfig[
-                                  form.watch(`measurements.${index}.metric`) as keyof typeof metricConfig
-                                ]?.unit || ""}
-                              </span>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const metricKey = form.watch(`measurements.${index}.metric`) as keyof typeof metricConfig;
+                        const config = metricConfig[metricKey];
+                        const unitType = config && "unitType" in config ? config.unitType : undefined;
+                        const decimals = config && "decimals" in config ? config.decimals : 2;
+
+                        return (
+                          <FormItem>
+                            <FormControl>
+                              {unitType ? (
+                                <UnitInput
+                                  value={typeof field.value === "number" ? field.value : null}
+                                  onChange={(val) => field.onChange(val ?? "")}
+                                  unitType={unitType}
+                                  decimals={decimals}
+                                />
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    placeholder="Value"
+                                    className="h-10"
+                                    {...field}
+                                  />
+                                  <span className="text-sm text-muted-foreground min-w-[40px]">
+                                    {config?.unit || ""}
+                                  </span>
+                                </div>
+                              )}
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   </div>
 
