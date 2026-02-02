@@ -14,23 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import {
-  ShoppingCart,
-  DollarSign,
-  Users,
-  TrendingUp,
-  ArrowRight,
-  Clock,
-  CheckCircle,
-  Truck,
-  Package,
-  XCircle,
-  FileText,
-  Calendar,
-  BarChart3,
-} from "lucide-react";
 
 // =============================================================================
 // Types
@@ -75,13 +59,13 @@ interface ProductMix {
 // =============================================================================
 
 const statusConfig = {
-  draft: { label: "Draft", icon: FileText, color: "bg-slate-500" },
-  confirmed: { label: "Confirmed", icon: CheckCircle, color: "bg-blue-500" },
-  scheduled: { label: "Scheduled", icon: Calendar, color: "bg-cyan-500" },
-  picking: { label: "Picking", icon: Package, color: "bg-amber-500" },
-  packed: { label: "Packed", icon: Package, color: "bg-orange-500" },
-  fulfilled: { label: "Fulfilled", icon: Truck, color: "bg-green-500" },
-  cancelled: { label: "Cancelled", icon: XCircle, color: "bg-red-500" },
+  draft: { label: "Draft", color: "bg-slate-500" },
+  confirmed: { label: "Confirmed", color: "bg-blue-500" },
+  scheduled: { label: "Scheduled", color: "bg-cyan-500" },
+  picking: { label: "Picking", color: "bg-amber-500" },
+  packed: { label: "Packed", color: "bg-orange-500" },
+  fulfilled: { label: "Fulfilled", color: "bg-green-500" },
+  cancelled: { label: "Cancelled", color: "bg-red-500" },
 };
 
 const badgeVariants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -332,22 +316,13 @@ export default function SalesDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <TrendingUp className="h-6 w-6" />
-          Sales Dashboard
-        </h1>
-        <p className="text-muted-foreground">
-          Order pipeline and revenue overview
-        </p>
-      </div>
+      <h1 className="text-2xl font-bold">Sales Dashboard</h1>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
-            <ShoppingCart className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activeOrders}</div>
@@ -360,7 +335,6 @@ export default function SalesDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Draft Orders</CardTitle>
-            <Clock className="h-5 w-5 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{orderCounts.draft}</div>
@@ -373,7 +347,6 @@ export default function SalesDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
@@ -386,7 +359,6 @@ export default function SalesDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Order Value</CardTitle>
-            <BarChart3 className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -407,18 +379,14 @@ export default function SalesDashboardPage() {
               <CardTitle>Order Pipeline</CardTitle>
               <CardDescription>Orders by status across the fulfillment workflow</CardDescription>
             </div>
-            <Link href="/sales/orders">
-              <Button variant="outline" size="sm">
-                View All Orders
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+            <Link href="/sales/orders" className="text-sm text-muted-foreground hover:text-foreground underline">
+              View All
             </Link>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-7">
             {Object.entries(statusConfig).map(([status, config]) => {
-              const Icon = config.icon;
               const count = orderCounts[status as keyof OrderStatusCounts] || 0;
 
               return (
@@ -427,9 +395,6 @@ export default function SalesDashboardPage() {
                   href={`/sales/orders?status=${status}`}
                   className="flex flex-col items-center p-4 rounded-lg border hover:bg-muted/50 transition-colors text-center"
                 >
-                  <div className={`p-2 rounded-full ${config.color} mb-2`}>
-                    <Icon className="h-4 w-4 text-white" />
-                  </div>
                   <div className="text-2xl font-bold">{count}</div>
                   <div className="text-xs text-muted-foreground">{config.label}</div>
                 </Link>
@@ -448,18 +413,14 @@ export default function SalesDashboardPage() {
                 <CardTitle>Recent Orders</CardTitle>
                 <CardDescription>Latest orders by date</CardDescription>
               </div>
-              <Link href="/sales/orders">
-                <Button variant="outline" size="sm">
-                  View All
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+              <Link href="/sales/orders" className="text-sm text-muted-foreground hover:text-foreground underline">
+                View All
               </Link>
             </div>
           </CardHeader>
           <CardContent>
             {recentOrders.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
-                <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No orders yet</p>
               </div>
             ) : (
@@ -498,24 +459,17 @@ export default function SalesDashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Top Customers
-                </CardTitle>
+                <CardTitle>Top Customers</CardTitle>
                 <CardDescription>By fulfilled order revenue</CardDescription>
               </div>
-              <Link href="/sales/customers">
-                <Button variant="outline" size="sm">
-                  View All
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+              <Link href="/sales/customers" className="text-sm text-muted-foreground hover:text-foreground underline">
+                View All
               </Link>
             </div>
           </CardHeader>
           <CardContent>
             {customerRevenue.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
-                <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No fulfilled orders yet</p>
               </div>
             ) : (
@@ -553,16 +507,12 @@ export default function SalesDashboardPage() {
       {/* Product Mix */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Product Mix
-          </CardTitle>
+          <CardTitle>Product Mix</CardTitle>
           <CardDescription>Revenue breakdown by brand</CardDescription>
         </CardHeader>
         <CardContent>
           {productMix.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground">
-              <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>No product sales data yet</p>
             </div>
           ) : (
