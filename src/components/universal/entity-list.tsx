@@ -21,14 +21,16 @@ import {
   flexRender,
   type SortingState,
   type ColumnFiltersState,
+  type RowSelectionState,
 } from "@tanstack/react-table";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityColumnDef } from "@/types/entity";
 import { EntityErrorBoundary } from "./entity-error-boundary";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -95,10 +97,14 @@ export function EntityList<T = Record<string, unknown>>({
   onAction,
 }: EntityListProps<T>) {
   const supabase = createClient();
+  const queryClient = useQueryClient();
   // Cast to any for dynamic table access - universal components work with any entity
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
   const path = basePath || `/${entity.domain}/${entity.name}s`;
+
+  // Whether this entity supports bulk status changes
+  const hasBulkActions = !!entity.stateMachine;
 
   // Table state
   const [sorting, setSorting] = useState<SortingState>(
@@ -108,6 +114,11 @@ export function EntityList<T = Record<string, unknown>>({
   );
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+
+  // Bulk selection state
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkTargetStatus, setBulkTargetStatus] = useState<string>("");
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   // Quick filter state - maps field name to selected value(s)
   const [quickFilters, setQuickFilters] = useState<Record<string, string | string[]>>({});
@@ -245,6 +256,90 @@ export function EntityList<T = Record<string, unknown>>({
     },
   });
 
+  // Reset row selection when data changes (e.g., filter change)
+  useEffect(() => {
+    setRowSelection({});
+    setBulkTargetStatus("");
+  }, [quickFilters, globalFilter]);
+
+  // Compute valid bulk transitions for selected rows
+  const selectedRows = useMemo(() => {
+    if (!data) return [];
+    return Object.keys(rowSelection)
+      .filter((key) => rowSelection[key])
+      .map((key) => data[parseInt(key)])
+      .filter(Boolean);
+  }, [rowSelection, data]);
+
+  const bulkTransitionOptions = useMemo(() => {
+    if (!entity.stateMachine || selectedRows.length === 0) return [];
+
+    const stateField = entity.stateMachine.stateField;
+    const transitions = entity.stateMachine.transitions;
+    const stateDisplay = entity.stateMachine.stateDisplay;
+
+    // Get the set of current states for all selected rows
+    const currentStates = new Set(
+      selectedRows.map((row) => (row as Record<string, unknown>)[stateField] as string)
+    );
+
+    // Find transitions valid for ALL selected items
+    // (intersection of allowed targets for each current state)
+    let commonTargets: string[] | null = null;
+    for (const state of currentStates) {
+      const allowed = transitions[state] || [];
+      if (commonTargets === null) {
+        commonTargets = [...allowed];
+      } else {
+        commonTargets = commonTargets.filter((t) => allowed.includes(t));
+      }
+    }
+
+    return (commonTargets || []).map((state) => ({
+      value: state,
+      label: stateDisplay?.[state]?.label || state,
+    }));
+  }, [entity.stateMachine, selectedRows]);
+
+  const handleBulkStatusChange = useCallback(async () => {
+    if (!entity.stateMachine || !bulkTargetStatus || selectedRows.length === 0) return;
+
+    const stateField = entity.stateMachine.stateField;
+    const ids = selectedRows.map((row) => (row as Record<string, unknown>).id as string);
+
+    setIsBulkUpdating(true);
+    try {
+      const { error } = await db
+        .from(entity.table)
+        .update({ [stateField]: bulkTargetStatus })
+        .in("id", ids);
+
+      if (error) throw error;
+
+      toast.success(
+        `Updated ${ids.length} ${ids.length === 1 ? entity.displayName.toLowerCase() : entity.displayNamePlural.toLowerCase()} to ${
+          entity.stateMachine.stateDisplay?.[bulkTargetStatus]?.label || bulkTargetStatus
+        }`
+      );
+
+      // Invalidate queries
+      const fetchTable = entity.viewTable || entity.table;
+      queryClient.invalidateQueries({ queryKey: entityKeys.all(fetchTable) });
+      if (entity.viewTable) {
+        queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.table) });
+      }
+
+      // Clear selection
+      setRowSelection({});
+      setBulkTargetStatus("");
+    } catch (err) {
+      console.error("Bulk status update failed:", err);
+      toast.error("Failed to update status. Please try again.");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  }, [entity, bulkTargetStatus, selectedRows, db, queryClient]);
+
   // Build columns from entity config
   const columns = useMemo(() => {
     return entity.listColumns.map((col) => ({
@@ -263,9 +358,33 @@ export function EntityList<T = Record<string, unknown>>({
     }));
   }, [entity.listColumns]);
 
-  // Add actions column
+  // Add selection checkbox column + actions column
   const columnsWithActions = useMemo(() => {
+    const selectColumn = hasBulkActions
+      ? [
+          {
+            id: "select",
+            header: ({ table: tbl }: { table: { getIsAllPageRowsSelected: () => boolean; getIsSomePageRowsSelected: () => boolean; toggleAllPageRowsSelected: (v?: boolean) => void } }) => (
+              <Checkbox
+                checked={tbl.getIsAllPageRowsSelected() || (tbl.getIsSomePageRowsSelected() && "indeterminate")}
+                onCheckedChange={(value) => tbl.toggleAllPageRowsSelected(!!value)}
+                aria-label="Select all"
+              />
+            ),
+            cell: ({ row }: { row: { getIsSelected: () => boolean; toggleSelected: (v?: boolean) => void } }) => (
+              <Checkbox
+                checked={row.getIsSelected()}
+                onCheckedChange={(value) => row.toggleSelected(!!value)}
+                aria-label="Select row"
+              />
+            ),
+            enableSorting: false,
+            enableHiding: false,
+          },
+        ]
+      : [];
     return [
+      ...selectColumn,
       ...columns,
       {
         id: "actions",
@@ -333,10 +452,12 @@ export function EntityList<T = Record<string, unknown>>({
       sorting,
       columnFilters,
       globalFilter,
+      ...(hasBulkActions ? { rowSelection } : {}),
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
+    ...(hasBulkActions ? { onRowSelectionChange: setRowSelection, enableRowSelection: true } : {}),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -714,6 +835,63 @@ export function EntityList<T = Record<string, unknown>>({
               disabled={!table.getCanNextPage()}
             >
               Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Action Bar */}
+      {hasBulkActions && selectedRows.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 bg-background border rounded-lg shadow-lg px-4 py-3">
+            <span className="text-sm font-medium whitespace-nowrap">
+              {selectedRows.length} selected
+            </span>
+            <div className="h-4 w-px bg-border" />
+            {bulkTransitionOptions.length > 0 ? (
+              <>
+                <Select
+                  value={bulkTargetStatus || "_placeholder"}
+                  onValueChange={(v) => setBulkTargetStatus(v === "_placeholder" ? "" : v)}
+                >
+                  <SelectTrigger className="h-8 w-[180px] text-sm">
+                    <SelectValue placeholder="Change status to..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_placeholder" disabled>
+                      Change status to...
+                    </SelectItem>
+                    {bulkTransitionOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  onClick={handleBulkStatusChange}
+                  disabled={!bulkTargetStatus || isBulkUpdating}
+                >
+                  {isBulkUpdating ? "Updating..." : "Apply"}
+                </Button>
+              </>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                No common status transitions available
+              </span>
+            )}
+            <div className="h-4 w-px bg-border" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setRowSelection({});
+                setBulkTargetStatus("");
+              }}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear
             </Button>
           </div>
         </div>
