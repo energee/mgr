@@ -172,13 +172,6 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       showInDetail: true,
     },
     {
-      name: "brand",
-      entity: "brand",
-      type: "belongsTo",
-      foreignKey: "brand_id",
-      showInDetail: true,
-    },
-    {
       name: "batch",
       entity: "batch",
       type: "belongsTo",

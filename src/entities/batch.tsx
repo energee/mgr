@@ -380,22 +380,6 @@ export const batchEntity: EntityConfig<Batch> = {
       showInDetail: true,
       detailTab: "Transfers",
     },
-    {
-      name: "batch_logs",
-      entity: "batch_log",
-      type: "hasMany",
-      foreignKey: "batch_id",
-      showInDetail: true,
-      detailTab: "Audit Log",
-    },
-    {
-      name: "blend_sources",
-      entity: "batch_blend",
-      type: "hasMany",
-      foreignKey: "blend_batch_id",
-      showInDetail: true,
-      detailTab: "Blend Sources",
-    },
   ],
 
   // ---------------------------------------------------------------------------

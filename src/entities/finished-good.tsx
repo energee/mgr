@@ -230,14 +230,6 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       type: "belongsTo",
       foreignKey: "batch_id",
     },
-    {
-      name: "allocations",
-      entity: "allocation",
-      type: "hasMany",
-      foreignKey: "source_id",
-      showInDetail: true,
-      detailTab: "Allocations",
-    },
   ],
 
   // ---------------------------------------------------------------------------
