@@ -12,8 +12,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -101,22 +100,9 @@ export function AdjunctEditor({
 }: AdjunctEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch adjunct catalog
-  const { data: adjunctCatalog = [], isLoading } = useQuery({
-    queryKey: catalogKeys.adjuncts(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("adjuncts")
-        .select("id, name, type, color_lovibond, potential_ppg, requires_mash")
-        .eq("is_active", true)
-        .order("type")
-        .order("name");
-      if (error) throw error;
-      return data as AdjunctCatalogItem[];
-    },
-  });
+  const { data: adjunctCatalog = [], isLoading } = useCatalog<AdjunctCatalogItem>(catalogKeys.adjuncts(), "adjuncts", "id, name, type, color_lovibond, potential_ppg, requires_mash", ["type", "name"]);
 
   // Calculate totals
   const totals = useMemo(() => {

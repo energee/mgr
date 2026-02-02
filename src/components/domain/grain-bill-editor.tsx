@@ -13,8 +13,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -88,22 +87,9 @@ export function GrainBillEditor({
 }: GrainBillEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch malt catalog
-  const { data: maltCatalog = [], isLoading: loadingMalts } = useQuery({
-    queryKey: catalogKeys.malts(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("malts")
-        .select("id, name, maltster, type, color_lovibond, potential_ppg")
-        .eq("is_active", true)
-        .order("type")
-        .order("name");
-      if (error) throw error;
-      return data as MaltCatalogItem[];
-    },
-  });
+  const { data: maltCatalog = [], isLoading: loadingMalts } = useCatalog<MaltCatalogItem>(catalogKeys.malts(), "malts", "id, name, maltster, type, color_lovibond, potential_ppg", ["type", "name"]);
 
   // Calculate totals
   const totals = useMemo(() => {

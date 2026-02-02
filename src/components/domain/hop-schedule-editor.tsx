@@ -13,8 +13,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -111,22 +110,9 @@ export function HopScheduleEditor({
 }: HopScheduleEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch hop catalog
-  const { data: hopCatalog = [], isLoading: loadingHops } = useQuery({
-    queryKey: catalogKeys.hops(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hops")
-        .select("id, name, origin, type, alpha_acid_typical, flavor_profile")
-        .eq("is_active", true)
-        .order("type")
-        .order("name");
-      if (error) throw error;
-      return data as HopCatalogItem[];
-    },
-  });
+  const { data: hopCatalog = [], isLoading: loadingHops } = useCatalog<HopCatalogItem>(catalogKeys.hops(), "hops", "id, name, origin, type, alpha_acid_typical, flavor_profile", ["type", "name"]);
 
   // Calculate IBU for a single hop addition (Tinseth formula)
   const calculateIBU = useCallback(

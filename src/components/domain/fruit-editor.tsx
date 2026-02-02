@@ -12,8 +12,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -119,22 +118,9 @@ export function FruitEditor({
 }: FruitEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch fruit catalog
-  const { data: fruitCatalog = [], isLoading } = useQuery({
-    queryKey: catalogKeys.fruits(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("fruits")
-        .select("id, name, type, form, sugar_content")
-        .eq("is_active", true)
-        .order("type")
-        .order("name");
-      if (error) throw error;
-      return data as FruitCatalogItem[];
-    },
-  });
+  const { data: fruitCatalog = [], isLoading } = useCatalog<FruitCatalogItem>(catalogKeys.fruits(), "fruits", "id, name, type, form, sugar_content", ["type", "name"]);
 
   // Calculate totals
   const totals = useMemo(() => {

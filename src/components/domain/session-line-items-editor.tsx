@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { brandKeys, packageTypeKeys, sessionLineItemKeys } from "@/lib/query-keys";
+import { sessionLineItemKeys } from "@/lib/query-keys";
+import { useBrands, usePackageTypes } from "@/hooks/use-catalog";
 
 // =============================================================================
 // Types
@@ -112,33 +113,9 @@ export function SessionLineItemsEditor({
     },
   });
 
-  // Fetch brands
-  const { data: brands } = useQuery({
-    queryKey: brandKeys.all(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brands")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data as Brand[];
-    },
-  });
-
-  // Fetch package types
-  const { data: packageTypes } = useQuery({
-    queryKey: packageTypeKeys.all(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("package_types")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data as PackageType[];
-    },
-  });
+  // Fetch brands and package types
+  const { data: brands } = useBrands();
+  const { data: packageTypes } = usePackageTypes();
 
   // Add item mutation
   const addItem = useMutation({

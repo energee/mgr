@@ -12,8 +12,7 @@
  */
 
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -90,24 +89,9 @@ export function YeastSelector({
 }: YeastSelectorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch yeast catalog
-  const { data: yeastCatalog = [], isLoading: loadingYeasts } = useQuery({
-    queryKey: catalogKeys.yeasts(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("yeasts")
-        .select(
-          "id, name, manufacturer, product_code, type, form, attenuation_typical, temp_min_f, temp_max_f, flocculation"
-        )
-        .eq("is_active", true)
-        .order("manufacturer")
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as YeastCatalogItem[];
-    },
-  });
+  const { data: yeastCatalog = [], isLoading: loadingYeasts } = useCatalog<YeastCatalogItem>(catalogKeys.yeasts(), "yeasts", "id, name, manufacturer, product_code, type, form, attenuation_typical, temp_min_f, temp_max_f, flocculation", ["manufacturer", "name"]);
 
   // Group by manufacturer
   const groupedYeasts = useMemo(() => {
