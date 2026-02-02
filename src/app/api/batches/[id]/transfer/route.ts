@@ -6,28 +6,14 @@ import {
   validateBody,
   ApiError,
 } from "@/lib/api";
+import { batchEntity } from "@/entities/batch";
+
+const transitions = batchEntity.stateMachine!.transitions;
+const validStates = Object.keys(transitions) as [string, ...string[]];
 
 const transitionSchema = z.object({
-  to_status: z.enum([
-    "planned",
-    "fermenting",
-    "conditioning",
-    "packaging",
-    "completed",
-    "cancelled",
-    "archived",
-  ]),
+  to_status: z.enum(validStates),
 });
-
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  planned: ["fermenting"],
-  fermenting: ["conditioning"],
-  conditioning: ["packaging"],
-  packaging: ["completed"],
-  completed: [],
-  cancelled: [],
-  archived: [],
-};
 
 export const POST = withAuth(async (request, { supabase, params }) => {
   const id = params?.id;
@@ -45,7 +31,7 @@ export const POST = withAuth(async (request, { supabase, params }) => {
     return errorResponse("NOT_FOUND", "Batch not found", undefined, 404);
   }
 
-  const allowed = VALID_TRANSITIONS[batch.status] ?? [];
+  const allowed = transitions[batch.status] ?? [];
   if (!allowed.includes(to_status)) {
     throw new ApiError(
       "VALIDATION_ERROR",
