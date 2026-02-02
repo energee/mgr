@@ -36,6 +36,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, GitMerge } from "lucide-react";
 import { toast } from "sonner";
+import { getStateLabel } from "@/types/entity";
+import { batchEntity } from "@/entities/batch";
 
 // =============================================================================
 // Types
@@ -279,8 +281,8 @@ export function BatchBlendDialog({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {batch.status}
+                          <Badge variant="outline">
+                            {getStateLabel(batchEntity, batch.status)}
                           </Badge>
                         </TableCell>
                         <TableCell>{batch.volume_bbl ?? "-"}</TableCell>

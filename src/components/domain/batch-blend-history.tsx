@@ -21,6 +21,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Loader2, GitMerge } from "lucide-react";
 import Link from "next/link";
+import { getStateLabel } from "@/types/entity";
+import { batchEntity } from "@/entities/batch";
 
 // =============================================================================
 // Types
@@ -131,8 +133,8 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                       {blend.source_recipe_name ?? "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {blend.source_batch_status}
+                      <Badge variant="outline">
+                        {getStateLabel(batchEntity, blend.source_batch_status)}
                       </Badge>
                     </TableCell>
                     <TableCell>{Number(blend.volume_bbl).toFixed(2)}</TableCell>

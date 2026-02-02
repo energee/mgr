@@ -1,5 +1,5 @@
 -- =============================================================================
--- Migration 00055: Landed Cost Calculation
+-- Migration 00056: Landed Cost Calculation
 -- =============================================================================
 -- Adds a database function to calculate landed cost per unit on inventory lots
 -- by allocating PO shipping cost across line items proportionally by value.
