@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Calculator, Calendar, FileText, Save } from "lucide-react";
+import { ArrowLeft, Bot, Building2, Calculator, Calendar, FileText, Save } from "lucide-react";
 
 // =============================================================================
 // Schema
@@ -63,6 +63,9 @@ const systemSettingsSchema = z.object({
   ttb_brewery_number: z.string(),
   ttb_permit_number: z.string(),
   abc_license_number: z.string(),
+
+  // Integrations
+  anthropic_api_key: z.string(),
 });
 
 type SystemSettingsForm = z.infer<typeof systemSettingsSchema>;
@@ -193,6 +196,7 @@ export default function SystemSettingsPage() {
       ttb_brewery_number: "",
       ttb_permit_number: "",
       abc_license_number: "",
+      anthropic_api_key: "",
     },
   });
 
@@ -220,6 +224,7 @@ export default function SystemSettingsPage() {
         ttb_brewery_number: (settings.ttb_brewery_number as string) || "",
         ttb_permit_number: (settings.ttb_permit_number as string) || "",
         abc_license_number: (settings.abc_license_number as string) || "",
+        anthropic_api_key: (settings.anthropic_api_key as string) || "",
       });
     }
   }, [settings, form]);
@@ -248,6 +253,7 @@ export default function SystemSettingsPage() {
         ttb_brewery_number: values.ttb_brewery_number,
         ttb_permit_number: values.ttb_permit_number,
         abc_license_number: values.abc_license_number,
+        anthropic_api_key: values.anthropic_api_key,
       });
       toast.success("System settings saved");
     } catch (error) {
@@ -285,7 +291,7 @@ export default function SystemSettingsPage() {
       ) : (
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="general" className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
                 <span className="hidden sm:inline">General</span>
@@ -301,6 +307,10 @@ export default function SystemSettingsPage() {
               <TabsTrigger value="compliance" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 <span className="hidden sm:inline">Compliance</span>
+              </TabsTrigger>
+              <TabsTrigger value="integrations" className="flex items-center gap-2">
+                <Bot className="h-4 w-4" />
+                <span className="hidden sm:inline">Integrations</span>
               </TabsTrigger>
             </TabsList>
 
@@ -603,6 +613,43 @@ export default function SystemSettingsPage() {
                     />
                     <p className="text-xs text-muted-foreground">
                       Your state Alcoholic Beverage Control license number
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Integrations Tab */}
+            <TabsContent value="integrations">
+              <Card>
+                <CardHeader>
+                  <CardTitle>AI Integration</CardTitle>
+                  <CardDescription>
+                    Configure the AI brewery assistant. This key is used as a fallback
+                    when individual users don&apos;t have their own key configured.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="anthropic_api_key">Anthropic API Key (Global)</Label>
+                    <Input
+                      id="anthropic_api_key"
+                      type="password"
+                      {...form.register("anthropic_api_key")}
+                      placeholder="sk-ant-..."
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Get your API key from{" "}
+                      <a
+                        href="https://console.anthropic.com/settings/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        console.anthropic.com
+                      </a>
+                      . Users can override this with their own key in Brewery Settings.
                     </p>
                   </div>
                 </CardContent>
