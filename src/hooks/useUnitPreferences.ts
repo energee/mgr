@@ -29,6 +29,7 @@ export interface UnitPreferences {
   temperature_unit: TemperatureUnit;
   gravity_unit: GravityUnit;
   retail_volume_unit: RetailVolumeUnit;
+  anthropic_api_key: string;
 }
 
 export interface UserPreferences extends UnitPreferences {
@@ -50,6 +51,7 @@ const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
   temperature_unit: "f",
   gravity_unit: "plato",
   retail_volume_unit: "oz",
+  anthropic_api_key: "",
 };
 
 // =============================================================================
@@ -84,11 +86,10 @@ export function useUnitPreferences() {
         return DEFAULT_UNIT_PREFERENCES;
       }
 
+      // Use select("*") to include anthropic_api_key which may not be in generated types yet
       const { data, error } = await supabase
         .from("user_preferences")
-        .select(
-          "volume_unit, weight_unit, temperature_unit, gravity_unit, retail_volume_unit"
-        )
+        .select("*")
         .eq("user_id", user.id)
         .single();
 
@@ -96,7 +97,15 @@ export function useUnitPreferences() {
         return DEFAULT_UNIT_PREFERENCES;
       }
 
-      return data as UnitPreferences;
+      const row = data as unknown as Record<string, unknown>;
+      return {
+        volume_unit: row.volume_unit,
+        weight_unit: row.weight_unit,
+        temperature_unit: row.temperature_unit,
+        gravity_unit: row.gravity_unit,
+        retail_volume_unit: row.retail_volume_unit,
+        anthropic_api_key: (row.anthropic_api_key as string) ?? "",
+      } as UnitPreferences;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes

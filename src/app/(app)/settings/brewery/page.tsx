@@ -23,7 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Building2, Ruler, Save } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Bot, Building2, Ruler, Save } from "lucide-react";
 import {
   useUnitPreferences,
   useUpdateUnitPreferences,
@@ -39,6 +40,7 @@ const unitPreferencesSchema = z.object({
   temperature_unit: z.enum(["f", "c"]),
   gravity_unit: z.enum(["plato", "sg"]),
   retail_volume_unit: z.enum(["oz", "ml"]),
+  anthropic_api_key: z.string(),
 });
 
 type UnitPreferencesForm = z.infer<typeof unitPreferencesSchema>;
@@ -90,6 +92,7 @@ export default function BrewerySettingsPage() {
       temperature_unit: "f",
       gravity_unit: "plato",
       retail_volume_unit: "oz",
+      anthropic_api_key: "",
     },
   });
 
@@ -102,6 +105,7 @@ export default function BrewerySettingsPage() {
         temperature_unit: preferences.temperature_unit,
         gravity_unit: preferences.gravity_unit,
         retail_volume_unit: preferences.retail_volume_unit,
+        anthropic_api_key: preferences.anthropic_api_key || "",
       });
     }
   }, [preferences, form]);
@@ -279,6 +283,44 @@ export default function BrewerySettingsPage() {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   For package sizes (cans, bottles, etc.)
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Assistant */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                AI Assistant
+              </CardTitle>
+              <CardDescription>
+                Set your personal API key for the AI brewery assistant.
+                This overrides the global key set in System Settings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="anthropic_api_key">Anthropic API Key</Label>
+                <Input
+                  id="anthropic_api_key"
+                  type="password"
+                  {...form.register("anthropic_api_key")}
+                  placeholder="sk-ant-..."
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional. Get your key from{" "}
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    console.anthropic.com
+                  </a>
+                  . Leave blank to use the brewery&apos;s global key.
                 </p>
               </div>
             </CardContent>
