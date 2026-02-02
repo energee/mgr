@@ -43,6 +43,18 @@ import { batchEntity } from "@/entities/batch";
 // Types
 // =============================================================================
 
+interface SourceBatch {
+  id: string;
+  batch_number: string;
+  name: string;
+  status: string;
+  volume_bbl: number | null;
+  actual_abv: number | null;
+  actual_og: number | null;
+  actual_fg: number | null;
+  recipe_id: string | null;
+}
+
 interface SourceBatchSelection {
   batchId: string;
   volumeBbl: number;
@@ -88,7 +100,7 @@ export function BatchBlendDialog({
         .neq("id", batchId)
         .order("batch_number");
       if (error) throw error;
-      return data;
+      return data as SourceBatch[];
     },
     enabled: open,
   });
