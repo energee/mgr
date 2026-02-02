@@ -423,6 +423,9 @@ function SectionCard<T>({
   data: T;
   entity: EntityConfig<T>;
 }) {
+  // Hooks must be called unconditionally
+  const relationDisplayValues = useRelationDisplayValues(section.fields, data);
+
   // Custom component takes precedence
   if (section.component) {
     const CustomComponent = section.component;
@@ -437,9 +440,6 @@ function SectionCard<T>({
       </Card>
     );
   }
-
-  // Fetch relation display values for FK fields
-  const relationDisplayValues = useRelationDisplayValues(section.fields, data);
 
   // Render fields
   return (

@@ -307,4 +307,5 @@ When reviewing recipes, check:
 
 ## When making commits
 
-1. Never put Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+1. Always run `pnpm lint` before committing and fix any errors introduced by your changes
+2. Never put Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
