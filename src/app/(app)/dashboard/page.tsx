@@ -15,20 +15,7 @@ import { dashboardKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import {
-  Beer,
-  FlaskConical,
-  Package,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  Container,
-  ArrowRight,
-  Activity,
-  CalendarClock,
-} from "lucide-react";
 import { vesselEntity } from "@/entities/vessel";
 import { getStateLabel } from "@/types/entity";
 
@@ -68,11 +55,11 @@ interface VesselStatus {
 // =============================================================================
 
 const statusConfig = {
-  planned: { label: "Planned", icon: Clock, color: "bg-slate-500" },
-  fermenting: { label: "Fermenting", icon: FlaskConical, color: "bg-blue-500" },
-  conditioning: { label: "Conditioning", icon: Beer, color: "bg-cyan-500" },
-  packaging: { label: "Packaging", icon: Package, color: "bg-amber-500" },
-  completed: { label: "Completed", icon: CheckCircle, color: "bg-green-500" },
+  planned: { label: "Planned", color: "bg-slate-500" },
+  fermenting: { label: "Fermenting", color: "bg-blue-500" },
+  conditioning: { label: "Conditioning", color: "bg-cyan-500" },
+  packaging: { label: "Packaging", color: "bg-amber-500" },
+  completed: { label: "Completed", color: "bg-green-500" },
 };
 
 
@@ -205,29 +192,17 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Activity className="h-6 w-6" />
-          Production Dashboard
-        </h1>
-        <p className="text-muted-foreground">
-          Overview of production status and vessel utilization
-        </p>
-      </div>
+      <h1 className="text-2xl font-bold">Production Dashboard</h1>
 
       {/* Batch Status Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {Object.entries(statusConfig).map(([status, config]) => {
-          const Icon = config.icon;
           const count = batchCounts[status as keyof BatchStatusCounts] || 0;
 
           return (
             <Card key={status}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{config.label}</CardTitle>
-                <div className={`p-2 rounded-full ${config.color}`}>
-                  <Icon className="h-4 w-4 text-white" />
-                </div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{count}</div>
@@ -243,34 +218,24 @@ export default function DashboardPage() {
       {/* Production Planning Alert */}
       {shortfalls.length > 0 && (
         <Card className={urgentShortfalls.length > 0 ? "border-destructive" : "border-amber-500"}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarClock className={`h-5 w-5 ${urgentShortfalls.length > 0 ? "text-destructive" : "text-amber-500"}`} />
-                <CardTitle className="text-base">Production Planning</CardTitle>
-              </div>
-              <Link href="/production/planning">
-                <Button variant={urgentShortfalls.length > 0 ? "destructive" : "outline"} size="sm">
-                  View Planning
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="flex items-center justify-between py-4">
             <div className="flex items-center gap-6">
               <div>
                 <span className="text-2xl font-bold">{shortfalls.length}</span>
                 <span className="text-sm text-muted-foreground ml-2">shortfalls</span>
               </div>
               {urgentShortfalls.length > 0 && (
-                <div className="flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="font-medium">{urgentShortfalls.length} urgent</span>
-                  <span className="text-sm">- need immediate action</span>
-                </div>
+                <span className="font-medium text-destructive">
+                  {urgentShortfalls.length} urgent
+                </span>
               )}
             </div>
+            <Link
+              href="/production/planning"
+              className="text-sm text-muted-foreground hover:text-foreground underline"
+            >
+              View Planning
+            </Link>
           </CardContent>
         </Card>
       )}
@@ -284,18 +249,17 @@ export default function DashboardPage() {
                 <CardTitle>Active Batches</CardTitle>
                 <CardDescription>Batches currently in production</CardDescription>
               </div>
-              <Link href="/production/batches">
-                <Button variant="outline" size="sm">
-                  View All
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+              <Link
+                href="/production/batches"
+                className="text-sm text-muted-foreground hover:text-foreground underline"
+              >
+                View All
               </Link>
             </div>
           </CardHeader>
           <CardContent>
             {activeBatches.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
-                <FlaskConical className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No active batches</p>
               </div>
             ) : (
@@ -320,8 +284,7 @@ export default function DashboardPage() {
                             {batch.volume_bbl} BBL
                           </span>
                         )}
-                        <Badge variant="secondary" className="flex items-center gap-1">
-                          {config && <config.icon className="h-3 w-3" />}
+                        <Badge variant="secondary">
                           {config?.label || batch.status}
                         </Badge>
                       </div>
@@ -341,11 +304,11 @@ export default function DashboardPage() {
                 <CardTitle>Vessel Utilization</CardTitle>
                 <CardDescription>Current vessel status overview</CardDescription>
               </div>
-              <Link href="/production/vessels">
-                <Button variant="outline" size="sm">
-                  View All
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+              <Link
+                href="/production/vessels"
+                className="text-sm text-muted-foreground hover:text-foreground underline"
+              >
+                View All
               </Link>
             </div>
           </CardHeader>
@@ -369,22 +332,12 @@ export default function DashboardPage() {
             </div>
 
             {/* Vessel Status Summary */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="text-center p-3 rounded-lg bg-muted/50">
-                <Container className="h-5 w-5 mx-auto mb-1 text-blue-500" />
-                <div className="text-lg font-bold">{vesselStats.inUse}</div>
-                <div className="text-xs text-muted-foreground">In Use</div>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-muted/50">
-                <CheckCircle className="h-5 w-5 mx-auto mb-1 text-green-500" />
-                <div className="text-lg font-bold">{vesselStats.available}</div>
-                <div className="text-xs text-muted-foreground">Available</div>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-muted/50">
-                <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-amber-500" />
-                <div className="text-lg font-bold">{vesselStats.maintenance}</div>
-                <div className="text-xs text-muted-foreground">Maint.</div>
-              </div>
+            <div className="flex items-center gap-4 mb-4 text-sm">
+              <span><span className="font-bold">{vesselStats.inUse}</span> in use</span>
+              <span className="text-muted-foreground">·</span>
+              <span><span className="font-bold">{vesselStats.available}</span> available</span>
+              <span className="text-muted-foreground">·</span>
+              <span><span className="font-bold">{vesselStats.maintenance}</span> maintenance</span>
             </div>
 
             {/* Vessel List */}
@@ -395,10 +348,7 @@ export default function DashboardPage() {
                   href={`/production/vessels/${vessel.id}`}
                   className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
-                    <Container className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">{vessel.name}</span>
-                  </div>
+                  <span className="font-medium text-sm">{vessel.name}</span>
                   <div className="flex items-center gap-2">
                     {vessel.current_batch_name && (
                       <span className="text-xs text-muted-foreground truncate max-w-[100px]">

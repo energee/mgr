@@ -38,7 +38,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 export function EntityDetail<T = Record<string, unknown>>({
   entity,
@@ -191,14 +191,12 @@ export function EntityDetail<T = Record<string, unknown>>({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={backUrl || path}>
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Link>
-            </Button>
-          </div>
+          <Link
+            href={backUrl || path}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            ← Back
+          </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">
               {header?.title || `${entity.displayName} ${id}`}
@@ -219,7 +217,6 @@ export function EntityDetail<T = Record<string, unknown>>({
           {showEdit && (
             <Button variant="outline" asChild>
               <Link href={`${path}/${id}/edit`}>
-                <Pencil className="h-4 w-4 mr-2" />
                 Edit
               </Link>
             </Button>
@@ -230,7 +227,7 @@ export function EntityDetail<T = Record<string, unknown>>({
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
                   Actions
-                  <MoreHorizontal className="h-4 w-4 ml-2" />
+                  <ChevronDown className="h-4 w-4 ml-2" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -520,7 +517,6 @@ function RelationTable({
             href={`/${relatedEntity.domain}/${routeName}s/new?${relation.foreignKey}=${parentId}`}
             aria-label={`Add new ${relatedEntity.displayName.toLowerCase()}`}
           >
-            <Plus className="h-4 w-4 mr-1" />
             Add
           </Link>
         </Button>
