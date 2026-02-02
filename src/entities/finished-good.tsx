@@ -59,16 +59,14 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       sortable: true,
     },
     {
-      accessorKey: "brand_id",
+      accessorKey: "brand_name",
       header: "Brand",
       sortable: true,
-      // TODO: Join brand name in view
     },
     {
-      accessorKey: "package_type_id",
+      accessorKey: "package_type_name",
       header: "Package",
       sortable: true,
-      // TODO: Join package type name in view
     },
     {
       accessorKey: "quantity",

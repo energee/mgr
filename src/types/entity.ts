@@ -230,6 +230,12 @@ export interface EntityFieldDisplay<T> {
   /** Unit type for unit formatting (volume, weight, temperature, gravity, retail_volume) */
   unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
 
+  /** Related entity for FK fields (fetches display name from related table) */
+  relation?: {
+    entity: string;
+    displayField: string;
+  };
+
   /** Custom render function */
   render?: (value: unknown, data: T) => ReactNode;
 

@@ -111,9 +111,8 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       title: "Transfer Details",
       fields: [
         { field: "transferred_at", label: "Date/Time", format: "datetime" },
-        // TODO: Add relation support to EntityFieldDisplay type
-        { field: "from_vessel_id", label: "From Vessel" },
-        { field: "to_vessel_id", label: "To Vessel" },
+        { field: "from_vessel_id", label: "From Vessel", relation: { entity: "vessel", displayField: "name" } },
+        { field: "to_vessel_id", label: "To Vessel", relation: { entity: "vessel", displayField: "name" } },
         { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
         { field: "notes", label: "Notes" },
       ],
