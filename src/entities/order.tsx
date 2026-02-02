@@ -297,6 +297,14 @@ export const orderEntity: EntityConfig<Order> = {
       showInDetail: true,
       detailTab: "Items",
     },
+    {
+      name: "pick_lists",
+      entity: "pick_list",
+      type: "hasMany",
+      foreignKey: "order_id",
+      showInDetail: true,
+      detailTab: "Pick Lists",
+    },
   ],
 
   // ---------------------------------------------------------------------------

@@ -39,6 +39,7 @@ import { kegTransactionEntity } from "./keg-transaction";
 import { locationEntity } from "./location";
 import { userProfileEntity } from "./user-profile";
 import { enumValueEntity } from "./enum-value";
+import { pickListEntity } from "./pick-list";
 
 // =============================================================================
 // Register All Entities
@@ -70,6 +71,7 @@ registerEntity(orderItemEntity);
 registerEntity(salesChannelEntity);
 registerEntity(priceTierEntity);
 registerEntity(tierPriceEntity);
+registerEntity(pickListEntity);
 
 // Purchasing domain
 registerEntity(supplierEntity);
@@ -135,6 +137,8 @@ export { userProfileEntity } from "./user-profile";
 export type { UserProfileFormValues, UserRole, UserStatus } from "./user-profile";
 export { enumValueEntity, ENUM_COLORS, fetchEnumTypes } from "./enum-value";
 export type { EnumValueFormValues } from "./enum-value";
+export { pickListEntity } from "./pick-list";
+export type { PickListFormValues } from "./pick-list";
 
 // =============================================================================
 // Helper Functions
