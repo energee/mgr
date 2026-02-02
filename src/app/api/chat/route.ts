@@ -1,6 +1,6 @@
 import { streamText, type UIMessage, convertToModelMessages } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 const SYSTEM_PROMPT = `You are the MGR Brewery Assistant. You help brewers manage their brewery operations.
 
@@ -36,8 +36,10 @@ async function resolveApiKey(
     return prefs.anthropic_api_key;
   }
 
-  // Fall back to global key from system_settings
-  const { data: setting } = await db
+  // Fall back to global key from system_settings.
+  // Uses admin client to bypass RLS (SELECT policy excludes api_key rows).
+  const adminDb = await createAdminClient();
+  const { data: setting } = await adminDb
     .from("system_settings")
     .select("value")
     .eq("key", "anthropic_api_key")
