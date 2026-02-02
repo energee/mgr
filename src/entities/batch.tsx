@@ -23,6 +23,7 @@ import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
 import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-info";
 import { BatchInsights } from "@/components/domain/batch-insights";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
+import { BatchBlendHistory } from "@/components/domain/batch-blend-history";
 
 // Use generated type from Supabase
 type Batch = Database["public"]["Tables"]["batches"]["Row"];
@@ -198,6 +199,12 @@ export const batchEntity: EntityConfig<Batch> = {
       component: BatchInsights,
     },
     {
+      id: "blend-history",
+      title: "Blend History",
+      component: BatchBlendHistory,
+      collapsible: true,
+    },
+    {
       id: "notes",
       title: "Notes",
       fields: [
@@ -342,6 +349,14 @@ export const batchEntity: EntityConfig<Batch> = {
       toState: "completed",
     },
     {
+      name: "blend",
+      label: "Blend Batches",
+      icon: "git-merge",
+      type: "dropdown",
+      fromStates: ["fermenting", "conditioning"],
+      // Opens BatchBlendDialog - no state transition, just records blend sources
+    },
+    {
       name: "cancel",
       label: "Cancel Batch",
       icon: "x",
@@ -398,6 +413,14 @@ export const batchEntity: EntityConfig<Batch> = {
       foreignKey: "batch_id",
       showInDetail: true,
       detailTab: "Audit Log",
+    },
+    {
+      name: "blend_sources",
+      entity: "batch_blend",
+      type: "hasMany",
+      foreignKey: "blend_batch_id",
+      showInDetail: true,
+      detailTab: "Blend Sources",
     },
   ],
 

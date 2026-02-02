@@ -14,6 +14,7 @@ import { EntityDetail } from "@/components/universal/entity-detail";
 import { batchEntity } from "@/entities/batch";
 import { StartFermentationDialog } from "@/components/domain/start-fermentation-dialog";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
+import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
 
 export default function BatchDetailPage({
   params,
@@ -23,6 +24,7 @@ export default function BatchDetailPage({
   const { id } = use(params);
   const [showStartFermentation, setShowStartFermentation] = useState(false);
   const [showCancellation, setShowCancellation] = useState(false);
+  const [showBlend, setShowBlend] = useState(false);
   const queryClient = useQueryClient();
   const supabase = createClient();
 
@@ -49,6 +51,10 @@ export default function BatchDetailPage({
     // Both cancel and archive use the same dialog (it adapts based on status)
     if (actionName === "cancel" || actionName === "archive") {
       setShowCancellation(true);
+      return true; // Indicates action was handled
+    }
+    if (actionName === "blend") {
+      setShowBlend(true);
       return true; // Indicates action was handled
     }
     return false; // Let EntityDetail handle normally
@@ -87,6 +93,15 @@ export default function BatchDetailPage({
             vesselName={batch.fermenter}
             open={showCancellation}
             onOpenChange={setShowCancellation}
+            onSuccess={handleDialogSuccess}
+          />
+
+          <BatchBlendDialog
+            batchId={batch.id}
+            batchNumber={batch.batch_number}
+            batchName={batch.name}
+            open={showBlend}
+            onOpenChange={setShowBlend}
             onSuccess={handleDialogSuccess}
           />
         </>
