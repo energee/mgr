@@ -22,6 +22,9 @@ export interface POLineItemDraft {
   estimated_total: number | null;
   shortfall_qty: number;
   min_order_qty: number | null;
+  total_required: number;
+  available_qty: number;
+  is_urgent: boolean;
 }
 
 export interface PODraft {
@@ -81,6 +84,9 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
       estimated_total: shortfall.unit_price ? orderQty * shortfall.unit_price : null,
       shortfall_qty: shortfall.shortfall_qty,
       min_order_qty: shortfall.min_order_qty,
+      total_required: shortfall.total_required,
+      available_qty: shortfall.available_qty,
+      is_urgent: shortfall.is_urgent,
     });
   }
 
