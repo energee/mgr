@@ -21,6 +21,7 @@ import {
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FlaskConical, Plus } from "lucide-react";
+import { batchEntity } from "@/entities/batch";
 import type { Database } from "@/types/supabase";
 
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
@@ -28,20 +29,6 @@ type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
 interface BrewLogBatchesProps {
   data: BrewLog;
 }
-
-const batchStateDisplay: Record<
-  string,
-  { label: string; color: "default" | "info" | "warning" | "success" | "error" }
-> = {
-  planned: { label: "Planned", color: "default" },
-  brewing: { label: "Brewing", color: "info" },
-  fermenting: { label: "Fermenting", color: "warning" },
-  conditioning: { label: "Conditioning", color: "info" },
-  ready: { label: "Ready", color: "success" },
-  packaging: { label: "Packaging", color: "info" },
-  completed: { label: "Completed", color: "success" },
-  cancelled: { label: "Cancelled", color: "error" },
-};
 
 export function BrewLogBatches({ data }: BrewLogBatchesProps) {
   const supabase = createClient();
@@ -134,7 +121,7 @@ export function BrewLogBatches({ data }: BrewLogBatchesProps) {
                 <TableCell>
                   <StatusBadge
                     status={batch.status}
-                    config={batchStateDisplay}
+                    config={batchEntity.stateMachine?.stateDisplay}
                   />
                 </TableCell>
               </TableRow>
