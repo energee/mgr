@@ -12,15 +12,23 @@ VALUES (
 )
 ON CONFLICT (key) DO NOTHING;
 
--- Restrict SELECT on system_settings to exclude sensitive keys from client-side reads.
--- The API route reads these server-side via the service role, bypassing RLS.
+-- Restrict client-side access to sensitive keys.
+-- The API route reads/writes these server-side via the service role, bypassing RLS.
 DROP POLICY IF EXISTS "system_settings_select" ON system_settings;
 CREATE POLICY "system_settings_select" ON system_settings
   FOR SELECT TO authenticated
   USING (key NOT LIKE '%api_key%');
 
--- Allow server-side reads of API keys via a separate policy for service role
--- (service role bypasses RLS, so no explicit policy needed)
+DROP POLICY IF EXISTS "system_settings_update" ON system_settings;
+CREATE POLICY "system_settings_update" ON system_settings
+  FOR UPDATE TO authenticated
+  USING ((SELECT auth.uid()) IS NOT NULL AND key NOT LIKE '%api_key%')
+  WITH CHECK (key NOT LIKE '%api_key%');
+
+DROP POLICY IF EXISTS "system_settings_insert" ON system_settings;
+CREATE POLICY "system_settings_insert" ON system_settings
+  FOR INSERT TO authenticated
+  WITH CHECK ((SELECT auth.uid()) IS NOT NULL AND key NOT LIKE '%api_key%');
 
 -- Per-user API key column
 ALTER TABLE user_preferences

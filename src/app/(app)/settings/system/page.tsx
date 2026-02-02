@@ -167,31 +167,31 @@ function useUpdateSystemSettings() {
 // =============================================================================
 
 function GlobalApiKeySection() {
-  const supabase = createClient();
   const [apiKey, setApiKey] = useState("");
   const [hasExistingKey, setHasExistingKey] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  // Check if a global key exists via a server-side function
-  // Since RLS blocks SELECT on api_key rows, we check indirectly:
-  // the chat route will fail if no key exists, so we just show
-  // a save form and let users set/replace the key.
+  useEffect(() => {
+    fetch("/api/settings/api-key?scope=global")
+      .then((res) => res.json())
+      .then((data) => {
+        setHasExistingKey(data.hasKey === true);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
 
   const saveKey = useMutation({
     mutationFn: async (key: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = supabase as unknown as {
-        from: (table: string) => {
-          update: (data: { value: unknown }) => {
-            eq: (col: string, val: string) => Promise<{ error: Error | null }>;
-          };
-        };
-      };
-      const { error } = await client
-        .from("system_settings")
-        .update({ value: key || null })
-        .eq("key", "anthropic_api_key");
-
-      if (error) throw error;
+      const res = await fetch("/api/settings/api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "global", key }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save");
+      }
     },
     onSuccess: () => {
       setHasExistingKey(!!apiKey);
@@ -202,6 +202,8 @@ function GlobalApiKeySection() {
       toast.error("Failed to save API key");
     },
   });
+
+  if (!loaded) return null;
 
   return (
     <Card>

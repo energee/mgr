@@ -14,7 +14,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,50 +82,32 @@ const RETAIL_VOLUME_OPTIONS = [
 // =============================================================================
 
 function ApiKeySection() {
-  const supabase = createClient();
   const queryClient = useQueryClient();
   const [apiKey, setApiKey] = useState("");
   const [hasExistingKey, setHasExistingKey] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  // Load current key status (masked — just check if one exists)
   useEffect(() => {
-    async function checkKey() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data } = await db
-        .from("user_preferences")
-        .select("anthropic_api_key")
-        .eq("user_id", user.id)
-        .single();
-
-      if (data?.anthropic_api_key) {
-        setHasExistingKey(true);
-      }
-      setLoaded(true);
-    }
-    checkKey();
-  }, [supabase]);
+    fetch("/api/settings/api-key?scope=user")
+      .then((res) => res.json())
+      .then((data) => {
+        setHasExistingKey(data.hasKey === true);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
 
   const saveKey = useMutation({
     mutationFn: async (key: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { error } = await db
-        .from("user_preferences")
-        .update({
-          anthropic_api_key: key || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      const res = await fetch("/api/settings/api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "user", key }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userPreferencesKeys.all });
