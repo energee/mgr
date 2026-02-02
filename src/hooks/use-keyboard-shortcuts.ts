@@ -60,11 +60,14 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
         if (shortcut.key === "Escape") continue; // Already handled above
 
         const matchesKey = event.key === shortcut.key;
+        // Check required modifiers are pressed AND unwanted modifiers are not.
+        // Shift is excluded from the "no extra modifiers" check because
+        // event.key already reflects shift state (e.g. "?" = Shift+/)
         const matchesMods =
-          (!shortcut.modifiers?.ctrl || event.ctrlKey) &&
-          (!shortcut.modifiers?.meta || event.metaKey) &&
+          (!!shortcut.modifiers?.ctrl === event.ctrlKey) &&
+          (!!shortcut.modifiers?.meta === event.metaKey) &&
           (!shortcut.modifiers?.shift || event.shiftKey) &&
-          (!shortcut.modifiers?.alt || event.altKey);
+          (!!shortcut.modifiers?.alt === event.altKey);
 
         if (matchesKey && matchesMods) {
           event.preventDefault();
