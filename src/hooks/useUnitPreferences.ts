@@ -77,9 +77,7 @@ export function useUnitPreferences() {
 
       const { data, error } = await supabase
         .from("user_preferences")
-        .select(
-          "volume_unit, weight_unit, temperature_unit, gravity_unit, retail_volume_unit"
-        )
+        .select("volume_unit, weight_unit, temperature_unit, gravity_unit, retail_volume_unit")
         .eq("user_id", user.id)
         .single();
 
@@ -87,7 +85,13 @@ export function useUnitPreferences() {
         return DEFAULT_UNIT_PREFERENCES;
       }
 
-      return data as UnitPreferences;
+      return {
+        volume_unit: data.volume_unit as VolumeUnit,
+        weight_unit: data.weight_unit as WeightUnit,
+        temperature_unit: data.temperature_unit as TemperatureUnit,
+        gravity_unit: data.gravity_unit as GravityUnit,
+        retail_volume_unit: data.retail_volume_unit as RetailVolumeUnit,
+      };
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
