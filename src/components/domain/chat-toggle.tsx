@@ -3,27 +3,25 @@
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useChatContext } from "@/contexts/chat-context";
 
-interface ChatToggleProps {
-  onClick: () => void;
-  open: boolean;
-}
+export function ChatToggle() {
+  const { isOpen, toggle } = useChatContext();
 
-export function ChatToggle({ onClick, open }: ChatToggleProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant={open ? "secondary" : "ghost"}
+          variant={isOpen ? "secondary" : "ghost"}
           size="icon"
-          onClick={onClick}
+          onClick={toggle}
           className="h-8 w-8"
         >
           <MessageCircle className="h-4 w-4" />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        {open ? "Close assistant" : "Open assistant"}
+        {isOpen ? "Close assistant" : "Open assistant"} (⌘.)
       </TooltipContent>
     </Tooltip>
   );
