@@ -51,6 +51,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UnitDisplay } from "@/components/ui/unit-input";
 import {
   phaseConfig,
   metricConfig,
@@ -193,15 +194,6 @@ export function BrewEventTimeline({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const formatMeasurement = (measurement: BrewMeasurement) => {
-    const config = metricConfig[measurement.metric as keyof typeof metricConfig];
-    const label = measurement.metric === "other"
-      ? measurement.custom_metric || "Other"
-      : config?.label || measurement.metric;
-    const unit = config?.unit || "";
-    return `${label}: ${measurement.value}${unit ? ` ${unit}` : ""}`;
   };
 
   const getPhaseIcon = (phase: string) => {
@@ -350,15 +342,38 @@ export function BrewEventTimeline({
                             {/* Measurements */}
                             {event.measurements && event.measurements.length > 0 && (
                               <div className="space-y-1">
-                                {event.measurements.map((m, mIndex) => (
-                                  <div
-                                    key={mIndex}
-                                    className="text-sm flex items-center gap-2"
-                                  >
-                                    <Thermometer className="h-3 w-3 text-muted-foreground" />
-                                    <span>{formatMeasurement(m)}</span>
-                                  </div>
-                                ))}
+                                {event.measurements.map((m, mIndex) => {
+                                  const config = metricConfig[m.metric as keyof typeof metricConfig];
+                                  const unitType = config && "unitType" in config ? config.unitType : undefined;
+                                  const decimals = config && "decimals" in config ? config.decimals : 2;
+                                  const label = m.metric === "other"
+                                    ? m.custom_metric || "Other"
+                                    : config?.label || m.metric;
+
+                                  return (
+                                    <div
+                                      key={mIndex}
+                                      className="text-sm flex items-center gap-2"
+                                    >
+                                      <Thermometer className="h-3 w-3 text-muted-foreground" />
+                                      <span>
+                                        {label}:{" "}
+                                        {unitType && typeof m.value === "number" ? (
+                                          <UnitDisplay
+                                            value={m.value}
+                                            unitType={unitType}
+                                            decimals={decimals}
+                                          />
+                                        ) : (
+                                          <>
+                                            {m.value}
+                                            {config?.unit ? ` ${config.unit}` : ""}
+                                          </>
+                                        )}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
 
