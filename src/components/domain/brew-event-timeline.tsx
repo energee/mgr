@@ -196,15 +196,6 @@ export function BrewEventTimeline({
     }
   };
 
-  const formatMeasurement = (measurement: BrewMeasurement) => {
-    const config = metricConfig[measurement.metric as keyof typeof metricConfig];
-    const label = measurement.metric === "other"
-      ? measurement.custom_metric || "Other"
-      : config?.label || measurement.metric;
-    const unit = config?.unit || "";
-    return `${label}: ${measurement.value}${unit ? ` ${unit}` : ""}`;
-  };
-
   const getPhaseIcon = (phase: string) => {
     const config = phaseConfig[phase as keyof typeof phaseConfig];
     const iconName = config?.icon || "more-horizontal";

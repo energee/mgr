@@ -5,7 +5,6 @@ import {
   convertTemperature,
   formatReadingValue,
   getUnitLabel,
-  READING_TYPES,
 } from "../batch-readings";
 
 describe("validateReading", () => {
