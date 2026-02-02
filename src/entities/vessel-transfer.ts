@@ -13,7 +13,8 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-type VesselTransfer = Database["public"]["Tables"]["vessel_transfers"]["Row"];
+// Use the view type since entity uses viewTable for queries
+type VesselTransfer = Database["public"]["Views"]["vessel_transfers_with_details"]["Row"];
 
 // =============================================================================
 // Zod Schema
