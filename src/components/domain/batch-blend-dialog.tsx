@@ -81,9 +81,9 @@ export function BatchBlendDialog({
   const { data: availableBatches, isLoading: batchesLoading } = useQuery({
     queryKey: batchKeys.list({ status: ["fermenting", "conditioning"], forBlend: true }),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batches")
-        .select("id, batch_number, name, status, volume_bbl, actual_abv, recipe_id")
+      const { data, error } = await db
+        .from("batches_with_brew_info")
+        .select("id, batch_number, name, status, volume_bbl, actual_abv, actual_og, actual_fg, recipe_id")
         .in("status", ["fermenting", "conditioning"])
         .neq("id", batchId)
         .order("batch_number");
@@ -107,6 +107,28 @@ export function BatchBlendDialog({
     enabled: open,
   });
 
+  // Fetch blend info for available volume calculation
+  const { data: blendInfoData } = useQuery({
+    queryKey: batchKeys.list({ blendInfo: true }),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("batches_with_blend_info")
+        .select("id, available_volume_bbl, volume_blended_away_bbl");
+      if (error) throw error;
+      return data as { id: string; available_volume_bbl: number; volume_blended_away_bbl: number }[];
+    },
+    enabled: open,
+  });
+
+  // Map batch ID to available volume
+  const availableVolumeMap = useMemo(() => {
+    const map = new Map<string, number>();
+    blendInfoData?.forEach((info) => {
+      map.set(info.id, Number(info.available_volume_bbl));
+    });
+    return map;
+  }, [blendInfoData]);
+
   const existingSourceIds = useMemo(
     () => new Set(existingBlends?.map((b: { source_batch_id: string }) => b.source_batch_id) ?? []),
     [existingBlends]
@@ -127,7 +149,7 @@ export function BatchBlendDialog({
       } else {
         next.set(batch.id, {
           batchId: batch.id,
-          volumeBbl: batch.volume_bbl ?? 0,
+          volumeBbl: availableVolumeMap.get(batch.id) ?? batch.volume_bbl ?? 0,
           notes: "",
         });
       }
@@ -154,20 +176,25 @@ export function BatchBlendDialog({
 
     const totalVolume = selectedEntries.reduce((sum, s) => sum + s.volumeBbl, 0);
 
-    // Weighted average ABV
-    let weightedAbv = 0;
-    let abvVolumeTotal = 0;
-    for (const sel of selectedEntries) {
-      const batch = filteredBatches.find((b) => b.id === sel.batchId);
-      if (batch?.actual_abv && sel.volumeBbl > 0) {
-        weightedAbv += batch.actual_abv * sel.volumeBbl;
-        abvVolumeTotal += sel.volumeBbl;
+    const weightedAvg = (getValue: (batch: (typeof filteredBatches)[number]) => number | null | undefined) => {
+      let weightedSum = 0;
+      let volumeSum = 0;
+      for (const sel of selectedEntries) {
+        const batch = filteredBatches.find((b) => b.id === sel.batchId);
+        const val = batch ? getValue(batch) : null;
+        if (val != null && sel.volumeBbl > 0) {
+          weightedSum += val * sel.volumeBbl;
+          volumeSum += sel.volumeBbl;
+        }
       }
-    }
+      return volumeSum > 0 ? weightedSum / volumeSum : null;
+    };
 
     return {
       totalVolume,
-      weightedAbv: abvVolumeTotal > 0 ? weightedAbv / abvVolumeTotal : null,
+      weightedAbv: weightedAvg((b) => b.actual_abv),
+      weightedOg: weightedAvg((b) => b.actual_og),
+      weightedFg: weightedAvg((b) => b.actual_fg),
       batchCount: selectedEntries.length,
     };
   }, [selections, filteredBatches]);
@@ -178,12 +205,14 @@ export function BatchBlendDialog({
       const entries = Array.from(selections.values());
       if (entries.length === 0) throw new Error("Select at least one source batch");
 
-      // Validate volumes don't exceed source batch capacity
+      // Validate volumes don't exceed available volume
       for (const entry of entries) {
         const sourceBatch = filteredBatches.find((b) => b.id === entry.batchId);
-        if (sourceBatch?.volume_bbl && entry.volumeBbl > sourceBatch.volume_bbl) {
+        const availableVol = availableVolumeMap.get(entry.batchId);
+        const maxVol = availableVol ?? sourceBatch?.volume_bbl;
+        if (maxVol !== undefined && maxVol !== null && entry.volumeBbl > maxVol) {
           throw new Error(
-            `Volume for ${sourceBatch.batch_number} (${entry.volumeBbl} BBL) exceeds available volume (${sourceBatch.volume_bbl} BBL)`
+            `Volume for ${sourceBatch?.batch_number} (${entry.volumeBbl} BBL) exceeds available volume (${Number(maxVol).toFixed(2)} BBL)`
           );
         }
         if (entry.volumeBbl <= 0) {
@@ -205,6 +234,7 @@ export function BatchBlendDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("batch_blends") });
+      queryClient.invalidateQueries({ queryKey: batchKeys.list({ blendInfo: true }) });
       toast.success(
         `Added ${selections.size} source batch${selections.size > 1 ? "es" : ""} to blend for ${batchNumber}`
       );
@@ -298,7 +328,11 @@ export function BatchBlendDialog({
                             {getStateLabel(batchEntity, batch.status)}
                           </Badge>
                         </TableCell>
-                        <TableCell>{batch.volume_bbl ?? "-"}</TableCell>
+                        <TableCell>
+                          {availableVolumeMap.has(batch.id)
+                            ? Number(availableVolumeMap.get(batch.id)).toFixed(2)
+                            : batch.volume_bbl ?? "-"}
+                        </TableCell>
                         <TableCell>{batch.actual_abv ?? "-"}</TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           {isSelected ? (
@@ -306,7 +340,7 @@ export function BatchBlendDialog({
                               type="number"
                               step="0.01"
                               min="0.01"
-                              max={batch.volume_bbl ?? undefined}
+                              max={availableVolumeMap.get(batch.id) ?? batch.volume_bbl ?? undefined}
                               value={selection?.volumeBbl ?? ""}
                               onChange={(e) =>
                                 updateVolume(batch.id, parseFloat(e.target.value) || 0)
@@ -341,9 +375,21 @@ export function BatchBlendDialog({
                 <div>
                   <span className="text-muted-foreground">Weighted ABV:</span>{" "}
                   <span className="font-medium">
-                    {blendTotals.weightedAbv ? `${blendTotals.weightedAbv.toFixed(1)}%` : "N/A"}
+                    {blendTotals.weightedAbv != null ? `${blendTotals.weightedAbv.toFixed(1)}%` : "N/A"}
                   </span>
                 </div>
+                {blendTotals.weightedOg != null && (
+                  <div>
+                    <span className="text-muted-foreground">Weighted OG:</span>{" "}
+                    <span className="font-medium">{blendTotals.weightedOg.toFixed(3)}</span>
+                  </div>
+                )}
+                {blendTotals.weightedFg != null && (
+                  <div>
+                    <span className="text-muted-foreground">Weighted FG:</span>{" "}
+                    <span className="font-medium">{blendTotals.weightedFg.toFixed(3)}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
