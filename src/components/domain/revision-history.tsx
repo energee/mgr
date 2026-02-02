@@ -13,6 +13,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { revisionKeys } from "@/lib/query-keys";
 import {
   Card,
   CardContent,
@@ -305,7 +306,7 @@ export function RevisionHistory({
   const db = supabase as any;
 
   const { data: revisions = [], isLoading } = useQuery({
-    queryKey: ["entity_revisions", entityType, entityId],
+    queryKey: revisionKeys.forEntity(entityType, entityId),
     queryFn: async () => {
       const { data, error } = await db
         .from("entity_revisions")
@@ -390,7 +391,7 @@ export function RevisionHistoryCompact({
   const db = supabase as any;
 
   const { data: revisions = [], isLoading } = useQuery({
-    queryKey: ["entity_revisions", entityType, entityId, "compact"],
+    queryKey: revisionKeys.forEntityCompact(entityType, entityId),
     queryFn: async () => {
       const { data, error } = await db
         .from("entity_revisions")

@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, TrendingUp } from "lucide-react";
+import { recipeKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Types
@@ -96,7 +97,7 @@ export function RecipeCOGSDisplay({ recipeId }: RecipeCOGSDisplayProps) {
   const supabase = createClient();
 
   const { data: cogs, isLoading, error } = useQuery({
-    queryKey: ["recipe-cogs", recipeId],
+    queryKey: recipeKeys.cogs(recipeId),
     queryFn: async () => {
       // NOTE: After migration runs, regenerate types with:
       // npx supabase gen types typescript --local > src/types/supabase.ts

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { EntityDetail } from "@/components/universal/entity-detail";
 import { RecipeCloneDialog } from "@/components/domain/recipe-clone-dialog";
 import { recipeEntity } from "@/entities/recipe";
+import { recipeKeys } from "@/lib/query-keys";
 
 export default function RecipeDetailPage({
   params,
@@ -21,7 +22,7 @@ export default function RecipeDetailPage({
   // Fetch recipe data for the clone dialog
   // Note: is_template added via migration 00018 but types not yet regenerated
   const { data: recipe } = useQuery({
-    queryKey: ["recipes", id],
+    queryKey: recipeKeys.detail(id),
     queryFn: async () => {
       // Use raw query to bypass type checking for is_template column
       const { data, error } = await supabase

@@ -35,6 +35,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Package, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { orderKeys, inventoryKeys } from "@/lib/query-keys";
+import { useBrands, usePackageTypes } from "@/hooks/use-catalog";
 
 // =============================================================================
 // Types
@@ -78,7 +80,7 @@ export function OrderAllocation({
 
   // Fetch order details
   const { isLoading: orderLoading } = useQuery({
-    queryKey: ["order", orderId],
+    queryKey: orderKeys.detail(orderId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -93,7 +95,7 @@ export function OrderAllocation({
 
   // Fetch available finished goods (sorted by production date - FIFO)
   const { data: finishedGoods, isLoading: fgLoading } = useQuery({
-    queryKey: ["finished-goods-available"],
+    queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
       // Note: Using type assertion since view may not be in generated types
       const { data, error } = await (supabase as unknown as {
@@ -115,31 +117,9 @@ export function OrderAllocation({
     enabled: open,
   });
 
-  // Fetch brands for display
-  const { data: brands } = useQuery({
-    queryKey: ["brands"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brands")
-        .select("id, name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: open,
-  });
-
-  // Fetch package types for display
-  const { data: packageTypes } = useQuery({
-    queryKey: ["package-types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("package_types")
-        .select("id, name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: open,
-  });
+  // Fetch brands and package types for display
+  const { data: brands } = useBrands();
+  const { data: packageTypes } = usePackageTypes();
 
   // Create allocations mutation
   const allocateMutation = useMutation({
@@ -166,9 +146,9 @@ export function OrderAllocation({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["order", orderId] });
-      queryClient.invalidateQueries({ queryKey: ["finished-goods"] });
-      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries({ queryKey: orderKeys.detail(orderId) });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.finishedGoods() });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.allocations() });
       toast.success("Inventory allocated successfully");
       setAllocations({});
       onOpenChange(false);

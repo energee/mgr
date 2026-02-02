@@ -12,8 +12,7 @@
  */
 
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -40,6 +39,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 export interface YeastItem {
   id?: string;
@@ -89,24 +89,9 @@ export function YeastSelector({
 }: YeastSelectorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch yeast catalog
-  const { data: yeastCatalog = [], isLoading: loadingYeasts } = useQuery({
-    queryKey: ["yeasts-catalog"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("yeasts")
-        .select(
-          "id, name, manufacturer, product_code, type, form, attenuation_typical, temp_min_f, temp_max_f, flocculation"
-        )
-        .eq("is_active", true)
-        .order("manufacturer")
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as YeastCatalogItem[];
-    },
-  });
+  const { data: yeastCatalog = [], isLoading: loadingYeasts } = useCatalog<YeastCatalogItem>(catalogKeys.yeasts(), "yeasts", "id, name, manufacturer, product_code, type, form, attenuation_typical, temp_min_f, temp_max_f, flocculation", ["manufacturer", "name"]);
 
   // Group by manufacturer
   const groupedYeasts = useMemo(() => {

@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { kegKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
@@ -101,7 +102,7 @@ export default function KegReportsPage() {
 
   // Fetch fleet summary
   const { data: fleetSummary, isLoading: loadingFleet } = useQuery({
-    queryKey: ["keg_fleet_summary"],
+    queryKey: kegKeys.fleetSummary(),
     queryFn: async () => {
       const { data, error } = await db
         .from("keg_fleet_summary")
@@ -114,7 +115,7 @@ export default function KegReportsPage() {
 
   // Fetch turnover metrics
   const { data: turnoverMetrics, isLoading: loadingTurnover } = useQuery({
-    queryKey: ["keg_turnover_metrics"],
+    queryKey: kegKeys.turnoverMetrics(),
     queryFn: async () => {
       const { data, error } = await db
         .from("keg_turnover_metrics")
@@ -127,7 +128,7 @@ export default function KegReportsPage() {
 
   // Fetch aging kegs (only non-normal)
   const { data: agingKegs, isLoading: loadingAging } = useQuery({
-    queryKey: ["keg_aging_report"],
+    queryKey: kegKeys.agingReport(),
     queryFn: async () => {
       const { data, error } = await db
         .from("keg_aging_report")
@@ -142,7 +143,7 @@ export default function KegReportsPage() {
 
   // Fetch customer balances
   const { data: customerBalances, isLoading: loadingCustomers } = useQuery({
-    queryKey: ["customer_keg_balances"],
+    queryKey: kegKeys.customerBalances(),
     queryFn: async () => {
       const { data, error } = await db
         .from("customer_keg_balances")

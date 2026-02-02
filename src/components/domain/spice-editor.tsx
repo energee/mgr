@@ -13,8 +13,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -47,6 +46,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Types for spice entries
 export interface SpiceItem {
@@ -110,22 +110,9 @@ export function SpiceEditor({
 }: SpiceEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch spice catalog
-  const { data: spiceCatalog = [], isLoading } = useQuery({
-    queryKey: ["spices-catalog"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("spices")
-        .select("id, name, type, typical_amount, typical_unit")
-        .eq("is_active", true)
-        .order("type")
-        .order("name");
-      if (error) throw error;
-      return data as SpiceCatalogItem[];
-    },
-  });
+  const { data: spiceCatalog = [], isLoading } = useCatalog<SpiceCatalogItem>(catalogKeys.spices(), "spices", "id, name, type, typical_amount, typical_unit", ["type", "name"]);
 
   // Add spice
   const handleAdd = useCallback(

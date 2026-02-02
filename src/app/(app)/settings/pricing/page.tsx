@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { settingsKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,7 +25,7 @@ export default function PricingPage() {
   const db = supabase as any;
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: ["pricing-stats"],
+    queryKey: settingsKeys.pricingStats(),
     queryFn: async () => {
       const [tiersResult, pricesResult] = await Promise.all([
         db.from("price_tiers").select("id, name, sales_channel_id, is_default", { count: "exact" }),

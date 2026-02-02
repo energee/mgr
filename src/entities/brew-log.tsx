@@ -384,18 +384,10 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
     },
     {
       name: "brewer",
-      entity: "user",
+      entity: "user_profile",
       type: "belongsTo",
       foreignKey: "brewer_id",
       showInDetail: true,
-    },
-    {
-      name: "brew_log_batches",
-      entity: "brew_log_batch",
-      type: "hasMany",
-      foreignKey: "brew_log_id",
-      showInDetail: true,
-      detailTab: "Batches",
     },
   ],
 

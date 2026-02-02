@@ -13,8 +13,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
   TableBody,
@@ -48,6 +47,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { catalogKeys } from "@/lib/query-keys";
 
 // Types for addition entries
 export interface AdditionItem {
@@ -127,22 +127,9 @@ export function AdditionsEditor({
 }: AdditionsEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const supabase = createClient();
 
   // Fetch additives catalog
-  const { data: additiveCatalog = [], isLoading } = useQuery({
-    queryKey: ["additives-catalog"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("additives")
-        .select("id, name, type, description, typical_amount, typical_unit")
-        .eq("is_active", true)
-        .order("type")
-        .order("name");
-      if (error) throw error;
-      return data as AdditiveCatalogItem[];
-    },
-  });
+  const { data: additiveCatalog = [], isLoading } = useCatalog<AdditiveCatalogItem>(catalogKeys.additives(), "additives", "id, name, type, description, typical_amount, typical_unit", ["type", "name"]);
 
   // Add additive
   const handleAdd = useCallback(

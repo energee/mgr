@@ -337,7 +337,7 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
       label: "From State",
       type: "select",
       options: [
-        { value: "", label: "None (New Kegs)" },
+        { value: "_none", label: "None (New Kegs)" },
         ...KEG_STATES.map((s) => ({ value: s.value, label: s.label })),
       ],
       colSpan: 4,

@@ -9,6 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { brewLogKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -21,6 +22,7 @@ import {
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FlaskConical, Plus } from "lucide-react";
+import { batchEntity } from "@/entities/batch";
 import type { Database } from "@/types/supabase";
 
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
@@ -29,25 +31,11 @@ interface BrewLogBatchesProps {
   data: BrewLog;
 }
 
-const batchStateDisplay: Record<
-  string,
-  { label: string; color: "default" | "info" | "warning" | "success" | "error" }
-> = {
-  planned: { label: "Planned", color: "default" },
-  brewing: { label: "Brewing", color: "info" },
-  fermenting: { label: "Fermenting", color: "warning" },
-  conditioning: { label: "Conditioning", color: "info" },
-  ready: { label: "Ready", color: "success" },
-  packaging: { label: "Packaging", color: "info" },
-  completed: { label: "Completed", color: "success" },
-  cancelled: { label: "Cancelled", color: "error" },
-};
-
 export function BrewLogBatches({ data }: BrewLogBatchesProps) {
   const supabase = createClient();
 
   const { data: linkedBatches, isLoading } = useQuery({
-    queryKey: ["brew_log_batches", data.id],
+    queryKey: brewLogKeys.batches(data.id),
     queryFn: async () => {
       const { data: links, error } = await supabase
         .from("brew_log_batches")
@@ -134,7 +122,7 @@ export function BrewLogBatches({ data }: BrewLogBatchesProps) {
                 <TableCell>
                   <StatusBadge
                     status={batch.status}
-                    config={batchStateDisplay}
+                    config={batchEntity.stateMachine?.stateDisplay}
                   />
                 </TableCell>
               </TableRow>

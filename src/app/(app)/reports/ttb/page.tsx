@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { reportKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -139,7 +140,7 @@ export default function TTBReportPage() {
   // Fetch TTB report data using the database function
   // Note: get_ttb_report function is added in migration 00041
   const { data: reportData, isLoading: reportLoading, error: reportError } = useQuery({
-    queryKey: ["ttb-report", year, month],
+    queryKey: reportKeys.ttb({ year, month }),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)("get_ttb_report", {
@@ -162,7 +163,7 @@ export default function TTBReportPage() {
 
   // Fetch batch details for the period (for detail section)
   const { data: batchData, isLoading: batchLoading } = useQuery({
-    queryKey: ["ttb-batches", year, month],
+    queryKey: reportKeys.ttbBatches(year, month),
     queryFn: async () => {
       const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
       const endDate = new Date(year, month, 0).toISOString().split("T")[0];

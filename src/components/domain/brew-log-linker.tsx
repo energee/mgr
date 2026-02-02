@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link2, Plus, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { batchKeys } from "@/lib/query-keys";
 
 interface BrewLog {
   id: string;
@@ -73,7 +74,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
 
   // Fetch existing links
   const { data: linkedBrewLogs = [], isLoading } = useQuery({
-    queryKey: ["batch-brew-logs", batchId],
+    queryKey: batchKeys.brewLogs(batchId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_log_batches")
@@ -99,7 +100,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
 
   // Fetch available brew logs (completed, not already linked to this batch)
   const { data: availableBrewLogs = [] } = useQuery({
-    queryKey: ["available-brew-logs", batchId],
+    queryKey: batchKeys.availableBrewLogs(batchId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_logs")
@@ -138,8 +139,8 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batch-brew-logs", batchId] });
-      queryClient.invalidateQueries({ queryKey: ["batch", batchId] });
+      queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(batchId) });
+      queryClient.invalidateQueries({ queryKey: batchKeys.detail(batchId) });
       setLinkDialogOpen(false);
       setSelectedBrewLogId("");
       setVolume("");
@@ -161,8 +162,8 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batch-brew-logs", batchId] });
-      queryClient.invalidateQueries({ queryKey: ["batch", batchId] });
+      queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(batchId) });
+      queryClient.invalidateQueries({ queryKey: batchKeys.detail(batchId) });
       toast.success("Brew log unlinked");
     },
     onError: (error) => {

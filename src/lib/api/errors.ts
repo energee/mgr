@@ -4,6 +4,8 @@
  * Custom error class and error mapping utilities for API route handlers.
  */
 
+import { PG_ERROR_CODES } from "../pg-error-codes";
+
 export type ApiErrorCode =
   | "UNAUTHORIZED"
   | "FORBIDDEN"
@@ -54,33 +56,34 @@ function defaultStatusForCode(code: ApiErrorCode): number {
 /**
  * PostgreSQL error code to friendly API error mapping.
  *
- * Reference: https://www.postgresql.org/docs/current/errcodes-appendix.html
+ * Error codes are sourced from the shared PG_ERROR_CODES constants.
+ * Messages here are API-specific (may differ from client-side messages).
  */
 const PG_ERROR_MAP: Record<
   string,
   { code: ApiErrorCode; status: number; message: string }
 > = {
-  "23505": {
+  [PG_ERROR_CODES.UNIQUE_VIOLATION]: {
     code: "CONFLICT",
     status: 409,
     message: "A record with this value already exists",
   },
-  "23503": {
+  [PG_ERROR_CODES.FOREIGN_KEY_VIOLATION]: {
     code: "CONFLICT",
     status: 409,
     message: "This record is referenced by other data and cannot be modified",
   },
-  "23502": {
+  [PG_ERROR_CODES.NOT_NULL_VIOLATION]: {
     code: "VALIDATION_ERROR",
     status: 422,
     message: "A required field is missing",
   },
-  "23514": {
+  [PG_ERROR_CODES.CHECK_VIOLATION]: {
     code: "VALIDATION_ERROR",
     status: 422,
     message: "A field value violates a constraint",
   },
-  "42501": {
+  [PG_ERROR_CODES.INSUFFICIENT_PRIVILEGE]: {
     code: "FORBIDDEN",
     status: 403,
     message: "Insufficient permissions for this operation",

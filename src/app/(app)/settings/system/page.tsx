@@ -18,6 +18,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { settingsKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,7 +112,7 @@ function useSystemSettings() {
   const supabase = createClient();
 
   return useQuery({
-    queryKey: ["system-settings"],
+    queryKey: settingsKeys.systemSettings(),
     queryFn: async () => {
       // Type assertion for table not yet in generated types
       const { data, error } = await (supabase as unknown as {
@@ -157,7 +158,7 @@ function useUpdateSystemSettings() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["system-settings"] });
+      queryClient.invalidateQueries({ queryKey: settingsKeys.systemSettings() });
     },
   });
 }

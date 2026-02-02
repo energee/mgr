@@ -238,18 +238,6 @@ export const tierPriceEntity: EntityConfig<TierPrice> = {
       type: "belongsTo",
       foreignKey: "format_id",
     },
-    {
-      name: "brand",
-      entity: "brand",
-      type: "belongsTo",
-      foreignKey: "brand_id",
-    },
-    {
-      name: "style",
-      entity: "beer_style",
-      type: "belongsTo",
-      foreignKey: "style_id",
-    },
   ],
 
   // ---------------------------------------------------------------------------

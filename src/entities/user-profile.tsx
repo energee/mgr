@@ -171,13 +171,13 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
       field: "role",
       type: "select",
       label: "Role",
-      options: [{ value: "", label: "All Roles" }, ...ROLE_OPTIONS],
+      options: ROLE_OPTIONS,
     },
     {
       field: "status",
       type: "select",
       label: "Status",
-      options: [{ value: "", label: "All Statuses" }, ...STATUS_OPTIONS],
+      options: STATUS_OPTIONS,
     },
     {
       field: "display_name",
