@@ -51,6 +51,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UnitDisplay } from "@/components/ui/unit-input";
 import {
   phaseConfig,
   metricConfig,
@@ -350,15 +351,37 @@ export function BrewEventTimeline({
                             {/* Measurements */}
                             {event.measurements && event.measurements.length > 0 && (
                               <div className="space-y-1">
-                                {event.measurements.map((m, mIndex) => (
-                                  <div
-                                    key={mIndex}
-                                    className="text-sm flex items-center gap-2"
-                                  >
-                                    <Thermometer className="h-3 w-3 text-muted-foreground" />
-                                    <span>{formatMeasurement(m)}</span>
-                                  </div>
-                                ))}
+                                {event.measurements.map((m, mIndex) => {
+                                  const config = metricConfig[m.metric as keyof typeof metricConfig];
+                                  const unitType = config && "unitType" in config ? config.unitType : undefined;
+                                  const label = m.metric === "other"
+                                    ? m.custom_metric || "Other"
+                                    : config?.label || m.metric;
+
+                                  return (
+                                    <div
+                                      key={mIndex}
+                                      className="text-sm flex items-center gap-2"
+                                    >
+                                      <Thermometer className="h-3 w-3 text-muted-foreground" />
+                                      <span>
+                                        {label}:{" "}
+                                        {unitType && typeof m.value === "number" ? (
+                                          <UnitDisplay
+                                            value={m.value}
+                                            unitType={unitType}
+                                            decimals={m.metric === "gravity_plato" ? 1 : m.metric === "temp_f" ? 1 : 2}
+                                          />
+                                        ) : (
+                                          <>
+                                            {m.value}
+                                            {config?.unit ? ` ${config.unit}` : ""}
+                                          </>
+                                        )}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
 
