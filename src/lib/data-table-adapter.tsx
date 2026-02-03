@@ -328,26 +328,40 @@ function buildPostgrestCondition(filter: ExtendedColumnFilter<any>): string | nu
     case "notILike":
       return `${id}.not.ilike.%${escapePostgrestOrValue(String(value))}%`;
     case "eq":
-      return `${id}.eq.${value}`;
+      return `${id}.eq.${escapePostgrestOrValue(String(value))}`;
     case "ne":
-      return `${id}.neq.${value}`;
+      return `${id}.neq.${escapePostgrestOrValue(String(value))}`;
     case "inArray": {
       const arr = Array.isArray(value) ? value : [value];
-      return `${id}.in.(${arr.join(",")})`;
+      return `${id}.in.(${arr.map((v) => escapePostgrestOrValue(String(v))).join(",")})`;
+    }
+    case "notInArray": {
+      const arr = Array.isArray(value) ? value : [value];
+      // PostgREST doesn't have a direct "not in" - use multiple neq joined with and
+      // For or() context, this returns multiple conditions that should be anded
+      return arr.map((v) => `${id}.neq.${escapePostgrestOrValue(String(v))}`).join(",");
     }
     case "lt":
-      return `${id}.lt.${value}`;
+      return `${id}.lt.${escapePostgrestOrValue(String(value))}`;
     case "lte":
-      return `${id}.lte.${value}`;
+      return `${id}.lte.${escapePostgrestOrValue(String(value))}`;
     case "gt":
-      return `${id}.gt.${value}`;
+      return `${id}.gt.${escapePostgrestOrValue(String(value))}`;
     case "gte":
-      return `${id}.gte.${value}`;
+      return `${id}.gte.${escapePostgrestOrValue(String(value))}`;
+    case "isBetween": {
+      if (Array.isArray(value) && value.length === 2) {
+        const v0 = escapePostgrestOrValue(String(value[0]));
+        const v1 = escapePostgrestOrValue(String(value[1]));
+        return `and(${id}.gte.${v0},${id}.lte.${v1})`;
+      }
+      return null;
+    }
     case "isEmpty":
       return `${id}.is.null`;
     case "isNotEmpty":
       return `${id}.not.is.null`;
     default:
-      return `${id}.eq.${value}`;
+      return `${id}.eq.${escapePostgrestOrValue(String(value))}`;
   }
 }

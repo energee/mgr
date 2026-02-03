@@ -8,6 +8,15 @@ import type {
   ExtendedColumnSort,
 } from "@/types/data-table";
 
+/** Deep equality for filter values (handles arrays) */
+function deepEqualValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  return false;
+}
+
 const sortingItemSchema = z.object({
   id: z.string(),
   desc: z.boolean(),
@@ -91,7 +100,7 @@ export const getFiltersStateParser = <TData>(
       a.every(
         (filter, index) =>
           filter.id === b[index]?.id &&
-          filter.value === b[index]?.value &&
+          deepEqualValue(filter.value, b[index]?.value) &&
           filter.variant === b[index]?.variant &&
           filter.operator === b[index]?.operator,
       ),
