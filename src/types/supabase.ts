@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       _schema_registry: {
@@ -491,13 +516,14 @@ export type Database = {
           cancelled_at: string | null
           cancelled_by: string | null
           created_at: string | null
-          fermenter: string | null
+          estimated_volume_bbl: number | null
           id: string
           name: string
           notes: string | null
           planned_start_date: string | null
           recipe_id: string | null
           status: string
+          target_package_date: string | null
           updated_at: string | null
           volume_bbl: number | null
         }
@@ -514,13 +540,14 @@ export type Database = {
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string | null
-          fermenter?: string | null
+          estimated_volume_bbl?: number | null
           id?: string
           name: string
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
           status?: string
+          target_package_date?: string | null
           updated_at?: string | null
           volume_bbl?: number | null
         }
@@ -537,13 +564,14 @@ export type Database = {
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string | null
-          fermenter?: string | null
+          estimated_volume_bbl?: number | null
           id?: string
           name?: string
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
           status?: string
+          target_package_date?: string | null
           updated_at?: string | null
           volume_bbl?: number | null
         }
@@ -591,6 +619,7 @@ export type Database = {
           ibu_min: number | null
           id: string
           is_active: boolean | null
+          is_bjcp: boolean | null
           name: string
           og_max: number | null
           og_min: number | null
@@ -610,6 +639,7 @@ export type Database = {
           ibu_min?: number | null
           id?: string
           is_active?: boolean | null
+          is_bjcp?: boolean | null
           name: string
           og_max?: number | null
           og_min?: number | null
@@ -629,6 +659,7 @@ export type Database = {
           ibu_min?: number | null
           id?: string
           is_active?: boolean | null
+          is_bjcp?: boolean | null
           name?: string
           og_max?: number | null
           og_min?: number | null
@@ -749,6 +780,7 @@ export type Database = {
           hops: Json | null
           id: string
           name: string
+          sku: string | null
           style_id: string | null
           untappd_rating: number | null
           untappd_url: string | null
@@ -762,6 +794,7 @@ export type Database = {
           hops?: Json | null
           id?: string
           name: string
+          sku?: string | null
           style_id?: string | null
           untappd_rating?: number | null
           untappd_url?: string | null
@@ -775,6 +808,7 @@ export type Database = {
           hops?: Json | null
           id?: string
           name?: string
+          sku?: string | null
           style_id?: string | null
           untappd_rating?: number | null
           untappd_url?: string | null
@@ -2134,6 +2168,8 @@ export type Database = {
           package_id: string | null
           package_type_id: string | null
           quantity: number
+          style_id: string | null
+          tbd_notes: string | null
           unit_price: number | null
         }
         Insert: {
@@ -2146,6 +2182,8 @@ export type Database = {
           package_id?: string | null
           package_type_id?: string | null
           quantity: number
+          style_id?: string | null
+          tbd_notes?: string | null
           unit_price?: number | null
         }
         Update: {
@@ -2158,6 +2196,8 @@ export type Database = {
           package_id?: string | null
           package_type_id?: string | null
           quantity?: number
+          style_id?: string | null
+          tbd_notes?: string | null
           unit_price?: number | null
         }
         Relationships: [
@@ -2243,6 +2283,13 @@ export type Database = {
             columns: ["package_type_id"]
             isOneToOne: false
             referencedRelation: "package_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_style_id_fkey"
+            columns: ["style_id"]
+            isOneToOne: false
+            referencedRelation: "beer_styles"
             referencedColumns: ["id"]
           },
         ]
@@ -3487,6 +3534,7 @@ export type Database = {
           notes: string | null
           preboil_volume_bbl: number | null
           sparge_water_volume_gal: number | null
+          status: string
           style: string | null
           style_id: string | null
           target_abv: number | null
@@ -3537,6 +3585,7 @@ export type Database = {
           notes?: string | null
           preboil_volume_bbl?: number | null
           sparge_water_volume_gal?: number | null
+          status?: string
           style?: string | null
           style_id?: string | null
           target_abv?: number | null
@@ -3587,6 +3636,7 @@ export type Database = {
           notes?: string | null
           preboil_volume_bbl?: number | null
           sparge_water_volume_gal?: number | null
+          status?: string
           style?: string | null
           style_id?: string | null
           target_abv?: number | null
@@ -4211,6 +4261,13 @@ export type Database = {
             foreignKeyName: "vessel_cleanings_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
+            referencedRelation: "vessel_batch_drift_check"
+            referencedColumns: ["vessel_id"]
+          },
+          {
+            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
             referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
@@ -4318,6 +4375,13 @@ export type Database = {
             foreignKeyName: "vessel_transfers_from_vessel_id_fkey"
             columns: ["from_vessel_id"]
             isOneToOne: false
+            referencedRelation: "vessel_batch_drift_check"
+            referencedColumns: ["vessel_id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_from_vessel_id_fkey"
+            columns: ["from_vessel_id"]
+            isOneToOne: false
             referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
@@ -4334,6 +4398,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "available_vessels"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_to_vessel_id_fkey"
+            columns: ["to_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessel_batch_drift_check"
+            referencedColumns: ["vessel_id"]
           },
           {
             foreignKeyName: "vessel_transfers_to_vessel_id_fkey"
@@ -4964,22 +5035,18 @@ export type Database = {
           actual_og: number | null
           archive_notes: string | null
           archive_reason: string | null
-          archive_reason_display: string | null
           archived_at: string | null
           archived_by: string | null
-          archived_by_name: string | null
           batch_number: string | null
+          brew_count: number | null
           brew_date: string | null
-          brew_log_id: string | null
-          brewer: string | null
           cancellation_notes: string | null
           cancellation_reason: string | null
-          cancellation_reason_display: string | null
           cancelled_at: string | null
           cancelled_by: string | null
-          cancelled_by_name: string | null
           created_at: string | null
-          fermenter: string | null
+          current_vessel_id: string | null
+          current_vessel_name: string | null
           id: string | null
           name: string | null
           notes: string | null
@@ -4988,6 +5055,63 @@ export type Database = {
           status: string | null
           updated_at: string | null
           volume_bbl: number | null
+          volume_from_brews_bbl: number | null
+        }
+        Insert: {
+          actual_abv?: number | null
+          actual_fg?: number | null
+          actual_og?: never
+          archive_notes?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          batch_number?: string | null
+          brew_count?: never
+          brew_date?: never
+          cancellation_notes?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string | null
+          current_vessel_id?: never
+          current_vessel_name?: never
+          id?: string | null
+          name?: string | null
+          notes?: string | null
+          planned_start_date?: string | null
+          recipe_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          volume_bbl?: number | null
+          volume_from_brews_bbl?: never
+        }
+        Update: {
+          actual_abv?: number | null
+          actual_fg?: number | null
+          actual_og?: never
+          archive_notes?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          batch_number?: string | null
+          brew_count?: never
+          brew_date?: never
+          cancellation_notes?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          created_at?: string | null
+          current_vessel_id?: never
+          current_vessel_name?: never
+          id?: string | null
+          name?: string | null
+          notes?: string | null
+          planned_start_date?: string | null
+          recipe_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          volume_bbl?: number | null
+          volume_from_brews_bbl?: never
         }
         Relationships: [
           {
@@ -5024,9 +5148,16 @@ export type Database = {
         Row: {
           actual_abv: number | null
           actual_fg: number | null
+          archive_notes: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           batch_number: string | null
+          cancellation_notes: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string | null
-          fermenter: string | null
           id: string | null
           name: string | null
           notes: string | null
@@ -5311,6 +5442,7 @@ export type Database = {
           batch_id: string | null
           best_by_date: string | null
           brand_id: string | null
+          brand_name: string | null
           created_at: string | null
           created_by: string | null
           expiration_date: string | null
@@ -5318,6 +5450,7 @@ export type Database = {
           lot_number: string | null
           notes: string | null
           package_type_id: string | null
+          package_type_name: string | null
           production_date: string | null
           quantity: number | null
           reserved_quantity: number | null
@@ -6258,6 +6391,13 @@ export type Database = {
             foreignKeyName: "vessel_cleanings_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
+            referencedRelation: "vessel_batch_drift_check"
+            referencedColumns: ["vessel_id"]
+          },
+          {
+            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
             referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
@@ -6343,6 +6483,7 @@ export type Database = {
           sparge_water_volume_gal: number | null
           style: string | null
           style_id: string | null
+          style_name: string | null
           target_abv: number | null
           target_attenuation: number | null
           target_fg: number | null
@@ -6512,6 +6653,69 @@ export type Database = {
         }
         Relationships: []
       }
+      vessel_batch_drift_check: {
+        Row: {
+          expected_batch_id: string | null
+          expected_batch_number: string | null
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+          stored_batch_id: string | null
+          stored_batch_number: string | null
+          vessel_id: string | null
+          vessel_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["stored_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["stored_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["stored_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["stored_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["stored_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["stored_batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["stored_batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+        ]
+      }
       vessel_transfers_with_details: {
         Row: {
           batch_id: string | null
@@ -6588,6 +6792,13 @@ export type Database = {
             foreignKeyName: "vessel_transfers_from_vessel_id_fkey"
             columns: ["from_vessel_id"]
             isOneToOne: false
+            referencedRelation: "vessel_batch_drift_check"
+            referencedColumns: ["vessel_id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_from_vessel_id_fkey"
+            columns: ["from_vessel_id"]
+            isOneToOne: false
             referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
@@ -6604,6 +6815,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "available_vessels"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_to_vessel_id_fkey"
+            columns: ["to_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessel_batch_drift_check"
+            referencedColumns: ["vessel_id"]
           },
           {
             foreignKeyName: "vessel_transfers_to_vessel_id_fkey"
@@ -7294,6 +7512,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       cleaning_type: ["cip", "caustic", "acid", "sanitize", "manual", "rinse"],
