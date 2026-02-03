@@ -18,7 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { batchKeys, entityKeys, inventoryKeys } from "@/lib/query-keys";
+import { batchKeys, dashboardKeys, entityKeys, inventoryKeys } from "@/lib/query-keys";
 import {
   Dialog,
   DialogContent,
@@ -154,10 +154,14 @@ export function BatchCancellationDialog({
       return data;
     },
     onSuccess: (data) => {
+      // Invalidate both the base table and view table for batches
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("batches_with_brew_info") });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("vessels") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("vessels_with_current_batch") });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("vessel_transfers") });
       queryClient.invalidateQueries({ queryKey: inventoryKeys.allocations() });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all() });
 
       const vesselReleased = data?.vessel_released;
       const action = isArchive ? "archived" : "cancelled";
