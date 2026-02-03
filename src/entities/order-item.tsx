@@ -20,10 +20,18 @@ export const orderItemSchema = z.object({
   brand_id: z.string().uuid().nullable().optional(),
   package_type_id: z.string().uuid().nullable().optional(),
   batch_id: z.string().uuid().nullable().optional(),
+  style_id: z.string().uuid().nullable().optional(),
+  tbd_notes: z.string().nullable().optional(),
   quantity: z.coerce.number().int().positive("Quantity must be at least 1"),
   unit_price: z.coerce.number().nullable().optional(),
   notes: z.string().nullable().optional(),
-});
+}).refine(
+  (data) => data.brand_id || data.style_id,
+  {
+    message: "Either Brand or Style (for TBD) is required",
+    path: ["brand_id"],
+  }
+);
 
 export type OrderItemFormValues = z.infer<typeof orderItemSchema>;
 
@@ -49,6 +57,20 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       relation: {
         entity: "brand",
         displayField: "name",
+      },
+    },
+    {
+      accessorKey: "style_id",
+      header: "Style (TBD)",
+      relation: {
+        entity: "beer_style",
+        displayField: "name",
+      },
+      render: (value, row) => {
+        if (row.brand_id) return null; // Not TBD
+        return value ? (
+          <span className="text-muted-foreground italic">TBD: {value}</span>
+        ) : null;
       },
     },
     {
@@ -91,6 +113,8 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       title: "Item Details",
       fields: [
         { field: "brand_id", label: "Brand" },
+        { field: "style_id", label: "Style (TBD)" },
+        { field: "tbd_notes", label: "TBD Notes" },
         { field: "package_type_id", label: "Package Type" },
         { field: "quantity", label: "Quantity" },
         { field: "unit_price", label: "Unit Price", format: "currency" },
@@ -121,6 +145,27 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       relation: { entity: "brand", displayField: "name" },
       required: false,
       colSpan: 6,
+    },
+    {
+      name: "style_id",
+      label: "Style (for TBD)",
+      type: "select",
+      colSpan: 6,
+      description: "Use when product is TBD - select the style category",
+      dynamicOptions: {
+        table: "beer_styles",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "category,name",
+      },
+    },
+    {
+      name: "tbd_notes",
+      label: "TBD Notes",
+      type: "textarea",
+      colSpan: 12,
+      placeholder: "Contract brew details, target specs, customer requirements...",
+      description: "Details about the TBD product for planning purposes",
     },
     {
       name: "package_type_id",
@@ -189,5 +234,5 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
     "Find items for IPA brand",
   ],
 
-  keyFields: ["order_id", "brand_id", "package_type_id", "quantity", "unit_price"],
+  keyFields: ["order_id", "brand_id", "style_id", "package_type_id", "quantity", "unit_price"],
 };
