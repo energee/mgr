@@ -64,7 +64,7 @@ interface SourceBatchSelection {
 interface BatchBlendDialogProps {
   batchId: string;
   batchNumber: string;
-  batchName: string;
+  batchName: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
@@ -133,13 +133,10 @@ export function BatchBlendDialog({
   });
 
   // Map batch ID to available volume
-  const availableVolumeMap = useMemo(() => {
-    const map = new Map<string, number>();
-    blendInfoData?.forEach((info) => {
-      map.set(info.id, Number(info.available_volume_bbl));
-    });
-    return map;
-  }, [blendInfoData]);
+  const availableVolumeMap = useMemo(
+    () => new Map(blendInfoData?.map((info) => [info.id, Number(info.available_volume_bbl)]) ?? []),
+    [blendInfoData]
+  );
 
   const existingSourceIds = useMemo(
     () => new Set(existingBlends?.map((b: { source_batch_id: string }) => b.source_batch_id) ?? []),
@@ -220,11 +217,10 @@ export function BatchBlendDialog({
       // Validate volumes don't exceed available volume
       for (const entry of entries) {
         const sourceBatch = filteredBatches.find((b) => b.id === entry.batchId);
-        const availableVol = availableVolumeMap.get(entry.batchId);
-        const maxVol = availableVol ?? sourceBatch?.volume_bbl;
-        if (maxVol !== undefined && maxVol !== null && entry.volumeBbl > maxVol) {
+        const maxVol = availableVolumeMap.get(entry.batchId) ?? sourceBatch?.volume_bbl;
+        if (maxVol != null && entry.volumeBbl > maxVol) {
           throw new Error(
-            `Volume for ${sourceBatch?.batch_number} (${entry.volumeBbl} BBL) exceeds available volume (${Number(maxVol).toFixed(2)} BBL)`
+            `Volume for ${sourceBatch?.batch_number} (${entry.volumeBbl} BBL) exceeds available volume (${maxVol.toFixed(2)} BBL)`
           );
         }
         if (entry.volumeBbl <= 0) {
@@ -341,9 +337,7 @@ export function BatchBlendDialog({
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {availableVolumeMap.has(batch.id)
-                            ? Number(availableVolumeMap.get(batch.id)).toFixed(2)
-                            : batch.volume_bbl ?? "-"}
+                          {(availableVolumeMap.get(batch.id) ?? batch.volume_bbl)?.toFixed(2) ?? "-"}
                         </TableCell>
                         <TableCell>{batch.actual_abv ?? "-"}</TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>

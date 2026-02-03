@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {
-  status: string;
+  status: string | null | undefined;
   /** Optional color variant override */
   variant?: "default" | "success" | "warning" | "error" | "info";
   /** Status display config from entity */
@@ -53,6 +53,15 @@ const colorClasses: Record<string, string> = {
 };
 
 export function StatusBadge({ status, variant, config }: StatusBadgeProps) {
+  // Handle null/undefined status
+  if (!status) {
+    return (
+      <Badge variant="outline" className={cn("capitalize font-medium border", colorClasses.default)}>
+        —
+      </Badge>
+    );
+  }
+
   // Get label and color from config or defaults
   const label = config?.[status]?.label || formatStatus(status);
   const color = variant || config?.[status]?.color || defaultColors[status] || "default";

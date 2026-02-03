@@ -75,6 +75,7 @@ export type POLineItemFormValues = z.infer<typeof poLineItemSchema>;
 export const poLineItemEntity: EntityConfig<POLineItem> = {
   name: "po_line_item",
   table: "po_line_items",
+  viewTable: "po_line_items_with_quantities",
   displayName: "PO Line Item",
   displayNamePlural: "PO Line Items",
   description: "Purchase order line items for ingredients and materials",
@@ -96,6 +97,16 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
     {
       accessorKey: "quantity",
       header: "Qty",
+      sortable: true,
+    },
+    {
+      accessorKey: "received_quantity",
+      header: "Received",
+      sortable: true,
+    },
+    {
+      accessorKey: "outstanding_quantity",
+      header: "Outstanding",
       sortable: true,
     },
     {
@@ -197,6 +208,14 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
       type: "belongsTo",
       foreignKey: "po_id",
       showInDetail: true,
+    },
+    {
+      name: "receives",
+      entity: "po_receive",
+      type: "hasMany",
+      foreignKey: "po_line_item_id",
+      showInDetail: true,
+      detailTab: "Receives",
     },
   ],
 

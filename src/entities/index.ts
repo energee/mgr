@@ -22,10 +22,12 @@ import { packagingSessionEntity } from "./packaging-session";
 import { orderEntity } from "./order";
 import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
+import { inventoryLotEntity } from "./inventory-lot";
 import { supplierEntity } from "./supplier";
 import { purchaseOrderEntity } from "./purchase-order";
 import { orderItemEntity } from "./order-item";
 import { poLineItemEntity } from "./po-line-item";
+import { poReceiveEntity } from "./po-receive";
 import { sessionLineItemEntity } from "./session-line-item";
 import { packageTypeEntity } from "./package-type";
 import { yeastStrainEntity } from "./yeast-strain";
@@ -40,6 +42,7 @@ import { locationEntity } from "./location";
 import { userProfileEntity } from "./user-profile";
 import { enumValueEntity } from "./enum-value";
 import { pickListEntity } from "./pick-list";
+import { allocationEntity } from "./allocation";
 import { beerStyleEntity } from "./beer-style";
 import { brandEntity } from "./brand";
 
@@ -62,6 +65,8 @@ registerEntity(brandEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
+registerEntity(inventoryLotEntity);
+registerEntity(allocationEntity);
 registerEntity(finishedGoodEntity);
 registerEntity(packageTypeEntity);
 registerEntity(kegTypeEntity);
@@ -81,6 +86,7 @@ registerEntity(pickListEntity);
 registerEntity(supplierEntity);
 registerEntity(purchaseOrderEntity);
 registerEntity(poLineItemEntity);
+registerEntity(poReceiveEntity);
 
 // Settings domain
 registerEntity(locationEntity);
@@ -109,6 +115,10 @@ export type { SessionLineItemFormValues } from "./session-line-item";
 export { orderEntity } from "./order";
 export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
+export { inventoryLotEntity } from "./inventory-lot";
+export type { InventoryLotFormValues } from "./inventory-lot";
+export { allocationEntity, SOURCE_TYPES, DESTINATION_TYPES, REASON_CODES } from "./allocation";
+export type { AllocationFormValues } from "./allocation";
 export { finishedGoodEntity } from "./finished-good";
 export type { FinishedGoodFormValues } from "./finished-good";
 export { supplierEntity } from "./supplier";
@@ -117,6 +127,8 @@ export { orderItemEntity } from "./order-item";
 export type { OrderItemFormValues } from "./order-item";
 export { poLineItemEntity, CATALOG_TYPES } from "./po-line-item";
 export type { POLineItemFormValues } from "./po-line-item";
+export { poReceiveEntity } from "./po-receive";
+export type { POReceiveFormValues } from "./po-receive";
 export { packageTypeEntity } from "./package-type";
 export type { PackageTypeFormValues } from "./package-type";
 export { kegTypeEntity } from "./keg-type";
