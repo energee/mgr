@@ -42,6 +42,7 @@ import { locationEntity } from "./location";
 import { userProfileEntity } from "./user-profile";
 import { enumValueEntity } from "./enum-value";
 import { pickListEntity } from "./pick-list";
+import { allocationEntity } from "./allocation";
 
 // =============================================================================
 // Register All Entities
@@ -61,6 +62,7 @@ registerEntity(yeastPitchEntity);
 // Inventory domain
 registerEntity(inventoryItemEntity);
 registerEntity(inventoryLotEntity);
+registerEntity(allocationEntity);
 registerEntity(finishedGoodEntity);
 registerEntity(packageTypeEntity);
 registerEntity(kegTypeEntity);
@@ -111,6 +113,8 @@ export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
 export { inventoryLotEntity } from "./inventory-lot";
 export type { InventoryLotFormValues } from "./inventory-lot";
+export { allocationEntity, SOURCE_TYPES, DESTINATION_TYPES, REASON_CODES } from "./allocation";
+export type { AllocationFormValues } from "./allocation";
 export { finishedGoodEntity } from "./finished-good";
 export type { FinishedGoodFormValues } from "./finished-good";
 export { supplierEntity } from "./supplier";
