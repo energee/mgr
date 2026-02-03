@@ -43,6 +43,8 @@ import { userProfileEntity } from "./user-profile";
 import { enumValueEntity } from "./enum-value";
 import { pickListEntity } from "./pick-list";
 import { allocationEntity } from "./allocation";
+import { beerStyleEntity } from "./beer-style";
+import { brandEntity } from "./brand";
 
 // =============================================================================
 // Register All Entities
@@ -58,6 +60,8 @@ registerEntity(packagingSessionEntity);
 registerEntity(sessionLineItemEntity);
 registerEntity(yeastStrainEntity);
 registerEntity(yeastPitchEntity);
+registerEntity(beerStyleEntity);
+registerEntity(brandEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
@@ -151,6 +155,10 @@ export { enumValueEntity, ENUM_COLORS, fetchEnumTypes } from "./enum-value";
 export type { EnumValueFormValues } from "./enum-value";
 export { pickListEntity } from "./pick-list";
 export type { PickListFormValues } from "./pick-list";
+export { beerStyleEntity } from "./beer-style";
+export type { BeerStyleFormValues } from "./beer-style";
+export { brandEntity } from "./brand";
+export type { BrandFormValues } from "./brand";
 
 // =============================================================================
 // Helper Functions

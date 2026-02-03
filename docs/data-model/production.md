@@ -430,17 +430,15 @@ Production batches (cold-side: fermentation through packaging). Hot-side data co
 | recipe_id | UUID | FK to [recipes](#recipes) |
 | batch_number | TEXT | Unique batch identifier |
 | name | TEXT | Batch name |
-| status | TEXT | Status: planned, fermenting, conditioning, packaging, completed, cancelled |
+| status | TEXT | Status: planned, fermenting, conditioning, packaging, completed, cancelled, archived |
 | **Planning** | | |
 | planned_start_date | DATE | Planned fermentation start date (for scheduling) |
 | **Volumes** | | |
-| volume_gallons | DECIMAL(6,2) | Volume in fermenter ⚠️ See note below |
+| volume_bbl | DECIMAL(8,2) | Target/actual volume in barrels |
+| estimated_volume_bbl | DECIMAL(8,2) | Estimated volume from recipe |
 | **Fermentation Results** | | |
-| actual_fg | DECIMAL(4,3) | Actual final gravity |
-| actual_abv | DECIMAL(3,1) | Actual ABV |
-| actual_og | DECIMAL(4,3) | Actual original gravity ⚠️ See note below |
-| **Equipment** | | |
-| fermenter | TEXT | Fermenter identifier |
+| actual_fg | DECIMAL(4,3) | Final gravity (derived from readings) |
+| actual_abv | DECIMAL(3,1) | ABV (calculated from OG/FG) |
 | **Notes** | | |
 | notes | TEXT | Batch notes |
 | **Meta** | | |

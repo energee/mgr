@@ -193,6 +193,16 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       },
     },
     {
+      name: "batch_id",
+      label: "Source Batch",
+      type: "relation",
+      colSpan: 12,
+      relation: {
+        entity: "batch",
+        displayField: "batch_number",
+      },
+    },
+    {
       name: "production_date",
       label: "Production Date",
       type: "date",

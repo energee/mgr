@@ -16,13 +16,14 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
-import type { ColumnDef, SortingState } from "@tanstack/react-table";
+import type { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getPaginationRowModel,
 } from "@tanstack/react-table";
+import { usePersistedPageSize } from "@/hooks/use-persisted-page-size";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
 import { parseAsStringEnum } from "nuqs";
@@ -126,6 +127,14 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const debouncedSetSearch = useDebouncedCallback(setDebouncedSearch, 300);
   const [rowSelection, setRowSelection] = useState({});
+
+  // Persisted page size
+  const { pageSize: persistedPageSize, setPageSize: setPersistedPageSize } =
+    usePersistedPageSize();
+  const [pagination, setPagination] = useState<PaginationState>(() => ({
+    pageIndex: 0,
+    pageSize: persistedPageSize,
+  }));
 
   // Debounce the global search
   useEffect(() => {
@@ -242,16 +251,33 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Table instance
   // ---------------------------------------------------------------------------
+  // Handle pagination changes, persisting page size when it changes
+  const handlePaginationChange = useCallback(
+    (updater: PaginationState | ((old: PaginationState) => PaginationState)) => {
+      setPagination((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        // Persist page size if it changed
+        if (next.pageSize !== prev.pageSize) {
+          setPersistedPageSize(next.pageSize);
+        }
+        return next;
+      });
+    },
+    [setPersistedPageSize]
+  );
+
   const table = useReactTable({
     data: data || [],
     columns,
     state: {
       sorting,
       globalFilter,
+      pagination,
       ...(hasBulkActions ? { rowSelection } : {}),
     },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: handlePaginationChange,
     ...(hasBulkActions
       ? { onRowSelectionChange: setRowSelection, enableRowSelection: true }
       : {}),
@@ -271,6 +297,34 @@ export function EntityDataTable<T = Record<string, unknown>>({
       .map(([key]) => data[parseInt(key)])
       .filter(Boolean);
   }, [rowSelection, data]);
+
+  // Check if selected rows have any common valid transitions
+  const hasValidBulkTransitions = useMemo(() => {
+    if (!entity.stateMachine || selectedRows.length === 0) return false;
+
+    const stateField = entity.stateMachine.stateField;
+    const transitions = entity.stateMachine.transitions;
+
+    // Get the set of current states for all selected rows
+    const currentStates = new Set(
+      selectedRows.map(
+        (row) => (row as Record<string, unknown>)[stateField] as string
+      )
+    );
+
+    // Find transitions valid for ALL selected items
+    let commonTargets: string[] | null = null;
+    for (const state of currentStates) {
+      const allowed = transitions[state] || [];
+      if (commonTargets === null) {
+        commonTargets = [...allowed];
+      } else {
+        commonTargets = commonTargets.filter((t) => allowed.includes(t));
+      }
+    }
+
+    return (commonTargets || []).length > 0;
+  }, [entity.stateMachine, selectedRows]);
 
   const handleBulkStatusChange = useCallback(
     async (targetStatus: string) => {
@@ -382,7 +436,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
           <DataTable
             table={table}
             actionBar={
-              hasBulkActions && selectedRows.length > 0 ? (
+              hasBulkActions && selectedRows.length > 0 && hasValidBulkTransitions ? (
                 <BulkStatusActionBar
                   entity={entity}
                   selectedRows={selectedRows}
