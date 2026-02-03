@@ -7,7 +7,7 @@
  * Returns a map of field name → options array.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { EntityFilterDef } from "@/types/entity";
 
@@ -20,7 +20,7 @@ export function useDynamicFilterOptions(
   listFilters: EntityFilterDef[] | undefined,
   entityName: string
 ): DynamicFilterOptions {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [dynamicFilterOptions, setDynamicFilterOptions] =
     useState<DynamicFilterOptions>({});
 
@@ -110,7 +110,7 @@ export function useDynamicFilterOptions(
     };
 
     fetchDynamicOptions();
-  }, [listFilters, supabase]);
+  }, [listFilters, entityName, supabase]);
 
   return dynamicFilterOptions;
 }
