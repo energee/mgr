@@ -8,37 +8,42 @@
  *
  * Architecture:
  * - Entity configs are translated to Dice UI columns via data-table-adapter
- * - Filters are synced to URL query params via nuqs
+ * - Filters are managed by DataTableFilterList via nuqs URL state
+ * - Sorting is managed by TanStack Table state (DataTableSortList reads/writes via table)
  * - Data is fetched from Supabase and filtered server-side
- * - Sorting and pagination are handled client-side by TanStack Table
+ * - Pagination is handled client-side by TanStack Table
  */
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
-import type { ColumnDef, ColumnFiltersState, SortingState } from "@tanstack/react-table";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
 } from "@tanstack/react-table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryState } from "nuqs";
+import { parseAsStringEnum } from "nuqs";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig } from "@/types/entity";
+import type { ExtendedColumnFilter } from "@/types/data-table";
+import { getFiltersStateParser } from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { BulkStatusActionBar } from "./bulk-status-action-bar";
 import {
   buildDataTableColumns,
   buildSelectColumn,
   buildActionsColumn,
-  buildSupabaseFilters,
+  buildSupabaseFiltersFromUrl,
+  escapePostgrestOrValue,
 } from "@/lib/data-table-adapter";
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
+import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableAdvancedToolbar } from "@/components/data-table/data-table-advanced-toolbar";
@@ -49,6 +54,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -63,7 +69,7 @@ import {
 export interface EntityDataTableProps<T = Record<string, unknown>> {
   /** Entity configuration */
   entity: EntityConfig<T>;
-  /** Base path for detail links (defaults to entity name) */
+  /** Base path for detail links (defaults to /{domain}/{table}) */
   basePath?: string;
   /** Additional query filters */
   filters?: Record<string, unknown>;
@@ -87,11 +93,11 @@ export function EntityDataTable<T = Record<string, unknown>>({
   onCreateClick,
   onAction,
 }: EntityDataTableProps<T>) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-  const path = basePath || `/${entity.domain}/${entity.name}s`;
+  const path = basePath || `/${entity.domain}/${entity.table}`;
 
   const hasBulkActions = !!entity.stateMachine;
 
@@ -116,21 +122,21 @@ export function EntityDataTable<T = Record<string, unknown>>({
         ]
       : []
   );
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSetSearch = useDebouncedCallback(setDebouncedSearch, 300);
   const [rowSelection, setRowSelection] = useState({});
+
+  // Debounce the global search
+  useEffect(() => {
+    debouncedSetSearch(globalFilter);
+  }, [globalFilter, debouncedSetSearch]);
 
   // Reset when navigating between entities
   useEffect(() => {
-    setColumnFilters([]);
     setGlobalFilter("");
     setRowSelection({});
   }, [entity.name]);
-
-  // Reset row selection when filters change
-  useEffect(() => {
-    setRowSelection({});
-  }, [columnFilters, globalFilter]);
 
   // ---------------------------------------------------------------------------
   // Build columns (memoized, updates when dynamicFilterOptions change)
@@ -147,33 +153,59 @@ export function EntityDataTable<T = Record<string, unknown>>({
   }, [entity, dynamicFilterOptions, path, onAction, hasBulkActions]);
 
   // ---------------------------------------------------------------------------
+  // URL-synced filter state (read from nuqs — DataTableFilterList writes here)
+  // ---------------------------------------------------------------------------
+  const filterableColumnIds = useMemo(
+    () =>
+      columns
+        .filter((c) => c.enableColumnFilter)
+        .map((c) => c.id)
+        .filter(Boolean) as string[],
+    [columns]
+  );
+
+  const [urlFilters] = useQueryState(
+    "filters",
+    getFiltersStateParser<T>(filterableColumnIds).withDefault([])
+  );
+
+  const [joinOperator] = useQueryState(
+    "joinOperator",
+    parseAsStringEnum(["and", "or"]).withDefault("and")
+  );
+
+  // Reset row selection when filters or search change
+  useEffect(() => {
+    setRowSelection({});
+  }, [urlFilters, debouncedSearch]);
+
+  // ---------------------------------------------------------------------------
   // Data fetching
   // ---------------------------------------------------------------------------
   const fetchTable = entity.viewTable || entity.table;
 
-  // Build a stable key from column filters for query cache
+  // Build a stable key from URL filters for query cache
   const filterKey = useMemo(
     () =>
-      columnFilters
-        .filter(
-          (f) =>
-            f.value !== undefined &&
-            f.value !== null &&
-            f.value !== "" &&
-            !(Array.isArray(f.value) && f.value.length === 0)
-        )
-        .reduce(
-          (acc, f) => {
-            acc[f.id] = f.value;
-            return acc;
-          },
-          {} as Record<string, unknown>
-        ),
-    [columnFilters]
+      urlFilters.length > 0
+        ? {
+            filters: urlFilters.map((f) => ({
+              id: f.id,
+              value: f.value,
+              operator: f.operator,
+            })),
+            joinOperator,
+          }
+        : {},
+    [urlFilters, joinOperator]
   );
 
   const { data, isLoading, isFetching, error } = useQuery({
-    queryKey: entityKeys.list(fetchTable, { ...filters, ...filterKey }),
+    queryKey: entityKeys.list(fetchTable, {
+      ...filters,
+      ...filterKey,
+      search: debouncedSearch || undefined,
+    }),
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     queryFn: async () => {
       let query = db.from(fetchTable).select("*");
@@ -185,17 +217,18 @@ export function EntityDataTable<T = Record<string, unknown>>({
         });
       }
 
-      // Apply column filters from UI (translated to Supabase ops)
-      const applyFilters = buildSupabaseFilters(
-        columnFilters,
-        entity.listFilters || []
+      // Apply URL filters from DataTableFilterList (translated to Supabase ops)
+      const applyFilters = buildSupabaseFiltersFromUrl(
+        urlFilters as ExtendedColumnFilter<T>[],
+        joinOperator
       );
       query = applyFilters(query);
 
-      // Apply global search
-      if (globalFilter && entity.searchableFields?.length) {
+      // Apply global search (debounced)
+      if (debouncedSearch && entity.searchableFields?.length) {
+        const escaped = escapePostgrestOrValue(debouncedSearch);
         const searchCondition = entity.searchableFields
-          .map((field) => `${field}.ilike.%${globalFilter}%`)
+          .map((field) => `${field}.ilike.%${escaped}%`)
           .join(",");
         query = query.or(searchCondition);
       }
@@ -214,23 +247,17 @@ export function EntityDataTable<T = Record<string, unknown>>({
     columns,
     state: {
       sorting,
-      columnFilters,
       globalFilter,
       ...(hasBulkActions ? { rowSelection } : {}),
     },
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     ...(hasBulkActions
       ? { onRowSelectionChange: setRowSelection, enableRowSelection: true }
       : {}),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    // Client-side sorting + pagination, server-side filtering
     manualFiltering: true,
   });
 
@@ -239,9 +266,9 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   const selectedRows = useMemo(() => {
     if (!data) return [];
-    return Object.keys(rowSelection)
-      .filter((key) => rowSelection[key as keyof typeof rowSelection])
-      .map((key) => data[parseInt(key)])
+    return Object.entries(rowSelection)
+      .filter(([, selected]) => selected)
+      .map(([key]) => data[parseInt(key)])
       .filter(Boolean);
   }, [rowSelection, data]);
 
@@ -251,14 +278,37 @@ export function EntityDataTable<T = Record<string, unknown>>({
         return;
 
       const stateField = entity.stateMachine.stateField;
+      const transitions = entity.stateMachine.transitions;
       const ids = selectedRows.map(
         (row) => (row as Record<string, unknown>).id as string
       );
 
+      // Fetch current states to validate transitions server-side
+      const { data: currentData, error: fetchError } = await db
+        .from(entity.table)
+        .select(`id, ${stateField}`)
+        .in("id", ids);
+
+      if (fetchError) throw fetchError;
+
+      // Only update rows where transition is valid
+      const validIds = (currentData || [])
+        .filter((row: Record<string, unknown>) => {
+          const currentState = row[stateField] as string;
+          const allowed = transitions[currentState] || [];
+          return allowed.includes(targetStatus);
+        })
+        .map((row: Record<string, unknown>) => row.id as string);
+
+      if (validIds.length === 0) {
+        toast.error("No valid transitions available. Data may have changed.");
+        return 0;
+      }
+
       const { error } = await db
         .from(entity.table)
         .update({ [stateField]: targetStatus })
-        .in("id", ids);
+        .in("id", validIds);
 
       if (error) throw error;
 
@@ -275,7 +325,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       // Clear selection
       setRowSelection({});
 
-      return ids.length;
+      return validIds.length;
     },
     [entity, selectedRows, db, queryClient, fetchTable]
   );
@@ -294,7 +344,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Check for active filters
   // ---------------------------------------------------------------------------
-  const hasActiveFilters = globalFilter || columnFilters.length > 0;
+  const hasActiveFilters = debouncedSearch || urlFilters.length > 0;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -317,7 +367,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
       {/* Data Table */}
       <div
-        className={`relative ${isFetching && !isLoading ? "opacity-60" : ""}`}
+        className={cn("relative", isFetching && !isLoading && "opacity-60")}
       >
         {/* Refetch indicator */}
         {isFetching && !isLoading && (
@@ -403,7 +453,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
             </DataTableAdvancedToolbar>
           </DataTable>
         )}
-
       </div>
     </div>
   );
@@ -442,18 +491,6 @@ export type EntityListProps<T = Record<string, unknown>> =
 
 export { EntityDataTable as EntityList };
 
-export function EntityListWithErrorBoundary<T = Record<string, unknown>>(
-  props: EntityDataTableProps<T>
-) {
-  return (
-    <EntityErrorBoundary
-      entity={props.entity as EntityConfig<Record<string, unknown>>}
-    >
-      <EntityDataTable {...props} />
-    </EntityErrorBoundary>
-  );
-}
-
 export function EntityDataTableWithErrorBoundary<
   T = Record<string, unknown>,
 >(props: EntityDataTableProps<T>) {
@@ -465,3 +502,5 @@ export function EntityDataTableWithErrorBoundary<
     </EntityErrorBoundary>
   );
 }
+
+export { EntityDataTableWithErrorBoundary as EntityListWithErrorBoundary };

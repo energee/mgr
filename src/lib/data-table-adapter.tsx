@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Data Table Adapter
  *
@@ -13,7 +11,7 @@ import type {
   EntityColumnDef,
   EntityFilterDef,
 } from "@/types/entity";
-import type { FilterVariant, Option } from "@/types/data-table";
+import type { FilterVariant, Option, ExtendedColumnFilter } from "@/types/data-table";
 import { formatValue } from "@/lib/utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -78,8 +76,7 @@ export function buildDataTableColumns<T>(
       }));
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const column: ColumnDef<T, any> = {
+    return {
       id: accessorKey || col.id,
       ...(accessorKey
         ? { accessorKey: accessorKey as keyof T & string }
@@ -95,18 +92,14 @@ export function buildDataTableColumns<T>(
       cell: ({ row }: { row: { getValue: (id: string) => unknown; original: T } }) => {
         const value = accessorKey ? row.getValue(accessorKey) : null;
 
-        // Custom render function from entity config
         if (col.render) {
           return col.render(value, row.original);
         }
 
-        // Use shared formatValue utility
         return formatValue(value, col.format);
       },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any as ColumnDef<T, any>;
-
-    return column;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as ColumnDef<T, any>;
   });
 }
 
@@ -219,56 +212,142 @@ export function buildActionsColumn<T>(
 }
 
 // =============================================================================
-// buildSupabaseFilters
+// Input Escaping
+// =============================================================================
+
+/** Escape SQL LIKE wildcards for use in ilike queries */
+export function escapeLikeValue(value: string): string {
+  return value.replace(/[%_\\]/g, (c) => `\\${c}`);
+}
+
+/** Escape special characters for PostgREST .or() filter strings */
+export function escapePostgrestOrValue(value: string): string {
+  return value.replace(/[%_\\,().]/g, (c) => `\\${c}`);
+}
+
+// =============================================================================
+// buildSupabaseFiltersFromUrl
 // =============================================================================
 
 /**
- * Translates Dice UI ColumnFiltersState into Supabase query operations.
+ * Translates nuqs ExtendedColumnFilter[] (from DataTableFilterList URL state)
+ * into Supabase query operations.
  *
- * Each filter in the state has:
- * - id: column/field name
- * - value: string | string[] (depends on filter variant)
- *
- * Returns a function that applies all filters to a Supabase query builder.
+ * Each filter has: { id, value, operator, variant, filterId }
+ * Operators: iLike, notILike, eq, ne, inArray, notInArray, lt, lte, gt, gte,
+ *            isEmpty, isNotEmpty, isBetween
  */
-export function buildSupabaseFilters(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  columnFilters: { id: string; value: any }[],
-  filterDefs: EntityFilterDef[]
+export function buildSupabaseFiltersFromUrl<T>(
+  urlFilters: ExtendedColumnFilter<T>[],
+  joinOperator: "and" | "or" = "and"
 ) {
-  const filterDefMap = new Map<string, EntityFilterDef>();
-  filterDefs.forEach((f) => filterDefMap.set(f.field, f));
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (query: any) => {
-    for (const filter of columnFilters) {
-      const value = filter.value;
-      if (
-        value === undefined ||
-        value === null ||
-        value === "" ||
-        (Array.isArray(value) && value.length === 0)
-      )
-        continue;
+    if (urlFilters.length === 0) return query;
 
-      const def = filterDefMap.get(filter.id);
-      const filterType = def?.type;
-
-      if (Array.isArray(value)) {
-        // Multiselect — use .in() operator
-        query = query.in(filter.id, value);
-      } else if (filterType === "search") {
-        // Text search — use ilike
-        query = query.ilike(filter.id, `%${value}%`);
-      } else if (filterType === "boolean") {
-        // Boolean
-        query = query.eq(filter.id, value === "true" || value === true);
-      } else {
-        // Single value — select or fallback
-        query = query.eq(filter.id, value);
+    // When using "or" join, we need to build an .or() string
+    if (joinOperator === "or") {
+      const conditions = urlFilters
+        .map((filter) => buildPostgrestCondition(filter))
+        .filter(Boolean);
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(","));
       }
+      return query;
     }
 
+    // "and" join: apply each filter sequentially
+    for (const filter of urlFilters) {
+      query = applyFilterToQuery(query, filter);
+    }
     return query;
   };
+}
+
+/** Apply a single filter to a Supabase query (for "and" mode) */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyFilterToQuery(query: any, filter: ExtendedColumnFilter<any>) {
+  const { id, value, operator } = filter;
+  if (value === undefined || value === null || value === "") {
+    if (operator !== "isEmpty" && operator !== "isNotEmpty") return query;
+  }
+
+  switch (operator) {
+    case "iLike":
+      return query.ilike(id, `%${escapeLikeValue(String(value))}%`);
+    case "notILike":
+      return query.not(id, "ilike", `%${escapeLikeValue(String(value))}%`);
+    case "eq":
+      return query.eq(id, value);
+    case "ne":
+      return query.neq(id, value);
+    case "inArray":
+      return query.in(id, Array.isArray(value) ? value : [value]);
+    case "notInArray": {
+      const arr = Array.isArray(value) ? value : [value];
+      // PostgREST: negate an in check
+      for (const v of arr) {
+        query = query.neq(id, v);
+      }
+      return query;
+    }
+    case "lt":
+      return query.lt(id, value);
+    case "lte":
+      return query.lte(id, value);
+    case "gt":
+      return query.gt(id, value);
+    case "gte":
+      return query.gte(id, value);
+    case "isEmpty":
+      return query.is(id, null);
+    case "isNotEmpty":
+      return query.not(id, "is", null);
+    case "isBetween": {
+      if (Array.isArray(value) && value.length === 2) {
+        return query.gte(id, value[0]).lte(id, value[1]);
+      }
+      return query;
+    }
+    default:
+      return query.eq(id, value);
+  }
+}
+
+/** Build a PostgREST condition string for .or() usage */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildPostgrestCondition(filter: ExtendedColumnFilter<any>): string | null {
+  const { id, value, operator } = filter;
+  if (value === undefined || value === null || value === "") {
+    if (operator !== "isEmpty" && operator !== "isNotEmpty") return null;
+  }
+
+  switch (operator) {
+    case "iLike":
+      return `${id}.ilike.%${escapePostgrestOrValue(String(value))}%`;
+    case "notILike":
+      return `${id}.not.ilike.%${escapePostgrestOrValue(String(value))}%`;
+    case "eq":
+      return `${id}.eq.${value}`;
+    case "ne":
+      return `${id}.neq.${value}`;
+    case "inArray": {
+      const arr = Array.isArray(value) ? value : [value];
+      return `${id}.in.(${arr.join(",")})`;
+    }
+    case "lt":
+      return `${id}.lt.${value}`;
+    case "lte":
+      return `${id}.lte.${value}`;
+    case "gt":
+      return `${id}.gt.${value}`;
+    case "gte":
+      return `${id}.gte.${value}`;
+    case "isEmpty":
+      return `${id}.is.null`;
+    case "isNotEmpty":
+      return `${id}.not.is.null`;
+    default:
+      return `${id}.eq.${value}`;
+  }
 }

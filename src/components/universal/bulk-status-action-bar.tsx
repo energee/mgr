@@ -10,6 +10,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import type { EntityConfig } from "@/types/entity";
+import { getStateLabel } from "@/types/entity";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -42,7 +43,6 @@ export function BulkStatusActionBar<T>({
 
     const stateField = entity.stateMachine.stateField;
     const transitions = entity.stateMachine.transitions;
-    const stateDisplay = entity.stateMachine.stateDisplay;
 
     // Get the set of current states for all selected rows
     const currentStates = new Set(
@@ -67,7 +67,7 @@ export function BulkStatusActionBar<T>({
 
     return (commonTargets || []).map((state) => ({
       value: state,
-      label: stateDisplay?.[state]?.label || state,
+      label: getStateLabel(entity, state),
     }));
   }, [entity.stateMachine, selectedRows]);
 
@@ -83,8 +83,7 @@ export function BulkStatusActionBar<T>({
             ? entity.displayName.toLowerCase()
             : entity.displayNamePlural.toLowerCase()
         } to ${
-          entity.stateMachine?.stateDisplay?.[bulkTargetStatus]
-            ?.label || bulkTargetStatus
+          getStateLabel(entity, bulkTargetStatus)
         }`
       );
       setBulkTargetStatus("");
