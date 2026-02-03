@@ -62,26 +62,24 @@ function StatDisplay({ stat }: { stat: StatItem }) {
 
 export function StatsStrip({ stats, secondaryStats, children, className }: StatsStripProps) {
   return (
-    <div className={cn("flex items-baseline gap-6 py-3 border-b text-sm", className)}>
-      {stats.map((stat, index) => (
-        <div key={stat.label} className="contents">
-          {index > 0 && <span className="text-border">|</span>}
-          <StatDisplay stat={stat} />
-        </div>
+    <div className={cn("flex flex-wrap items-baseline gap-x-8 gap-y-3 py-3 text-sm", className)}>
+      {stats.map((stat) => (
+        <StatDisplay key={stat.label} stat={stat} />
       ))}
 
-      {/* Children (e.g., filters) take precedence over secondaryStats */}
-      {children ? (
-        <div className="ml-auto flex items-center gap-3">{children}</div>
-      ) : secondaryStats && secondaryStats.length > 0 ? (
-        <div className="ml-auto flex items-baseline gap-4 text-muted-foreground">
+      {children && (
+        <div className="sm:ml-auto flex items-center gap-3">{children}</div>
+      )}
+
+      {!children && secondaryStats && secondaryStats.length > 0 && (
+        <div className="sm:ml-auto flex flex-wrap items-baseline gap-x-6 gap-y-2 text-muted-foreground">
           {secondaryStats.map((stat) => (
             <span key={stat.label}>
               <span className="font-mono font-medium">{stat.value}</span> {stat.label}
             </span>
           ))}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

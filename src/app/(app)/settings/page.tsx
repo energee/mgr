@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Building2, Cog, Container, DollarSign, FlaskConical, Link2, List, MapPin, Package, Settings, Store, Users } from "lucide-react";
+import { Beer, Bell, BookOpen, Building2, Cog, Container, DollarSign, FlaskConical, Link2, List, MapPin, Package, Settings, Store, Users } from "lucide-react";
 
 const settingsLinks = [
   {
@@ -70,6 +70,20 @@ const settingsLinks = [
     description: "Manage yeast strain catalog for recipe building",
     href: "/settings/yeasts",
     icon: FlaskConical,
+    available: true,
+  },
+  {
+    title: "Beer Styles",
+    description: "BJCP style guidelines and custom styles",
+    href: "/settings/beer-styles",
+    icon: BookOpen,
+    available: true,
+  },
+  {
+    title: "Brands",
+    description: "Manage your beer brands and products",
+    href: "/settings/brands",
+    icon: Beer,
     available: true,
   },
   {

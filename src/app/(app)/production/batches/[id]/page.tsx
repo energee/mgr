@@ -35,7 +35,7 @@ export default function BatchDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
-        .select("id, batch_number, name, status, volume_bbl, fermenter")
+        .select("id, batch_number, name, status, volume_bbl")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -91,7 +91,6 @@ export default function BatchDetailPage({
             batchName={batch.name}
             currentStatus={batch.status}
             currentVolume={batch.volume_bbl}
-            vesselName={batch.fermenter}
             open={showCancellation}
             onOpenChange={setShowCancellation}
             onSuccess={handleDialogSuccess}

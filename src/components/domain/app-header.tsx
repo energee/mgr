@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,9 +50,10 @@ export function AppHeader({ user, breweryName }: AppHeaderProps) {
   const logoutIconRef = useRef<AnimatedIconHandle>(null);
 
   return (
-    <header className="h-16 border-b bg-card flex items-center justify-between px-6">
-      {/* Brewery name */}
-      <div>
+    <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-6">
+      {/* Left side: menu trigger + brewery name */}
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
         <h1 className="text-lg font-semibold">{breweryName}</h1>
       </div>
 
