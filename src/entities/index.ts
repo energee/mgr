@@ -27,6 +27,7 @@ import { supplierEntity } from "./supplier";
 import { purchaseOrderEntity } from "./purchase-order";
 import { orderItemEntity } from "./order-item";
 import { poLineItemEntity } from "./po-line-item";
+import { poReceiveEntity } from "./po-receive";
 import { sessionLineItemEntity } from "./session-line-item";
 import { packageTypeEntity } from "./package-type";
 import { yeastStrainEntity } from "./yeast-strain";
@@ -79,6 +80,7 @@ registerEntity(pickListEntity);
 registerEntity(supplierEntity);
 registerEntity(purchaseOrderEntity);
 registerEntity(poLineItemEntity);
+registerEntity(poReceiveEntity);
 
 // Settings domain
 registerEntity(locationEntity);
@@ -117,6 +119,8 @@ export { orderItemEntity } from "./order-item";
 export type { OrderItemFormValues } from "./order-item";
 export { poLineItemEntity, CATALOG_TYPES } from "./po-line-item";
 export type { POLineItemFormValues } from "./po-line-item";
+export { poReceiveEntity } from "./po-receive";
+export type { POReceiveFormValues } from "./po-receive";
 export { packageTypeEntity } from "./package-type";
 export type { PackageTypeFormValues } from "./package-type";
 export { kegTypeEntity } from "./keg-type";
