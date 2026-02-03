@@ -36,7 +36,7 @@ import { RefreshCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SupplierGroupCard } from "@/components/domain/supplier-group-card";
 import { UnassignedShortfallsCard } from "@/components/domain/unassigned-shortfalls-card";
-import { DashboardSection, DashboardEmpty } from "@/components/dashboard";
+import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
 
 // =============================================================================
 // Types
@@ -278,88 +278,60 @@ export default function IngredientDemandPage() {
         </div>
 
         {/* Stats Strip with integrated filters */}
-        <div className="flex items-baseline gap-6 py-3 border-b text-sm">
-          {/* Primary Stats */}
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-mono text-2xl font-semibold">{totalDemandItems}</span>
-            <span className="text-muted-foreground">demand</span>
-          </div>
-          <span className="text-border">|</span>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-mono text-2xl font-semibold">{shortfallCount}</span>
-            <span className="text-muted-foreground">shortfalls</span>
-          </div>
-          <span className="text-border">|</span>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-mono text-2xl font-semibold">{suppliersAffected}</span>
-            <span className="text-muted-foreground">
-              suppliers
-              {unassignedShortfalls.length > 0 && (
-                <span className="text-amber-600 ml-1">(+{unassignedShortfalls.length} unassigned)</span>
-              )}
-            </span>
-          </div>
+        <StatsStrip
+          stats={[
+            { value: totalDemandItems, label: "demand" },
+            { value: shortfallCount, label: "shortfalls" },
+            {
+              value: suppliersAffected,
+              label: unassignedShortfalls.length > 0
+                ? `suppliers (+${unassignedShortfalls.length} unassigned)`
+                : "suppliers",
+              variant: unassignedShortfalls.length > 0 ? "warning" : "default",
+            },
+            ...(urgentCount > 0
+              ? [{ value: urgentCount, label: "urgent", variant: "warning" as const }]
+              : []),
+            ...(urgentCount === 0 && estimatedTotalCost > 0
+              ? [{ value: `$${estimatedTotalCost.toFixed(0)}`, label: "est. cost" }]
+              : []),
+          ]}
+        >
+          <Select
+            value={filters.horizonWeeks.toString()}
+            onValueChange={(value) =>
+              setFilters({ ...filters, horizonWeeks: parseInt(value) })
+            }
+          >
+            <SelectTrigger className="h-8 w-[100px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="4">4 weeks</SelectItem>
+              <SelectItem value="8">8 weeks</SelectItem>
+              <SelectItem value="12">12 weeks</SelectItem>
+            </SelectContent>
+          </Select>
 
-          {/* Urgent count if any */}
-          {urgentCount > 0 && (
-            <>
-              <span className="text-border">|</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-mono text-2xl font-semibold text-amber-600">{urgentCount}</span>
-                <span className="text-amber-600">urgent</span>
-              </div>
-            </>
-          )}
-
-          {/* Estimated cost if no urgent */}
-          {urgentCount === 0 && estimatedTotalCost > 0 && (
-            <>
-              <span className="text-border">|</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-mono text-2xl font-semibold">${estimatedTotalCost.toFixed(0)}</span>
-                <span className="text-muted-foreground">est. cost</span>
-              </div>
-            </>
-          )}
-
-          {/* Filters pushed right */}
-          <div className="ml-auto flex items-center gap-3">
-            <Select
-              value={filters.horizonWeeks.toString()}
-              onValueChange={(value) =>
-                setFilters({ ...filters, horizonWeeks: parseInt(value) })
-              }
-            >
-              <SelectTrigger className="h-8 w-[100px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="4">4 weeks</SelectItem>
-                <SelectItem value="8">8 weeks</SelectItem>
-                <SelectItem value="12">12 weeks</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.catalogType}
-              onValueChange={(value) =>
-                setFilters({ ...filters, catalogType: value })
-              }
-            >
-              <SelectTrigger className="h-8 w-[120px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_all">All Types</SelectItem>
-                {catalogTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {getCatalogTypeDisplay(type)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+          <Select
+            value={filters.catalogType}
+            onValueChange={(value) =>
+              setFilters({ ...filters, catalogType: value })
+            }
+          >
+            <SelectTrigger className="h-8 w-[120px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">All Types</SelectItem>
+              {catalogTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {getCatalogTypeDisplay(type)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </StatsStrip>
       </div>
 
       {/* Supplier Groups */}

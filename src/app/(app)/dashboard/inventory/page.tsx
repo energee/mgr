@@ -48,6 +48,12 @@ interface InventorySummary {
 }
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+const MAX_ITEMS_SHOWN = 8;
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 
@@ -251,7 +257,7 @@ export default function InventoryDashboardPage() {
             <DashboardEmpty message="All items are stocked" />
           ) : (
             <div className="divide-y">
-              {lowStockItems.slice(0, 8).map((item) => {
+              {lowStockItems.slice(0, MAX_ITEMS_SHOWN).map((item) => {
                 const percentOfReorder = Math.round((item.current_qty / item.reorder_point) * 100);
 
                 return (
@@ -287,7 +293,7 @@ export default function InventoryDashboardPage() {
             <DashboardEmpty message="No lots expiring soon" />
           ) : (
             <div className="divide-y">
-              {expiringLots.slice(0, 8).map((lot) => (
+              {expiringLots.slice(0, MAX_ITEMS_SHOWN).map((lot) => (
                 <div
                   key={lot.id}
                   className="flex items-center justify-between py-2"

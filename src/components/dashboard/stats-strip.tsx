@@ -24,6 +24,8 @@ interface StatsStripProps {
   stats: StatItem[];
   /** Secondary stats pushed to the right */
   secondaryStats?: StatItem[];
+  /** Custom content pushed to the right (e.g., filters) - takes precedence over secondaryStats */
+  children?: React.ReactNode;
   /** Additional className for the container */
   className?: string;
 }
@@ -58,7 +60,7 @@ function StatDisplay({ stat }: { stat: StatItem }) {
   return content;
 }
 
-export function StatsStrip({ stats, secondaryStats, className }: StatsStripProps) {
+export function StatsStrip({ stats, secondaryStats, children, className }: StatsStripProps) {
   return (
     <div className={cn("flex items-baseline gap-6 py-3 border-b text-sm", className)}>
       {stats.map((stat, index) => (
@@ -68,7 +70,10 @@ export function StatsStrip({ stats, secondaryStats, className }: StatsStripProps
         </div>
       ))}
 
-      {secondaryStats && secondaryStats.length > 0 && (
+      {/* Children (e.g., filters) take precedence over secondaryStats */}
+      {children ? (
+        <div className="ml-auto flex items-center gap-3">{children}</div>
+      ) : secondaryStats && secondaryStats.length > 0 ? (
         <div className="ml-auto flex items-baseline gap-4 text-muted-foreground">
           {secondaryStats.map((stat) => (
             <span key={stat.label}>
@@ -76,7 +81,7 @@ export function StatsStrip({ stats, secondaryStats, className }: StatsStripProps
             </span>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

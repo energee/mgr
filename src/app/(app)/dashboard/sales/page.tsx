@@ -57,6 +57,14 @@ interface ProductMix {
 }
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+const MAX_ORDERS_SHOWN = 6;
+const MAX_CUSTOMERS_SHOWN = 6;
+const MAX_QUERY_RESULTS = 10;
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 
@@ -212,7 +220,7 @@ export default function SalesDashboardPage() {
           sales_channel: data.channel,
         }))
         .sort((a, b) => b.total_revenue - a.total_revenue)
-        .slice(0, 10) as CustomerRevenue[];
+        .slice(0, MAX_QUERY_RESULTS) as CustomerRevenue[];
     },
     refetchInterval: 60000,
   });
@@ -266,7 +274,7 @@ export default function SalesDashboardPage() {
           total_revenue: data.revenue,
         }))
         .sort((a, b) => b.total_revenue - a.total_revenue)
-        .slice(0, 10) as ProductMix[];
+        .slice(0, MAX_QUERY_RESULTS) as ProductMix[];
     },
     refetchInterval: 60000,
   });
@@ -358,7 +366,7 @@ export default function SalesDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {recentOrders.slice(0, 6).map((order) => (
+                {recentOrders.slice(0, MAX_ORDERS_SHOWN).map((order) => (
                   <tr key={order.id} className="hover:bg-muted/50">
                     <td className="py-2">
                       <Link href={`/sales/orders/${order.id}`} className="hover:underline">
@@ -390,7 +398,7 @@ export default function SalesDashboardPage() {
             <DashboardEmpty message="No fulfilled orders yet" />
           ) : (
             <div className="divide-y">
-              {customerRevenue.slice(0, 6).map((customer, index) => (
+              {customerRevenue.slice(0, MAX_CUSTOMERS_SHOWN).map((customer, index) => (
                 <div
                   key={customer.customer_id}
                   className="flex items-center justify-between py-2"

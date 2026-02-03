@@ -52,6 +52,13 @@ interface VesselStatus {
 }
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+const MAX_BATCHES_SHOWN = 8;
+const MAX_VESSELS_SHOWN = 10;
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -234,7 +241,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {activeBatches.slice(0, 8).map((batch) => (
+                {activeBatches.slice(0, MAX_BATCHES_SHOWN).map((batch) => (
                   <tr key={batch.id} className="hover:bg-muted/50">
                     <td className="py-2">
                       <Link href={`/production/batches/${batch.id}`} className="hover:underline">
@@ -315,7 +322,7 @@ export default function DashboardPage() {
 
           {/* Dense Vessel List */}
           <div className="divide-y max-h-[240px] overflow-y-auto">
-            {vesselArray.slice(0, 10).map((vessel) => (
+            {vesselArray.slice(0, MAX_VESSELS_SHOWN).map((vessel) => (
               <Link
                 key={vessel.id}
                 href={`/production/vessels/${vessel.id}`}

@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, RefreshCw, Calendar, List } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import Link from "next/link";
 import type {
   ProductionShortfall,
@@ -123,14 +123,12 @@ export default function ProductionPlanningPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold">Production Planning</h1>
-            <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
-              <Button variant="ghost" size="sm" className="h-7 px-2 bg-background shadow-sm">
-                <List className="h-4 w-4 mr-1" />
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 text-sm">
+              <Button variant="ghost" size="sm" className="h-7 px-3 bg-background shadow-sm">
                 List
               </Button>
               <Link href="/production/planning/timeline">
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
-                  <Calendar className="h-4 w-4 mr-1" />
+                <Button variant="ghost" size="sm" className="h-7 px-3 text-muted-foreground hover:text-foreground">
                   Timeline
                 </Button>
               </Link>
@@ -260,7 +258,6 @@ export default function ProductionPlanningPage() {
                       onClick={() => setSelectedShortfall(shortfall)}
                       disabled={!shortfall.recipe_id}
                     >
-                      <Plus className="h-4 w-4 mr-1" />
                       Create Batch
                     </Button>
                   </TableCell>
