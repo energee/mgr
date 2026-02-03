@@ -80,7 +80,7 @@ function NavSectionHeader({
         chevronRef.current?.stopAnimation();
       }}
       className={cn(
-        "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+        "flex items-center justify-between w-full px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200",
         isActive
           ? "text-sidebar-foreground"
           : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
@@ -122,7 +122,7 @@ function NavItemLink({
       onMouseEnter={() => iconRef.current?.startAnimation()}
       onMouseLeave={() => iconRef.current?.stopAnimation()}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200",
+        "flex items-center gap-3 px-3 py-1 rounded-md text-sm transition-all duration-200",
         isActive
           ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
           : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
@@ -153,7 +153,7 @@ function FooterLink({
       onMouseEnter={() => iconRef.current?.startAnimation()}
       onMouseLeave={() => iconRef.current?.stopAnimation()}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+        "flex items-center gap-3 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200",
         isActive
           ? "bg-sidebar-primary text-sidebar-primary-foreground"
           : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
@@ -261,13 +261,13 @@ export function AppSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {navigation.map((section) => {
           const isExpanded = expandedSections.includes(section.label);
           const isActive = section.items.some((item) => pathname.startsWith(item.href));
 
           return (
-            <div key={section.label} className="mt-3 first:mt-0">
+            <div key={section.label} className="mt-1 first:mt-0">
               <NavSectionHeader
                 section={section}
                 isActive={isActive}
@@ -276,7 +276,7 @@ export function AppSidebar() {
               />
 
               {isExpanded && (
-                <div className="mt-1 ml-3 pl-4 border-l border-sidebar-border/50 space-y-0.5">
+                <div className="mt-1 ml-3 pl-4 border-l border-sidebar-border/50">
                   {section.items.map((item) => {
                     const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
                     return (
@@ -295,7 +295,7 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer links */}
-      <div className="px-3 py-4 border-t border-sidebar-border space-y-0.5">
+      <div className="px-3 py-3 border-t border-sidebar-border">
         <FooterLink
           href="/help"
           icon={AnimatedHelpCircle}
