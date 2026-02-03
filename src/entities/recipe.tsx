@@ -9,12 +9,14 @@
  * recipes_with_estimates view.
  */
 
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, StateMachineConfig } from "@/types/entity";
+import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
+import { StatusBadge } from "@/components/universal/status-badge";
 
 import { recipeSchema } from "@/lib/schemas/recipe";
 
@@ -23,6 +25,29 @@ export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
 
 // Use view type to include calculated estimates
 type Recipe = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
+
+// =============================================================================
+// State Machine (defined separately to derive options)
+// =============================================================================
+
+const recipeStateMachine: StateMachineConfig<Recipe> = {
+  stateField: "status",
+  states: ["draft", "spec", "complete"],
+  initialState: "draft",
+  transitions: {
+    draft: ["spec", "complete"],
+    spec: ["complete"],
+    complete: [],
+  },
+  stateDisplay: {
+    draft: { label: "Draft", color: "default" },
+    spec: { label: "Spec", color: "warning" },
+    complete: { label: "Complete", color: "success" },
+  },
+};
+
+// Derive status options from state machine (single source of truth)
+const statusOptions = statesAsOptions(recipeStateMachine);
 
 // =============================================================================
 // Entity Configuration
@@ -78,6 +103,17 @@ export const recipeEntity: EntityConfig<Recipe> = {
       render: (value) => value ? "Template" : "",
     },
     {
+      accessorKey: "status",
+      header: "Status",
+      sortable: true,
+      render: (value) => (
+        <StatusBadge
+          status={value as string}
+          config={recipeStateMachine.stateDisplay}
+        />
+      ),
+    },
+    {
       accessorKey: "is_active",
       header: "Active",
       sortable: true,
@@ -86,6 +122,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
   ],
 
   listFilters: [
+    {
+      field: "status",
+      type: "multiselect",
+      label: "Status",
+      options: statusOptions,
+    },
     {
       field: "is_active",
       type: "boolean",
@@ -313,6 +355,14 @@ export const recipeEntity: EntityConfig<Recipe> = {
       defaultValue: true,
       colSpan: 6,
     },
+    {
+      name: "status",
+      label: "Recipe Status",
+      type: "select",
+      options: statusOptions,
+      description: "Draft = incomplete, Spec = enough for planning, Complete = ready to brew",
+      colSpan: 6,
+    },
     // Volumes
     {
       name: "volume_bbl",
@@ -415,6 +465,11 @@ export const recipeEntity: EntityConfig<Recipe> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // State Machine
+  // ---------------------------------------------------------------------------
+  stateMachine: recipeStateMachine,
+
+  // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------
   relations: [
@@ -453,5 +508,5 @@ export const recipeEntity: EntityConfig<Recipe> = {
     "Show grain bill for recipe X",
   ],
 
-  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_template", "is_active"],
+  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_template", "is_active", "status"],
 };
