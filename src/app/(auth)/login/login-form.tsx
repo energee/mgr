@@ -13,6 +13,12 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+  InputOTPSeparator,
+} from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -32,6 +38,7 @@ export function LoginForm() {
   const [isMagicLinkSent, setIsMagicLinkSent] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const handleSubmit = async (e: FormEvent) => {
@@ -100,16 +107,83 @@ export function LoginForm() {
     }
   };
 
+  const handleVerifyOtp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.length !== 8) {
+      toast.error("Please enter the 8-digit code from your email");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otpCode,
+        type: "email",
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      router.push(redirect);
+      router.refresh();
+    } catch {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (isMagicLinkSent) {
     return (
-      <div className="text-center space-y-4">
-        <p className="text-muted-foreground">
-          We sent a login link to your email. Click the link to sign in.
-        </p>
-        <Button variant="outline" onClick={() => setIsMagicLinkSent(false)} className="w-full">
-          Back to login
+      <form onSubmit={handleVerifyOtp} className="space-y-6">
+        <div className="space-y-2 text-center">
+          <p className="text-sm text-muted-foreground">
+            We sent a code to <span className="font-medium text-foreground">{email}</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Enter the code below or click the link in the email
+          </p>
+        </div>
+        <div className="flex justify-center">
+          <InputOTP
+            maxLength={8}
+            value={otpCode}
+            onChange={setOtpCode}
+            disabled={isLoading}
+            autoFocus
+          >
+            <InputOTPGroup>
+              <InputOTPSlot index={0} />
+              <InputOTPSlot index={1} />
+              <InputOTPSlot index={2} />
+              <InputOTPSlot index={3} />
+            </InputOTPGroup>
+            <InputOTPSeparator />
+            <InputOTPGroup>
+              <InputOTPSlot index={4} />
+              <InputOTPSlot index={5} />
+              <InputOTPSlot index={6} />
+              <InputOTPSlot index={7} />
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+        <Button type="submit" className="w-full" disabled={isLoading || otpCode.length !== 8}>
+          {isLoading ? "Verifying..." : "Verify"}
         </Button>
-      </div>
+        <button
+          type="button"
+          onClick={() => {
+            setIsMagicLinkSent(false);
+            setOtpCode("");
+          }}
+          className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Back to login
+        </button>
+      </form>
     );
   }
 
