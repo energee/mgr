@@ -67,7 +67,6 @@ interface TimelineBatch {
   status: string;
   planned_start_date: string | null;
   volume_bbl: number | null;
-  fermenter: string | null;
   recipe_id: string | null;
   recipe_name?: string;
   brand_id?: string;
@@ -140,7 +139,6 @@ export default function ProductionTimelinePage() {
           status,
           planned_start_date,
           volume_bbl,
-          fermenter,
           recipe_id,
           recipes:recipe_id (
             name,
@@ -243,6 +241,17 @@ export default function ProductionTimelinePage() {
     },
   });
 
+  // Create a reverse lookup from batch ID to vessel name
+  const batchToVessel = useMemo(() => {
+    const map = new Map<string, string>();
+    vessels.forEach((v) => {
+      if (v.current_batch_id) {
+        map.set(v.current_batch_id, v.name);
+      }
+    });
+    return map;
+  }, [vessels]);
+
   // Filter and group batches by vessel
   const batchesByVessel = useMemo(() => {
     const map = new Map<string, TimelineBatch[]>();
@@ -260,14 +269,14 @@ export default function ProductionTimelinePage() {
     });
 
     filteredBatches.forEach((b) => {
-      const key = b.fermenter || "unassigned";
-      const list = map.get(key) || [];
+      const vesselName = batchToVessel.get(b.id) || "unassigned";
+      const list = map.get(vesselName) || [];
       list.push(b);
-      map.set(key, list);
+      map.set(vesselName, list);
     });
 
     return map;
-  }, [batches, vessels, brandFilter, recipeFilter]);
+  }, [batches, vessels, brandFilter, recipeFilter, batchToVessel]);
 
   // Navigation
   const goToPrevious = () => setStartDate((d) => addWeeks(d, -weeksToShow));

@@ -52,7 +52,6 @@ export default function BatchesPage() {
           batchName={selectedBatch.name}
           currentStatus={selectedBatch.status}
           currentVolume={selectedBatch.volume_bbl}
-          vesselName={selectedBatch.fermenter}
           open={showTerminationDialog}
           onOpenChange={setShowTerminationDialog}
           onSuccess={handleDialogSuccess}

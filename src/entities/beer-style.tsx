@@ -107,7 +107,6 @@ export const beerStyleEntity: EntityConfig<BeerStyle> = {
         table: "beer_styles",
         valueField: "category",
         labelField: "category",
-        distinct: true,
       },
     },
     {
