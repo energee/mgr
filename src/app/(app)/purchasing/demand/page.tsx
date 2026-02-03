@@ -4,8 +4,7 @@
  * Ingredient Demand Page
  *
  * Shows ingredient demand from planned/fermenting batches:
- * - Summary cards for demand overview
- * - Filter controls for horizon and ingredient type
+ * - Stats strip with inline filters
  * - Shortfalls grouped by supplier with editable quantities
  * - Per-supplier and bulk PO generation
  */
@@ -25,12 +24,6 @@ import {
   createDraftPO,
 } from "@/lib/purchasing/po-generator";
 import type { PODraft } from "@/lib/purchasing/po-generator";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -39,20 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import {
-  Package,
-  AlertTriangle,
-  TrendingUp,
-  DollarSign,
-  RefreshCw,
-  ShoppingCart,
-  Loader2,
-  Users,
-} from "lucide-react";
+import { RefreshCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SupplierGroupCard } from "@/components/domain/supplier-group-card";
 import { UnassignedShortfallsCard } from "@/components/domain/unassigned-shortfalls-card";
+import { DashboardSection, DashboardEmpty } from "@/components/dashboard";
 
 // =============================================================================
 // Types
@@ -60,7 +44,7 @@ import { UnassignedShortfallsCard } from "@/components/domain/unassigned-shortfa
 
 interface DemandFilters {
   horizonWeeks: number;
-  catalogType: string; // "_all" or specific type
+  catalogType: string;
 }
 
 // =============================================================================
@@ -86,7 +70,7 @@ export default function IngredientDemandPage() {
   >(new Map());
 
   // Loading state for PO generation
-  const [generatingPO, setGeneratingPO] = useState<string | null>(null); // supplier_id or "all"
+  const [generatingPO, setGeneratingPO] = useState<string | null>(null);
 
   // Fetch shortfalls
   const {
@@ -125,7 +109,6 @@ export default function IngredientDemandPage() {
       if (s.preferred_supplier_id) {
         assigned.push(s);
       } else if (localAssignment) {
-        // User assigned a supplier locally — treat as assigned
         assigned.push({
           ...s,
           preferred_supplier_id: localAssignment.supplierId,
@@ -153,7 +136,6 @@ export default function IngredientDemandPage() {
           item.estimated_total = item.unit_price ? override * item.unit_price : null;
         }
       }
-      // Recalculate group total
       group.estimated_total = group.line_items.reduce(
         (sum, item) => sum + (item.estimated_total || 0),
         0
@@ -257,184 +239,136 @@ export default function IngredientDemandPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ShoppingCart className="h-6 w-6" />
-            Ingredient Demand
-          </h1>
-          <p className="text-muted-foreground">
-            Track ingredient needs from planned production
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {supplierGroups.length > 0 && (
+      {/* Header with Stats Strip and Filters */}
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <h1 className="text-2xl font-semibold">Ingredient Demand</h1>
+          <div className="flex items-center gap-2">
+            {supplierGroups.length > 0 && (
+              <Button
+                size="sm"
+                onClick={handleGenerateAllPOs}
+                disabled={!!generatingPO || unassignedShortfalls.length > 0}
+                title={
+                  unassignedShortfalls.length > 0
+                    ? "Assign all items to a supplier first"
+                    : undefined
+                }
+              >
+                {generatingPO === "all" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  `Generate All POs (${supplierGroups.length})`
+                )}
+              </Button>
+            )}
             <Button
-              onClick={handleGenerateAllPOs}
-              disabled={!!generatingPO || unassignedShortfalls.length > 0}
-              title={
-                unassignedShortfalls.length > 0
-                  ? "Assign all items to a supplier first"
-                  : undefined
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={shortfallsLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${shortfallsLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Strip with integrated filters */}
+        <div className="flex items-baseline gap-6 py-3 border-b text-sm">
+          {/* Primary Stats */}
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono text-2xl font-semibold">{totalDemandItems}</span>
+            <span className="text-muted-foreground">demand</span>
+          </div>
+          <span className="text-border">|</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono text-2xl font-semibold">{shortfallCount}</span>
+            <span className="text-muted-foreground">shortfalls</span>
+          </div>
+          <span className="text-border">|</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono text-2xl font-semibold">{suppliersAffected}</span>
+            <span className="text-muted-foreground">
+              suppliers
+              {unassignedShortfalls.length > 0 && (
+                <span className="text-amber-600 ml-1">(+{unassignedShortfalls.length} unassigned)</span>
+              )}
+            </span>
+          </div>
+
+          {/* Urgent count if any */}
+          {urgentCount > 0 && (
+            <>
+              <span className="text-border">|</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-mono text-2xl font-semibold text-amber-600">{urgentCount}</span>
+                <span className="text-amber-600">urgent</span>
+              </div>
+            </>
+          )}
+
+          {/* Estimated cost if no urgent */}
+          {urgentCount === 0 && estimatedTotalCost > 0 && (
+            <>
+              <span className="text-border">|</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-mono text-2xl font-semibold">${estimatedTotalCost.toFixed(0)}</span>
+                <span className="text-muted-foreground">est. cost</span>
+              </div>
+            </>
+          )}
+
+          {/* Filters pushed right */}
+          <div className="ml-auto flex items-center gap-3">
+            <Select
+              value={filters.horizonWeeks.toString()}
+              onValueChange={(value) =>
+                setFilters({ ...filters, horizonWeeks: parseInt(value) })
               }
             >
-              {generatingPO === "all" ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Generate All POs ({supplierGroups.length})
-                </>
-              )}
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => refetch()}
-            disabled={shortfallsLoading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${shortfallsLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+              <SelectTrigger className="h-8 w-[100px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="4">4 weeks</SelectItem>
+                <SelectItem value="8">8 weeks</SelectItem>
+                <SelectItem value="12">12 weeks</SelectItem>
+              </SelectContent>
+            </Select>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="horizon">Planning Horizon</Label>
-              <Select
-                value={filters.horizonWeeks.toString()}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, horizonWeeks: parseInt(value) })
-                }
-              >
-                <SelectTrigger id="horizon" className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="4">4 weeks</SelectItem>
-                  <SelectItem value="8">8 weeks</SelectItem>
-                  <SelectItem value="12">12 weeks</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="type">Ingredient Type</Label>
-              <Select
-                value={filters.catalogType}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, catalogType: value })
-                }
-              >
-                <SelectTrigger id="type" className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">All Types</SelectItem>
-                  {catalogTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {getCatalogTypeDisplay(type)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select
+              value={filters.catalogType}
+              onValueChange={(value) =>
+                setFilters({ ...filters, catalogType: value })
+              }
+            >
+              <SelectTrigger className="h-8 w-[120px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">All Types</SelectItem>
+                {catalogTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {getCatalogTypeDisplay(type)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Demand</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDemandItems}</div>
-            <p className="text-xs text-muted-foreground">ingredients needed</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Shortfalls</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{shortfallCount}</div>
-            <p className="text-xs text-muted-foreground">need ordering</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Suppliers Affected</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{suppliersAffected}</div>
-            <p className="text-xs text-muted-foreground">
-              {unassignedShortfalls.length > 0
-                ? `+ ${unassignedShortfalls.length} unassigned`
-                : "all items assigned"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={urgentCount > 0 ? "border-destructive" : ""}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              {urgentCount > 0 ? "Urgent" : "Estimated Cost"}
-            </CardTitle>
-            {urgentCount > 0 ? (
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-            ) : (
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            )}
-          </CardHeader>
-          <CardContent>
-            {urgentCount > 0 ? (
-              <>
-                <div className="text-2xl font-bold text-destructive">{urgentCount}</div>
-                <p className="text-xs text-muted-foreground">need immediate action</p>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {estimatedTotalCost > 0 ? `$${estimatedTotalCost.toFixed(2)}` : "-"}
-                </div>
-                <p className="text-xs text-muted-foreground">across all POs</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        </div>
       </div>
 
       {/* Supplier Groups */}
       {shortfallsLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <p className="text-sm text-muted-foreground py-12 text-center">Loading demand data...</p>
       ) : filteredShortfalls.length === 0 ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No shortfalls detected</p>
-              <p className="text-sm">
-                All ingredient demand is covered by available inventory
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <DashboardSection title="Status">
+          <DashboardEmpty message="No shortfalls detected — all ingredient demand is covered by available inventory" />
+        </DashboardSection>
       ) : (
         <div className="space-y-4">
           {supplierGroups.map((group) => (
