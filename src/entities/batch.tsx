@@ -28,8 +28,23 @@ import { batchSchema, batchStates, batchTransitions } from "@/lib/schemas/batch"
 // Re-export schema so existing client-side imports keep working
 export { batchSchema, type BatchFormValues } from "@/lib/schemas/batch";
 
-// Use generated type from Supabase
-type Batch = Database["public"]["Tables"]["batches"]["Row"];
+// Base table type for form operations
+type BatchTable = Database["public"]["Tables"]["batches"]["Row"];
+
+// View type has additional computed fields but nullable id (views can return null)
+type BatchViewRaw = Database["public"]["Views"]["batches_with_brew_info"]["Row"];
+
+// Combined type for entity config: table fields + view computed fields with non-null id
+// This is the type used for list/detail display where id is always present
+type Batch = BatchTable & {
+  // Computed fields from batches_with_brew_info view
+  actual_og: number | null;
+  brew_count: number | null;
+  brew_date: string | null;
+  current_vessel_id: string | null;
+  current_vessel_name: string | null;
+  volume_from_brews_bbl: number | null;
+};
 
 // =============================================================================
 // State Machine (defined separately to derive options)
@@ -108,6 +123,11 @@ export const batchEntity: EntityConfig<Batch> = {
       format: "unit",
       unitType: "volume",
     },
+    {
+      accessorKey: "current_vessel_name",
+      header: "Vessel",
+      sortable: true,
+    },
   ],
 
   listFilters: [
@@ -146,6 +166,7 @@ export const batchEntity: EntityConfig<Batch> = {
         { field: "status", label: "Status" },
         { field: "planned_start_date", label: "Planned Start", format: "date" },
         { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
+        { field: "current_vessel_name", label: "Vessel" },
       ],
     },
     {
@@ -348,5 +369,5 @@ export const batchEntity: EntityConfig<Batch> = {
     "What's the total volume in fermentation?",
   ],
 
-  keyFields: ["batch_number", "name", "status", "planned_start_date", "volume_bbl"],
+  keyFields: ["batch_number", "name", "status", "planned_start_date", "current_vessel_name"],
 };

@@ -49,6 +49,7 @@ import {
   AnimatedBuilding2,
   AnimatedCalendarClock,
   AnimatedArrowRightLeft,
+  AnimatedArrowLeft,
   AnimatedContainer,
   AnimatedBatches,
   AnimatedUpload,
@@ -85,6 +86,7 @@ const navigation: NavSection[] = [
     icon: AnimatedFlask,
     items: [
       { label: "Planning", href: "/production/planning", icon: AnimatedCalendarClock },
+      { label: "Backward Planning", href: "/production/planning/backward", icon: AnimatedArrowLeft },
       { label: "Batches", href: "/production/batches", icon: AnimatedBatches },
       { label: "Recipes", href: "/production/recipes", icon: AnimatedFileText },
       { label: "Vessels", href: "/production/vessels", icon: AnimatedContainer },
@@ -106,6 +108,8 @@ const navigation: NavSection[] = [
     items: [
       { label: "Raw Materials", href: "/inventory/items", icon: AnimatedUpload },
       { label: "Finished Goods", href: "/inventory/finished-goods", icon: AnimatedDownload },
+      { label: "Lots", href: "/inventory/lots", icon: AnimatedPackage },
+      { label: "Allocations", href: "/inventory/allocations", icon: AnimatedArrowRightLeft },
     ],
   },
   {

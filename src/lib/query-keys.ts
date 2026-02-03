@@ -280,6 +280,13 @@ export const planningKeys = {
   batchesInProduction: () => ["planning", "batches-in-production"] as const,
   demandDetail: (brandId: string, packageTypeId: string, week: string) =>
     ["planning", "demand-detail", brandId, packageTypeId, week] as const,
+  // Backward planning from orders
+  orderDemand: (horizonWeeks: number) =>
+    [...planningKeys.all(), "orderDemand", horizonWeeks] as const,
+  productionRequirements: (horizonWeeks: number) =>
+    [...planningKeys.all(), "productionRequirements", horizonWeeks] as const,
+  materialRequirements: (horizonWeeks: number) =>
+    [...planningKeys.all(), "materialRequirements", horizonWeeks] as const,
 };
 
 // =============================================================================

@@ -19,7 +19,6 @@ export const batchSchema = z.object({
   recipe_id: z.string().uuid().nullable().optional(),
   planned_start_date: z.string().nullable().optional(),
   volume_bbl: z.coerce.number().nullable().optional(),
-  fermenter: z.string().nullable().optional(),
   actual_fg: z.coerce.number().nullable().optional(),
   actual_abv: z.coerce.number().nullable().optional(),
   notes: z.string().nullable().optional(),
