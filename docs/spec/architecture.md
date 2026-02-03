@@ -169,12 +169,12 @@ Form field configurations can specify `dynamicOptions` to populate select fields
 ```typescript
 formFields: [
   {
-    name: "fermenter",
-    label: "Vessel",
+    name: "style_id",
+    label: "Style",
     type: "select",
     dynamicOptions: {
-      table: "vessels",           // Table to query
-      valueField: "name",          // Field to use as option value
+      table: "beer_styles",        // Table to query
+      valueField: "id",            // Field to use as option value
       labelField: "name",          // Field to display as option label
       filter: { is_active: true }, // Optional WHERE conditions
       orderBy: "name",             // Optional ORDER BY clause
@@ -184,7 +184,7 @@ formFields: [
 ```
 
 **When to use**:
-- Foreign key fields where options come from another table (e.g., selecting a vessel for a batch)
+- Foreign key fields where options come from another table (e.g., selecting a style for a brand)
 - Dropdown values that change frequently (e.g., active locations, available ingredients)
 - Fields that need filtered options based on business rules (e.g., only active items)
 
@@ -193,17 +193,16 @@ formFields: [
 - Complex multi-table joins (use `relation` type field instead)
 - Very large datasets (>1000 records) where autocomplete would be better
 
-**Example** ([batch.tsx:231-237](https://github.com/energee/mgr/blob/feature/phase-2-vessel-brewlog/src/entities/batch.tsx#L231-L237)):
+**Example** (brand.tsx):
 ```typescript
 {
-  name: "fermenter",
-  label: "Vessel",
+  name: "style_id",
+  label: "Style",
   type: "select",
   dynamicOptions: {
-    table: "vessels",
-    valueField: "name",
+    table: "beer_styles",
+    valueField: "id",
     labelField: "name",
-    filter: { is_active: true },
     orderBy: "name",
   },
 }
