@@ -77,17 +77,17 @@ export const beerStyleEntity: EntityConfig<BeerStyle> = {
       sortable: true,
     },
     {
-      accessorKey: "abv_range",
+      accessorKey: "abv_min",
       header: "ABV",
       render: (_, row) => formatRange(row.abv_min, row.abv_max, "%"),
     },
     {
-      accessorKey: "ibu_range",
+      accessorKey: "ibu_min",
       header: "IBU",
       render: (_, row) => formatRange(row.ibu_min, row.ibu_max),
     },
     {
-      accessorKey: "srm_range",
+      accessorKey: "srm_min",
       header: "SRM",
       render: (_, row) => formatRange(row.srm_min, row.srm_max),
     },
