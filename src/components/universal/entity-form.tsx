@@ -8,17 +8,19 @@
  * Supports dynamicOptions for select fields that fetch from database tables.
  */
 
-import { useState, useMemo, useRef, type FormEvent } from "react";
+import { useState, useMemo, useRef, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { entityKeys, dynamicOptionsKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityFieldDef } from "@/types/entity";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -172,6 +174,8 @@ export function EntityForm<T = Record<string, unknown>>({
   const path = basePath || `/${entity.domain}/${entity.name}s`;
   const isEdit = Boolean(id);
 
+  const submitRef = useSubmitShortcut();
+
   // Conflict dialog for optimistic locking
   const conflictDialog = useConflictDialog();
   // Track the loaded version for optimistic locking
@@ -184,7 +188,10 @@ export function EntityForm<T = Record<string, unknown>>({
     entity.formFields.forEach((field) => {
       const rec = initial as Record<string, unknown>;
       if (field.defaultValue !== undefined) {
-        rec[field.name] = field.defaultValue;
+        // Support function defaults for dynamic values like "now"
+        rec[field.name] = typeof field.defaultValue === "function"
+          ? field.defaultValue()
+          : field.defaultValue;
       } else {
         // Initialize based on field type to avoid undefined -> value transitions
         switch (field.type) {
@@ -208,6 +215,12 @@ export function EntityForm<T = Record<string, unknown>>({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMac, setIsMac] = useState(true); // Default to Mac, update on mount
+
+  // Detect platform for keyboard shortcut display
+  useEffect(() => {
+    setIsMac(navigator.platform.toLowerCase().includes("mac"));
+  }, []);
 
   // Fetch existing record for edit mode
   const { data: existingData, isLoading } = useQuery({
@@ -448,9 +461,13 @@ export function EntityForm<T = Record<string, unknown>>({
               Cancel
             </Link>
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button ref={submitRef} type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {isEdit ? "Save Changes" : `Create ${entity.displayName}`}
+            <KbdGroup>
+              <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
+              <Kbd>{isMac ? "Return" : "Enter"}</Kbd>
+            </KbdGroup>
           </Button>
         </div>
       </form>
@@ -485,8 +502,18 @@ function FormField<T>({
 }) {
   const colSpan = field.colSpan || 6;
 
+  // Map colSpan to responsive Tailwind classes (full width on mobile, colSpan on md+)
+  const colSpanClasses: Record<number, string> = {
+    3: "col-span-12 md:col-span-3",
+    4: "col-span-12 md:col-span-4",
+    6: "col-span-12 md:col-span-6",
+    8: "col-span-12 md:col-span-8",
+    12: "col-span-12",
+  };
+  const colClass = colSpanClasses[colSpan] || "col-span-12 md:col-span-6";
+
   return (
-    <div className={`col-span-${colSpan}`} style={{ gridColumn: `span ${colSpan}` }}>
+    <div className={colClass}>
       <Label htmlFor={field.name} className={field.required ? "required" : ""}>
         {field.label}
         {field.required && <span className="text-destructive ml-1">*</span>}

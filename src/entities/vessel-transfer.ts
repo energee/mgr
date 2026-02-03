@@ -131,6 +131,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       relation: { entity: "batch", displayField: "batch_number" },
       description: "Batch being transferred",
       required: true,
+      colSpan: 12,
     },
     {
       name: "from_vessel_id",
@@ -162,6 +163,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       type: "datetime",
       description: "When the transfer occurred",
       required: true,
+      defaultValue: () => new Date().toISOString(),
     },
     {
       name: "notes",
@@ -169,6 +171,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       type: "textarea",
       description: "Additional notes about the transfer",
       required: false,
+      colSpan: 12,
     },
   ],
 
