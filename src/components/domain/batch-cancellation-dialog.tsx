@@ -167,9 +167,11 @@ export function BatchCancellationDialog({
       handleOpenChange(false);
       onSuccess?.();
     },
-    onError: (error) => {
-      console.error(`${mode} batch error:`, error);
-      const message = error instanceof Error ? error.message : `Failed to ${mode} batch`;
+    onError: (error: unknown) => {
+      console.error(`${mode} batch error:`, JSON.stringify(error, null, 2));
+      // Supabase errors have message, code, details, hint properties
+      const pgError = error as { message?: string; code?: string; details?: string; hint?: string };
+      const message = pgError?.message || (error instanceof Error ? error.message : `Failed to ${mode} batch`);
       toast.error(message);
     },
   });
