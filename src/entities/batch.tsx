@@ -154,14 +154,6 @@ export const batchEntity: EntityConfig<Batch> = {
       component: BatchBrewInfo,
     },
     {
-      id: "fermentation",
-      title: "Fermentation Results",
-      fields: [
-        { field: "actual_fg", label: "Final Gravity" },
-        { field: "actual_abv", label: "ABV %" },
-      ],
-    },
-    {
       id: "ai-insights",
       title: "AI Insights",
       component: BatchInsights,
@@ -235,20 +227,6 @@ export const batchEntity: EntityConfig<Batch> = {
       label: "Status",
       type: "select",
       options: statusOptions,
-      colSpan: 6,
-    },
-    {
-      name: "actual_fg",
-      label: "Final Gravity",
-      type: "number",
-      placeholder: "e.g., 1.012",
-      colSpan: 6,
-    },
-    {
-      name: "actual_abv",
-      label: "ABV %",
-      type: "number",
-      placeholder: "e.g., 6.8",
       colSpan: 6,
     },
     {
