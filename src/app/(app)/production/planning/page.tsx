@@ -40,7 +40,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Calendar,
   Package,
   AlertTriangle,
   TrendingUp,
@@ -48,6 +47,7 @@ import {
   Plus,
   RefreshCw,
   List,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 import type {
@@ -135,16 +135,8 @@ export default function ProductionPlanningPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Calendar className="h-6 w-6" />
-              Production Planning
-            </h1>
-            <p className="text-muted-foreground">
-              Plan production backward from order due dates
-            </p>
-          </div>
+        <h1 className="text-2xl font-bold">Production Planning</h1>
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
             <Button variant="ghost" size="sm" className="h-7 px-2 bg-background shadow-sm">
               <List className="h-4 w-4 mr-1" />
@@ -157,11 +149,11 @@ export default function ProductionPlanningPage() {
               </Button>
             </Link>
           </div>
+          <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
-        <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
       </div>
 
       {/* Filters */}

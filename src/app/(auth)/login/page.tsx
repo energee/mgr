@@ -6,13 +6,17 @@
 
 import { Suspense } from "react";
 import { LoginForm } from "./login-form";
+import { MGRIcon } from "@/components/icons/mgr-logo";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage() {
   return (
     <Card>
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">MGR</CardTitle>
+        <div className="flex items-center justify-center gap-2">
+          <MGRIcon size={28} />
+          <CardTitle className="text-2xl">MGR</CardTitle>
+        </div>
         <CardDescription>Sign in to your brewery account</CardDescription>
       </CardHeader>
       <CardContent>

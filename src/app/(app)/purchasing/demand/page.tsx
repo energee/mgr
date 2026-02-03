@@ -259,15 +259,7 @@ export default function IngredientDemandPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ShoppingCart className="h-6 w-6" />
-            Ingredient Demand
-          </h1>
-          <p className="text-muted-foreground">
-            Track ingredient needs from planned production
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold">Ingredient Demand</h1>
         <div className="flex items-center gap-2">
           {supplierGroups.length > 0 && (
             <Button
