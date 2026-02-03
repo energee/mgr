@@ -272,6 +272,34 @@ export function EntityDataTable<T = Record<string, unknown>>({
       .filter(Boolean);
   }, [rowSelection, data]);
 
+  // Check if selected rows have any common valid transitions
+  const hasValidBulkTransitions = useMemo(() => {
+    if (!entity.stateMachine || selectedRows.length === 0) return false;
+
+    const stateField = entity.stateMachine.stateField;
+    const transitions = entity.stateMachine.transitions;
+
+    // Get the set of current states for all selected rows
+    const currentStates = new Set(
+      selectedRows.map(
+        (row) => (row as Record<string, unknown>)[stateField] as string
+      )
+    );
+
+    // Find transitions valid for ALL selected items
+    let commonTargets: string[] | null = null;
+    for (const state of currentStates) {
+      const allowed = transitions[state] || [];
+      if (commonTargets === null) {
+        commonTargets = [...allowed];
+      } else {
+        commonTargets = commonTargets.filter((t) => allowed.includes(t));
+      }
+    }
+
+    return (commonTargets || []).length > 0;
+  }, [entity.stateMachine, selectedRows]);
+
   const handleBulkStatusChange = useCallback(
     async (targetStatus: string) => {
       if (!entity.stateMachine || !targetStatus || selectedRows.length === 0)
@@ -382,7 +410,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
           <DataTable
             table={table}
             actionBar={
-              hasBulkActions && selectedRows.length > 0 ? (
+              hasBulkActions && selectedRows.length > 0 && hasValidBulkTransitions ? (
                 <BulkStatusActionBar
                   entity={entity}
                   selectedRows={selectedRows}
