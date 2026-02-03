@@ -235,7 +235,7 @@ export function AppSidebar() {
       <SidebarHeader className="h-16 border-b border-sidebar-border justify-center">
         <Link href="/" className="flex items-center gap-2 px-2">
           <MGRIcon size={20} className="shrink-0" />
-          <span className="text-lg font-semibold tracking-tight leading-none">MGR</span>
+          <span className="text-lg font-semibold tracking-tight leading-none translate-y-px">MGR</span>
         </Link>
       </SidebarHeader>
 
