@@ -144,7 +144,7 @@ export const allocationEntity: EntityConfig<Allocation> = {
       sortable: true,
       render: (value) => {
         const sourceType = SOURCE_TYPES.find((s) => s.value === value);
-        return sourceType?.label || value;
+        return sourceType?.label || String(value);
       },
     },
     {
@@ -153,7 +153,7 @@ export const allocationEntity: EntityConfig<Allocation> = {
       sortable: true,
       render: (value) => {
         const destType = DESTINATION_TYPES.find((d) => d.value === value);
-        return destType?.label || value;
+        return destType?.label || String(value);
       },
     },
     {

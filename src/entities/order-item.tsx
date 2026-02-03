@@ -69,7 +69,7 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       render: (value, row) => {
         if (row.brand_id) return null; // Not TBD
         return value ? (
-          <span className="text-muted-foreground italic">TBD: {value}</span>
+          <span className="text-muted-foreground italic">TBD: {String(value)}</span>
         ) : null;
       },
     },

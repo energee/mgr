@@ -38,7 +38,7 @@ export type InventoryLotFormValues = z.infer<typeof inventoryLotSchema>;
 export const inventoryLotEntity: EntityConfig<InventoryLot> = {
   name: "inventory_lot",
   table: "inventory_lots",
-  viewTable: "inventory_lots_with_quantities",
+  // viewTable: "inventory_lots_with_quantities",  // TODO: create this view for calculated quantities
   displayName: "Inventory Lot",
   displayNamePlural: "Inventory Lots",
   description:
@@ -63,18 +63,8 @@ export const inventoryLotEntity: EntityConfig<InventoryLot> = {
       },
     },
     {
-      accessorKey: "received_quantity",
-      header: "Received",
-      sortable: true,
-    },
-    {
-      accessorKey: "allocated_quantity",
-      header: "Allocated",
-      sortable: true,
-    },
-    {
-      accessorKey: "remaining_quantity",
-      header: "Remaining",
+      accessorKey: "quantity",
+      header: "Quantity",
       sortable: true,
     },
     {
@@ -133,10 +123,7 @@ export const inventoryLotEntity: EntityConfig<InventoryLot> = {
       id: "quantities",
       title: "Quantities",
       fields: [
-        { field: "quantity", label: "Original Quantity" },
-        { field: "received_quantity", label: "Received" },
-        { field: "allocated_quantity", label: "Allocated" },
-        { field: "remaining_quantity", label: "Remaining" },
+        { field: "quantity", label: "Quantity" },
         { field: "unit", label: "Unit" },
       ],
     },
@@ -291,7 +278,6 @@ export const inventoryLotEntity: EntityConfig<InventoryLot> = {
     "lot_number",
     "inventory_item_id",
     "quantity",
-    "remaining_quantity",
     "expiration_date",
   ],
 };

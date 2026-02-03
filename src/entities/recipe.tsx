@@ -23,8 +23,11 @@ import { recipeSchema } from "@/lib/schemas/recipe";
 // Re-export schema so existing client-side imports keep working
 export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
 
-// Use view type to include calculated estimates
-type Recipe = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
+// Use table type for base fields plus any-typed view fields
+// The view adds est_* fields but may not have the status field yet
+type RecipeBase = Database["public"]["Tables"]["recipes"]["Row"];
+type RecipeView = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
+type Recipe = RecipeBase & Partial<Pick<RecipeView, "est_og" | "est_fg" | "est_abv" | "est_ibu" | "est_srm" | "style_name" | "est_cogs">>;
 
 // =============================================================================
 // State Machine (defined separately to derive options)

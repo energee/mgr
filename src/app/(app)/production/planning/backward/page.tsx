@@ -188,23 +188,22 @@ export default function BackwardPlanningPage() {
 
       {/* Order Details (Collapsible) */}
       <Collapsible open={ordersOpen} onOpenChange={setOrdersOpen}>
-        <DashboardSection
-          title={
-            <CollapsibleTrigger asChild>
-              <button className="flex items-center gap-2 hover:text-foreground transition-colors w-full text-left">
-                {ordersOpen ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-                <span>Order Details</span>
-                <Badge variant="secondary" className="ml-2">
-                  {orders.length}
-                </Badge>
-              </button>
-            </CollapsibleTrigger>
-          }
-        >
+        <div className="rounded-lg border bg-card p-4">
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center gap-2 hover:text-foreground transition-colors w-full text-left mb-4">
+              {ordersOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+              <span className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                Order Details
+              </span>
+              <Badge variant="secondary" className="ml-2">
+                {orders.length}
+              </Badge>
+            </button>
+          </CollapsibleTrigger>
           <CollapsibleContent>
             {ordersLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -215,14 +214,14 @@ export default function BackwardPlanningPage() {
                 No open orders
               </p>
             ) : (
-              <div className="space-y-4 pt-4">
+              <div className="space-y-4">
                 {orders.map((order) => (
                   <OrderCard key={order.order_id} order={order} />
                 ))}
               </div>
             )}
           </CollapsibleContent>
-        </DashboardSection>
+        </div>
       </Collapsible>
     </div>
   );

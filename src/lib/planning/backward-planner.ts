@@ -258,7 +258,7 @@ export async function getProductionRequirements(
   if (brandPackageKeys.length > 0) {
     // Get finished goods availability
     const { data: inventory, error: invError } = await supabase
-      .from("finished_goods_available")
+      .from("finished_goods_with_availability")
       .select("brand_id, package_type_id, available_quantity");
 
     if (invError) {
