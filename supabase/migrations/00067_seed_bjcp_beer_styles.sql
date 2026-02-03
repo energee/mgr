@@ -4,7 +4,7 @@
 -- Add is_bjcp column
 ALTER TABLE beer_styles ADD COLUMN IF NOT EXISTS is_bjcp boolean DEFAULT false;
 
--- Insert BJCP styles
+-- Insert BJCP styles (upsert to handle existing styles)
 INSERT INTO beer_styles (name, category, description, og_min, og_max, fg_min, fg_max, abv_min, abv_max, ibu_min, ibu_max, srm_min, srm_max, is_bjcp)
 VALUES
   ('American Light Lager', 'Standard American Beer', 'A highly carbonated, very light-bodied, nearly flavorless lager designed to be consumed very cold. Very refreshing and thirst-quenching.', 1.028, 1.04, 0.998, 1.008, 2.8, 4.2, 8, 12, 2, 3, true),
@@ -113,8 +113,22 @@ VALUES
   ('Mixed-Style Beer', 'Specialty Beer', 'Based on the declared Base Styles, methods, and ingredients. As with all Specialty-Type Beers, the resulting combination of beer styles needs to be harmonious and balanced, and be pleasant to drink.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, true),
   ('Experimental Beer', 'Specialty Beer', 'Varies, but should be a unique experience.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, true),
   ('Dorada Pampeana', 'Argentine Styles', NULL, 1.042, 1.054, 1.009, 1.013, 4.3, 5.5, 15, 22, 3, 5, true),
-  ('IPA Argenta', 'Argentine Styles', NULL, 1055, 1065, 1008, 1015, 5, 6.5, 35, 60, 6, 15, true),
+  ('IPA Argenta', 'Argentine Styles', NULL, 1.055, 1.065, 1.008, 1.015, 5, 6.5, 35, 60, 6, 15, true),
   ('Italian Grape Ale', 'Italian Styles', 'A sometimes refreshing, sometimes more complex Italian ale characterized by different varieties of grapes.', 1.045, 1.1, 1.005, 1.015, 4.5, 12, 6, 30, 14, 25, true),
   ('Catharina Sour', 'Brazilian Styles', NULL, 1.039, 1.048, 1.004, 1.012, 4, 5.5, 2, 8, 2, 6, true),
-  ('New Zealand Pilsner', 'New Zealand Styles', 'A pale, dry, golden-colored, cleanly-fermented beer showcasing the characteristic tropical, citrusy, fruity, grassy New Zealand-type hops. Medium body, soft mouthfeel, and smooth palate and finish, with a neutral to bready malt base provide the support for this very drinkable, refreshing, hop-forward beer.', 1.044, 1.056, 1.009, 1.014, 4.5, 5.8, 25, 45, 2, 6, true);
+  ('New Zealand Pilsner', 'New Zealand Styles', 'A pale, dry, golden-colored, cleanly-fermented beer showcasing the characteristic tropical, citrusy, fruity, grassy New Zealand-type hops. Medium body, soft mouthfeel, and smooth palate and finish, with a neutral to bready malt base provide the support for this very drinkable, refreshing, hop-forward beer.', 1.044, 1.056, 1.009, 1.014, 4.5, 5.8, 25, 45, 2, 6, true)
+ON CONFLICT (name) DO UPDATE SET
+  category = EXCLUDED.category,
+  description = EXCLUDED.description,
+  og_min = EXCLUDED.og_min,
+  og_max = EXCLUDED.og_max,
+  fg_min = EXCLUDED.fg_min,
+  fg_max = EXCLUDED.fg_max,
+  abv_min = EXCLUDED.abv_min,
+  abv_max = EXCLUDED.abv_max,
+  ibu_min = EXCLUDED.ibu_min,
+  ibu_max = EXCLUDED.ibu_max,
+  srm_min = EXCLUDED.srm_min,
+  srm_max = EXCLUDED.srm_max,
+  is_bjcp = EXCLUDED.is_bjcp;
 
