@@ -268,6 +268,138 @@ export type Database = {
           },
         ]
       }
+      batch_blends: {
+        Row: {
+          blend_batch_id: string
+          blended_at: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          source_batch_id: string
+          volume_bbl: number
+        }
+        Insert: {
+          blend_batch_id: string
+          blended_at?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          source_batch_id: string
+          volume_bbl: number
+        }
+        Update: {
+          blend_batch_id?: string
+          blended_at?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          source_batch_id?: string
+          volume_bbl?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+        ]
+      }
       batch_logs: {
         Row: {
           batch_id: string
@@ -305,6 +437,20 @@ export type Database = {
             foreignKeyName: "batch_logs_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_logs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_logs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -335,6 +481,10 @@ export type Database = {
         Row: {
           actual_abv: number | null
           actual_fg: number | null
+          archive_notes: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           batch_number: string
           cancellation_notes: string | null
           cancellation_reason: string | null
@@ -354,6 +504,10 @@ export type Database = {
         Insert: {
           actual_abv?: number | null
           actual_fg?: number | null
+          archive_notes?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           batch_number: string
           cancellation_notes?: string | null
           cancellation_reason?: string | null
@@ -373,6 +527,10 @@ export type Database = {
         Update: {
           actual_abv?: number | null
           actual_fg?: number | null
+          archive_notes?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           batch_number?: string
           cancellation_notes?: string | null
           cancellation_reason?: string | null
@@ -390,6 +548,13 @@ export type Database = {
           volume_bbl?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "batches_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
           {
             foreignKeyName: "batches_recipe_id_fkey"
             columns: ["recipe_id"]
@@ -655,6 +820,20 @@ export type Database = {
             foreignKeyName: "brew_log_batches_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "brew_log_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brew_log_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -736,6 +915,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "brew_logs_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
           {
             foreignKeyName: "brew_logs_recipe_id_fkey"
             columns: ["recipe_id"]
@@ -973,6 +1159,20 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
             referencedColumns: ["id"]
           },
           {
@@ -1300,6 +1500,20 @@ export type Database = {
             foreignKeyName: "keg_inventory_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "keg_inventory_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_inventory_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -1450,6 +1664,20 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
             referencedColumns: ["id"]
           },
           {
@@ -1944,6 +2172,20 @@ export type Database = {
             foreignKeyName: "order_items_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -2091,6 +2333,7 @@ export type Database = {
           inner_packs_per_case: number | null
           is_active: boolean | null
           name: string
+          units_per_bbl_override: number | null
           units_per_case: number | null
           updated_at: string | null
           volume_oz: number
@@ -2103,6 +2346,7 @@ export type Database = {
           inner_packs_per_case?: number | null
           is_active?: boolean | null
           name: string
+          units_per_bbl_override?: number | null
           units_per_case?: number | null
           updated_at?: string | null
           volume_oz: number
@@ -2115,6 +2359,7 @@ export type Database = {
           inner_packs_per_case?: number | null
           is_active?: boolean | null
           name?: string
+          units_per_bbl_override?: number | null
           units_per_case?: number | null
           updated_at?: string | null
           volume_oz?: number
@@ -2161,6 +2406,20 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packages_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "packages_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
             referencedColumns: ["id"]
           },
           {
@@ -2229,6 +2488,156 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      pick_list_items: {
+        Row: {
+          finished_good_id: string
+          id: string
+          location_id: string | null
+          notes: string | null
+          order_item_id: string
+          pick_list_id: string
+          picked_at: string | null
+          quantity_picked: number | null
+          quantity_requested: number
+          sort_order: number
+        }
+        Insert: {
+          finished_good_id: string
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          order_item_id: string
+          pick_list_id: string
+          picked_at?: string | null
+          quantity_picked?: number | null
+          quantity_requested: number
+          sort_order?: number
+        }
+        Update: {
+          finished_good_id?: string
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          order_item_id?: string
+          pick_list_id?: string
+          picked_at?: string | null
+          quantity_picked?: number | null
+          quantity_requested?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_list_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_with_availability"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_with_ttb_class"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items_with_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_pick_list_id_fkey"
+            columns: ["pick_list_id"]
+            isOneToOne: false
+            referencedRelation: "pick_list_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_pick_list_id_fkey"
+            columns: ["pick_list_id"]
+            isOneToOne: false
+            referencedRelation: "pick_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pick_lists: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          generated_at: string
+          id: string
+          notes: string | null
+          order_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          generated_at?: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          generated_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_totals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       po_line_items: {
         Row: {
@@ -2471,6 +2880,13 @@ export type Database = {
             foreignKeyName: "recipe_additions_recipe_id_fkey"
             columns: ["recipe_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_additions_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
@@ -2533,6 +2949,13 @@ export type Database = {
             foreignKeyName: "recipe_adjuncts_recipe_id_fkey"
             columns: ["recipe_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_adjuncts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
@@ -2572,6 +2995,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "recipe_collaborators_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
           {
             foreignKeyName: "recipe_collaborators_recipe_id_fkey"
             columns: ["recipe_id"]
@@ -2636,6 +3066,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "fruits"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_fruits_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
           },
           {
             foreignKeyName: "recipe_fruits_recipe_id_fkey"
@@ -2709,6 +3146,13 @@ export type Database = {
             foreignKeyName: "recipe_hops_recipe_id_fkey"
             columns: ["recipe_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_hops_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
@@ -2769,6 +3213,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "malts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_malts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
           },
           {
             foreignKeyName: "recipe_malts_recipe_id_fkey"
@@ -2835,6 +3286,13 @@ export type Database = {
             foreignKeyName: "recipe_spices_recipe_id_fkey"
             columns: ["recipe_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_spices_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
@@ -2893,6 +3351,13 @@ export type Database = {
           weight_lbs?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "recipe_sugars_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
           {
             foreignKeyName: "recipe_sugars_recipe_id_fkey"
             columns: ["recipe_id"]
@@ -2958,6 +3423,13 @@ export type Database = {
           yeast_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "recipe_yeasts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
           {
             foreignKeyName: "recipe_yeasts_recipe_id_fkey"
             columns: ["recipe_id"]
@@ -3599,6 +4071,7 @@ export type Database = {
       }
       user_preferences: {
         Row: {
+          anthropic_api_key: string | null
           created_at: string
           date_format: string
           gravity_unit: string
@@ -3612,6 +4085,7 @@ export type Database = {
           weight_unit: string
         }
         Insert: {
+          anthropic_api_key?: string | null
           created_at?: string
           date_format?: string
           gravity_unit?: string
@@ -3625,6 +4099,7 @@ export type Database = {
           weight_unit?: string
         }
         Update: {
+          anthropic_api_key?: string | null
           created_at?: string
           date_format?: string
           gravity_unit?: string
@@ -3794,6 +4269,20 @@ export type Database = {
             foreignKeyName: "vessel_transfers_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -3908,6 +4397,20 @@ export type Database = {
             columns: ["current_batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
             referencedColumns: ["id"]
           },
           {
@@ -4080,6 +4583,20 @@ export type Database = {
             foreignKeyName: "yeast_pitches_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -4232,6 +4749,20 @@ export type Database = {
             foreignKeyName: "vessels_current_batch_id_fkey"
             columns: ["current_batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -4265,11 +4796,178 @@ export type Database = {
           },
         ]
       }
+      batch_blend_details: {
+        Row: {
+          blend_batch_id: string | null
+          blend_batch_name: string | null
+          blend_batch_number: string | null
+          blended_at: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          notes: string | null
+          source_batch_abv: number | null
+          source_batch_id: string | null
+          source_batch_name: string | null
+          source_batch_number: string | null
+          source_batch_status: string | null
+          source_batch_volume: number | null
+          source_recipe_name: string | null
+          volume_bbl: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+        ]
+      }
+      batches_in_production_by_brand: {
+        Row: {
+          batch_id: string | null
+          batch_name: string | null
+          batch_number: string | null
+          brand_id: string | null
+          conditioning_days: number | null
+          estimated_ready_date: string | null
+          fermentation_days: number | null
+          planned_start_date: string | null
+          recipe_id: string | null
+          recipe_name: string | null
+          status: string | null
+          volume_bbl: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipes_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      batches_with_blend_info: {
+        Row: {
+          available_volume_bbl: number | null
+          blend_source_count: number | null
+          blend_source_recipes: string[] | null
+          blended_abv: number | null
+          blended_fg: number | null
+          blended_ibu: number | null
+          blended_og: number | null
+          blended_srm: number | null
+          blended_volume_in_bbl: number | null
+          id: string | null
+          volume_blended_away_bbl: number | null
+        }
+        Relationships: []
+      }
       batches_with_brew_info: {
         Row: {
           actual_abv: number | null
           actual_fg: number | null
           actual_og: number | null
+          archive_notes: string | null
+          archive_reason: string | null
+          archive_reason_display: string | null
+          archived_at: string | null
+          archived_by: string | null
+          archived_by_name: string | null
           batch_number: string | null
           brew_date: string | null
           brew_log_id: string | null
@@ -4292,6 +4990,13 @@ export type Database = {
           volume_bbl: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "batches_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
           {
             foreignKeyName: "batches_recipe_id_fkey"
             columns: ["recipe_id"]
@@ -4339,6 +5044,13 @@ export type Database = {
             foreignKeyName: "batches_recipe_id_fkey"
             columns: ["recipe_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "batches_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
             referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
@@ -4369,6 +5081,13 @@ export type Database = {
           status: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "brew_logs_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
           {
             foreignKeyName: "brew_logs_recipe_id_fkey"
             columns: ["recipe_id"]
@@ -4559,6 +5278,32 @@ export type Database = {
           },
         ]
       }
+      finished_goods_supply_by_product: {
+        Row: {
+          allocated_quantity: number | null
+          available_quantity: number | null
+          brand_id: string | null
+          package_type_id: string | null
+          reserved_quantity: number | null
+          total_quantity: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_package_type_id_fkey"
+            columns: ["package_type_id"]
+            isOneToOne: false
+            referencedRelation: "package_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finished_goods_with_availability: {
         Row: {
           allocated_quantity: number | null
@@ -4566,7 +5311,6 @@ export type Database = {
           batch_id: string | null
           best_by_date: string | null
           brand_id: string | null
-          brand_name: string | null
           created_at: string | null
           created_by: string | null
           expiration_date: string | null
@@ -4574,7 +5318,6 @@ export type Database = {
           lot_number: string | null
           notes: string | null
           package_type_id: string | null
-          package_type_name: string | null
           production_date: string | null
           quantity: number | null
           reserved_quantity: number | null
@@ -4589,6 +5332,20 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
             referencedColumns: ["id"]
           },
           {
@@ -4673,6 +5430,20 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
             referencedColumns: ["id"]
           },
           {
@@ -4918,6 +5689,20 @@ export type Database = {
             foreignKeyName: "keg_transactions_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -5157,6 +5942,35 @@ export type Database = {
         }
         Relationships: []
       }
+      order_demand_by_product: {
+        Row: {
+          brand_id: string | null
+          demand_week: string | null
+          earliest_due_date: string | null
+          latest_due_date: string | null
+          order_count: number | null
+          order_ids: string[] | null
+          order_statuses: string[] | null
+          package_type_id: string | null
+          total_quantity: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_package_type_id_fkey"
+            columns: ["package_type_id"]
+            isOneToOne: false
+            referencedRelation: "package_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items_with_details: {
         Row: {
           batch_id: string | null
@@ -5183,6 +5997,20 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
             referencedColumns: ["id"]
           },
           {
@@ -5300,6 +6128,41 @@ export type Database = {
           },
         ]
       }
+      pick_list_details: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_name: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_name: string | null
+          generated_at: string | null
+          id: string | null
+          items_picked: number | null
+          notes: string | null
+          order_id: string | null
+          order_number: string | null
+          started_at: string | null
+          status: string | null
+          total_items: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_totals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_line_items_with_quantities: {
         Row: {
           catalog_id: string | null
@@ -5407,6 +6270,17 @@ export type Database = {
           },
         ]
       }
+      recipe_ingredients_normalized: {
+        Row: {
+          catalog_id: string | null
+          catalog_name: string | null
+          catalog_type: string | null
+          quantity: number | null
+          recipe_id: string | null
+          unit: string | null
+        }
+        Relationships: []
+      }
       recipes_with_cogs: {
         Row: {
           addition_cost: number | null
@@ -5469,7 +6343,6 @@ export type Database = {
           sparge_water_volume_gal: number | null
           style: string | null
           style_id: string | null
-          style_name: string | null
           target_abv: number | null
           target_attenuation: number | null
           target_fg: number | null
@@ -5639,6 +6512,115 @@ export type Database = {
         }
         Relationships: []
       }
+      vessel_transfers_with_details: {
+        Row: {
+          batch_id: string | null
+          batch_number: string | null
+          created_at: string | null
+          from_vessel_id: string | null
+          from_vessel_name: string | null
+          id: string | null
+          notes: string | null
+          to_vessel_id: string | null
+          to_vessel_name: string | null
+          transferred_at: string | null
+          transferred_by: string | null
+          volume_bbl: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_from_vessel_id_fkey"
+            columns: ["from_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "available_vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_from_vessel_id_fkey"
+            columns: ["from_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_from_vessel_id_fkey"
+            columns: ["from_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_to_vessel_id_fkey"
+            columns: ["to_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "available_vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_to_vessel_id_fkey"
+            columns: ["to_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_to_vessel_id_fkey"
+            columns: ["to_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vessels_with_batch: {
         Row: {
           batch_id: string | null
@@ -5664,6 +6646,20 @@ export type Database = {
             columns: ["current_batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
             referencedColumns: ["id"]
           },
           {
@@ -5765,6 +6761,20 @@ export type Database = {
             foreignKeyName: "yeast_pitches_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -5812,14 +6822,14 @@ export type Database = {
           },
           {
             foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["strain_id"]
+            columns: ["parent_strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["parent_strain_id"]
+            columns: ["strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
             referencedColumns: ["id"]
@@ -5832,6 +6842,88 @@ export type Database = {
       analyze_recipe_style_compliance: {
         Args: { p_recipe_id: string }
         Returns: Json
+      }
+      archive_batch: {
+        Args: {
+          p_batch_id: string
+          p_loss_volume_bbl?: number
+          p_notes?: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      calculate_ingredient_demand: {
+        Args: {
+          p_horizon_weeks?: number
+          p_include_fermenting?: boolean
+          p_include_planned?: boolean
+        }
+        Returns: {
+          batch_count: number
+          catalog_id: string
+          catalog_name: string
+          catalog_type: string
+          earliest_required_by: string
+          total_required: number
+          unit: string
+        }[]
+      }
+      calculate_ingredient_shortfalls: {
+        Args: { p_horizon_weeks?: number }
+        Returns: {
+          available_qty: number
+          batch_count: number
+          catalog_id: string
+          catalog_name: string
+          catalog_type: string
+          is_urgent: boolean
+          lead_time_days: number
+          min_order_qty: number
+          order_by_date: string
+          preferred_supplier_id: string
+          preferred_supplier_name: string
+          required_by_date: string
+          shortfall_qty: number
+          total_required: number
+          unit: string
+          unit_price: number
+        }[]
+      }
+      calculate_landed_cost: {
+        Args: { p_po_id: string }
+        Returns: {
+          allocated_shipping: number
+          catalog_type: string
+          landed_cost_per_unit: number
+          line_item_id: string
+          lot_id: string
+          quantity: number
+          unit_price: number
+        }[]
+      }
+      calculate_production_shortfalls: {
+        Args: { p_horizon_weeks?: number; p_include_drafts?: boolean }
+        Returns: {
+          available_quantity: number
+          brand_id: string
+          brand_name: string
+          demand_quantity: number
+          demand_week: string
+          in_production_bbl: number
+          in_production_cases: number
+          is_urgent: boolean
+          lead_time_days: number
+          package_type_id: string
+          package_type_name: string
+          recipe_id: string
+          recipe_name: string
+          recommended_brew_start: string
+          shortfall_quantity: number
+        }[]
+      }
+      calculate_units_per_bbl: {
+        Args: { p_units_per_case: number; p_volume_oz: number }
+        Returns: number
       }
       cancel_batch: {
         Args: {
@@ -5870,6 +6962,7 @@ export type Database = {
         Returns: undefined
       }
       generate_lot_number: { Args: { p_date: string }; Returns: string }
+      generate_pick_list: { Args: { p_order_id: string }; Returns: string }
       get_ai_schema_context: { Args: { p_domain?: string }; Returns: Json }
       get_enum_default: { Args: { p_enum_type: string }; Returns: string }
       get_enum_label: {
@@ -6017,8 +7110,6 @@ export type Database = {
         }
         Returns: string
       }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
       start_batch_fermentation: {
         Args: {
           p_batch_id: string
