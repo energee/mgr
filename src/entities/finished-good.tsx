@@ -199,7 +199,7 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       colSpan: 12,
       relation: {
         entity: "batch",
-        displayField: "batch_code",
+        displayField: "batch_number",
       },
     },
     {
