@@ -27,7 +27,7 @@ export const SOURCE_TYPES = [
   { value: "batch", label: "Batch" },
   { value: "finished_good", label: "Finished Good" },
   { value: "external", label: "External" },
-] as const;
+];
 
 export const DESTINATION_TYPES = [
   { value: "batch", label: "Batch" },
@@ -39,7 +39,7 @@ export const DESTINATION_TYPES = [
   { value: "destruction", label: "Destruction" },
   { value: "loss", label: "Loss" },
   { value: "transfer", label: "Transfer" },
-] as const;
+];
 
 export const REASON_CODES = [
   { value: "breakage", label: "Breakage" },
@@ -51,7 +51,7 @@ export const REASON_CODES = [
   { value: "theft", label: "Theft" },
   { value: "count_adjustment", label: "Count Adjustment" },
   { value: "other", label: "Other" },
-] as const;
+];
 
 // =============================================================================
 // Zod Schema

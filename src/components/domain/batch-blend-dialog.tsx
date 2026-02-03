@@ -139,7 +139,7 @@ export function BatchBlendDialog({
   );
 
   const existingSourceIds = useMemo(
-    () => new Set(existingBlends?.map((b) => b.source_batch_id) ?? []),
+    () => new Set(existingBlends?.map((b: { source_batch_id: string }) => b.source_batch_id) ?? []),
     [existingBlends]
   );
 
