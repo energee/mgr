@@ -64,7 +64,7 @@ interface SourceBatchSelection {
 interface BatchBlendDialogProps {
   batchId: string;
   batchNumber: string;
-  batchName: string;
+  batchName: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;

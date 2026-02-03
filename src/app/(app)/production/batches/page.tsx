@@ -13,20 +13,27 @@ import { EntityList } from "@/components/universal/entity-list";
 import { batchEntity } from "@/entities/batch";
 import { batchKeys } from "@/lib/query-keys";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
-import type { Database } from "@/types/supabase";
 
-type Batch = Database["public"]["Tables"]["batches"]["Row"];
+interface BatchRecord {
+  id: string;
+  batch_number: string;
+  name: string | null;
+  status: string | null;
+  volume_bbl: number | null;
+  current_vessel_name: string | null;
+}
 
 export default function BatchesPage() {
   const queryClient = useQueryClient();
-  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  const [selectedBatch, setSelectedBatch] = useState<BatchRecord | null>(null);
   const [showTerminationDialog, setShowTerminationDialog] = useState(false);
 
   // Custom action handler for batch-specific actions
-  const handleAction = useCallback((actionName: string, record: Batch) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleAction = useCallback((actionName: string, record: any) => {
     // Both cancel and archive use the same dialog (it adapts based on status)
     if (actionName === "cancel" || actionName === "archive") {
-      setSelectedBatch(record);
+      setSelectedBatch(record as BatchRecord);
       setShowTerminationDialog(true);
       return true; // Indicates action was handled
     }
@@ -39,7 +46,7 @@ export default function BatchesPage() {
 
   return (
     <>
-      <EntityList<Batch>
+      <EntityList
         entity={batchEntity}
         basePath="/production/batches"
         onAction={handleAction}
@@ -52,7 +59,7 @@ export default function BatchesPage() {
           batchName={selectedBatch.name}
           currentStatus={selectedBatch.status}
           currentVolume={selectedBatch.volume_bbl}
-          vesselName={selectedBatch.fermenter}
+          vesselName={selectedBatch.current_vessel_name}
           open={showTerminationDialog}
           onOpenChange={setShowTerminationDialog}
           onSuccess={handleDialogSuccess}

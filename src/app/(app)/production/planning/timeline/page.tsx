@@ -67,7 +67,7 @@ interface TimelineBatch {
   status: string;
   planned_start_date: string | null;
   volume_bbl: number | null;
-  fermenter: string | null;
+  current_vessel_name: string | null;
   recipe_id: string | null;
   recipe_name?: string;
   brand_id?: string;
@@ -140,7 +140,7 @@ export default function ProductionTimelinePage() {
           status,
           planned_start_date,
           volume_bbl,
-          fermenter,
+          current_vessel_name,
           recipe_id,
           recipes:recipe_id (
             name,
@@ -260,7 +260,7 @@ export default function ProductionTimelinePage() {
     });
 
     filteredBatches.forEach((b) => {
-      const key = b.fermenter || "unassigned";
+      const key = b.current_vessel_name || "unassigned";
       const list = map.get(key) || [];
       list.push(b);
       map.set(key, list);

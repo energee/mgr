@@ -29,13 +29,13 @@ export default function BatchDetailPage({
   const queryClient = useQueryClient();
   const supabase = createClient();
 
-  // Fetch batch data for the dialogs
+  // Fetch batch data for the dialogs (use view to get vessel info)
   const { data: batch } = useQuery({
     queryKey: batchKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("batches")
-        .select("id, batch_number, name, status, volume_bbl, fermenter")
+        .from("batches_with_brew_info")
+        .select("id, batch_number, name, status, volume_bbl, current_vessel_name")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -74,7 +74,7 @@ export default function BatchDetailPage({
         onAction={handleAction}
       />
 
-      {batch && (
+      {batch && batch.id && batch.batch_number && (
         <>
           <StartFermentationDialog
             batchId={batch.id}
@@ -91,7 +91,7 @@ export default function BatchDetailPage({
             batchName={batch.name}
             currentStatus={batch.status}
             currentVolume={batch.volume_bbl}
-            vesselName={batch.fermenter}
+            vesselName={batch.current_vessel_name}
             open={showCancellation}
             onOpenChange={setShowCancellation}
             onSuccess={handleDialogSuccess}

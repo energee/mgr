@@ -82,8 +82,8 @@ type TerminationFormValues = z.infer<typeof terminationSchema>;
 interface BatchCancellationDialogProps {
   batchId: string;
   batchNumber: string;
-  batchName: string;
-  currentStatus: string;
+  batchName: string | null;
+  currentStatus: string | null;
   currentVolume?: number | null;
   vesselName?: string | null;
   open: boolean;
