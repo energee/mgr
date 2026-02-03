@@ -149,25 +149,24 @@ export async function getOrderDemand(horizonWeeks = 8): Promise<OrderDemand[]> {
   // Map items by order
   const itemsByOrder = new Map<string, OrderItemDemand[]>();
   for (const item of items || []) {
-    const orderId = item.order_id;
-    if (!itemsByOrder.has(orderId)) {
-      itemsByOrder.set(orderId, []);
+    if (!itemsByOrder.has(item.order_id)) {
+      itemsByOrder.set(item.order_id, []);
     }
 
     const brand = item.brands as { name: string } | null;
     const packageType = item.package_types as { name: string } | null;
     const style = item.beer_styles as { name: string } | null;
 
-    itemsByOrder.get(orderId)!.push({
+    itemsByOrder.get(item.order_id)!.push({
       item_id: item.id,
       brand_id: item.brand_id,
-      brand_name: brand?.name || null,
+      brand_name: brand?.name ?? null,
       package_type_id: item.package_type_id,
-      package_type_name: packageType?.name || null,
+      package_type_name: packageType?.name ?? null,
       quantity: item.quantity,
       is_tbd: !item.brand_id && !!item.style_id,
       style_id: item.style_id,
-      style_name: style?.name || null,
+      style_name: style?.name ?? null,
       tbd_notes: item.tbd_notes,
     });
   }
@@ -179,12 +178,12 @@ export async function getOrderDemand(horizonWeeks = 8): Promise<OrderDemand[]> {
       order_id: order.id,
       order_number: order.order_number,
       customer_id: order.customer_id,
-      customer_name: customer?.name || null,
+      customer_name: customer?.name ?? null,
       status: order.status,
       order_date: order.order_date,
       requested_date: order.requested_date,
       scheduled_date: order.scheduled_date,
-      items: itemsByOrder.get(order.id) || [],
+      items: itemsByOrder.get(order.id) ?? [],
     };
   });
 }
@@ -326,8 +325,7 @@ export async function getBackwardPlanningSummary(
  */
 export function formatPlanningDate(dateStr: string | null): string {
   if (!dateStr) return "—";
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("en-US", {
+  return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -338,8 +336,7 @@ export function formatPlanningDate(dateStr: string | null): string {
  * Get product display name (handles TBD)
  */
 export function getProductDisplayName(req: ProductionRequirement): string {
-  if (req.is_tbd) {
-    return `TBD: ${req.style_name || "Unknown Style"}`;
-  }
-  return req.brand_name || "Unknown Brand";
+  return req.is_tbd
+    ? `TBD: ${req.style_name ?? "Unknown Style"}`
+    : req.brand_name ?? "Unknown Brand";
 }

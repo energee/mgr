@@ -114,7 +114,7 @@ export function POReceiveDialog({
                 <FormItem>
                   <FormLabel>Lot Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="Supplier lot #" {...field} value={field.value || ""} />
+                    <Input placeholder="Supplier lot #" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -128,7 +128,7 @@ export function POReceiveDialog({
                   <FormItem>
                     <FormLabel>Received Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value || ""} />
+                      <Input type="date" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -141,7 +141,7 @@ export function POReceiveDialog({
                   <FormItem>
                     <FormLabel>Expiration Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} value={field.value || ""} />
+                      <Input type="date" {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -158,7 +158,7 @@ export function POReceiveDialog({
                     <Textarea
                       placeholder="Quality notes, discrepancies..."
                       {...field}
-                      value={field.value || ""}
+                      value={field.value ?? ""}
                     />
                   </FormControl>
                   <FormMessage />
