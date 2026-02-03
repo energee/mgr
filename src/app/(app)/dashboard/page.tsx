@@ -65,8 +65,16 @@ const MAX_VESSELS_SHOWN = 10;
 export default function DashboardPage() {
   const supabase = createClient();
 
+  const defaultCounts: BatchStatusCounts = {
+    planned: 0,
+    fermenting: 0,
+    conditioning: 0,
+    packaging: 0,
+    completed: 0,
+  };
+
   // Fetch batch status counts
-  const { data: batchCounts = { planned: 0, fermenting: 0, conditioning: 0, packaging: 0, completed: 0 } } = useQuery({
+  const { data: batchCounts = defaultCounts } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -75,21 +83,13 @@ export default function DashboardPage() {
 
       if (error) throw error;
 
-      const counts: BatchStatusCounts = {
-        planned: 0,
-        fermenting: 0,
-        conditioning: 0,
-        packaging: 0,
-        completed: 0,
-      };
-
-      data?.forEach((batch) => {
+      const counts = { ...defaultCounts };
+      for (const batch of data ?? []) {
         const status = batch.status as keyof BatchStatusCounts;
-        if (counts[status] !== undefined) {
+        if (status in counts) {
           counts[status]++;
         }
-      });
-
+      }
       return counts;
     },
     refetchInterval: 30000,
@@ -163,9 +163,8 @@ export default function DashboardPage() {
     refetchInterval: 60000,
   });
 
-  const urgentShortfalls = shortfalls.filter((s) => s.is_urgent);
-
   // Calculate vessel utilization
+  // Cast to any[] because query has fallback to vessels table without current_batch_name
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vesselArray = vessels as any[];
   const vesselStats = {
@@ -180,6 +179,8 @@ export default function DashboardPage() {
   const utilizationPercent = vesselStats.total > 0
     ? Math.round((vesselStats.inUse / vesselStats.total) * 100)
     : 0;
+
+  const urgentShortfalls = shortfalls.filter((s) => s.is_urgent);
 
   // Build stats for the strip
   const primaryStats: StatItem[] = [
@@ -221,12 +222,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Two-Column Layout */}
-      <div className="grid gap-6 grid-cols-5">
+      <div className="grid gap-6 lg:grid-cols-5">
         {/* Active Batches (col-span-3) */}
         <DashboardSection
           title="Active Batches"
           viewAllHref="/production/batches"
-          className="col-span-3"
+          className="lg:col-span-3"
         >
           {activeBatches.length === 0 ? (
             <DashboardEmpty message="No active batches" />
@@ -271,7 +272,7 @@ export default function DashboardPage() {
         <DashboardSection
           title="Vessel Utilization"
           viewAllHref="/production/vessels"
-          className="col-span-2"
+          className="lg:col-span-2"
         >
           {/* Big utilization percentage */}
           <div className="mb-4">

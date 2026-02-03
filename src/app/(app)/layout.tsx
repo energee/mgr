@@ -12,6 +12,7 @@ import { AppSidebar } from "@/components/domain/app-sidebar";
 import { AppHeader } from "@/components/domain/app-header";
 import { AppProviders } from "@/components/domain/app-providers";
 import { ChatLayout } from "@/components/domain/chat-layout";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -38,12 +39,14 @@ export default async function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <AppProviders>
-      <div className="flex min-h-screen">
+      <SidebarProvider>
         <AppSidebar />
-        <ChatLayout header={<AppHeader user={user} breweryName={breweryName} />}>
-          {children}
-        </ChatLayout>
-      </div>
+        <SidebarInset>
+          <ChatLayout header={<AppHeader user={user} breweryName={breweryName} />}>
+            {children}
+          </ChatLayout>
+        </SidebarInset>
+      </SidebarProvider>
     </AppProviders>
   );
 }
