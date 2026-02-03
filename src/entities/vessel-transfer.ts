@@ -58,6 +58,11 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
   // ---------------------------------------------------------------------------
   listColumns: [
     {
+      accessorKey: "batch_number",
+      header: "Batch",
+      sortable: true,
+    },
+    {
       accessorKey: "transferred_at",
       header: "Date/Time",
       sortable: true,
