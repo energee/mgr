@@ -108,11 +108,6 @@ export const batchEntity: EntityConfig<Batch> = {
       format: "unit",
       unitType: "volume",
     },
-    {
-      accessorKey: "fermenter",
-      header: "Fermenter",
-      sortable: true,
-    },
   ],
 
   listFilters: [
@@ -151,21 +146,12 @@ export const batchEntity: EntityConfig<Batch> = {
         { field: "status", label: "Status" },
         { field: "planned_start_date", label: "Planned Start", format: "date" },
         { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
-        { field: "fermenter", label: "Fermenter" },
       ],
     },
     {
       id: "brew-info",
       title: "Brewing",
       component: BatchBrewInfo,
-    },
-    {
-      id: "fermentation",
-      title: "Fermentation Results",
-      fields: [
-        { field: "actual_fg", label: "Final Gravity" },
-        { field: "actual_abv", label: "ABV %" },
-      ],
     },
     {
       id: "ai-insights",
@@ -237,40 +223,10 @@ export const batchEntity: EntityConfig<Batch> = {
       colSpan: 6,
     },
     {
-      name: "fermenter",
-      label: "Vessel",
-      type: "select",
-      placeholder: "Select vessel...",
-      colSpan: 6,
-      // Options populated dynamically from vessels table
-      // See VesselSelector component for enhanced version
-      dynamicOptions: {
-        table: "vessels",
-        valueField: "name",
-        labelField: "name",
-        filter: { is_active: true },
-        orderBy: "name",
-      },
-    },
-    {
       name: "status",
       label: "Status",
       type: "select",
       options: statusOptions,
-      colSpan: 6,
-    },
-    {
-      name: "actual_fg",
-      label: "Final Gravity",
-      type: "number",
-      placeholder: "e.g., 1.012",
-      colSpan: 6,
-    },
-    {
-      name: "actual_abv",
-      label: "ABV %",
-      type: "number",
-      placeholder: "e.g., 6.8",
       colSpan: 6,
     },
     {
@@ -392,5 +348,5 @@ export const batchEntity: EntityConfig<Batch> = {
     "What's the total volume in fermentation?",
   ],
 
-  keyFields: ["batch_number", "name", "status", "planned_start_date", "fermenter"],
+  keyFields: ["batch_number", "name", "status", "planned_start_date", "volume_bbl"],
 };

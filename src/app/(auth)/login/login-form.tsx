@@ -11,14 +11,10 @@ import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-  InputOTPSeparator,
-} from "@/components/ui/input-otp";
+import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -33,12 +29,18 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/";
   const supabase = createClient();
+  const submitRef = useSubmitShortcut();
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isMagicLinkSent, setIsMagicLinkSent] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [email, setEmail] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("mgr:login-email") ?? "";
+    }
+    return "";
+  });
+  const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const handleSubmit = async (e: FormEvent) => {
@@ -69,6 +71,7 @@ export function LoginForm() {
         return;
       }
 
+      localStorage.setItem("mgr:login-email", email);
       router.push(redirect);
       router.refresh();
     } catch {
@@ -98,8 +101,10 @@ export function LoginForm() {
         return;
       }
 
-      setIsMagicLinkSent(true);
-      toast.success("Check your email for the login link");
+      localStorage.setItem("mgr:login-email", email);
+      setOtpSent(true);
+      setOtpCode("");
+      toast.success("Check your email for the login code");
     } catch {
       toast.error("An unexpected error occurred");
     } finally {
@@ -109,16 +114,13 @@ export function LoginForm() {
 
   const handleVerifyOtp = async (e: FormEvent) => {
     e.preventDefault();
-    if (!otpCode || otpCode.length !== 8) {
-      toast.error("Please enter the 8-digit code from your email");
-      return;
-    }
+    if (!otpCode.trim()) return;
 
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.verifyOtp({
         email,
-        token: otpCode,
+        token: otpCode.trim(),
         type: "email",
       });
 
@@ -127,6 +129,7 @@ export function LoginForm() {
         return;
       }
 
+      localStorage.setItem("mgr:login-email", email);
       router.push(redirect);
       router.refresh();
     } catch {
@@ -136,53 +139,38 @@ export function LoginForm() {
     }
   };
 
-  if (isMagicLinkSent) {
+  if (otpSent) {
     return (
-      <form onSubmit={handleVerifyOtp} className="space-y-6">
-        <div className="space-y-2 text-center">
-          <p className="text-sm text-muted-foreground">
-            We sent a code to <span className="font-medium text-foreground">{email}</span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Enter the code below or click the link in the email
-          </p>
-        </div>
-        <div className="flex justify-center">
-          <InputOTP
-            maxLength={8}
+      <form onSubmit={handleVerifyOtp} className="space-y-4">
+        <p className="text-sm text-muted-foreground text-center">
+          Enter the code we sent to <span className="font-medium text-foreground">{email}</span>
+        </p>
+        <div className="space-y-2">
+          <Label htmlFor="otp">Code</Label>
+          <Input
+            id="otp"
+            type="text"
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            placeholder="Enter code"
             value={otpCode}
-            onChange={setOtpCode}
+            onChange={(e) => setOtpCode(e.target.value)}
             disabled={isLoading}
             autoFocus
-          >
-            <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-            </InputOTPGroup>
-            <InputOTPSeparator />
-            <InputOTPGroup>
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
-              <InputOTPSlot index={6} />
-              <InputOTPSlot index={7} />
-            </InputOTPGroup>
-          </InputOTP>
+          />
         </div>
-        <Button type="submit" className="w-full" disabled={isLoading || otpCode.length !== 8}>
-          {isLoading ? "Verifying..." : "Verify"}
+        <Button ref={submitRef} type="submit" className="w-full" disabled={isLoading || !otpCode.trim()}>
+          {isLoading ? "Verifying..." : <><span>Verify</span><Kbd>&#8984;&#9166;</Kbd></>}
         </Button>
-        <button
-          type="button"
-          onClick={() => {
-            setIsMagicLinkSent(false);
-            setOtpCode("");
-          }}
-          className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Back to login
-        </button>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={() => setOtpSent(false)} disabled={isLoading}>
+            Back
+          </Button>
+          <Button type="button" variant="outline" className="flex-1" onClick={handleMagicLink} disabled={isLoading}>
+            Resend code
+          </Button>
+        </div>
       </form>
     );
   }
@@ -215,8 +203,8 @@ export function LoginForm() {
         {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
       </div>
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? "Signing in..." : "Sign in"}
+      <Button ref={submitRef} type="submit" className="w-full" disabled={isLoading}>
+        {isLoading ? "Signing in..." : <><span>Sign in</span><Kbd>&#8984;&#9166;</Kbd></>}
       </Button>
 
       <div className="relative">
@@ -235,7 +223,7 @@ export function LoginForm() {
         onClick={handleMagicLink}
         disabled={isLoading}
       >
-        Sign in with magic link
+        Sign in with email code
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">

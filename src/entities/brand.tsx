@@ -1,0 +1,202 @@
+/**
+ * Brand Entity Configuration
+ *
+ * Brands represent the brewery's beer products/labels.
+ * Each brand has a style, ABV, and optional Untappd integration.
+ */
+
+import { z } from "zod";
+import type { EntityConfig } from "@/types/entity";
+import type { Database } from "@/types/supabase";
+
+type Brand = Database["public"]["Tables"]["brands"]["Row"];
+
+// =============================================================================
+// Zod Schema
+// =============================================================================
+
+export const brandSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  variant: z.string().nullable().optional(),
+  style_id: z.string().uuid().nullable().optional(),
+  abv: z.coerce.number().nullable().optional(),
+  description: z.string().nullable().optional(),
+  untappd_url: z.string().url().nullable().optional().or(z.literal("")),
+});
+
+export type BrandFormValues = z.infer<typeof brandSchema>;
+
+// =============================================================================
+// Entity Configuration
+// =============================================================================
+
+export const brandEntity: EntityConfig<Brand> = {
+  // ---------------------------------------------------------------------------
+  // Identity
+  // ---------------------------------------------------------------------------
+  name: "brand",
+  table: "brands",
+  displayName: "Brand",
+  displayNamePlural: "Brands",
+  description: "Beer brands and products",
+  domain: "production",
+
+  // ---------------------------------------------------------------------------
+  // List View
+  // ---------------------------------------------------------------------------
+  listColumns: [
+    {
+      accessorKey: "name",
+      header: "Name",
+      sortable: true,
+    },
+    {
+      accessorKey: "variant",
+      header: "Variant",
+      sortable: true,
+    },
+    {
+      accessorKey: "style_id",
+      header: "Style",
+      sortable: true,
+    },
+    {
+      accessorKey: "abv",
+      header: "ABV",
+      sortable: true,
+      render: (value) => (value ? `${value}%` : "—"),
+    },
+  ],
+
+  listFilters: [
+    {
+      field: "style_id",
+      type: "select",
+      label: "Style",
+      dynamicOptions: {
+        table: "beer_styles",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "name",
+      },
+    },
+  ],
+
+  defaultSort: { column: "name", direction: "asc" },
+  searchableFields: ["name", "variant", "description"],
+
+  // ---------------------------------------------------------------------------
+  // Detail View
+  // ---------------------------------------------------------------------------
+  detailHeader: {
+    title: "name",
+    subtitle: "variant",
+  },
+
+  detailSections: [
+    {
+      id: "overview",
+      title: "Brand Information",
+      fields: [
+        { field: "name", label: "Name" },
+        { field: "variant", label: "Variant" },
+        { field: "style_id", label: "Style" },
+        { field: "abv", label: "ABV", render: (v) => (v ? `${v}%` : "—") },
+      ],
+    },
+    {
+      id: "description",
+      title: "Description",
+      fields: [
+        { field: "description", label: "Description", fullWidth: true },
+      ],
+    },
+    {
+      id: "untappd",
+      title: "Untappd",
+      fields: [
+        { field: "untappd_url", label: "Untappd URL" },
+        { field: "untappd_rating", label: "Rating" },
+      ],
+      collapsible: true,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Form
+  // ---------------------------------------------------------------------------
+  formSchema: brandSchema,
+
+  formFields: [
+    {
+      name: "name",
+      label: "Brand Name",
+      type: "text",
+      placeholder: "e.g., Hop Highway",
+      required: true,
+      colSpan: 6,
+    },
+    {
+      name: "variant",
+      label: "Variant",
+      type: "text",
+      placeholder: "e.g., Session, Double, Nitro",
+      colSpan: 6,
+    },
+    {
+      name: "style_id",
+      label: "Style",
+      type: "relation",
+      colSpan: 6,
+      relation: {
+        entity: "beer_style",
+        displayField: "name",
+      },
+    },
+    {
+      name: "abv",
+      label: "ABV (%)",
+      type: "number",
+      placeholder: "e.g., 6.5",
+      colSpan: 6,
+    },
+    {
+      name: "description",
+      label: "Description",
+      type: "textarea",
+      placeholder: "Beer description, tasting notes, etc.",
+      colSpan: 12,
+    },
+    {
+      name: "untappd_url",
+      label: "Untappd URL",
+      type: "text",
+      placeholder: "https://untappd.com/b/...",
+      colSpan: 12,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Relations
+  // ---------------------------------------------------------------------------
+  relations: [
+    {
+      name: "style",
+      entity: "beer_style",
+      type: "belongsTo",
+      foreignKey: "style_id",
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // AI Context
+  // ---------------------------------------------------------------------------
+  queryExamples: [
+    "List all brands",
+    "What IPAs do we make?",
+    "Show brands over 7% ABV",
+    "What's the most popular brand on Untappd?",
+  ],
+
+  keyFields: ["name", "variant", "style_id", "abv"],
+};

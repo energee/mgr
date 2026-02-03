@@ -86,11 +86,13 @@ brew_logs (hot-side)          batches (cold-side)
 ├── brew_number               ├── batch_number
 ├── brew_date (actual)        ├── planned_start_date
 ├── events[] (timeline)       ├── status (planned→fermenting→...)
-├── recipe_id                 ├── actual_fg, actual_abv
-└── status                    └── fermenter
+├── recipe_id                 ├── volume_bbl
+└── status                    └── notes
          │                            │
          └──── brew_log_batches ──────┘
               (volume_bbl allocation)
+
+Note: Vessel assignment tracked via vessels.current_batch_id
 ```
 
 ### Features

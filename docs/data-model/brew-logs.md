@@ -312,12 +312,12 @@ With brew logs decoupled, the `batches` table focuses on **fermentation and pack
 | name | Batch name |
 | status | Lifecycle state |
 | recipe_id | Keep for convenience (may differ from brew log recipe in blends) |
-| fermenter | Current/initial fermenter |
-| brite_tank | Conditioning vessel |
-| actual_fg | Fermentation result |
-| actual_abv | Final calculated ABV |
-| volume_gallons | Current volume (may change from KO due to losses) |
+| volume_bbl | Target/actual volume |
+| actual_fg | Final gravity (derived from fermentation readings) |
+| actual_abv | ABV (calculated from OG/FG) |
 | notes | Batch-specific notes |
+
+**Note:** Vessel assignment is tracked via `vessels.current_batch_id`, not on the batch itself.
 
 ### Fields to Remove from Batch (now on brew_log)
 | Field | New Location |
