@@ -138,9 +138,9 @@ export interface EntityConfig<T = Record<string, unknown>> {
 // List View Types
 // =============================================================================
 
-export type EntityColumnDef<T> = ColumnDef<T, unknown> & {
-  /** Field key for sorting/filtering */
-  accessorKey?: keyof T & string;
+export type EntityColumnDef<T> = Omit<ColumnDef<T, unknown>, "accessorKey"> & {
+  /** Field key for sorting/filtering - uses string to allow view columns not in base type */
+  accessorKey?: string;
 
   /** Whether this column is sortable */
   sortable?: boolean;
