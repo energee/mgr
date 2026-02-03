@@ -4,7 +4,7 @@
  * Production Planning Page
  *
  * Backward planning from orders - shows:
- * - Demand summary cards
+ * - Demand summary in stats strip
  * - Shortfall table with recommended brew dates
  * - Quick batch creation from shortfalls
  */
@@ -13,13 +13,6 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { planningKeys, batchKeys } from "@/lib/query-keys";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,16 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Package,
-  AlertTriangle,
-  TrendingUp,
-  Clock,
-  Plus,
-  RefreshCw,
-  List,
-  Calendar,
-} from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import Link from "next/link";
 import type {
   ProductionShortfall,
@@ -57,6 +41,7 @@ import type {
 } from "@/types/planning";
 import { DEFAULT_PLANNING_FILTERS } from "@/types/planning";
 import { CreateBatchFromShortfall } from "@/components/domain/create-batch-from-shortfall";
+import { StatsStrip } from "@/components/dashboard";
 
 // =============================================================================
 // Component
@@ -133,51 +118,39 @@ export default function ProductionPlanningPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Production Planning</h1>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
-            <Button variant="ghost" size="sm" className="h-7 px-2 bg-background shadow-sm">
-              <List className="h-4 w-4 mr-1" />
-              List
-            </Button>
-            <Link href="/production/planning/timeline">
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
-                <Calendar className="h-4 w-4 mr-1" />
-                Timeline
+      {/* Header with stats strip */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">Production Planning</h1>
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 text-sm">
+              <Button variant="ghost" size="sm" className="h-7 px-3 bg-background shadow-sm">
+                List
               </Button>
-            </Link>
-          </div>
-          <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="horizon">Planning Horizon</Label>
-              <Select
-                value={filters.horizonWeeks.toString()}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, horizonWeeks: parseInt(value) })
-                }
-              >
-                <SelectTrigger id="horizon" className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="4">4 weeks</SelectItem>
-                  <SelectItem value="8">8 weeks</SelectItem>
-                  <SelectItem value="12">12 weeks</SelectItem>
-                </SelectContent>
-              </Select>
+              <Link href="/production/planning/timeline">
+                <Button variant="ghost" size="sm" className="h-7 px-3 text-muted-foreground hover:text-foreground">
+                  Timeline
+                </Button>
+              </Link>
             </div>
+          </div>
+          <div className="flex items-center gap-4">
+            {/* Inline filters */}
+            <Select
+              value={filters.horizonWeeks.toString()}
+              onValueChange={(value) =>
+                setFilters({ ...filters, horizonWeeks: parseInt(value) })
+              }
+            >
+              <SelectTrigger className="w-[120px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="4">4 weeks</SelectItem>
+                <SelectItem value="8">8 weeks</SelectItem>
+                <SelectItem value="12">12 weeks</SelectItem>
+              </SelectContent>
+            </Select>
             <div className="flex items-center gap-2">
               <Switch
                 id="include-drafts"
@@ -186,171 +159,114 @@ export default function ProductionPlanningPage() {
                   setFilters({ ...filters, includeDrafts: checked })
                 }
               />
-              <Label htmlFor="include-drafts">Include draft orders</Label>
+              <Label htmlFor="include-drafts" className="text-sm">Drafts</Label>
             </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Demand</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.totalDemand.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">cases needed</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.availableSupply.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">cases in stock</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Shortfalls</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.shortfallCount}</div>
-            <p className="text-xs text-muted-foreground">products need brewing</p>
-          </CardContent>
-        </Card>
-
-        <Card className={summary.urgentCount > 0 ? "border-destructive" : ""}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Urgent</CardTitle>
-            <AlertTriangle
-              className={`h-4 w-4 ${
-                summary.urgentCount > 0 ? "text-destructive" : "text-muted-foreground"
-              }`}
-            />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${
-                summary.urgentCount > 0 ? "text-destructive" : ""
-              }`}
-            >
-              {summary.urgentCount}
-            </div>
-            <p className="text-xs text-muted-foreground">need immediate action</p>
-          </CardContent>
-        </Card>
+        {/* Stats strip */}
+        <StatsStrip
+          stats={[
+            { value: summary.totalDemand.toLocaleString(), label: "demand" },
+            { value: summary.availableSupply.toLocaleString(), label: "available" },
+            { value: summary.shortfallCount, label: "shortfalls" },
+            ...(summary.urgentCount > 0
+              ? [{ value: summary.urgentCount, label: "urgent", variant: "warning" as const }]
+              : []),
+          ]}
+          secondaryStats={[
+            { value: summary.inProduction.toLocaleString(), label: "in production" },
+          ]}
+        />
       </div>
 
       {/* Shortfall Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Production Shortfalls</CardTitle>
-          <CardDescription>
-            Products where demand exceeds available supply. Click &quot;Create Batch&quot; to
-            schedule production.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : shortfalls.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No shortfalls detected</p>
-              <p className="text-sm">
-                All demand within the {filters.horizonWeeks}-week horizon is covered
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Demand Week</TableHead>
-                    <TableHead className="text-right">Demand</TableHead>
-                    <TableHead className="text-right">Available</TableHead>
-                    <TableHead className="text-right">Shortfall</TableHead>
-                    <TableHead>Brew By</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shortfalls.map((shortfall, index) => (
-                    <TableRow key={`${shortfall.brand_id}-${shortfall.package_type_id}-${shortfall.demand_week}-${index}`}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{shortfall.brand_name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {shortfall.package_type_name}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatWeek(shortfall.demand_week)}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {shortfall.demand_quantity.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {shortfall.available_quantity.toLocaleString()}
-                        {shortfall.in_production_cases > 0 && (
-                          <span className="text-muted-foreground text-xs block">
-                            +{shortfall.in_production_cases} in prod
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={shortfall.is_urgent ? "destructive" : "secondary"}>
-                          {shortfall.shortfall_quantity.toLocaleString()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {shortfall.is_urgent && (
-                            <AlertTriangle className="h-4 w-4 text-destructive" />
-                          )}
-                          <span
-                            className={
-                              isPast(shortfall.recommended_brew_start)
-                                ? "text-destructive font-medium"
-                                : ""
-                            }
-                          >
-                            {formatDate(shortfall.recommended_brew_start)}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {shortfall.lead_time_days} day lead time
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant={shortfall.is_urgent ? "destructive" : "outline"}
-                          onClick={() => setSelectedShortfall(shortfall)}
-                          disabled={!shortfall.recipe_id}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Create Batch
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border bg-card">
+        <div className="p-4 border-b">
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            Production Shortfalls
+          </h2>
+        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : shortfalls.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-12 text-center">
+            No shortfalls — all demand within {filters.horizonWeeks} weeks is covered
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="uppercase tracking-wider text-xs">Product</TableHead>
+                <TableHead className="uppercase tracking-wider text-xs">Demand Week</TableHead>
+                <TableHead className="uppercase tracking-wider text-xs text-right">Demand</TableHead>
+                <TableHead className="uppercase tracking-wider text-xs text-right">Available</TableHead>
+                <TableHead className="uppercase tracking-wider text-xs text-right">Shortfall</TableHead>
+                <TableHead className="uppercase tracking-wider text-xs">Brew By</TableHead>
+                <TableHead className="uppercase tracking-wider text-xs text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {shortfalls.map((shortfall, index) => (
+                <TableRow key={`${shortfall.brand_id}-${shortfall.package_type_id}-${shortfall.demand_week}-${index}`}>
+                  <TableCell>
+                    <div className="font-medium">{shortfall.brand_name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {shortfall.package_type_name}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm">{formatWeek(shortfall.demand_week)}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {shortfall.demand_quantity.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="font-mono">{shortfall.available_quantity.toLocaleString()}</span>
+                    {shortfall.in_production_cases > 0 && (
+                      <span className="text-muted-foreground text-xs block">
+                        +{shortfall.in_production_cases} in prod
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant={shortfall.is_urgent ? "destructive" : "secondary"}>
+                      {shortfall.shortfall_quantity.toLocaleString()}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={
+                        isPast(shortfall.recommended_brew_start)
+                          ? "text-amber-600 font-medium"
+                          : ""
+                      }
+                    >
+                      {formatDate(shortfall.recommended_brew_start)}
+                    </span>
+                    <div className="text-xs text-muted-foreground">
+                      {shortfall.lead_time_days}d lead time
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedShortfall(shortfall)}
+                      disabled={!shortfall.recipe_id}
+                    >
+                      Create Batch
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
 
       {/* Create Batch Dialog */}
       {selectedShortfall && (

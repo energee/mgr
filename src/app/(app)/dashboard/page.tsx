@@ -13,11 +13,12 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { vesselEntity } from "@/entities/vessel";
-import { getStateLabel } from "@/types/entity";
+import { batchEntity } from "@/entities/batch";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
+import type { StatItem } from "@/components/dashboard";
 
 // =============================================================================
 // Types
@@ -51,17 +52,11 @@ interface VesselStatus {
 }
 
 // =============================================================================
-// Status Configuration
+// Constants
 // =============================================================================
 
-const statusConfig = {
-  planned: { label: "Planned", color: "bg-slate-500" },
-  fermenting: { label: "Fermenting", color: "bg-blue-500" },
-  conditioning: { label: "Conditioning", color: "bg-cyan-500" },
-  packaging: { label: "Packaging", color: "bg-amber-500" },
-  completed: { label: "Completed", color: "bg-green-500" },
-};
-
+const MAX_BATCHES_SHOWN = 8;
+const MAX_VESSELS_SHOWN = 10;
 
 // =============================================================================
 // Component
@@ -97,7 +92,7 @@ export default function DashboardPage() {
 
       return counts;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
   // Fetch active batches (not completed or cancelled)
@@ -133,7 +128,6 @@ export default function DashboardPage() {
   const { data: vessels = [] } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
-      // Use vessels_with_batch view if available, otherwise base table
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
       const { data, error } = await db
@@ -142,7 +136,6 @@ export default function DashboardPage() {
         .order("name");
 
       if (error) {
-        // Fallback to base table
         const { data: fallback } = await supabase
           .from("vessels")
           .select("*")
@@ -173,7 +166,6 @@ export default function DashboardPage() {
   const urgentShortfalls = shortfalls.filter((s) => s.is_urgent);
 
   // Calculate vessel utilization
-  // Vessel statuses: dirty, caustic_cleaned, ready_for_use, in_use, maintenance
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vesselArray = vessels as any[];
   const vesselStats = {
@@ -189,181 +181,169 @@ export default function DashboardPage() {
     ? Math.round((vesselStats.inUse / vesselStats.total) * 100)
     : 0;
 
+  // Build stats for the strip
+  const primaryStats: StatItem[] = [
+    { value: batchCounts.fermenting, label: "fermenting" },
+    { value: batchCounts.conditioning, label: "conditioning" },
+    { value: batchCounts.packaging, label: "packaging" },
+  ];
+
+  if (shortfalls.length > 0) {
+    primaryStats.push({
+      value: shortfalls.length,
+      label: urgentShortfalls.length > 0
+        ? `shortfalls (${urgentShortfalls.length} urgent)`
+        : "shortfalls",
+      href: "/production/planning",
+      variant: urgentShortfalls.length > 0 ? "warning" : "default",
+    });
+  }
+
+  const secondaryStats: StatItem[] = [
+    { value: batchCounts.planned, label: "planned" },
+    { value: batchCounts.completed, label: "completed" },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <h1 className="text-2xl font-bold">Production Dashboard</h1>
-
-      {/* Batch Status Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {Object.entries(statusConfig).map(([status, config]) => {
-          const count = batchCounts[status as keyof BatchStatusCounts] || 0;
-
-          return (
-            <Card key={status}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{config.label}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{count}</div>
-                <p className="text-xs text-muted-foreground">
-                  {count === 1 ? "batch" : "batches"}
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Header with Stats Strip */}
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <h1 className="text-2xl font-semibold">Production Dashboard</h1>
+          <Link
+            href="/production/batches"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            View All Batches
+          </Link>
+        </div>
+        <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
       </div>
 
-      {/* Production Planning Alert */}
-      {shortfalls.length > 0 && (
-        <Card className={urgentShortfalls.length > 0 ? "border-destructive" : "border-amber-500"}>
-          <CardContent className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-6">
-              <div>
-                <span className="text-2xl font-bold">{shortfalls.length}</span>
-                <span className="text-sm text-muted-foreground ml-2">shortfalls</span>
-              </div>
-              {urgentShortfalls.length > 0 && (
-                <span className="font-medium text-destructive">
-                  {urgentShortfalls.length} urgent
-                </span>
+      {/* Two-Column Layout */}
+      <div className="grid gap-6 grid-cols-5">
+        {/* Active Batches (col-span-3) */}
+        <DashboardSection
+          title="Active Batches"
+          viewAllHref="/production/batches"
+          className="col-span-3"
+        >
+          {activeBatches.length === 0 ? (
+            <DashboardEmpty message="No active batches" />
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="pb-2 font-medium uppercase tracking-wider text-xs text-muted-foreground">Batch</th>
+                  <th className="pb-2 font-medium uppercase tracking-wider text-xs text-muted-foreground">Recipe</th>
+                  <th className="pb-2 font-medium uppercase tracking-wider text-xs text-muted-foreground text-right">Volume</th>
+                  <th className="pb-2 font-medium uppercase tracking-wider text-xs text-muted-foreground text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {activeBatches.slice(0, MAX_BATCHES_SHOWN).map((batch) => (
+                  <tr key={batch.id} className="hover:bg-muted/50">
+                    <td className="py-2">
+                      <Link href={`/production/batches/${batch.id}`} className="hover:underline">
+                        <span className="font-mono font-medium">{batch.batch_number}</span>
+                      </Link>
+                    </td>
+                    <td className="py-2 text-muted-foreground truncate max-w-[200px]">
+                      {batch.recipe_name || batch.name}
+                    </td>
+                    <td className="py-2 text-right font-mono">
+                      {batch.volume_bbl ? `${batch.volume_bbl} BBL` : "—"}
+                    </td>
+                    <td className="py-2 text-right">
+                      <StatusBadge
+                        status={batch.status}
+                        config={batchEntity.stateMachine?.stateDisplay}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </DashboardSection>
+
+        {/* Vessel Utilization (col-span-2) */}
+        <DashboardSection
+          title="Vessel Utilization"
+          viewAllHref="/production/vessels"
+          className="col-span-2"
+        >
+          {/* Big utilization percentage */}
+          <div className="mb-4">
+            <span className="font-mono text-4xl font-semibold">{utilizationPercent}%</span>
+            <span className="text-muted-foreground ml-2 text-sm">in use</span>
+          </div>
+
+          {/* Segmented Tri-Color Bar */}
+          <div className="mb-4">
+            <div className="h-3 rounded-full overflow-hidden flex bg-muted">
+              {vesselStats.total > 0 && (
+                <>
+                  <div
+                    className="h-full bg-orange-500 transition-all duration-500"
+                    style={{ width: `${(vesselStats.inUse / vesselStats.total) * 100}%` }}
+                    title={`${vesselStats.inUse} in use`}
+                  />
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${(vesselStats.available / vesselStats.total) * 100}%` }}
+                    title={`${vesselStats.available} available`}
+                  />
+                  <div
+                    className="h-full bg-slate-400 transition-all duration-500"
+                    style={{ width: `${(vesselStats.maintenance / vesselStats.total) * 100}%` }}
+                    title={`${vesselStats.maintenance} maintenance`}
+                  />
+                </>
               )}
             </div>
-            <Link
-              href="/production/planning"
-              className="text-sm text-muted-foreground hover:text-foreground underline"
-            >
-              View Planning
-            </Link>
-          </CardContent>
-        </Card>
-      )}
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Active Batches */}
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Active Batches</CardTitle>
-                <CardDescription>Batches currently in production</CardDescription>
-              </div>
+            {/* Legend */}
+            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-orange-500" />
+                <span className="font-mono font-medium">{vesselStats.inUse}</span> in use
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="font-mono font-medium">{vesselStats.available}</span> available
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                <span className="font-mono font-medium">{vesselStats.maintenance}</span> other
+              </span>
+            </div>
+          </div>
+
+          {/* Dense Vessel List */}
+          <div className="divide-y max-h-[240px] overflow-y-auto">
+            {vesselArray.slice(0, MAX_VESSELS_SHOWN).map((vessel) => (
               <Link
-                href="/production/batches"
-                className="text-sm text-muted-foreground hover:text-foreground underline"
+                key={vessel.id}
+                href={`/production/vessels/${vessel.id}`}
+                className="flex items-center justify-between py-2 hover:bg-muted/50 -mx-1 px-1"
               >
-                View All
+                <span className="font-medium text-sm">{vessel.name}</span>
+                <div className="flex items-center gap-2">
+                  {vessel.current_batch_name && (
+                    <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+                      {vessel.current_batch_name}
+                    </span>
+                  )}
+                  <StatusBadge
+                    status={vessel.status}
+                    config={vesselEntity.stateMachine?.stateDisplay}
+                  />
+                </div>
               </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {activeBatches.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <p>No active batches</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {activeBatches.slice(0, 5).map((batch) => {
-                  const config = statusConfig[batch.status as keyof typeof statusConfig];
-                  return (
-                    <Link
-                      key={batch.id}
-                      href={`/production/batches/${batch.id}`}
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{batch.batch_number}</div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {batch.recipe_name || batch.name}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {batch.volume_bbl && (
-                          <span className="text-sm text-muted-foreground">
-                            {batch.volume_bbl} BBL
-                          </span>
-                        )}
-                        <Badge variant="secondary">
-                          {config?.label || batch.status}
-                        </Badge>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Vessel Utilization */}
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Vessel Utilization</CardTitle>
-                <CardDescription>Current vessel status overview</CardDescription>
-              </div>
-              <Link
-                href="/production/vessels"
-                className="text-sm text-muted-foreground hover:text-foreground underline"
-              >
-                View All
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Utilization Bar */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Utilization</span>
-                <span className="text-2xl font-bold">{utilizationPercent}%</span>
-              </div>
-              <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-500"
-                  style={{ width: `${utilizationPercent}%` }}
-                />
-              </div>
-              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                <span>{vesselStats.inUse} in use</span>
-                <span>{vesselStats.available} available</span>
-              </div>
-            </div>
-
-            {/* Vessel Status Summary */}
-            <div className="flex items-center gap-4 mb-4 text-sm">
-              <span><span className="font-bold">{vesselStats.inUse}</span> in use</span>
-              <span className="text-muted-foreground">·</span>
-              <span><span className="font-bold">{vesselStats.available}</span> available</span>
-              <span className="text-muted-foreground">·</span>
-              <span><span className="font-bold">{vesselStats.maintenance}</span> maintenance</span>
-            </div>
-
-            {/* Vessel List */}
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-              {vesselArray.slice(0, 8).map((vessel) => (
-                <Link
-                  key={vessel.id}
-                  href={`/production/vessels/${vessel.id}`}
-                  className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 transition-colors"
-                >
-                  <span className="font-medium text-sm">{vessel.name}</span>
-                  <div className="flex items-center gap-2">
-                    {vessel.current_batch_name && (
-                      <span className="text-xs text-muted-foreground truncate max-w-[100px]">
-                        {vessel.current_batch_name}
-                      </span>
-                    )}
-                    <Badge variant="outline">
-                      {getStateLabel(vesselEntity, vessel.status)}
-                    </Badge>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+        </DashboardSection>
       </div>
     </div>
   );

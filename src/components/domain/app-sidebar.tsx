@@ -13,105 +13,220 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Beaker,
-  Warehouse,
-  DollarSign,
-  Settings,
-  HelpCircle,
-  LayoutDashboard,
-  FlaskConical,
-  FileText,
-  BoxesIcon,
-  Users,
-  ChevronDown,
-  Container,
-  ClipboardList,
-  BarChart3,
-  Package,
-  Truck,
-  Building2,
-  ShoppingCart,
-  ArrowRightLeft,
-  PackageCheck,
-  CalendarClock,
-  TrendingUp,
-} from "lucide-react";
-import { useState } from "react";
+  AnimatedLayoutDashboard,
+  AnimatedFlask,
+  AnimatedDollarSign,
+  AnimatedSettings,
+  AnimatedHelpCircle,
+  AnimatedFileText,
+  AnimatedUsers,
+  AnimatedChevronDown,
+  AnimatedClipboardList,
+  AnimatedBarChart3,
+  AnimatedTruck,
+  AnimatedShoppingCart,
+  AnimatedTrendingUp,
+  AnimatedPackage,
+  AnimatedPackageCheck,
+  AnimatedWarehouse,
+  AnimatedBuilding2,
+  AnimatedCalendarClock,
+  AnimatedArrowRightLeft,
+  AnimatedContainer,
+  AnimatedBatches,
+  AnimatedUpload,
+  AnimatedDownload,
+} from "@/components/icons/animated";
+import type { AnimatedIconHandle, AnimatedIconProps } from "@/components/icons/animated";
+import { useRef, useState } from "react";
+
+type AnimatedIcon = React.ComponentType<AnimatedIconProps>;
 
 interface NavItem {
   label: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: AnimatedIcon;
 }
 
 interface NavSection {
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: AnimatedIcon;
   items: NavItem[];
+}
+
+function NavSectionHeader({
+  section,
+  isActive,
+  isExpanded,
+  onToggle,
+}: {
+  section: NavSection;
+  isActive: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const iconRef = useRef<AnimatedIconHandle>(null);
+  const chevronRef = useRef<AnimatedIconHandle>(null);
+
+  return (
+    <button
+      onClick={onToggle}
+      onMouseEnter={() => {
+        iconRef.current?.startAnimation();
+        chevronRef.current?.startAnimation();
+      }}
+      onMouseLeave={() => {
+        iconRef.current?.stopAnimation();
+        chevronRef.current?.stopAnimation();
+      }}
+      className={cn(
+        "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+        isActive
+          ? "text-sidebar-foreground"
+          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+      )}
+    >
+      <span className="flex items-center gap-3">
+        <section.icon
+          ref={iconRef}
+          className={cn(
+            "h-4 w-4 transition-colors",
+            isActive && "text-sidebar-primary"
+          )}
+        />
+        {section.label}
+      </span>
+      <AnimatedChevronDown
+        ref={chevronRef}
+        className={cn(
+          "h-4 w-4 transition-transform duration-200",
+          isExpanded && "rotate-180"
+        )}
+      />
+    </button>
+  );
+}
+
+function NavItemLink({
+  item,
+  isActive,
+}: {
+  item: NavItem;
+  isActive: boolean;
+}) {
+  const iconRef = useRef<AnimatedIconHandle>(null);
+
+  return (
+    <Link
+      href={item.href}
+      onMouseEnter={() => iconRef.current?.startAnimation()}
+      onMouseLeave={() => iconRef.current?.stopAnimation()}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200",
+        isActive
+          ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+      )}
+    >
+      <item.icon ref={iconRef} className="h-4 w-4" />
+      {item.label}
+    </Link>
+  );
+}
+
+function FooterLink({
+  href,
+  icon: Icon,
+  label,
+  isActive,
+}: {
+  href: string;
+  icon: AnimatedIcon;
+  label: string;
+  isActive: boolean;
+}) {
+  const iconRef = useRef<AnimatedIconHandle>(null);
+
+  return (
+    <Link
+      href={href}
+      onMouseEnter={() => iconRef.current?.startAnimation()}
+      onMouseLeave={() => iconRef.current?.stopAnimation()}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+        isActive
+          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+      )}
+    >
+      <Icon ref={iconRef} className="h-4 w-4" />
+      {label}
+    </Link>
+  );
 }
 
 const navigation: NavSection[] = [
   {
     label: "Dashboards",
-    icon: LayoutDashboard,
+    icon: AnimatedLayoutDashboard,
     items: [
-      { label: "Production", href: "/dashboard", icon: FlaskConical },
-      { label: "Inventory", href: "/dashboard/inventory", icon: Package },
-      { label: "Sales", href: "/dashboard/sales", icon: DollarSign },
+      { label: "Production", href: "/dashboard", icon: AnimatedFlask },
+      { label: "Inventory", href: "/dashboard/inventory", icon: AnimatedPackage },
+      { label: "Sales", href: "/dashboard/sales", icon: AnimatedDollarSign },
     ],
   },
   {
     label: "Production",
-    icon: Beaker,
+    icon: AnimatedFlask,
     items: [
-      { label: "Planning", href: "/production/planning", icon: CalendarClock },
-      { label: "Batches", href: "/production/batches", icon: FlaskConical },
-      { label: "Recipes", href: "/production/recipes", icon: FileText },
-      { label: "Vessels", href: "/production/vessels", icon: Container },
-      { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: ArrowRightLeft },
-      { label: "Brew Logs", href: "/production/brew-logs", icon: ClipboardList },
-      { label: "Yeast Pitches", href: "/production/yeast-pitches", icon: Beaker },
+      { label: "Planning", href: "/production/planning", icon: AnimatedCalendarClock },
+      { label: "Batches", href: "/production/batches", icon: AnimatedBatches },
+      { label: "Recipes", href: "/production/recipes", icon: AnimatedFileText },
+      { label: "Vessels", href: "/production/vessels", icon: AnimatedContainer },
+      { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: AnimatedArrowRightLeft },
+      { label: "Brew Logs", href: "/production/brew-logs", icon: AnimatedClipboardList },
+      { label: "Yeast Pitches", href: "/production/yeast-pitches", icon: AnimatedFlask },
     ],
   },
   {
     label: "Packaging",
-    icon: PackageCheck,
+    icon: AnimatedPackageCheck,
     items: [
-      { label: "Sessions", href: "/production/packaging", icon: Package },
-      { label: "Finished Goods", href: "/inventory/finished-goods", icon: BoxesIcon },
+      { label: "Sessions", href: "/production/packaging", icon: AnimatedPackage },
     ],
   },
   {
     label: "Inventory",
-    icon: Warehouse,
+    icon: AnimatedWarehouse,
     items: [
-      { label: "Items", href: "/inventory/items", icon: BoxesIcon },
+      { label: "Raw Materials", href: "/inventory/items", icon: AnimatedUpload },
+      { label: "Finished Goods", href: "/inventory/finished-goods", icon: AnimatedDownload },
     ],
   },
   {
     label: "Purchasing",
-    icon: Truck,
+    icon: AnimatedTruck,
     items: [
-      { label: "Ingredient Demand", href: "/purchasing/demand", icon: TrendingUp },
-      { label: "Suppliers", href: "/purchasing/suppliers", icon: Building2 },
-      { label: "Purchase Orders", href: "/purchasing/pos", icon: ShoppingCart },
+      { label: "Ingredient Demand", href: "/purchasing/demand", icon: AnimatedTrendingUp },
+      { label: "Suppliers", href: "/purchasing/suppliers", icon: AnimatedBuilding2 },
+      { label: "Purchase Orders", href: "/purchasing/pos", icon: AnimatedShoppingCart },
     ],
   },
   {
     label: "Sales",
-    icon: DollarSign,
+    icon: AnimatedDollarSign,
     items: [
-      { label: "Orders", href: "/sales/orders", icon: FileText },
-      { label: "Pick Lists", href: "/sales/pick-lists", icon: ClipboardList },
-      { label: "Customers", href: "/sales/customers", icon: Users },
+      { label: "Orders", href: "/sales/orders", icon: AnimatedFileText },
+      { label: "Pick Lists", href: "/sales/pick-lists", icon: AnimatedClipboardList },
+      { label: "Customers", href: "/sales/customers", icon: AnimatedUsers },
     ],
   },
   {
     label: "Reports",
-    icon: BarChart3,
+    icon: AnimatedBarChart3,
     items: [
-      { label: "All Reports", href: "/reports", icon: FileText },
-      { label: "TTB Report", href: "/reports/ttb", icon: ClipboardList },
+      { label: "All Reports", href: "/reports", icon: AnimatedFileText },
+      { label: "TTB Report", href: "/reports/ttb", icon: AnimatedClipboardList },
     ],
   },
 ];
@@ -153,48 +268,23 @@ export function AppSidebar() {
 
           return (
             <div key={section.label} className="mt-3 first:mt-0">
-              <button
-                onClick={() => toggleSection(section.label)}
-                className={cn(
-                  "flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
-                  isActive
-                    ? "text-sidebar-foreground"
-                    : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                )}
-              >
-                <span className="flex items-center gap-3">
-                  <section.icon className={cn(
-                    "h-4 w-4 transition-colors",
-                    isActive && "text-sidebar-primary"
-                  )} />
-                  {section.label}
-                </span>
-                <ChevronDown
-                  className={cn(
-                    "h-4 w-4 transition-transform duration-200",
-                    isExpanded && "rotate-180"
-                  )}
-                />
-              </button>
+              <NavSectionHeader
+                section={section}
+                isActive={isActive}
+                isExpanded={isExpanded}
+                onToggle={() => toggleSection(section.label)}
+              />
 
               {isExpanded && (
                 <div className="mt-1 ml-3 pl-4 border-l border-sidebar-border/50 space-y-0.5">
                   {section.items.map((item) => {
                     const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
                     return (
-                      <Link
+                      <NavItemLink
                         key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200",
-                          isItemActive
-                            ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
-                            : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                        )}
-                      >
-                        <item.icon className="h-4 w-4" />
-                        {item.label}
-                      </Link>
+                        item={item}
+                        isActive={isItemActive}
+                      />
                     );
                   })}
                 </div>
@@ -206,30 +296,18 @@ export function AppSidebar() {
 
       {/* Footer links */}
       <div className="px-3 py-4 border-t border-sidebar-border space-y-0.5">
-        <Link
+        <FooterLink
           href="/help"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
-            pathname.startsWith("/help")
-              ? "bg-sidebar-primary text-sidebar-primary-foreground"
-              : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-          )}
-        >
-          <HelpCircle className="h-4 w-4" />
-          Help
-        </Link>
-        <Link
+          icon={AnimatedHelpCircle}
+          label="Help"
+          isActive={pathname.startsWith("/help")}
+        />
+        <FooterLink
           href="/settings"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
-            pathname.startsWith("/settings")
-              ? "bg-sidebar-primary text-sidebar-primary-foreground"
-              : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-          )}
-        >
-          <Settings className="h-4 w-4" />
-          Settings
-        </Link>
+          icon={AnimatedSettings}
+          label="Settings"
+          isActive={pathname.startsWith("/settings")}
+        />
       </div>
     </aside>
   );

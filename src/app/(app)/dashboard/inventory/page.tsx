@@ -12,10 +12,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys } from "@/lib/query-keys";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { InventoryAlerts } from "@/components/domain/inventory-alerts";
+import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
+import type { StatItem } from "@/components/dashboard";
+import { StatusBadge } from "@/components/universal/status-badge";
 
 // =============================================================================
 // Types
@@ -47,15 +48,26 @@ interface InventorySummary {
 }
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+const MAX_ITEMS_SHOWN = 8;
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 
-function formatDaysUntilExpiry(days: number): { text: string; variant: "destructive" | "warning" | "default" } {
-  if (days < 0) return { text: "Expired", variant: "destructive" };
-  if (days === 0) return { text: "Expires today", variant: "destructive" };
-  if (days <= 7) return { text: `${days}d`, variant: "destructive" };
-  if (days <= 30) return { text: `${days}d`, variant: "warning" };
-  return { text: `${days}d`, variant: "default" };
+function getExpiryVariant(days: number): "default" | "warning" | "error" {
+  if (days < 0) return "error";
+  if (days <= 7) return "error";
+  if (days <= 30) return "warning";
+  return "default";
+}
+
+function getExpiryText(days: number): string {
+  if (days < 0) return "Expired";
+  if (days === 0) return "Today";
+  return `${days}d`;
 }
 
 // =============================================================================
@@ -66,11 +78,9 @@ export default function InventoryDashboardPage() {
   const supabase = createClient();
 
   // Fetch low stock items
-  // Note: This requires aggregating from inventory_lots since inventory_items is a catalog
   const { data: lowStockItems = [] } = useQuery({
     queryKey: dashboardKeys.lowStock(),
     queryFn: async () => {
-      // Get items with reorder points
       const { data: items, error: itemsError } = await supabase
         .from("inventory_items")
         .select("id, name, category, reorder_point, unit")
@@ -79,21 +89,18 @@ export default function InventoryDashboardPage() {
 
       if (itemsError) throw itemsError;
 
-      // Get total quantities from inventory_lots
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
       const { data: lotsData } = await db
         .from("inventory_lots_with_quantities")
         .select("item_id, remaining_quantity");
 
-      // Aggregate by item_id
       const quantityByItem = new Map<string, number>();
       (lotsData || []).forEach((lot: { item_id: string; remaining_quantity: number }) => {
         const current = quantityByItem.get(lot.item_id) || 0;
         quantityByItem.set(lot.item_id, current + (lot.remaining_quantity || 0));
       });
 
-      // Filter items below reorder point
       return (items || [])
         .filter((item) => {
           const currentQty = quantityByItem.get(item.id) || 0;
@@ -108,7 +115,7 @@ export default function InventoryDashboardPage() {
           unit: item.unit || "units",
         })) as LowStockItem[];
     },
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: 60000,
   });
 
   // Fetch expiring lots (lots expiring within 90 days)
@@ -174,14 +181,12 @@ export default function InventoryDashboardPage() {
 
       if (itemsError) throw itemsError;
 
-      // Get lot values: quantity * unit_cost
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
       const { data: lotsData } = await db
         .from("inventory_lots")
         .select("inventory_item_id, quantity, unit_cost");
 
-      // Build value map by item_id
       const valueByItem = new Map<string, number>();
       (lotsData || []).forEach((lot: { inventory_item_id: string; quantity: number; unit_cost: number | null }) => {
         if (lot.unit_cost != null && lot.quantity > 0) {
@@ -190,7 +195,6 @@ export default function InventoryDashboardPage() {
         }
       });
 
-      // Group by category
       const categoryMap = new Map<string, { count: number; value: number }>();
       (items || []).forEach((item) => {
         const category = item.category || "other";
@@ -214,173 +218,119 @@ export default function InventoryDashboardPage() {
   const expiringCount = expiringLots.filter((lot) => lot.days_until_expiry <= 30).length;
   const totalItems = inventorySummary.reduce((sum, cat) => sum + cat.item_count, 0);
 
+  // Build stats for the strip
+  const primaryStats: StatItem[] = [
+    {
+      value: lowStockCount,
+      label: "low stock",
+      variant: lowStockCount > 0 ? "warning" : "default",
+    },
+    {
+      value: expiringCount,
+      label: "expiring soon",
+      variant: expiringCount > 0 ? "warning" : "default",
+    },
+    { value: totalItems, label: "total items" },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <h1 className="text-2xl font-bold">Inventory Dashboard</h1>
-
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{lowStockCount}</div>
-            <p className="text-xs text-muted-foreground">
-              items below reorder point
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{expiringCount}</div>
-            <p className="text-xs text-muted-foreground">
-              lots expiring within 30 days
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalItems}</div>
-            <p className="text-xs text-muted-foreground">
-              inventory items tracked
-            </p>
-          </CardContent>
-        </Card>
+      {/* Header with Stats Strip */}
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between">
+          <h1 className="text-2xl font-semibold">Inventory Dashboard</h1>
+          <Link
+            href="/inventory/items"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            View All Items
+          </Link>
+        </div>
+        <StatsStrip stats={primaryStats} />
       </div>
 
+      {/* Two-Column Layout */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Low Stock Items */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Low Stock Items</CardTitle>
-                <CardDescription>Items below reorder point</CardDescription>
-              </div>
-              <Link
-                href="/inventory/items"
-                className="text-sm text-muted-foreground hover:text-foreground underline"
-              >
-                View All
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {lowStockItems.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <p>All items are stocked</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {lowStockItems.slice(0, 8).map((item) => {
-                  const percentOfReorder = Math.round((item.current_qty / item.reorder_point) * 100);
+        <DashboardSection title="Low Stock Items" viewAllHref="/inventory/items">
+          {lowStockItems.length === 0 ? (
+            <DashboardEmpty message="All items are stocked" />
+          ) : (
+            <div className="divide-y">
+              {lowStockItems.slice(0, MAX_ITEMS_SHOWN).map((item) => {
+                const percentOfReorder = Math.round((item.current_qty / item.reorder_point) * 100);
 
-                  return (
-                    <Link
-                      key={item.id}
-                      href={`/inventory/items/${item.id}`}
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <div>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Reorder at: {item.reorder_point} {item.unit}
-                        </div>
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/inventory/items/${item.id}`}
+                    className="flex items-center justify-between py-2 hover:bg-muted/50 -mx-1 px-1"
+                  >
+                    <div>
+                      <div className="font-medium text-sm">{item.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Reorder: <span className="font-mono">{item.reorder_point}</span> {item.unit}
                       </div>
-                      <div className="text-right">
-                        <div className="font-bold text-amber-600">
-                          {item.current_qty} {item.unit}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {percentOfReorder}% of reorder
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono font-semibold text-amber-600">
+                        {item.current_qty} {item.unit}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({percentOfReorder}%)
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </DashboardSection>
 
         {/* Expiring Lots */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Expiring Lots</CardTitle>
-                <CardDescription>Lots approaching expiration</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {expiringLots.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <p>No lots expiring soon</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {expiringLots.slice(0, 8).map((lot) => {
-                  const expiryInfo = formatDaysUntilExpiry(lot.days_until_expiry);
-
-                  return (
-                    <div
-                      key={lot.id}
-                      className="flex items-center justify-between p-3 rounded-lg border"
-                    >
-                      <div>
-                        <div className="font-medium">{lot.item_name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Lot: {lot.lot_number} • {lot.quantity} {lot.unit}
-                        </div>
-                      </div>
-                      <Badge
-                        variant={expiryInfo.variant === "warning" ? "secondary" : expiryInfo.variant}
-                        className={expiryInfo.variant === "warning" ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : ""}
-                      >
-                        {expiryInfo.text}
-                      </Badge>
+        <DashboardSection title="Expiring Lots">
+          {expiringLots.length === 0 ? (
+            <DashboardEmpty message="No lots expiring soon" />
+          ) : (
+            <div className="divide-y">
+              {expiringLots.slice(0, MAX_ITEMS_SHOWN).map((lot) => (
+                <div
+                  key={lot.id}
+                  className="flex items-center justify-between py-2"
+                >
+                  <div>
+                    <div className="font-medium text-sm">{lot.item_name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Lot: {lot.lot_number} · <span className="font-mono">{lot.quantity}</span> {lot.unit}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  </div>
+                  <StatusBadge
+                    status={getExpiryText(lot.days_until_expiry)}
+                    variant={getExpiryVariant(lot.days_until_expiry)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </DashboardSection>
       </div>
 
       {/* Inventory by Category */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Inventory by Category</CardTitle>
-          <CardDescription>Item distribution across categories</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            {inventorySummary.map((summary) => (
-              <span key={summary.category} className="text-sm">
-                <span className="font-bold">{summary.item_count}</span>
-                <span className="text-muted-foreground ml-1 capitalize">{summary.category}</span>
-                {summary.total_value > 0 && (
-                  <span className="text-muted-foreground ml-1">
-                    (${summary.total_value.toLocaleString()})
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <DashboardSection title="Inventory by Category">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          {inventorySummary.map((summary) => (
+            <span key={summary.category} className="text-sm">
+              <span className="font-mono font-semibold">{summary.item_count}</span>
+              <span className="text-muted-foreground ml-1 capitalize">{summary.category}</span>
+              {summary.total_value > 0 && (
+                <span className="text-muted-foreground ml-1 font-mono">
+                  (${summary.total_value.toLocaleString()})
+                </span>
+              )}
+            </span>
+          ))}
+        </div>
+      </DashboardSection>
 
       {/* AI-Powered Inventory Overview */}
       <InventoryAlerts autoExpandOnAlerts={false} />
