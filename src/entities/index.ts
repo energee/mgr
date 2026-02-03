@@ -22,6 +22,7 @@ import { packagingSessionEntity } from "./packaging-session";
 import { orderEntity } from "./order";
 import { customerEntity } from "./customer";
 import { inventoryItemEntity } from "./inventory-item";
+import { inventoryLotEntity } from "./inventory-lot";
 import { supplierEntity } from "./supplier";
 import { purchaseOrderEntity } from "./purchase-order";
 import { orderItemEntity } from "./order-item";
@@ -58,6 +59,7 @@ registerEntity(yeastPitchEntity);
 
 // Inventory domain
 registerEntity(inventoryItemEntity);
+registerEntity(inventoryLotEntity);
 registerEntity(finishedGoodEntity);
 registerEntity(packageTypeEntity);
 registerEntity(kegTypeEntity);
@@ -105,6 +107,8 @@ export type { SessionLineItemFormValues } from "./session-line-item";
 export { orderEntity } from "./order";
 export { customerEntity } from "./customer";
 export { inventoryItemEntity } from "./inventory-item";
+export { inventoryLotEntity } from "./inventory-lot";
+export type { InventoryLotFormValues } from "./inventory-lot";
 export { finishedGoodEntity } from "./finished-good";
 export type { FinishedGoodFormValues } from "./finished-good";
 export { supplierEntity } from "./supplier";
