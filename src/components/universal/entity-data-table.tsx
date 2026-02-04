@@ -642,7 +642,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
               {/* Global search */}
               {entity.searchableFields &&
                 entity.searchableFields.length > 0 && (
-                  <div className="relative max-w-sm">
+                  <div className="relative w-full sm:w-auto sm:min-w-[200px] sm:max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
