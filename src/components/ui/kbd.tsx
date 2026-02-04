@@ -9,6 +9,8 @@ function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
         "[&_svg:not([class*='size-'])]:size-3",
         "[[data-slot=tooltip-content]_&]:bg-background/20 [[data-slot=tooltip-content]_&]:text-background dark:[[data-slot=tooltip-content]_&]:bg-background/10",
         "[[data-slot=button]_&]:bg-primary-foreground/20 [[data-slot=button]_&]:text-primary-foreground",
+        "[[data-slot=button][data-variant=ghost]_&]:bg-foreground/10 [[data-slot=button][data-variant=ghost]_&]:text-foreground/50",
+        "[[data-slot=button][data-variant=outline]_&]:bg-foreground/10 [[data-slot=button][data-variant=outline]_&]:text-foreground/50",
         className
       )}
       {...props}
