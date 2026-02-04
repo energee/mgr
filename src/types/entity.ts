@@ -102,6 +102,9 @@ export interface EntityConfig<T = Record<string, unknown>> {
 
   stateMachine?: StateMachineConfig<T>;
 
+  /** Kanban board config. Requires stateMachine. */
+  kanbanConfig?: KanbanConfig<T>;
+
   // ---------------------------------------------------------------------------
   // Value Display (for non-state enum fields)
   // ---------------------------------------------------------------------------
@@ -358,6 +361,27 @@ export interface ValueDisplayConfig {
       color?: "default" | "success" | "warning" | "error" | "info";
     }
   >;
+}
+
+// =============================================================================
+// Kanban Board Types
+// =============================================================================
+
+export interface KanbanCardField<T> {
+  field: keyof T & string;
+  label: string;
+  format?: "date" | "datetime" | "number";
+}
+
+export interface KanbanConfig<T> {
+  /** Field for card title */
+  titleField: keyof T & string;
+  /** Optional field for card subtitle */
+  subtitleField?: keyof T & string;
+  /** Additional fields shown on card (keep to 2-3) */
+  cardFields?: KanbanCardField<T>[];
+  /** States to hide from board (e.g., terminal states) */
+  excludeStates?: string[];
 }
 
 // =============================================================================
