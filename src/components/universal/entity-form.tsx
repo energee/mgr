@@ -432,6 +432,7 @@ export function EntityForm<T = Record<string, unknown>>({
             <Link href={cancelUrl || (isEdit && id ? `${path}/${id}` : path)}>
               <ArrowLeft className="h-4 w-4 mr-1" />
               Cancel
+              <Kbd>Esc</Kbd>
             </Link>
           </Button>
         </div>
