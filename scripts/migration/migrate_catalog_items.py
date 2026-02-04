@@ -13,31 +13,9 @@ Example:
         --output-dir ./sql-output
 """
 import argparse
-import bson
-import gzip
-from hashlib import sha256
 from pathlib import Path
 
-
-def object_id_to_uuid(object_id_str):
-    """Generate deterministic UUID from MongoDB ObjectID"""
-    hash_obj = sha256(f"mgr-migration-{object_id_str}".encode())
-    hash_hex = hash_obj.hexdigest()
-    return f"{hash_hex[0:8]}-{hash_hex[8:12]}-4{hash_hex[13:16]}-8{hash_hex[17:20]}-{hash_hex[20:32]}"
-
-
-def load_collection(backup_dir, name):
-    """Load and decode BSON collection"""
-    with gzip.open(f"{backup_dir}/{name}.bson.gz", 'rb') as f:
-        data = f.read()
-    return bson.decode_all(data)
-
-
-def escape_sql_string(s):
-    """Escape single quotes for SQL"""
-    if s is None:
-        return None
-    return str(s).replace("'", "''")
+from migration_utils import escape_sql_string, load_collection, object_id_to_uuid
 
 
 def main():
@@ -101,13 +79,14 @@ def main():
         protein = malt.get('protein')
 
         # Convert yield percentage to PPG (potential points per gallon)
-        # PPG = extract_percentage * 0.46
+        # 0.46 is the standard conversion factor: PPG = yield% * 46 / 100
+        # e.g. 80% yield → 36.8 PPG (sucrose is 46 PPG at 100% yield)
         extract_pct = malt.get('yieldOnGrind')
         potential_ppg = round(extract_pct * 0.46, 1) if extract_pct else None
 
         bag_weight = malt.get('weight', 55)
         price_per_bag = malt.get('price', 0)
-        cost_per_lb = round(price_per_bag / bag_weight, 2) if price_per_bag and bag_weight else None
+        cost_per_lb = round(price_per_bag / bag_weight, 2) if price_per_bag and bag_weight > 0 else None
 
         malt_sql.append(
             f"  ('{uuid}', '{name}', " +
@@ -139,7 +118,8 @@ def main():
         beta_acid = hop.get('betaAcid')
         total_oil = hop.get('totalOil')
 
-        # Alpha acid ranges (estimate +/- 10%)
+        # Alpha acid ranges: estimate ±10% from the typical value,
+        # since the source data only has a single alpha acid measurement
         alpha_min = round(alpha_acid * 0.9, 1) if alpha_acid else None
         alpha_max = round(alpha_acid * 1.1, 1) if alpha_acid else None
 
