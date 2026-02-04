@@ -176,6 +176,18 @@ export function EntityForm<T = Record<string, unknown>>({
 
   const submitRef = useSubmitShortcut();
 
+  // Esc to cancel / go back
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        router.push(cancelUrl || (isEdit && id ? `${path}/${id}` : path));
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [router, cancelUrl, isEdit, id, path]);
+
   // Conflict dialog for optimistic locking
   const conflictDialog = useConflictDialog();
   // Track the loaded version for optimistic locking
@@ -459,6 +471,7 @@ export function EntityForm<T = Record<string, unknown>>({
           <Button type="button" variant="outline" asChild>
             <Link href={cancelUrl || (isEdit && id ? `${path}/${id}` : path)}>
               Cancel
+              <Kbd>Esc</Kbd>
             </Link>
           </Button>
           <Button ref={submitRef} type="submit" disabled={isSubmitting}>
