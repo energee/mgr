@@ -14,9 +14,10 @@ import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
 import Link from "next/link";
-import { vesselEntity } from "@/entities/vessel";
+import { VESSEL_TYPES } from "@/entities/vessel";
 import { batchEntity } from "@/entities/batch";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { Progress } from "@/components/ui/progress";
 import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 
@@ -45,7 +46,7 @@ interface ActiveBatch {
 interface VesselStatus {
   id: string;
   name: string;
-  type: string;
+  vessel_type: string;
   status: string;
   current_batch_name?: string;
   capacity_bbl: number | null;
@@ -56,7 +57,6 @@ interface VesselStatus {
 // =============================================================================
 
 const MAX_BATCHES_SHOWN = 8;
-const MAX_VESSELS_SHOWN = 10;
 
 // =============================================================================
 // Component
@@ -163,21 +163,22 @@ export default function DashboardPage() {
     refetchInterval: 60000,
   });
 
-  // Calculate vessel utilization
-  // Cast to any[] because query has fallback to vessels table without current_batch_name
+  // Calculate per-type vessel utilization
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vesselArray = vessels as any[];
-  const vesselStats = {
-    total: vesselArray.length,
-    inUse: vesselArray.filter((v) => v.status === "in_use").length,
-    available: vesselArray.filter((v) => v.status === "ready_for_use").length,
-    maintenance: vesselArray.filter((v) =>
-      v.status === "maintenance" || v.status === "dirty" || v.status === "caustic_cleaned"
-    ).length,
-  };
+  const vesselsByType = VESSEL_TYPES
+    .map(({ value, label }) => {
+      const ofType = vesselArray.filter((v) => v.vessel_type === value);
+      if (ofType.length === 0) return null;
+      const inUse = ofType.filter((v) => v.status === "in_use").length;
+      return { type: value, label, total: ofType.length, inUse };
+    })
+    .filter(Boolean) as { type: string; label: string; total: number; inUse: number }[];
 
-  const utilizationPercent = vesselStats.total > 0
-    ? Math.round((vesselStats.inUse / vesselStats.total) * 100)
+  const totalVessels = vesselArray.length;
+  const totalInUse = vesselArray.filter((v) => v.status === "in_use").length;
+  const utilizationPercent = totalVessels > 0
+    ? Math.round((totalInUse / totalVessels) * 100)
     : 0;
 
   const urgentShortfalls = shortfalls.filter((s) => s.is_urgent);
@@ -275,73 +276,28 @@ export default function DashboardPage() {
           className="lg:col-span-2"
         >
           {/* Big utilization percentage */}
-          <div className="mb-4">
+          <div className="mb-5">
             <span className="font-mono text-4xl font-semibold">{utilizationPercent}%</span>
-            <span className="text-muted-foreground ml-2 text-sm">in use</span>
+            <span className="text-muted-foreground ml-2 text-sm">
+              in use ({totalInUse}/{totalVessels})
+            </span>
           </div>
 
-          {/* Segmented Tri-Color Bar */}
-          <div className="mb-4">
-            <div className="h-3 rounded-full overflow-hidden flex bg-muted">
-              {vesselStats.total > 0 && (
-                <>
-                  <div
-                    className="h-full bg-orange-500 transition-all duration-500"
-                    style={{ width: `${(vesselStats.inUse / vesselStats.total) * 100}%` }}
-                    title={`${vesselStats.inUse} in use`}
-                  />
-                  <div
-                    className="h-full bg-emerald-500 transition-all duration-500"
-                    style={{ width: `${(vesselStats.available / vesselStats.total) * 100}%` }}
-                    title={`${vesselStats.available} available`}
-                  />
-                  <div
-                    className="h-full bg-slate-400 transition-all duration-500"
-                    style={{ width: `${(vesselStats.maintenance / vesselStats.total) * 100}%` }}
-                    title={`${vesselStats.maintenance} maintenance`}
-                  />
-                </>
-              )}
-            </div>
-
-            {/* Legend */}
-            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-orange-500" />
-                <span className="font-mono font-medium">{vesselStats.inUse}</span> in use
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="font-mono font-medium">{vesselStats.available}</span> available
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                <span className="font-mono font-medium">{vesselStats.maintenance}</span> other
-              </span>
-            </div>
-          </div>
-
-          {/* Dense Vessel List */}
-          <div className="divide-y max-h-[240px] overflow-y-auto">
-            {vesselArray.slice(0, MAX_VESSELS_SHOWN).map((vessel) => (
-              <Link
-                key={vessel.id}
-                href={`/production/vessels/${vessel.id}`}
-                className="flex items-center justify-between py-2 hover:bg-muted/50 -mx-1 px-1"
-              >
-                <span className="font-medium text-sm">{vessel.name}</span>
-                <div className="flex items-center gap-2">
-                  {vessel.current_batch_name && (
-                    <span className="text-xs text-muted-foreground truncate max-w-[100px]">
-                      {vessel.current_batch_name}
-                    </span>
-                  )}
-                  <StatusBadge
-                    status={vessel.status}
-                    config={vesselEntity.stateMachine?.stateDisplay}
-                  />
+          {/* Per-Type Progress Bars */}
+          <div className="space-y-3">
+            {vesselsByType.map(({ type, label, total, inUse }) => (
+              <div key={type}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium">{label}</span>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {inUse}/{total}
+                  </span>
                 </div>
-              </Link>
+                <Progress
+                  value={total > 0 ? (inUse / total) * 100 : 0}
+                  className="h-[3px]"
+                />
+              </div>
             ))}
           </div>
         </DashboardSection>
