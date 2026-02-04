@@ -633,7 +633,7 @@ function renderFieldInput<T>(
               id={field.name}
               placeholder={field.placeholder || "Search..."}
             />
-            {!field.required && value && (
+            {!field.required && !!value && (
               <button
                 type="button"
                 onClick={() => onChange(null)}

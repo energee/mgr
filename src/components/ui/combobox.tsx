@@ -230,7 +230,7 @@ function ComboboxItem({
       data-slot="combobox-item"
       className={cn(
         "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 text-sm outline-hidden data-disabled:pointer-events-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-50",
-        outset ? "pr-8 pl-2" : "pr-2 pl-8",
+        outset ? "pr-2 pl-8" : "pr-8 pl-2",
         className,
       )}
       {...props}
@@ -238,7 +238,7 @@ function ComboboxItem({
       <ComboboxPrimitive.ItemIndicator
         className={cn(
           "absolute flex size-3.5 items-center justify-center",
-          outset ? "right-2" : "left-2",
+          outset ? "left-2" : "right-2",
         )}
       >
         <Check className="size-4" />
