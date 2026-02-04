@@ -53,6 +53,23 @@ export const DELETE = withAuth(async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Recipe ID required", undefined, 400);
 
+  // Check for associated batches
+  const { count, error: countError } = await supabase
+    .from("batches")
+    .select("id", { count: "exact", head: true })
+    .eq("recipe_id", id);
+
+  if (countError) throw countError;
+
+  if (count && count > 0) {
+    return errorResponse(
+      "CONFLICT",
+      `Cannot delete recipe that is associated with ${count} batch${count === 1 ? "" : "es"}`,
+      undefined,
+      409
+    );
+  }
+
   const { error } = await supabase
     .from("recipes")
     .delete()

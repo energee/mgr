@@ -497,6 +497,13 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "button",
       // Available for all recipes - custom handler needed
     },
+    {
+      name: "delete",
+      label: "Delete Recipe",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+    },
   ],
 
   // ---------------------------------------------------------------------------
