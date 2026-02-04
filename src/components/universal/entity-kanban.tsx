@@ -33,10 +33,9 @@ interface EntityKanbanProps<T = Record<string, unknown>> {
   onTransition: (id: string, toState: string) => Promise<void>;
 }
 
-// Item type that wraps data with a guaranteed string id
-interface KanbanRecord {
-  id: string;
-  [key: string]: unknown;
+// Helper to extract string id from any record
+function getRecordId(item: Record<string, unknown>): string {
+  return String((item as Record<string, unknown>).id ?? "");
 }
 
 // =============================================================================
@@ -73,7 +72,7 @@ function formatCardFieldValue(
 // Card Content Component
 // =============================================================================
 
-function KanbanCardContent<T extends KanbanRecord>({
+function KanbanCardContent<T = Record<string, unknown>>({
   item,
   entity,
   onClick,
@@ -85,9 +84,10 @@ function KanbanCardContent<T extends KanbanRecord>({
   const kanbanConfig = entity.kanbanConfig;
   if (!kanbanConfig) return null;
 
-  const title = item[kanbanConfig.titleField as string];
+  const record = item as Record<string, unknown>;
+  const title = record[kanbanConfig.titleField as string];
   const subtitle = kanbanConfig.subtitleField
-    ? item[kanbanConfig.subtitleField as string]
+    ? record[kanbanConfig.subtitleField as string]
     : null;
   const cardFields = kanbanConfig.cardFields ?? [];
 
@@ -111,7 +111,7 @@ function KanbanCardContent<T extends KanbanRecord>({
               <span>{field.label}</span>
               <span className="font-medium text-foreground/70">
                 {formatCardFieldValue(
-                  item[field.field as string],
+                  record[field.field as string],
                   field.format,
                 )}
               </span>
@@ -127,7 +127,7 @@ function KanbanCardContent<T extends KanbanRecord>({
 // Main Component
 // =============================================================================
 
-function EntityKanban<T extends KanbanRecord>({
+function EntityKanban<T = Record<string, unknown>>({
   entity,
   data,
   basePath,
@@ -161,7 +161,7 @@ function EntityKanban<T extends KanbanRecord>({
 
     // Distribute data into columns
     for (const item of data) {
-      const state = String(item[stateField] ?? "");
+      const state = String((item as Record<string, unknown>)[stateField] ?? "");
       if (columns[state]) {
         columns[state].push(item);
       }
@@ -182,7 +182,7 @@ function EntityKanban<T extends KanbanRecord>({
   const findItemColumn = React.useCallback(
     (itemId: string, cols: Record<string, T[]>): string | null => {
       for (const [colId, items] of Object.entries(cols)) {
-        if (items.some((item) => item.id === itemId)) {
+        if (items.some((item) => getRecordId(item as Record<string, unknown>) === itemId)) {
           return colId;
         }
       }
@@ -285,7 +285,7 @@ function EntityKanban<T extends KanbanRecord>({
       <Kanban
         value={columns}
         onValueChange={handleValueChange}
-        getItemValue={(item: T) => item.id}
+        getItemValue={(item: T) => getRecordId(item as Record<string, unknown>)}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
@@ -322,15 +322,18 @@ function EntityKanban<T extends KanbanRecord>({
                 )}
 
                 {/* Cards */}
-                {items.map((item) => (
-                  <KanbanItem key={item.id} value={item.id} asHandle>
-                    <KanbanCardContent
-                      item={item}
-                      entity={entity}
-                      onClick={() => router.push(`${basePath}/${item.id}`)}
-                    />
-                  </KanbanItem>
-                ))}
+                {items.map((item) => {
+                  const itemId = getRecordId(item as Record<string, unknown>);
+                  return (
+                    <KanbanItem key={itemId} value={itemId} asHandle>
+                      <KanbanCardContent
+                        item={item}
+                        entity={entity}
+                        onClick={() => router.push(`${basePath}/${itemId}`)}
+                      />
+                    </KanbanItem>
+                  );
+                })}
               </KanbanColumn>
             );
           })}
@@ -341,7 +344,7 @@ function EntityKanban<T extends KanbanRecord>({
           {({ value: activeId }) => {
             // Find the item being dragged
             for (const items of Object.values(columns)) {
-              const item = items.find((i) => i.id === String(activeId));
+              const item = items.find((i) => getRecordId(i as Record<string, unknown>) === String(activeId));
               if (item) {
                 return (
                   <KanbanCardContent

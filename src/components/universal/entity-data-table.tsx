@@ -647,8 +647,8 @@ export function EntityDataTable<T = Record<string, unknown>>({
           <LoadingSkeleton columnCount={entity.listColumns.length + 1} />
         ) : viewMode === "board" && entity.kanbanConfig ? (
           <EntityKanban
-            entity={entity as EntityConfig<Record<string, unknown>>}
-            data={(data || []) as Record<string, unknown>[]}
+            entity={entity}
+            data={data || []}
             basePath={path}
             onTransition={handleSingleTransition}
           />
