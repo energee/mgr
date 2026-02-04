@@ -22,21 +22,17 @@ export default function RecipeDetailPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const supabase = createClient();
 
-  // Fetch recipe data for the clone dialog
-  // Note: is_template added via migration 00018 but types not yet regenerated
+  // Fetch recipe name for clone/delete dialogs
   const { data: recipe } = useQuery({
     queryKey: recipeKeys.detail(id),
     queryFn: async () => {
-      // Use raw query to bypass type checking for is_template column
       const { data, error } = await supabase
         .from("recipes")
         .select("name")
         .eq("id", id)
         .single();
       if (error) throw error;
-      // Fetch is_template separately using raw RPC or assume it exists
-      // For now, just return name - RecipeCloneDialog handles templates correctly
-      return { name: data.name, is_template: false };
+      return data;
     },
   });
 
@@ -78,7 +74,6 @@ export default function RecipeDetailPage({
           <RecipeCloneDialog
             recipeId={id}
             recipeName={recipe.name}
-            isTemplate={recipe.is_template || false}
             open={cloneDialogOpen}
             onOpenChange={setCloneDialogOpen}
             onSuccess={handleCloneSuccess}
