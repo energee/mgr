@@ -28,6 +28,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Combobox,
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxTrigger,
+} from "@/components/ui/combobox";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { purchaseOrderKeys, catalogKeys } from "@/lib/query-keys";
@@ -392,22 +401,28 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                     placeholder="Enter item description"
                   />
                 ) : (
-                  <Select
+                  <Combobox
                     value={newItem.catalog_id}
-                    onValueChange={(value) => setNewItem({ ...newItem, catalog_id: value })}
+                    onValueChange={(v) => setNewItem({ ...newItem, catalog_id: v })}
                     disabled={!newItem.catalog_type}
+                    onFilter={(values, search) => {
+                      const term = search.toLowerCase();
+                      return values.filter((v) => catalogItems?.find((ci) => ci.id === v)?.name.toLowerCase().includes(term));
+                    }}
                   >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder={newItem.catalog_type ? "Select item" : "Select type first"} />
-                    </SelectTrigger>
-                    <SelectContent>
+                    <ComboboxAnchor className="h-8">
+                      <ComboboxInput className="h-8" placeholder={newItem.catalog_type ? "Search items..." : "Select type first"} />
+                      <ComboboxTrigger />
+                    </ComboboxAnchor>
+                    <ComboboxContent>
+                      <ComboboxEmpty>No items found</ComboboxEmpty>
                       {catalogItems?.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
+                        <ComboboxItem key={item.id} value={item.id} label={item.name}>
                           {item.name}
-                        </SelectItem>
+                        </ComboboxItem>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </ComboboxContent>
+                  </Combobox>
                 )}
               </TableCell>
               <TableCell>

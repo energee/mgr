@@ -22,12 +22,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Combobox,
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxTrigger,
+} from "@/components/ui/combobox";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sessionLineItemKeys } from "@/lib/query-keys";
@@ -302,42 +304,54 @@ export function SessionLineItemsEditor({
           {showAddRow && (
             <TableRow>
               <TableCell>
-                <Select
+                <Combobox
                   value={newItem.brand_id}
-                  onValueChange={(value) =>
-                    setNewItem({ ...newItem, brand_id: value })
+                  onValueChange={(v) =>
+                    setNewItem({ ...newItem, brand_id: v })
                   }
+                  onFilter={(values, search) => {
+                    const term = search.toLowerCase();
+                    return values.filter((v) => brands?.find((b) => b.id === v)?.name.toLowerCase().includes(term));
+                  }}
                 >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent>
+                  <ComboboxAnchor className="h-8">
+                    <ComboboxInput className="h-8" placeholder="Select brand" />
+                    <ComboboxTrigger />
+                  </ComboboxAnchor>
+                  <ComboboxContent>
+                    <ComboboxEmpty>No brands found</ComboboxEmpty>
                     {brands?.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
+                      <ComboboxItem key={brand.id} value={brand.id} label={brand.name}>
                         {brand.name}
-                      </SelectItem>
+                      </ComboboxItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </ComboboxContent>
+                </Combobox>
               </TableCell>
               <TableCell>
-                <Select
+                <Combobox
                   value={newItem.package_type_id}
-                  onValueChange={(value) =>
-                    setNewItem({ ...newItem, package_type_id: value })
+                  onValueChange={(v) =>
+                    setNewItem({ ...newItem, package_type_id: v })
                   }
+                  onFilter={(values, search) => {
+                    const term = search.toLowerCase();
+                    return values.filter((v) => packageTypes?.find((p) => p.id === v)?.name.toLowerCase().includes(term));
+                  }}
                 >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Select package type" />
-                  </SelectTrigger>
-                  <SelectContent>
+                  <ComboboxAnchor className="h-8">
+                    <ComboboxInput className="h-8" placeholder="Select package type" />
+                    <ComboboxTrigger />
+                  </ComboboxAnchor>
+                  <ComboboxContent>
+                    <ComboboxEmpty>No package types found</ComboboxEmpty>
                     {packageTypes?.map((pt) => (
-                      <SelectItem key={pt.id} value={pt.id}>
+                      <ComboboxItem key={pt.id} value={pt.id} label={pt.name}>
                         {pt.name}
-                      </SelectItem>
+                      </ComboboxItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </ComboboxContent>
+                </Combobox>
               </TableCell>
               <TableCell>
                 <Input
