@@ -42,7 +42,6 @@ export const recipeSchema = z.object({
   // Flags
   use_default_additions: z.boolean().default(true),
   is_active: z.boolean().default(true),
-  is_template: z.boolean().default(false),
   // Status
   status: z.enum(["draft", "spec", "complete"]).default("complete"),
 });
