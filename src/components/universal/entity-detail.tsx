@@ -224,9 +224,10 @@ export function EntityDetail<T = Record<string, unknown>>({
         <div className="space-y-1">
           <Link
             href={backUrl || path}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
           >
             ← Back
+            <Kbd>⌫</Kbd>
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">

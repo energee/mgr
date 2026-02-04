@@ -648,8 +648,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
                       placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
                       value={globalFilter}
                       onChange={(e) => setGlobalFilter(e.target.value)}
-                      className="pl-10 h-8"
+                      className="pl-10 pr-8 h-8"
                     />
+                    {!globalFilter && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Kbd>/</Kbd>
+                      </div>
+                    )}
                   </div>
                 )}
               <DataTableFilterList table={table} />
