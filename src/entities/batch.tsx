@@ -287,6 +287,19 @@ export const batchEntity: EntityConfig<Batch> = {
   stateMachine: batchStateMachine,
 
   // ---------------------------------------------------------------------------
+  // Kanban Board
+  // ---------------------------------------------------------------------------
+  kanbanConfig: {
+    titleField: "batch_number",
+    subtitleField: "name",
+    cardFields: [
+      { field: "planned_start_date", label: "Start", format: "date" },
+      { field: "current_vessel_name", label: "Vessel" },
+    ],
+    excludeStates: ["archived"],
+  },
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
   actions: [

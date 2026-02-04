@@ -234,6 +234,17 @@ export const orderEntity: EntityConfig<Order> = {
   stateMachine: orderStateMachine,
 
   // ---------------------------------------------------------------------------
+  // Kanban Board
+  // ---------------------------------------------------------------------------
+  kanbanConfig: {
+    titleField: "order_number",
+    cardFields: [
+      { field: "order_date", label: "Ordered", format: "date" },
+      { field: "requested_date", label: "Requested", format: "date" },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
   actions: [
