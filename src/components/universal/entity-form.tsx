@@ -466,7 +466,7 @@ export function EntityForm<T = Record<string, unknown>>({
             {isEdit ? "Save Changes" : `Create ${entity.displayName}`}
             <KbdGroup>
               <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-              <Kbd>{isMac ? "Return" : "Enter"}</Kbd>
+              <Kbd>{isMac ? "↵" : "Enter"}</Kbd>
             </KbdGroup>
           </Button>
         </div>

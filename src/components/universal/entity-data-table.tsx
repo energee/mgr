@@ -16,6 +16,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table";
 import {
   useReactTable,
@@ -54,6 +55,7 @@ import { DataTableSortList } from "@/components/data-table/data-table-sort-list"
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
@@ -101,8 +103,38 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
   const path = basePath || `/${entity.domain}/${entity.table}`;
+  const router = useRouter();
 
   const hasBulkActions = !!entity.stateMachine;
+
+  // ---------------------------------------------------------------------------
+  // "n" hotkey for New entity
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!showCreate) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "n" || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // Don't trigger when typing in an input
+      const el = document.activeElement;
+      if (el) {
+        const tag = el.tagName.toLowerCase();
+        if (tag === "input" || tag === "textarea" || tag === "select") return;
+        if ((el as HTMLElement).isContentEditable) return;
+      }
+
+      e.preventDefault();
+      if (onCreateClick) {
+        onCreateClick();
+      } else {
+        router.push(`${path}/new`);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showCreate, onCreateClick, router, path]);
 
   // ---------------------------------------------------------------------------
   // Dynamic filter options
@@ -506,9 +538,15 @@ export function EntityDataTable<T = Record<string, unknown>>({
         {showCreate && (
           <Button asChild={!onCreateClick} onClick={onCreateClick}>
             {onCreateClick ? (
-              `New ${entity.displayName}`
+              <>
+                New {entity.displayName}
+                <Kbd>N</Kbd>
+              </>
             ) : (
-              <Link href={`${path}/new`}>New {entity.displayName}</Link>
+              <Link href={`${path}/new`}>
+                New {entity.displayName}
+                <Kbd>N</Kbd>
+              </Link>
             )}
           </Button>
         )}
