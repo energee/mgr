@@ -13,31 +13,10 @@ Example:
         --output-dir ./sql-output
 """
 import argparse
-import bson
-import gzip
-from hashlib import sha256
+from datetime import datetime
 from pathlib import Path
 
-
-def object_id_to_uuid(object_id_str):
-    """Generate deterministic UUID from MongoDB ObjectID"""
-    hash_obj = sha256(f"mgr-migration-{object_id_str}".encode())
-    hash_hex = hash_obj.hexdigest()
-    return f"{hash_hex[0:8]}-{hash_hex[8:12]}-4{hash_hex[13:16]}-8{hash_hex[17:20]}-{hash_hex[20:32]}"
-
-
-def load_collection(backup_dir, name):
-    """Load and decode BSON collection"""
-    with gzip.open(f"{backup_dir}/{name}.bson.gz", 'rb') as f:
-        data = f.read()
-    return bson.decode_all(data)
-
-
-def escape_sql_string(s):
-    """Escape single quotes for SQL"""
-    if s is None:
-        return None
-    return str(s).replace("'", "''").replace("\n", "\\n").replace("\r", "")
+from migration_utils import escape_sql_string, load_collection, object_id_to_uuid
 
 
 def format_date(date_obj):
@@ -101,7 +80,7 @@ def main():
         if order_date and hasattr(order_date, 'strftime'):
             date_part = order_date.strftime('%Y%m%d')
         else:
-            date_part = '20240101'
+            date_part = f"{datetime.now().year}0101"
         order_number = f"ORD-{date_part}-{idx:03d}"
 
         status = map_order_status(order.get('status', 'draft'))
@@ -185,7 +164,7 @@ def main():
 
         for idx, chunk in enumerate(chunks, 1):
             chunk_copy = chunk.copy()
-            if chunk_copy[-1].endswith(','):
+            if chunk_copy and chunk_copy[-1].endswith(','):
                 chunk_copy[-1] = chunk_copy[-1][:-1]
 
             chunk_sql = header + ",\n".join(chunk_copy) + footer

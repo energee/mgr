@@ -120,19 +120,22 @@ AND customer_id NOT IN (SELECT id FROM customers);
 
 ## UUID Determinism
 
-UUIDs are generated deterministically using SHA256:
+UUIDs are generated deterministically using Python's `uuid.uuid5()` (RFC 4122 compliant, SHA-1 based) with a fixed migration namespace:
 
 ```python
-def object_id_to_uuid(object_id_str):
-    hash_obj = sha256(f"mgr-migration-{object_id_str}".encode())
-    hash_hex = hash_obj.hexdigest()
-    return f"{hash_hex[0:8]}-{hash_hex[8:12]}-4{hash_hex[13:16]}-8{hash_hex[17:20]}-{hash_hex[20:32]}"
+import uuid
+
+MIGRATION_NAMESPACE = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+
+def object_id_to_uuid(object_id_str: str) -> str:
+    return str(uuid.uuid5(MIGRATION_NAMESPACE, object_id_str))
 ```
 
 **Benefits:**
 - Same MongoDB ObjectID → same UUID every time
 - Re-running migrations is idempotent
 - Cross-references are consistent
+- RFC 4122 compliant UUID v5 format
 
 ## Future Migrations
 
