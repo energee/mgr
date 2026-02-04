@@ -34,6 +34,7 @@ Sales orders.
 | requested_date | DATE | Requested delivery date |
 | scheduled_date | DATE | Scheduled delivery date |
 | fulfilled_date | DATE | Actual fulfillment date |
+| delivery_id | UUID | FK to deliveries (nullable) |
 | shipping_address | JSONB | Shipping address |
 | notes | TEXT | Notes |
 | created_at | TIMESTAMPTZ | Created timestamp |

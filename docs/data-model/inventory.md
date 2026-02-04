@@ -241,6 +241,57 @@ Finished goods quantities per bin.
 
 ---
 
+## `bin_inventory_items`
+
+Raw material (inventory lot) quantities per bin. Mirrors `bin_inventory` for finished goods.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| inventory_lot_id | UUID | FK to inventory_lots |
+| bin_id | UUID | FK to bins |
+| quantity | NUMERIC | Current quantity in bin (must be >= 0) |
+| version | INTEGER | Optimistic locking version |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Unique constraint:** (inventory_lot_id, bin_id)
+
+---
+
+## `deliveries`
+
+Groups location transfers and order fulfillments into a single delivery run.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| delivery_number | TEXT | Auto-generated: DEL-YYYYMMDD-NNN |
+| status | TEXT | Status: planned, in_transit, completed, cancelled |
+| scheduled_date | DATE | Scheduled delivery date |
+| ship_date | TIMESTAMPTZ | Actual ship timestamp |
+| receive_date | TIMESTAMPTZ | Actual receive timestamp |
+| driver_name | TEXT | Driver name |
+| vehicle | TEXT | Vehicle identifier |
+| notes | TEXT | Notes |
+| created_by | UUID | FK to auth.users |
+| updated_by | UUID | FK to auth.users |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Auto-number trigger:** When `delivery_number` is null/empty on insert, generates `DEL-YYYYMMDD-NNN` based on scheduled_date (or current date).
+
+### State Machine: Delivery
+
+```
+planned -> in_transit -> completed
+    |           |
+    v           v
+cancelled   cancelled
+```
+
+---
+
 ## `location_transfers`
 
 Transfers of finished goods between locations/bins.
@@ -255,6 +306,7 @@ Transfers of finished goods between locations/bins.
 | receive_date | DATE | Receive date |
 | shipped_by | UUID | FK to auth.users |
 | received_by | UUID | FK to auth.users |
+| delivery_id | UUID | FK to deliveries (nullable) |
 | notes | TEXT | Notes |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
@@ -263,15 +315,18 @@ Transfers of finished goods between locations/bins.
 
 ## `transfer_lines`
 
-Line items for location transfers.
+Line items for location transfers. Supports both finished goods and raw materials (exactly one must be set).
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
 | transfer_id | UUID | FK to location_transfers |
-| finished_good_id | UUID | FK to finished_goods |
+| finished_good_id | UUID | FK to finished_goods (nullable) |
+| inventory_lot_id | UUID | FK to inventory_lots (nullable) |
 | quantity | INTEGER | Quantity transferred |
 | created_at | TIMESTAMPTZ | Created timestamp |
+
+**Constraint:** Exactly one of `finished_good_id` or `inventory_lot_id` must be set (XOR).
 
 ---
 
@@ -521,6 +576,63 @@ TTB reports use calendar months. For allocations that span month boundaries:
 
 ---
 
+## Views
+
+### `bin_contents`
+
+Unified view of all items (FG and raw materials) stored in bins.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| bin_id | UUID | FK to bins |
+| item_type | TEXT | `finished_good` or `raw_material` |
+| item_id | UUID | ID of the FG or inventory lot |
+| item_name | TEXT | Brand name (FG) or item name (raw material) |
+| package_name | TEXT | Package type name (FG only, NULL for raw materials) |
+| lot_number | TEXT | Lot number |
+| quantity | NUMERIC | Quantity in bin |
+| item_date | DATE | Production date (FG) or received date (raw material) |
+
+### `bins_with_summary`
+
+Bins with location info and item counts.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| *(all bins columns)* | | |
+| location_name | TEXT | Location name |
+| location_type | TEXT | Location type |
+| fg_item_count | INTEGER | Number of FG line items in bin |
+| rm_item_count | INTEGER | Number of raw material line items in bin |
+| total_item_count | INTEGER | Total item count |
+
+### `location_transfers_with_details`
+
+Location transfers with resolved bin/location names.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| *(all location_transfers columns)* | | |
+| from_bin_name | TEXT | Source bin name |
+| from_location_name | TEXT | Source location name |
+| to_bin_name | TEXT | Destination bin name |
+| to_location_name | TEXT | Destination location name |
+| delivery_number | TEXT | Delivery number (if assigned) |
+| lines_count | INTEGER | Number of transfer lines |
+
+### `deliveries_with_summary`
+
+Deliveries with stop counts.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| *(all deliveries columns)* | | |
+| transfer_count | INTEGER | Number of associated transfers |
+| order_count | INTEGER | Number of associated orders |
+| total_stops | INTEGER | Total stops (transfers + orders) |
+
+---
+
 ## Indexes
 
 Performance indexes for inventory domain tables (critical for allocation calculations):
@@ -549,4 +661,16 @@ CREATE INDEX idx_bins_location ON bins(location_id, is_active);
 CREATE INDEX idx_location_transfers_status ON location_transfers(status, transfer_date);
 CREATE INDEX idx_location_transfers_from ON location_transfers(from_location_id, transfer_date);
 CREATE INDEX idx_location_transfers_to ON location_transfers(to_location_id, transfer_date);
+CREATE INDEX idx_location_transfers_delivery ON location_transfers(delivery_id);
+
+-- Bin inventory items (raw materials)
+CREATE INDEX idx_bin_inventory_items_lot ON bin_inventory_items(inventory_lot_id);
+CREATE INDEX idx_bin_inventory_items_bin ON bin_inventory_items(bin_id);
+
+-- Deliveries
+CREATE INDEX idx_deliveries_status ON deliveries(status);
+CREATE INDEX idx_deliveries_scheduled ON deliveries(scheduled_date);
+
+-- Transfer lines (raw material support)
+CREATE INDEX idx_transfer_lines_lot ON transfer_lines(inventory_lot_id);
 ```

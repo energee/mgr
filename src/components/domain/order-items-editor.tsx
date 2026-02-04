@@ -12,7 +12,7 @@
  * - Manual price override with indication
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { orderKeys } from "@/lib/query-keys";
+import { orderKeys, finishedGoodKeys } from "@/lib/query-keys";
 import { useBrands, usePackageTypes } from "@/hooks/use-catalog";
 
 // =============================================================================
@@ -80,6 +80,88 @@ interface TierPriceResult {
   tier_name: string;
   is_brand_specific: boolean;
   is_style_specific: boolean;
+}
+
+// =============================================================================
+// Inventory Awareness Hooks
+// =============================================================================
+
+function useBrandAvailability() {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: finishedGoodKeys.brandAvailability(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("finished_goods_with_availability")
+        .select("brand_id, package_type_id, available_quantity")
+        .gt("available_quantity", 0);
+      if (error) throw error;
+      const byBrand: Record<string, number> = {};
+      const byBrandPackage: Record<string, number> = {};
+      for (const row of data ?? []) {
+        if (row.brand_id) {
+          byBrand[row.brand_id] = (byBrand[row.brand_id] ?? 0) + (row.available_quantity ?? 0);
+        }
+        if (row.brand_id && row.package_type_id) {
+          const key = `${row.brand_id}:${row.package_type_id}`;
+          byBrandPackage[key] = (byBrandPackage[key] ?? 0) + (row.available_quantity ?? 0);
+        }
+      }
+      return { byBrand, byBrandPackage };
+    },
+  });
+}
+
+function useAvailability(brandId: string | null, packageTypeId: string | null) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: finishedGoodKeys.availability(brandId ?? "", packageTypeId ?? ""),
+    queryFn: async () => {
+      if (!brandId || !packageTypeId) return [];
+      const { data, error } = await supabase
+        .from("finished_goods_with_availability")
+        .select("id, lot_number, production_date, quantity, available_quantity")
+        .eq("brand_id", brandId)
+        .eq("package_type_id", packageTypeId)
+        .gt("available_quantity", 0)
+        .order("production_date", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!brandId && !!packageTypeId,
+  });
+}
+
+// =============================================================================
+// Availability Panel
+// =============================================================================
+
+function AvailabilityPanel({ brandId, packageTypeId }: { brandId: string | null; packageTypeId: string | null }) {
+  const { data: fgItems, isLoading } = useAvailability(brandId, packageTypeId);
+
+  if (!brandId || !packageTypeId) return null;
+  if (isLoading) return <div className="text-sm text-muted-foreground p-2"><Loader2 className="h-3 w-3 animate-spin inline mr-1" />Checking inventory...</div>;
+  if (!fgItems || fgItems.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground p-2 border rounded bg-muted/50">
+        No inventory — will need production
+      </div>
+    );
+  }
+
+  const totalAvailable = fgItems.reduce((sum, fg) => sum + (fg.available_quantity ?? 0), 0);
+
+  return (
+    <div className="text-sm border rounded p-2 space-y-1 bg-muted/30">
+      <div className="font-medium">{totalAvailable} available across {fgItems.length} lot{fgItems.length !== 1 ? "s" : ""}</div>
+      {fgItems.map((fg) => (
+        <div key={fg.id} className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{fg.lot_number} ({fg.production_date})</span>
+          <span>{fg.available_quantity} avail</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // =============================================================================
@@ -192,6 +274,27 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   // Fetch brands and package types for dropdowns
   const { data: brands } = useBrands();
   const { data: packageTypes } = usePackageTypes();
+
+  // Inventory availability
+  const { data: availability } = useBrandAvailability();
+
+  const sortedBrands = useMemo(() => {
+    if (!brands || !availability) return brands ?? [];
+    return [...brands].sort((a, b) => {
+      const aAvail = availability.byBrand[a.id] ?? 0;
+      const bAvail = availability.byBrand[b.id] ?? 0;
+      if (aAvail > 0 && bAvail === 0) return -1;
+      if (aAvail === 0 && bAvail > 0) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [brands, availability]);
+
+  // Availability for new item row
+  const { data: newItemFGs } = useAvailability(
+    newItem.brand_id || null,
+    newItem.package_type_id || null,
+  );
+  const newItemTotalAvailable = newItemFGs?.reduce((sum, fg) => sum + (fg.available_quantity ?? 0), 0);
 
   // Add item mutation
   const addItem = useMutation({
@@ -348,9 +451,15 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                     </ComboboxAnchor>
                     <ComboboxContent>
                       <ComboboxEmpty>No brands found</ComboboxEmpty>
-                      {brands?.map((b) => (
+                      {sortedBrands.map((b) => (
                         <ComboboxItem key={b.id} value={b.id} label={b.name}>
-                          {b.name}
+                          <span className="flex items-center gap-2">
+                            {b.name}
+                            {availability?.byBrand[b.id]
+                              ? <Badge variant="secondary" className="text-xs">{availability.byBrand[b.id]} avail</Badge>
+                              : <span className="text-xs text-muted-foreground">no stock</span>
+                            }
+                          </span>
                         </ComboboxItem>
                       ))}
                     </ComboboxContent>
@@ -379,7 +488,13 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       <ComboboxEmpty>No packages found</ComboboxEmpty>
                       {packageTypes?.map((p) => (
                         <ComboboxItem key={p.id} value={p.id} label={p.name}>
-                          {p.name}
+                          <span className="flex items-center gap-2">
+                            {p.name}
+                            {item.brand_id && availability?.byBrandPackage[`${item.brand_id}:${p.id}`]
+                              ? <Badge variant="secondary" className="text-xs">{availability.byBrandPackage[`${item.brand_id}:${p.id}`]} avail</Badge>
+                              : item.brand_id ? <span className="text-xs text-muted-foreground">no stock</span> : null
+                            }
+                          </span>
                         </ComboboxItem>
                       ))}
                     </ComboboxContent>
@@ -484,9 +599,15 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   </ComboboxAnchor>
                   <ComboboxContent>
                     <ComboboxEmpty>No brands found</ComboboxEmpty>
-                    {brands?.map((b) => (
+                    {sortedBrands.map((b) => (
                       <ComboboxItem key={b.id} value={b.id} label={b.name}>
-                        {b.name}
+                        <span className="flex items-center gap-2">
+                          {b.name}
+                          {availability?.byBrand[b.id]
+                            ? <Badge variant="secondary" className="text-xs">{availability.byBrand[b.id]} avail</Badge>
+                            : <span className="text-xs text-muted-foreground">no stock</span>
+                          }
+                        </span>
                       </ComboboxItem>
                     ))}
                   </ComboboxContent>
@@ -509,7 +630,13 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                     <ComboboxEmpty>No packages found</ComboboxEmpty>
                     {packageTypes?.map((p) => (
                       <ComboboxItem key={p.id} value={p.id} label={p.name}>
-                        {p.name}
+                        <span className="flex items-center gap-2">
+                          {p.name}
+                          {newItem.brand_id && availability?.byBrandPackage[`${newItem.brand_id}:${p.id}`]
+                            ? <Badge variant="secondary" className="text-xs">{availability.byBrandPackage[`${newItem.brand_id}:${p.id}`]} avail</Badge>
+                            : newItem.brand_id ? <span className="text-xs text-muted-foreground">no stock</span> : null
+                          }
+                        </span>
                       </ComboboxItem>
                     ))}
                   </ComboboxContent>
@@ -525,6 +652,11 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   }
                   className="h-8 w-full"
                 />
+                {newItemTotalAvailable !== undefined && newItem.quantity > newItemTotalAvailable && (
+                  <div className="text-xs text-orange-500 mt-1">
+                    Exceeds available ({newItemTotalAvailable}). Will need production.
+                  </div>
+                )}
               </TableCell>
               <TableCell>
                 <div className="space-y-1">
@@ -585,6 +717,14 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                     )}
                   </Button>
                 </div>
+              </TableCell>
+            </TableRow>
+          )}
+
+          {showAddRow && newItem.brand_id && newItem.package_type_id && (
+            <TableRow>
+              <TableCell colSpan={readOnly ? 5 : 6}>
+                <AvailabilityPanel brandId={newItem.brand_id} packageTypeId={newItem.package_type_id} />
               </TableCell>
             </TableRow>
           )}

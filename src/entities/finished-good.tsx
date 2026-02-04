@@ -11,6 +11,7 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
+import { FGInventorySection } from "@/components/domain/fg-inventory-section";
 
 // Use the view type for availability calculations
 type FinishedGoodView = Database["public"]["Views"]["finished_goods_with_availability"]["Row"];
@@ -114,12 +115,7 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
     {
       id: "inventory",
       title: "Inventory",
-      fields: [
-        { field: "quantity", label: "Total Quantity" },
-        { field: "allocated_quantity", label: "Allocated" },
-        { field: "reserved_quantity", label: "Reserved" },
-        { field: "available_quantity", label: "Available" },
-      ],
+      component: FGInventorySection,
     },
     {
       id: "dates",

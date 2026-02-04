@@ -110,6 +110,9 @@ const navigation: NavSection[] = [
       { label: "Finished Goods", href: "/inventory/finished-goods", icon: AnimatedDownload },
       { label: "Lots", href: "/inventory/lots", icon: AnimatedPackage },
       { label: "Allocations", href: "/inventory/allocations", icon: AnimatedArrowRightLeft },
+      { label: "Bins", href: "/inventory/bins", icon: AnimatedWarehouse },
+      { label: "Transfers", href: "/inventory/transfers", icon: AnimatedArrowRightLeft },
+      { label: "Deliveries", href: "/inventory/deliveries", icon: AnimatedTruck },
     ],
   },
   {
