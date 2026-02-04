@@ -28,12 +28,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Combobox,
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxTrigger,
+} from "@/components/ui/combobox";
 import {
   Tooltip,
   TooltipContent,
@@ -330,46 +332,58 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 {readOnly ? (
                   getBrandName(item.brand_id)
                 ) : (
-                  <Select
+                  <Combobox
                     value={item.brand_id || ""}
-                    onValueChange={(value) =>
-                      updateItem.mutate({ id: item.id, field: "brand_id", value: value || null })
+                    onValueChange={(v) =>
+                      updateItem.mutate({ id: item.id, field: "brand_id", value: v || null })
                     }
+                    onFilter={(values, search) => {
+                      const term = search.toLowerCase();
+                      return values.filter((v) => brands?.find((b) => b.id === v)?.name.toLowerCase().includes(term));
+                    }}
                   >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Select brand" />
-                    </SelectTrigger>
-                    <SelectContent>
+                    <ComboboxAnchor className="h-8">
+                      <ComboboxInput className="h-8" placeholder="Select brand" />
+                      <ComboboxTrigger />
+                    </ComboboxAnchor>
+                    <ComboboxContent>
+                      <ComboboxEmpty>No brands found</ComboboxEmpty>
                       {brands?.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
+                        <ComboboxItem key={b.id} value={b.id} label={b.name}>
                           {b.name}
-                        </SelectItem>
+                        </ComboboxItem>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </ComboboxContent>
+                  </Combobox>
                 )}
               </TableCell>
               <TableCell>
                 {readOnly ? (
                   getPackageName(item.package_type_id)
                 ) : (
-                  <Select
+                  <Combobox
                     value={item.package_type_id || ""}
-                    onValueChange={(value) =>
-                      updateItem.mutate({ id: item.id, field: "package_type_id", value: value || null })
+                    onValueChange={(v) =>
+                      updateItem.mutate({ id: item.id, field: "package_type_id", value: v || null })
                     }
+                    onFilter={(values, search) => {
+                      const term = search.toLowerCase();
+                      return values.filter((v) => packageTypes?.find((p) => p.id === v)?.name.toLowerCase().includes(term));
+                    }}
                   >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Select package" />
-                    </SelectTrigger>
-                    <SelectContent>
+                    <ComboboxAnchor className="h-8">
+                      <ComboboxInput className="h-8" placeholder="Select package" />
+                      <ComboboxTrigger />
+                    </ComboboxAnchor>
+                    <ComboboxContent>
+                      <ComboboxEmpty>No packages found</ComboboxEmpty>
                       {packageTypes?.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
+                        <ComboboxItem key={p.id} value={p.id} label={p.name}>
                           {p.name}
-                        </SelectItem>
+                        </ComboboxItem>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </ComboboxContent>
+                  </Combobox>
                 )}
               </TableCell>
               <TableCell>
@@ -456,38 +470,50 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
           {showAddRow && (
             <TableRow>
               <TableCell>
-                <Select
+                <Combobox
                   value={newItem.brand_id}
-                  onValueChange={(value) => setNewItem({ ...newItem, brand_id: value })}
+                  onValueChange={(v) => setNewItem({ ...newItem, brand_id: v })}
+                  onFilter={(values, search) => {
+                    const term = search.toLowerCase();
+                    return values.filter((v) => brands?.find((b) => b.id === v)?.name.toLowerCase().includes(term));
+                  }}
                 >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent>
+                  <ComboboxAnchor className="h-8">
+                    <ComboboxInput className="h-8" placeholder="Select brand" />
+                    <ComboboxTrigger />
+                  </ComboboxAnchor>
+                  <ComboboxContent>
+                    <ComboboxEmpty>No brands found</ComboboxEmpty>
                     {brands?.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
+                      <ComboboxItem key={b.id} value={b.id} label={b.name}>
                         {b.name}
-                      </SelectItem>
+                      </ComboboxItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </ComboboxContent>
+                </Combobox>
               </TableCell>
               <TableCell>
-                <Select
+                <Combobox
                   value={newItem.package_type_id}
-                  onValueChange={(value) => setNewItem({ ...newItem, package_type_id: value })}
+                  onValueChange={(v) => setNewItem({ ...newItem, package_type_id: v })}
+                  onFilter={(values, search) => {
+                    const term = search.toLowerCase();
+                    return values.filter((v) => packageTypes?.find((p) => p.id === v)?.name.toLowerCase().includes(term));
+                  }}
                 >
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Select package" />
-                  </SelectTrigger>
-                  <SelectContent>
+                  <ComboboxAnchor className="h-8">
+                    <ComboboxInput className="h-8" placeholder="Select package" />
+                    <ComboboxTrigger />
+                  </ComboboxAnchor>
+                  <ComboboxContent>
+                    <ComboboxEmpty>No packages found</ComboboxEmpty>
                     {packageTypes?.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
+                      <ComboboxItem key={p.id} value={p.id} label={p.name}>
                         {p.name}
-                      </SelectItem>
+                      </ComboboxItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </ComboboxContent>
+                </Combobox>
               </TableCell>
               <TableCell>
                 <Input

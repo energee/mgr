@@ -31,13 +31,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Combobox,
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxTrigger,
+} from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { UnitInput } from "@/components/ui/unit-input";
 import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dialog";
 import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 
 // Hook to fetch dynamic options for fields (handles both dynamicOptions and relation types)
 function useDynamicOptions<T>(fields: EntityFieldDef<T>[]) {
@@ -622,32 +631,45 @@ function renderFieldInput<T>(
     }
 
     case "relation": {
-      // Relation fields use dynamicOptions fetched from the related entity
       const options = dynamicOptions || [];
-      // Use _none sentinel for "no selection" since Radix Select reserves empty string
-      const selectValue = value ? String(value) : "_none";
+      // Build a lookup map so onFilter can match search text against labels (not UUIDs)
+      const labelMap = new Map(options.map((o) => [o.value, o.label.toLowerCase()]));
       return (
-        <Select
-          value={selectValue}
-          onValueChange={(v) => onChange(v === "_none" ? null : v)}
+        <Combobox
+          value={value ? String(value) : ""}
+          onValueChange={(v) => onChange(v || null)}
           disabled={disabled}
+          onFilter={(values, search) => {
+            const term = search.toLowerCase();
+            return values.filter((v) => labelMap.get(v)?.includes(term));
+          }}
         >
-          <SelectTrigger id={field.name}>
-            <SelectValue placeholder={field.placeholder || "Select..."} />
-          </SelectTrigger>
-          <SelectContent>
-            {!field.required && (
-              <SelectItem value="_none">
-                <span className="text-muted-foreground">None</span>
-              </SelectItem>
+          <ComboboxAnchor>
+            <ComboboxInput
+              id={field.name}
+              placeholder={field.placeholder || "Search..."}
+            />
+            {!field.required && !!value && (
+              <button
+                type="button"
+                onClick={() => onChange(null)}
+                className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                aria-label="Clear selection"
+              >
+                <X className="size-3.5" />
+              </button>
             )}
+            <ComboboxTrigger />
+          </ComboboxAnchor>
+          <ComboboxContent>
+            <ComboboxEmpty>No results found</ComboboxEmpty>
             {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
+              <ComboboxItem key={option.value} value={option.value} label={option.label}>
                 {option.label}
-              </SelectItem>
+              </ComboboxItem>
             ))}
-          </SelectContent>
-        </Select>
+          </ComboboxContent>
+        </Combobox>
       );
     }
 
