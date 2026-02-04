@@ -616,11 +616,17 @@ function renderFieldInput<T>(
 
     case "relation": {
       const options = dynamicOptions || [];
+      // Build a lookup map so onFilter can match search text against labels (not UUIDs)
+      const labelMap = new Map(options.map((o) => [o.value, o.label.toLowerCase()]));
       return (
         <Combobox
           value={value ? String(value) : ""}
           onValueChange={(v) => onChange(v || null)}
           disabled={disabled}
+          onFilter={(values, search) => {
+            const term = search.toLowerCase();
+            return values.filter((v) => labelMap.get(v)?.includes(term));
+          }}
         >
           <ComboboxAnchor>
             <ComboboxInput
