@@ -1,14 +1,16 @@
 "use client";
 
 import { use } from "react";
-import { EntityForm } from "@/components/universal/entity-form";
-import { recipeEntity } from "@/entities/recipe";
+import { redirect } from "next/navigation";
 
+/**
+ * Edit page now redirects to the recipe builder which handles editing inline.
+ */
 export default function EditRecipePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityForm entity={recipeEntity} id={id} basePath="/production/recipes" />;
+  redirect(`/production/recipes/${id}`);
 }
