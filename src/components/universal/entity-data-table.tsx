@@ -115,16 +115,14 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Table state
   // ---------------------------------------------------------------------------
-  const [sorting, setSorting] = useState<SortingState>(
-    entity.defaultSort
-      ? [
-          {
-            id: entity.defaultSort.column,
-            desc: entity.defaultSort.direction === "desc",
-          },
-        ]
-      : []
+  const defaultSorting: SortingState = useMemo(
+    () =>
+      entity.defaultSort
+        ? [{ id: entity.defaultSort.column, desc: entity.defaultSort.direction === "desc" }]
+        : [],
+    [entity.defaultSort]
   );
+  const [sorting, setSorting] = useState<SortingState>(defaultSorting);
   const [globalFilter, setGlobalFilter] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const debouncedSetSearch = useDebouncedCallback(setDebouncedSearch, 300);
@@ -235,6 +233,9 @@ export function EntityDataTable<T = Record<string, unknown>>({
           filterId: generateId({ length: 8 }),
         })) as ExtendedColumnFilter<T>[]
       );
+      if (defaultFilter.sort) {
+        setSorting([{ id: defaultFilter.sort.column, desc: defaultFilter.sort.direction === "desc" }]);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quickFilters]);
@@ -251,6 +252,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         setUrlFilters(
           urlFilters.filter((f) => !quickColumns.has(f.id as string))
         );
+        setSorting(defaultSorting);
         return;
       }
 
@@ -270,8 +272,15 @@ export function EntityDataTable<T = Record<string, unknown>>({
         filterId: generateId({ length: 8 }),
       }));
       setUrlFilters([...preserved, ...newFilters] as ExtendedColumnFilter<T>[]);
+
+      // Apply sort override if defined, otherwise revert to default
+      if (qf.sort) {
+        setSorting([{ id: qf.sort.column, desc: qf.sort.direction === "desc" }]);
+      } else {
+        setSorting(defaultSorting);
+      }
     },
-    [quickFilters, urlFilters, setUrlFilters]
+    [quickFilters, urlFilters, setUrlFilters, defaultSorting]
   );
 
   // ---------------------------------------------------------------------------

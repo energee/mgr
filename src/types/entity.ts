@@ -181,6 +181,9 @@ export interface QuickFilterDef {
 
   /** Whether this tab is selected by default */
   isDefault?: boolean;
+
+  /** Override default sort when this tab is active */
+  sort?: { column: string; direction: "asc" | "desc" };
 }
 
 export interface EntityFilterDef {
