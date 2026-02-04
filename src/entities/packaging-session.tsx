@@ -15,9 +15,18 @@ import { z } from "zod";
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { StatusBadge } from "@/components/universal/status-badge";
 import { SessionLineItemsDisplay } from "@/components/domain/session-line-items-display";
 
-type PackagingSession = Database["public"]["Tables"]["packaging_sessions"]["Row"];
+type PackagingSessionTable = Database["public"]["Tables"]["packaging_sessions"]["Row"];
+
+// Combined type: base table + computed fields from view
+type PackagingSession = PackagingSessionTable & {
+  line_count: number | null;
+  brands: string | null;
+  total_planned: number | null;
+  total_actual: number | null;
+};
 
 // =============================================================================
 // Zod Schema
@@ -67,6 +76,7 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
   // ---------------------------------------------------------------------------
   name: "packaging_session",
   table: "packaging_sessions",
+  viewTable: "packaging_sessions_with_summary",
   displayName: "Packaging Session",
   displayNamePlural: "Packaging Sessions",
   description: "Track kegging, canning, and bottling runs",
@@ -77,25 +87,43 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
   // ---------------------------------------------------------------------------
   listColumns: [
     {
-      accessorKey: "id",
-      header: "Session ID",
-      sortable: true,
-      render: (value) => String(value).slice(0, 8),
-    },
-    {
       accessorKey: "session_date",
       header: "Date",
       sortable: true,
+      format: "date",
     },
     {
       accessorKey: "status",
       header: "Status",
       sortable: true,
+      render: (value) => (
+        <StatusBadge
+          status={value as string}
+          config={packagingSessionEntity.stateMachine?.stateDisplay}
+        />
+      ),
     },
     {
-      accessorKey: "notes",
-      header: "Notes",
-      render: (value) => value ? String(value).slice(0, 50) + (String(value).length > 50 ? "..." : "") : "—",
+      accessorKey: "brands",
+      header: "Brands",
+      render: (value) => value ? String(value) : "—",
+    },
+    {
+      accessorKey: "total_planned",
+      header: "Planned",
+      sortable: true,
+      render: (value) => (value && Number(value) > 0) ? String(value) : "—",
+    },
+    {
+      accessorKey: "total_actual",
+      header: "Actual",
+      sortable: true,
+      render: (value) => (value && Number(value) > 0) ? String(value) : "—",
+    },
+    {
+      accessorKey: "line_count",
+      header: "Items",
+      sortable: true,
     },
   ],
 
@@ -109,7 +137,7 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
   ],
 
   defaultSort: { column: "session_date", direction: "desc" },
-  searchableFields: ["notes"],
+  searchableFields: ["notes", "brands"],
 
   // ---------------------------------------------------------------------------
   // State Machine

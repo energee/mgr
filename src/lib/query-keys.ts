@@ -450,6 +450,7 @@ export const deliveryKeys = {
 
 export const finishedGoodKeys = {
   all: () => ["finished-goods"] as const,
+  brandAvailability: () => ["finished-goods", "brand-availability"] as const,
   availability: (brandId: string, packageTypeId: string) =>
     ["finished-goods", "availability", brandId, packageTypeId] as const,
   binInventory: (fgId: string) => ["finished-goods", fgId, "bins"] as const,

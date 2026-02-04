@@ -1944,6 +1944,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "keg_transactions_packaging_session_id_fkey"
+            columns: ["packaging_session_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_sessions_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "keg_transactions_to_location_id_fkey"
             columns: ["to_location_id"]
             isOneToOne: false
@@ -3913,6 +3920,13 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "packaging_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_line_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_sessions_with_summary"
             referencedColumns: ["id"]
           },
         ]
@@ -6195,6 +6209,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "keg_transactions_packaging_session_id_fkey"
+            columns: ["packaging_session_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_sessions_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "keg_transactions_to_location_id_fkey"
             columns: ["to_location_id"]
             isOneToOne: false
@@ -6548,6 +6569,22 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      packaging_sessions_with_summary: {
+        Row: {
+          brands: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          line_count: number | null
+          notes: string | null
+          session_date: string | null
+          status: string | null
+          total_actual: number | null
+          total_planned: number | null
+          updated_at: string | null
+        }
+        Relationships: []
       }
       pick_list_details: {
         Row: {
@@ -7328,14 +7365,14 @@ export type Database = {
           },
           {
             foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["parent_strain_id"]
+            columns: ["strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["strain_id"]
+            columns: ["parent_strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
             referencedColumns: ["id"]
@@ -7842,4 +7879,3 @@ export const Constants = {
     },
   },
 } as const
-

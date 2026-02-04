@@ -89,7 +89,7 @@ interface TierPriceResult {
 function useBrandAvailability() {
   const supabase = createClient();
   return useQuery({
-    queryKey: ["finished-goods", "brand-availability"],
+    queryKey: finishedGoodKeys.brandAvailability(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("finished_goods_with_availability")
