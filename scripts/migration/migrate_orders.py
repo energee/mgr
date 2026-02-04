@@ -132,8 +132,8 @@ def main():
 
         # Process order items (products array)
         products = order.get('products', [])
-        for product in products:
-            item_id = object_id_to_uuid(str(product.get('id', order['_id'])))
+        for i, product in enumerate(products):
+            item_id = object_id_to_uuid(str(product.get('id', f"{order['_id']}-{i}")))
 
             # Get brand_id from product reference
             product_ref = product.get('product', {})
@@ -203,7 +203,10 @@ def main():
     print("="*60)
     print(f"\nSQL files created in: {output_dir}")
     print(f"  - orders.sql ({len(order_sql)} records)")
-    print(f"  - order_items_chunk_*.sql ({len(order_items_sql)} total items in {len(chunks)} files)")
+    if order_items_sql:
+        print(f"  - order_items_chunk_*.sql ({len(order_items_sql)} total items in {len(chunks)} files)")
+    else:
+        print("  - order_items: 0 items (no chunks generated)")
 
 
 if __name__ == '__main__':
