@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Copy } from "lucide-react";
 import { toast } from "sonner";
-import { recipeKeys } from "@/lib/query-keys";
+import { entityKeys } from "@/lib/query-keys";
 import { useBrands } from "@/hooks/use-catalog";
 
 // =============================================================================
@@ -129,7 +129,8 @@ export function RecipeCloneDialog({
       return cloned.id;
     },
     onSuccess: (newId) => {
-      queryClient.invalidateQueries({ queryKey: recipeKeys.all() });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("recipes") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("recipes_with_estimates") });
       toast.success("Recipe cloned successfully");
       onOpenChange(false);
       onSuccess?.(newId);
