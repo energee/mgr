@@ -12,6 +12,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { batchEntity } from "@/entities/batch";
 import {
   Table,
   TableBody,
@@ -32,7 +42,7 @@ import {
 } from "@/components/ui/combobox";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { sessionLineItemKeys } from "@/lib/query-keys";
+import { sessionLineItemKeys, packagingKeys } from "@/lib/query-keys";
 import { useBrands, usePackageTypes } from "@/hooks/use-catalog";
 
 // =============================================================================
@@ -47,6 +57,11 @@ interface SessionLineItemRow {
   package_type_name: string;
   planned_quantity: number | null;
   actual_quantity: number | null;
+  source_batches: Array<{
+    batch_id: string;
+    planned_qty: number | null;
+    actual_qty: number | null;
+  }>;
 }
 
 interface SessionLineItemsEditorProps {
@@ -59,16 +74,132 @@ interface NewItemState {
   package_type_id: string;
   planned_quantity: number | null;
   actual_quantity: number | null;
+  batch_id: string;
 }
 
-interface Brand {
+// =============================================================================
+// Batch Selection
+// =============================================================================
+
+interface BatchOption {
   id: string;
+  batch_number: string;
   name: string;
+  status: string;
+  volume_bbl: number | null;
+  current_vessel_name: string | null;
 }
 
-interface PackageType {
-  id: string;
-  name: string;
+const STATUS_SORT_ORDER: Record<string, number> = {
+  conditioning: 1,
+  packaging: 2,
+  fermenting: 3,
+  planned: 4,
+};
+
+const BATCH_STATUS_COLORS: Record<string, string> = {
+  planned: "bg-gray-100 text-gray-700",
+  fermenting: "bg-blue-100 text-blue-700",
+  conditioning: "bg-blue-100 text-blue-700",
+  packaging: "bg-yellow-100 text-yellow-700",
+};
+
+function useBatchesForBrand(brandId: string | null) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: packagingKeys.batchesForBrand(brandId ?? ""),
+    queryFn: async () => {
+      if (!brandId) return [];
+      // Get active batches from the view
+      const { data, error } = await supabase
+        .from("batches_with_brew_info")
+        .select(
+          "id, batch_number, name, status, volume_bbl, current_vessel_name, recipe_id"
+        )
+        .in("status", ["planned", "fermenting", "conditioning", "packaging"]);
+      if (error) throw error;
+
+      // Filter by brand through recipes
+      const recipeIds = [
+        ...new Set((data ?? []).map((b) => b.recipe_id).filter(Boolean)),
+      ];
+      if (recipeIds.length === 0) return [];
+
+      const { data: recipes, error: recipeError } = await supabase
+        .from("recipes")
+        .select("id, brand_id")
+        .in("id", recipeIds)
+        .eq("brand_id", brandId);
+      if (recipeError) throw recipeError;
+
+      const validRecipeIds = new Set((recipes ?? []).map((r) => r.id));
+      return (data ?? [])
+        .filter((b) => b.recipe_id && validRecipeIds.has(b.recipe_id))
+        .sort(
+          (a, b) =>
+            (STATUS_SORT_ORDER[a.status] ?? 99) -
+            (STATUS_SORT_ORDER[b.status] ?? 99)
+        ) as BatchOption[];
+    },
+    enabled: !!brandId,
+  });
+}
+
+function BatchCell({
+  brandId,
+  currentBatchId,
+  onSelect,
+  readOnly,
+}: {
+  brandId: string;
+  currentBatchId: string;
+  onSelect: (batchId: string) => void;
+  readOnly: boolean;
+}) {
+  const { data: batches, isLoading } = useBatchesForBrand(brandId || null);
+
+  if (readOnly) {
+    const batch = batches?.find((b) => b.id === currentBatchId);
+    return <span>{batch?.batch_number ?? "—"}</span>;
+  }
+
+  return (
+    <Select value={currentBatchId} onValueChange={onSelect}>
+      <SelectTrigger className="h-8">
+        <SelectValue placeholder="Select batch" />
+      </SelectTrigger>
+      <SelectContent>
+        {isLoading && (
+          <SelectItem value="_loading" disabled>
+            Loading...
+          </SelectItem>
+        )}
+        {batches?.map((batch) => (
+          <SelectItem key={batch.id} value={batch.id}>
+            <span className="flex items-center gap-2">
+              {batch.batch_number}
+              <Badge
+                variant="outline"
+                className={`text-xs ${BATCH_STATUS_COLORS[batch.status] ?? ""}`}
+              >
+                {batch.status}
+              </Badge>
+              {batch.volume_bbl != null && (
+                <span className="text-xs text-muted-foreground">
+                  {batch.volume_bbl} bbl
+                </span>
+              )}
+            </span>
+          </SelectItem>
+        ))}
+        {!isLoading && (!batches || batches.length === 0) && (
+          <SelectItem value="_none" disabled>
+            No batches available
+          </SelectItem>
+        )}
+      </SelectContent>
+    </Select>
+  );
 }
 
 // =============================================================================
@@ -88,6 +219,7 @@ export function SessionLineItemsEditor({
     package_type_id: "",
     planned_quantity: null,
     actual_quantity: null,
+    batch_id: "",
   });
   const [showAddRow, setShowAddRow] = useState(false);
 
@@ -111,6 +243,12 @@ export function SessionLineItemsEditor({
           (item.package_types as { name: string } | null)?.name || "Unknown",
         planned_quantity: item.planned_quantity,
         actual_quantity: item.actual_quantity,
+        source_batches:
+          (item.source_batches as Array<{
+            batch_id: string;
+            planned_qty: number | null;
+            actual_qty: number | null;
+          }>) ?? [],
       })) as SessionLineItemRow[];
     },
   });
@@ -119,25 +257,42 @@ export function SessionLineItemsEditor({
   const { data: brands } = useBrands();
   const { data: packageTypes } = usePackageTypes();
 
+  // Batch options for new item row
+  const { data: newItemBatches, isLoading: newItemBatchesLoading } =
+    useBatchesForBrand(newItem.brand_id || null);
+
   // Add item mutation
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
+      const sourceBatches = item.batch_id
+        ? [
+            {
+              batch_id: item.batch_id,
+              planned_qty: item.planned_quantity,
+              actual_qty: item.actual_quantity,
+            },
+          ]
+        : [];
       const { error } = await supabase.from("session_line_items").insert({
         session_id: sessionId,
         brand_id: item.brand_id,
         package_type_id: item.package_type_id,
         planned_quantity: item.planned_quantity,
         actual_quantity: item.actual_quantity,
+        source_batches: sourceBatches,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
+      queryClient.invalidateQueries({
+        queryKey: sessionLineItemKeys.all(sessionId),
+      });
       setNewItem({
         brand_id: "",
         package_type_id: "",
         planned_quantity: null,
         actual_quantity: null,
+        batch_id: "",
       });
       setShowAddRow(false);
       toast.success("Line item added");
@@ -165,7 +320,9 @@ export function SessionLineItemsEditor({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
+      queryClient.invalidateQueries({
+        queryKey: sessionLineItemKeys.all(sessionId),
+      });
     },
     onError: () => {
       toast.error("Failed to update line item");
@@ -182,7 +339,9 @@ export function SessionLineItemsEditor({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: sessionLineItemKeys.all(sessionId) });
+      queryClient.invalidateQueries({
+        queryKey: sessionLineItemKeys.all(sessionId),
+      });
       toast.success("Line item removed");
     },
     onError: () => {
@@ -222,7 +381,11 @@ export function SessionLineItemsEditor({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Line Items</h3>
         {!readOnly && !showAddRow && (
-          <Button size="sm" variant="outline" onClick={() => setShowAddRow(true)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowAddRow(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Line Item
           </Button>
@@ -233,6 +396,7 @@ export function SessionLineItemsEditor({
         <TableHeader>
           <TableRow>
             <TableHead>Brand</TableHead>
+            <TableHead>Batch</TableHead>
             <TableHead>Package Type</TableHead>
             <TableHead className="w-[120px]">Planned Qty</TableHead>
             <TableHead className="w-[120px]">Actual Qty</TableHead>
@@ -243,6 +407,26 @@ export function SessionLineItemsEditor({
           {items?.map((item) => (
             <TableRow key={item.id}>
               <TableCell className="font-medium">{item.brand_name}</TableCell>
+              <TableCell>
+                <BatchCell
+                  brandId={item.brand_id}
+                  currentBatchId={item.source_batches?.[0]?.batch_id ?? ""}
+                  onSelect={(batchId) =>
+                    updateItem.mutate({
+                      id: item.id,
+                      field: "source_batches",
+                      value: [
+                        {
+                          batch_id: batchId,
+                          planned_qty: item.planned_quantity,
+                          actual_qty: item.actual_quantity,
+                        },
+                      ],
+                    })
+                  }
+                  readOnly={readOnly}
+                />
+              </TableCell>
               <TableCell>{item.package_type_name}</TableCell>
               <TableCell>
                 {readOnly ? (
@@ -307,7 +491,7 @@ export function SessionLineItemsEditor({
                 <Combobox
                   value={newItem.brand_id}
                   onValueChange={(v) =>
-                    setNewItem({ ...newItem, brand_id: v })
+                    setNewItem({ ...newItem, brand_id: v, batch_id: "" })
                   }
                   onFilter={(values, search) => {
                     const term = search.toLowerCase();
@@ -327,6 +511,47 @@ export function SessionLineItemsEditor({
                     ))}
                   </ComboboxContent>
                 </Combobox>
+              </TableCell>
+              <TableCell>
+                <Select
+                  value={newItem.batch_id}
+                  onValueChange={(value) =>
+                    setNewItem({ ...newItem, batch_id: value })
+                  }
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Select batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {newItemBatchesLoading && (
+                      <SelectItem value="_loading" disabled>
+                        Loading...
+                      </SelectItem>
+                    )}
+                    {newItemBatches?.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        <span className="flex items-center gap-2">
+                          {batch.batch_number}
+                          <StatusBadge
+                            status={batch.status}
+                            config={batchEntity.stateMachine?.stateDisplay}
+                          />
+                          {batch.volume_bbl != null && (
+                            <span className="text-xs text-muted-foreground">
+                              {batch.volume_bbl} bbl
+                            </span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                    {!newItemBatchesLoading &&
+                      (!newItemBatches || newItemBatches.length === 0) && (
+                        <SelectItem value="_none" disabled>
+                          No batches available
+                        </SelectItem>
+                      )}
+                  </SelectContent>
+                </Select>
               </TableCell>
               <TableCell>
                 <Combobox
@@ -408,11 +633,11 @@ export function SessionLineItemsEditor({
           {(!items || items.length === 0) && !showAddRow && (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="text-center text-muted-foreground py-8"
               >
-                No line items yet. Click &quot;Add Line Item&quot; to add products
-                to this packaging session.
+                No line items yet. Click &quot;Add Line Item&quot; to add
+                products to this packaging session.
               </TableCell>
             </TableRow>
           )}
@@ -420,7 +645,7 @@ export function SessionLineItemsEditor({
         {items && items.length > 0 && (
           <TableFooter>
             <TableRow>
-              <TableCell colSpan={2} className="text-right font-medium">
+              <TableCell colSpan={3} className="text-right font-medium">
                 Totals
               </TableCell>
               <TableCell className="font-bold">{totalPlanned}</TableCell>
@@ -433,7 +658,11 @@ export function SessionLineItemsEditor({
 
       {showAddRow && (
         <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setShowAddRow(false)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAddRow(false)}
+          >
             Cancel
           </Button>
         </div>
