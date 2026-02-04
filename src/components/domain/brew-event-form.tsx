@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/time-picker";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -279,10 +280,11 @@ export function BrewEventForm({
                 <FormItem>
                   <FormLabel className="text-base">Time</FormLabel>
                   <FormControl>
-                    <Input
-                      type="time"
-                      className="h-12 text-lg"
-                      {...field}
+                    <TimePicker
+                      value={field.value}
+                      onChange={field.onChange}
+                      minuteStep={1}
+                      className="h-12"
                     />
                   </FormControl>
                   <FormMessage />
