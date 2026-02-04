@@ -1,0 +1,2 @@
+# Migration script dependencies
+pymongo>=4.0.0  # For BSON decoding
