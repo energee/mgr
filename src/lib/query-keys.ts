@@ -64,8 +64,6 @@ export const recipeKeys = {
   cogs: (id: string) => ["recipe-cogs", id] as const,
   fermentationAdditions: (id: string) =>
     ["recipe-fermentation-additions", id] as const,
-  junction: (recipeId: string, tableName: string) =>
-    ["recipe-junction", recipeId, tableName] as const,
 };
 
 // =============================================================================
