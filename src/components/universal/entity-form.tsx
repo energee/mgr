@@ -469,11 +469,13 @@ export function EntityForm<T = Record<string, unknown>>({
 
         {/* Actions */}
         <div className="flex justify-end gap-2 mt-4">
-          <Button type="button" variant="outline" asChild>
-            <Link href={cancelUrl || (isEdit && id ? `${path}/${id}` : path)}>
-              Cancel
-              <Kbd>Esc</Kbd>
-            </Link>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(cancelUrl || (isEdit && id ? `${path}/${id}` : path))}
+          >
+            Cancel
+            <Kbd>Esc</Kbd>
           </Button>
           <Button ref={submitRef} type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
