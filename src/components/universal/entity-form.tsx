@@ -31,13 +31,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Combobox,
+  ComboboxAnchor,
+  ComboboxCancel,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxTrigger,
+} from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { UnitInput } from "@/components/ui/unit-input";
 import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dialog";
 import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 
 // Hook to fetch dynamic options for fields (handles both dynamicOptions and relation types)
 function useDynamicOptions<T>(fields: EntityFieldDef<T>[]) {
@@ -606,32 +616,34 @@ function renderFieldInput<T>(
     }
 
     case "relation": {
-      // Relation fields use dynamicOptions fetched from the related entity
       const options = dynamicOptions || [];
-      // Use _none sentinel for "no selection" since Radix Select reserves empty string
-      const selectValue = value ? String(value) : "_none";
       return (
-        <Select
-          value={selectValue}
-          onValueChange={(v) => onChange(v === "_none" ? null : v)}
+        <Combobox
+          value={value ? String(value) : ""}
+          onValueChange={(v) => onChange(v || null)}
           disabled={disabled}
         >
-          <SelectTrigger id={field.name}>
-            <SelectValue placeholder={field.placeholder || "Select..."} />
-          </SelectTrigger>
-          <SelectContent>
-            {!field.required && (
-              <SelectItem value="_none">
-                <span className="text-muted-foreground">None</span>
-              </SelectItem>
+          <ComboboxAnchor className="h-9 w-full">
+            <ComboboxInput
+              id={field.name}
+              placeholder={field.placeholder || "Search..."}
+            />
+            {!field.required && value && (
+              <ComboboxCancel>
+                <X className="size-4" />
+              </ComboboxCancel>
             )}
+            <ComboboxTrigger />
+          </ComboboxAnchor>
+          <ComboboxContent>
+            <ComboboxEmpty>No results found</ComboboxEmpty>
             {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
+              <ComboboxItem key={option.value} value={option.value} label={option.label}>
                 {option.label}
-              </SelectItem>
+              </ComboboxItem>
             ))}
-          </SelectContent>
-        </Select>
+          </ComboboxContent>
+        </Combobox>
       );
     }
 
