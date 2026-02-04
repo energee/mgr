@@ -57,6 +57,9 @@ export interface EntityConfig<T = Record<string, unknown>> {
   /** Available filters for list view */
   listFilters?: EntityFilterDef[];
 
+  /** Quick filter tabs above the toolbar (presets that set URL filters on click) */
+  quickFilters?: QuickFilterDef[];
+
   /** Default sort configuration */
   defaultSort?: { column: keyof T & string; direction: "asc" | "desc" };
 
@@ -163,6 +166,22 @@ export type EntityColumnDef<T> = Omit<ColumnDef<T, unknown>, "accessorKey"> & {
     displayField: string;
   };
 };
+
+export interface QuickFilterDef {
+  /** Tab label (e.g., "Active", "Completed") */
+  label: string;
+
+  /** Filter presets to apply when this tab is selected */
+  filters: {
+    /** Column id to filter on */
+    column: string;
+    /** Values to filter by */
+    values: string[];
+  }[];
+
+  /** Whether this tab is selected by default */
+  isDefault?: boolean;
+}
 
 export interface EntityFilterDef {
   /** Field to filter on */

@@ -139,6 +139,22 @@ export const batchEntity: EntityConfig<Batch> = {
     },
   ],
 
+  quickFilters: [
+    {
+      label: "Active",
+      filters: [
+        { column: "status", values: ["planned", "fermenting", "conditioning", "packaging"] },
+      ],
+      isDefault: true,
+    },
+    {
+      label: "Completed",
+      filters: [
+        { column: "status", values: ["completed", "cancelled", "archived"] },
+      ],
+    },
+  ],
+
   defaultSort: { column: "planned_start_date", direction: "desc" },
   searchableFields: ["batch_number", "name"],
 

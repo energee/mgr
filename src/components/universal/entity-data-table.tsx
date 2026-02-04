@@ -45,6 +45,7 @@ import {
 } from "@/lib/data-table-adapter";
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
+import { generateId } from "@/lib/id";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableAdvancedToolbar } from "@/components/data-table/data-table-advanced-toolbar";
@@ -54,6 +55,7 @@ import { DataTableSortList } from "@/components/data-table/data-table-sort-list"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -173,7 +175,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
     [columns]
   );
 
-  const [urlFilters] = useQueryState(
+  const [urlFilters, setUrlFilters] = useQueryState(
     "filters",
     getFiltersStateParser<T>(filterableColumnIds).withDefault([])
   );
@@ -187,6 +189,90 @@ export function EntityDataTable<T = Record<string, unknown>>({
   useEffect(() => {
     setRowSelection({});
   }, [urlFilters, debouncedSearch]);
+
+  // ---------------------------------------------------------------------------
+  // Quick filter tabs
+  // ---------------------------------------------------------------------------
+  const quickFilters = entity.quickFilters;
+
+  // Derive active quick filter tab from current URL filters
+  const activeQuickFilter = useMemo(() => {
+    if (!quickFilters) return undefined;
+    return quickFilters.find((qf) =>
+      qf.filters.every((preset) => {
+        const match = urlFilters.find(
+          (f) => f.id === preset.column && f.operator === "inArray"
+        );
+        if (!match) return false;
+        const val = Array.isArray(match.value) ? match.value : [match.value];
+        return (
+          val.length === preset.values.length &&
+          preset.values.every((v) => val.includes(v))
+        );
+      })
+    );
+  }, [quickFilters, urlFilters]);
+
+  const activeTabValue = activeQuickFilter?.label ?? "_all";
+
+  // Apply default quick filter on initial load (when no filters are set)
+  const hasAppliedDefault = useMemo(() => ({ current: false }), []);
+  useEffect(() => {
+    if (!quickFilters || hasAppliedDefault.current) return;
+    hasAppliedDefault.current = true;
+
+    // Only apply default if no URL filters exist at all
+    if (urlFilters.length > 0) return;
+
+    const defaultFilter = quickFilters.find((qf) => qf.isDefault);
+    if (defaultFilter) {
+      setUrlFilters(
+        defaultFilter.filters.map((preset) => ({
+          id: preset.column,
+          value: preset.values,
+          variant: "multiSelect",
+          operator: "inArray",
+          filterId: generateId({ length: 8 }),
+        })) as ExtendedColumnFilter<T>[]
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickFilters]);
+
+  const handleQuickFilterChange = useCallback(
+    (tabValue: string) => {
+      if (!quickFilters) return;
+
+      // "All" tab — remove quick filter columns from URL filters
+      if (tabValue === "_all") {
+        const quickColumns = new Set(
+          quickFilters.flatMap((qf) => qf.filters.map((f) => f.column))
+        );
+        setUrlFilters(
+          urlFilters.filter((f) => !quickColumns.has(f.id as string))
+        );
+        return;
+      }
+
+      const qf = quickFilters.find((q) => q.label === tabValue);
+      if (!qf) return;
+
+      // Remove existing filters for quick filter columns, then add presets
+      const quickColumns = new Set(qf.filters.map((f) => f.column));
+      const preserved = urlFilters.filter(
+        (f) => !quickColumns.has(f.id as string)
+      );
+      const newFilters = qf.filters.map((preset) => ({
+        id: preset.column,
+        value: preset.values,
+        variant: "multiSelect",
+        operator: "inArray",
+        filterId: generateId({ length: 8 }),
+      }));
+      setUrlFilters([...preserved, ...newFilters] as ExtendedColumnFilter<T>[]);
+    },
+    [quickFilters, urlFilters, setUrlFilters]
+  );
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -418,6 +504,23 @@ export function EntityDataTable<T = Record<string, unknown>>({
           </Button>
         )}
       </div>
+
+      {/* Quick Filter Tabs */}
+      {quickFilters && quickFilters.length > 0 && (
+        <Tabs
+          value={activeTabValue}
+          onValueChange={handleQuickFilterChange}
+        >
+          <TabsList>
+            {quickFilters.map((qf) => (
+              <TabsTrigger key={qf.label} value={qf.label}>
+                {qf.label}
+              </TabsTrigger>
+            ))}
+            <TabsTrigger value="_all">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
 
       {/* Data Table */}
       <div
