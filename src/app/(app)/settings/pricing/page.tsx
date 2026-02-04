@@ -14,7 +14,7 @@ import { settingsKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, DollarSign, Layers, Plus } from "lucide-react";
+import { DollarSign, Layers, Plus } from "lucide-react";
 
 export default function PricingPage() {
   const supabase = createClient();
@@ -41,22 +41,11 @@ export default function PricingPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/settings">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <DollarSign className="h-6 w-6" />
-            Pricing
-          </h1>
-          <p className="text-muted-foreground">
-            Manage price tiers and format pricing
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">Pricing</h1>
+        <p className="text-muted-foreground">
+          Manage price tiers and format pricing
+        </p>
       </div>
 
       {/* Stats Cards */}

@@ -10,5 +10,5 @@ export default function EditEnumValuePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityForm entity={enumValueEntity} id={id} basePath="/settings/enums" />;
+  return <EntityForm entity={enumValueEntity} id={id} basePath="/settings/status-options" />;
 }

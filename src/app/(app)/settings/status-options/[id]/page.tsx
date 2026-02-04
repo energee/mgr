@@ -10,5 +10,5 @@ export default function EnumValueDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetail entity={enumValueEntity} id={id} basePath="/settings/enums" />;
+  return <EntityDetail entity={enumValueEntity} id={id} basePath="/settings/status-options" />;
 }

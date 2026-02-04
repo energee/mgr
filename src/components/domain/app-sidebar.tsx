@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useContext, useRef } from "react";
+import { useContext, useRef, useState } from "react";
 import { Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -244,6 +244,12 @@ function AnimatedSectionHeader({
 export function AppSidebar() {
   const pathname = usePathname();
   const { openHelp } = useContext(KeyboardShortcutsContext);
+  const activeSection = navigation.find((s) =>
+    s.items.some((item) => pathname.startsWith(item.href))
+  );
+  const [openSection, setOpenSection] = useState<string | null>(
+    activeSection?.label ?? null
+  );
 
   return (
     <Sidebar>
@@ -273,37 +279,36 @@ export function AppSidebar() {
 
       {/* Navigation */}
       <SidebarContent>
-        {navigation.map((section) => {
-          const isActive = section.items.some((item) => pathname.startsWith(item.href));
-
-          return (
-            <Collapsible
-              key={section.label}
-              defaultOpen={isActive}
-              className="group/collapsible"
-            >
-              <SidebarGroup>
-                <AnimatedSectionHeader section={section} />
-                <CollapsibleContent>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {section.items.map((item) => {
-                        const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                        return (
-                          <AnimatedNavItem
-                            key={item.href}
-                            item={item}
-                            isActive={isItemActive}
-                          />
-                        );
-                      })}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </CollapsibleContent>
-              </SidebarGroup>
-            </Collapsible>
-          );
-        })}
+        {navigation.map((section) => (
+          <Collapsible
+            key={section.label}
+            open={openSection === section.label}
+            onOpenChange={(open) =>
+              setOpenSection(open ? section.label : null)
+            }
+            className="group/collapsible"
+          >
+            <SidebarGroup>
+              <AnimatedSectionHeader section={section} />
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {section.items.map((item) => {
+                      const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                      return (
+                        <AnimatedNavItem
+                          key={item.href}
+                          item={item}
+                          isActive={isItemActive}
+                        />
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        ))}
       </SidebarContent>
 
       {/* Footer */}

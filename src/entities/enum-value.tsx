@@ -1,8 +1,8 @@
 /**
- * Enum Value Entity Configuration
+ * Status & Option Entity Configuration
  *
- * Centralized registry for all enum values in the system.
- * Enables dynamic enum management and AI integration.
+ * Manages the values that appear in dropdowns and status fields
+ * throughout the app (e.g., batch statuses, vessel types, user roles).
  */
 
 import { z } from "zod";
@@ -86,9 +86,9 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
   // ---------------------------------------------------------------------------
   name: "enum_value",
   table: "enum_values",
-  displayName: "Enum Value",
-  displayNamePlural: "Enum Values",
-  description: "Centralized registry for all dropdown values and statuses",
+  displayName: "Status & Option",
+  displayNamePlural: "Status & Options",
+  description: "Values that appear in dropdowns and status fields throughout the app",
   domain: "system",
 
   // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
   listColumns: [
     {
       accessorKey: "enum_type",
-      header: "Type",
+      header: "Category",
       sortable: true,
       render: (value: unknown) => {
         // Convert snake_case to Title Case
@@ -110,7 +110,7 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
     },
     {
       accessorKey: "value",
-      header: "Value",
+      header: "Stored Value",
       sortable: true,
     },
     {
@@ -130,18 +130,18 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
     },
     {
       accessorKey: "sort_order",
-      header: "Order",
+      header: "Sort Order",
       sortable: true,
     },
     {
       accessorKey: "is_default",
-      header: "Default",
+      header: "Default?",
       sortable: true,
       render: (value: unknown) => (value ? "Yes" : "-"),
     },
     {
       accessorKey: "is_active",
-      header: "Active",
+      header: "Enabled",
       sortable: true,
       render: (value: unknown) => (value ? "Yes" : "No"),
     },
@@ -151,14 +151,13 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
     {
       field: "enum_type",
       type: "select",
-      label: "Type",
-      // Dynamic options fetched from database - automatically includes all enum types
+      label: "Category",
       fetchOptions: fetchEnumTypes,
     },
     {
       field: "is_active",
       type: "boolean",
-      label: "Active",
+      label: "Enabled",
     },
   ],
 
@@ -176,26 +175,26 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
   detailSections: [
     {
       id: "overview",
-      title: "Enum Value Details",
+      title: "Option Details",
       fields: [
-        { field: "enum_type", label: "Enum Type" },
-        { field: "value", label: "Value" },
-        { field: "label", label: "Label" },
+        { field: "enum_type", label: "Category" },
+        { field: "value", label: "Stored Value" },
+        { field: "label", label: "Display Label" },
         { field: "description", label: "Description" },
         { field: "color", label: "Color" },
         { field: "icon", label: "Icon" },
         { field: "sort_order", label: "Sort Order" },
         { field: "group_name", label: "Group" },
-        { field: "is_default", label: "Is Default" },
-        { field: "is_active", label: "Is Active" },
+        { field: "is_default", label: "Default?" },
+        { field: "is_active", label: "Enabled" },
         { field: "created_at", label: "Created", format: "datetime" },
         { field: "updated_at", label: "Last Updated", format: "datetime" },
       ],
     },
     {
       id: "metadata",
-      title: "Metadata",
-      fields: [{ field: "metadata", label: "Metadata", format: "json" }],
+      title: "Extra Data",
+      fields: [{ field: "metadata", label: "Extra Data", format: "json" }],
     },
   ],
 
@@ -207,28 +206,28 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
   formFields: [
     {
       name: "enum_type",
-      label: "Enum Type",
+      label: "Category",
       type: "text",
       placeholder: "e.g., batch_status, vessel_type",
-      description: "The category of this enum (use snake_case)",
+      description: "Which dropdown or status field this option belongs to",
       required: true,
       colSpan: 6,
     },
     {
       name: "value",
-      label: "Value",
+      label: "Stored Value",
       type: "text",
       placeholder: "e.g., pending, in_progress",
-      description: "The value stored in the database (use snake_case)",
+      description: "The value saved when this option is selected (use lowercase with underscores)",
       required: true,
       colSpan: 6,
     },
     {
       name: "label",
-      label: "Label",
+      label: "Display Label",
       type: "text",
       placeholder: "e.g., Pending, In Progress",
-      description: "Human-readable display label",
+      description: "What users see in the dropdown",
       required: true,
       colSpan: 6,
     },
@@ -236,7 +235,7 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
       name: "description",
       label: "Description",
       type: "text",
-      placeholder: "Optional description",
+      placeholder: "Optional description of when to use this option",
       colSpan: 6,
     },
     {
@@ -244,7 +243,7 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
       label: "Color",
       type: "select",
       options: ENUM_COLORS as unknown as Array<{ value: string; label: string }>,
-      description: "Badge color for UI display",
+      description: "Color shown on status badges",
       colSpan: 6,
     },
     {
@@ -252,14 +251,14 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
       label: "Icon",
       type: "text",
       placeholder: "e.g., CheckCircle, AlertTriangle",
-      description: "Lucide icon name (optional)",
+      description: "Icon name (optional)",
       colSpan: 6,
     },
     {
       name: "sort_order",
       label: "Sort Order",
       type: "number",
-      description: "Lower numbers appear first",
+      description: "Lower numbers appear first in dropdowns",
       defaultValue: 0,
       colSpan: 4,
     },
@@ -272,16 +271,16 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
     },
     {
       name: "is_default",
-      label: "Default Value",
+      label: "Pre-selected",
       type: "switch",
-      description: "Use this value as the default for new records",
+      description: "Automatically selected for new records",
       colSpan: 2,
     },
     {
       name: "is_active",
-      label: "Active",
+      label: "Enabled",
       type: "switch",
-      description: "Inactive values won't appear in dropdowns",
+      description: "Disabled options are hidden from dropdowns",
       defaultValue: true,
       colSpan: 2,
     },
@@ -294,7 +293,7 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
     "List all batch statuses",
     "Get valid vessel types",
     "What user roles exist?",
-    "Show enum values with colors",
+    "Show dropdown options with colors",
   ],
 
   keyFields: ["enum_type", "value", "label", "is_active"],
