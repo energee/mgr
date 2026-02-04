@@ -385,6 +385,15 @@ export const sessionLineItemKeys = {
 };
 
 // =============================================================================
+// Packaging Keys
+// =============================================================================
+
+export const packagingKeys = {
+  batchesForBrand: (brandId: string) =>
+    ["packaging", "batches-for-brand", brandId] as const,
+};
+
+// =============================================================================
 // Vessel Keys
 // =============================================================================
 
@@ -392,4 +401,59 @@ export const vesselKeys = {
   all: () => ["vessels"] as const,
   available: () => ["vessels", "available"] as const,
   transfers: () => ["vessel_transfers"] as const,
+};
+
+// =============================================================================
+// Bin Keys
+// =============================================================================
+
+export const binKeys = {
+  all: () => ["bins"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters ? (["bins", "list", filters] as const) : (["bins", "list"] as const),
+  detail: (id: string) => ["bins", id] as const,
+  contents: (binId: string) => ["bins", binId, "contents"] as const,
+};
+
+// =============================================================================
+// Transfer Keys
+// =============================================================================
+
+export const transferKeys = {
+  all: () => ["transfers"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["transfers", "list", filters] as const)
+      : (["transfers", "list"] as const),
+  detail: (id: string) => ["transfers", id] as const,
+  lines: (transferId: string) => ["transfers", transferId, "lines"] as const,
+};
+
+// =============================================================================
+// Delivery Keys
+// =============================================================================
+
+export const deliveryKeys = {
+  all: () => ["deliveries"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["deliveries", "list", filters] as const)
+      : (["deliveries", "list"] as const),
+  detail: (id: string) => ["deliveries", id] as const,
+  stops: (deliveryId: string) =>
+    ["deliveries", deliveryId, "stops"] as const,
+};
+
+// =============================================================================
+// Finished Good Keys
+// =============================================================================
+
+export const finishedGoodKeys = {
+  all: () => ["finished-goods"] as const,
+  brandAvailability: () => ["finished-goods", "brand-availability"] as const,
+  availability: (brandId: string, packageTypeId: string) =>
+    ["finished-goods", "availability", brandId, packageTypeId] as const,
+  binInventory: (fgId: string) => ["finished-goods", fgId, "bins"] as const,
+  commitments: (fgId: string) =>
+    ["finished-goods", fgId, "commitments"] as const,
 };

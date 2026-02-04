@@ -45,6 +45,9 @@ import { pickListEntity } from "./pick-list";
 import { allocationEntity } from "./allocation";
 import { beerStyleEntity } from "./beer-style";
 import { brandEntity } from "./brand";
+import { binEntity } from "./bin";
+import { deliveryEntity } from "./delivery";
+import { locationTransferEntity } from "./location-transfer";
 
 // =============================================================================
 // Register All Entities
@@ -72,6 +75,9 @@ registerEntity(packageTypeEntity);
 registerEntity(kegTypeEntity);
 registerEntity(kegInventoryEntity);
 registerEntity(kegTransactionEntity);
+registerEntity(binEntity);
+registerEntity(deliveryEntity);
+registerEntity(locationTransferEntity);
 
 // Sales domain
 registerEntity(orderEntity);
@@ -159,6 +165,12 @@ export { beerStyleEntity } from "./beer-style";
 export type { BeerStyleFormValues } from "./beer-style";
 export { brandEntity } from "./brand";
 export type { BrandFormValues } from "./brand";
+export { binEntity, BIN_TYPES } from "./bin";
+export type { BinFormValues } from "./bin";
+export { deliveryEntity } from "./delivery";
+export type { DeliveryFormValues } from "./delivery";
+export { locationTransferEntity } from "./location-transfer";
+export type { LocationTransferFormValues } from "./location-transfer";
 
 // =============================================================================
 // Helper Functions
