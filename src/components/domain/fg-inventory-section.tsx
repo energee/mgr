@@ -10,7 +10,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { allocationEntity } from "@/entities/allocation";
 import {
   Table,
   TableBody,
@@ -177,13 +178,10 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
                   </TableCell>
                   <TableCell className="text-right">{row.quantity}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        row.status === "completed" ? "default" : "secondary"
-                      }
-                    >
-                      {row.status}
-                    </Badge>
+                    <StatusBadge
+                      status={row.status}
+                      config={allocationEntity.stateMachine?.stateDisplay}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

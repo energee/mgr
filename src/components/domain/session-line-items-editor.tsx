@@ -12,7 +12,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { batchEntity } from "@/entities/batch";
 import {
   Select,
   SelectContent,
@@ -20,8 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StatusBadge } from "@/components/universal/status-badge";
-import { batchEntity } from "@/entities/batch";
 import {
   Table,
   TableBody,
@@ -97,12 +96,6 @@ const STATUS_SORT_ORDER: Record<string, number> = {
   planned: 4,
 };
 
-const BATCH_STATUS_COLORS: Record<string, string> = {
-  planned: "bg-gray-100 text-gray-700",
-  fermenting: "bg-blue-100 text-blue-700",
-  conditioning: "bg-blue-100 text-blue-700",
-  packaging: "bg-yellow-100 text-yellow-700",
-};
 
 function useBatchesForBrand(brandId: string | null) {
   const supabase = createClient();
@@ -182,12 +175,10 @@ function BatchCell({
           <SelectItem key={batch.id} value={batch.id}>
             <span className="flex items-center gap-2">
               {batch.batch_number}
-              <Badge
-                variant="outline"
-                className={`text-xs ${BATCH_STATUS_COLORS[batch.status] ?? ""}`}
-              >
-                {batch.status}
-              </Badge>
+              <StatusBadge
+                status={batch.status}
+                config={batchEntity.stateMachine?.stateDisplay}
+              />
               {batch.volume_bbl != null && (
                 <span className="text-xs text-muted-foreground">
                   {batch.volume_bbl} bbl
