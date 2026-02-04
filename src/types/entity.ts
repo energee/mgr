@@ -491,6 +491,9 @@ export interface EntityRelationDef {
 
   /** Limit for related records query (default: 50) */
   relationLimit?: number;
+
+  /** Custom component to render instead of default table (for inline editors, etc.) */
+  component?: ComponentType<{ parentId: string; data?: Record<string, unknown> }>;
 }
 
 // =============================================================================
