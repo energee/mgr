@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       _schema_registry: {
@@ -706,6 +681,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bin_inventory_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bin_inventory_finished_good_id_fkey"
             columns: ["finished_good_id"]
             isOneToOne: false
@@ -724,6 +706,65 @@ export type Database = {
             columns: ["finished_good_id"]
             isOneToOne: false
             referencedRelation: "finished_goods_with_ttb_class"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bin_inventory_items: {
+        Row: {
+          bin_id: string
+          created_at: string
+          id: string
+          inventory_lot_id: string
+          quantity: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          bin_id: string
+          created_at?: string
+          id?: string
+          inventory_lot_id: string
+          quantity?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          bin_id?: string
+          created_at?: string
+          id?: string
+          inventory_lot_id?: string
+          quantity?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bin_inventory_items_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bin_inventory_items_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bin_inventory_items_inventory_lot_id_fkey"
+            columns: ["inventory_lot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bin_inventory_items_inventory_lot_id_fkey"
+            columns: ["inventory_lot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_lots_with_quantities"
             referencedColumns: ["id"]
           },
         ]
@@ -1041,6 +1082,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      deliveries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delivery_number: string
+          driver_name: string | null
+          id: string
+          notes: string | null
+          receive_date: string | null
+          scheduled_date: string | null
+          ship_date: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+          vehicle: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delivery_number: string
+          driver_name?: string | null
+          id?: string
+          notes?: string | null
+          receive_date?: string | null
+          scheduled_date?: string | null
+          ship_date?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delivery_number?: string
+          driver_name?: string | null
+          id?: string
+          notes?: string | null
+          receive_date?: string | null
+          scheduled_date?: string | null
+          ship_date?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle?: string | null
+        }
+        Relationships: []
       }
       entity_revisions: {
         Row: {
@@ -1905,6 +1994,7 @@ export type Database = {
       location_transfers: {
         Row: {
           created_at: string | null
+          delivery_id: string | null
           from_bin_id: string
           id: string
           notes: string | null
@@ -1918,6 +2008,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          delivery_id?: string | null
           from_bin_id: string
           id?: string
           notes?: string | null
@@ -1931,6 +2022,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          delivery_id?: string | null
           from_bin_id?: string
           id?: string
           notes?: string | null
@@ -1944,8 +2036,36 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "location_transfers_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "location_transfers_from_bin_id_fkey"
             columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_to_bin_id_fkey"
+            columns: ["to_bin_id"]
             isOneToOne: false
             referencedRelation: "bins"
             referencedColumns: ["id"]
@@ -1954,7 +2074,7 @@ export type Database = {
             foreignKeyName: "location_transfers_to_bin_id_fkey"
             columns: ["to_bin_id"]
             isOneToOne: false
-            referencedRelation: "bins"
+            referencedRelation: "bins_with_summary"
             referencedColumns: ["id"]
           },
         ]
@@ -2298,6 +2418,7 @@ export type Database = {
         Row: {
           created_at: string | null
           customer_id: string | null
+          delivery_id: string | null
           fulfilled_date: string | null
           id: string
           is_export: boolean | null
@@ -2313,6 +2434,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           customer_id?: string | null
+          delivery_id?: string | null
           fulfilled_date?: string | null
           id?: string
           is_export?: boolean | null
@@ -2328,6 +2450,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           customer_id?: string | null
+          delivery_id?: string | null
           fulfilled_date?: string | null
           id?: string
           is_export?: boolean | null
@@ -2367,6 +2490,20 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers_with_order_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries_with_summary"
             referencedColumns: ["id"]
           },
         ]
@@ -4069,22 +4206,25 @@ export type Database = {
       transfer_lines: {
         Row: {
           created_at: string | null
-          finished_good_id: string
+          finished_good_id: string | null
           id: string
+          inventory_lot_id: string | null
           quantity: number
           transfer_id: string
         }
         Insert: {
           created_at?: string | null
-          finished_good_id: string
+          finished_good_id?: string | null
           id?: string
+          inventory_lot_id?: string | null
           quantity: number
           transfer_id: string
         }
         Update: {
           created_at?: string | null
-          finished_good_id?: string
+          finished_good_id?: string | null
           id?: string
+          inventory_lot_id?: string | null
           quantity?: number
           transfer_id?: string
         }
@@ -4111,10 +4251,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "transfer_lines_inventory_lot_id_fkey"
+            columns: ["inventory_lot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_lines_inventory_lot_id_fkey"
+            columns: ["inventory_lot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_lots_with_quantities"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transfer_lines_transfer_id_fkey"
             columns: ["transfer_id"]
             isOneToOne: false
             referencedRelation: "location_transfers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_lines_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "location_transfers_with_details"
             referencedColumns: ["id"]
           },
         ]
@@ -5201,6 +5362,46 @@ export type Database = {
           },
         ]
       }
+      bin_contents: {
+        Row: {
+          bin_id: string | null
+          item_date: string | null
+          item_id: string | null
+          item_name: string | null
+          item_type: string | null
+          lot_number: string | null
+          package_name: string | null
+          quantity: number | null
+        }
+        Relationships: []
+      }
+      bins_with_summary: {
+        Row: {
+          bin_type: string | null
+          capacity: number | null
+          created_at: string | null
+          fg_item_count: number | null
+          id: string | null
+          is_active: boolean | null
+          location_id: string | null
+          location_name: string | null
+          location_type: string | null
+          name: string | null
+          notes: string | null
+          rm_item_count: number | null
+          total_item_count: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bins_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brew_log_metrics: {
         Row: {
           batch_count: number | null
@@ -5408,6 +5609,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      deliveries_with_summary: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          delivery_number: string | null
+          driver_name: string | null
+          id: string | null
+          notes: string | null
+          order_count: number | null
+          receive_date: string | null
+          scheduled_date: string | null
+          ship_date: string | null
+          status: string | null
+          total_stops: number | null
+          transfer_count: number | null
+          updated_at: string | null
+          updated_by: string | null
+          vehicle: string | null
+        }
+        Relationships: []
       }
       finished_goods_supply_by_product: {
         Row: {
@@ -5993,6 +6215,72 @@ export type Database = {
           min_cycle_days: number | null
         }
         Relationships: []
+      }
+      location_transfers_with_details: {
+        Row: {
+          created_at: string | null
+          delivery_id: string | null
+          delivery_number: string | null
+          from_bin_id: string | null
+          from_bin_name: string | null
+          from_location_name: string | null
+          id: string | null
+          lines_count: number | null
+          notes: string | null
+          receive_date: string | null
+          received_by: string | null
+          ship_date: string | null
+          shipped_by: string | null
+          status: string | null
+          to_bin_id: string | null
+          to_bin_name: string | null
+          to_location_name: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_transfers_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       my_notifications: {
         Row: {
@@ -7512,9 +7800,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       cleaning_type: ["cip", "caustic", "acid", "sanitize", "manual", "rinse"],
@@ -7557,3 +7842,4 @@ export const Constants = {
     },
   },
 } as const
+
