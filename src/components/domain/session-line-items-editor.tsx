@@ -121,7 +121,11 @@ function useBatchesForBrand(brandId: string | null) {
 
       // Filter by brand through recipes
       const recipeIds = [
-        ...new Set((data ?? []).map((b) => b.recipe_id).filter(Boolean)),
+        ...new Set(
+          (data ?? [])
+            .map((b) => b.recipe_id)
+            .filter((id): id is string => id != null)
+        ),
       ];
       if (recipeIds.length === 0) return [];
 
@@ -137,8 +141,8 @@ function useBatchesForBrand(brandId: string | null) {
         .filter((b) => b.recipe_id && validRecipeIds.has(b.recipe_id))
         .sort(
           (a, b) =>
-            (STATUS_SORT_ORDER[a.status] ?? 99) -
-            (STATUS_SORT_ORDER[b.status] ?? 99)
+            (STATUS_SORT_ORDER[a.status ?? ""] ?? 99) -
+            (STATUS_SORT_ORDER[b.status ?? ""] ?? 99)
         ) as BatchOption[];
     },
     enabled: !!brandId,
