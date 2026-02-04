@@ -297,7 +297,6 @@ function EntityKanban<T = Record<string, unknown>>({
               <KanbanColumn
                 key={state}
                 value={state}
-                disabled
                 className={cn(
                   "bg-muted/50 rounded-lg transition-all",
                   items.length > 0
