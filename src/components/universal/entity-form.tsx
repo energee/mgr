@@ -34,7 +34,6 @@ import {
 import {
   Combobox,
   ComboboxAnchor,
-  ComboboxCancel,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
@@ -623,15 +622,20 @@ function renderFieldInput<T>(
           onValueChange={(v) => onChange(v || null)}
           disabled={disabled}
         >
-          <ComboboxAnchor className="h-9 w-full">
+          <ComboboxAnchor>
             <ComboboxInput
               id={field.name}
               placeholder={field.placeholder || "Search..."}
             />
             {!field.required && value && (
-              <ComboboxCancel>
-                <X className="size-4" />
-              </ComboboxCancel>
+              <button
+                type="button"
+                onClick={() => onChange(null)}
+                className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                aria-label="Clear selection"
+              >
+                <X className="size-3.5" />
+              </button>
             )}
             <ComboboxTrigger />
           </ComboboxAnchor>
