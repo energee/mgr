@@ -7,8 +7,9 @@
  * Supports: sections, tabs, custom components, actions, state badges, relations.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
@@ -20,6 +21,7 @@ import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -49,6 +51,7 @@ export function EntityDetail<T = Record<string, unknown>>({
   onAction,
 }: EntityDetailProps<T>) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const supabase = createClient();
   const path = basePath || `/${entity.domain}/${entity.name}s`;
 
@@ -166,6 +169,34 @@ export function EntityDetail<T = Record<string, unknown>>({
     });
   }, [data, entity.actions, stateInfo]);
 
+  // ---------------------------------------------------------------------------
+  // Keyboard shortcuts: "e" to edit, "Backspace" to go back
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // Don't trigger when typing in an input
+      const el = document.activeElement;
+      if (el) {
+        const tag = el.tagName.toLowerCase();
+        if (tag === "input" || tag === "textarea" || tag === "select") return;
+        if ((el as HTMLElement).isContentEditable) return;
+      }
+
+      if (e.key === "e" && showEdit) {
+        e.preventDefault();
+        router.push(`${path}/${id}/edit`);
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        router.push(backUrl || path);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showEdit, router, path, id, backUrl]);
+
   if (error) {
     return (
       <div className="text-center py-8 text-destructive">
@@ -193,9 +224,10 @@ export function EntityDetail<T = Record<string, unknown>>({
         <div className="space-y-1">
           <Link
             href={backUrl || path}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
           >
             ← Back
+            <Kbd>⌫</Kbd>
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">
@@ -218,6 +250,7 @@ export function EntityDetail<T = Record<string, unknown>>({
             <Button variant="outline" asChild>
               <Link href={`${path}/${id}/edit`}>
                 Edit
+                <Kbd>E</Kbd>
               </Link>
             </Button>
           )}

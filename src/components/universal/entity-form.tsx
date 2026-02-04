@@ -176,6 +176,18 @@ export function EntityForm<T = Record<string, unknown>>({
 
   const submitRef = useSubmitShortcut();
 
+  // Esc to cancel / go back
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        router.push(cancelUrl || (isEdit && id ? `${path}/${id}` : path));
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [router, cancelUrl, isEdit, id, path]);
+
   // Conflict dialog for optimistic locking
   const conflictDialog = useConflictDialog();
   // Track the loaded version for optimistic locking
@@ -420,6 +432,7 @@ export function EntityForm<T = Record<string, unknown>>({
             <Link href={cancelUrl || (isEdit && id ? `${path}/${id}` : path)}>
               <ArrowLeft className="h-4 w-4 mr-1" />
               Cancel
+              <Kbd>Esc</Kbd>
             </Link>
           </Button>
         </div>
@@ -456,17 +469,20 @@ export function EntityForm<T = Record<string, unknown>>({
 
         {/* Actions */}
         <div className="flex justify-end gap-2 mt-4">
-          <Button type="button" variant="outline" asChild>
-            <Link href={cancelUrl || (isEdit && id ? `${path}/${id}` : path)}>
-              Cancel
-            </Link>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(cancelUrl || (isEdit && id ? `${path}/${id}` : path))}
+          >
+            Cancel
+            <Kbd>Esc</Kbd>
           </Button>
           <Button ref={submitRef} type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {isEdit ? "Save Changes" : `Create ${entity.displayName}`}
             <KbdGroup>
               <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-              <Kbd>{isMac ? "Return" : "Enter"}</Kbd>
+              <Kbd>{isMac ? "↵" : "Enter"}</Kbd>
             </KbdGroup>
           </Button>
         </div>

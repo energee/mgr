@@ -16,6 +16,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table";
 import {
   useReactTable,
@@ -45,6 +46,7 @@ import {
 } from "@/lib/data-table-adapter";
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
+import { generateId } from "@/lib/id";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableAdvancedToolbar } from "@/components/data-table/data-table-advanced-toolbar";
@@ -53,7 +55,9 @@ import { DataTableSortList } from "@/components/data-table/data-table-sort-list"
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -99,8 +103,38 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
   const path = basePath || `/${entity.domain}/${entity.table}`;
+  const router = useRouter();
 
   const hasBulkActions = !!entity.stateMachine;
+
+  // ---------------------------------------------------------------------------
+  // "n" hotkey for New entity
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!showCreate) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "n" || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // Don't trigger when typing in an input
+      const el = document.activeElement;
+      if (el) {
+        const tag = el.tagName.toLowerCase();
+        if (tag === "input" || tag === "textarea" || tag === "select") return;
+        if ((el as HTMLElement).isContentEditable) return;
+      }
+
+      e.preventDefault();
+      if (onCreateClick) {
+        onCreateClick();
+      } else {
+        router.push(`${path}/new`);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showCreate, onCreateClick, router, path]);
 
   // ---------------------------------------------------------------------------
   // Dynamic filter options
@@ -113,16 +147,14 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Table state
   // ---------------------------------------------------------------------------
-  const [sorting, setSorting] = useState<SortingState>(
-    entity.defaultSort
-      ? [
-          {
-            id: entity.defaultSort.column,
-            desc: entity.defaultSort.direction === "desc",
-          },
-        ]
-      : []
+  const defaultSorting: SortingState = useMemo(
+    () =>
+      entity.defaultSort
+        ? [{ id: entity.defaultSort.column, desc: entity.defaultSort.direction === "desc" }]
+        : [],
+    [entity.defaultSort]
   );
+  const [sorting, setSorting] = useState<SortingState>(defaultSorting);
   const [globalFilter, setGlobalFilter] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const debouncedSetSearch = useDebouncedCallback(setDebouncedSearch, 300);
@@ -173,7 +205,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
     [columns]
   );
 
-  const [urlFilters] = useQueryState(
+  const [urlFilters, setUrlFilters] = useQueryState(
     "filters",
     getFiltersStateParser<T>(filterableColumnIds).withDefault([])
   );
@@ -187,6 +219,101 @@ export function EntityDataTable<T = Record<string, unknown>>({
   useEffect(() => {
     setRowSelection({});
   }, [urlFilters, debouncedSearch]);
+
+  // ---------------------------------------------------------------------------
+  // Quick filter tabs
+  // ---------------------------------------------------------------------------
+  const quickFilters = entity.quickFilters;
+
+  // Derive active quick filter tab from current URL filters
+  const activeQuickFilter = useMemo(() => {
+    if (!quickFilters) return undefined;
+    return quickFilters.find((qf) =>
+      qf.filters.every((preset) => {
+        const match = urlFilters.find(
+          (f) => f.id === preset.column && f.operator === "inArray"
+        );
+        if (!match) return false;
+        const val = Array.isArray(match.value) ? match.value : [match.value];
+        return (
+          val.length === preset.values.length &&
+          preset.values.every((v) => val.includes(v))
+        );
+      })
+    );
+  }, [quickFilters, urlFilters]);
+
+  const activeTabValue = activeQuickFilter?.label ?? "_all";
+
+  // Apply default quick filter on initial load (when no filters are set)
+  const hasAppliedDefault = useMemo(() => ({ current: false }), []);
+  useEffect(() => {
+    if (!quickFilters || hasAppliedDefault.current) return;
+    hasAppliedDefault.current = true;
+
+    // Only apply default if no URL filters exist at all
+    if (urlFilters.length > 0) return;
+
+    const defaultFilter = quickFilters.find((qf) => qf.isDefault);
+    if (defaultFilter) {
+      setUrlFilters(
+        defaultFilter.filters.map((preset) => ({
+          id: preset.column,
+          value: preset.values,
+          variant: "multiSelect",
+          operator: "inArray",
+          filterId: generateId({ length: 8 }),
+        })) as ExtendedColumnFilter<T>[]
+      );
+      if (defaultFilter.sort) {
+        setSorting([{ id: defaultFilter.sort.column, desc: defaultFilter.sort.direction === "desc" }]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickFilters]);
+
+  const handleQuickFilterChange = useCallback(
+    (tabValue: string) => {
+      if (!quickFilters) return;
+
+      // "All" tab — remove quick filter columns from URL filters
+      if (tabValue === "_all") {
+        const quickColumns = new Set(
+          quickFilters.flatMap((qf) => qf.filters.map((f) => f.column))
+        );
+        setUrlFilters(
+          urlFilters.filter((f) => !quickColumns.has(f.id as string))
+        );
+        setSorting(defaultSorting);
+        return;
+      }
+
+      const qf = quickFilters.find((q) => q.label === tabValue);
+      if (!qf) return;
+
+      // Remove existing filters for quick filter columns, then add presets
+      const quickColumns = new Set(qf.filters.map((f) => f.column));
+      const preserved = urlFilters.filter(
+        (f) => !quickColumns.has(f.id as string)
+      );
+      const newFilters = qf.filters.map((preset) => ({
+        id: preset.column,
+        value: preset.values,
+        variant: "multiSelect",
+        operator: "inArray",
+        filterId: generateId({ length: 8 }),
+      }));
+      setUrlFilters([...preserved, ...newFilters] as ExtendedColumnFilter<T>[]);
+
+      // Apply sort override if defined, otherwise revert to default
+      if (qf.sort) {
+        setSorting([{ id: qf.sort.column, desc: qf.sort.direction === "desc" }]);
+      } else {
+        setSorting(defaultSorting);
+      }
+    },
+    [quickFilters, urlFilters, setUrlFilters, defaultSorting]
+  );
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -411,13 +538,36 @@ export function EntityDataTable<T = Record<string, unknown>>({
         {showCreate && (
           <Button asChild={!onCreateClick} onClick={onCreateClick}>
             {onCreateClick ? (
-              `New ${entity.displayName}`
+              <>
+                New {entity.displayName}
+                <Kbd>N</Kbd>
+              </>
             ) : (
-              <Link href={`${path}/new`}>New {entity.displayName}</Link>
+              <Link href={`${path}/new`}>
+                New {entity.displayName}
+                <Kbd>N</Kbd>
+              </Link>
             )}
           </Button>
         )}
       </div>
+
+      {/* Quick Filter Tabs */}
+      {quickFilters && quickFilters.length > 0 && (
+        <Tabs
+          value={activeTabValue}
+          onValueChange={handleQuickFilterChange}
+        >
+          <TabsList>
+            {quickFilters.map((qf) => (
+              <TabsTrigger key={qf.label} value={qf.label}>
+                {qf.label}
+              </TabsTrigger>
+            ))}
+            <TabsTrigger value="_all">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
 
       {/* Data Table */}
       <div
@@ -492,14 +642,19 @@ export function EntityDataTable<T = Record<string, unknown>>({
               {/* Global search */}
               {entity.searchableFields &&
                 entity.searchableFields.length > 0 && (
-                  <div className="relative max-w-sm">
+                  <div className="relative w-full sm:w-auto sm:min-w-[250px] sm:max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
                       value={globalFilter}
                       onChange={(e) => setGlobalFilter(e.target.value)}
-                      className="pl-10 h-8"
+                      className="pl-10 pr-8 h-8"
                     />
+                    {!globalFilter && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Kbd>/</Kbd>
+                      </div>
+                    )}
                   </div>
                 )}
               <DataTableFilterList table={table} />
