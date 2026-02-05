@@ -21,6 +21,7 @@ import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
 import { BatchRecipeContext } from "@/components/domain/batch-recipe-context";
 import { BatchCostBreakdown } from "@/components/domain/batch-cost-breakdown";
 import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
+import { BatchAdditionsDisplay } from "@/components/domain/batch-additions-display";
 import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-info";
 import { BatchInsights } from "@/components/domain/batch-insights";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
@@ -207,6 +208,11 @@ export const batchEntity: EntityConfig<Batch> = {
       id: "brew-info",
       title: "Brewing",
       component: BatchBrewInfo,
+    },
+    {
+      id: "additions",
+      title: "Cold-Side Additions",
+      component: BatchAdditionsDisplay,
     },
     {
       id: "ai-insights",
