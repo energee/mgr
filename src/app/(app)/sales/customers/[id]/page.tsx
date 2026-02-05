@@ -3,12 +3,12 @@
 /**
  * Customer Detail Page
  *
- * Custom customer detail that wraps EntityDetail with the
- * CustomerKegBalances component for detailed keg tracking.
+ * Uses unified detail/edit with the CustomerKegBalances component
+ * for detailed keg tracking.
  */
 
 import { use } from "react";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { customerEntity } from "@/entities/customer";
 import { CustomerKegBalances } from "@/components/domain/customer-keg-balances";
 
@@ -21,7 +21,7 @@ export default function CustomerDetailPage({
 
   return (
     <div className="space-y-6">
-      <EntityDetail
+      <EntityDetailUnifiedWithErrorBoundary
         entity={customerEntity}
         id={id}
         basePath="/sales/customers"

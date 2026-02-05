@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { packageTypeEntity } from "@/entities/package-type";
 
 export default function PackageTypeDetailPage({
@@ -10,5 +10,5 @@ export default function PackageTypeDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetail entity={packageTypeEntity} id={id} basePath="/settings/formats" />;
+  return <EntityDetailUnifiedWithErrorBoundary entity={packageTypeEntity} id={id} basePath="/settings/formats" />;
 }

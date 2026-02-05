@@ -213,6 +213,176 @@ export const customerEntity: EntityConfig<Customer> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "name",
+          label: "Company Name",
+          type: "text",
+          placeholder: "e.g., Downtown Distributors",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "customer_type",
+          label: "Customer Type",
+          type: "select",
+          required: true,
+          options: valuesAsOptions(customerTypeDisplayConfig),
+          colSpan: 6,
+        },
+        {
+          name: "is_active",
+          label: "Active",
+          type: "switch",
+          description: "Inactive customers won't appear in order selection",
+          defaultValue: true,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "contact",
+      title: "Contact Information",
+      fields: [
+        {
+          name: "contact_name",
+          label: "Contact Name",
+          type: "text",
+          placeholder: "e.g., John Smith",
+          colSpan: 6,
+        },
+        {
+          name: "email",
+          label: "Email",
+          type: "text",
+          placeholder: "e.g., john@example.com",
+          colSpan: 6,
+        },
+        {
+          name: "phone",
+          label: "Phone",
+          type: "text",
+          placeholder: "e.g., 555-0100",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "pricing",
+      title: "Pricing",
+      fields: [
+        {
+          name: "sales_channel_id",
+          label: "Sales Channel",
+          type: "select",
+          description: "Determines default pricing tier",
+          dynamicOptions: {
+            table: "sales_channels",
+            valueField: "id",
+            labelField: "name",
+            filter: { is_active: true },
+          },
+          colSpan: 6,
+        },
+        {
+          name: "price_tier_id",
+          label: "Price Tier Override",
+          type: "select",
+          description: "Override default tier pricing (optional)",
+          dynamicOptions: {
+            table: "pricing_tiers",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "cogs_max",
+          },
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "order_summary",
+      title: "Order Summary",
+      fields: [
+        {
+          name: "total_orders",
+          label: "Total Orders",
+          format: "number",
+          editable: false,
+          colSpan: 4,
+        },
+        {
+          name: "total_revenue",
+          label: "Total Revenue",
+          format: "currency",
+          editable: false,
+          colSpan: 4,
+        },
+        {
+          name: "last_order_date",
+          label: "Last Order",
+          format: "date",
+          editable: false,
+          colSpan: 4,
+        },
+        {
+          name: "pending_orders",
+          label: "Pending Orders",
+          format: "number",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "pending_revenue",
+          label: "Pending Revenue",
+          format: "currency",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "keg_balance",
+      title: "Keg Balance",
+      fields: [
+        {
+          name: "total_kegs_out",
+          label: "Total Kegs Out",
+          format: "number",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "total_deposit_value",
+          label: "Deposit Value",
+          format: "currency",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Delivery preferences, payment terms...",
+          fullWidth: true,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: customerSchema,

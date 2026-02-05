@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { pricingTierEntity } from "@/entities/pricing-tier";
 
 export default function PricingTierDetailPage({
@@ -10,5 +10,5 @@ export default function PricingTierDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetail entity={pricingTierEntity} id={id} basePath="/settings/pricing/tiers" />;
+  return <EntityDetailUnifiedWithErrorBoundary entity={pricingTierEntity} id={id} basePath="/settings/pricing/tiers" />;
 }

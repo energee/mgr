@@ -124,6 +124,96 @@ export const supplierEntity: EntityConfig<Supplier> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Supplier Details",
+      fields: [
+        {
+          name: "name",
+          label: "Supplier Name",
+          type: "text",
+          placeholder: "e.g., Briess Malt & Ingredients",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "is_active",
+          label: "Active",
+          type: "switch",
+          defaultValue: true,
+          description: "Inactive suppliers won't appear in purchase order creation",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "contact",
+      title: "Contact Information",
+      fields: [
+        {
+          name: "contact_name",
+          label: "Contact Name",
+          type: "text",
+          placeholder: "e.g., John Smith",
+          colSpan: 6,
+        },
+        {
+          name: "contact_email",
+          label: "Email",
+          type: "text",
+          placeholder: "orders@supplier.com",
+          colSpan: 6,
+        },
+        {
+          name: "contact_phone",
+          label: "Phone",
+          type: "text",
+          placeholder: "(555) 123-4567",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "terms",
+      title: "Terms & Logistics",
+      fields: [
+        {
+          name: "payment_terms",
+          label: "Payment Terms",
+          type: "text",
+          placeholder: "e.g., Net 30, COD, 2% 10 Net 30",
+          colSpan: 6,
+        },
+        {
+          name: "default_lead_time_days",
+          label: "Default Lead Time (days)",
+          type: "number",
+          placeholder: "e.g., 7",
+          description: "Typical days between order and delivery",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Additional information about this supplier...",
+          fullWidth: true,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: supplierSchema,

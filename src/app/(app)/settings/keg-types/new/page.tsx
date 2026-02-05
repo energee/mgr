@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { kegTypeEntity } from "@/entities/keg-type";
 
 export default function NewKegTypePage() {
-  return <EntityForm entity={kegTypeEntity} basePath="/settings/keg-types" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={kegTypeEntity}
+      basePath="/settings/keg-types"
+    />
+  );
 }
