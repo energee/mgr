@@ -13,6 +13,7 @@ export const recipeSchema = z.object({
   style_id: z.string().uuid().nullable().optional(),
   yeast_id: z.string().uuid().nullable().optional(),
   water_profile_id: z.string().uuid().nullable().optional(),
+  pricing_tier_id: z.string().uuid().nullable().optional(),
   description: z.string().nullable().optional(),
   // Volumes
   volume_bbl: z.coerce.number().nullable().optional(),

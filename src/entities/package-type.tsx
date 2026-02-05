@@ -24,6 +24,7 @@ export const packageTypeSchema = z.object({
   inner_pack_size: z.coerce.number().int().positive().nullable().optional(),
   inner_packs_per_case: z.coerce.number().int().positive().nullable().optional(),
   is_active: z.boolean().default(true),
+  show_in_pricing: z.boolean().default(false),
 }).refine(
   (data) => {
     // If either inner pack field is set, both must be set and units_per_case must equal their product
@@ -106,6 +107,12 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       render: (value) => (value != null ? String(value) : "—"),
     },
     {
+      accessorKey: "show_in_pricing",
+      header: "Pricing",
+      sortable: true,
+      render: (value) => (value ? "Yes" : ""),
+    },
+    {
       accessorKey: "is_active",
       header: "Active",
       sortable: true,
@@ -148,6 +155,7 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
         { field: "units_per_case", label: "Units per Case" },
         { field: "inner_pack_size", label: "Inner Pack Size" },
         { field: "inner_packs_per_case", label: "Inner Packs per Case" },
+        { field: "show_in_pricing", label: "Show in Pricing" },
         { field: "is_active", label: "Active" },
         { field: "created_at", label: "Created", format: "datetime" },
         { field: "updated_at", label: "Last Updated", format: "datetime" },
@@ -212,12 +220,20 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       colSpan: 4,
     },
     {
+      name: "show_in_pricing",
+      label: "Show in Pricing Matrix",
+      type: "switch",
+      description: "Include this format as a column in the pricing matrix",
+      defaultValue: false,
+      colSpan: 6,
+    },
+    {
       name: "is_active",
       label: "Active",
       type: "switch",
       description: "Inactive types won't appear in dropdown menus",
       defaultValue: true,
-      colSpan: 12,
+      colSpan: 6,
     },
   ],
 

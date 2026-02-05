@@ -343,6 +343,20 @@ export const recipeEntity: EntityConfig<Recipe> = {
       },
     },
     {
+      name: "pricing_tier_id",
+      label: "Pricing Tier",
+      type: "select",
+      placeholder: "Select pricing tier...",
+      description: "Auto-suggested from COGS thresholds or set manually",
+      colSpan: 6,
+      dynamicOptions: {
+        table: "pricing_tiers",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "sort_order",
+      },
+    },
+    {
       name: "is_template",
       label: "Template Recipe",
       type: "switch",
