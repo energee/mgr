@@ -7,10 +7,7 @@ import { usePrefillStore } from "@/stores/prefill-store";
 
 export default function NewBatchPage() {
   const [defaultValues] = useState(() => {
-    const { prefillData } = usePrefillStore.getState();
-    if (prefillData) {
-      usePrefillStore.getState().consume();
-    }
+    const { prefillData } = usePrefillStore.getState().consume();
     return prefillData ?? undefined;
   });
 

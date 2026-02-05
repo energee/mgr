@@ -1,10 +1,41 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { batchEntity } from "@/entities/batch";
+import { getStateLabel } from "@/types/entity";
 
 /** Escape LIKE/ILIKE wildcard characters so they match literally. */
 function escapeLike(value: string): string {
   return value.replace(/[%_\\]/g, "\\$&");
+}
+
+/** Resolve a batch by UUID or batch number. Returns `{ id, batch_number, status }`. */
+async function resolveBatch(
+  supabase: SupabaseClient,
+  batchId?: string,
+  batchNumber?: string,
+): Promise<{ id: string; batch_number: string; status: string }> {
+  if (batchId) {
+    const { data, error } = await supabase
+      .from("batches")
+      .select("id, batch_number, status")
+      .eq("id", batchId)
+      .single();
+    if (error) throw new Error(`Batch not found: ${error.message}`);
+    return data;
+  }
+  if (batchNumber) {
+    const { data, error } = await supabase
+      .from("batches")
+      .select("id, batch_number, status")
+      .ilike("batch_number", `%${escapeLike(batchNumber)}%`)
+      .limit(1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0)
+      throw new Error(`No batch found matching "${batchNumber}"`);
+    return data[0];
+  }
+  throw new Error("Either batchId or batchNumber is required");
 }
 
 /**
@@ -762,33 +793,7 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("Target state"),
       }),
       execute: async ({ batchId, batchNumber, toState }) => {
-        let batch: {
-          id: string;
-          batch_number: string;
-          status: string;
-        } | null = null;
-
-        if (batchId) {
-          const { data, error } = await supabase
-            .from("batches")
-            .select("id, batch_number, status")
-            .eq("id", batchId)
-            .single();
-          if (error) throw new Error(`Batch not found: ${error.message}`);
-          batch = data;
-        } else if (batchNumber) {
-          const { data, error } = await supabase
-            .from("batches")
-            .select("id, batch_number, status")
-            .ilike("batch_number", `%${escapeLike(batchNumber)}%`)
-            .limit(1);
-          if (error) throw new Error(error.message);
-          if (!data || data.length === 0)
-            throw new Error(`No batch found matching "${batchNumber}"`);
-          batch = data[0];
-        } else {
-          throw new Error("Either batchId or batchNumber is required");
-        }
+        const batch = await resolveBatch(supabase, batchId, batchNumber);
 
         const validTransitions: Record<string, string[]> = {
           planned: ["fermenting", "cancelled"],
@@ -804,33 +809,23 @@ export function createChatTools(supabase: SupabaseClient) {
           );
         }
 
-        const dialogMap: Record<string, string | null> = {
+        const dialogMap: Record<string, string> = {
           fermenting: "start_fermentation",
           cancelled: "cancel",
           archived: "archive",
-          conditioning: null,
-          packaging: null,
-          completed: null,
         };
 
-        const openDialog = dialogMap[toState] ?? undefined;
-        const stateLabels: Record<string, string> = {
-          fermenting: "Fermenting",
-          conditioning: "Conditioning",
-          packaging: "Packaging",
-          completed: "Completed",
-          cancelled: "Cancelled",
-          archived: "Archived",
-        };
+        const openDialog = dialogMap[toState] as string | undefined;
+        const toLabel = getStateLabel(batchEntity, toState);
 
         const description = openDialog
-          ? `Move batch #${batch.batch_number} from ${batch.status} to ${stateLabels[toState]}`
-          : `Navigate to batch #${batch.batch_number} — click "${stateLabels[toState]}" in the Actions menu to transition from ${batch.status}`;
+          ? `Move batch #${batch.batch_number} from ${batch.status} to ${toLabel}`
+          : `Navigate to batch #${batch.batch_number} — click "${toLabel}" in the Actions menu to transition from ${batch.status}`;
 
         return {
           action: "navigate" as const,
           url: `/production/batches/${batch.id}`,
-          openDialog: openDialog ?? undefined,
+          openDialog,
           description,
         };
       },
@@ -847,33 +842,7 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("The batch number to search for"),
       }),
       execute: async ({ batchId, batchNumber }) => {
-        let batch: {
-          id: string;
-          batch_number: string;
-          status: string;
-        } | null = null;
-
-        if (batchId) {
-          const { data, error } = await supabase
-            .from("batches")
-            .select("id, batch_number, status")
-            .eq("id", batchId)
-            .single();
-          if (error) throw new Error(`Batch not found: ${error.message}`);
-          batch = data;
-        } else if (batchNumber) {
-          const { data, error } = await supabase
-            .from("batches")
-            .select("id, batch_number, status")
-            .ilike("batch_number", `%${escapeLike(batchNumber)}%`)
-            .limit(1);
-          if (error) throw new Error(error.message);
-          if (!data || data.length === 0)
-            throw new Error(`No batch found matching "${batchNumber}"`);
-          batch = data[0];
-        } else {
-          throw new Error("Either batchId or batchNumber is required");
-        }
+        const batch = await resolveBatch(supabase, batchId, batchNumber);
 
         const activeStates = ["fermenting", "conditioning", "packaging"];
         if (!activeStates.includes(batch.status)) {
