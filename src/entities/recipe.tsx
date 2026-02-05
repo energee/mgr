@@ -16,6 +16,7 @@ import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/d
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
+import { RecipeProductionHistory } from "@/components/domain/recipe-production-history";
 import { StatusBadge } from "@/components/universal/status-badge";
 
 import { recipeSchema } from "@/lib/schemas/recipe";
@@ -246,6 +247,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       id: "additions",
       title: "Additions",
       component: RecipeAdditionsDisplay,
+    },
+    {
+      id: "production-history",
+      title: "Production History",
+      component: RecipeProductionHistory,
+      collapsible: true,
     },
     {
       id: "notes",
