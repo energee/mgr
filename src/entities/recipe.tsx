@@ -499,6 +499,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
+      showWhen: (data) => !data.batch_count,
     },
   ],
 
