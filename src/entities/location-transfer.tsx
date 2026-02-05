@@ -165,7 +165,7 @@ export const locationTransferEntity: EntityConfig<LocationTransferView> = {
   ],
 
   defaultSort: {
-    column: "created_at" as keyof LocationTransferView & string,
+    column: "ship_date",
     direction: "desc",
   },
   searchableFields: [

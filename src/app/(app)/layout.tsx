@@ -26,23 +26,27 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     redirect("/login");
   }
 
-  // Get brewery name from system_settings
+  // Get brewery name and logo from system_settings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-  const { data: setting } = await db
+  const { data: settings } = await db
     .from("system_settings")
-    .select("value")
-    .eq("key", "brewery_name")
-    .single();
+    .select("key, value")
+    .in("key", ["brewery_name", "brewery_logo_svg"]);
 
-  const breweryName = (setting?.value as string) || "My Brewery";
+  const settingsMap: Record<string, unknown> = {};
+  for (const row of settings || []) {
+    settingsMap[row.key as string] = row.value;
+  }
+  const breweryName = (settingsMap.brewery_name as string) || "My Brewery";
+  const breweryLogoSvg = (settingsMap.brewery_logo_svg as string) || null;
 
   return (
     <AppProviders>
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
-          <ChatLayout header={<AppHeader user={user} breweryName={breweryName} />}>
+          <ChatLayout header={<AppHeader user={user} breweryName={breweryName} breweryLogoSvg={breweryLogoSvg} />}>
             {children}
           </ChatLayout>
         </SidebarInset>

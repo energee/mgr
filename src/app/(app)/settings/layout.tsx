@@ -15,6 +15,7 @@ const settingsNav = [
   {
     heading: "General",
     items: [
+      { label: "Account", href: "/settings/account" },
       { label: "System", href: "/settings/system" },
       { label: "Brewery", href: "/settings/brewery" },
       { label: "Users", href: "/settings/users" },

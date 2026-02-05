@@ -30,7 +30,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Building2, Calculator, Calendar, Check, FileText, Save } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
 // =============================================================================
 // Schema
@@ -163,146 +165,6 @@ function useUpdateSystemSettings() {
 }
 
 // =============================================================================
-// Global API Key Section (write-only — key is never read back to the client)
-// =============================================================================
-
-function GlobalApiKeySection() {
-  const [apiKey, setApiKey] = useState("");
-  const [hasExistingKey, setHasExistingKey] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/settings/api-key?scope=global")
-      .then((res) => res.json())
-      .then((data) => {
-        setHasExistingKey(data.hasKey === true);
-        setLoaded(true);
-      })
-      .catch(() => setLoaded(true));
-  }, []);
-
-  const saveKey = useMutation({
-    mutationFn: async (key: string) => {
-      const res = await fetch("/api/settings/api-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope: "global", key }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save");
-      }
-    },
-    onSuccess: (_data, key) => {
-      setHasExistingKey(!!key);
-      setApiKey("");
-      toast.success(key ? "Global API key saved" : "Global API key removed");
-    },
-    onError: () => {
-      toast.error("Failed to save API key");
-    },
-  });
-
-  const testKey = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/settings/api-key/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope: "global" }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Test failed");
-      }
-    },
-    onSuccess: () => {
-      toast.success("API key is valid");
-    },
-    onError: (err: Error) => {
-      toast.error(`API key test failed: ${err.message}`);
-    },
-  });
-
-  if (!loaded) return null;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>AI Integration</CardTitle>
-        <CardDescription>
-          Configure the AI brewery assistant. This key is used as a fallback
-          when individual users don&apos;t have their own key configured.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {hasExistingKey && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Check className="h-4 w-4 text-green-600" />
-            Global API key is configured
-          </div>
-        )}
-        <div className="grid gap-2">
-          <Label htmlFor="global_api_key">
-            {hasExistingKey ? "Replace API Key" : "Anthropic API Key (Global)"}
-          </Label>
-          <div className="flex gap-2">
-            <Input
-              id="global_api_key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-ant-..."
-              autoComplete="off"
-            />
-            <Button
-              type="button"
-              onClick={() => saveKey.mutate(apiKey)}
-              disabled={!apiKey || saveKey.isPending}
-            >
-              {saveKey.isPending ? "Saving..." : "Save"}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Get your API key from{" "}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              console.anthropic.com
-            </a>
-            . Users can override this with their own key in Brewery Settings.
-          </p>
-        </div>
-        {hasExistingKey && (
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => testKey.mutate()}
-              disabled={testKey.isPending}
-            >
-              {testKey.isPending ? "Testing..." : "Test Key"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => saveKey.mutate("")}
-              disabled={saveKey.isPending}
-            >
-              Remove global key
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// =============================================================================
 // Component
 // =============================================================================
 
@@ -310,6 +172,12 @@ export default function SystemSettingsPage() {
   const { data: settings, isLoading } = useSystemSettings();
   const updateSettings = useUpdateSystemSettings();
   const [activeTab, setActiveTab] = useState("general");
+  const [isMac, setIsMac] = useState(false);
+  const submitRef = useSubmitShortcut();
+
+  useEffect(() => {
+    setIsMac(navigator.userAgent.includes("Mac"));
+  }, []);
 
   const form = useForm<SystemSettingsForm>({
     resolver: zodResolver(systemSettingsSchema),
@@ -414,27 +282,11 @@ export default function SystemSettingsPage() {
       ) : (
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="general" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                <span className="hidden sm:inline">General</span>
-              </TabsTrigger>
-              <TabsTrigger value="tax" className="flex items-center gap-2">
-                <Calculator className="h-4 w-4" />
-                <span className="hidden sm:inline">Tax</span>
-              </TabsTrigger>
-              <TabsTrigger value="fiscal" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Fiscal</span>
-              </TabsTrigger>
-              <TabsTrigger value="compliance" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Compliance</span>
-              </TabsTrigger>
-              <TabsTrigger value="integrations" className="flex items-center gap-2">
-                <Bot className="h-4 w-4" />
-                <span className="hidden sm:inline">Integrations</span>
-              </TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="tax">Tax</TabsTrigger>
+              <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
+              <TabsTrigger value="compliance">Compliance</TabsTrigger>
             </TabsList>
 
             {/* General Tab */}
@@ -743,17 +595,17 @@ export default function SystemSettingsPage() {
               </Card>
             </TabsContent>
 
-            {/* Integrations Tab */}
-            <TabsContent value="integrations">
-              <GlobalApiKeySection />
-            </TabsContent>
           </Tabs>
 
           {/* Submit */}
           <div className="flex justify-end">
-            <Button type="submit" disabled={updateSettings.isPending}>
-              <Save className="h-4 w-4 mr-2" />
-              {updateSettings.isPending ? "Saving..." : "Save Settings"}
+            <Button ref={submitRef} type="submit" disabled={updateSettings.isPending}>
+              {updateSettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Settings
+              <KbdGroup>
+                <Kbd>{isMac ? "\u2318" : "Ctrl"}</Kbd>
+                <Kbd>{isMac ? "\u21B5" : "Enter"}</Kbd>
+              </KbdGroup>
             </Button>
           </div>
         </form>
