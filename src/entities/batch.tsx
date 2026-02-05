@@ -18,6 +18,8 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
+import { BatchRecipeContext } from "@/components/domain/batch-recipe-context";
+import { BatchCostBreakdown } from "@/components/domain/batch-cost-breakdown";
 import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
 import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-info";
 import { BatchInsights } from "@/components/domain/batch-insights";
@@ -188,6 +190,18 @@ export const batchEntity: EntityConfig<Batch> = {
         { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
         { field: "current_vessel_name", label: "Vessel" },
       ],
+    },
+    {
+      id: "recipe-context",
+      title: "Recipe",
+      component: BatchRecipeContext,
+      collapsible: true,
+    },
+    {
+      id: "cost-breakdown",
+      title: "Cost Breakdown",
+      component: BatchCostBreakdown,
+      collapsible: true,
     },
     {
       id: "brew-info",
