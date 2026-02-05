@@ -285,7 +285,7 @@ export const customerEntity: EntityConfig<Customer> = {
         table: "pricing_tiers",
         valueField: "id",
         labelField: "name",
-        orderBy: "sort_order",
+        orderBy: "cogs_max",
       },
       colSpan: 6,
     },

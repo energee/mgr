@@ -122,7 +122,7 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
         table: "pricing_tiers",
         valueField: "id",
         labelField: "name",
-        orderBy: "sort_order",
+        orderBy: "cogs_max",
       },
     },
     {
