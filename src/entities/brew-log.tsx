@@ -152,7 +152,7 @@ export const metricConfig = {
 } as const;
 
 // =============================================================================
-// State Machine
+// State Machine (defined separately to derive options)
 // =============================================================================
 
 const brewLogStateMachine: StateMachineConfig<BrewLog> = {
@@ -280,6 +280,79 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
         { field: "notes", label: "Notes", fullWidth: true },
       ],
       collapsible: true,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Unified Sections (for EntityDetailUnified)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "brew_number",
+          label: "Brew Number",
+          type: "text",
+          placeholder: "e.g., BRW-2024-001",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "brew_date",
+          label: "Brew Date",
+          type: "date",
+          format: "date",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "recipe_id",
+          label: "Recipe",
+          type: "relation",
+          relation: { entity: "recipe", displayField: "name" },
+          colSpan: 6,
+        },
+        {
+          name: "brewer_id",
+          label: "Brewer",
+          type: "relation",
+          relation: { entity: "user", displayField: "full_name" },
+          colSpan: 6,
+        },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: statusOptions,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "timeline",
+      title: "Brew Day Timeline",
+      component: BrewLogTimeline,
+    },
+    {
+      id: "batches",
+      title: "Linked Batches",
+      component: BrewLogSplitOverview,
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
     },
   ],
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { binEntity } from "@/entities/bin";
 
 export default function BinDetailPage({
@@ -10,5 +10,5 @@ export default function BinDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetail entity={binEntity} id={id} basePath="/inventory/bins" />;
+  return <EntityDetailUnifiedWithErrorBoundary entity={binEntity} id={id} basePath="/inventory/bins" />;
 }

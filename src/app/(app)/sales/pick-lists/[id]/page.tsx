@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { pickListEntity } from "@/entities/pick-list";
 
 export default function PickListDetailPage({
@@ -10,5 +10,5 @@ export default function PickListDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetail entity={pickListEntity} id={id} basePath="/sales/pick-lists" />;
+  return <EntityDetailUnifiedWithErrorBoundary entity={pickListEntity} id={id} basePath="/sales/pick-lists" />;
 }

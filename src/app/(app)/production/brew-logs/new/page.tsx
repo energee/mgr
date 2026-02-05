@@ -1,15 +1,11 @@
 "use client";
 
-/**
- * New Brew Log Page
- */
-
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { brewLogEntity } from "@/entities/brew-log";
 
 export default function NewBrewLogPage() {
   return (
-    <EntityForm
+    <EntityDetailUnifiedWithErrorBoundary
       entity={brewLogEntity}
       basePath="/production/brew-logs"
     />

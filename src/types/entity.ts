@@ -70,7 +70,7 @@ export interface EntityConfig<T = Record<string, unknown>> {
   // Detail View Configuration
   // ---------------------------------------------------------------------------
 
-  /** Sections to display in detail view */
+  /** @deprecated Use `sections` instead. Will be removed in a future update. */
   detailSections?: EntitySectionDef<T>[];
 
   /** Header fields to show prominently */
@@ -81,19 +81,26 @@ export interface EntityConfig<T = Record<string, unknown>> {
   };
 
   // ---------------------------------------------------------------------------
+  // Unified Detail/Edit View Configuration (replaces detailSections + formFields)
+  // ---------------------------------------------------------------------------
+
+  /** Unified sections for combined detail/edit view. Takes precedence over detailSections + formFields. */
+  sections?: UnifiedSectionDef<T>[];
+
+  // ---------------------------------------------------------------------------
   // Form Configuration
   // ---------------------------------------------------------------------------
 
   /** Zod schema for form validation */
   formSchema: ZodSchema<Partial<T>>;
 
-  /** Form field definitions */
+  /** @deprecated Use `sections` instead. Kept for backward compatibility. */
   formFields: EntityFieldDef<T>[];
 
-  /** Fields to show in create mode (defaults to all) */
+  /** @deprecated Use `sections` with `editable: "create-only"` instead. */
   createFields?: (keyof T & string)[];
 
-  /** Fields to show in edit mode (defaults to all) */
+  /** @deprecated Use `sections` with `editable` control instead. */
   editFields?: (keyof T & string)[];
 
   // ---------------------------------------------------------------------------
@@ -345,6 +352,141 @@ export interface EntityFieldDef<T> {
 }
 
 // =============================================================================
+// Unified Detail/Edit Types
+// =============================================================================
+
+/**
+ * Unified field definition for the combined detail/edit view.
+ * Each field knows how to render in both display (view) and input (edit) mode.
+ * Merges the concepts of EntityFieldDisplay (view) and EntityFieldDef (edit).
+ */
+export interface UnifiedFieldDef<T = Record<string, unknown>> {
+  /** Field key (maps to record property) */
+  name: keyof T & string;
+
+  /** Display label */
+  label: string;
+
+  // -- Layout (shared) --
+
+  /** Grid column span (1-12). Controls layout in both view and edit modes. */
+  colSpan?: number;
+
+  /** Span full width (alternative to colSpan: 12) */
+  fullWidth?: boolean;
+
+  // -- Display mode props --
+
+  /** Custom render function for view mode */
+  render?: (value: unknown, data: T) => ReactNode;
+
+  /** Format type for automatic formatting in view mode */
+  format?: "date" | "datetime" | "currency" | "number" | "percentage" | "json" | "unit";
+
+  // -- Edit mode props --
+
+  /** Input type for edit mode. If omitted, field is display-only. */
+  type?: "text" | "textarea" | "number" | "select" | "multiselect" | "combobox"
+    | "date" | "datetime" | "checkbox" | "switch" | "json" | "relation" | "unit";
+
+  /** Placeholder text (edit mode) */
+  placeholder?: string;
+
+  /** Help text shown below the input (edit mode) */
+  description?: string;
+
+  /** Whether field is required (edit mode) */
+  required?: boolean;
+
+  /** Whether field is disabled (edit mode) */
+  disabled?: boolean;
+
+  /** Static options for select/multiselect/combobox */
+  options?: { value: string; label: string }[];
+
+  /** Dynamic options from database table */
+  dynamicOptions?: {
+    table: string;
+    valueField: string;
+    labelField: string;
+    filter?: Record<string, unknown>;
+    orderBy?: string;
+  };
+
+  /** Related entity configuration (for relation type fields and FK display) */
+  relation?: {
+    entity: string;
+    displayField: string;
+  };
+
+  /** Default value for create mode */
+  defaultValue?: unknown;
+
+  /** Conditional visibility based on current form values */
+  showWhen?: (values: Partial<T>) => boolean;
+
+  /** Unit type for unit fields/formatting */
+  unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
+
+  /** Allow inline unit switching */
+  allowUnitSwitch?: boolean;
+
+  // -- Mode control --
+
+  /**
+   * Controls whether this field is editable.
+   * - true (default): editable in both create and edit modes
+   * - false: always display-only (e.g., computed fields, timestamps)
+   * - "create-only": editable in create mode, display-only in edit mode
+   */
+  editable?: boolean | "create-only";
+}
+
+/**
+ * Unified section definition for the combined detail/edit view.
+ * Each section can contain either unified fields or a custom component.
+ */
+export interface UnifiedSectionDef<T = Record<string, unknown>> {
+  /** Section identifier */
+  id: string;
+
+  /** Section title */
+  title: string;
+
+  /** Unified fields for this section */
+  fields?: UnifiedFieldDef<T>[];
+
+  /**
+   * Custom component for view mode (or both modes if editComponent is not set).
+   * Receives { data, editing, form } props.
+   */
+  component?: ComponentType<{
+    data: T;
+    editing?: boolean;
+    form?: unknown; // UseFormReturn - typed as unknown to avoid import
+  }>;
+
+  /**
+   * Custom component for edit mode (overrides component when editing).
+   * Use this when view and edit have fundamentally different UIs.
+   */
+  editComponent?: ComponentType<{
+    data: T;
+    editing?: boolean;
+    form?: unknown;
+  }>;
+
+  /** Whether this section is collapsible */
+  collapsible?: boolean;
+
+  /** Default collapsed state */
+  defaultCollapsed?: boolean;
+
+  /** Tab name if using tabbed layout */
+  tab?: string;
+}
+
+// =============================================================================
 // Value Display Types (for non-state enum fields)
 // =============================================================================
 
@@ -518,6 +660,9 @@ export interface EntityRelationDef {
 
   /** Limit for related records query (default: 50) */
   relationLimit?: number;
+
+  /** Hide the "Add" button on relation tabs (e.g., when creation is handled by a dialog) */
+  hideAdd?: boolean;
 
   /** Custom component to render instead of default table (for inline editors, etc.) */
   component?: ComponentType<{ parentId: string; data?: Record<string, unknown> }>;

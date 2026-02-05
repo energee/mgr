@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { binEntity } from "@/entities/bin";
 
 export default function NewBinPage() {
-  return <EntityForm entity={binEntity} basePath="/inventory/bins" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={binEntity}
+      basePath="/inventory/bins"
+    />
+  );
 }

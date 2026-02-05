@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { packageTypeEntity } from "@/entities/package-type";
 
 export default function NewPackageTypePage() {
-  return <EntityForm entity={packageTypeEntity} basePath="/settings/formats" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={packageTypeEntity}
+      basePath="/settings/formats"
+    />
+  );
 }

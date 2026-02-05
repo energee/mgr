@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { inventoryItemEntity } from "@/entities/inventory-item";
 
 export default function NewInventoryItemPage() {
-  return <EntityForm entity={inventoryItemEntity} basePath="/inventory/items" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={inventoryItemEntity}
+      basePath="/inventory/items"
+    />
+  );
 }
