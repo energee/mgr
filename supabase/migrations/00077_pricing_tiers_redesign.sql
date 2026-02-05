@@ -217,7 +217,7 @@ DROP VIEW IF EXISTS tier_prices_with_status;
 DROP VIEW IF EXISTS customers_with_order_summary;
 
 -- Drop old function and tables
-DROP FUNCTION IF EXISTS get_price_for_customer(UUID, UUID, UUID, UUID);
+DROP FUNCTION IF EXISTS get_price_for_customer(UUID, UUID, UUID, UUID, DATE);
 DROP TABLE IF EXISTS tier_prices CASCADE;
 DROP TABLE IF EXISTS price_tiers CASCADE;
 

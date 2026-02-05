@@ -41,6 +41,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
 
 export function EntityDetail<T = Record<string, unknown>>({
   entity,
@@ -286,26 +287,25 @@ export function EntityDetail<T = Record<string, unknown>>({
                 {availableActions.map((action) => {
                   const disabledReason = action.disabledWhen?.(data);
                   return (
-                    <DropdownMenuItem
+                    <AnimatedActionMenuItem
                       key={action.name}
+                      icon={action.icon}
+                      label={action.label}
+                      variant={action.variant === "destructive" ? "destructive" : undefined}
                       disabled={!!disabledReason}
                       title={disabledReason || undefined}
                       onClick={() => {
                         if (disabledReason) return;
-                        // Check if external handler wants to handle this action
                         if (onAction && onAction(action.name, data)) {
-                          return; // Action was handled externally
+                          return;
                         }
-                        // Default handling
                         if (action.toState) {
                           transitionMutation.mutate({ toState: action.toState });
                         } else {
                           action.handler?.(data);
                         }
                       }}
-                    >
-                      {action.label}
-                    </DropdownMenuItem>
+                    />
                   );
                 })}
               </DropdownMenuContent>

@@ -75,11 +75,11 @@ export function RecipeDeleteDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent size="sm">
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Recipe</AlertDialogTitle>
+<AlertDialogTitle>Delete recipe?</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete &quot;{recipeName}&quot;? This action
+            This will permanently delete &quot;{recipeName}&quot;. This action
             cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -87,16 +87,16 @@ export function RecipeDeleteDialog({
           <p className="text-sm text-destructive">{error}</p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleteMutation.isPending}>
+          <AlertDialogCancel variant="outline" disabled={deleteMutation.isPending}>
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction
+            variant="destructive"
             onClick={(e) => {
               e.preventDefault();
               deleteMutation.mutate();
             }}
             disabled={deleteMutation.isPending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {deleteMutation.isPending ? "Deleting..." : "Delete"}
           </AlertDialogAction>

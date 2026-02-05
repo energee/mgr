@@ -13,16 +13,18 @@ import type {
 } from "@/types/entity";
 import type { FilterVariant, Option, ExtendedColumnFilter } from "@/types/data-table";
 import { formatValue } from "@/lib/utils";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MoreHorizontal } from "lucide-react";
+import {
+  AnimatedActionMenuItem,
+  AnimatedLinkActionMenuItem,
+} from "@/components/universal/animated-action-menu-item";
 
 // =============================================================================
 // Filter Variant Mapping
@@ -169,12 +171,8 @@ export function buildActionsColumn<T>(
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`${basePath}/${id}`}>View</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`${basePath}/${id}/edit`}>Edit</Link>
-            </DropdownMenuItem>
+            <AnimatedLinkActionMenuItem icon="view" label="View" href={`${basePath}/${id}`} />
+            <AnimatedLinkActionMenuItem icon="edit" label="Edit" href={`${basePath}/${id}/edit`} />
             {entity.actions?.map((action) => {
               if (action.showWhen && !action.showWhen(record)) return null;
               if (action.fromStates) {
@@ -192,8 +190,11 @@ export function buildActionsColumn<T>(
               }
               const disabledReason = action.disabledWhen?.(record);
               return (
-                <DropdownMenuItem
+                <AnimatedActionMenuItem
                   key={action.name}
+                  icon={action.icon}
+                  label={action.label}
+                  variant={action.variant === "destructive" ? "destructive" : undefined}
                   disabled={!!disabledReason}
                   title={disabledReason || undefined}
                   onClick={() => {
@@ -203,9 +204,7 @@ export function buildActionsColumn<T>(
                     }
                     action.handler?.(record);
                   }}
-                >
-                  {action.label}
-                </DropdownMenuItem>
+                />
               );
             })}
           </DropdownMenuContent>

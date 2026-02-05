@@ -289,19 +289,19 @@ export default function OrderAllocationsPage({
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Allocation</AlertDialogTitle>
+<AlertDialogTitle>Remove allocation?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this allocation? The finished goods
-              will be returned to available inventory.
+              The finished goods will be returned to available inventory. This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel variant="outline">Cancel</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               onClick={() => deleteId && deleteMutation.mutate(deleteId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
