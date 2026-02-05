@@ -492,7 +492,7 @@ function SectionCard<T>({
         <CardTitle>{section.title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-12 gap-4">
+        <dl className="grid grid-cols-2 gap-4">
           {section.fields?.map((field) => {
             const value = data[field.field as keyof T];
             // Check if this field is the state field and format using entity config
