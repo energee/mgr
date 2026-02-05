@@ -19,6 +19,7 @@ CREATE TABLE recipe_variants (
 
 ALTER TABLE recipe_variants ENABLE ROW LEVEL SECURITY;
 
+-- Note: WITH CHECK (true) is acceptable for single-tenant reference data per DEC-SEC-006
 CREATE POLICY "Authenticated users can manage recipe_variants"
   ON recipe_variants FOR ALL
   TO authenticated
@@ -36,7 +37,7 @@ COMMENT ON TABLE recipe_variants IS 'Planned cold-side variations for a recipe (
 CREATE TABLE recipe_variant_hops (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_variant_id UUID NOT NULL REFERENCES recipe_variants(id) ON DELETE CASCADE,
-  hop_id UUID NOT NULL REFERENCES hops(id),
+  hop_id UUID NOT NULL REFERENCES hops(id) ON DELETE RESTRICT,
   weight_oz DECIMAL NOT NULL CHECK (weight_oz > 0),
   timing TEXT NOT NULL DEFAULT 'dry_hop',
   days INT,
@@ -46,6 +47,7 @@ CREATE TABLE recipe_variant_hops (
 
 ALTER TABLE recipe_variant_hops ENABLE ROW LEVEL SECURITY;
 
+-- Note: WITH CHECK (true) is acceptable for single-tenant reference data per DEC-SEC-006
 CREATE POLICY "Authenticated users can manage recipe_variant_hops"
   ON recipe_variant_hops FOR ALL
   TO authenticated
@@ -63,7 +65,7 @@ COMMENT ON TABLE recipe_variant_hops IS 'Hop additions planned for a recipe vari
 CREATE TABLE recipe_variant_adjuncts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_variant_id UUID NOT NULL REFERENCES recipe_variants(id) ON DELETE CASCADE,
-  adjunct_id UUID NOT NULL REFERENCES adjuncts(id),
+  adjunct_id UUID NOT NULL REFERENCES adjuncts(id) ON DELETE RESTRICT,
   amount DECIMAL NOT NULL CHECK (amount > 0),
   unit TEXT NOT NULL,
   timing TEXT,
@@ -73,6 +75,7 @@ CREATE TABLE recipe_variant_adjuncts (
 
 ALTER TABLE recipe_variant_adjuncts ENABLE ROW LEVEL SECURITY;
 
+-- Note: WITH CHECK (true) is acceptable for single-tenant reference data per DEC-SEC-006
 CREATE POLICY "Authenticated users can manage recipe_variant_adjuncts"
   ON recipe_variant_adjuncts FOR ALL
   TO authenticated
@@ -90,7 +93,7 @@ COMMENT ON TABLE recipe_variant_adjuncts IS 'Adjunct additions planned for a rec
 CREATE TABLE recipe_variant_fruits (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_variant_id UUID NOT NULL REFERENCES recipe_variants(id) ON DELETE CASCADE,
-  fruit_id UUID NOT NULL REFERENCES fruits(id),
+  fruit_id UUID NOT NULL REFERENCES fruits(id) ON DELETE RESTRICT,
   amount DECIMAL NOT NULL CHECK (amount > 0),
   unit TEXT NOT NULL,
   timing TEXT,
@@ -100,6 +103,7 @@ CREATE TABLE recipe_variant_fruits (
 
 ALTER TABLE recipe_variant_fruits ENABLE ROW LEVEL SECURITY;
 
+-- Note: WITH CHECK (true) is acceptable for single-tenant reference data per DEC-SEC-006
 CREATE POLICY "Authenticated users can manage recipe_variant_fruits"
   ON recipe_variant_fruits FOR ALL
   TO authenticated
@@ -117,7 +121,7 @@ COMMENT ON TABLE recipe_variant_fruits IS 'Fruit additions planned for a recipe 
 CREATE TABLE recipe_variant_spices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_variant_id UUID NOT NULL REFERENCES recipe_variants(id) ON DELETE CASCADE,
-  spice_id UUID NOT NULL REFERENCES spices(id),
+  spice_id UUID NOT NULL REFERENCES spices(id) ON DELETE RESTRICT,
   amount DECIMAL NOT NULL CHECK (amount > 0),
   unit TEXT NOT NULL,
   timing TEXT,
@@ -128,6 +132,7 @@ CREATE TABLE recipe_variant_spices (
 
 ALTER TABLE recipe_variant_spices ENABLE ROW LEVEL SECURITY;
 
+-- Note: WITH CHECK (true) is acceptable for single-tenant reference data per DEC-SEC-006
 CREATE POLICY "Authenticated users can manage recipe_variant_spices"
   ON recipe_variant_spices FOR ALL
   TO authenticated

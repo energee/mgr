@@ -65,7 +65,7 @@ SELECT
     THEN ROUND((
       COALESCE(hs.hot_side_cost_per_bbl, 0)
       + (COALESCE(vhc.hop_cost, 0) + COALESCE(vac.adjunct_cost, 0) + COALESCE(vfc.fruit_cost, 0))
-        / rv.planned_volume_bbl
+        / COALESCE(rv.planned_volume_bbl, 1)
     )::numeric, 2)
     ELSE NULL
   END as est_cost_per_bbl

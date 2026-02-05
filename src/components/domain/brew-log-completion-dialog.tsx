@@ -99,8 +99,10 @@ export function BrewLogCompletionDialog({
   // ---------------------------------------------------------------------------
 
   // Fetch linked batches with current vessel info
-  const { data: linkedBatches = [], isLoading: batchesLoading } = useQuery({
-    queryKey: [...brewLogKeys.batches(brewLogId), "completion"],
+  const { data: linkedBatches = [], isLoading: batchesLoading } = useQuery<
+    LinkedBatch[]
+  >({
+    queryKey: brewLogKeys.batchesForCompletion(brewLogId),
     queryFn: async () => {
       // Get brew_log_batches joined with batch info
       const { data: links, error } = await db
@@ -152,8 +154,10 @@ export function BrewLogCompletionDialog({
   });
 
   // Fetch available vessels (no current batch, active, fermenter or unitank)
-  const { data: availableVessels = [], isLoading: vesselsLoading } = useQuery({
-    queryKey: [...vesselKeys.available(), "completion"],
+  const { data: availableVessels = [], isLoading: vesselsLoading } = useQuery<
+    AvailableVessel[]
+  >({
+    queryKey: vesselKeys.availableForCompletion(),
     queryFn: async () => {
       const { data, error } = await db
         .from("vessels")

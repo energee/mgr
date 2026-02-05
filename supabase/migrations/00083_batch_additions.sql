@@ -23,6 +23,7 @@ CREATE TABLE batch_additions (
 
 ALTER TABLE batch_additions ENABLE ROW LEVEL SECURITY;
 
+-- Note: WITH CHECK (true) is acceptable for single-tenant reference data per DEC-SEC-006
 CREATE POLICY "Authenticated users can manage batch_additions"
   ON batch_additions FOR ALL
   TO authenticated

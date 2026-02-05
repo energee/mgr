@@ -105,6 +105,36 @@ interface VariantSpiceItem {
   position: number;
 }
 
+type SimpleAdditionItem = VariantAdjunctItem | VariantFruitItem | VariantSpiceItem;
+
+type SimpleAdditionType = "adjuncts" | "fruits" | "spices";
+
+/** Clone a variant with a modified simple-addition array (adjuncts, fruits, or spices). */
+function withUpdatedAdditions(
+  variant: VariantItem,
+  type: SimpleAdditionType,
+  updater: (items: SimpleAdditionItem[]) => SimpleAdditionItem[]
+): VariantItem {
+  return { ...variant, [type]: updater(variant[type]) };
+}
+
+/** Create a new empty addition item for the given type. */
+function newSimpleAddition(
+  type: SimpleAdditionType,
+  catalog: SimpleAdditionCatalog,
+  position: number
+): SimpleAdditionItem {
+  const base = { amount: 0, unit: "oz" as const, timing: null, position };
+  switch (type) {
+    case "adjuncts":
+      return { adjunct_id: catalog.id, adjunct_name: catalog.name, ...base };
+    case "fruits":
+      return { fruit_id: catalog.id, fruit_name: catalog.name, ...base };
+    case "spices":
+      return { spice_id: catalog.id, spice_name: catalog.name, ...base };
+  }
+}
+
 interface VariantItem {
   id?: string;
   name: string;
@@ -559,26 +589,16 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
   const addAddition = useCallback(
     (
       variantIndex: number,
-      type: "adjuncts" | "fruits" | "spices",
+      type: SimpleAdditionType,
       item: SimpleAdditionCatalog
     ) => {
       setVariants((prev) => {
         const updated = [...prev];
-        const variant = { ...updated[variantIndex] };
-        const idField = type === "adjuncts" ? "adjunct_id" : type === "fruits" ? "fruit_id" : "spice_id";
-        const nameField = type === "adjuncts" ? "adjunct_name" : type === "fruits" ? "fruit_name" : "spice_name";
-        const existing = [...(variant[type] as Array<Record<string, unknown>>)];
-        existing.push({
-          [idField]: item.id,
-          [nameField]: item.name,
-          amount: 0,
-          unit: "oz",
-          timing: null,
-          position: existing.length,
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (variant as any)[type] = existing;
-        updated[variantIndex] = variant;
+        updated[variantIndex] = withUpdatedAdditions(
+          updated[variantIndex],
+          type,
+          (items) => [...items, newSimpleAddition(type, item, items.length)]
+        );
         return updated;
       });
       setIsDirty(true);
@@ -589,17 +609,16 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
   const removeAddition = useCallback(
     (
       variantIndex: number,
-      type: "adjuncts" | "fruits" | "spices",
+      type: SimpleAdditionType,
       additionIndex: number
     ) => {
       setVariants((prev) => {
         const updated = [...prev];
-        const variant = { ...updated[variantIndex] };
-        const existing = [...(variant[type] as unknown[])];
-        existing.splice(additionIndex, 1);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (variant as any)[type] = existing;
-        updated[variantIndex] = variant;
+        updated[variantIndex] = withUpdatedAdditions(
+          updated[variantIndex],
+          type,
+          (items) => items.filter((_, i) => i !== additionIndex)
+        );
         return updated;
       });
       setIsDirty(true);
@@ -610,19 +629,23 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
   const updateAddition = useCallback(
     (
       variantIndex: number,
-      type: "adjuncts" | "fruits" | "spices",
+      type: SimpleAdditionType,
       additionIndex: number,
       field: string,
       value: unknown
     ) => {
       setVariants((prev) => {
         const updated = [...prev];
-        const variant = { ...updated[variantIndex] };
-        const existing = [...(variant[type] as Array<Record<string, unknown>>)];
-        existing[additionIndex] = { ...existing[additionIndex], [field]: value };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (variant as any)[type] = existing;
-        updated[variantIndex] = variant;
+        updated[variantIndex] = withUpdatedAdditions(
+          updated[variantIndex],
+          type,
+          (items) =>
+            items.map((item, i) =>
+              i === additionIndex
+                ? ({ ...item, [field]: value } as SimpleAdditionItem)
+                : item
+            )
+        );
         return updated;
       });
       setIsDirty(true);
@@ -787,7 +810,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     renderItem={(hop, hIndex) => (
                       <HopRow
                         key={hIndex}
-                        hop={hop}
+                        hop={hop as VariantHopItem}
                         onUpdate={(field, value) =>
                           updateHop(vIndex, hIndex, field, value)
                         }
@@ -1049,23 +1072,23 @@ function SimpleAdditionSection({
 }: {
   title: string;
   icon: React.ReactNode;
-  type: "adjuncts" | "fruits" | "spices";
-  items: Array<Record<string, unknown>>;
+  type: SimpleAdditionType;
+  items: SimpleAdditionItem[];
   catalog: SimpleAdditionCatalog[];
   variantIndex: number;
   onAdd: (
     variantIndex: number,
-    type: "adjuncts" | "fruits" | "spices",
+    type: SimpleAdditionType,
     item: SimpleAdditionCatalog
   ) => void;
   onRemove: (
     variantIndex: number,
-    type: "adjuncts" | "fruits" | "spices",
+    type: SimpleAdditionType,
     index: number
   ) => void;
   onUpdate: (
     variantIndex: number,
-    type: "adjuncts" | "fruits" | "spices",
+    type: SimpleAdditionType,
     index: number,
     field: string,
     value: unknown
@@ -1084,7 +1107,7 @@ function SimpleAdditionSection({
       onAdd={(item) => onAdd(variantIndex, type, item)}
       renderCatalogItem={(item) => <span>{item.name}</span>}
       renderItem={(item, index) => {
-        const row = item as Record<string, unknown>;
+        const row = item as SimpleAdditionItem & Record<string, unknown>;
         return (
           <TableRow key={index}>
             <TableCell className="font-medium">
@@ -1095,7 +1118,7 @@ function SimpleAdditionSection({
                 type="number"
                 step="0.25"
                 min="0"
-                value={(row.amount as number) || ""}
+                value={row.amount || ""}
                 onChange={(e) =>
                   onUpdate(
                     variantIndex,
@@ -1110,7 +1133,7 @@ function SimpleAdditionSection({
             </TableCell>
             <TableCell>
               <Select
-                value={(row.unit as string) || "oz"}
+                value={row.unit || "oz"}
                 onValueChange={(value) =>
                   onUpdate(variantIndex, type, index, "unit", value)
                 }
@@ -1129,7 +1152,7 @@ function SimpleAdditionSection({
             </TableCell>
             <TableCell>
               <Select
-                value={(row.timing as string) || "_none"}
+                value={row.timing || "_none"}
                 onValueChange={(value) =>
                   onUpdate(
                     variantIndex,
