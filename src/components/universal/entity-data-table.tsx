@@ -108,6 +108,55 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const router = useRouter();
 
   const hasBulkActions = !!entity.stateMachine;
+  const fetchTable = entity.viewTable || entity.table;
+
+  // ---------------------------------------------------------------------------
+  // Single item state transition (used by kanban drag-and-drop + row actions)
+  // ---------------------------------------------------------------------------
+  const handleSingleTransition = useCallback(
+    async (id: string, toState: string) => {
+      if (!entity.stateMachine) return;
+
+      const stateField = entity.stateMachine.stateField;
+      const transitions = entity.stateMachine.transitions;
+
+      // Validate transition is allowed before hitting the database
+      const { data: current } = await db
+        .from(entity.table)
+        .select(stateField)
+        .eq("id", id)
+        .single();
+
+      const currentState = current?.[stateField] as string | undefined;
+      if (!currentState || !transitions[currentState]?.includes(toState)) {
+        toast.error("Transition no longer valid — status may have changed");
+        queryClient.invalidateQueries({ queryKey: entityKeys.all(fetchTable) });
+        return;
+      }
+
+      const { error } = await db
+        .from(entity.table)
+        .update({ [stateField]: toState })
+        .eq("id", id);
+
+      if (error) {
+        toast.error("Failed to update status");
+        return;
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all(fetchTable),
+      });
+      if (entity.viewTable) {
+        queryClient.invalidateQueries({
+          queryKey: entityKeys.all(entity.table),
+        });
+      }
+
+      toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
+    },
+    [entity, db, queryClient, fetchTable],
+  );
 
   // ---------------------------------------------------------------------------
   // View mode (table vs board)
@@ -195,13 +244,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const columns = useMemo((): ColumnDef<T, any>[] => {
     const dataColumns = buildDataTableColumns(entity, dynamicFilterOptions);
-    const actionsColumn = buildActionsColumn(entity, path, onAction);
+    const actionsColumn = buildActionsColumn(entity, path, onAction, handleSingleTransition);
 
     if (hasBulkActions) {
       return [buildSelectColumn<T>(), ...dataColumns, actionsColumn];
     }
     return [...dataColumns, actionsColumn];
-  }, [entity, dynamicFilterOptions, path, onAction, hasBulkActions]);
+  }, [entity, dynamicFilterOptions, path, onAction, hasBulkActions, handleSingleTransition]);
 
   // ---------------------------------------------------------------------------
   // URL-synced filter state (read from nuqs — DataTableFilterList writes here)
@@ -328,7 +377,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Data fetching
   // ---------------------------------------------------------------------------
-  const fetchTable = entity.viewTable || entity.table;
 
   // Build a stable key from URL filters for query cache
   const filterKey = useMemo(
@@ -519,37 +567,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
       return validIds.length;
     },
     [entity, selectedRows, db, queryClient, fetchTable]
-  );
-
-  // ---------------------------------------------------------------------------
-  // Single item state transition (used by kanban drag-and-drop)
-  // ---------------------------------------------------------------------------
-  const handleSingleTransition = useCallback(
-    async (id: string, toState: string) => {
-      if (!entity.stateMachine) return;
-
-      const stateField = entity.stateMachine.stateField;
-
-      const { error } = await db
-        .from(entity.table)
-        .update({ [stateField]: toState })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      // Invalidate queries
-      queryClient.invalidateQueries({
-        queryKey: entityKeys.all(fetchTable),
-      });
-      if (entity.viewTable) {
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.all(entity.table),
-        });
-      }
-
-      toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
-    },
-    [entity, db, queryClient, fetchTable],
   );
 
   // ---------------------------------------------------------------------------

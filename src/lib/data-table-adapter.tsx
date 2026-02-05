@@ -156,7 +156,8 @@ export function buildSelectColumn<T>(): ColumnDef<T, unknown> {
 export function buildActionsColumn<T>(
   entity: EntityConfig<T>,
   basePath: string,
-  onAction?: (actionName: string, record: T) => boolean
+  onAction?: (actionName: string, record: T) => boolean,
+  onTransition?: (id: string, toState: string) => void
 ): ColumnDef<T, unknown> {
   return {
     id: "actions",
@@ -204,6 +205,10 @@ export function buildActionsColumn<T>(
                   onClick={() => {
                     if (disabledReason) return;
                     if (onAction && onAction(action.name, record)) {
+                      return;
+                    }
+                    if (action.toState && onTransition) {
+                      onTransition(id, action.toState);
                       return;
                     }
                     action.handler?.(record);

@@ -15,10 +15,19 @@ function createAdminDb() {
   );
 }
 
+/** Return last 4 characters of key as a hint, e.g. "...a1b2" */
+function maskKey(key: string | null | undefined): string | null {
+  if (!key || key.length < 8) return null;
+  return `...${key.slice(-4)}`;
+}
+
+const VALID_INTEGRATION_IDS = ["square", "slack", "quickbooks"];
+
 /**
- * GET /api/settings/api-key?scope=global|user
+ * GET /api/settings/api-key?scope=global|user|integration&id=<integration_id>
  *
- * Returns { hasKey: boolean } — never exposes the actual key value.
+ * Returns { hasKey: boolean, keyHint: string | null }.
+ * keyHint shows the last 4 characters so users can identify which key is saved.
  */
 export async function GET(req: Request): Promise<Response> {
   const supabase = await createClient();
@@ -48,7 +57,10 @@ export async function GET(req: Request): Promise<Response> {
 
     const value = data?.value;
     const hasKey = typeof value === "string" && value !== "null" && value.length > 0;
-    return NextResponse.json({ hasKey });
+    return NextResponse.json({
+      hasKey,
+      keyHint: hasKey ? maskKey(value as string) : null,
+    });
   }
 
   if (scope === "user") {
@@ -62,7 +74,38 @@ export async function GET(req: Request): Promise<Response> {
       console.error("[api-key] Failed to check user key:", error.message);
     }
 
-    return NextResponse.json({ hasKey: !!data?.anthropic_api_key });
+    const key = data?.anthropic_api_key;
+    const hasKey = !!key;
+    return NextResponse.json({
+      hasKey,
+      keyHint: hasKey ? maskKey(key) : null,
+    });
+  }
+
+  if (scope === "integration") {
+    const id = searchParams.get("id");
+    if (!id || !VALID_INTEGRATION_IDS.includes(id)) {
+      return NextResponse.json({ error: "Invalid integration id" }, { status: 400 });
+    }
+
+    const settingsKey = `${id}_api_key`;
+    const admin = createAdminDb();
+    const { data, error } = await admin
+      .from("system_settings")
+      .select("value")
+      .eq("key", settingsKey)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`[api-key] Failed to check ${id} key:`, error.message);
+    }
+
+    const value = data?.value;
+    const hasKey = typeof value === "string" && value !== "null" && value.length > 0;
+    return NextResponse.json({
+      hasKey,
+      keyHint: hasKey ? maskKey(value as string) : null,
+    });
   }
 
   return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
@@ -71,7 +114,7 @@ export async function GET(req: Request): Promise<Response> {
 /**
  * POST /api/settings/api-key
  *
- * Body: { scope: "global" | "user", key: string }
+ * Body: { scope: "global" | "user" | "integration", key: string, id?: string }
  * Saves or removes an API key. Empty string removes the key.
  */
 export async function POST(req: Request): Promise<Response> {
@@ -85,7 +128,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { scope, key } = (await req.json()) as { scope: string; key: string };
+  const { scope, key, id } = (await req.json()) as { scope: string; key: string; id?: string };
 
   if (scope === "global") {
     const admin = createAdminDb();
@@ -114,6 +157,45 @@ export async function POST(req: Request): Promise<Response> {
       console.error("[api-key] Failed to save user key:", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    return NextResponse.json({ success: true });
+  }
+
+  if (scope === "integration") {
+    if (!id || !VALID_INTEGRATION_IDS.includes(id)) {
+      return NextResponse.json({ error: "Invalid integration id" }, { status: 400 });
+    }
+
+    const settingsKey = `${id}_api_key`;
+    const admin = createAdminDb();
+
+    // Upsert: try update first, insert if row doesn't exist
+    const { data: existing } = await admin
+      .from("system_settings")
+      .select("key")
+      .eq("key", settingsKey)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await admin
+        .from("system_settings")
+        .update({ value: key || null })
+        .eq("key", settingsKey);
+
+      if (error) {
+        console.error(`[api-key] Failed to save ${id} key:`, error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    } else {
+      const { error } = await admin
+        .from("system_settings")
+        .insert({ key: settingsKey, value: key || null });
+
+      if (error) {
+        console.error(`[api-key] Failed to insert ${id} key:`, error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
+
     return NextResponse.json({ success: true });
   }
 

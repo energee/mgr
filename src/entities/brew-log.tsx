@@ -173,6 +173,7 @@ const brewLogStateMachine: StateMachineConfig<BrewLog> = {
   },
 };
 
+// Derive status options from state machine (single source of truth)
 const statusOptions = statesAsOptions(brewLogStateMachine);
 
 // =============================================================================
@@ -400,12 +401,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       name: "status",
       label: "Status",
       type: "select",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "in_progress", label: "In Progress" },
-        { value: "completed", label: "Completed" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: statusOptions,
       colSpan: 6,
     },
     {

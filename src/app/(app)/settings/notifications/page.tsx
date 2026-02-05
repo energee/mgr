@@ -9,7 +9,7 @@
  * - Quiet hours configuration
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,8 +29,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TimePicker } from "@/components/ui/time-picker";
-import { ArrowLeft, Bell, Mail, Moon, Save } from "lucide-react";
-import Link from "next/link";
+import { Loader2 } from "lucide-react";
+import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+
 
 // =============================================================================
 // Types & Schema
@@ -74,6 +76,12 @@ const defaultPreferences: PreferencesFormValues = {
 export default function NotificationPreferencesPage() {
   const supabase = createClient();
   const queryClient = useQueryClient();
+  const [isMac, setIsMac] = useState(false);
+  const submitRef = useSubmitShortcut();
+
+  useEffect(() => {
+    setIsMac(navigator.userAgent.includes("Mac"));
+  }, []);
 
   // Fetch preferences
   const { data: preferences, isLoading } = useQuery({
@@ -182,10 +190,7 @@ export default function NotificationPreferencesPage() {
         {/* Notification Types */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notification Types
-            </CardTitle>
+            <CardTitle>Notification Types</CardTitle>
             <CardDescription>
               Choose which types of notifications you want to receive
             </CardDescription>
@@ -256,10 +261,7 @@ export default function NotificationPreferencesPage() {
         {/* Delivery Preferences */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Delivery Preferences
-            </CardTitle>
+            <CardTitle>Delivery Preferences</CardTitle>
             <CardDescription>
               Configure how notifications are delivered to you
             </CardDescription>
@@ -329,10 +331,7 @@ export default function NotificationPreferencesPage() {
         {/* Quiet Hours */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Moon className="h-5 w-5" />
-              Quiet Hours
-            </CardTitle>
+            <CardTitle>Quiet Hours</CardTitle>
             <CardDescription>
               Pause notifications during specific hours
             </CardDescription>
@@ -380,9 +379,13 @@ export default function NotificationPreferencesPage() {
 
         {/* Submit */}
         <div className="flex justify-end">
-          <Button type="submit" disabled={saveMutation.isPending}>
-            <Save className="h-4 w-4 mr-2" />
-            {saveMutation.isPending ? "Saving..." : "Save Preferences"}
+          <Button ref={submitRef} type="submit" disabled={saveMutation.isPending}>
+            {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Save Preferences
+            <KbdGroup>
+              <Kbd>{isMac ? "\u2318" : "Ctrl"}</Kbd>
+              <Kbd>{isMac ? "\u21B5" : "Enter"}</Kbd>
+            </KbdGroup>
           </Button>
         </div>
       </form>
