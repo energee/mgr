@@ -47,6 +47,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
 import { catalogKeys } from "@/lib/query-keys";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // Types for adjunct entries
 export interface AdjunctItem {
@@ -373,7 +374,7 @@ export function AdjunctEditor({
                 Total
               </TableCell>
               <TableCell className="text-right font-medium">
-                {totals.totalWeight.toFixed(2)} lbs
+                <UnitDisplay value={totals.totalWeight} unitType="weight" />
               </TableCell>
               <TableCell colSpan={2}></TableCell>
             </TableRow>

@@ -47,6 +47,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
 import { catalogKeys } from "@/lib/query-keys";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // Types for sugar entries
 export interface SugarItem {
@@ -379,7 +380,7 @@ export function SugarEditor({
                 Total
               </TableCell>
               <TableCell className="text-right font-medium">
-                {totals.totalWeight.toFixed(2)} lbs
+                <UnitDisplay value={totals.totalWeight} unitType="weight" />
               </TableCell>
               <TableCell colSpan={3}></TableCell>
             </TableRow>

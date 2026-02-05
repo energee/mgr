@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Thermometer, FlaskConical } from "lucide-react";
+import { UnitDisplay } from "@/components/ui/unit-input";
 import type { MashStep } from "./mash-schedule-editor";
 import type { FermentationStage } from "./fermentation-schedule-editor";
 
@@ -88,7 +89,7 @@ export function MashScheduleDisplay({ data }: MashScheduleDisplayProps) {
               </Badge>
             </TableCell>
             <TableCell className="font-medium">{step.name}</TableCell>
-            <TableCell className="text-right">{step.temp_f}°F</TableCell>
+            <TableCell className="text-right"><UnitDisplay value={step.temp_f} unitType="temperature" decimals={1} /></TableCell>
             <TableCell className="text-right">{step.duration_min} min</TableCell>
           </TableRow>
         ))}
@@ -155,7 +156,7 @@ export function FermentationScheduleDisplay({ data }: FermentationScheduleDispla
                   )}
                 </div>
               </TableCell>
-              <TableCell className="text-right">{stage.temp_f}°F</TableCell>
+              <TableCell className="text-right"><UnitDisplay value={stage.temp_f} unitType="temperature" decimals={1} /></TableCell>
               <TableCell className="text-right">{stage.duration_days} days</TableCell>
             </TableRow>
           ))}

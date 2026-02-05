@@ -11,6 +11,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, recipeVariantKeys, batchAdditionKeys } from "@/lib/query-keys";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -64,15 +65,22 @@ function CostRow({
   label,
   planned,
   actual,
+  volumeBbl,
 }: {
   label: string;
   planned: number | null | undefined;
   actual?: number | null;
+  volumeBbl?: number | null;
 }) {
   const showActual = actual !== undefined;
   return (
     <div className="flex items-center justify-between py-1.5">
-      <span className="text-sm">{label}</span>
+      <span className="text-sm">
+        {label}
+        {volumeBbl ? (
+          <> (<UnitDisplay value={volumeBbl} unitType="volume" />)</>
+        ) : null}
+      </span>
       <div className="flex items-center gap-4">
         <span className="text-sm font-medium w-24 text-right">
           {formatCurrency(planned)}
@@ -193,7 +201,8 @@ export function BatchCostBreakdown({ data }: BatchCostBreakdownProps) {
       {/* Cost rows */}
       <div className="divide-y">
         <CostRow
-          label={`Hot-side${volumeBbl ? ` (${volumeBbl} BBL)` : ""}`}
+          label="Hot-side"
+          volumeBbl={volumeBbl}
           planned={plannedHotSide}
           actual={plannedHotSide}
         />
