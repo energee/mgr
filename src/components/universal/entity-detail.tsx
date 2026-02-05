@@ -379,12 +379,16 @@ function TabsWithRelations<T>({
 
       {relationTabs.map((rel) => (
         <TabsContent key={rel.name} value={rel.name}>
-          <RelationTable
-            key={rel.name}
-            relation={rel}
-            parentId={parentId}
-            enabled={activeTab === rel.name}
-          />
+          {rel.component ? (
+            <rel.component parentId={parentId} data={data as Record<string, unknown>} />
+          ) : (
+            <RelationTable
+              key={rel.name}
+              relation={rel}
+              parentId={parentId}
+              enabled={activeTab === rel.name}
+            />
+          )}
         </TabsContent>
       ))}
     </Tabs>

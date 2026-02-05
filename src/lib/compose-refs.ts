@@ -1,3 +1,4 @@
+/* eslint-disable */
 import * as React from "react";
 
 type PossibleRef<T> = React.Ref<T> | undefined;
@@ -55,11 +56,8 @@ function composeRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
  * Accepts callback refs and RefObject(s)
  */
 function useComposedRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
-  return React.useCallback((node: T) => {
-    const composed = composeRefs(...refs);
-    return composed(node);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, refs);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: we want to memoize by all values
+  return React.useCallback(composeRefs(...refs), refs);
 }
 
 export { composeRefs, useComposedRefs };

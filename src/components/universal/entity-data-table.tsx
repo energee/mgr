@@ -33,9 +33,11 @@ import { createClient } from "@/lib/supabase/client";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig } from "@/types/entity";
+import { getStateLabel } from "@/types/entity";
 import type { ExtendedColumnFilter } from "@/types/data-table";
 import { getFiltersStateParser } from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
+import { EntityKanban } from "@/components/universal/entity-kanban";
 import { BulkStatusActionBar } from "./bulk-status-action-bar";
 import {
   buildDataTableColumns,
@@ -58,7 +60,7 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search } from "lucide-react";
+import { Search, LayoutList, Kanban as KanbanIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -106,6 +108,14 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const router = useRouter();
 
   const hasBulkActions = !!entity.stateMachine;
+
+  // ---------------------------------------------------------------------------
+  // View mode (table vs board)
+  // ---------------------------------------------------------------------------
+  const [viewMode, setViewMode] = useQueryState(
+    "view",
+    parseAsStringEnum(["table", "board"]).withDefault("table")
+  );
 
   // ---------------------------------------------------------------------------
   // "n" hotkey for New entity
@@ -512,6 +522,37 @@ export function EntityDataTable<T = Record<string, unknown>>({
   );
 
   // ---------------------------------------------------------------------------
+  // Single item state transition (used by kanban drag-and-drop)
+  // ---------------------------------------------------------------------------
+  const handleSingleTransition = useCallback(
+    async (id: string, toState: string) => {
+      if (!entity.stateMachine) return;
+
+      const stateField = entity.stateMachine.stateField;
+
+      const { error } = await db
+        .from(entity.table)
+        .update({ [stateField]: toState })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      // Invalidate queries
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all(fetchTable),
+      });
+      if (entity.viewTable) {
+        queryClient.invalidateQueries({
+          queryKey: entityKeys.all(entity.table),
+        });
+      }
+
+      toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
+    },
+    [entity, db, queryClient, fetchTable],
+  );
+
+  // ---------------------------------------------------------------------------
   // Error state
   // ---------------------------------------------------------------------------
   if (error) {
@@ -535,21 +576,43 @@ export function EntityDataTable<T = Record<string, unknown>>({
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{entity.displayNamePlural}</h1>
-        {showCreate && (
-          <Button asChild={!onCreateClick} onClick={onCreateClick}>
-            {onCreateClick ? (
-              <>
-                New {entity.displayName}
-                <Kbd>N</Kbd>
-              </>
-            ) : (
-              <Link href={`${path}/new`}>
-                New {entity.displayName}
-                <Kbd>N</Kbd>
-              </Link>
-            )}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {entity.stateMachine && entity.kanbanConfig && (
+            <div className="flex gap-1">
+              <Button
+                variant={viewMode === "table" ? "default" : "outline"}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setViewMode("table")}
+              >
+                <LayoutList className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "board" ? "default" : "outline"}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setViewMode("board")}
+              >
+                <KanbanIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {showCreate && (
+            <Button asChild={!onCreateClick} onClick={onCreateClick}>
+              {onCreateClick ? (
+                <>
+                  New {entity.displayName}
+                  <Kbd>N</Kbd>
+                </>
+              ) : (
+                <Link href={`${path}/new`}>
+                  New {entity.displayName}
+                  <Kbd>N</Kbd>
+                </Link>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Quick Filter Tabs */}
@@ -569,7 +632,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         </Tabs>
       )}
 
-      {/* Data Table */}
+      {/* Data Table or Kanban Board */}
       <div
         className={cn("relative", isFetching && !isLoading && "opacity-60")}
       >
@@ -582,6 +645,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
         {isLoading ? (
           <LoadingSkeleton columnCount={entity.listColumns.length + 1} />
+        ) : viewMode === "board" && entity.kanbanConfig ? (
+          <EntityKanban
+            entity={entity}
+            data={data || []}
+            basePath={path}
+            onTransition={handleSingleTransition}
+          />
         ) : (
           <DataTable
             table={table}

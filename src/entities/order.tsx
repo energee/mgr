@@ -12,6 +12,17 @@ import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { OrderQuickLinks } from "@/components/domain/order-quick-links";
+import { OrderItemsEditor } from "@/components/domain/order-items-editor";
+
+// Wrapper component to adapt OrderItemsEditor to relation component interface
+function OrderItemsRelation({ parentId, data }: { parentId: string; data?: Record<string, unknown> }) {
+  return (
+    <OrderItemsEditor
+      orderId={parentId}
+      customerId={data?.customer_id as string | null | undefined}
+    />
+  );
+}
 
 type Order = Database["public"]["Tables"]["orders"]["Row"];
 
@@ -223,6 +234,17 @@ export const orderEntity: EntityConfig<Order> = {
   stateMachine: orderStateMachine,
 
   // ---------------------------------------------------------------------------
+  // Kanban Board
+  // ---------------------------------------------------------------------------
+  kanbanConfig: {
+    titleField: "order_number",
+    cardFields: [
+      { field: "order_date", label: "Ordered", format: "date" },
+      { field: "requested_date", label: "Requested", format: "date" },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
   actions: [
@@ -296,6 +318,7 @@ export const orderEntity: EntityConfig<Order> = {
       foreignKey: "order_id",
       showInDetail: true,
       detailTab: "Items",
+      component: OrderItemsRelation,
     },
     {
       name: "pick_lists",
