@@ -119,8 +119,8 @@ interface VariantItem {
 
 interface CostData {
   id: string;
-  estimated_cost: number | null;
-  cost_per_bbl: number | null;
+  est_total_cost: number | null;
+  est_cost_per_bbl: number | null;
 }
 
 interface RecipeVariantEditorProps {
@@ -235,7 +235,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from("recipe_variants_with_costs")
-        .select("id, estimated_cost, cost_per_bbl")
+        .select("id, est_total_cost, est_cost_per_bbl")
         .eq("recipe_id", recipeId);
       if (error) throw error;
       return rows as CostData[];
@@ -713,12 +713,12 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     {variant.planned_volume_bbl != null && (
                       <span>{variant.planned_volume_bbl} BBL</span>
                     )}
-                    {cost?.estimated_cost != null && (
-                      <span>${cost.estimated_cost.toFixed(2)}</span>
+                    {cost?.est_total_cost != null && (
+                      <span>${cost.est_total_cost.toFixed(2)}</span>
                     )}
-                    {cost?.cost_per_bbl != null && (
+                    {cost?.est_cost_per_bbl != null && (
                       <span className="text-xs">
-                        (${cost.cost_per_bbl.toFixed(2)}/BBL)
+                        (${cost.est_cost_per_bbl.toFixed(2)}/BBL)
                       </span>
                     )}
                   </div>

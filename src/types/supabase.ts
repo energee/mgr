@@ -5848,12 +5848,15 @@ export type Database = {
           created_at: string | null
           current_vessel_id: string | null
           current_vessel_name: string | null
+          estimated_volume_bbl: number | null
           id: string | null
           name: string | null
           notes: string | null
           planned_start_date: string | null
           recipe_id: string | null
+          recipe_variant_id: string | null
           status: string | null
+          target_package_date: string | null
           updated_at: string | null
           volume_bbl: number | null
           volume_from_brews_bbl: number | null
@@ -5876,12 +5879,15 @@ export type Database = {
           created_at?: string | null
           current_vessel_id?: never
           current_vessel_name?: never
+          estimated_volume_bbl?: number | null
           id?: string | null
           name?: string | null
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
+          recipe_variant_id?: string | null
           status?: string | null
+          target_package_date?: string | null
           updated_at?: string | null
           volume_bbl?: number | null
           volume_from_brews_bbl?: never
@@ -5904,12 +5910,15 @@ export type Database = {
           created_at?: string | null
           current_vessel_id?: never
           current_vessel_name?: never
+          estimated_volume_bbl?: number | null
           id?: string | null
           name?: string | null
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
+          recipe_variant_id?: string | null
           status?: string | null
+          target_package_date?: string | null
           updated_at?: string | null
           volume_bbl?: number | null
           volume_from_brews_bbl?: never
@@ -5941,6 +5950,20 @@ export type Database = {
             columns: ["recipe_id"]
             isOneToOne: false
             referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants_with_costs"
             referencedColumns: ["id"]
           },
         ]
@@ -8474,6 +8497,7 @@ export type Database = {
       get_ttb_tax_class: { Args: { container_type: string }; Returns: string }
       get_user_role: { Args: { p_user_id?: string }; Returns: string }
       is_admin: { Args: { p_user_id?: string }; Returns: boolean }
+      is_admin_rls: { Args: { p_user_id: string }; Returns: boolean }
       is_valid_enum: {
         Args: { p_enum_type: string; p_value: string }
         Returns: boolean
@@ -8741,4 +8765,3 @@ export const Constants = {
     },
   },
 } as const
-

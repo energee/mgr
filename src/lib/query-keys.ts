@@ -74,6 +74,7 @@ export const recipeVariantKeys = {
   all: ["recipe-variants"] as const,
   byRecipe: (recipeId: string) => ["recipe-variants", "by-recipe", recipeId] as const,
   detail: (id: string) => ["recipe-variants", "detail", id] as const,
+  costDetail: (id: string) => ["recipe-variants", "cost-detail", id] as const,
   withCosts: (recipeId: string) => ["recipe-variants", "with-costs", recipeId] as const,
 };
 

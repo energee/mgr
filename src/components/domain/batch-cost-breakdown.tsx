@@ -115,7 +115,7 @@ export function BatchCostBreakdown({ data }: BatchCostBreakdownProps) {
 
   // Fetch variant costs (cold-side planned) if linked
   const { data: variantCosts } = useQuery({
-    queryKey: recipeVariantKeys.detail(variantId!),
+    queryKey: recipeVariantKeys.costDetail(variantId!),
     queryFn: async () => {
       const { data: result, error } = await supabase
         .from("recipe_variants_with_costs")
