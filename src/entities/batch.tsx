@@ -252,6 +252,16 @@ export const batchEntity: EntityConfig<Batch> = {
       colSpan: 6,
     },
     {
+      name: "recipe_id",
+      label: "Recipe",
+      type: "relation",
+      relation: {
+        entity: "recipe",
+        displayField: "name",
+      },
+      colSpan: 6,
+    },
+    {
       name: "planned_start_date",
       label: "Planned Start Date",
       type: "date",
