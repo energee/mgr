@@ -67,6 +67,17 @@ export const recipeKeys = {
 };
 
 // =============================================================================
+// Recipe Variant Keys
+// =============================================================================
+
+export const recipeVariantKeys = {
+  all: ["recipe-variants"] as const,
+  byRecipe: (recipeId: string) => ["recipe-variants", "by-recipe", recipeId] as const,
+  detail: (id: string) => ["recipe-variants", "detail", id] as const,
+  withCosts: (recipeId: string) => ["recipe-variants", "with-costs", recipeId] as const,
+};
+
+// =============================================================================
 // Batch Keys
 // =============================================================================
 
@@ -85,6 +96,16 @@ export const batchKeys = {
   performance: (id: string) => ["batch-performance", id] as const,
   brewLogs: (id: string) => ["batch-brew-logs", id] as const,
   availableBrewLogs: (id: string) => ["available-brew-logs", id] as const,
+};
+
+// =============================================================================
+// Batch Addition Keys
+// =============================================================================
+
+export const batchAdditionKeys = {
+  all: ["batch-additions"] as const,
+  byBatch: (batchId: string) => ["batch-additions", "by-batch", batchId] as const,
+  withCosts: (batchId: string) => ["batch-additions", "with-costs", batchId] as const,
 };
 
 // =============================================================================
