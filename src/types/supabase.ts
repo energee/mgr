@@ -7135,6 +7135,7 @@ export type Database = {
       }
       recipes_with_estimates: {
         Row: {
+          batch_count: number | null
           batch_size_bbl: number | null
           batch_size_gallons: number | null
           boil_time_min: number | null

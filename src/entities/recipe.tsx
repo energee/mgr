@@ -27,7 +27,7 @@ export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
 // The view adds est_* fields but may not have the status field yet
 type RecipeBase = Database["public"]["Tables"]["recipes"]["Row"];
 type RecipeView = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
-type Recipe = RecipeBase & Partial<Pick<RecipeView, "est_og" | "est_fg" | "est_abv" | "est_ibu" | "est_srm" | "style_name" | "est_cogs">>;
+type Recipe = RecipeBase & Partial<Pick<RecipeView, "est_og" | "est_fg" | "est_abv" | "est_ibu" | "est_srm" | "style_name" | "est_cogs" | "batch_count">>;
 
 // =============================================================================
 // State Machine (defined separately to derive options)
@@ -98,6 +98,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       header: "Boil Time",
       sortable: true,
       render: (value) => value ? `${value} min` : "—",
+    },
+    {
+      accessorKey: "batch_count",
+      header: "Batches",
+      sortable: true,
+      render: (value) => (value as number) || 0,
     },
     {
       accessorKey: "status",
