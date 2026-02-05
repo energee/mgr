@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import Image from "next/image";
 import type { EntityConfig } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 
@@ -109,9 +110,11 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
         return (
           <div className="flex items-center gap-3">
             {user.avatar_url ? (
-              <img
+              <Image
                 src={user.avatar_url}
                 alt={String(value || "User")}
+                width={32}
+                height={32}
                 className="h-8 w-8 rounded-full object-cover"
               />
             ) : (

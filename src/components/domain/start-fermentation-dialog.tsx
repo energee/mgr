@@ -140,6 +140,7 @@ export function StartFermentationDialog({
     startMutation.mutate(values);
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const selectedVesselId = form.watch("vessel_id");
   const selectedVessel = vessels?.find((v) => v.id === selectedVesselId);
 

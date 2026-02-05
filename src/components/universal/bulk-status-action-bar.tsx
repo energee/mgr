@@ -69,7 +69,7 @@ export function BulkStatusActionBar<T>({
       value: state,
       label: getStateLabel(entity, state),
     }));
-  }, [entity.stateMachine, selectedRows]);
+  }, [entity, selectedRows]);
 
   const handleApply = useCallback(async () => {
     if (!bulkTargetStatus) return;

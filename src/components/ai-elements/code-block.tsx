@@ -31,13 +31,9 @@ import {
 import { createHighlighter } from "shiki";
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
-// eslint-disable-next-line no-bitwise -- shiki bitflag check
 const isItalic = (fontStyle: number | undefined) => fontStyle && fontStyle & 1;
-// eslint-disable-next-line no-bitwise -- shiki bitflag check
 const isBold = (fontStyle: number | undefined) => fontStyle && fontStyle & 2;
-const isUnderline = (fontStyle: number | undefined) =>
-  // eslint-disable-next-line no-bitwise -- shiki bitflag check
-  fontStyle && fontStyle & 4;
+const isUnderline = (fontStyle: number | undefined) => fontStyle && fontStyle & 4;
 
 // Transform tokens to include pre-computed keys to avoid noArrayIndexKey lint
 interface KeyedToken {
@@ -381,18 +377,31 @@ export const CodeBlockContent = ({
   // Memoized raw tokens for immediate display
   const rawTokens = useMemo(() => createRawTokens(code), [code]);
 
-  // Try to get cached result synchronously, otherwise use raw tokens
-  const [tokenized, setTokenized] = useState<TokenizedCode>(
-    () => highlightCode(code, language) ?? rawTokens
+  // Synchronous cached result (or raw fallback) recomputed when code/language changes
+  const syncTokens = useMemo(
+    () => highlightCode(code, language) ?? rawTokens,
+    [code, language, rawTokens]
   );
 
-  useEffect(() => {
-    // Reset to raw tokens when code changes (shows current code, not stale tokens)
-    setTokenized(highlightCode(code, language) ?? rawTokens);
+  // Track async highlighting result keyed to current code/language
+  const [asyncEntry, setAsyncEntry] = useState<{
+    key: string;
+    tokens: TokenizedCode;
+  } | null>(null);
 
+  const codeKey = `${code}\0${language}`;
+
+  useEffect(() => {
+    const key = `${code}\0${language}`;
     // Subscribe to async highlighting result
-    highlightCode(code, language, setTokenized);
-  }, [code, language, rawTokens]);
+    highlightCode(code, language, (result) => {
+      setAsyncEntry({ key, tokens: result });
+    });
+  }, [code, language]);
+
+  // Use async result only if it matches current code/language, otherwise show sync
+  const tokenized =
+    asyncEntry?.key === codeKey ? asyncEntry.tokens : syncTokens;
 
   return (
     <div className="relative overflow-auto">
