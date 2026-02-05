@@ -70,7 +70,7 @@ export interface EntityConfig<T = Record<string, unknown>> {
   // Detail View Configuration
   // ---------------------------------------------------------------------------
 
-  /** Sections to display in detail view */
+  /** @deprecated Use `sections` instead. Will be removed in a future update. */
   detailSections?: EntitySectionDef<T>[];
 
   /** Header fields to show prominently */
@@ -94,13 +94,13 @@ export interface EntityConfig<T = Record<string, unknown>> {
   /** Zod schema for form validation */
   formSchema: ZodSchema<Partial<T>>;
 
-  /** Form field definitions */
+  /** @deprecated Use `sections` instead. Kept for backward compatibility. */
   formFields: EntityFieldDef<T>[];
 
-  /** Fields to show in create mode (defaults to all) */
+  /** @deprecated Use `sections` with `editable: "create-only"` instead. */
   createFields?: (keyof T & string)[];
 
-  /** Fields to show in edit mode (defaults to all) */
+  /** @deprecated Use `sections` with `editable` control instead. */
   editFields?: (keyof T & string)[];
 
   // ---------------------------------------------------------------------------
