@@ -1206,14 +1206,16 @@ function RelationTable({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{relation.detailTab}</CardTitle>
-        <Button size="sm" variant="outline" asChild>
-          <Link
-            href={`/${relatedEntity.domain}/${routeName}s/new?${relation.foreignKey}=${parentId}`}
-            aria-label={`Add new ${relatedEntity.displayName.toLowerCase()}`}
-          >
-            Add
-          </Link>
-        </Button>
+        {!relation.hideAdd && (
+          <Button size="sm" variant="outline" asChild>
+            <Link
+              href={`/${relatedEntity.domain}/${routeName}s/new?${relation.foreignKey}=${parentId}`}
+              aria-label={`Add new ${relatedEntity.displayName.toLowerCase()}`}
+            >
+              Add
+            </Link>
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {error ? (

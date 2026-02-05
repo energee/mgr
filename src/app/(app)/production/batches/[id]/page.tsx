@@ -9,13 +9,13 @@
 
 import { use, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { batchEntity } from "@/entities/batch";
 import { StartFermentationDialog } from "@/components/domain/start-fermentation-dialog";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
+import { VesselTransferDialog } from "@/components/domain/vessel-transfer-dialog";
 import { batchKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
 
@@ -38,8 +38,10 @@ export default function BatchDetailPage({
     prefillDialog === "cancel" || prefillDialog === "archive"
   );
   const [showBlend, setShowBlend] = useState(prefillDialog === "blend");
+  const [showTransfer, setShowTransfer] = useState(
+    prefillDialog === "transfer_vessel"
+  );
 
-  const router = useRouter();
   const queryClient = useQueryClient();
   const supabase = createClient();
 
@@ -72,17 +74,12 @@ export default function BatchDetailPage({
       setShowBlend(true);
       return true; // Indicates action was handled
     }
-    if (actionName === "transfer_vessel" && batch) {
-      usePrefillStore.getState().setPrefill({
-        batch_id: batch.id,
-        from_vessel_id: batch.current_vessel_id,
-        volume_bbl: batch.volume_bbl,
-      });
-      router.push("/production/vessel-transfers/new");
+    if (actionName === "transfer_vessel") {
+      setShowTransfer(true);
       return true;
     }
     return false; // Let EntityDetail handle normally
-  }, [batch, router]);
+  }, []);
 
   const handleDialogSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
@@ -126,6 +123,17 @@ export default function BatchDetailPage({
             batchName={batch.name}
             open={showBlend}
             onOpenChange={setShowBlend}
+            onSuccess={handleDialogSuccess}
+          />
+
+          <VesselTransferDialog
+            batchId={batch.id}
+            batchNumber={batch.batch_number}
+            fromVesselId={batch.current_vessel_id}
+            fromVesselName={batch.current_vessel_name}
+            currentVolume={batch.volume_bbl}
+            open={showTransfer}
+            onOpenChange={setShowTransfer}
             onSuccess={handleDialogSuccess}
           />
         </>

@@ -661,6 +661,9 @@ export interface EntityRelationDef {
   /** Limit for related records query (default: 50) */
   relationLimit?: number;
 
+  /** Hide the "Add" button on relation tabs (e.g., when creation is handled by a dialog) */
+  hideAdd?: boolean;
+
   /** Custom component to render instead of default table (for inline editors, etc.) */
   component?: ComponentType<{ parentId: string; data?: Record<string, unknown> }>;
 }

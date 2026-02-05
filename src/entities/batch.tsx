@@ -535,6 +535,7 @@ export const batchEntity: EntityConfig<Batch> = {
       foreignKey: "batch_id",
       showInDetail: true,
       detailTab: "Transfers",
+      hideAdd: true,
     },
   ],
 
