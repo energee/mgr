@@ -218,6 +218,7 @@ export function RecipeCloneDialog({
           <div className="space-y-2">
             <Label htmlFor="brand_id">Brand (optional)</Label>
             <Select
+              // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
               value={form.watch("brand_id") || "_keep_original"}
               onValueChange={(v) => form.setValue("brand_id", v === "_keep_original" ? null : v)}
             >

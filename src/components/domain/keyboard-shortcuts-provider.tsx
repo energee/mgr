@@ -5,13 +5,16 @@
  *
  * Registers global keyboard shortcuts and renders the help dialog.
  * Added to AppProviders so shortcuts are available on all authenticated pages.
+ * Exports KeyboardShortcutsContext so the sidebar can trigger the help dialog.
  */
 
-import { useState, useCallback, type ReactNode } from "react";
+import { createContext, useState, useCallback, type ReactNode } from "react";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts-dialog";
-import { Button } from "@/components/ui/button";
-import { Keyboard } from "lucide-react";
+
+export const KeyboardShortcutsContext = createContext<{ openHelp: () => void }>({
+  openHelp: () => {},
+});
 
 interface KeyboardShortcutsProviderProps {
   children: ReactNode;
@@ -22,6 +25,10 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
 
   const toggleHelp = useCallback(() => {
     setHelpOpen((prev) => !prev);
+  }, []);
+
+  const openHelp = useCallback(() => {
+    setHelpOpen(true);
   }, []);
 
   const focusSearch = useCallback(() => {
@@ -71,18 +78,9 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
   ]);
 
   return (
-    <>
+    <KeyboardShortcutsContext.Provider value={{ openHelp }}>
       {children}
-      <Button
-        variant="outline"
-        size="icon"
-        className="fixed bottom-4 right-4 z-50 h-8 w-8 rounded-full shadow-md opacity-60 hover:opacity-100 transition-opacity"
-        onClick={() => setHelpOpen(true)}
-        aria-label="Keyboard shortcuts"
-      >
-        <Keyboard className="h-4 w-4" />
-      </Button>
       <KeyboardShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
-    </>
+    </KeyboardShortcutsContext.Provider>
   );
 }

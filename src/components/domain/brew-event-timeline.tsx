@@ -56,7 +56,6 @@ import {
   phaseConfig,
   metricConfig,
   type BrewEvent,
-  type BrewMeasurement,
 } from "@/entities/brew-log";
 import { BrewEventForm } from "./brew-event-form";
 

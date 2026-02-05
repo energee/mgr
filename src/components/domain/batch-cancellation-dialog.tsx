@@ -188,6 +188,7 @@ export function BatchCancellationDialog({
     terminateMutation.mutate(values);
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const selectedReason = form.watch("reason");
   const selectedReasonInfo = reasons.find((r) => r.value === selectedReason);
 

@@ -31,6 +31,7 @@ import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domai
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
 import { batchKeys } from "@/lib/query-keys";
+import { usePrefillStore } from "@/stores/prefill-store";
 
 interface BatchLog {
   id: string;
@@ -49,7 +50,12 @@ export default function BatchReadingsPage({
   const { id } = use(params);
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
+
+  // Consume prefill store once on initial render to auto-show form from AI
+  const [showForm, setShowForm] = useState(() => {
+    const { prefillData } = usePrefillStore.getState().consume();
+    return !!prefillData;
+  });
 
   // Fetch batch details
   const { data: batch, isLoading: batchLoading } = useQuery({

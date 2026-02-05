@@ -10,8 +10,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef } from "react";
+import { useContext, useRef } from "react";
+import { Keyboard } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { MGRIcon } from "@/components/icons/mgr-logo";
+import { KeyboardShortcutsContext } from "@/components/domain/keyboard-shortcuts-provider";
 import {
   Sidebar,
   SidebarContent,
@@ -235,15 +243,32 @@ function AnimatedSectionHeader({
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { openHelp } = useContext(KeyboardShortcutsContext);
 
   return (
     <Sidebar>
       {/* Logo */}
       <SidebarHeader className="h-16 border-b border-sidebar-border justify-center">
-        <Link href="/" className="flex items-center gap-2 px-2">
-          <MGRIcon size={20} className="shrink-0" />
-          <span className="text-lg font-semibold tracking-tight leading-none translate-y-px">MGR</span>
-        </Link>
+        <div className="flex items-center justify-between px-2">
+          <Link href="/" className="flex items-center gap-2">
+            <MGRIcon size={20} className="shrink-0" />
+            <span className="text-lg font-semibold tracking-tight leading-none translate-y-px">MGR</span>
+          </Link>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={openHelp}
+              >
+                <Keyboard className="h-4 w-4" />
+                <span className="sr-only">Keyboard shortcuts</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Keyboard shortcuts</TooltipContent>
+          </Tooltip>
+        </div>
       </SidebarHeader>
 
       {/* Navigation */}

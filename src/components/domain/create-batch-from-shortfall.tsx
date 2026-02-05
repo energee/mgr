@@ -142,6 +142,7 @@ export function CreateBatchFromShortfall({
   }, [shortfall.recipe_id, form]);
 
   // Update name and volume when recipe changes
+  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const selectedRecipeId = form.watch("recipe_id");
   useEffect(() => {
     const recipe = recipes?.find((r) => r.id === selectedRecipeId);
