@@ -21,9 +21,9 @@ export function AppProviders({ children }: AppProvidersProps) {
   useEffect(() => {
     createClient()
       .rpc("update_last_active")
-      .catch((err: unknown) => {
-        if (process.env.NODE_ENV === "development") {
-          console.warn("update_last_active failed:", err);
+      .then(({ error }) => {
+        if (error && process.env.NODE_ENV === "development") {
+          console.warn("update_last_active failed:", error);
         }
       });
   }, []);
