@@ -324,5 +324,339 @@ export function createChatTools(supabase: SupabaseClient) {
         return data;
       },
     }),
+
+    getBatchDetail: tool({
+      description:
+        "Get full details for a specific batch by UUID or batch number. Returns batch info, recipe name, current vessel, brew dates, and status.",
+      inputSchema: z.object({
+        batchId: z.string().uuid().optional().describe("The batch UUID"),
+        batchNumber: z
+          .string()
+          .optional()
+          .describe("The batch number (e.g. '42' or 'B-042')"),
+      }),
+      execute: async ({ batchId, batchNumber }) => {
+        let query = supabase
+          .from("batches_with_brew_info")
+          .select(
+            "id, batch_number, name, status, volume_bbl, planned_start_date, actual_og, actual_fg, actual_abv, brew_date, current_vessel_name, notes, recipe:recipes(id, name)"
+          );
+        if (batchId) {
+          query = query.eq("id", batchId);
+        } else if (batchNumber) {
+          query = query.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
+        } else {
+          throw new Error("Either batchId or batchNumber is required");
+        }
+        const { data, error } = batchId
+          ? await query.single()
+          : await query.limit(5);
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchBatches: tool({
+      description:
+        "Search and filter batches by status, recipe name, date range, or batch number. Returns matching batches with recipe and vessel info.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by status: planned, fermenting, conditioning, packaging, completed, cancelled, archived"
+          ),
+        recipeName: z
+          .string()
+          .optional()
+          .describe("Filter by recipe name (partial match)"),
+        startDate: z.string().optional().describe("Start of date range (YYYY-MM-DD)"),
+        endDate: z.string().optional().describe("End of date range (YYYY-MM-DD)"),
+        batchNumber: z.string().optional().describe("Filter by batch number (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, recipeName, startDate, endDate, batchNumber, limit }) => {
+        let query = supabase
+          .from("batches_with_brew_info")
+          .select(
+            "id, batch_number, name, status, volume_bbl, planned_start_date, brew_date, current_vessel_name, recipe:recipes(id, name)"
+          )
+          .order("planned_start_date", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (batchNumber)
+          query = query.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
+        if (startDate) query = query.gte("planned_start_date", startDate);
+        if (endDate) query = query.lte("planned_start_date", endDate);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+
+        if (recipeName && data) {
+          const lower = recipeName.toLowerCase();
+          return data.filter(
+            (b: Record<string, unknown>) => {
+              const recipe = b.recipe as { name: string } | null;
+              return recipe?.name?.toLowerCase().includes(lower);
+            }
+          );
+        }
+        return data;
+      },
+    }),
+
+    getBrands: tool({
+      description: "Search brands by name. Returns brand info with style.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Search by brand name"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ query, limit }) => {
+        let q = supabase
+          .from("brands")
+          .select("id, name, variant, abv, description, style:beer_styles(id, name)")
+          .order("name")
+          .limit(limit);
+
+        if (query) q = q.ilike("name", `%${escapeLike(query)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    getFinishedGoods: tool({
+      description:
+        "Get finished goods inventory with availability. Filter by brand or package type.",
+      inputSchema: z.object({
+        brandId: z.string().uuid().optional().describe("Filter by brand UUID"),
+        query: z.string().optional().describe("Search by brand name"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ brandId, query, limit }) => {
+        let q = supabase
+          .from("finished_goods_with_availability")
+          .select(
+            "id, lot_number, brand_name, package_type_name, total_quantity, allocated_quantity, reserved_quantity, available_quantity, production_date, best_by_date"
+          )
+          .gt("available_quantity", 0)
+          .order("brand_name")
+          .limit(limit);
+
+        if (brandId) q = q.eq("brand_id", brandId);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+
+        if (query && data) {
+          const lower = query.toLowerCase();
+          return data.filter(
+            (fg: Record<string, unknown>) =>
+              typeof fg.brand_name === "string" &&
+              fg.brand_name.toLowerCase().includes(lower)
+          );
+        }
+        return data;
+      },
+    }),
+
+    lookupEntity: tool({
+      description:
+        "Resolve a human-friendly name to a UUID. Searches batches (by number), recipes (by name), customers (by name), brands (by name), and orders (by number). Use this when you need a UUID for another tool.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .describe("The name or number to search for (e.g. 'batch 42', 'Hazy IPA')"),
+        entityType: z
+          .enum(["batch", "recipe", "customer", "brand", "order"])
+          .optional()
+          .describe("Narrow search to a specific entity type"),
+      }),
+      execute: async ({ query, entityType }) => {
+        const results: Array<{
+          type: string;
+          id: string;
+          display: string;
+        }> = [];
+        const escaped = escapeLike(query);
+
+        if (!entityType || entityType === "batch") {
+          const { data } = await supabase
+            .from("batches")
+            .select("id, batch_number, name")
+            .or(
+              `batch_number.ilike.%${escaped}%,name.ilike.%${escaped}%`
+            )
+            .limit(5);
+          if (data) {
+            for (const b of data) {
+              results.push({
+                type: "batch",
+                id: b.id,
+                display: `${b.batch_number}${b.name ? ` — ${b.name}` : ""}`,
+              });
+            }
+          }
+        }
+
+        if (!entityType || entityType === "recipe") {
+          const { data } = await supabase
+            .from("recipes")
+            .select("id, name")
+            .ilike("name", `%${escaped}%`)
+            .limit(5);
+          if (data) {
+            for (const r of data) {
+              results.push({ type: "recipe", id: r.id, display: r.name });
+            }
+          }
+        }
+
+        if (!entityType || entityType === "customer") {
+          const { data } = await supabase
+            .from("customers")
+            .select("id, name")
+            .ilike("name", `%${escaped}%`)
+            .eq("is_active", true)
+            .limit(5);
+          if (data) {
+            for (const c of data) {
+              results.push({ type: "customer", id: c.id, display: c.name });
+            }
+          }
+        }
+
+        if (!entityType || entityType === "brand") {
+          const { data } = await supabase
+            .from("brands")
+            .select("id, name")
+            .ilike("name", `%${escaped}%`)
+            .limit(5);
+          if (data) {
+            for (const b of data) {
+              results.push({ type: "brand", id: b.id, display: b.name });
+            }
+          }
+        }
+
+        if (!entityType || entityType === "order") {
+          const { data } = await supabase
+            .from("orders")
+            .select("id, order_number")
+            .ilike("order_number", `%${escaped}%`)
+            .limit(5);
+          if (data) {
+            for (const o of data) {
+              results.push({
+                type: "order",
+                id: o.id,
+                display: o.order_number,
+              });
+            }
+          }
+        }
+
+        return results;
+      },
+    }),
+
+    searchOrders: tool({
+      description:
+        "Search orders by status, customer name, or date range. Returns order headers with customer info.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by status: draft, confirmed, scheduled, picking, packed, fulfilled, cancelled"
+          ),
+        customerName: z
+          .string()
+          .optional()
+          .describe("Filter by customer name (partial match)"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Order date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Order date end (YYYY-MM-DD)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, customerName, startDate, endDate, limit }) => {
+        let query = supabase
+          .from("orders")
+          .select(
+            "id, order_number, status, order_date, requested_date, scheduled_date, notes, customer:customers(id, name)"
+          )
+          .order("order_date", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (startDate) query = query.gte("order_date", startDate);
+        if (endDate) query = query.lte("order_date", endDate);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+
+        if (customerName && data) {
+          const lower = customerName.toLowerCase();
+          return data.filter((o: Record<string, unknown>) => {
+            const customer = o.customer as { name: string } | null;
+            return customer?.name?.toLowerCase().includes(lower);
+          });
+        }
+        return data;
+      },
+    }),
+
+    getOrderDetail: tool({
+      description:
+        "Get full details for an order including line items with brand, package type, quantity, and price.",
+      inputSchema: z.object({
+        orderId: z.string().uuid().describe("The order UUID"),
+      }),
+      execute: async ({ orderId }) => {
+        const { data, error } = await supabase
+          .from("orders")
+          .select(
+            `id, order_number, status, order_date, requested_date, scheduled_date, fulfilled_date, shipping_address, notes,
+             customer:customers(id, name, customer_type, email, phone),
+             items:order_items(id, quantity, unit_price, notes, brand:brands(id, name), package_type:package_types(id, name, volume_oz), batch:batches(id, batch_number))`
+          )
+          .eq("id", orderId)
+          .single();
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    getCustomers: tool({
+      description:
+        "Search customers by name. Returns customer info with order statistics.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Search by customer name"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ query, limit }) => {
+        let q = supabase
+          .from("customers_with_order_summary")
+          .select(
+            "id, name, customer_type, contact_name, email, phone, total_orders, total_revenue, pending_orders, last_order_date"
+          )
+          .eq("is_active", true)
+          .order("name")
+          .limit(limit);
+
+        if (query) q = q.ilike("name", `%${escapeLike(query)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
   };
 }
