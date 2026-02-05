@@ -38,6 +38,7 @@ import {
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { UnitInput } from "@/components/ui/unit-input";
 import { X } from "lucide-react";
+import { getColSpanClass } from "./field-utils";
 
 // =============================================================================
 // Minimal field shape (compatible with both EntityFieldDef and UnifiedFieldDef)
@@ -98,20 +99,8 @@ export function FieldInput({
   disabled,
   dynamicOptions,
 }: FieldInputProps) {
-  const colSpan = field.fullWidth ? 12 : (field.colSpan || 6);
-
-  // Map colSpan to responsive Tailwind classes (full width on mobile, colSpan on md+)
-  const colSpanClasses: Record<number, string> = {
-    3: "col-span-12 md:col-span-3",
-    4: "col-span-12 md:col-span-4",
-    6: "col-span-12 md:col-span-6",
-    8: "col-span-12 md:col-span-8",
-    12: "col-span-12",
-  };
-  const colClass = colSpanClasses[colSpan] || "col-span-12 md:col-span-6";
-
   return (
-    <div className={colClass}>
+    <div className={getColSpanClass(field.colSpan, field.fullWidth)}>
       <Label htmlFor={field.name} className={field.required ? "required" : ""}>
         {field.label}
         {field.required && <span className="text-destructive ml-1">*</span>}

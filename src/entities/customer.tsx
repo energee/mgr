@@ -280,26 +280,22 @@ export const customerEntity: EntityConfig<Customer> = {
         {
           name: "sales_channel_id",
           label: "Sales Channel",
-          type: "select",
+          type: "relation",
           description: "Determines default pricing tier",
-          dynamicOptions: {
-            table: "sales_channels",
-            valueField: "id",
-            labelField: "name",
-            filter: { is_active: true },
+          relation: {
+            entity: "sales_channel",
+            displayField: "name",
           },
           colSpan: 6,
         },
         {
           name: "price_tier_id",
           label: "Price Tier Override",
-          type: "select",
+          type: "relation",
           description: "Override default tier pricing (optional)",
-          dynamicOptions: {
-            table: "pricing_tiers",
-            valueField: "id",
-            labelField: "name",
-            orderBy: "cogs_max",
+          relation: {
+            entity: "pricing_tier",
+            displayField: "name",
           },
           colSpan: 6,
         },

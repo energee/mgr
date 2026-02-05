@@ -151,7 +151,7 @@ export function buildSelectColumn<T>(): ColumnDef<T, unknown> {
 // =============================================================================
 
 /**
- * Creates the row actions dropdown column (View, Edit, state transitions, custom actions).
+ * Creates the row actions dropdown column (View, state transitions, custom actions).
  */
 export function buildActionsColumn<T>(
   entity: EntityConfig<T>,
@@ -177,7 +177,6 @@ export function buildActionsColumn<T>(
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <AnimatedLinkActionMenuItem icon="view" label="View" href={`${basePath}/${id}`} />
-            <AnimatedLinkActionMenuItem icon="edit" label="Edit" href={`${basePath}/${id}/edit`} />
             {entity.actions?.map((action) => {
               if (action.showWhen && !action.showWhen(record)) return null;
               if (action.fromStates) {

@@ -207,10 +207,7 @@ function useRelationDisplayValues<T>(
   }, [fields, data]);
 
   const { data: relationMap = {} } = useQuery({
-    queryKey: [
-      "relation-display",
-      ...relationQueries.map((q) => `${q.table}:${q.id}`),
-    ],
+    queryKey: entityKeys.relationDisplay(relationQueries),
     enabled: relationQueries.length > 0,
     staleTime: CACHE_DURATIONS.STATIC_DATA,
     queryFn: async () => {
@@ -1050,7 +1047,7 @@ function UnifiedSectionCard<T>({
         <CardTitle>{section.title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className={editing ? "grid grid-cols-12 gap-4" : "grid grid-cols-2 gap-4"}>
+        <dl className="grid grid-cols-12 gap-4">
           {section.fields?.map((field) => (
             <UnifiedField
               key={field.name}

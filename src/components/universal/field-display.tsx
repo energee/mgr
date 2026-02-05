@@ -14,6 +14,7 @@ import { formatValue } from "@/lib/utils";
 import type { EntityConfig, UnifiedFieldDef } from "@/types/entity";
 import { getStateLabel } from "@/types/entity";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { getColSpanClass } from "./field-utils";
 
 // =============================================================================
 // Props
@@ -50,7 +51,7 @@ export function FieldDisplay<T = Record<string, unknown>>({
   const displayValue = resolveDisplayValue(field, value, record, entity, relationDisplayValues);
 
   return (
-    <div className={field.fullWidth ? "col-span-2" : ""}>
+    <div className={getColSpanClass(field.colSpan, field.fullWidth)}>
       <dt className="text-sm font-medium text-muted-foreground">
         {field.label}
       </dt>
