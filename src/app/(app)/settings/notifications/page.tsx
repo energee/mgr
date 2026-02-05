@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/time-picker";
 import { ArrowLeft, Bell, Mail, Moon, Save } from "lucide-react";
 import Link from "next/link";
 
@@ -364,24 +364,20 @@ export default function NotificationPreferencesPage() {
               <div className="flex items-center gap-4 pl-6 border-l-2 border-muted">
                 <div className="space-y-1">
                   <Label>Start Time</Label>
-                  <Input
-                    type="time"
+                  <TimePicker
                     value={form.watch("quiet_hours_start") || "22:00"}
-                    onChange={(e) =>
-                      form.setValue("quiet_hours_start", e.target.value)
+                    onChange={(value) =>
+                      form.setValue("quiet_hours_start", value)
                     }
-                    className="w-32"
                   />
                 </div>
                 <div className="space-y-1">
                   <Label>End Time</Label>
-                  <Input
-                    type="time"
+                  <TimePicker
                     value={form.watch("quiet_hours_end") || "08:00"}
-                    onChange={(e) =>
-                      form.setValue("quiet_hours_end", e.target.value)
+                    onChange={(value) =>
+                      form.setValue("quiet_hours_end", value)
                     }
-                    className="w-32"
                   />
                 </div>
               </div>

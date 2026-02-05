@@ -11,7 +11,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/time-picker";
 
 interface DatePickerProps {
   id?: string;
@@ -113,8 +113,7 @@ export function DateTimePicker({
     setOpen(false);
   };
 
-  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = e.target.value;
+  const handleTimeChange = (newTime: string) => {
     if (date) {
       const [hours, minutes] = newTime.split(":").map(Number);
       const newDate = new Date(date);
@@ -149,12 +148,10 @@ export function DateTimePicker({
           />
         </PopoverContent>
       </Popover>
-      <Input
-        type="time"
+      <TimePicker
         value={time}
         onChange={handleTimeChange}
         disabled={disabled || !date}
-        className="w-[120px]"
       />
     </div>
   );
