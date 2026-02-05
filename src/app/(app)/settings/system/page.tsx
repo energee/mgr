@@ -30,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Building2, Calculator, Calendar, Check, FileText, Save } from "lucide-react";
+import { FileUpload, FileUploadDropzone, FileUploadTrigger } from "@/components/ui/file-upload";
+import { Bot, Building2, Calculator, Calendar, Check, FileText, Save, Trash2, Upload } from "lucide-react";
 
 // =============================================================================
 // Schema
@@ -144,15 +145,18 @@ function useUpdateSystemSettings() {
           update: (data: { value: unknown }) => {
             eq: (col: string, val: string) => Promise<{ error: Error | null }>;
           };
+          insert: (data: { key: string; value: unknown }) => Promise<{ error: Error | null }>;
         };
       };
       // Update each setting - value column is JSONB, Supabase handles serialization
       for (const [key, value] of Object.entries(updates)) {
+        // Ensure the row exists (ignore duplicate key errors)
+        await client.from("system_settings").insert({ key, value });
+        // Then update to the latest value
         const { error } = await client
           .from("system_settings")
           .update({ value })
           .eq("key", key);
-
         if (error) throw error;
       }
     },
@@ -310,6 +314,8 @@ export default function SystemSettingsPage() {
   const { data: settings, isLoading } = useSystemSettings();
   const updateSettings = useUpdateSystemSettings();
   const [activeTab, setActiveTab] = useState("general");
+  const [logoSvg, setLogoSvg] = useState<string | null>(null);
+  const [uploadResetKey, setUploadResetKey] = useState(0);
 
   const form = useForm<SystemSettingsForm>({
     resolver: zodResolver(systemSettingsSchema),
@@ -339,6 +345,8 @@ export default function SystemSettingsPage() {
   // Update form when settings load
   useEffect(() => {
     if (settings) {
+      const savedLogo = settings.brewery_logo_svg as string | null;
+      setLogoSvg(savedLogo || null);
       const address = settings.brewery_address as Record<string, string> || {};
       form.reset({
         brewery_name: (settings.brewery_name as string) || "",
@@ -366,7 +374,7 @@ export default function SystemSettingsPage() {
 
   const onSubmit = async (values: SystemSettingsForm) => {
     try {
-      await updateSettings.mutateAsync({
+      const updates: Record<string, unknown> = {
         brewery_name: values.brewery_name,
         brewery_address: {
           street: values.brewery_street,
@@ -388,7 +396,8 @@ export default function SystemSettingsPage() {
         ttb_brewery_number: values.ttb_brewery_number,
         ttb_permit_number: values.ttb_permit_number,
         abc_license_number: values.abc_license_number,
-      });
+      };
+      await updateSettings.mutateAsync(updates);
       toast.success("System settings saved");
     } catch (error) {
       console.error("Failed to save settings:", error);
@@ -459,6 +468,80 @@ export default function SystemSettingsPage() {
                         {form.formState.errors.brewery_name.message}
                       </p>
                     )}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Brewery Logo</Label>
+                    <div className="flex items-start gap-4">
+                      {logoSvg && (
+                        <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
+                          <div className="h-[120px] w-[120px] rounded-md border bg-white flex items-center justify-center p-3">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`data:image/svg+xml;base64,${btoa(logoSvg)}`}
+                              alt="Brewery logo"
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={async () => {
+                              setLogoSvg(null);
+                              setUploadResetKey((k) => k + 1);
+                              try {
+                                await updateSettings.mutateAsync({ brewery_logo_svg: "" });
+                                toast.success("Logo removed");
+                              } catch {
+                                toast.error("Failed to remove logo");
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Remove
+                          </Button>
+                        </div>
+                      )}
+                      <FileUpload
+                        key={uploadResetKey}
+                        maxFiles={1}
+                        accept="image/svg+xml"
+                        className="flex-1 min-w-0"
+                        onFileAccept={(file) => {
+                          const reader = new FileReader();
+                          reader.onload = async (ev) => {
+                            const svgText = ev.target?.result as string;
+                            setLogoSvg(svgText);
+                            setUploadResetKey((k) => k + 1);
+                            try {
+                              await updateSettings.mutateAsync({ brewery_logo_svg: svgText });
+                              toast.success("Logo saved");
+                            } catch {
+                              toast.error("Failed to save logo");
+                            }
+                          };
+                          reader.readAsText(file);
+                        }}
+                        onFileReject={(_file, message) => {
+                          toast.error(message);
+                        }}
+                      >
+                        <FileUploadDropzone className="h-[120px] p-4">
+                          <Upload className="size-5 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground text-center">
+                            Drag & drop or click to browse
+                          </p>
+                          <p className="text-xs text-muted-foreground">SVG only</p>
+                          <FileUploadTrigger asChild>
+                            <Button type="button" variant="outline" size="sm">
+                              Browse files
+                            </Button>
+                          </FileUploadTrigger>
+                        </FileUploadDropzone>
+                      </FileUpload>
+                    </div>
                   </div>
 
                   <div className="grid gap-2">

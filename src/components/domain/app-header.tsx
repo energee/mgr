@@ -28,9 +28,10 @@ import { NotificationBell } from "@/components/domain/notification-bell";
 interface AppHeaderProps {
   user: User;
   breweryName: string;
+  breweryLogoSvg?: string | null;
 }
 
-export function AppHeader({ user, breweryName }: AppHeaderProps) {
+export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -50,9 +51,17 @@ export function AppHeader({ user, breweryName }: AppHeaderProps) {
 
   return (
     <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-6">
-      {/* Left side: menu trigger + brewery name */}
+      {/* Left side: menu trigger + brewery logo + name */}
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
+        {breweryLogoSvg && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={`data:image/svg+xml;base64,${btoa(breweryLogoSvg)}`}
+            alt=""
+            className="h-8 w-8 object-contain"
+          />
+        )}
         <h1 className="text-lg font-semibold">{breweryName}</h1>
       </div>
 
