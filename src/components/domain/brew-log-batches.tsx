@@ -23,6 +23,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FlaskConical, Plus } from "lucide-react";
 import { batchEntity } from "@/entities/batch";
+import { UnitDisplay } from "@/components/ui/unit-input";
 import type { Database } from "@/types/supabase";
 
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
@@ -118,7 +119,7 @@ export function BrewLogBatches({ data }: BrewLogBatchesProps) {
                   </Link>
                 </TableCell>
                 <TableCell>{batch.recipe?.name || "—"}</TableCell>
-                <TableCell>{link.volume_bbl} BBL</TableCell>
+                <TableCell><UnitDisplay value={link.volume_bbl} unitType="volume" /></TableCell>
                 <TableCell>
                   <StatusBadge
                     status={batch.status}
@@ -131,7 +132,7 @@ export function BrewLogBatches({ data }: BrewLogBatchesProps) {
         </TableBody>
       </Table>
       <div className="flex justify-between items-center text-sm text-muted-foreground border-t pt-3">
-        <span>Total Volume: {totalVolume.toFixed(2)} BBL</span>
+        <span>Total Volume: <UnitDisplay value={totalVolume} unitType="volume" /></span>
         <Button variant="outline" size="sm" asChild>
           <Link href={`/production/batches/new?brew_log_id=${data.id}`}>
             <Plus className="mr-1 h-4 w-4" />

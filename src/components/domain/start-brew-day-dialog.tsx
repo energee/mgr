@@ -51,6 +51,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -428,7 +429,7 @@ export function StartBrewDayDialog({
           <div className="p-3 rounded-md border text-center">
             <div className="text-xs text-muted-foreground">Volume</div>
             <div className="font-medium">
-              {recipeSummary.batch_size_bbl?.toFixed(1) ?? "-"} BBL
+              <UnitDisplay value={recipeSummary.batch_size_bbl} unitType="volume" decimals={1} />
             </div>
           </div>
           <div className="p-3 rounded-md border text-center">
@@ -584,7 +585,7 @@ export function StartBrewDayDialog({
                           <SelectItem key={v.id} value={v.id}>
                             {v.name}
                             {v.capacity_bbl
-                              ? ` (${v.capacity_bbl} BBL)`
+                              ? <>{" "}(<UnitDisplay value={v.capacity_bbl} unitType="volume" />)</>
                               : ""}
                           </SelectItem>
                         ))}
@@ -600,7 +601,7 @@ export function StartBrewDayDialog({
       {/* Volume total */}
       <div className="flex items-center justify-between p-3 rounded-md border bg-muted/30">
         <span className="text-sm text-muted-foreground">Total Volume</span>
-        <span className="font-medium">{totalVolume.toFixed(1)} BBL</span>
+        <span className="font-medium"><UnitDisplay value={totalVolume} unitType="volume" decimals={1} /></span>
       </div>
     </div>
   );
@@ -663,7 +664,7 @@ export function StartBrewDayDialog({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Volume</span>
-                    <span>{split.volumeBbl?.toFixed(1) ?? "-"} BBL</span>
+                    <span><UnitDisplay value={split.volumeBbl} unitType="volume" decimals={1} /></span>
                   </div>
                   {vessel && (
                     <div className="flex justify-between col-span-2">
@@ -681,7 +682,7 @@ export function StartBrewDayDialog({
       {/* Totals */}
       <div className="flex items-center justify-between p-3 rounded-md border bg-muted/30">
         <span className="text-sm text-muted-foreground">Total Volume</span>
-        <span className="font-medium">{totalVolume.toFixed(1)} BBL</span>
+        <span className="font-medium"><UnitDisplay value={totalVolume} unitType="volume" decimals={1} /></span>
       </div>
     </div>
   );

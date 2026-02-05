@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, RotateCcw } from "lucide-react";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 interface CustomerKegBalance {
   customer_id: string;
@@ -142,7 +143,7 @@ export function CustomerKegBalances({
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      {balance.volume_bbl} BBL
+                      <UnitDisplay value={balance.volume_bbl} unitType="volume" />
                     </TableCell>
                     <TableCell className="text-right font-semibold">
                       {balance.kegs_out}

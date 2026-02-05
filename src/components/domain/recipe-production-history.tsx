@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
 import { BarChart3, TrendingUp } from "lucide-react";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 interface RecipeProductionHistoryProps {
   data: { id: string; est_og?: number | null; [key: string]: unknown };
@@ -121,7 +122,7 @@ export function RecipeProductionHistory({
             <div className="text-sm font-medium text-muted-foreground">
               Avg Actual OG
             </div>
-            <div className="text-lg font-semibold">{avgOg.toFixed(1)}°P</div>
+            <div className="text-lg font-semibold"><UnitDisplay value={avgOg} unitType="gravity" decimals={1} /></div>
           </div>
         )}
         {ogVariance != null && (
@@ -140,7 +141,7 @@ export function RecipeProductionHistory({
               }`}
             >
               {ogVariance > 0 ? "+" : ""}
-              {ogVariance.toFixed(1)}°P
+              <UnitDisplay value={ogVariance} unitType="gravity" decimals={1} />
             </div>
           </div>
         )}
@@ -190,11 +191,11 @@ export function RecipeProductionHistory({
               </TableCell>
               <TableCell>
                 {batch.actual_og != null
-                  ? `${Number(batch.actual_og).toFixed(1)}°P`
+                  ? <UnitDisplay value={Number(batch.actual_og)} unitType="gravity" decimals={1} />
                   : "—"}
               </TableCell>
               <TableCell>
-                {batch.volume_bbl != null ? batch.volume_bbl : "—"}
+                <UnitDisplay value={batch.volume_bbl} unitType="volume" />
               </TableCell>
             </TableRow>
           ))}

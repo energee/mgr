@@ -41,6 +41,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -329,7 +330,7 @@ export function BrewLogCompletionDialog({
                         )}
                       </div>
                       <Badge variant="outline" className="text-xs">
-                        {batch.link_volume_bbl ?? batch.volume_bbl ?? "—"} BBL
+                        <UnitDisplay value={batch.link_volume_bbl ?? batch.volume_bbl} unitType="volume" />
                       </Badge>
                     </div>
 
@@ -368,7 +369,7 @@ export function BrewLogCompletionDialog({
                               <SelectItem key={v.id} value={v.id}>
                                 {v.name}
                                 {v.capacity_bbl
-                                  ? ` (${v.capacity_bbl} BBL)`
+                                  ? <>{" "}(<UnitDisplay value={v.capacity_bbl} unitType="volume" />)</>
                                   : ""}
                               </SelectItem>
                             ))}

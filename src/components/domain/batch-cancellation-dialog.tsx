@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/alert";
 import { Loader2, XCircle, Archive, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types & Constants
@@ -277,7 +278,7 @@ export function BatchCancellationDialog({
               )}
               <p className="text-sm text-muted-foreground">
                 Volume of beer lost. Used for TTB loss reporting.
-                {currentVolume && ` Current batch volume: ${currentVolume} BBL`}
+                {currentVolume && <>{" "}Current batch volume: <UnitDisplay value={currentVolume} unitType="volume" /></>}
               </p>
             </div>
           )}

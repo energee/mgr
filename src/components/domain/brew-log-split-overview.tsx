@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
 import { Beer, FlaskConical, ExternalLink } from "lucide-react";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // Segment colors for the volume bar
 const SEGMENT_COLORS = [
@@ -165,10 +166,10 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
             <div className="flex gap-4 text-xs text-muted-foreground">
               {recipe.style_name && <span>{recipe.style_name}</span>}
               {recipe.batch_size_bbl != null && (
-                <span>{recipe.batch_size_bbl} BBL</span>
+                <span><UnitDisplay value={recipe.batch_size_bbl} unitType="volume" /></span>
               )}
               {recipe.est_og != null && (
-                <span>Est. OG {recipe.est_og.toFixed(1)}°P</span>
+                <span>Est. OG <UnitDisplay value={recipe.est_og} unitType="gravity" decimals={1} /></span>
               )}
             </div>
           </div>
@@ -179,7 +180,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Volume Split</span>
-          <span>{totalVolume.toFixed(2)} BBL total</span>
+          <span><UnitDisplay value={totalVolume} unitType="volume" /> total</span>
         </div>
         <div className="flex h-7 w-full overflow-hidden rounded-full bg-muted">
           {validBatches.map((lb, index) => {
@@ -243,7 +244,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
                   <div>
                     <span className="text-muted-foreground">Volume</span>
                     <p className="font-medium">
-                      {volume.toFixed(2)} BBL
+                      <UnitDisplay value={volume} unitType="volume" />
                       <Badge
                         variant="outline"
                         className="ml-1.5 text-[10px] font-normal"
