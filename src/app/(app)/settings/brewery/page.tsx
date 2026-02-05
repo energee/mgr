@@ -24,7 +24,9 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Bot, Check, Ruler, Save } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
+import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   useUnitPreferences,
   useUpdateUnitPreferences,
@@ -124,10 +126,7 @@ function ApiKeySection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-5 w-5" />
-          AI Assistant
-        </CardTitle>
+        <CardTitle>AI Assistant</CardTitle>
         <CardDescription>
           Set your personal API key for the AI brewery assistant.
           This overrides the global key set in System Settings.
@@ -197,6 +196,12 @@ function ApiKeySection() {
 export default function BrewerySettingsPage() {
   const { data: preferences, isLoading } = useUnitPreferences();
   const updatePreferences = useUpdateUnitPreferences();
+  const [isMac, setIsMac] = useState(false);
+  const submitRef = useSubmitShortcut();
+
+  useEffect(() => {
+    setIsMac(navigator.userAgent.includes("Mac"));
+  }, []);
 
   const form = useForm<UnitPreferencesForm>({
     resolver: zodResolver(unitPreferencesSchema),
@@ -252,10 +257,7 @@ export default function BrewerySettingsPage() {
           {/* Unit Preferences */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Ruler className="h-5 w-5" />
-                Measurement Units
-              </CardTitle>
+              <CardTitle>Measurement Units</CardTitle>
               <CardDescription>
                 Set your preferred units for displaying measurements throughout the app.
                 All data is stored in canonical units (BBL, lbs, °F, °P) and converted for display.
@@ -392,9 +394,13 @@ export default function BrewerySettingsPage() {
 
           {/* Submit */}
           <div className="flex justify-end">
-            <Button type="submit" disabled={updatePreferences.isPending}>
-              <Save className="h-4 w-4 mr-2" />
-              {updatePreferences.isPending ? "Saving..." : "Save Preferences"}
+            <Button ref={submitRef} type="submit" disabled={updatePreferences.isPending}>
+              {updatePreferences.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Preferences
+              <KbdGroup>
+                <Kbd>{isMac ? "\u2318" : "Ctrl"}</Kbd>
+                <Kbd>{isMac ? "\u21B5" : "Enter"}</Kbd>
+              </KbdGroup>
             </Button>
           </div>
         </form>
