@@ -226,6 +226,78 @@ Ingredients are stored in junction tables rather than JSONB arrays. This enables
 
 ---
 
+## Recipe Variant Tables (Split Templates)
+
+Recipe variants represent planned cold-side variations for a recipe. Each variant defines a distinct beer that can be produced from one brew (split fermentation). For example, one IPA brew could be split into a "Citra Single Hop" variant and a "Mosaic Single Hop" variant.
+
+### `recipe_variants`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_id | UUID | FK to recipes |
+| name | TEXT | Variant name |
+| description | TEXT | Variant description |
+| position | INT | Sort order |
+| planned_volume_bbl | DECIMAL | Planned volume for this variant |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+### `recipe_variant_hops`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_variant_id | UUID | FK to recipe_variants |
+| hop_id | UUID | FK to hops |
+| weight_oz | DECIMAL | Weight in ounces (must be > 0) |
+| timing | TEXT | Timing (default: dry_hop) |
+| days | INT | Contact time in days |
+| position | INT | Sort order |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### `recipe_variant_adjuncts`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_variant_id | UUID | FK to recipe_variants |
+| adjunct_id | UUID | FK to adjuncts |
+| amount | DECIMAL | Amount (must be > 0) |
+| unit | TEXT | Unit |
+| timing | TEXT | Timing |
+| position | INT | Sort order |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### `recipe_variant_fruits`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_variant_id | UUID | FK to recipe_variants |
+| fruit_id | UUID | FK to fruits |
+| amount | DECIMAL | Amount (must be > 0) |
+| unit | TEXT | Unit |
+| timing | TEXT | Timing |
+| position | INT | Sort order |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+### `recipe_variant_spices`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| recipe_variant_id | UUID | FK to recipe_variants |
+| spice_id | UUID | FK to spices |
+| amount | DECIMAL | Amount (must be > 0) |
+| unit | TEXT | Unit |
+| timing | TEXT | Timing |
+| boil_time_min | INT | Boil time in minutes |
+| position | INT | Sort order |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+---
+
 ## `recipes_with_estimates` (View)
 
 Calculated view that computes recipe estimates on read. Use this view instead of the base `recipes` table when estimates are needed.
@@ -302,6 +374,43 @@ Detailed recipe cost breakdown by ingredient category. Use this view when you ne
 This view provides detailed cost breakdown. `recipes_with_estimates.est_cogs` is a placeholder that could be updated to use this view's `total_cogs` in the future. Currently kept separate because:
 - `recipes_with_estimates` focuses on brewing metrics (OG, FG, ABV, IBU, SRM)
 - This view focuses on cost analysis with detailed breakdowns
+
+---
+
+## `recipe_variants_with_costs` (View)
+
+Recipe variants with hot-side and cold-side cost projections. Combines the base recipe's hot-side COGS (from `recipes_with_cogs`) with each variant's cold-side ingredient costs.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| *(all recipe_variants columns)* | | Base variant data |
+| hot_side_cost_per_bbl | DECIMAL | Hot-side cost per BBL from recipe |
+| variant_addition_cost | DECIMAL | Total cold-side ingredient cost (hops + adjuncts + fruits) |
+| est_total_cost | DECIMAL | Hot-side × volume + cold-side additions |
+| est_cost_per_bbl | DECIMAL | Total cost / planned_volume_bbl |
+
+**Cost sources:**
+- Hop cost: `weight_oz / 16.0 * hops.cost_per_lb`
+- Adjunct cost: `amount * adjuncts.cost_per_lb`
+- Fruit cost: `amount * fruits.cost_per_lb`
+
+---
+
+## `batch_additions_with_costs` (View)
+
+Batch additions with estimated costs from catalog prices. Performs polymorphic cost lookup based on `catalog_table`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| *(all batch_additions columns)* | | Base addition data |
+| estimated_cost | DECIMAL | `amount × unit_cost` from catalog |
+
+**Cost lookup:**
+- hops: `cost_per_lb / 16.0` (converts to per-oz)
+- adjuncts: `cost_per_lb`
+- fruits: `cost_per_lb`
+- spices: `cost_per_unit`
+- Returns 0 when no catalog link or no cost data
 
 ---
 
@@ -428,6 +537,7 @@ Production batches (cold-side: fermentation through packaging). Hot-side data co
 |--------|------|-------------|
 | id | UUID | Primary key |
 | recipe_id | UUID | FK to [recipes](#recipes) |
+| recipe_variant_id | UUID | FK to [recipe_variants](#recipe_variants) - links batch to planned split variant |
 | batch_number | TEXT | Unique batch identifier |
 | name | TEXT | Batch name |
 | status | TEXT | Status: planned, fermenting, conditioning, packaging, completed, cancelled, archived |
@@ -716,23 +826,25 @@ Fermentation readings and measurements over time.
 
 ## `batch_additions`
 
-Post-brewday additions (dry hops, fruit, yeast, etc.).
+Actual cold-side additions recorded on a batch (dry hops, fruit, adjuncts, spices, etc.). Replaces the previous JSON-based approach in `batch_logs`.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
 | batch_id | UUID | FK to batches |
-| addition_type | TEXT | Type: dry_hop, fruit, sugar, yeast, adjunct, other |
-| catalog_type | TEXT | Catalog type: hop, fruit, sugar, yeast, adjunct |
-| catalog_id | UUID | FK to catalog item |
-| inventory_lot_id | UUID | FK to inventory_lots (optional) |
-| amount | DECIMAL(10,4) | Amount |
-| unit | TEXT | Unit |
-| vessel_id | UUID | FK to vessels |
-| added_at | TIMESTAMPTZ | When added |
-| added_by | UUID | FK to auth.users |
+| addition_type | TEXT | Type: hop, adjunct, fruit, spice, yeast, other |
+| catalog_id | UUID | FK to catalog item (polymorphic, see catalog_table) |
+| catalog_table | TEXT | Which catalog table: hops, adjuncts, fruits, spices |
+| name | TEXT | Ingredient name (denormalized for display) |
+| amount | DECIMAL | Amount (must be > 0) |
+| unit | TEXT | Unit (oz, lbs, g, etc.) |
+| timing | TEXT | Timing context (e.g., "dry_hop") |
+| days | INT | Contact time in days |
+| date_added | DATE | When physically added |
 | notes | TEXT | Notes |
 | created_at | TIMESTAMPTZ | Created timestamp |
+
+**Polymorphic catalog reference:** `catalog_table` + `catalog_id` together form a polymorphic FK to the relevant catalog table (hops, adjuncts, fruits, or spices). When `catalog_id` is NULL, the addition was entered manually without a catalog reference.
 
 ---
 
@@ -1204,4 +1316,15 @@ CREATE INDEX idx_batches_planning ON batches(status, recipe_id)
   WHERE status IN ('planned', 'fermenting', 'conditioning');
 CREATE INDEX idx_recipes_brand_active ON recipes(brand_id, updated_at DESC)
   WHERE brand_id IS NOT NULL AND is_active = true;
+
+-- Recipe variants and split templates
+CREATE INDEX idx_recipe_variants_recipe ON recipe_variants(recipe_id);
+CREATE INDEX idx_recipe_variant_hops_variant ON recipe_variant_hops(recipe_variant_id);
+CREATE INDEX idx_recipe_variant_adjuncts_variant ON recipe_variant_adjuncts(recipe_variant_id);
+CREATE INDEX idx_recipe_variant_fruits_variant ON recipe_variant_fruits(recipe_variant_id);
+CREATE INDEX idx_recipe_variant_spices_variant ON recipe_variant_spices(recipe_variant_id);
+
+-- Batch additions and variant linkage
+CREATE INDEX idx_batch_additions_batch ON batch_additions(batch_id);
+CREATE INDEX idx_batches_recipe_variant ON batches(recipe_variant_id);
 ```

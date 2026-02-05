@@ -17,6 +17,7 @@ export const batchSchema = z.object({
   name: z.string().min(1, "Name is required"),
   status: z.string().default("planned"),
   recipe_id: z.string().uuid().nullable().optional(),
+  recipe_variant_id: z.string().uuid().nullable().optional(),
   planned_start_date: z.string().nullable().optional(),
   volume_bbl: z.coerce.number().nullable().optional(),
   actual_fg: z.coerce.number().nullable().optional(),

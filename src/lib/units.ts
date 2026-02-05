@@ -310,6 +310,16 @@ export function getUnitLabel(unit: string): string {
 }
 
 /**
+ * Get the next unit in the cycle for a given unit type.
+ * Used by UnitDisplay click-to-cycle behavior.
+ */
+export function getNextUnit(unitType: UnitType, currentUnit: string): string {
+  const options = getUnitOptions(unitType);
+  const currentIndex = options.indexOf(currentUnit);
+  return options[(currentIndex + 1) % options.length];
+}
+
+/**
  * Generic conversion from canonical to display value.
  */
 export function toDisplayValue(

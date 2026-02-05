@@ -38,6 +38,7 @@ import {
 import { Loader2, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import { batchKeys, vesselKeys } from "@/lib/query-keys";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -178,7 +179,7 @@ export function StartFermentationDialog({
                     <SelectItem key={vessel.id} value={vessel.id}>
                       <span className="font-medium">{vessel.name}</span>
                       <span className="text-muted-foreground ml-2">
-                        ({vessel.capacity_bbl} BBL)
+                        (<UnitDisplay value={vessel.capacity_bbl} unitType="volume" />)
                       </span>
                     </SelectItem>
                   ))
@@ -192,7 +193,7 @@ export function StartFermentationDialog({
             )}
             {selectedVessel && (
               <p className="text-sm text-muted-foreground">
-                Capacity: {selectedVessel.capacity_bbl} BBL
+                Capacity: <UnitDisplay value={selectedVessel.capacity_bbl} unitType="volume" />
               </p>
             )}
           </div>
@@ -214,7 +215,7 @@ export function StartFermentationDialog({
             )}
             {selectedVessel && form.watch("volume_bbl") > selectedVessel.capacity_bbl && (
               <p className="text-sm text-amber-600">
-                Volume exceeds vessel capacity ({selectedVessel.capacity_bbl} BBL)
+                Volume exceeds vessel capacity (<UnitDisplay value={selectedVessel.capacity_bbl} unitType="volume" />)
               </p>
             )}
           </div>

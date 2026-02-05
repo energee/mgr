@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, TrendingUp } from "lucide-react";
 import { recipeKeys } from "@/lib/query-keys";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -64,21 +65,21 @@ function CostRow({
   label,
   cost,
   quantity,
-  unit,
+  unitType,
 }: {
   label: string;
   cost: number | null;
   quantity?: number | null;
-  unit?: string;
+  unitType?: "weight" | "volume" | "temperature";
 }) {
   const hasCost = cost !== null && cost > 0;
   return (
     <div className="flex items-center justify-between py-1.5">
       <div className="flex items-center gap-2">
         <span className="text-sm">{label}</span>
-        {quantity !== undefined && quantity !== null && quantity > 0 && (
+        {quantity !== undefined && quantity !== null && quantity > 0 && unitType && (
           <span className="text-xs text-muted-foreground">
-            ({quantity.toFixed(1)} {unit})
+            (<UnitDisplay value={quantity} unitType={unitType} decimals={1} />)
           </span>
         )}
       </div>
@@ -176,13 +177,13 @@ export function RecipeCOGSDisplay({ recipeId }: RecipeCOGSDisplayProps) {
             label="Malt/Grain"
             cost={cogs.malt_cost}
             quantity={cogs.total_grain_lbs}
-            unit="lbs"
+            unitType="weight"
           />
           <CostRow
             label="Hops"
             cost={cogs.hop_cost}
-            quantity={cogs.total_hop_oz}
-            unit="oz"
+            quantity={cogs.total_hop_oz != null ? cogs.total_hop_oz / 16 : null}
+            unitType="weight"
           />
           <CostRow label="Yeast" cost={cogs.yeast_cost} />
           <CostRow label="Adjuncts" cost={cogs.adjunct_cost} />

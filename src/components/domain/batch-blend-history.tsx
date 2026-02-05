@@ -23,6 +23,7 @@ import { Loader2, GitMerge } from "lucide-react";
 import Link from "next/link";
 import { getStateLabel } from "@/types/entity";
 import { batchEntity } from "@/entities/batch";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -151,7 +152,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                         {getStateLabel(batchEntity, blend.source_batch_status)}
                       </Badge>
                     </TableCell>
-                    <TableCell>{Number(blend.volume_bbl).toFixed(2)}</TableCell>
+                    <TableCell><UnitDisplay value={Number(blend.volume_bbl)} unitType="volume" /></TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(blend.blended_at).toLocaleDateString()}
                     </TableCell>
@@ -161,7 +162,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                   <TableCell colSpan={3} className="text-right">
                     Total Blended Volume:
                   </TableCell>
-                  <TableCell>{totalVolume.toFixed(2)} BBL</TableCell>
+                  <TableCell><UnitDisplay value={totalVolume} unitType="volume" /></TableCell>
                   <TableCell />
                 </TableRow>
               </TableBody>
@@ -224,8 +225,8 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
           </div>
           {blendInfo && Number(blendInfo.volume_blended_away_bbl) > 0 && (
             <p className="text-sm text-muted-foreground">
-              {Number(blendInfo.volume_blended_away_bbl).toFixed(2)} BBL blended away
-              {" "}({Number(blendInfo.available_volume_bbl).toFixed(2)} BBL remaining)
+              <UnitDisplay value={Number(blendInfo.volume_blended_away_bbl)} unitType="volume" /> blended away
+              {" "}(<UnitDisplay value={Number(blendInfo.available_volume_bbl)} unitType="volume" /> remaining)
             </p>
           )}
           <div className="border rounded-md">
@@ -254,7 +255,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>{Number(blend.volume_bbl).toFixed(2)}</TableCell>
+                    <TableCell><UnitDisplay value={Number(blend.volume_bbl)} unitType="volume" /></TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(blend.blended_at).toLocaleDateString()}
                     </TableCell>

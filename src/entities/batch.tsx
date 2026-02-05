@@ -18,7 +18,10 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
+import { BatchRecipeContext } from "@/components/domain/batch-recipe-context";
+import { BatchCostBreakdown } from "@/components/domain/batch-cost-breakdown";
 import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
+import { BatchAdditionsDisplay } from "@/components/domain/batch-additions-display";
 import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-info";
 import { BatchInsights } from "@/components/domain/batch-insights";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
@@ -190,9 +193,26 @@ export const batchEntity: EntityConfig<Batch> = {
       ],
     },
     {
+      id: "recipe-context",
+      title: "Recipe",
+      component: BatchRecipeContext,
+      collapsible: true,
+    },
+    {
+      id: "cost-breakdown",
+      title: "Cost Breakdown",
+      component: BatchCostBreakdown,
+      collapsible: true,
+    },
+    {
       id: "brew-info",
       title: "Brewing",
       component: BatchBrewInfo,
+    },
+    {
+      id: "additions",
+      title: "Cold-Side Additions",
+      component: BatchAdditionsDisplay,
     },
     {
       id: "ai-insights",
@@ -258,6 +278,8 @@ export const batchEntity: EntityConfig<Batch> = {
       },
       colSpan: 6,
     },
+    // recipe_variant_id is set by the Start Brew Day dialog, not manual entry.
+    // Displayed in the BatchRecipeContext detail section instead.
     {
       name: "planned_start_date",
       label: "Planned Start Date",

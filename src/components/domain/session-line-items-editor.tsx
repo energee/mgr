@@ -47,6 +47,7 @@ import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sessionLineItemKeys, packagingKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners, type PackagingFormat } from "@/hooks/use-catalog";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -201,7 +202,7 @@ function BatchCell({
               />
               {batch.volume_bbl != null && (
                 <span className="text-xs text-muted-foreground">
-                  {batch.volume_bbl} bbl
+                  <UnitDisplay value={batch.volume_bbl} unitType="volume" />
                 </span>
               )}
             </span>
@@ -644,7 +645,7 @@ export function SessionLineItemsEditor({
                           />
                           {batch.volume_bbl != null && (
                             <span className="text-xs text-muted-foreground">
-                              {batch.volume_bbl} bbl
+                              <UnitDisplay value={batch.volume_bbl} unitType="volume" />
                             </span>
                           )}
                         </span>

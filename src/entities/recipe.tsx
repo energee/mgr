@@ -14,8 +14,10 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
+import { RecipeVariantEditor } from "@/components/domain/recipe-variant-editor";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
+import { RecipeProductionHistory } from "@/components/domain/recipe-production-history";
 import { StatusBadge } from "@/components/universal/status-badge";
 
 import { recipeSchema } from "@/lib/schemas/recipe";
@@ -246,6 +248,17 @@ export const recipeEntity: EntityConfig<Recipe> = {
       id: "additions",
       title: "Additions",
       component: RecipeAdditionsDisplay,
+    },
+    {
+      id: "variants",
+      title: "Split Variants",
+      component: RecipeVariantEditor,
+    },
+    {
+      id: "production-history",
+      title: "Production History",
+      component: RecipeProductionHistory,
+      collapsible: true,
     },
     {
       id: "notes",
@@ -486,6 +499,13 @@ export const recipeEntity: EntityConfig<Recipe> = {
   // Actions
   // ---------------------------------------------------------------------------
   actions: [
+    {
+      name: "start_brew_day",
+      label: "Start Brew Day",
+      icon: "play",
+      type: "button",
+      fromStates: ["complete"],
+    },
     {
       name: "clone",
       label: "Clone Recipe",

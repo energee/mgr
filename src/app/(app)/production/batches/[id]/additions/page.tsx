@@ -28,16 +28,75 @@ import {
 } from "@/lib/batch-additions";
 import { PlannedAdditions } from "@/components/domain/planned-additions";
 import { format } from "date-fns";
-import type { Json } from "@/types/supabase";
-import { batchKeys } from "@/lib/query-keys";
+import { batchKeys, batchAdditionKeys } from "@/lib/query-keys";
 
-interface BatchLog {
+/** Row from the batch_additions table */
+interface BatchAdditionRow {
   id: string;
   batch_id: string;
-  log_type: string;
-  data: BatchAddition;
+  addition_type: string;
+  catalog_id: string | null;
+  catalog_table: string | null;
+  name: string;
+  amount: number;
+  unit: string;
+  timing: string | null;
+  days: number | null;
+  date_added: string | null;
+  notes: string | null;
   created_at: string;
-  created_by: string | null;
+}
+
+/**
+ * Map the form's addition_type to the DB enum values.
+ * Form uses: dry_hop, fruit, adjunct, fining, spice, other
+ * DB allows: hop, adjunct, fruit, spice, yeast, other
+ */
+function mapAdditionTypeToDb(
+  formType: AdditionType
+): "hop" | "adjunct" | "fruit" | "spice" | "yeast" | "other" {
+  switch (formType) {
+    case "dry_hop":
+      return "hop";
+    case "fruit":
+      return "fruit";
+    case "adjunct":
+      return "adjunct";
+    case "fining":
+      return "other";
+    case "spice":
+      return "spice";
+    case "other":
+      return "other";
+  }
+}
+
+/**
+ * Reverse-map the DB addition_type back to the form AdditionType for display.
+ */
+function mapDbTypeToDisplay(
+  dbType: string
+): AdditionType {
+  switch (dbType) {
+    case "hop":
+      return "dry_hop";
+    case "fruit":
+      return "fruit";
+    case "adjunct":
+      return "adjunct";
+    case "spice":
+      return "spice";
+    default:
+      return "other";
+  }
+}
+
+/**
+ * Map the form's addition_type to the catalog table name for the DB.
+ */
+function mapTypeToCatalogTable(formType: AdditionType): string | null {
+  const config = ADDITION_TYPES[formType];
+  return config.catalogTable ?? null;
 }
 
 export default function BatchAdditionsPage({
@@ -64,30 +123,45 @@ export default function BatchAdditionsPage({
     },
   });
 
-  // Fetch additions from batch_logs
+  // Fetch additions from batch_additions table
   const { data: additions, isLoading: additionsLoading } = useQuery({
-    queryKey: batchKeys.additions(id),
+    queryKey: batchAdditionKeys.byBatch(id),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("batch_logs")
+        .from("batch_additions")
         .select("*")
         .eq("batch_id", id)
-        .eq("log_type", "addition")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data as unknown) as BatchLog[];
+      return data as BatchAdditionRow[];
     },
   });
 
-  // Add addition mutation
+  // Add addition mutation - inserts into batch_additions table
   const addAddition = useMutation({
     mutationFn: async (addition: BatchAddition) => {
+      const dbAdditionType = mapAdditionTypeToDb(addition.addition_type);
+      const catalogTable = mapTypeToCatalogTable(addition.addition_type);
+      const dateAdded = addition.timestamp
+        ? new Date(addition.timestamp).toISOString().split("T")[0]
+        : null;
+
       const { data, error } = await supabase
-        .from("batch_logs")
+        .from("batch_additions")
         .insert({
           batch_id: id,
-          log_type: "addition",
-          data: addition as unknown as Json,
+          addition_type: dbAdditionType,
+          catalog_id: addition.ingredient_id || null,
+          catalog_table: addition.ingredient_id ? catalogTable : null,
+          name: addition.ingredient_name,
+          amount: addition.quantity,
+          unit: addition.unit,
+          timing: addition.addition_type === "dry_hop" ? "dry_hop" : null,
+          days: addition.contact_time_hours
+            ? Math.ceil(addition.contact_time_hours / 24)
+            : null,
+          date_added: dateAdded,
+          notes: addition.notes || null,
         })
         .select()
         .single();
@@ -95,7 +169,9 @@ export default function BatchAdditionsPage({
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: batchKeys.additions(id) });
+      queryClient.invalidateQueries({
+        queryKey: batchAdditionKeys.byBatch(id),
+      });
       setShowForm(false);
       toast.success("Addition recorded");
     },
@@ -104,15 +180,15 @@ export default function BatchAdditionsPage({
     },
   });
 
-  // Group additions by type for summary
+  // Group additions by display type for summary
   const additionsByType = additions?.reduce(
-    (acc, log) => {
-      const type = log.data.addition_type;
+    (acc, row) => {
+      const type = mapDbTypeToDisplay(row.addition_type);
       if (!acc[type]) acc[type] = [];
-      acc[type].push(log);
+      acc[type].push(row);
       return acc;
     },
-    {} as Record<AdditionType, BatchLog[]>
+    {} as Record<AdditionType, BatchAdditionRow[]>
   );
 
   const getAdditionIcon = (type: AdditionType) => {
@@ -177,12 +253,12 @@ export default function BatchAdditionsPage({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {(Object.entries(additionsByType) as [AdditionType, BatchLog[]][]).map(
-                ([type, logs]) => {
+              {(Object.entries(additionsByType) as [AdditionType, BatchAdditionRow[]][]).map(
+                ([type, rows]) => {
                   const Icon = getAdditionIcon(type);
                   const config = ADDITION_TYPES[type];
-                  const totalQty = logs.reduce((sum, log) => sum + log.data.quantity, 0);
-                  const unit = logs[0]?.data.unit || config.defaultUnit;
+                  const totalQty = rows.reduce((sum, row) => sum + Number(row.amount), 0);
+                  const unit = rows[0]?.unit || config.defaultUnit;
                   return (
                     <div
                       key={type}
@@ -197,7 +273,7 @@ export default function BatchAdditionsPage({
                           {totalQty.toFixed(1)} {unit}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {logs.length} addition{logs.length !== 1 ? "s" : ""}
+                          {rows.length} addition{rows.length !== 1 ? "s" : ""}
                         </p>
                       </div>
                     </div>
@@ -235,39 +311,40 @@ export default function BatchAdditionsPage({
             </p>
           ) : (
             <div className="space-y-3">
-              {additions?.map((log) => {
-                const config = ADDITION_TYPES[log.data.addition_type];
-                const Icon = getAdditionIcon(log.data.addition_type);
+              {additions?.map((row) => {
+                const displayType = mapDbTypeToDisplay(row.addition_type);
+                const config = ADDITION_TYPES[displayType];
+                const Icon = getAdditionIcon(displayType);
                 return (
                   <div
-                    key={log.id}
+                    key={row.id}
                     className="flex items-start gap-4 rounded-lg border p-4"
                   >
                     <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="font-medium">{log.data.ingredient_name}</span>
+                        <span className="font-medium">{row.name}</span>
                         <span className="text-muted-foreground">
-                          {log.data.quantity} {log.data.unit}
+                          {Number(row.amount)} {row.unit}
                         </span>
                         <span className="text-xs bg-muted px-2 py-0.5 rounded">
                           {config.label}
                         </span>
                       </div>
-                      {log.data.contact_time_hours && (
+                      {row.days != null && row.days > 0 && (
                         <p className="text-sm text-muted-foreground">
-                          Contact time: {log.data.contact_time_hours}h
+                          Contact time: {row.days} day{row.days !== 1 ? "s" : ""}
                         </p>
                       )}
-                      {log.data.notes && (
+                      {row.notes && (
                         <p className="text-sm text-muted-foreground truncate">
-                          {log.data.notes}
+                          {row.notes}
                         </p>
                       )}
                     </div>
                     <div className="text-right text-sm text-muted-foreground flex-shrink-0">
-                      <p>{format(new Date(log.created_at), "MMM d")}</p>
-                      <p>{format(new Date(log.created_at), "h:mm a")}</p>
+                      <p>{format(new Date(row.created_at), "MMM d")}</p>
+                      <p>{format(new Date(row.created_at), "h:mm a")}</p>
                     </div>
                   </div>
                 );

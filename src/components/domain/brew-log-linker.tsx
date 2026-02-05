@@ -38,6 +38,7 @@ import { Link2, Plus, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { batchKeys } from "@/lib/query-keys";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 interface BrewLog {
   id: string;
@@ -283,7 +284,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
                       {link.brew_log.brew_number}
                     </span>
                     <Badge variant="outline" className="text-xs">
-                      {link.volume_bbl} BBL
+                      <UnitDisplay value={link.volume_bbl} unitType="volume" />
                     </Badge>
                     <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>

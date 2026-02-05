@@ -15,7 +15,7 @@ import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BrewLogTimeline } from "@/components/domain/brew-log-timeline";
-import { BrewLogBatches } from "@/components/domain/brew-log-batches";
+import { BrewLogSplitOverview } from "@/components/domain/brew-log-split-overview";
 
 // Use generated type from Supabase (will need regeneration after migration)
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
@@ -243,9 +243,9 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       component: BrewLogTimeline,
     },
     {
-      id: "batches",
-      title: "Linked Batches",
-      component: BrewLogBatches,
+      id: "split-overview",
+      title: "Batch Splits",
+      component: BrewLogSplitOverview,
     },
     {
       id: "notes",
