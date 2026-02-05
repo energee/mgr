@@ -14,6 +14,7 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
+import { RecipeVariantEditor } from "@/components/domain/recipe-variant-editor";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
 import { RecipeProductionHistory } from "@/components/domain/recipe-production-history";
@@ -247,6 +248,11 @@ export const recipeEntity: EntityConfig<Recipe> = {
       id: "additions",
       title: "Additions",
       component: RecipeAdditionsDisplay,
+    },
+    {
+      id: "variants",
+      title: "Split Variants",
+      component: RecipeVariantEditor,
     },
     {
       id: "production-history",
@@ -486,6 +492,13 @@ export const recipeEntity: EntityConfig<Recipe> = {
       foreignKey: "recipe_id",
       showInDetail: true,
       detailTab: "Batches",
+    },
+    {
+      name: "variants",
+      entity: "recipe_variant",
+      type: "hasMany",
+      foreignKey: "recipe_id",
+      showInDetail: false,
     },
   ],
 
