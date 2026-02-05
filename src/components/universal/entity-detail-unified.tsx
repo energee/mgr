@@ -82,6 +82,14 @@ export interface EntityDetailUnifiedProps<T = Record<string, unknown>> {
   showEdit?: boolean; // default true
   onAction?: (actionName: string, data: T) => boolean;
   defaultValues?: Partial<T>; // For create mode
+  /** Field names that should be rendered as disabled (read-only) */
+  disabledFields?: string[];
+  /** Callback when any form field value changes. Use setFieldValue to update other fields. */
+  onFieldChange?: (
+    fieldName: string,
+    value: unknown,
+    form: UseFormReturn<Record<string, unknown>>,
+  ) => void;
 }
 
 // =============================================================================
@@ -247,6 +255,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   showEdit = true,
   onAction,
   defaultValues,
+  disabledFields,
+  onFieldChange,
 }: EntityDetailUnifiedProps<T>) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -323,6 +333,19 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       }
     }
   }, [data, form, formDefaults]);
+
+  // ---------------------------------------------------------------------------
+  // onFieldChange subscription - notify parent when form fields change
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!onFieldChange || !editing) return;
+    const subscription = form.watch((_, { name }) => {
+      if (name) {
+        onFieldChange(name, form.getValues(name), form);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [onFieldChange, editing, form]);
 
   // ---------------------------------------------------------------------------
   // Dynamic options for editable fields
@@ -831,6 +854,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           isCreateMode={isCreateMode}
           form={form}
           optionsMap={optionsMap}
+          disabledFields={disabledFields}
         />
       ) : (
         <div className="space-y-4">
@@ -844,6 +868,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
               isCreateMode={isCreateMode}
               form={form}
               optionsMap={optionsMap}
+              disabledFields={disabledFields}
             />
           ))}
         </div>
@@ -897,6 +922,7 @@ function UnifiedTabsWithRelations<T>({
   isCreateMode,
   form,
   optionsMap,
+  disabledFields,
 }: {
   tabs: [string, UnifiedSectionDef<T>[]][];
   relationTabs: EntityRelationDef[];
@@ -908,6 +934,7 @@ function UnifiedTabsWithRelations<T>({
   isCreateMode: boolean;
   form: UseFormReturn<Record<string, unknown>>;
   optionsMap: Record<string, { value: string; label: string }[]>;
+  disabledFields?: string[];
 }) {
   const [activeTab, setActiveTab] = useState("details");
 
@@ -938,6 +965,7 @@ function UnifiedTabsWithRelations<T>({
             isCreateMode={isCreateMode}
             form={form}
             optionsMap={optionsMap}
+            disabledFields={disabledFields}
           />
         ))}
       </TabsContent>
@@ -954,6 +982,7 @@ function UnifiedTabsWithRelations<T>({
               isCreateMode={isCreateMode}
               form={form}
               optionsMap={optionsMap}
+              disabledFields={disabledFields}
             />
           ))}
         </TabsContent>
@@ -992,6 +1021,7 @@ function UnifiedSectionCard<T>({
   isCreateMode = false,
   form,
   optionsMap = {},
+  disabledFields,
 }: {
   section: UnifiedSectionDef<T>;
   data: T;
@@ -1000,6 +1030,7 @@ function UnifiedSectionCard<T>({
   isCreateMode?: boolean;
   form?: UseFormReturn<Record<string, unknown>>;
   optionsMap?: Record<string, { value: string; label: string }[]>;
+  disabledFields?: string[];
 }) {
   // Always call the relation hook (rules of hooks)
   const relationDisplayValues = useRelationDisplayValues(
@@ -1048,19 +1079,24 @@ function UnifiedSectionCard<T>({
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-12 gap-4">
-          {section.fields?.map((field) => (
-            <UnifiedField
-              key={field.name}
-              field={field as UnifiedFieldDef<Record<string, unknown>>}
-              editing={editing}
-              isCreateMode={isCreateMode}
-              form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
-              record={data as Record<string, unknown>}
-              entity={entity as EntityConfig<Record<string, unknown>>}
-              relationDisplayValues={relationDisplayValues}
-              dynamicOptions={optionsMap[field.name]}
-            />
-          ))}
+          {section.fields?.map((field) => {
+            const effectiveField = disabledFields?.includes(field.name)
+              ? { ...field, disabled: true }
+              : field;
+            return (
+              <UnifiedField
+                key={field.name}
+                field={effectiveField as UnifiedFieldDef<Record<string, unknown>>}
+                editing={editing}
+                isCreateMode={isCreateMode}
+                form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
+                record={data as Record<string, unknown>}
+                entity={entity as EntityConfig<Record<string, unknown>>}
+                relationDisplayValues={relationDisplayValues}
+                dynamicOptions={optionsMap[field.name]}
+              />
+            );
+          })}
         </dl>
       </CardContent>
     </Card>
@@ -1267,9 +1303,9 @@ function EntityDetailSkeleton() {
           <Skeleton className="h-6 w-32" />
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-12 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i}>
+              <div key={i} className="col-span-6">
                 <Skeleton className="h-4 w-24 mb-2" />
                 <Skeleton className="h-5 w-32" />
               </div>

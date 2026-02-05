@@ -455,7 +455,7 @@ export const batchEntity: EntityConfig<Batch> = {
       toState: "fermenting",
     },
     {
-      name: "transfer_to_brite",
+      name: "transfer_vessel",
       label: "Move to Conditioning",
       icon: "arrow-right",
       type: "button",

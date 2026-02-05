@@ -9,6 +9,7 @@
 
 import { use, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { batchEntity } from "@/entities/batch";
@@ -38,6 +39,7 @@ export default function BatchDetailPage({
   );
   const [showBlend, setShowBlend] = useState(prefillDialog === "blend");
 
+  const router = useRouter();
   const queryClient = useQueryClient();
   const supabase = createClient();
 
@@ -47,7 +49,7 @@ export default function BatchDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
-        .select("id, batch_number, name, status, volume_bbl, current_vessel_name")
+        .select("id, batch_number, name, status, volume_bbl, current_vessel_id, current_vessel_name")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -70,8 +72,17 @@ export default function BatchDetailPage({
       setShowBlend(true);
       return true; // Indicates action was handled
     }
+    if (actionName === "transfer_vessel" && batch) {
+      usePrefillStore.getState().setPrefill({
+        batch_id: batch.id,
+        from_vessel_id: batch.current_vessel_id,
+        volume_bbl: batch.volume_bbl,
+      });
+      router.push("/production/vessel-transfers/new");
+      return true;
+    }
     return false; // Let EntityDetail handle normally
-  }, []);
+  }, [batch, router]);
 
   const handleDialogSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
