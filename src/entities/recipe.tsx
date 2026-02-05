@@ -507,6 +507,13 @@ export const recipeEntity: EntityConfig<Recipe> = {
   // ---------------------------------------------------------------------------
   actions: [
     {
+      name: "start_brew_day",
+      label: "Start Brew Day",
+      icon: "play",
+      type: "button",
+      fromStates: ["complete"],
+    },
+    {
       name: "clone",
       label: "Clone Recipe",
       icon: "copy",
