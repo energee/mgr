@@ -1,8 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { batchEntity } from "@/entities/batch";
-import { getStateLabel } from "@/types/entity";
+import { formatStateLabel } from "@/types/entity";
 
 /** Escape LIKE/ILIKE wildcard characters so they match literally. */
 function escapeLike(value: string): string {
@@ -816,7 +815,7 @@ export function createChatTools(supabase: SupabaseClient) {
         };
 
         const openDialog = dialogMap[toState] as string | undefined;
-        const toLabel = getStateLabel(batchEntity, toState);
+        const toLabel = formatStateLabel(toState);
 
         const description = openDialog
           ? `Move batch #${batch.batch_number} from ${batch.status} to ${toLabel}`
