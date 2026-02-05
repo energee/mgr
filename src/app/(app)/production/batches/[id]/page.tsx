@@ -10,7 +10,7 @@
 import { use, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { batchEntity } from "@/entities/batch";
 import { StartFermentationDialog } from "@/components/domain/start-fermentation-dialog";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
@@ -79,7 +79,7 @@ export default function BatchDetailPage({
 
   return (
     <>
-      <EntityDetail
+      <EntityDetailUnifiedWithErrorBoundary
         entity={batchEntity}
         id={id}
         basePath="/production/batches"

@@ -6,12 +6,12 @@
  * Record a new yeast pitch (purchase or harvest).
  */
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
 
 export default function YeastPitchNewPage() {
   return (
-    <EntityForm
+    <EntityDetailUnifiedWithErrorBoundary
       entity={yeastPitchEntity}
       basePath="/production/yeast-pitches"
     />

@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 
 export default function NewPurchaseOrderPage() {
-  return <EntityForm entity={purchaseOrderEntity} basePath="/purchasing/pos" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={purchaseOrderEntity}
+      basePath="/purchasing/pos"
+    />
+  );
 }

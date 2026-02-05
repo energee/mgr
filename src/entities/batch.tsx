@@ -247,6 +247,120 @@ export const batchEntity: EntityConfig<Batch> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "quick-links",
+      title: "Quick Actions",
+      component: BatchQuickLinks,
+    },
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "batch_number",
+          label: "Batch Number",
+          type: "text",
+          placeholder: "e.g., 2024-001",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "name",
+          label: "Name",
+          type: "text",
+          placeholder: "e.g., Hazy IPA #5",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "recipe_id",
+          label: "Recipe",
+          type: "relation",
+          relation: {
+            entity: "recipe",
+            displayField: "name",
+          },
+          colSpan: 6,
+        },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: statusOptions,
+          colSpan: 6,
+        },
+        {
+          name: "planned_start_date",
+          label: "Planned Start",
+          type: "date",
+          format: "date",
+          description: "When fermentation is planned to start",
+          colSpan: 6,
+        },
+        {
+          name: "volume_bbl",
+          label: "Volume",
+          type: "unit",
+          unitType: "volume",
+          format: "unit",
+          placeholder: "e.g., 10",
+          colSpan: 6,
+        },
+        {
+          name: "current_vessel_name",
+          label: "Vessel",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "brew-info",
+      title: "Brewing",
+      component: BatchBrewInfo,
+    },
+    {
+      id: "ai-insights",
+      title: "AI Insights",
+      component: BatchInsights,
+    },
+    {
+      id: "blend-history",
+      title: "Blend History",
+      component: BatchBlendHistory,
+      collapsible: true,
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+    {
+      id: "cancellation",
+      title: "Cancellation Details",
+      component: BatchCancellationInfo,
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("batches"),
+      collapsible: true,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: batchSchema,

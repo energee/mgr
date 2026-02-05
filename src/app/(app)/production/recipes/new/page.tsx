@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { recipeEntity } from "@/entities/recipe";
 
 export default function NewRecipePage() {
-  return <EntityForm entity={recipeEntity} basePath="/production/recipes" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={recipeEntity}
+      basePath="/production/recipes"
+    />
+  );
 }

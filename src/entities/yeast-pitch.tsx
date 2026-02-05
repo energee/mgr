@@ -308,6 +308,193 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Pitch Info",
+      fields: [
+        {
+          name: "strain_id",
+          label: "Yeast Strain",
+          type: "select",
+          required: true,
+          colSpan: 6,
+          dynamicOptions: {
+            table: "yeasts",
+            labelField: "name",
+            valueField: "id",
+            filter: { is_active: true },
+          },
+        },
+        { name: "strain_name", label: "Strain", editable: false, colSpan: 6 },
+        { name: "strain_manufacturer", label: "Manufacturer", editable: false, colSpan: 6 },
+        { name: "strain_code", label: "Product Code", editable: false, colSpan: 6 },
+        {
+          name: "source_type",
+          label: "Source Type",
+          type: "select",
+          options: SOURCE_TYPE_OPTIONS,
+          required: true,
+          colSpan: 4,
+        },
+        { name: "generation", label: "Generation", editable: false, colSpan: 4 },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: STATUS_OPTIONS,
+          colSpan: 4,
+        },
+        {
+          name: "parent_pitch_id",
+          label: "Parent Pitch (for harvest)",
+          type: "select",
+          colSpan: 6,
+          dynamicOptions: {
+            table: "yeast_pitches_with_details",
+            labelField: "strain_name",
+            valueField: "id",
+            filter: { status: "in_use" },
+          },
+          description: "Select parent pitch when recording a harvest",
+        },
+      ],
+    },
+    {
+      id: "viability",
+      title: "Viability & Quantity",
+      fields: [
+        {
+          name: "initial_viability",
+          label: "Initial Viability (%)",
+          type: "number",
+          format: "percentage",
+          placeholder: "95",
+          description: "Viability at time of receipt/harvest",
+          colSpan: 4,
+        },
+        { name: "estimated_viability", label: "Current Viability (Est.)", format: "percentage", editable: false, colSpan: 4 },
+        { name: "viability_status", label: "Viability Status", editable: false, colSpan: 4 },
+        {
+          name: "volume_ml",
+          label: "Volume (mL)",
+          type: "number",
+          format: "number",
+          placeholder: "e.g., 100",
+          colSpan: 4,
+        },
+        {
+          name: "cell_count_billion",
+          label: "Cell Count (Billion)",
+          type: "number",
+          format: "number",
+          placeholder: "e.g., 200",
+          description: "Estimated billion cells",
+          colSpan: 4,
+        },
+        { name: "days_old", label: "Days Old", format: "number", editable: false, colSpan: 4 },
+      ],
+    },
+    {
+      id: "dates",
+      title: "Dates",
+      fields: [
+        {
+          name: "received_date",
+          label: "Received",
+          type: "date",
+          format: "date",
+          description: "When purchased/received",
+          colSpan: 6,
+        },
+        {
+          name: "harvest_date",
+          label: "Harvested",
+          type: "date",
+          format: "date",
+          description: "When harvested (for harvest source)",
+          colSpan: 6,
+        },
+        {
+          name: "use_by_date",
+          label: "Use By",
+          type: "date",
+          format: "date",
+          colSpan: 6,
+        },
+        { name: "pitched_at", label: "Pitched", format: "datetime", editable: false, colSpan: 6 },
+      ],
+    },
+    {
+      id: "cost",
+      title: "Cost",
+      fields: [
+        {
+          name: "cost",
+          label: "Purchase Cost ($)",
+          type: "number",
+          format: "currency",
+          placeholder: "e.g., 12.00",
+          description: "Cost for purchased yeast",
+          colSpan: 6,
+        },
+        { name: "cost_per_batch", label: "Cost Per Batch", format: "currency", editable: false, colSpan: 6 },
+      ],
+    },
+    {
+      id: "usage",
+      title: "Usage",
+      fields: [
+        {
+          name: "batch_id",
+          label: "Pitched Into Batch",
+          type: "select",
+          colSpan: 6,
+          dynamicOptions: {
+            table: "batches",
+            labelField: "name",
+            valueField: "id",
+            orderBy: "created_at",
+          },
+          description: "Batch this pitch was used for (if already pitched)",
+        },
+        { name: "batch_name", label: "Batch", editable: false, colSpan: 6 },
+        { name: "batch_number", label: "Batch Number", editable: false, colSpan: 6 },
+        {
+          name: "location_id",
+          label: "Storage Location",
+          type: "select",
+          colSpan: 6,
+          dynamicOptions: {
+            table: "locations",
+            labelField: "name",
+            valueField: "id",
+            filter: { is_active: true },
+          },
+        },
+        { name: "location_name", label: "Storage Location", editable: false, colSpan: 6 },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Any observations about this pitch...",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: yeastPitchSchema,
