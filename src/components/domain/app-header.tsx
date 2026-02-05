@@ -24,7 +24,6 @@ import type { AnimatedIconHandle } from "@/components/icons/animated";
 import { useRef } from "react";
 import { toast } from "sonner";
 import { NotificationBell } from "@/components/domain/notification-bell";
-import { ChatToggle } from "@/components/domain/chat-toggle";
 
 interface AppHeaderProps {
   user: User;
@@ -61,9 +60,6 @@ export function AppHeader({ user, breweryName }: AppHeaderProps) {
       <div className="flex items-center gap-2">
         {/* Notifications */}
         <NotificationBell />
-
-        {/* AI Assistant */}
-        <ChatToggle />
 
         {/* User menu */}
         <DropdownMenu>

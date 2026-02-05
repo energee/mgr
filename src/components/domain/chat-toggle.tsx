@@ -6,23 +6,29 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useChatContext } from "@/contexts/chat-context";
 
 export function ChatToggle() {
-  const { isOpen, toggle } = useChatContext();
+  const { isOpen, toggle, chat } = useChatContext();
+  const isWorking = chat.status === "submitted" || chat.status === "streaming";
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={toggle}
-          className="h-8 w-8"
+          className={`group fixed bottom-4 right-4 z-50 h-10 w-10 rounded-full shadow-lg transition-colors ${
+            isOpen
+              ? "bg-[#D97757] text-white border-[#D97757] hover:bg-[#c56847] hover:text-white"
+              : "hover:border-[#D97757]/50"
+          }`}
         >
-          <ClaudeIcon
-            className={`h-4 w-4 transition-colors ${isOpen ? "text-[#D97757]" : "text-muted-foreground"}`}
-          />
+          {isWorking && !isOpen && (
+            <span className="absolute inset-0 rounded-full animate-ping bg-[#D97757]/30" />
+          )}
+          <ClaudeIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-75" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="bottom">
+      <TooltipContent side="left">
         {isOpen ? "Close Claude" : "Ask Claude"} (⌘.)
       </TooltipContent>
     </Tooltip>

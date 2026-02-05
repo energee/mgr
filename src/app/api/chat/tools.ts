@@ -858,5 +858,32 @@ export function createChatTools(supabase: SupabaseClient) {
         };
       },
     }),
+
+    createPackagingSession: tool({
+      description:
+        "Prepare a new packaging session. Returns a navigation action that opens the packaging session form with pre-filled data. The user will review and submit the form.",
+      inputSchema: z.object({
+        sessionDate: z
+          .string()
+          .describe("Session date (YYYY-MM-DD)"),
+        notes: z
+          .string()
+          .optional()
+          .describe("Optional session notes or special instructions"),
+      }),
+      execute: async ({ sessionDate, notes }) => {
+        const prefillData: Record<string, unknown> = {
+          session_date: sessionDate,
+        };
+        if (notes) prefillData.notes = notes;
+
+        return {
+          action: "navigate" as const,
+          url: "/production/packaging/new",
+          prefillData,
+          description: `Create a packaging session for ${sessionDate}`,
+        };
+      },
+    }),
   };
 }
