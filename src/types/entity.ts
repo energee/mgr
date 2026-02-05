@@ -438,6 +438,9 @@ export interface EntityActionDef<T> {
   /** When to show this action */
   showWhen?: (data: T) => boolean;
 
+  /** When to disable this action (returns tooltip reason when disabled) */
+  disabledWhen?: (data: T) => string | false;
+
   /** Required states (for stateful entities) */
   fromStates?: string[];
 

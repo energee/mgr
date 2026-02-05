@@ -171,19 +171,11 @@ export default function NotificationPreferencesPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/settings">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">Notification Preferences</h1>
-          <p className="text-muted-foreground">
-            Configure how and when you receive notifications
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">Notification Preferences</h1>
+        <p className="text-muted-foreground">
+          Configure how and when you receive notifications
+        </p>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

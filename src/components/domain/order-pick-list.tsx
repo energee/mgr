@@ -141,8 +141,8 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
       if (fgError) throw fgError;
 
       // Get brands and package types
-      const brandIds = [...new Set(finishedGoods?.map((fg) => fg.brand_id).filter(Boolean))];
-      const packageIds = [...new Set(finishedGoods?.map((fg) => fg.package_type_id).filter(Boolean))];
+      const brandIds = [...new Set(finishedGoods?.map((fg) => fg.brand_id).filter((id): id is string => !!id))];
+      const packageIds = [...new Set(finishedGoods?.map((fg) => fg.package_type_id).filter((id): id is string => !!id))];
 
       const [brandsResult, packagesResult] = await Promise.all([
         brandIds.length > 0
@@ -191,8 +191,8 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
             allocation_id: a.id,
             finished_good_id: fg.id,
             lot_number: fg.lot_number || "N/A",
-            brand_name: brandMap.get(fg.brand_id) || "Unknown",
-            package_name: packageMap.get(fg.package_type_id) || "Unknown",
+            brand_name: (fg.brand_id && brandMap.get(fg.brand_id)) || "Unknown",
+            package_name: (fg.package_type_id && packageMap.get(fg.package_type_id)) || "Unknown",
             quantity: a.quantity,
             bin_name: binInfo?.bin_name || null,
             location_name: binInfo?.location_name || null,

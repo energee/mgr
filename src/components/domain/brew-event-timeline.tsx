@@ -427,19 +427,22 @@ export function BrewEventTimeline({
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deletingEventId} onOpenChange={() => setDeletingEventId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+<AlertDialogTitle>Delete event?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this event? This action cannot be undone.
+              This will permanently delete this brew event. This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel variant="outline" disabled={isSubmitting}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               onClick={handleDeleteEvent}
               disabled={isSubmitting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isSubmitting ? "Deleting..." : "Delete"}
             </AlertDialogAction>

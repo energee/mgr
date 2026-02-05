@@ -2,13 +2,13 @@
 
 import { use } from "react";
 import { EntityForm } from "@/components/universal/entity-form";
-import { tierPriceEntity } from "@/entities/tier-price";
+import { enumValueEntity } from "@/entities/enum-value";
 
-export default function EditTierPricePage({
+export default function EditEnumValuePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityForm entity={tierPriceEntity} id={id} basePath="/settings/pricing/prices" />;
+  return <EntityForm entity={enumValueEntity} id={id} basePath="/settings/status-options" />;
 }

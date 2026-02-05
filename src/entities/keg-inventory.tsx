@@ -27,6 +27,7 @@ export type KegState =
 interface KegInventory {
   id: string;
   keg_type_id: string;
+  keg_owner_id: string | null;
   state: KegState;
   location_id: string | null;
   quantity: number;
@@ -35,6 +36,7 @@ interface KegInventory {
   // Joined fields from view
   keg_type_name?: string;
   keg_type_code?: string;
+  keg_owner_name?: string;
   volume_bbl?: number;
   location_name?: string;
   batch_number?: string;
@@ -61,6 +63,7 @@ export const KEG_STATES: { value: KegState; label: string; description: string }
 
 export const kegInventorySchema = z.object({
   keg_type_id: z.string().uuid(),
+  keg_owner_id: z.string().uuid().nullable().optional(),
   state: z.enum(["empty", "filled", "shipped", "returned_dirty", "cleaning", "maintenance", "retired"]),
   location_id: z.string().uuid().nullable().optional(),
   quantity: z.number().int(),
@@ -94,6 +97,12 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
       accessorKey: "keg_type_name",
       header: "Keg Type",
       sortable: true,
+    },
+    {
+      accessorKey: "keg_owner_name",
+      header: "Owner",
+      sortable: true,
+      render: (value: unknown) => (value ? String(value) : "—"),
     },
     {
       accessorKey: "state",
@@ -150,6 +159,7 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
       fields: [
         { field: "keg_type_name", label: "Keg Type" },
         { field: "keg_type_code", label: "Code" },
+        { field: "keg_owner_name", label: "Owner" },
         { field: "state", label: "State" },
         { field: "quantity", label: "Quantity" },
         { field: "location_name", label: "Location" },
@@ -176,5 +186,5 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
     "What's the total keg count by state?",
   ],
 
-  keyFields: ["keg_type_id", "state", "quantity", "location_id"],
+  keyFields: ["keg_type_id", "keg_owner_id", "state", "quantity", "location_id"],
 };
