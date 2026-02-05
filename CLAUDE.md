@@ -1,5 +1,12 @@
 # MGR - Brewery Management System
 
+## Tech Stack
+- Primary: TypeScript, JavaScript
+- Frontend: HTML, CSS
+- Backend: PostgREST with PostgreSQL
+- Config: JSON, YAML
+- Always prefer TypeScript over plain JavaScript for new files
+
 ## Quick Context
 
 MGR is a professional brewery management system following an **AI-first, minimalist design philosophy**.
@@ -304,6 +311,27 @@ When reviewing recipes, check:
 - Hop schedule (bittering vs flavor/aroma)
 - Water chemistry (sulfate:chloride ratio for style)
 - Fermentation temp vs yeast range
+
+## Database Debugging
+
+When debugging database issues, always check:
+1. PostgREST schema cache (`NOTIFY pgrst, 'reload schema'`)
+2. Stale enum/lookup table data
+3. Check constraints and triggers
+
+...before assuming application-level bugs.
+
+## Problem Solving Guidelines
+
+Before implementing any fix, first explain: 1) What you believe the root cause is, 2) Why you believe this, 3) Two alternative approaches ranked by likelihood of success. Wait for confirmation before writing code.
+
+When a first fix attempt doesn't work, STOP and re-analyze the root cause before trying another patch. Present 2-3 alternative approaches with tradeoffs before implementing.
+
+Debug systematically: 1) Reproduce the exact error, 2) Identify which layer the bug is in (database, API, frontend), 3) Check for stale caches or data, 4) Propose the minimal fix, 5) Verify the fix resolves the original error. Show each step.
+
+For cross-stack bugs, use separate task agents to investigate in parallel: Agent 1 checks database schema, constraints, and recent migrations. Agent 2 traces the API request/response flow. Agent 3 checks frontend form submission logic. Then synthesize findings.
+
+When a test-driven fix is feasible: first write a failing test that reproduces the bug, run it to confirm it fails, then fix the underlying code. Run the test again — if it still fails, analyze why and iterate. Keep looping until the test passes and all existing tests still pass. Summarize what caused the bug and what changed.
 
 ## When making commits
 
