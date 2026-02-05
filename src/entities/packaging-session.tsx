@@ -180,6 +180,72 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (for EntityDetailUnified)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Session Details",
+      fields: [
+        {
+          name: "id",
+          label: "Session ID",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "session_date",
+          label: "Session Date",
+          type: "date",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: statusOptions,
+          colSpan: 6,
+        },
+        {
+          name: "created_at",
+          label: "Created",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "updated_at",
+          label: "Last Updated",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Session notes, special instructions, etc.",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+    {
+      id: "line_items",
+      title: "Line Items",
+      component: SessionLineItemsDisplay,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: packagingSessionSchema,

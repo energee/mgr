@@ -167,6 +167,109 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (for EntityDetailUnified)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "name",
+          label: "Item Name",
+          type: "text",
+          placeholder: "e.g., Pale Malt (2-Row)",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "category",
+          label: "Category",
+          type: "select",
+          required: true,
+          options: valuesAsOptions(categoryDisplayConfig),
+          colSpan: 6,
+        },
+        {
+          name: "sku",
+          label: "SKU",
+          type: "text",
+          placeholder: "e.g., GRAIN-001",
+          colSpan: 6,
+        },
+        {
+          name: "unit",
+          label: "Unit of Measure",
+          type: "select",
+          required: true,
+          options: [
+            { value: "lb", label: "Pounds (lb)" },
+            { value: "oz", label: "Ounces (oz)" },
+            { value: "kg", label: "Kilograms (kg)" },
+            { value: "g", label: "Grams (g)" },
+            { value: "each", label: "Each" },
+            { value: "case", label: "Case" },
+            { value: "gal", label: "Gallons" },
+          ],
+          colSpan: 6,
+        },
+        {
+          name: "is_active",
+          label: "Active",
+          type: "switch",
+          description: "Inactive items won't appear in selection menus",
+          defaultValue: true,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "reorder",
+      title: "Reorder Settings",
+      fields: [
+        {
+          name: "reorder_point",
+          label: "Reorder Point",
+          type: "number",
+          placeholder: "e.g., 100",
+          description: "Minimum quantity before reorder alert",
+          colSpan: 4,
+        },
+        {
+          name: "reorder_qty",
+          label: "Reorder Quantity",
+          type: "number",
+          placeholder: "e.g., 500",
+          description: "Standard quantity to reorder",
+          colSpan: 4,
+        },
+        {
+          name: "supplier",
+          label: "Preferred Supplier",
+          type: "text",
+          placeholder: "e.g., Midwest Malting",
+          colSpan: 4,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Storage requirements, alternate suppliers...",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: inventoryItemSchema,

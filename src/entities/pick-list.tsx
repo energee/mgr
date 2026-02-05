@@ -185,6 +185,93 @@ export const pickListEntity: EntityConfig<PickListView> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (for EntityDetailUnified)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "order_id",
+          label: "Order",
+          type: "relation",
+          relation: { entity: "order", displayField: "order_number" },
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "order_number" as keyof PickListView & string,
+          label: "Order Number",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "customer_name" as keyof PickListView & string,
+          label: "Customer",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: statusOptions,
+          colSpan: 6,
+        },
+        {
+          name: "assigned_to",
+          label: "Assigned To",
+          type: "relation",
+          relation: { entity: "user_profile", displayField: "display_name" },
+          colSpan: 6,
+        },
+        {
+          name: "generated_at",
+          label: "Generated",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "started_at",
+          label: "Started",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "completed_at",
+          label: "Completed",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "pick-items",
+      title: "Pick Items",
+      component: PickListItems,
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Picking instructions, special handling...",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: pickListSchema,

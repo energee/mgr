@@ -191,6 +191,76 @@ export const binEntity: EntityConfig<Bin> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (for EntityDetailUnified)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Bin Details",
+      fields: [
+        {
+          name: "name",
+          label: "Name",
+          type: "text",
+          placeholder: "e.g., Shelf A-1, Cold Room 1",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "location_id",
+          label: "Location",
+          type: "relation",
+          relation: { entity: "location", displayField: "name" },
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "bin_type",
+          label: "Type",
+          type: "select",
+          options: binTypeOptions,
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "capacity",
+          label: "Capacity",
+          type: "number",
+          format: "number",
+          placeholder: "e.g., 100",
+          description: "Maximum number of items this bin can hold",
+          colSpan: 6,
+        },
+        {
+          name: "is_active",
+          label: "Active",
+          type: "switch",
+          description: "Inactive bins won't appear in dropdown menus",
+          defaultValue: true,
+          colSpan: 6,
+        },
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Any special notes about this bin...",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+    {
+      id: "contents_summary",
+      title: "Contents Summary",
+      fields: [
+        { name: "fg_item_count" as keyof Bin & string, label: "Finished Goods Items", format: "number", editable: false, colSpan: 4 },
+        { name: "rm_item_count" as keyof Bin & string, label: "Raw Material Items", format: "number", editable: false, colSpan: 4 },
+        { name: "total_item_count" as keyof Bin & string, label: "Total Items", format: "number", editable: false, colSpan: 4 },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: binSchema,

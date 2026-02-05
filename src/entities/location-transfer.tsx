@@ -235,6 +235,93 @@ export const locationTransferEntity: EntityConfig<LocationTransferView> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (for EntityDetailUnified)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "from_bin_id",
+          label: "From Bin",
+          type: "relation",
+          relation: { entity: "bin", displayField: "name" },
+          description: "Source bin to transfer from",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "from_location_name" as keyof LocationTransferView & string,
+          label: "From Location",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "to_bin_id",
+          label: "To Bin",
+          type: "relation",
+          relation: { entity: "bin", displayField: "name" },
+          description: "Destination bin to transfer to",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "to_location_name" as keyof LocationTransferView & string,
+          label: "To Location",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "status",
+          label: "Status",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "lines_count" as keyof LocationTransferView & string,
+          label: "Line Items",
+          editable: false,
+          colSpan: 3,
+        },
+        {
+          name: "delivery_id",
+          label: "Delivery",
+          type: "relation",
+          relation: { entity: "delivery", displayField: "delivery_number" },
+          description: "Optional delivery run this transfer belongs to",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "shipping",
+      title: "Shipping Details",
+      fields: [
+        { name: "ship_date", label: "Ship Date", format: "datetime", editable: false, colSpan: 6 },
+        { name: "shipped_by", label: "Shipped By", editable: false, colSpan: 6 },
+        { name: "receive_date", label: "Receive Date", format: "datetime", editable: false, colSpan: 6 },
+        { name: "received_by", label: "Received By", editable: false, colSpan: 6 },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Transfer instructions, special handling...",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: locationTransferSchema,
