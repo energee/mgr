@@ -33,6 +33,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import {
@@ -42,7 +50,8 @@ import {
   Settings2,
   Grid3X3,
 } from "lucide-react";
-import { TierSettings } from "./tier-settings";
+import { EntityList } from "@/components/universal/entity-list";
+import { pricingTierEntity } from "@/entities/pricing-tier";
 
 // =============================================================================
 // Types
@@ -59,7 +68,7 @@ interface SalesChannel {
 interface PricingTier {
   id: string;
   name: string;
-  sort_order: number;
+  cogs_max: number | null;
 }
 
 interface PackageFormat {
@@ -79,11 +88,15 @@ interface PricingTierPrice {
 // Cell Editor Component
 // =============================================================================
 
+type NavigateDirection = "up" | "down" | "left" | "right";
+
 function PriceCell({
   price,
   tierId,
   formatId,
   channelId,
+  rowIndex,
+  colIndex,
   onSave,
   onNavigate,
 }: {
@@ -91,17 +104,29 @@ function PriceCell({
   tierId: string;
   formatId: string;
   channelId: string;
+  rowIndex: number;
+  colIndex: number;
   onSave: (tierId: string, formatId: string, channelId: string, value: number | null) => void;
-  onNavigate: (direction: "right" | "down") => void;
+  onNavigate: (rowIndex: number, colIndex: number, direction: NavigateDirection) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const startEditing = useCallback(() => {
     setValue(price != null ? price.toFixed(2) : "");
     setEditing(true);
   }, [price]);
+
+  // Expose focus method via data attribute for external navigation
+  useEffect(() => {
+    const el = buttonRef.current;
+    if (el) {
+      el.dataset.cellRow = String(rowIndex);
+      el.dataset.cellCol = String(colIndex);
+    }
+  }, [rowIndex, colIndex]);
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -128,16 +153,32 @@ function PriceCell({
       if (e.key === "Enter") {
         e.preventDefault();
         commit();
-        onNavigate("down");
+        onNavigate(rowIndex, colIndex, "down");
       } else if (e.key === "Tab") {
         e.preventDefault();
         commit();
-        onNavigate(e.shiftKey ? "right" : "right"); // Tab always goes right
+        onNavigate(rowIndex, colIndex, e.shiftKey ? "left" : "right");
       } else if (e.key === "Escape") {
         setEditing(false);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        commit();
+        onNavigate(rowIndex, colIndex, "up");
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        commit();
+        onNavigate(rowIndex, colIndex, "down");
+      } else if (e.key === "ArrowLeft" && inputRef.current?.selectionStart === 0) {
+        e.preventDefault();
+        commit();
+        onNavigate(rowIndex, colIndex, "left");
+      } else if (e.key === "ArrowRight" && inputRef.current?.selectionStart === value.length) {
+        e.preventDefault();
+        commit();
+        onNavigate(rowIndex, colIndex, "right");
       }
     },
-    [commit, onNavigate]
+    [commit, onNavigate, rowIndex, colIndex, value.length]
   );
 
   if (editing) {
@@ -150,13 +191,14 @@ function PriceCell({
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        className="h-8 w-full text-right text-sm px-2 py-0"
+        className="h-8 w-full text-right text-sm px-2 py-0 tabular-nums"
       />
     );
   }
 
   return (
     <button
+      ref={buttonRef}
       onClick={startEditing}
       className="w-full h-8 text-right text-sm px-2 rounded hover:bg-muted/50 transition-colors cursor-text tabular-nums"
     >
@@ -175,7 +217,7 @@ export default function PricingPage() {
   const db = supabase as any;
   const queryClient = useQueryClient();
 
-  const [activeChannelIdOverride, setActiveChannelId] = useState<string | null>(null);
+  const [channelOverride, setChannelOverride] = useState<string | null>(null);
   const [view, setView] = useState<"matrix" | "tiers">("matrix");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkType, setBulkType] = useState<"percent" | "flat">("percent");
@@ -188,7 +230,7 @@ export default function PricingPage() {
   // ---------------------------------------------------------------------------
 
   const { data: channels, isLoading: channelsLoading } = useQuery({
-    queryKey: settingsKeys.pricingStats(),
+    queryKey: settingsKeys.pricingChannels(),
     queryFn: async () => {
       const { data, error } = await db
         .from("sales_channels")
@@ -201,15 +243,15 @@ export default function PricingPage() {
   });
 
   // Derive active channel: user override or first available
-  const activeChannelId = activeChannelIdOverride ?? channels?.[0]?.id ?? null;
+  const activeChannelId = channelOverride ?? channels?.[0]?.id ?? null;
 
   const { data: tiers, isLoading: tiersLoading } = useQuery({
     queryKey: settingsKeys.pricingTiers(),
     queryFn: async () => {
       const { data, error } = await db
         .from("pricing_tiers")
-        .select("id, name, sort_order")
-        .order("sort_order");
+        .select("id, name, cogs_max")
+        .order("cogs_max", { nullsFirst: false });
       if (error) throw error;
       return data as PricingTier[];
     },
@@ -410,12 +452,41 @@ export default function PricingPage() {
   });
 
   // ---------------------------------------------------------------------------
-  // Navigation helpers for Tab/Enter in cells
+  // Navigation helpers for Tab/Enter/Arrow in cells
   // ---------------------------------------------------------------------------
 
-  const handleCellNavigate = useCallback(() => {
-    // Navigation handled by browser's natural focus flow
-  }, []);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const handleCellNavigate = useCallback(
+    (rowIndex: number, colIndex: number, direction: NavigateDirection) => {
+      if (!tiers || !formats) return;
+
+      let newRow = rowIndex;
+      let newCol = colIndex;
+
+      switch (direction) {
+        case "up":
+          newRow = Math.max(0, rowIndex - 1);
+          break;
+        case "down":
+          newRow = Math.min(tiers.length - 1, rowIndex + 1);
+          break;
+        case "left":
+          newCol = Math.max(0, colIndex - 1);
+          break;
+        case "right":
+          newCol = Math.min(formats.length - 1, colIndex + 1);
+          break;
+      }
+
+      // Find and click the target cell button
+      const targetButton = tableRef.current?.querySelector(
+        `button[data-cell-row="${newRow}"][data-cell-col="${newCol}"]`
+      ) as HTMLButtonElement | null;
+      targetButton?.click();
+    },
+    [tiers, formats]
+  );
 
   // ---------------------------------------------------------------------------
   // Render
@@ -483,13 +554,16 @@ export default function PricingPage() {
       </div>
 
       {view === "tiers" ? (
-        <TierSettings />
+        <EntityList
+          entity={pricingTierEntity}
+          basePath="/settings/pricing/tiers"
+        />
       ) : (
         <>
           {/* Channel Tabs */}
           <Tabs
             value={activeChannelId ?? undefined}
-            onValueChange={setActiveChannelId}
+            onValueChange={setChannelOverride}
           >
             <div className="flex items-center justify-between">
               <TabsList>
@@ -626,11 +700,13 @@ export default function PricingPage() {
           </Tabs>
 
           {/* Matrix Grid */}
-          {!tiers?.length ? (
+          {!tiers?.length && (
             <p className="text-muted-foreground py-8 text-center">
               No pricing tiers defined. Switch to Tier Settings to create tiers.
             </p>
-          ) : !formats?.length ? (
+          )}
+
+          {!!tiers?.length && !formats?.length && (
             <p className="text-muted-foreground py-8 text-center">
               No package formats marked for pricing. Enable{" "}
               <code className="text-xs">show_in_pricing</code> on package formats in{" "}
@@ -639,65 +715,67 @@ export default function PricingPage() {
               </Link>
               .
             </p>
-          ) : (
-            <div className="border rounded-lg overflow-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left font-medium px-3 py-2 sticky left-0 bg-muted/50 min-w-[120px]">
+          )}
+
+          {!!tiers?.length && !!formats?.length && (
+            <div ref={tableRef} className="border rounded-lg">
+              <Table className="table-fixed">
+                <TableHeader>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="sticky left-0 z-10 bg-muted/50 min-w-[120px]">
                       Tier
-                    </th>
+                    </TableHead>
                     {formats.map((f) => (
-                      <th
+                      <TableHead
                         key={f.id}
-                        className="text-right font-medium px-2 py-2 min-w-[100px]"
+                        className="text-right w-[120px]"
                       >
                         {f.name}
-                      </th>
+                      </TableHead>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {tiers.map((tier, tierIdx) => (
-                    <tr
+                    <TableRow
                       key={tier.id}
                       className={
-                        tierIdx % 2 === 0 ? "bg-background" : "bg-muted/25"
+                        tierIdx % 2 === 0
+                          ? "bg-background hover:bg-muted/50"
+                          : "bg-muted/25 hover:bg-muted/50"
                       }
                     >
-                      <td className="font-medium px-3 py-1 sticky left-0 bg-inherit border-r">
+                      <TableCell className="sticky left-0 z-10 bg-inherit border-r px-3 py-1 font-medium">
                         {tier.name}
-                      </td>
-                      {formats.map((fmt) => {
-                        const priceObj = priceMap
-                          .get(tier.id)
-                          ?.get(fmt.id);
+                      </TableCell>
+                      {formats.map((fmt, fmtIdx) => {
+                        const priceObj = priceMap.get(tier.id)?.get(fmt.id);
                         return (
-                          <td key={fmt.id} className="px-1 py-0.5">
+                          <TableCell key={fmt.id} className="px-1 py-0.5">
                             <PriceCell
                               price={priceObj?.price ?? null}
                               tierId={tier.id}
                               formatId={fmt.id}
                               channelId={activeChannelId!}
+                              rowIndex={tierIdx}
+                              colIndex={fmtIdx}
                               onSave={handleSave}
                               onNavigate={handleCellNavigate}
                             />
-                          </td>
+                          </TableCell>
                         );
                       })}
-                    </tr>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
 
           {/* Legend */}
-          <p className="text-xs text-muted-foreground flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <DollarSign className="h-3 w-3" />
-              Click any cell to edit. Enter to confirm &amp; move down. Tab to move right.
-            </span>
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <DollarSign className="h-3 w-3" />
+            Click to edit. Arrow keys, Tab, or Enter to navigate.
           </p>
         </>
       )}

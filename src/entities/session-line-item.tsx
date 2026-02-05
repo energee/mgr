@@ -21,7 +21,9 @@ type SessionLineItem = Database["public"]["Tables"]["session_line_items"]["Row"]
 export const sessionLineItemSchema = z.object({
   session_id: z.string().uuid(),
   brand_id: z.string().uuid({ message: "Brand is required" }),
-  package_type_id: z.string().uuid({ message: "Package type is required" }),
+  package_type_id: z.string().uuid().nullable().optional(),
+  keg_type_id: z.string().uuid().nullable().optional(),
+  keg_owner_id: z.string().uuid().nullable().optional(),
   source_batches: z.array(z.object({
     batch_id: z.string().uuid(),
     planned_qty: z.number().int().nullable(),
@@ -71,6 +73,15 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
       },
     },
     {
+      accessorKey: "keg_type_id",
+      header: "Keg Type",
+      sortable: true,
+      relation: {
+        entity: "keg_type",
+        displayField: "name",
+      },
+    },
+    {
       accessorKey: "planned_quantity",
       header: "Planned",
       sortable: true,
@@ -103,6 +114,8 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
       fields: [
         { field: "brand_id", label: "Brand" },
         { field: "package_type_id", label: "Package Type" },
+        { field: "keg_type_id", label: "Keg Type" },
+        { field: "keg_owner_id", label: "Keg Owner" },
         { field: "planned_quantity", label: "Planned Quantity" },
         { field: "actual_quantity", label: "Actual Quantity" },
         { field: "created_at", label: "Created" },
@@ -133,7 +146,7 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
       name: "package_type_id",
       label: "Package Type",
       type: "select",
-      required: true,
+      required: false,
       colSpan: 6,
       dynamicOptions: {
         table: "package_types",
@@ -141,6 +154,23 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
         labelField: "name",
         orderBy: "name",
       },
+    },
+    {
+      name: "keg_type_id",
+      label: "Keg Type",
+      type: "relation",
+      required: false,
+      colSpan: 6,
+      relation: { entity: "keg_type", displayField: "name" },
+    },
+    {
+      name: "keg_owner_id",
+      label: "Keg Owner",
+      type: "relation",
+      required: false,
+      colSpan: 6,
+      relation: { entity: "keg_owner", displayField: "name" },
+      description: "Fleet owner for keg packaging",
     },
     {
       name: "planned_quantity",
@@ -185,5 +215,5 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
     "Total units packaged by brand",
   ],
 
-  keyFields: ["brand_id", "package_type_id", "planned_quantity", "actual_quantity"],
+  keyFields: ["brand_id", "package_type_id", "keg_type_id", "planned_quantity", "actual_quantity"],
 };

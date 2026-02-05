@@ -3,6 +3,7 @@
  *
  * Tier definitions for the pricing matrix. Small, rarely-changing set.
  * Each tier defines prices across all package format x sales channel combinations.
+ * Tiers are sorted by cogs_max — the lower bound is implicitly the previous tier's upper bound.
  */
 
 import { z } from "zod";
@@ -11,9 +12,7 @@ import type { EntityConfig } from "@/types/entity";
 interface PricingTier {
   id: string;
   name: string;
-  sort_order: number;
   default_upc: string | null;
-  cogs_min: number | null;
   cogs_max: number | null;
   created_at: string;
   updated_at: string;
@@ -25,9 +24,7 @@ interface PricingTier {
 
 export const pricingTierSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  sort_order: z.coerce.number().int().min(0).default(0),
   default_upc: z.string().nullable().optional(),
-  cogs_min: z.coerce.number().min(0).nullable().optional(),
   cogs_max: z.coerce.number().min(0).nullable().optional(),
 });
 
@@ -55,18 +52,9 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
       sortable: true,
     },
     {
-      accessorKey: "sort_order",
-      header: "Order",
-      sortable: true,
-    },
-    {
-      accessorKey: "cogs_min",
-      header: "COGS Min",
-      render: (value) => (value != null ? `$${Number(value).toFixed(2)}` : "—"),
-    },
-    {
       accessorKey: "cogs_max",
-      header: "COGS Max",
+      header: "COGS Upper Bound",
+      sortable: true,
       render: (value) => (value != null ? `$${Number(value).toFixed(2)}` : "—"),
     },
     {
@@ -76,7 +64,7 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
     },
   ],
 
-  defaultSort: { column: "sort_order", direction: "asc" },
+  defaultSort: { column: "cogs_max", direction: "asc" },
   searchableFields: ["name"],
 
   // ---------------------------------------------------------------------------
@@ -92,10 +80,8 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
       title: "Overview",
       fields: [
         { field: "name", label: "Name" },
-        { field: "sort_order", label: "Sort Order" },
+        { field: "cogs_max", label: "COGS Upper Bound", format: "currency" },
         { field: "default_upc", label: "Default UPC" },
-        { field: "cogs_min", label: "COGS Min", format: "currency" },
-        { field: "cogs_max", label: "COGS Max", format: "currency" },
       ],
     },
   ],
@@ -115,11 +101,11 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
       colSpan: 6,
     },
     {
-      name: "sort_order",
-      label: "Sort Order",
+      name: "cogs_max",
+      label: "COGS Upper Bound",
       type: "number",
-      placeholder: "0",
-      description: "Controls display ordering in the pricing matrix",
+      placeholder: "e.g., 8.00",
+      description: "Recipes with COGS up to this value fall in this tier",
       colSpan: 6,
     },
     {
@@ -129,22 +115,6 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
       placeholder: "e.g., 123456789012",
       description: "Overridden by brand UPC if set",
       colSpan: 12,
-    },
-    {
-      name: "cogs_min",
-      label: "COGS Min",
-      type: "number",
-      placeholder: "e.g., 5.00",
-      description: "Lower bound for auto-assignment from recipe COGS",
-      colSpan: 6,
-    },
-    {
-      name: "cogs_max",
-      label: "COGS Max",
-      type: "number",
-      placeholder: "e.g., 8.00",
-      description: "Upper bound for auto-assignment from recipe COGS",
-      colSpan: 6,
     },
   ],
 
@@ -175,9 +145,9 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
   // ---------------------------------------------------------------------------
   queryExamples: [
     "Show me all pricing tiers",
-    "What tier covers COGS between $5 and $8?",
-    "List tiers by sort order",
+    "What tier covers COGS up to $8?",
+    "List tiers by COGS upper bound",
   ],
 
-  keyFields: ["name", "sort_order", "cogs_min", "cogs_max"],
+  keyFields: ["name", "cogs_max"],
 };

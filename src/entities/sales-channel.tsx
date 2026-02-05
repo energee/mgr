@@ -71,7 +71,7 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
     },
   ],
 
-  defaultSort: { column: "position", direction: "asc" },
+  defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name", "code", "description"],
 
   // ---------------------------------------------------------------------------

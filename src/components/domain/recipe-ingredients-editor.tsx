@@ -73,7 +73,7 @@ export function RecipeIngredientsEditor({
     },
   });
 
-  // Sync fetched data → local state (React recommended pattern)
+  // Sync fetched data → local state (React recommended pattern for derived state)
   const [prevGrains, setPrevGrains] = useState(fetchedGrains);
   if (fetchedGrains && fetchedGrains !== prevGrains) {
     setPrevGrains(fetchedGrains);

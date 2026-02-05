@@ -100,12 +100,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
       render: (value) => value ? `${value} min` : "—",
     },
     {
-      accessorKey: "is_template",
-      header: "Template",
-      sortable: true,
-      render: (value) => value ? "Template" : "",
-    },
-    {
       accessorKey: "status",
       header: "Status",
       sortable: true,
@@ -135,15 +129,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
       field: "is_active",
       type: "boolean",
       label: "Active",
-    },
-    {
-      field: "is_template",
-      type: "select",
-      label: "Type",
-      options: [
-        { value: "true", label: "Templates Only" },
-        { value: "false", label: "Hide Templates" },
-      ],
     },
     {
       field: "style_id",
@@ -179,7 +164,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
         { field: "style_id", label: "Style" },
         { field: "yeast_id", label: "Yeast" },
         { field: "water_profile_id", label: "Water Profile" },
-        { field: "is_template", label: "Template" },
         { field: "is_active", label: "Active" },
       ],
     },
@@ -357,14 +341,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
       },
     },
     {
-      name: "is_template",
-      label: "Template Recipe",
-      type: "switch",
-      description: "Template recipes can be cloned to create new recipes",
-      defaultValue: false,
-      colSpan: 6,
-    },
-    {
       name: "is_active",
       label: "Active",
       type: "switch",
@@ -532,5 +508,5 @@ export const recipeEntity: EntityConfig<Recipe> = {
     "Show grain bill for recipe X",
   ],
 
-  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_template", "is_active", "status"],
+  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_active", "status"],
 };
