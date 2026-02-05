@@ -190,10 +190,14 @@ export function buildActionsColumn<T>(
                 )
                   return null;
               }
+              const disabledReason = action.disabledWhen?.(record);
               return (
                 <DropdownMenuItem
                   key={action.name}
+                  disabled={!!disabledReason}
+                  title={disabledReason || undefined}
                   onClick={() => {
+                    if (disabledReason) return;
                     if (onAction && onAction(action.name, record)) {
                       return;
                     }
