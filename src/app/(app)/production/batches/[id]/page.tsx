@@ -7,7 +7,7 @@
  * action handling (e.g., start fermentation dialog, cancellation dialog).
  */
 
-import { use, useState, useCallback, useEffect, useRef } from "react";
+import { use, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetail } from "@/components/universal/entity-detail";
@@ -24,26 +24,19 @@ export default function BatchDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const [showStartFermentation, setShowStartFermentation] = useState(false);
-  const [showCancellation, setShowCancellation] = useState(false);
-  const [showBlend, setShowBlend] = useState(false);
-  const consumed = useRef(false);
-  const consume = usePrefillStore((s) => s.consume);
 
-  useEffect(() => {
-    if (consumed.current) return;
-    consumed.current = true;
-    const { openDialog } = consume();
-    if (!openDialog) return;
-
-    if (openDialog === "start_fermentation") {
-      setShowStartFermentation(true);
-    } else if (openDialog === "cancel" || openDialog === "archive") {
-      setShowCancellation(true);
-    } else if (openDialog === "blend") {
-      setShowBlend(true);
-    }
-  }, [consume]);
+  // Consume prefill store once on initial render to auto-open dialogs from AI
+  const [prefillDialog] = useState(() => {
+    const { openDialog } = usePrefillStore.getState().consume();
+    return openDialog;
+  });
+  const [showStartFermentation, setShowStartFermentation] = useState(
+    prefillDialog === "start_fermentation"
+  );
+  const [showCancellation, setShowCancellation] = useState(
+    prefillDialog === "cancel" || prefillDialog === "archive"
+  );
+  const [showBlend, setShowBlend] = useState(prefillDialog === "blend");
 
   const queryClient = useQueryClient();
   const supabase = createClient();

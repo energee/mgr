@@ -10,7 +10,7 @@
  * - Real-time updates
  */
 
-import { use, useState, useRef, useEffect } from "react";
+import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { BatchReadingForm } from "@/components/domain/batch-reading-form";
@@ -50,19 +50,12 @@ export default function BatchReadingsPage({
   const { id } = use(params);
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
 
-  const consumed = useRef(false);
-  const consume = usePrefillStore((s) => s.consume);
-
-  useEffect(() => {
-    if (consumed.current) return;
-    consumed.current = true;
-    const { prefillData } = consume();
-    if (prefillData) {
-      setShowForm(true);
-    }
-  }, [consume]);
+  // Consume prefill store once on initial render to auto-show form from AI
+  const [showForm, setShowForm] = useState(() => {
+    const { prefillData } = usePrefillStore.getState().consume();
+    return !!prefillData;
+  });
 
   // Fetch batch details
   const { data: batch, isLoading: batchLoading } = useQuery({
