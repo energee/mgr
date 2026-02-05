@@ -7,7 +7,7 @@
  * action handling (e.g., start fermentation dialog, cancellation dialog).
  */
 
-import { use, useState, useCallback } from "react";
+import { use, useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetail } from "@/components/universal/entity-detail";
@@ -16,6 +16,7 @@ import { StartFermentationDialog } from "@/components/domain/start-fermentation-
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
 import { batchKeys } from "@/lib/query-keys";
+import { usePrefillStore } from "@/stores/prefill-store";
 
 export default function BatchDetailPage({
   params,
@@ -26,6 +27,24 @@ export default function BatchDetailPage({
   const [showStartFermentation, setShowStartFermentation] = useState(false);
   const [showCancellation, setShowCancellation] = useState(false);
   const [showBlend, setShowBlend] = useState(false);
+  const consumed = useRef(false);
+  const consume = usePrefillStore((s) => s.consume);
+
+  useEffect(() => {
+    if (consumed.current) return;
+    consumed.current = true;
+    const { openDialog } = consume();
+    if (!openDialog) return;
+
+    if (openDialog === "start_fermentation") {
+      setShowStartFermentation(true);
+    } else if (openDialog === "cancel" || openDialog === "archive") {
+      setShowCancellation(true);
+    } else if (openDialog === "blend") {
+      setShowBlend(true);
+    }
+  }, [consume]);
+
   const queryClient = useQueryClient();
   const supabase = createClient();
 
