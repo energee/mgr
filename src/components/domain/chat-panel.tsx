@@ -141,11 +141,11 @@ export function ChatPanel() {
                       if (part.type.startsWith("tool-")) {
                         const toolPart = part as {
                           state: string;
-                          result?: unknown;
+                          output?: unknown;
                         };
-                        if (toolPart.state === "result") {
-                          if (isNavigationIntent(toolPart.result)) {
-                            const intent = toolPart.result;
+                        if (toolPart.state === "output-available") {
+                          if (isNavigationIntent(toolPart.output)) {
+                            const intent = toolPart.output;
                             return (
                               <div
                                 key={`${message.id}-${i}`}
