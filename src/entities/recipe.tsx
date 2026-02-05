@@ -777,6 +777,13 @@ export const recipeEntity: EntityConfig<Recipe> = {
       showInDetail: true,
       detailTab: "Batches",
     },
+    {
+      name: "variants",
+      entity: "recipe_variant",
+      type: "hasMany",
+      foreignKey: "recipe_id",
+      showInDetail: false,
+    },
   ],
 
   // ---------------------------------------------------------------------------
