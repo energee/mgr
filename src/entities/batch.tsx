@@ -259,6 +259,17 @@ export const batchEntity: EntityConfig<Batch> = {
       colSpan: 6,
     },
     {
+      name: "recipe_variant_id",
+      label: "Recipe Variant",
+      type: "relation",
+      relation: {
+        entity: "recipe_variant",
+        displayField: "name",
+      },
+      colSpan: 6,
+      description: "Planned variant this batch was produced from",
+    },
+    {
       name: "planned_start_date",
       label: "Planned Start Date",
       type: "date",
@@ -382,6 +393,13 @@ export const batchEntity: EntityConfig<Batch> = {
       type: "belongsTo",
       foreignKey: "recipe_id",
       showInDetail: true,
+    },
+    {
+      name: "recipe_variant",
+      entity: "recipe_variant",
+      type: "belongsTo",
+      foreignKey: "recipe_variant_id",
+      showInDetail: false,
     },
     {
       name: "brew_logs",
