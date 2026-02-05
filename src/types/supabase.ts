@@ -1068,10 +1068,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "customers_price_tier_id_fkey"
+            foreignKeyName: "customers_pricing_tier_id_fkey"
             columns: ["price_tier_id"]
             isOneToOne: false
-            referencedRelation: "price_tiers"
+            referencedRelation: "pricing_tiers"
             referencedColumns: ["id"]
           },
           {
@@ -1233,9 +1233,10 @@ export type Database = {
           created_by: string | null
           expiration_date: string | null
           id: string
+          keg_type_id: string | null
           lot_number: string
           notes: string | null
-          package_type_id: string
+          package_type_id: string | null
           production_date: string | null
           quantity: number
           session_line_item_id: string | null
@@ -1250,9 +1251,10 @@ export type Database = {
           created_by?: string | null
           expiration_date?: string | null
           id?: string
+          keg_type_id?: string | null
           lot_number: string
           notes?: string | null
-          package_type_id: string
+          package_type_id?: string | null
           production_date?: string | null
           quantity: number
           session_line_item_id?: string | null
@@ -1267,9 +1269,10 @@ export type Database = {
           created_by?: string | null
           expiration_date?: string | null
           id?: string
+          keg_type_id?: string | null
           lot_number?: string
           notes?: string | null
-          package_type_id?: string
+          package_type_id?: string | null
           production_date?: string | null
           quantity?: number
           session_line_item_id?: string | null
@@ -1331,6 +1334,41 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
             referencedColumns: ["id"]
           },
           {
@@ -1574,157 +1612,117 @@ export type Database = {
           },
         ]
       }
-      keg_inventory: {
+      keg_owner_deposits: {
         Row: {
-          batch_id: string | null
           created_at: string | null
-          finished_good_id: string | null
+          deposit_amount: number
           id: string
+          keg_owner_id: string
           keg_type_id: string
-          location_id: string | null
-          notes: string | null
-          quantity: number
-          state: Database["public"]["Enums"]["keg_state"]
           updated_at: string | null
         }
         Insert: {
-          batch_id?: string | null
           created_at?: string | null
-          finished_good_id?: string | null
+          deposit_amount?: number
           id?: string
+          keg_owner_id: string
           keg_type_id: string
-          location_id?: string | null
-          notes?: string | null
-          quantity?: number
-          state?: Database["public"]["Enums"]["keg_state"]
           updated_at?: string | null
         }
         Update: {
-          batch_id?: string | null
           created_at?: string | null
-          finished_good_id?: string | null
+          deposit_amount?: number
           id?: string
+          keg_owner_id?: string
           keg_type_id?: string
-          location_id?: string | null
-          notes?: string | null
-          quantity?: number
-          state?: Database["public"]["Enums"]["keg_state"]
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "keg_inventory_batch_id_fkey"
-            columns: ["batch_id"]
+            foreignKeyName: "keg_owner_deposits_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
             isOneToOne: false
-            referencedRelation: "batches"
+            referencedRelation: "keg_owners"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "keg_inventory_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_blend_info"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_brew_info"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_remaining_volume"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "ttb_in_process_beer"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "vessels_with_batch"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_finished_good_id_fkey"
-            columns: ["finished_good_id"]
-            isOneToOne: false
-            referencedRelation: "finished_goods"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_finished_good_id_fkey"
-            columns: ["finished_good_id"]
-            isOneToOne: false
-            referencedRelation: "finished_goods_with_availability"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_finished_good_id_fkey"
-            columns: ["finished_good_id"]
-            isOneToOne: false
-            referencedRelation: "finished_goods_with_ttb_class"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "keg_inventory_keg_type_id_fkey"
+            foreignKeyName: "keg_owner_deposits_keg_type_id_fkey"
             columns: ["keg_type_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
             referencedColumns: ["keg_type_id"]
           },
           {
-            foreignKeyName: "keg_inventory_keg_type_id_fkey"
+            foreignKeyName: "keg_owner_deposits_keg_type_id_fkey"
             columns: ["keg_type_id"]
             isOneToOne: false
             referencedRelation: "keg_fleet_summary"
             referencedColumns: ["keg_type_id"]
           },
           {
-            foreignKeyName: "keg_inventory_keg_type_id_fkey"
+            foreignKeyName: "keg_owner_deposits_keg_type_id_fkey"
             columns: ["keg_type_id"]
             isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["keg_type_id"]
           },
           {
-            foreignKeyName: "keg_inventory_keg_type_id_fkey"
+            foreignKeyName: "keg_owner_deposits_keg_type_id_fkey"
             columns: ["keg_type_id"]
             isOneToOne: false
             referencedRelation: "keg_turnover_metrics"
             referencedColumns: ["keg_type_id"]
           },
           {
-            foreignKeyName: "keg_inventory_keg_type_id_fkey"
+            foreignKeyName: "keg_owner_deposits_keg_type_id_fkey"
             columns: ["keg_type_id"]
             isOneToOne: false
             referencedRelation: "keg_types"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "keg_inventory_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
         ]
+      }
+      keg_owners: {
+        Row: {
+          code: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          position: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          position?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          position?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       keg_transactions: {
         Row: {
@@ -1736,6 +1734,7 @@ export type Database = {
           from_location_id: string | null
           from_state: Database["public"]["Enums"]["keg_state"] | null
           id: string
+          keg_owner_id: string | null
           keg_type_id: string
           notes: string | null
           order_id: string | null
@@ -1754,6 +1753,7 @@ export type Database = {
           from_location_id?: string | null
           from_state?: Database["public"]["Enums"]["keg_state"] | null
           id?: string
+          keg_owner_id?: string | null
           keg_type_id: string
           notes?: string | null
           order_id?: string | null
@@ -1772,6 +1772,7 @@ export type Database = {
           from_location_id?: string | null
           from_state?: Database["public"]["Enums"]["keg_state"] | null
           id?: string
+          keg_owner_id?: string | null
           keg_type_id?: string
           notes?: string | null
           order_id?: string | null
@@ -1885,6 +1886,13 @@ export type Database = {
             columns: ["from_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
+            isOneToOne: false
+            referencedRelation: "keg_owners"
             referencedColumns: ["id"]
           },
           {
@@ -2290,6 +2298,8 @@ export type Database = {
           brand_id: string | null
           created_at: string | null
           id: string
+          keg_owner_id: string | null
+          keg_type_id: string | null
           notes: string | null
           order_id: string
           package_id: string | null
@@ -2304,6 +2314,8 @@ export type Database = {
           brand_id?: string | null
           created_at?: string | null
           id?: string
+          keg_owner_id?: string | null
+          keg_type_id?: string | null
           notes?: string | null
           order_id: string
           package_id?: string | null
@@ -2318,6 +2330,8 @@ export type Database = {
           brand_id?: string | null
           created_at?: string | null
           id?: string
+          keg_owner_id?: string | null
+          keg_type_id?: string | null
           notes?: string | null
           order_id?: string
           package_id?: string | null
@@ -2382,6 +2396,48 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
+            isOneToOne: false
+            referencedRelation: "keg_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
             referencedColumns: ["id"]
           },
           {
@@ -2524,6 +2580,7 @@ export type Database = {
           inner_packs_per_case: number | null
           is_active: boolean | null
           name: string
+          show_in_pricing: boolean
           units_per_bbl_override: number | null
           units_per_case: number | null
           updated_at: string | null
@@ -2537,6 +2594,7 @@ export type Database = {
           inner_packs_per_case?: number | null
           is_active?: boolean | null
           name: string
+          show_in_pricing?: boolean
           units_per_bbl_override?: number | null
           units_per_case?: number | null
           updated_at?: string | null
@@ -2550,6 +2608,7 @@ export type Database = {
           inner_packs_per_case?: number | null
           is_active?: boolean | null
           name?: string
+          show_in_pricing?: boolean
           units_per_bbl_override?: number | null
           units_per_case?: number | null
           updated_at?: string | null
@@ -2922,49 +2981,128 @@ export type Database = {
           },
         ]
       }
-      price_tiers: {
+      pricing_history: {
         Row: {
-          created_at: string | null
-          description: string | null
-          discount_percent: number | null
+          changed_at: string
+          changed_by: string | null
           id: string
-          is_active: boolean | null
-          is_default: boolean | null
-          name: string
+          new_price: number | null
+          old_price: number | null
+          package_format_id: string
+          pricing_tier_id: string
+          pricing_tier_price_id: string | null
           sales_channel_id: string
-          updated_at: string | null
         }
         Insert: {
-          created_at?: string | null
-          description?: string | null
-          discount_percent?: number | null
+          changed_at?: string
+          changed_by?: string | null
           id?: string
-          is_active?: boolean | null
-          is_default?: boolean | null
-          name: string
+          new_price?: number | null
+          old_price?: number | null
+          package_format_id: string
+          pricing_tier_id: string
+          pricing_tier_price_id?: string | null
           sales_channel_id: string
-          updated_at?: string | null
         }
         Update: {
-          created_at?: string | null
-          description?: string | null
-          discount_percent?: number | null
+          changed_at?: string
+          changed_by?: string | null
           id?: string
-          is_active?: boolean | null
-          is_default?: boolean | null
-          name?: string
+          new_price?: number | null
+          old_price?: number | null
+          package_format_id?: string
+          pricing_tier_id?: string
+          pricing_tier_price_id?: string | null
           sales_channel_id?: string
-          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "price_tiers_sales_channel_id_fkey"
+            foreignKeyName: "pricing_history_pricing_tier_price_id_fkey"
+            columns: ["pricing_tier_price_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_tier_prices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pricing_tier_prices: {
+        Row: {
+          created_at: string
+          id: string
+          package_format_id: string
+          price: number
+          pricing_tier_id: string
+          sales_channel_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          package_format_id: string
+          price: number
+          pricing_tier_id: string
+          sales_channel_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          package_format_id?: string
+          price?: number
+          pricing_tier_id?: string
+          sales_channel_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_tier_prices_package_format_id_fkey"
+            columns: ["package_format_id"]
+            isOneToOne: false
+            referencedRelation: "package_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricing_tier_prices_pricing_tier_id_fkey"
+            columns: ["pricing_tier_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_tiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricing_tier_prices_sales_channel_id_fkey"
             columns: ["sales_channel_id"]
             isOneToOne: false
             referencedRelation: "sales_channels"
             referencedColumns: ["id"]
           },
         ]
+      }
+      pricing_tiers: {
+        Row: {
+          cogs_max: number | null
+          created_at: string
+          default_upc: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          cogs_max?: number | null
+          created_at?: string
+          default_upc?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          cogs_max?: number | null
+          created_at?: string
+          default_upc?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       purchase_orders: {
         Row: {
@@ -3677,6 +3815,7 @@ export type Database = {
           name: string
           notes: string | null
           preboil_volume_bbl: number | null
+          pricing_tier_id: string | null
           sparge_water_volume_gal: number | null
           status: string
           style: string | null
@@ -3728,6 +3867,7 @@ export type Database = {
           name: string
           notes?: string | null
           preboil_volume_bbl?: number | null
+          pricing_tier_id?: string | null
           sparge_water_volume_gal?: number | null
           status?: string
           style?: string | null
@@ -3779,6 +3919,7 @@ export type Database = {
           name?: string
           notes?: string | null
           preboil_volume_bbl?: number | null
+          pricing_tier_id?: string | null
           sparge_water_volume_gal?: number | null
           status?: string
           style?: string | null
@@ -3811,6 +3952,13 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_pricing_tier_id_fkey"
+            columns: ["pricing_tier_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_tiers"
             referencedColumns: ["id"]
           },
           {
@@ -3875,7 +4023,9 @@ export type Database = {
           brand_id: string
           created_at: string | null
           id: string
-          package_type_id: string
+          keg_owner_id: string | null
+          keg_type_id: string | null
+          package_type_id: string | null
           planned_quantity: number | null
           session_id: string
           source_batches: Json | null
@@ -3885,7 +4035,9 @@ export type Database = {
           brand_id: string
           created_at?: string | null
           id?: string
-          package_type_id: string
+          keg_owner_id?: string | null
+          keg_type_id?: string | null
+          package_type_id?: string | null
           planned_quantity?: number | null
           session_id: string
           source_batches?: Json | null
@@ -3895,7 +4047,9 @@ export type Database = {
           brand_id?: string
           created_at?: string | null
           id?: string
-          package_type_id?: string
+          keg_owner_id?: string | null
+          keg_type_id?: string | null
+          package_type_id?: string | null
           planned_quantity?: number | null
           session_id?: string
           source_batches?: Json | null
@@ -3906,6 +4060,48 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_line_items_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
+            isOneToOne: false
+            referencedRelation: "keg_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_line_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "session_line_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "session_line_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "session_line_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "session_line_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
             referencedColumns: ["id"]
           },
           {
@@ -4145,77 +4341,6 @@ export type Database = {
           value?: Json
         }
         Relationships: []
-      }
-      tier_prices: {
-        Row: {
-          brand_id: string | null
-          created_at: string | null
-          effective_from: string | null
-          effective_to: string | null
-          format_id: string
-          id: string
-          notes: string | null
-          price: number
-          price_tier_id: string
-          style_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          brand_id?: string | null
-          created_at?: string | null
-          effective_from?: string | null
-          effective_to?: string | null
-          format_id: string
-          id?: string
-          notes?: string | null
-          price: number
-          price_tier_id: string
-          style_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          brand_id?: string | null
-          created_at?: string | null
-          effective_from?: string | null
-          effective_to?: string | null
-          format_id?: string
-          id?: string
-          notes?: string | null
-          price?: number
-          price_tier_id?: string
-          style_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tier_prices_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tier_prices_format_id_fkey"
-            columns: ["format_id"]
-            isOneToOne: false
-            referencedRelation: "package_types"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tier_prices_price_tier_id_fkey"
-            columns: ["price_tier_id"]
-            isOneToOne: false
-            referencedRelation: "price_tiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tier_prices_style_id_fkey"
-            columns: ["style_id"]
-            isOneToOne: false
-            referencedRelation: "beer_styles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       transfer_lines: {
         Row: {
@@ -5473,6 +5598,8 @@ export type Database = {
           customer_name: string | null
           deposit_amount: number | null
           deposit_value: number | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
           keg_type_code: string | null
           keg_type_id: string | null
           keg_type_name: string | null
@@ -5489,6 +5616,8 @@ export type Database = {
           customer_name: string | null
           from_state: Database["public"]["Enums"]["keg_state"] | null
           id: string | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
           keg_type_code: string | null
           keg_type_id: string | null
           keg_type_name: string | null
@@ -5529,6 +5658,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers_with_order_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
+            isOneToOne: false
+            referencedRelation: "keg_owners"
             referencedColumns: ["id"]
           },
           {
@@ -5609,10 +5745,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "customers_price_tier_id_fkey"
+            foreignKeyName: "customers_pricing_tier_id_fkey"
             columns: ["price_tier_id"]
             isOneToOne: false
-            referencedRelation: "price_tiers"
+            referencedRelation: "pricing_tiers"
             referencedColumns: ["id"]
           },
           {
@@ -5650,6 +5786,7 @@ export type Database = {
           allocated_quantity: number | null
           available_quantity: number | null
           brand_id: string | null
+          keg_type_id: string | null
           package_type_id: string | null
           reserved_quantity: number | null
           total_quantity: number | null
@@ -5660,6 +5797,41 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
             referencedColumns: ["id"]
           },
           {
@@ -5682,7 +5854,9 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           expiration_date: string | null
+          format_source: string | null
           id: string | null
+          keg_type_id: string | null
           lot_number: string | null
           notes: string | null
           package_type_id: string | null
@@ -5753,6 +5927,41 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "finished_goods_package_type_id_fkey"
             columns: ["package_type_id"]
             isOneToOne: false
@@ -5779,6 +5988,7 @@ export type Database = {
           created_by: string | null
           expiration_date: string | null
           id: string | null
+          keg_type_id: string | null
           lot_number: string | null
           notes: string | null
           package_type_id: string | null
@@ -5851,6 +6061,41 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "finished_goods_package_type_id_fkey"
             columns: ["package_type_id"]
             isOneToOne: false
@@ -5911,6 +6156,8 @@ export type Database = {
           days_out: number | null
           deposit_amount: number | null
           deposit_at_risk: number | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
           keg_type_code: string | null
           keg_type_id: string | null
           keg_type_name: string | null
@@ -5943,6 +6190,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers_with_order_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
+            isOneToOne: false
+            referencedRelation: "keg_owners"
             referencedColumns: ["id"]
           },
           {
@@ -5991,6 +6245,8 @@ export type Database = {
           dirty_count: number | null
           empty_count: number | null
           filled_count: number | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
           keg_type_code: string | null
           keg_type_id: string | null
           keg_type_name: string | null
@@ -6003,14 +6259,50 @@ export type Database = {
         }
         Relationships: []
       }
+      keg_inventory: {
+        Row: {
+          batch_id: string | null
+          finished_good_id: string | null
+          id: string | null
+          keg_owner_id: string | null
+          keg_type_id: string | null
+          location_id: string | null
+          quantity: number | null
+          state: Database["public"]["Enums"]["keg_state"] | null
+        }
+        Relationships: []
+      }
       keg_inventory_summary: {
         Row: {
+          keg_owner_id: string | null
+          keg_owner_name: string | null
           keg_type_code: string | null
           keg_type_id: string | null
           keg_type_name: string | null
           location_count: number | null
           state: Database["public"]["Enums"]["keg_state"] | null
           total_quantity: number | null
+          volume_bbl: number | null
+        }
+        Relationships: []
+      }
+      keg_inventory_with_details: {
+        Row: {
+          batch_id: string | null
+          batch_number: string | null
+          finished_good_id: string | null
+          finished_good_name: string | null
+          id: string | null
+          keg_owner_code: string | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
+          keg_type_code: string | null
+          keg_type_id: string | null
+          keg_type_name: string | null
+          location_id: string | null
+          location_name: string | null
+          quantity: number | null
+          state: Database["public"]["Enums"]["keg_state"] | null
           volume_bbl: number | null
         }
         Relationships: []
@@ -6026,13 +6318,18 @@ export type Database = {
           finished_good_brand: string | null
           finished_good_id: string | null
           finished_good_lot: string | null
+          finished_good_name: string | null
           from_location_id: string | null
           from_location_name: string | null
           from_state: Database["public"]["Enums"]["keg_state"] | null
           id: string | null
+          keg_owner_code: string | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
           keg_type_code: string | null
           keg_type_id: string | null
           keg_type_name: string | null
+          location_name: string | null
           notes: string | null
           order_id: string | null
           order_number: string | null
@@ -6153,6 +6450,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "keg_transactions_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
+            isOneToOne: false
+            referencedRelation: "keg_owners"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "keg_transactions_keg_type_id_fkey"
             columns: ["keg_type_id"]
             isOneToOne: false
@@ -6229,13 +6533,23 @@ export type Database = {
           annual_turnover_rate: number | null
           avg_cycle_days: number | null
           completed_cycles: number | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
           keg_type_code: string | null
           keg_type_id: string | null
           keg_type_name: string | null
           max_cycle_days: number | null
           min_cycle_days: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "keg_transactions_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
+            isOneToOne: false
+            referencedRelation: "keg_owners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       location_transfers_with_details: {
         Row: {
@@ -6389,6 +6703,7 @@ export type Database = {
           brand_id: string | null
           demand_week: string | null
           earliest_due_date: string | null
+          keg_type_id: string | null
           latest_due_date: string | null
           order_count: number | null
           order_ids: string[] | null
@@ -6402,6 +6717,41 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "order_items_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
             referencedColumns: ["id"]
           },
           {
@@ -6569,6 +6919,16 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      packaging_formats: {
+        Row: {
+          container_type: string | null
+          format_source: string | null
+          id: string | null
+          is_active: boolean | null
+          name: string | null
+        }
+        Relationships: []
       }
       packaging_sessions_with_summary: {
         Row: {
@@ -6806,6 +7166,7 @@ export type Database = {
           notes: string | null
           preboil_volume_bbl: number | null
           sparge_water_volume_gal: number | null
+          status: string | null
           style: string | null
           style_id: string | null
           style_name: string | null
@@ -6858,57 +7219,6 @@ export type Database = {
             columns: ["yeast_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tier_prices_with_status: {
-        Row: {
-          brand_id: string | null
-          brand_name: string | null
-          channel_name: string | null
-          created_at: string | null
-          effective_from: string | null
-          effective_to: string | null
-          format_id: string | null
-          format_name: string | null
-          id: string | null
-          notes: string | null
-          price: number | null
-          price_tier_id: string | null
-          style_id: string | null
-          style_name: string | null
-          tier_name: string | null
-          updated_at: string | null
-          validity_status: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tier_prices_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tier_prices_format_id_fkey"
-            columns: ["format_id"]
-            isOneToOne: false
-            referencedRelation: "package_types"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tier_prices_price_tier_id_fkey"
-            columns: ["price_tier_id"]
-            isOneToOne: false
-            referencedRelation: "price_tiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tier_prices_style_id_fkey"
-            columns: ["style_id"]
-            isOneToOne: false
-            referencedRelation: "beer_styles"
             referencedColumns: ["id"]
           },
         ]
@@ -7486,6 +7796,10 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: number
       }
+      create_keg_ship_transactions_from_order: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
       create_notification: {
         Args: {
           p_action_url?: string
@@ -7879,3 +8193,4 @@ export const Constants = {
     },
   },
 } as const
+
