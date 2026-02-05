@@ -3,31 +3,37 @@
 /**
  * EntityDetailUnified - Combined Detail/Edit View Component
  *
- * Replaces EntityDetail with a unified component that reads from `sections`
- * (UnifiedSectionDef) config. Falls back to legacy `detailSections` by
- * converting them on the fly.
+ * Replaces EntityDetail + EntityForm with a unified component that reads from
+ * `sections` (UnifiedSectionDef) config. Falls back to legacy `detailSections`
+ * by converting them on the fly.
  *
- * View mode (this task) works identically to the current EntityDetail:
- * - Data fetching from viewTable or table
- * - Header rendering (title, subtitle, badge, actions dropdown)
- * - Tab organization (default "Details" tab + custom tabs + relation tabs)
- * - Section rendering using UnifiedField for field-based sections
- * - Custom component rendering for component-based sections
- * - Relation tables on their own tabs
- * - State machine transitions in actions dropdown
- * - onAction callback for page-level custom action handling
- * - Keyboard shortcut Backspace to go back
- * - Error boundary wrapping
+ * Supports:
+ * - View mode: data display, header, tabs, relations, state transitions, actions
+ * - Edit mode: inline form editing with react-hook-form, Zod validation,
+ *   optimistic locking, dirty form guard, keyboard shortcuts
+ * - Create mode: when id is undefined, starts in edit mode with INSERT on save
+ *
+ * Keyboard shortcuts:
+ * - Backspace: go back (view mode only)
+ * - E: toggle into edit mode (view mode only)
+ * - Cmd/Ctrl+Enter: save (edit mode)
+ * - Escape: cancel edit (edit mode, with dirty guard)
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
+import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
+import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { useDynamicOptions } from "@/hooks/use-dynamic-options";
+import { toast } from "sonner";
 import type {
   EntityConfig,
   EntityRelationDef,
@@ -37,6 +43,8 @@ import type {
 import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { UnifiedField } from "./unified-field";
+import { EditFooter } from "./edit-footer";
+import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
@@ -58,8 +66,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Pencil } from "lucide-react";
 import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
+import type { UseFormReturn } from "react-hook-form";
 
 // =============================================================================
 // Props
@@ -67,12 +76,12 @@ import { AnimatedActionMenuItem } from "@/components/universal/animated-action-m
 
 export interface EntityDetailUnifiedProps<T = Record<string, unknown>> {
   entity: EntityConfig<T>;
-  id?: string; // undefined = create mode (handled in Task 7)
+  id?: string; // undefined = create mode
   basePath?: string;
   backUrl?: string;
   showEdit?: boolean; // default true
   onAction?: (actionName: string, data: T) => boolean;
-  defaultValues?: Partial<T>; // For create mode (Task 7)
+  defaultValues?: Partial<T>; // For create mode
 }
 
 // =============================================================================
@@ -107,12 +116,74 @@ function getUnifiedSections<T>(
 }
 
 // =============================================================================
+// Helper: Extract editable fields from sections for useDynamicOptions
+// =============================================================================
+
+function getEditableFieldsFromSections<T>(
+  sections: UnifiedSectionDef<T>[]
+): UnifiedFieldDef<T>[] {
+  const fields: UnifiedFieldDef<T>[] = [];
+  for (const section of sections) {
+    if (section.fields) {
+      for (const field of section.fields) {
+        // Only include fields that have a type (i.e., they are editable)
+        if (field.type) {
+          fields.push(field);
+        }
+      }
+    }
+  }
+  return fields;
+}
+
+// =============================================================================
+// Helper: Build default values for form initialization
+// =============================================================================
+
+function buildDefaultValues<T>(
+  sections: UnifiedSectionDef<T>[],
+  defaultValues?: Partial<T>
+): Record<string, unknown> {
+  const initial: Record<string, unknown> = {};
+  for (const section of sections) {
+    if (!section.fields) continue;
+    for (const field of section.fields) {
+      if (!field.type) continue; // Skip display-only fields
+      if (field.defaultValue !== undefined) {
+        initial[field.name] =
+          typeof field.defaultValue === "function"
+            ? (field.defaultValue as () => unknown)()
+            : field.defaultValue;
+      } else {
+        switch (field.type) {
+          case "switch":
+          case "checkbox":
+            initial[field.name] = false;
+            break;
+          case "number":
+          case "unit":
+          case "relation":
+            initial[field.name] = null;
+            break;
+          default:
+            initial[field.name] = "";
+        }
+      }
+    }
+  }
+  if (defaultValues) {
+    Object.assign(initial, defaultValues);
+  }
+  return initial;
+}
+
+// =============================================================================
 // Hook: Fetch relation display values for FK fields
 // =============================================================================
 
 function useRelationDisplayValues<T>(
   fields: UnifiedFieldDef<T>[] | undefined,
-  data: T
+  data: T | null
 ) {
   const supabase = createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,7 +191,7 @@ function useRelationDisplayValues<T>(
 
   // Collect all relation fields that have a UUID value
   const relationQueries = useMemo(() => {
-    if (!fields) return [];
+    if (!fields || !data) return [];
     return fields
       .filter((f) => f.relation && data[f.name as keyof T])
       .map((f) => {
@@ -178,11 +249,15 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   backUrl,
   showEdit = true,
   onAction,
+  defaultValues,
 }: EntityDetailUnifiedProps<T>) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const supabase = createClient();
   const path = basePath || `/${entity.domain}/${entity.name}s`;
+
+  const isCreateMode = !id;
+  const canEdit = showEdit && !!entity.formSchema;
 
   // Cast to any for dynamic table access - universal components work with any entity
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,7 +269,20 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // Resolve sections (unified or legacy)
   const sections = useMemo(() => getUnifiedSections(entity), [entity]);
 
-  // Fetch record
+  // ---------------------------------------------------------------------------
+  // Edit state
+  // ---------------------------------------------------------------------------
+  const [editing, setEditing] = useState(isCreateMode);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const loadedVersionRef = useRef<number | null>(null);
+  const conflictDialog = useConflictDialog();
+
+  // Cmd+Enter save shortcut - the ref is attached to a hidden save button
+  const submitRef = useSubmitShortcut();
+
+  // ---------------------------------------------------------------------------
+  // Fetch record (skip in create mode)
+  // ---------------------------------------------------------------------------
   const { data, isLoading, error } = useQuery({
     queryKey: entityKeys.detail(fetchTable, id || ""),
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
@@ -210,7 +298,49 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     },
   });
 
+  // ---------------------------------------------------------------------------
+  // react-hook-form setup
+  // ---------------------------------------------------------------------------
+  const formDefaults = useMemo(
+    () => buildDefaultValues(sections, defaultValues as Partial<T> | undefined),
+    [sections, defaultValues]
+  );
+
+  const form = useForm<Record<string, unknown>>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: entity.formSchema ? zodResolver(entity.formSchema as any) : undefined,
+    defaultValues: formDefaults,
+  });
+
+  // When data loads (edit mode), reset form with record values + store version
+  const prevDataRef = useRef<T | null>(null);
+  useEffect(() => {
+    if (data && data !== prevDataRef.current) {
+      prevDataRef.current = data;
+      const record = data as Record<string, unknown>;
+      // Merge defaults with loaded data
+      const merged = { ...formDefaults, ...record };
+      form.reset(merged);
+      if (typeof record.version === "number") {
+        loadedVersionRef.current = record.version;
+      }
+    }
+  }, [data, form, formDefaults]);
+
+  // ---------------------------------------------------------------------------
+  // Dynamic options for editable fields
+  // ---------------------------------------------------------------------------
+  const editableFields = useMemo(
+    () => (editing ? getEditableFieldsFromSections(sections) : []),
+    [editing, sections]
+  );
+  const { optionsMap } = useDynamicOptions(
+    editableFields as { name: string; type?: string; dynamicOptions?: { table: string; valueField: string; labelField: string; filter?: Record<string, unknown>; orderBy?: string }; relation?: { entity: string; displayField: string } }[]
+  );
+
+  // ---------------------------------------------------------------------------
   // State transition mutation
+  // ---------------------------------------------------------------------------
   const transitionMutation = useMutation({
     mutationFn: async ({ toState }: { toState: string }) => {
       if (!entity.stateMachine)
@@ -223,7 +353,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       if (error) throw error;
     },
     onSuccess: () => {
-      // Invalidate both the view table (if used) and base table to ensure cache is cleared
       queryClient.invalidateQueries({
         queryKey: entityKeys.detail(fetchTable, id || ""),
       });
@@ -232,7 +361,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           queryKey: entityKeys.detail(entity.table, id || ""),
         });
       }
-      // Also invalidate list queries to update status badges
       queryClient.invalidateQueries({
         queryKey: entityKeys.all(entity.table),
       });
@@ -244,7 +372,9 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     },
   });
 
-  // Get header info
+  // ---------------------------------------------------------------------------
+  // Header info
+  // ---------------------------------------------------------------------------
   const header = useMemo(() => {
     if (!data || !entity.detailHeader) return null;
     const { title, subtitle, badge } = entity.detailHeader;
@@ -311,52 +441,273 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   }, [data, entity.actions, stateInfo]);
 
   // ---------------------------------------------------------------------------
-  // Keyboard shortcuts: Backspace to go back
+  // Edit mode: toggle in
+  // ---------------------------------------------------------------------------
+  const startEditing = useCallback(() => {
+    if (!canEdit) return;
+    if (data) {
+      const record = data as Record<string, unknown>;
+      form.reset({ ...formDefaults, ...record });
+      if (typeof record.version === "number") {
+        loadedVersionRef.current = record.version;
+      }
+    }
+    setEditing(true);
+  }, [canEdit, data, form, formDefaults]);
+
+  // ---------------------------------------------------------------------------
+  // Cancel handler with dirty guard
+  // ---------------------------------------------------------------------------
+  const handleCancel = useCallback(() => {
+    if (form.formState.isDirty) {
+      const confirmed = window.confirm(
+        "You have unsaved changes. Discard?"
+      );
+      if (!confirmed) return;
+    }
+    if (isCreateMode) {
+      // In create mode, go back to list
+      router.push(backUrl || path);
+      return;
+    }
+    form.reset();
+    setEditing(false);
+  }, [form, isCreateMode, router, backUrl, path]);
+
+  // ---------------------------------------------------------------------------
+  // Save handler
+  // ---------------------------------------------------------------------------
+  const handleSave = useCallback(async () => {
+    // Trigger validation
+    const isValid = await form.trigger();
+    if (!isValid) return;
+
+    const values = form.getValues();
+
+    // Pre-process: convert empty strings to null for optional fields
+    const editableFieldsList = getEditableFieldsFromSections(sections);
+    for (const field of editableFieldsList) {
+      const key = field.name as string;
+      if (values[key] === "" && !field.required) {
+        values[key] = null;
+      }
+    }
+
+    // Validate with Zod
+    if (!entity.formSchema) return;
+    const result = entity.formSchema.safeParse(values);
+    if (!result.success) {
+      // Set errors on form
+      for (const err of result.error.errors) {
+        const fieldPath = err.path.join(".");
+        form.setError(fieldPath, { message: err.message });
+      }
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (isCreateMode) {
+        // INSERT
+        const { data: newRow, error } = await db
+          .from(entity.table)
+          .insert(result.data)
+          .select()
+          .single();
+        if (error) throw error;
+        toast.success(`${entity.displayName} created successfully`);
+        queryClient.invalidateQueries({
+          queryKey: entityKeys.all(entity.table),
+        });
+        const newId = (newRow as Record<string, unknown>).id;
+        router.push(`${path}/${newId}`);
+      } else if (id) {
+        // UPDATE
+        if (loadedVersionRef.current !== null) {
+          // Optimistic locking
+          const lockResult = await updateWithOptimisticLock(
+            supabase,
+            entity.table,
+            id,
+            result.data as Record<string, unknown>,
+            loadedVersionRef.current
+          );
+
+          if (!lockResult.success) {
+            if (lockResult.conflicted) {
+              conflictDialog.showConflict();
+              setIsSubmitting(false);
+              return;
+            }
+            throw new Error(lockResult.error);
+          }
+
+          toast.success(`${entity.displayName} updated successfully`);
+        } else {
+          // Standard update (no version field)
+          const { error } = await db
+            .from(entity.table)
+            .update(result.data)
+            .eq("id", id)
+            .select()
+            .single();
+          if (error) throw error;
+          toast.success(`${entity.displayName} updated successfully`);
+        }
+
+        // Invalidate caches
+        queryClient.invalidateQueries({
+          queryKey: entityKeys.detail(fetchTable, id),
+        });
+        queryClient.invalidateQueries({
+          queryKey: entityKeys.detail(entity.table, id),
+        });
+        queryClient.invalidateQueries({
+          queryKey: entityKeys.all(entity.table),
+        });
+        if (entity.viewTable) {
+          queryClient.invalidateQueries({
+            queryKey: entityKeys.all(entity.viewTable),
+          });
+        }
+
+        setEditing(false);
+      }
+    } catch (err) {
+      let message = "An unexpected error occurred";
+      if (err && typeof err === "object" && "message" in err && typeof (err as Error).message === "string") {
+        message = (err as Error).message;
+      }
+      toast.error(message);
+      console.error("Form submission error:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    form,
+    sections,
+    entity,
+    isCreateMode,
+    id,
+    db,
+    supabase,
+    queryClient,
+    fetchTable,
+    path,
+    router,
+    conflictDialog,
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // Conflict dialog handlers
+  // ---------------------------------------------------------------------------
+  const handleConflictRefresh = useCallback(async () => {
+    conflictDialog.setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: entityKeys.detail(entity.table, id || ""),
+      });
+      const { data: freshData } = await db
+        .from(entity.table)
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (freshData) {
+        const record = freshData as Record<string, unknown>;
+        form.reset({ ...formDefaults, ...record });
+        if (typeof record.version === "number") {
+          loadedVersionRef.current = record.version;
+        }
+        toast.info("Data refreshed. Please re-apply your changes.");
+      }
+    } catch {
+      toast.error("Failed to refresh data");
+    } finally {
+      conflictDialog.hideConflict();
+    }
+  }, [conflictDialog, queryClient, entity.table, id, db, form, formDefaults]);
+
+  const handleConflictDiscard = useCallback(() => {
+    conflictDialog.hideConflict();
+    setEditing(false);
+  }, [conflictDialog]);
+
+  // ---------------------------------------------------------------------------
+  // Keyboard shortcuts
   // ---------------------------------------------------------------------------
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
       // Don't trigger when typing in an input
       const el = document.activeElement;
       if (el) {
         const tag = el.tagName.toLowerCase();
-        if (tag === "input" || tag === "textarea" || tag === "select") return;
+        if (tag === "input" || tag === "textarea" || tag === "select") {
+          // Only allow Escape while in inputs during edit mode
+          if (editing && e.key === "Escape") {
+            e.preventDefault();
+            handleCancel();
+          }
+          return;
+        }
         if ((el as HTMLElement).isContentEditable) return;
       }
 
-      if (e.key === "Backspace") {
-        e.preventDefault();
-        router.push(backUrl || path);
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (editing) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          handleCancel();
+        }
+      } else {
+        // View mode shortcuts
+        if (e.key === "Backspace") {
+          e.preventDefault();
+          router.push(backUrl || path);
+        }
+        if (e.key === "e" || e.key === "E") {
+          e.preventDefault();
+          startEditing();
+        }
       }
     }
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [router, path, backUrl]);
+  }, [editing, router, path, backUrl, handleCancel, startEditing]);
 
-  if (error) {
-    return (
-      <div className="text-center py-8 text-destructive">
-        Failed to load {entity.displayName.toLowerCase()}
-      </div>
-    );
+  // ---------------------------------------------------------------------------
+  // Rendering guards
+  // ---------------------------------------------------------------------------
+
+  // In create mode, don't show loading/error for data fetch
+  if (!isCreateMode) {
+    if (error) {
+      return (
+        <div className="text-center py-8 text-destructive">
+          Failed to load {entity.displayName.toLowerCase()}
+        </div>
+      );
+    }
+
+    if (isLoading) {
+      return <EntityDetailSkeleton />;
+    }
+
+    if (!data) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          {entity.displayName} not found
+        </div>
+      );
+    }
   }
 
-  if (isLoading) {
-    return <EntityDetailSkeleton />;
-  }
-
-  if (!data) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        {entity.displayName} not found
-      </div>
-    );
-  }
+  // For display purposes, use data or empty object for create mode
+  const displayData = (data || ({} as T)) as T;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6${editing ? " pb-20" : ""}`}>
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
@@ -365,99 +716,108 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
           >
             &larr; Back
-            <Kbd>&lArr;</Kbd>
+            {!editing && <Kbd>&lArr;</Kbd>}
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">
-              {header?.title || `${entity.displayName} ${id}`}
+              {isCreateMode
+                ? `Create ${entity.displayName}`
+                : header?.title || `${entity.displayName} ${id}`}
             </h1>
-            {stateInfo && (
+            {!isCreateMode && stateInfo && (
               <StatusBadge
                 status={stateInfo.currentState}
                 config={entity.stateMachine?.stateDisplay}
               />
             )}
           </div>
-          {header?.subtitle && (
+          {!isCreateMode && header?.subtitle && (
             <p className="text-muted-foreground">{header.subtitle}</p>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          {showEdit && (
-            <Button variant="outline" asChild>
-              <Link href={`${path}/${id}/edit`}>
-                Edit
-                <Kbd>E</Kbd>
-              </Link>
+          {canEdit && !editing && !isCreateMode && (
+            <Button variant="outline" size="icon" onClick={startEditing} title="Edit">
+              <Pencil className="h-4 w-4" />
+              <span className="sr-only">Edit</span>
             </Button>
           )}
 
-          {(availableActions.length > 0 ||
-            (stateInfo && stateInfo.validTransitions.length > 0)) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  Actions
-                  <ChevronDown className="h-4 w-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {/* State transitions */}
-                {stateInfo && stateInfo.validTransitions.length > 0 && (
-                  <>
-                    {stateInfo.validTransitions.map((toState) => {
-                      const display =
-                        entity.stateMachine?.stateDisplay?.[toState];
-                      return (
-                        <DropdownMenuItem
-                          key={toState}
-                          onClick={() =>
-                            transitionMutation.mutate({ toState })
-                          }
-                        >
-                          Move to {display?.label || toState}
-                        </DropdownMenuItem>
-                      );
-                    })}
-                    {availableActions.length > 0 && <DropdownMenuSeparator />}
-                  </>
-                )}
+          {!editing &&
+            !isCreateMode &&
+            (availableActions.length > 0 ||
+              (stateInfo && stateInfo.validTransitions.length > 0)) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    Actions
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {/* State transitions */}
+                  {stateInfo && stateInfo.validTransitions.length > 0 && (
+                    <>
+                      {stateInfo.validTransitions.map((toState) => {
+                        const display =
+                          entity.stateMachine?.stateDisplay?.[toState];
+                        return (
+                          <DropdownMenuItem
+                            key={toState}
+                            onClick={() =>
+                              transitionMutation.mutate({ toState })
+                            }
+                          >
+                            Move to {display?.label || toState}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                      {availableActions.length > 0 && (
+                        <DropdownMenuSeparator />
+                      )}
+                    </>
+                  )}
 
-                {/* Custom actions */}
-                {availableActions.map((action) => {
-                  const disabledReason = action.disabledWhen?.(data);
-                  return (
-                    <AnimatedActionMenuItem
-                      key={action.name}
-                      icon={action.icon}
-                      label={action.label}
-                      variant={
-                        action.variant === "destructive"
-                          ? "destructive"
-                          : undefined
-                      }
-                      disabled={!!disabledReason}
-                      title={disabledReason || undefined}
-                      onClick={() => {
-                        if (disabledReason) return;
-                        if (onAction && onAction(action.name, data)) {
-                          return;
+                  {/* Custom actions */}
+                  {availableActions.map((action) => {
+                    const disabledReason = action.disabledWhen?.(
+                      displayData
+                    );
+                    return (
+                      <AnimatedActionMenuItem
+                        key={action.name}
+                        icon={action.icon}
+                        label={action.label}
+                        variant={
+                          action.variant === "destructive"
+                            ? "destructive"
+                            : undefined
                         }
-                        if (action.toState) {
-                          transitionMutation.mutate({
-                            toState: action.toState,
-                          });
-                        } else {
-                          action.handler?.(data);
-                        }
-                      }}
-                    />
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                        disabled={!!disabledReason}
+                        title={disabledReason || undefined}
+                        onClick={() => {
+                          if (disabledReason) return;
+                          if (
+                            onAction &&
+                            onAction(action.name, displayData)
+                          ) {
+                            return;
+                          }
+                          if (action.toState) {
+                            transitionMutation.mutate({
+                              toState: action.toState,
+                            });
+                          } else {
+                            action.handler?.(displayData);
+                          }
+                        }}
+                      />
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
         </div>
       </div>
 
@@ -467,9 +827,13 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           tabs={tabs}
           relationTabs={relationTabs}
           defaultSections={defaultSections}
-          data={data}
+          data={displayData}
           entity={entity}
           parentId={id || ""}
+          editing={editing}
+          isCreateMode={isCreateMode}
+          form={form}
+          optionsMap={optionsMap}
         />
       ) : (
         <div className="space-y-4">
@@ -477,12 +841,46 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             <UnifiedSectionCard
               key={section.id}
               section={section}
-              data={data}
+              data={displayData}
               entity={entity}
+              editing={editing}
+              isCreateMode={isCreateMode}
+              form={form}
+              optionsMap={optionsMap}
             />
           ))}
         </div>
       )}
+
+      {/* Hidden save button for Cmd+Enter shortcut */}
+      {editing && (
+        <button
+          ref={submitRef}
+          type="button"
+          className="hidden"
+          onClick={handleSave}
+          aria-hidden
+        />
+      )}
+
+      {/* Edit Footer */}
+      {editing && (
+        <EditFooter
+          form={form as UseFormReturn<Record<string, unknown>>}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          isSubmitting={isSubmitting}
+        />
+      )}
+
+      {/* Conflict Dialog */}
+      <ConflictDialog
+        open={conflictDialog.isOpen}
+        onOpenChange={conflictDialog.setIsOpen}
+        onRefresh={handleConflictRefresh}
+        onDiscard={handleConflictDiscard}
+        isRefreshing={conflictDialog.isRefreshing}
+      />
     </div>
   );
 }
@@ -498,6 +896,10 @@ function UnifiedTabsWithRelations<T>({
   data,
   entity,
   parentId,
+  editing,
+  isCreateMode,
+  form,
+  optionsMap,
 }: {
   tabs: [string, UnifiedSectionDef<T>[]][];
   relationTabs: EntityRelationDef[];
@@ -505,6 +907,10 @@ function UnifiedTabsWithRelations<T>({
   data: T;
   entity: EntityConfig<T>;
   parentId: string;
+  editing: boolean;
+  isCreateMode: boolean;
+  form: UseFormReturn<Record<string, unknown>>;
+  optionsMap: Record<string, { value: string; label: string }[]>;
 }) {
   const [activeTab, setActiveTab] = useState("details");
 
@@ -531,6 +937,10 @@ function UnifiedTabsWithRelations<T>({
             section={section}
             data={data}
             entity={entity}
+            editing={editing}
+            isCreateMode={isCreateMode}
+            form={form}
+            optionsMap={optionsMap}
           />
         ))}
       </TabsContent>
@@ -543,6 +953,10 @@ function UnifiedTabsWithRelations<T>({
               section={section}
               data={data}
               entity={entity}
+              editing={editing}
+              isCreateMode={isCreateMode}
+              form={form}
+              optionsMap={optionsMap}
             />
           ))}
         </TabsContent>
@@ -577,10 +991,18 @@ function UnifiedSectionCard<T>({
   section,
   data,
   entity,
+  editing = false,
+  isCreateMode = false,
+  form,
+  optionsMap = {},
 }: {
   section: UnifiedSectionDef<T>;
   data: T;
   entity: EntityConfig<T>;
+  editing?: boolean;
+  isCreateMode?: boolean;
+  form?: UseFormReturn<Record<string, unknown>>;
+  optionsMap?: Record<string, { value: string; label: string }[]>;
 }) {
   // Always call the relation hook (rules of hooks)
   const relationDisplayValues = useRelationDisplayValues(
@@ -588,7 +1010,21 @@ function UnifiedSectionCard<T>({
     data
   );
 
-  // Custom component takes precedence
+  // Custom component handling
+  if (editing && section.editComponent) {
+    const EditComponent = section.editComponent;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{section.title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EditComponent data={data} editing={true} form={form} />
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (section.component) {
     const CustomComponent = section.component;
     return (
@@ -597,7 +1033,11 @@ function UnifiedSectionCard<T>({
           <CardTitle>{section.title}</CardTitle>
         </CardHeader>
         <CardContent>
-          <CustomComponent data={data} editing={false} />
+          <CustomComponent
+            data={data}
+            editing={editing}
+            form={editing ? form : undefined}
+          />
         </CardContent>
       </Card>
     );
@@ -610,16 +1050,18 @@ function UnifiedSectionCard<T>({
         <CardTitle>{section.title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-2 gap-4">
+        <dl className={editing ? "grid grid-cols-12 gap-4" : "grid grid-cols-2 gap-4"}>
           {section.fields?.map((field) => (
             <UnifiedField
               key={field.name}
               field={field as UnifiedFieldDef<Record<string, unknown>>}
-              editing={false}
-              isCreateMode={false}
+              editing={editing}
+              isCreateMode={isCreateMode}
+              form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
               record={data as Record<string, unknown>}
               entity={entity as EntityConfig<Record<string, unknown>>}
               relationDisplayValues={relationDisplayValues}
+              dynamicOptions={optionsMap[field.name]}
             />
           ))}
         </dl>
