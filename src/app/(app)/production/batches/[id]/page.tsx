@@ -16,6 +16,7 @@ import { StartFermentationDialog } from "@/components/domain/start-fermentation-
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
 import { batchKeys } from "@/lib/query-keys";
+import { usePrefillStore } from "@/stores/prefill-store";
 
 export default function BatchDetailPage({
   params,
@@ -23,9 +24,20 @@ export default function BatchDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const [showStartFermentation, setShowStartFermentation] = useState(false);
-  const [showCancellation, setShowCancellation] = useState(false);
-  const [showBlend, setShowBlend] = useState(false);
+
+  // Consume prefill store once on initial render to auto-open dialogs from AI
+  const [prefillDialog] = useState(() => {
+    const { openDialog } = usePrefillStore.getState().consume();
+    return openDialog;
+  });
+  const [showStartFermentation, setShowStartFermentation] = useState(
+    prefillDialog === "start_fermentation"
+  );
+  const [showCancellation, setShowCancellation] = useState(
+    prefillDialog === "cancel" || prefillDialog === "archive"
+  );
+  const [showBlend, setShowBlend] = useState(prefillDialog === "blend");
+
   const queryClient = useQueryClient();
   const supabase = createClient();
 

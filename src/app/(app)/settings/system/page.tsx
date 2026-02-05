@@ -552,6 +552,7 @@ export default function SystemSettingsPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="timezone">Timezone</Label>
                     <Select
+                      // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
                       value={form.watch("timezone")}
                       onValueChange={(value) => form.setValue("timezone", value)}
                     >

@@ -31,9 +31,6 @@ export { batchSchema, type BatchFormValues } from "@/lib/schemas/batch";
 // Base table type for form operations
 type BatchTable = Database["public"]["Tables"]["batches"]["Row"];
 
-// View type has additional computed fields but nullable id (views can return null)
-type BatchViewRaw = Database["public"]["Views"]["batches_with_brew_info"]["Row"];
-
 // Combined type for entity config: table fields + view computed fields with non-null id
 // This is the type used for list/detail display where id is always present
 type Batch = BatchTable & {
@@ -249,6 +246,16 @@ export const batchEntity: EntityConfig<Batch> = {
       type: "text",
       placeholder: "e.g., Hazy IPA #5",
       required: true,
+      colSpan: 6,
+    },
+    {
+      name: "recipe_id",
+      label: "Recipe",
+      type: "relation",
+      relation: {
+        entity: "recipe",
+        displayField: "name",
+      },
       colSpan: 6,
     },
     {

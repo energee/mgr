@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { User, Maximize2, Minimize2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { isToolUIPart } from "ai";
+import type { ToolUIPart, DynamicToolUIPart } from "ai";
+import { User, Maximize2, Minimize2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -10,7 +13,12 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  usePrefillStore,
+  type NavigationIntent,
+} from "@/stores/prefill-store";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
+import { ClaudeWordmark } from "@/components/ui/claude-wordmark";
 import {
   Conversation,
   ConversationContent,
@@ -28,13 +36,49 @@ import {
   PromptInputFooter,
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
+import {
+  Tool,
+  ToolHeader,
+  ToolContent,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
 import { cn } from "@/lib/utils";
 import { useChatContext } from "@/contexts/chat-context";
+
+function isNavigationIntent(result: unknown): result is NavigationIntent {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "action" in result &&
+    (result as Record<string, unknown>).action === "navigate"
+  );
+}
+
+const TOOL_TITLES: Record<string, string> = {
+  analyzeRecipe: "Analyze Recipe",
+  getRecipeSummary: "Recipe Summary",
+  suggestImprovements: "Suggest Improvements",
+  analyzeBatch: "Analyze Batch",
+  getInventoryOverview: "Inventory Overview",
+  searchRecipes: "Search Recipes",
+  getBatchStatus: "Batch Status",
+  getVesselAvailability: "Vessel Availability",
+  getProductionSchedule: "Production Schedule",
+  getIngredientInventory: "Ingredient Inventory",
+  getBatchLogs: "Batch Logs",
+  getVesselCleanings: "Vessel Cleanings",
+  getBatchTransfers: "Batch Transfers",
+  getRecipeCost: "Recipe Cost",
+  getLotExpiration: "Lot Expiration",
+};
 
 export function ChatPanel() {
   const { isOpen, close, chat } = useChatContext();
   const { messages, status } = chat;
   const [isMaximized, setIsMaximized] = useState(false);
+  const router = useRouter();
+  const setPrefill = usePrefillStore((s) => s.setPrefill);
   const isStreaming = status === "streaming";
 
   return (
@@ -56,7 +100,9 @@ export function ChatPanel() {
         <SheetHeader className="px-4 py-3 border-b space-y-0">
           <div className="flex items-center gap-2 pr-8">
             <ClaudeIcon className="h-4 w-4 text-[#D97757]" />
-            <SheetTitle className="text-sm flex-1">Claude</SheetTitle>
+            <SheetTitle className="flex-1">
+              <ClaudeWordmark />
+            </SheetTitle>
             <Button
               variant="ghost"
               size="icon"
@@ -122,17 +168,85 @@ export function ChatPanel() {
                           </div>
                         );
                       }
-                      if (part.type.startsWith("tool-")) {
+                      if (isToolUIPart(part)) {
+                        const toolPart = part as
+                          | ToolUIPart
+                          | DynamicToolUIPart;
+
+                        // NavigationIntent outputs render as action cards
+                        if (
+                          toolPart.state === "output-available" &&
+                          isNavigationIntent(toolPart.output)
+                        ) {
+                          const intent = toolPart.output;
+                          return (
+                            <div
+                              key={`${message.id}-${i}`}
+                              className="rounded-lg border bg-muted/50 p-3 text-sm"
+                            >
+                              <p className="mb-2 text-foreground">
+                                {intent.description}
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => {
+                                  if (
+                                    intent.prefillData ||
+                                    intent.openDialog
+                                  ) {
+                                    setPrefill(
+                                      intent.prefillData ?? {},
+                                      intent.openDialog
+                                    );
+                                  }
+                                  router.push(intent.url);
+                                  close();
+                                }}
+                              >
+                                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                                Open Form
+                              </Button>
+                            </div>
+                          );
+                        }
+
+                        // All other tool calls render with the Tool component
+                        const toolName =
+                          toolPart.type === "dynamic-tool"
+                            ? toolPart.toolName
+                            : toolPart.type.split("-").slice(1).join("-");
+                        const title = TOOL_TITLES[toolName] ?? toolName;
                         return (
-                          <div
+                          <Tool
                             key={`${message.id}-${i}`}
-                            className="text-xs text-muted-foreground italic"
+                            defaultOpen={toolPart.state === "output-error"}
                           >
-                            {(part as { state: string }).state ===
-                            "result"
-                              ? null
-                              : "Looking up data..."}
-                          </div>
+                            {toolPart.type === "dynamic-tool" ? (
+                              <ToolHeader
+                                type={toolPart.type}
+                                state={toolPart.state}
+                                toolName={toolPart.toolName}
+                                title={title}
+                              />
+                            ) : (
+                              <ToolHeader
+                                type={toolPart.type}
+                                state={toolPart.state}
+                                title={title}
+                              />
+                            )}
+                            <ToolContent>
+                              <ToolInput input={toolPart.input} />
+                              {(toolPart.state === "output-available" ||
+                                toolPart.state === "output-error") && (
+                                <ToolOutput
+                                  output={toolPart.output}
+                                  errorText={toolPart.errorText}
+                                />
+                              )}
+                            </ToolContent>
+                          </Tool>
                         );
                       }
                       return null;

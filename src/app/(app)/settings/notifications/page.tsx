@@ -157,6 +157,7 @@ export default function NotificationPreferencesPage() {
     saveMutation.mutate(values);
   };
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const watchQuietHours = form.watch("quiet_hours_enabled");
   const watchEmailEnabled = form.watch("email_enabled");
 

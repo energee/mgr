@@ -278,6 +278,7 @@ export default function BrewerySettingsPage() {
               <div className="grid gap-2">
                 <Label htmlFor="volume_unit">Production Volume</Label>
                 <Select
+                  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
                   value={form.watch("volume_unit")}
                   onValueChange={(value) =>
                     form.setValue("volume_unit", value as UnitPreferencesForm["volume_unit"])
