@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { User, Maximize2, Minimize2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { User, Maximize2, Minimize2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -10,6 +11,10 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  usePrefillStore,
+  type NavigationIntent,
+} from "@/stores/prefill-store";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import {
   Conversation,
@@ -31,10 +36,21 @@ import {
 import { cn } from "@/lib/utils";
 import { useChatContext } from "@/contexts/chat-context";
 
+function isNavigationIntent(result: unknown): result is NavigationIntent {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "action" in result &&
+    (result as Record<string, unknown>).action === "navigate"
+  );
+}
+
 export function ChatPanel() {
   const { isOpen, close, chat } = useChatContext();
   const { messages, status } = chat;
   const [isMaximized, setIsMaximized] = useState(false);
+  const router = useRouter();
+  const setPrefill = usePrefillStore((s) => s.setPrefill);
   const isStreaming = status === "streaming";
 
   return (
@@ -123,15 +139,52 @@ export function ChatPanel() {
                         );
                       }
                       if (part.type.startsWith("tool-")) {
+                        const toolPart = part as {
+                          state: string;
+                          result?: unknown;
+                        };
+                        if (toolPart.state === "result") {
+                          if (isNavigationIntent(toolPart.result)) {
+                            const intent = toolPart.result;
+                            return (
+                              <div
+                                key={`${message.id}-${i}`}
+                                className="rounded-lg border bg-muted/50 p-3 text-sm"
+                              >
+                                <p className="mb-2 text-foreground">
+                                  {intent.description}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => {
+                                    if (
+                                      intent.prefillData ||
+                                      intent.openDialog
+                                    ) {
+                                      setPrefill(
+                                        intent.prefillData ?? {},
+                                        intent.openDialog
+                                      );
+                                    }
+                                    router.push(intent.url);
+                                    close();
+                                  }}
+                                >
+                                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                                  Open Form
+                                </Button>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }
                         return (
                           <div
                             key={`${message.id}-${i}`}
                             className="text-xs text-muted-foreground italic"
                           >
-                            {(part as { state: string }).state ===
-                            "result"
-                              ? null
-                              : "Looking up data..."}
+                            Looking up data...
                           </div>
                         );
                       }
