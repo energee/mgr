@@ -283,25 +283,31 @@ export function EntityDetail<T = Record<string, unknown>>({
                 )}
 
                 {/* Custom actions */}
-                {availableActions.map((action) => (
-                  <DropdownMenuItem
-                    key={action.name}
-                    onClick={() => {
-                      // Check if external handler wants to handle this action
-                      if (onAction && onAction(action.name, data)) {
-                        return; // Action was handled externally
-                      }
-                      // Default handling
-                      if (action.toState) {
-                        transitionMutation.mutate({ toState: action.toState });
-                      } else {
-                        action.handler?.(data);
-                      }
-                    }}
-                  >
-                    {action.label}
-                  </DropdownMenuItem>
-                ))}
+                {availableActions.map((action) => {
+                  const disabledReason = action.disabledWhen?.(data);
+                  return (
+                    <DropdownMenuItem
+                      key={action.name}
+                      disabled={!!disabledReason}
+                      title={disabledReason || undefined}
+                      onClick={() => {
+                        if (disabledReason) return;
+                        // Check if external handler wants to handle this action
+                        if (onAction && onAction(action.name, data)) {
+                          return; // Action was handled externally
+                        }
+                        // Default handling
+                        if (action.toState) {
+                          transitionMutation.mutate({ toState: action.toState });
+                        } else {
+                          action.handler?.(data);
+                        }
+                      }}
+                    >
+                      {action.label}
+                    </DropdownMenuItem>
+                  );
+                })}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
