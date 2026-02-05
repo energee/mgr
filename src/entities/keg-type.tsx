@@ -85,7 +85,7 @@ export const kegTypeEntity: EntityConfig<KegType> = {
     },
   ],
 
-  defaultSort: { column: "position", direction: "asc" },
+  defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name", "code"],
 
   // ---------------------------------------------------------------------------
