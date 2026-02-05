@@ -49,6 +49,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // Hop timing options
 export const HOP_TIMINGS = [
@@ -445,7 +446,7 @@ export function HopScheduleEditor({
                 Total
               </TableCell>
               <TableCell className="text-right font-medium">
-                {totals.totalWeight.toFixed(2)} oz
+                <UnitDisplay value={totals.totalWeight / 16} unitType="weight" />
               </TableCell>
               <TableCell></TableCell>
               <TableCell className="text-right font-medium">

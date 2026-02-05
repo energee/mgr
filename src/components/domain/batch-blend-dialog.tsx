@@ -38,6 +38,7 @@ import { Loader2, GitMerge } from "lucide-react";
 import { toast } from "sonner";
 import { getStateLabel } from "@/types/entity";
 import { batchEntity } from "@/entities/batch";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -376,7 +377,7 @@ export function BatchBlendDialog({
                 </div>
                 <div>
                   <span className="text-muted-foreground">Total Volume:</span>{" "}
-                  <span className="font-medium">{blendTotals.totalVolume.toFixed(2)} BBL</span>
+                  <span className="font-medium"><UnitDisplay value={blendTotals.totalVolume} unitType="volume" /></span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Weighted ABV:</span>{" "}

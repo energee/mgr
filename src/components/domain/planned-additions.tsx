@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Circle, Leaf, Apple, Sparkles, Beaker } from "lucide-react";
-import type { BatchAddition, AdditionType } from "@/lib/batch-additions";
+import type { AdditionType } from "@/lib/batch-additions";
 import { recipeKeys } from "@/lib/query-keys";
 
 // =============================================================================
@@ -34,14 +34,19 @@ interface PlannedAddition {
   notes?: string;
 }
 
-interface BatchLog {
+/** Row from the batch_additions table */
+interface BatchAdditionRow {
   id: string;
-  data: BatchAddition;
+  addition_type: string;
+  catalog_id: string | null;
+  name: string;
+  amount: number;
+  unit: string;
 }
 
 interface PlannedAdditionsProps {
   recipeId: string;
-  actualAdditions: BatchLog[];
+  actualAdditions: BatchAdditionRow[];
   className?: string;
 }
 
@@ -157,18 +162,28 @@ export function PlannedAdditions({
     enabled: !!recipeId,
   });
 
+  // Map display types to DB types for comparison
+  const displayToDb: Record<string, string[]> = {
+    dry_hop: ["hop"],
+    fruit: ["fruit"],
+    adjunct: ["adjunct"],
+    fining: ["other"],
+    spice: ["spice"],
+    other: ["other"],
+  };
+
   // Check if an addition has been logged
   const isAdditionLogged = (planned: PlannedAddition): boolean => {
-    return actualAdditions.some((log) => {
-      const actual = log.data;
-      // Match by type first
-      if (actual.addition_type !== planned.type) return false;
+    return actualAdditions.some((row) => {
+      // Match by mapped type first
+      const dbTypes = displayToDb[planned.type] || [planned.type];
+      if (!dbTypes.includes(row.addition_type)) return false;
 
-      // If ingredient_id is available, use exact match
-      if (planned.id && actual.ingredient_id === planned.id) return true;
+      // If catalog_id matches the planned addition id, exact match
+      if (planned.id && row.catalog_id === planned.id) return true;
 
       // Otherwise, use fuzzy name matching
-      const actualName = actual.ingredient_name.toLowerCase();
+      const actualName = row.name.toLowerCase();
       const plannedName = planned.name.toLowerCase();
       return actualName.includes(plannedName) || plannedName.includes(actualName);
     });

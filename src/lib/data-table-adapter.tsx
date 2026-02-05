@@ -25,6 +25,7 @@ import {
   AnimatedActionMenuItem,
   AnimatedLinkActionMenuItem,
 } from "@/components/universal/animated-action-menu-item";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Filter Variant Mapping
@@ -96,6 +97,10 @@ export function buildDataTableColumns<T>(
 
         if (col.render) {
           return col.render(value, row.original);
+        }
+
+        if (col.format === "unit" && col.unitType) {
+          return <UnitDisplay value={value as number | null} unitType={col.unitType} />;
         }
 
         return formatValue(value, col.format);

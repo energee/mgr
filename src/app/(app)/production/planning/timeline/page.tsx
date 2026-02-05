@@ -129,7 +129,7 @@ export default function ProductionTimelinePage() {
 
   // Fetch batches with recipe info
   const { data: batches = [] } = useQuery({
-    queryKey: [...entityKeys.list("batches_with_brew_info"), "timeline", startDate.toISOString()],
+    queryKey: entityKeys.timeline("batches_with_brew_info", startDate.toISOString()),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches_with_brew_info")

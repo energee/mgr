@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 interface KegOwnerDepositsEditorProps {
   kegOwnerId: string;
@@ -218,7 +219,7 @@ export function KegOwnerDepositsEditor({
           {kegTypes.map((kt) => (
             <TableRow key={kt.id}>
               <TableCell className="font-medium">{kt.name}</TableCell>
-              <TableCell>{kt.volume_bbl}</TableCell>
+              <TableCell><UnitDisplay value={kt.volume_bbl} unitType="volume" /></TableCell>
               <TableCell className="text-muted-foreground">
                 ${Number(kt.deposit_amount).toFixed(2)}
               </TableCell>

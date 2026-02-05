@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
 import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
+import { UnitDisplay } from "@/components/ui/unit-input";
 
 export function EntityDetail<T = Record<string, unknown>>({
   entity,
@@ -503,6 +504,8 @@ function SectionCard<T>({
               displayValue = getStateLabel(entity, value);
             } else if (field.relation && relationDisplayValues[field.field]) {
               displayValue = relationDisplayValues[field.field];
+            } else if (field.format === "unit" && field.unitType) {
+              displayValue = <UnitDisplay value={value as number | null} unitType={field.unitType} />;
             } else {
               displayValue = formatValue(value, field.format);
             }
@@ -671,7 +674,9 @@ function RelationTable({
                       <TableCell key={key}>
                         {col.render
                           ? col.render(value, item)
-                          : formatValue(value, col.format)}
+                          : col.format === "unit" && col.unitType
+                            ? <UnitDisplay value={value as number | null} unitType={col.unitType} />
+                            : formatValue(value, col.format)}
                       </TableCell>
                     );
                   })}

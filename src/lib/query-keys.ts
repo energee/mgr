@@ -28,6 +28,10 @@ export const entityKeys = {
   /** Related records for a parent */
   related: (table: string, foreignKey: string, parentId: string) =>
     [table, "by", foreignKey, parentId] as const,
+
+  /** Timeline view for a table */
+  timeline: (table: string, startDate: string) =>
+    [table, "list", "timeline", startDate] as const,
 };
 
 // =============================================================================
@@ -67,6 +71,18 @@ export const recipeKeys = {
 };
 
 // =============================================================================
+// Recipe Variant Keys
+// =============================================================================
+
+export const recipeVariantKeys = {
+  all: ["recipe-variants"] as const,
+  byRecipe: (recipeId: string) => ["recipe-variants", "by-recipe", recipeId] as const,
+  detail: (id: string) => ["recipe-variants", "detail", id] as const,
+  costDetail: (id: string) => ["recipe-variants", "cost-detail", id] as const,
+  withCosts: (recipeId: string) => ["recipe-variants", "with-costs", recipeId] as const,
+};
+
+// =============================================================================
 // Batch Keys
 // =============================================================================
 
@@ -85,6 +101,16 @@ export const batchKeys = {
   performance: (id: string) => ["batch-performance", id] as const,
   brewLogs: (id: string) => ["batch-brew-logs", id] as const,
   availableBrewLogs: (id: string) => ["available-brew-logs", id] as const,
+};
+
+// =============================================================================
+// Batch Addition Keys
+// =============================================================================
+
+export const batchAdditionKeys = {
+  all: ["batch-additions"] as const,
+  byBatch: (batchId: string) => ["batch-additions", "by-batch", batchId] as const,
+  withCosts: (batchId: string) => ["batch-additions", "with-costs", batchId] as const,
 };
 
 // =============================================================================
@@ -382,6 +408,7 @@ export const brewLogKeys = {
   all: () => ["brew_logs"] as const,
   detail: (id: string) => ["brew_logs", id] as const,
   batches: (id: string) => ["brew_log_batches", id] as const,
+  batchesForCompletion: (id: string) => ["brew_log_batches", id, "completion"] as const,
 };
 
 // =============================================================================
@@ -416,6 +443,7 @@ export const packagingFormatKeys = {
 export const vesselKeys = {
   all: () => ["vessels"] as const,
   available: () => ["vessels", "available"] as const,
+  availableForCompletion: () => ["vessels", "available", "completion"] as const,
   transfers: () => ["vessel_transfers"] as const,
 };
 
