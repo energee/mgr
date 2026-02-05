@@ -317,7 +317,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
     {
       id: "batches",
       title: "Linked Batches",
-      component: BrewLogBatches,
+      component: BrewLogSplitOverview,
     },
     {
       id: "notes",
