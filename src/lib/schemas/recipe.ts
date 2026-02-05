@@ -13,6 +13,7 @@ export const recipeSchema = z.object({
   style_id: z.string().uuid().nullable().optional(),
   yeast_id: z.string().uuid().nullable().optional(),
   water_profile_id: z.string().uuid().nullable().optional(),
+  pricing_tier_id: z.string().uuid().nullable().optional(),
   description: z.string().nullable().optional(),
   // Volumes
   volume_bbl: z.coerce.number().nullable().optional(),
@@ -42,7 +43,6 @@ export const recipeSchema = z.object({
   // Flags
   use_default_additions: z.boolean().default(true),
   is_active: z.boolean().default(true),
-  is_template: z.boolean().default(false),
   // Status
   status: z.enum(["draft", "spec", "complete"]).default("complete"),
 });

@@ -71,7 +71,7 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
     },
   ],
 
-  defaultSort: { column: "position", direction: "asc" },
+  defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name", "code", "description"],
 
   // ---------------------------------------------------------------------------
@@ -146,12 +146,12 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
   // ---------------------------------------------------------------------------
   relations: [
     {
-      name: "price_tiers",
-      entity: "price_tier",
+      name: "pricing_tier_prices",
+      entity: "pricing_tier_price",
       type: "hasMany",
       foreignKey: "sales_channel_id",
       showInDetail: true,
-      detailTab: "Price Tiers",
+      detailTab: "Prices",
     },
     {
       name: "customers",

@@ -120,8 +120,8 @@ export function PickListItems({ data }: PickListItemsProps) {
       const locationMap = new Map((locationResult.data || []).map((l) => [l.id, l.name]));
 
       // Get brand and package type names
-      const brandIds = [...new Set((fgResult.data || []).map((fg) => fg.brand_id).filter(Boolean))];
-      const packageIds = [...new Set((fgResult.data || []).map((fg) => fg.package_type_id).filter(Boolean))];
+      const brandIds = [...new Set((fgResult.data || []).map((fg) => fg.brand_id).filter((id): id is string => !!id))];
+      const packageIds = [...new Set((fgResult.data || []).map((fg) => fg.package_type_id).filter((id): id is string => !!id))];
 
       const [brandsResult, packagesResult] = await Promise.all([
         brandIds.length > 0
@@ -140,8 +140,8 @@ export function PickListItems({ data }: PickListItemsProps) {
         return {
           ...item,
           lot_number: fg?.lot_number || "N/A",
-          brand_name: fg ? brandMap.get(fg.brand_id) || "Unknown" : "Unknown",
-          package_name: fg ? packageMap.get(fg.package_type_id) || "Unknown" : "Unknown",
+          brand_name: fg?.brand_id ? brandMap.get(fg.brand_id) || "Unknown" : "Unknown",
+          package_name: fg?.package_type_id ? packageMap.get(fg.package_type_id) || "Unknown" : "Unknown",
           location_name: item.location_id ? locationMap.get(item.location_id) || null : null,
           production_date: fg?.production_date || null,
         } as PickListItemRow;

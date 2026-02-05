@@ -1,8 +1,8 @@
 "use client";
 
 import { EntityForm } from "@/components/universal/entity-form";
-import { priceTierEntity } from "@/entities/price-tier";
+import { pricingTierEntity } from "@/entities/pricing-tier";
 
-export default function NewPriceTierPage() {
-  return <EntityForm entity={priceTierEntity} basePath="/settings/pricing/tiers" />;
+export default function NewPricingTierPage() {
+  return <EntityForm entity={pricingTierEntity} basePath="/settings/pricing/tiers" />;
 }

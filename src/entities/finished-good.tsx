@@ -23,7 +23,8 @@ type FinishedGoodView = Database["public"]["Views"]["finished_goods_with_availab
 export const finishedGoodSchema = z.object({
   lot_number: z.string().min(1, "Lot number is required"),
   brand_id: z.string().uuid(),
-  package_type_id: z.string().uuid(),
+  package_type_id: z.string().uuid().nullable().optional(),
+  keg_type_id: z.string().uuid().nullable().optional(),
   batch_id: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().int().min(0),
   production_date: z.string().nullable().optional(),
@@ -109,6 +110,7 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
         { field: "lot_number", label: "Lot Code" },
         { field: "brand_id", label: "Brand" },
         { field: "package_type_id", label: "Package Type" },
+        { field: "keg_type_id", label: "Keg Type" },
         { field: "batch_id", label: "Source Batch" },
       ],
     },
@@ -179,7 +181,7 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       name: "package_type_id",
       label: "Package Type",
       type: "select",
-      required: true,
+      required: false,
       colSpan: 6,
       dynamicOptions: {
         table: "package_types",
@@ -187,6 +189,14 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
         labelField: "name",
         orderBy: "name",
       },
+    },
+    {
+      name: "keg_type_id",
+      label: "Keg Type",
+      type: "relation",
+      required: false,
+      colSpan: 6,
+      relation: { entity: "keg_type", displayField: "name" },
     },
     {
       name: "batch_id",
@@ -246,5 +256,5 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
     "Show allocation history for lot Y",
   ],
 
-  keyFields: ["lot_number", "brand_id", "package_type_id", "quantity", "available_quantity"],
+  keyFields: ["lot_number", "brand_id", "package_type_id", "keg_type_id", "quantity", "available_quantity"],
 };

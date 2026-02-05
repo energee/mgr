@@ -27,7 +27,7 @@ export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
 // The view adds est_* fields but may not have the status field yet
 type RecipeBase = Database["public"]["Tables"]["recipes"]["Row"];
 type RecipeView = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
-type Recipe = RecipeBase & Partial<Pick<RecipeView, "est_og" | "est_fg" | "est_abv" | "est_ibu" | "est_srm" | "style_name" | "est_cogs">>;
+type Recipe = RecipeBase & Partial<Pick<RecipeView, "est_og" | "est_fg" | "est_abv" | "est_ibu" | "est_srm" | "style_name" | "est_cogs" | "batch_count">>;
 
 // =============================================================================
 // State Machine (defined separately to derive options)
@@ -100,10 +100,10 @@ export const recipeEntity: EntityConfig<Recipe> = {
       render: (value) => value ? `${value} min` : "—",
     },
     {
-      accessorKey: "is_template",
-      header: "Template",
+      accessorKey: "batch_count",
+      header: "Batches",
       sortable: true,
-      render: (value) => value ? "Template" : "",
+      render: (value) => (value as number) || 0,
     },
     {
       accessorKey: "status",
@@ -135,15 +135,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
       field: "is_active",
       type: "boolean",
       label: "Active",
-    },
-    {
-      field: "is_template",
-      type: "select",
-      label: "Type",
-      options: [
-        { value: "true", label: "Templates Only" },
-        { value: "false", label: "Hide Templates" },
-      ],
     },
     {
       field: "style_id",
@@ -179,7 +170,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
         { field: "style_id", label: "Style" },
         { field: "yeast_id", label: "Yeast" },
         { field: "water_profile_id", label: "Water Profile" },
-        { field: "is_template", label: "Template" },
         { field: "is_active", label: "Active" },
       ],
     },
@@ -343,12 +333,18 @@ export const recipeEntity: EntityConfig<Recipe> = {
       },
     },
     {
-      name: "is_template",
-      label: "Template Recipe",
-      type: "switch",
-      description: "Template recipes can be cloned to create new recipes",
-      defaultValue: false,
+      name: "pricing_tier_id",
+      label: "Pricing Tier",
+      type: "select",
+      placeholder: "Select pricing tier...",
+      description: "Auto-suggested from COGS thresholds or set manually",
       colSpan: 6,
+      dynamicOptions: {
+        table: "pricing_tiers",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "cogs_max",
+      },
     },
     {
       name: "is_active",
@@ -497,6 +493,15 @@ export const recipeEntity: EntityConfig<Recipe> = {
       type: "button",
       // Available for all recipes - custom handler needed
     },
+    {
+      name: "delete",
+      label: "Delete Recipe",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      disabledWhen: (data) =>
+        data.batch_count ? `Has ${data.batch_count} associated batch${data.batch_count === 1 ? "" : "es"}` : false,
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -511,5 +516,5 @@ export const recipeEntity: EntityConfig<Recipe> = {
     "Show grain bill for recipe X",
   ],
 
-  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_template", "is_active", "status"],
+  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_active", "status"],
 };

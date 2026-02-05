@@ -150,7 +150,13 @@ export const settingsKeys = {
   enums: () => ["settings", "enums"] as const,
   enumValues: (enumType: string) => ["settings", "enums", enumType] as const,
   systemSettings: () => ["system-settings"] as const,
-  pricingStats: () => ["pricing-stats"] as const,
+  pricingChannels: () => ["pricing-channels"] as const,
+  pricingMatrix: (channelId?: string) =>
+    channelId
+      ? (["pricing-matrix", channelId] as const)
+      : (["pricing-matrix"] as const),
+  pricingTiers: () => ["pricing-tiers"] as const,
+  pricingFormats: () => ["pricing-formats"] as const,
   notificationPreferences: () => ["notification-preferences"] as const,
 };
 
@@ -364,6 +370,8 @@ export const kegKeys = {
     customerId
       ? (["customer_keg_balances", customerId] as const)
       : (["customer_keg_balances"] as const),
+  ownerDeposits: (ownerId: string) =>
+    ["keg_owner_deposits", ownerId] as const,
 };
 
 // =============================================================================
@@ -391,6 +399,14 @@ export const sessionLineItemKeys = {
 export const packagingKeys = {
   batchesForBrand: (brandId: string) =>
     ["packaging", "batches-for-brand", brandId] as const,
+};
+
+// =============================================================================
+// Packaging Format Keys (union of package_types + keg_types)
+// =============================================================================
+
+export const packagingFormatKeys = {
+  all: () => ["packaging-formats"] as const,
 };
 
 // =============================================================================

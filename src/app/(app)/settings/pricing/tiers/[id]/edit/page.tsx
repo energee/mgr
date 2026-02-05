@@ -2,13 +2,13 @@
 
 import { use } from "react";
 import { EntityForm } from "@/components/universal/entity-form";
-import { priceTierEntity } from "@/entities/price-tier";
+import { pricingTierEntity } from "@/entities/pricing-tier";
 
-export default function EditPriceTierPage({
+export default function EditPricingTierPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityForm entity={priceTierEntity} id={id} basePath="/settings/pricing/tiers" />;
+  return <EntityForm entity={pricingTierEntity} id={id} basePath="/settings/pricing/tiers" />;
 }

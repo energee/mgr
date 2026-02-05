@@ -26,6 +26,7 @@ import {
   brewLogKeys,
   sessionLineItemKeys,
   vesselKeys,
+  packagingFormatKeys,
 } from "../query-keys";
 
 // =============================================================================
@@ -373,9 +374,9 @@ describe("Key factory consistency", () => {
     expect(userKeys.full()).toEqual(["user", "preferences", "full"]);
   });
 
-  it("settingsKeys systemSettings/pricingStats/notificationPreferences", () => {
+  it("settingsKeys systemSettings/pricingChannels/notificationPreferences", () => {
     expect(settingsKeys.systemSettings()).toEqual(["system-settings"]);
-    expect(settingsKeys.pricingStats()).toEqual(["pricing-stats"]);
+    expect(settingsKeys.pricingChannels()).toEqual(["pricing-channels"]);
     expect(settingsKeys.notificationPreferences()).toEqual([
       "notification-preferences",
     ]);
@@ -457,6 +458,13 @@ describe("kegKeys", () => {
       "c1",
     ]);
   });
+
+  it("ownerDeposits() returns key with ownerId", () => {
+    expect(kegKeys.ownerDeposits("ko1")).toEqual([
+      "keg_owner_deposits",
+      "ko1",
+    ]);
+  });
 });
 
 // =============================================================================
@@ -502,5 +510,15 @@ describe("vesselKeys", () => {
 
   it("transfers() returns ['vessel_transfers']", () => {
     expect(vesselKeys.transfers()).toEqual(["vessel_transfers"]);
+  });
+});
+
+// =============================================================================
+// packagingFormatKeys
+// =============================================================================
+
+describe("packagingFormatKeys", () => {
+  it("all() returns ['packaging-formats']", () => {
+    expect(packagingFormatKeys.all()).toEqual(["packaging-formats"]);
   });
 });

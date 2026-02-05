@@ -8,7 +8,7 @@
  * Supports dynamicOptions for select fields that fetch from database tables.
  */
 
-import { useState, useMemo, useRef, useEffect, type FormEvent } from "react";
+import { useState, useMemo, useRef, useEffect, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
@@ -164,6 +164,8 @@ interface EntityFormProps<T = Record<string, unknown>> {
   defaultValues?: Partial<T>;
   /** Callback on successful save */
   onSuccess?: (data: T) => void;
+  /** Render prop for additional content below the form fields (edit mode only) */
+  children?: (context: { id: string; isSubmitting: boolean }) => ReactNode;
 }
 
 export function EntityForm<T = Record<string, unknown>>({
@@ -173,6 +175,7 @@ export function EntityForm<T = Record<string, unknown>>({
   cancelUrl,
   defaultValues,
   onSuccess,
+  children,
 }: EntityFormProps<T>) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -475,6 +478,8 @@ export function EntityForm<T = Record<string, unknown>>({
             </div>
           </CardContent>
         </Card>
+
+        {isEdit && id && children && children({ id, isSubmitting })}
 
         {/* Actions */}
         <div className="flex justify-end gap-2 mt-4">

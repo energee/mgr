@@ -1,12 +1,5 @@
 "use client";
 
-/**
- * Keyboard Shortcuts Dialog
- *
- * Shows all available keyboard shortcuts in a clean table layout.
- * Triggered by pressing "?" anywhere in the app.
- */
-
 import {
   Dialog,
   DialogContent,
@@ -14,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
 
 interface KeyboardShortcutsDialogProps {
   open: boolean;
@@ -23,9 +17,9 @@ interface KeyboardShortcutsDialogProps {
 const shortcuts = [
   { key: "?", description: "Show this help dialog" },
   { key: "/", description: "Focus search input" },
-  { key: "n", description: "Create new (on list pages)" },
+  { key: "N", description: "Create new (on list pages)" },
   { key: "e", description: "Edit (on detail pages)" },
-  { key: "⌫", description: "Go back (on detail pages)" },
+  { key: "\u232B", description: "Go back (on detail pages)" },
   { key: "Esc", description: "Cancel / close dialog" },
 ];
 
@@ -48,9 +42,7 @@ export function KeyboardShortcutsDialog({
               {shortcuts.map((shortcut) => (
                 <tr key={shortcut.key} className="border-b last:border-0">
                   <td className="py-2.5 pr-4">
-                    <kbd className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded border bg-muted text-xs font-mono font-medium">
-                      {shortcut.key}
-                    </kbd>
+                    <Kbd>{shortcut.key}</Kbd>
                   </td>
                   <td className="py-2.5 text-muted-foreground">
                     {shortcut.description}

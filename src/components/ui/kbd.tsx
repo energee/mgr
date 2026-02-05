@@ -9,6 +9,7 @@ function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
         "[&_svg:not([class*='size-'])]:size-3",
         "[[data-slot=tooltip-content]_&]:bg-background/20 [[data-slot=tooltip-content]_&]:text-background dark:[[data-slot=tooltip-content]_&]:bg-background/10",
         "[[data-slot=button]_&]:bg-primary-foreground/20 [[data-slot=button]_&]:text-primary-foreground",
+        "[[data-slot=button]:is([data-variant=ghost],[data-variant=outline])_&]:bg-foreground/10 [[data-slot=button]:is([data-variant=ghost],[data-variant=outline])_&]:text-foreground/50",
         className
       )}
       {...props}
@@ -18,7 +19,7 @@ function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
 
 function KbdGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <kbd
+    <div
       data-slot="kbd-group"
       className={cn("inline-flex items-center gap-1", className)}
       {...props}

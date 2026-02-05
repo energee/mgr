@@ -10,11 +10,10 @@
  * that are out of scope for the initial implementation.
  */
 
-import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ExternalLink, MessageSquare, CreditCard, Calculator, Settings } from "lucide-react";
+import { ExternalLink, MessageSquare, CreditCard, Calculator } from "lucide-react";
 
 const integrations = [
   {
@@ -72,22 +71,11 @@ function getStatusBadge(status: "connected" | "coming_soon" | "disconnected") {
 export default function IntegrationsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/settings">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Settings className="h-6 w-6" />
-            Integrations
-          </h1>
-          <p className="text-muted-foreground">
-            Connect external services to extend your brewery management
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">Integrations</h1>
+        <p className="text-muted-foreground">
+          Connect external services to extend your brewery management
+        </p>
       </div>
 
       {/* Info Banner */}

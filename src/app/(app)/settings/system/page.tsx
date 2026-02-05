@@ -11,7 +11,6 @@
  */
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -31,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Bot, Building2, Calculator, Calendar, Check, FileText, Save } from "lucide-react";
+import { Bot, Building2, Calculator, Calendar, Check, FileText, Save } from "lucide-react";
 
 // =============================================================================
 // Schema
@@ -399,22 +398,11 @@ export default function SystemSettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/settings">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Building2 className="h-6 w-6" />
-            System Settings
-          </h1>
-          <p className="text-muted-foreground">
-            Configure brewery-wide settings
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">System Settings</h1>
+        <p className="text-muted-foreground">
+          Configure brewery-wide settings
+        </p>
       </div>
 
       {isLoading ? (

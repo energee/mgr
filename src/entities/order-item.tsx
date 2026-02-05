@@ -19,7 +19,9 @@ export const orderItemSchema = z.object({
   order_id: z.string().uuid("Order is required"),
   brand_id: z.string().uuid().nullable().optional(),
   package_type_id: z.string().uuid().nullable().optional(),
+  keg_type_id: z.string().uuid().nullable().optional(),
   batch_id: z.string().uuid().nullable().optional(),
+  keg_owner_id: z.string().uuid().nullable().optional(),
   style_id: z.string().uuid().nullable().optional(),
   tbd_notes: z.string().nullable().optional(),
   quantity: z.coerce.number().int().positive("Quantity must be at least 1"),
@@ -82,6 +84,14 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       },
     },
     {
+      accessorKey: "keg_type_id",
+      header: "Keg Type",
+      relation: {
+        entity: "keg_type",
+        displayField: "name",
+      },
+    },
+    {
       accessorKey: "quantity",
       header: "Qty",
       sortable: true,
@@ -116,9 +126,11 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
         { field: "style_id", label: "Style (TBD)" },
         { field: "tbd_notes", label: "TBD Notes" },
         { field: "package_type_id", label: "Package Type" },
+        { field: "keg_type_id", label: "Keg Type" },
         { field: "quantity", label: "Quantity" },
         { field: "unit_price", label: "Unit Price", format: "currency" },
         { field: "batch_id", label: "Batch" },
+        { field: "keg_owner_id", label: "Keg Owner" },
         { field: "notes", label: "Notes" },
       ],
     },
@@ -176,6 +188,14 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       colSpan: 6,
     },
     {
+      name: "keg_type_id",
+      label: "Keg Type",
+      type: "relation",
+      relation: { entity: "keg_type", displayField: "name" },
+      required: false,
+      colSpan: 6,
+    },
+    {
       name: "quantity",
       label: "Quantity",
       type: "number",
@@ -195,6 +215,15 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       type: "relation",
       relation: { entity: "batch", displayField: "batch_number" },
       required: false,
+      colSpan: 4,
+    },
+    {
+      name: "keg_owner_id",
+      label: "Keg Owner (optional)",
+      type: "relation",
+      relation: { entity: "keg_owner", displayField: "name" },
+      required: false,
+      description: "Fleet owner for keg orders (picker uses this to select kegs)",
       colSpan: 4,
     },
     {
@@ -234,5 +263,5 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
     "Find items for IPA brand",
   ],
 
-  keyFields: ["order_id", "brand_id", "style_id", "package_type_id", "quantity", "unit_price"],
+  keyFields: ["order_id", "brand_id", "style_id", "package_type_id", "keg_type_id", "quantity", "unit_price", "keg_owner_id"],
 };

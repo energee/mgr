@@ -10,6 +10,9 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import { KEG_STATES, type KegState } from "./keg-inventory";
 
+// Derive the keg state enum values from KEG_STATES (single source of truth)
+const KEG_STATE_VALUES = KEG_STATES.map((s) => s.value) as [KegState, ...KegState[]];
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -30,13 +33,15 @@ interface KegTransaction {
   keg_type_id: string;
   quantity: number;
   from_state: KegState | null;
-  to_state: KegState;
-  location_id: string | null;
+  to_state: KegState | null;
+  from_location_id: string | null;
+  to_location_id: string | null;
   order_id: string | null;
   customer_id: string | null;
   packaging_session_id: string | null;
   batch_id: string | null;
   finished_good_id: string | null;
+  keg_owner_id: string | null;
   notes: string | null;
   created_by_name: string | null;
   created_at: string | null;
@@ -44,11 +49,13 @@ interface KegTransaction {
   keg_type_name?: string;
   keg_type_code?: string;
   volume_bbl?: number;
+  keg_owner_name?: string;
   customer_name?: string;
   order_number?: string;
   batch_number?: string;
   finished_good_name?: string;
-  location_name?: string;
+  from_location_name?: string;
+  to_location_name?: string;
 }
 
 // =============================================================================
@@ -136,21 +143,12 @@ export const kegTransactionSchema = z.object({
     "maintain",
   ]),
   keg_type_id: z.string().uuid("Select a keg type"),
+  keg_owner_id: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().int().positive("Quantity must be at least 1"),
-  from_state: z
-    .enum(["empty", "filled", "shipped", "returned_dirty", "cleaning", "maintenance", "retired"])
-    .nullable()
-    .optional(),
-  to_state: z.enum([
-    "empty",
-    "filled",
-    "shipped",
-    "returned_dirty",
-    "cleaning",
-    "maintenance",
-    "retired",
-  ]),
-  location_id: z.string().uuid().nullable().optional(),
+  from_state: z.enum(KEG_STATE_VALUES).nullable().optional(),
+  to_state: z.enum(KEG_STATE_VALUES).nullable().optional(),
+  from_location_id: z.string().uuid().nullable().optional(),
+  to_location_id: z.string().uuid().nullable().optional(),
   order_id: z.string().uuid().nullable().optional(),
   customer_id: z.string().uuid().nullable().optional(),
   packaging_session_id: z.string().uuid().nullable().optional(),
@@ -214,6 +212,12 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
       sortable: true,
     },
     {
+      accessorKey: "keg_owner_name",
+      header: "Owner",
+      sortable: true,
+      render: (value: unknown) => (value ? String(value) : "—"),
+    },
+    {
       accessorKey: "quantity",
       header: "Qty",
       sortable: true,
@@ -233,6 +237,7 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
       header: "To",
       sortable: false,
       render: (value: unknown) => {
+        if (!value) return "—";
         const state = KEG_STATES.find((s) => s.value === value);
         return state?.label || String(value);
       },
@@ -272,10 +277,12 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
       fields: [
         { field: "transaction_type", label: "Type" },
         { field: "keg_type_name", label: "Keg Type" },
+        { field: "keg_owner_name", label: "Keg Owner" },
         { field: "quantity", label: "Quantity" },
         { field: "from_state", label: "From State" },
         { field: "to_state", label: "To State" },
-        { field: "location_name", label: "Location" },
+        { field: "from_location_name", label: "From Location" },
+        { field: "to_location_name", label: "To Location" },
       ],
     },
     {
@@ -325,6 +332,14 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
       colSpan: 6,
     },
     {
+      name: "keg_owner_id",
+      label: "Keg Owner",
+      type: "relation",
+      relation: { entity: "keg_owner", displayField: "name" },
+      description: "Fleet provider (e.g., Owned, Microstar, KegFleet)",
+      colSpan: 6,
+    },
+    {
       name: "quantity",
       label: "Quantity",
       type: "number",
@@ -341,18 +356,30 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
         ...KEG_STATES.map((s) => ({ value: s.value, label: s.label })),
       ],
       colSpan: 4,
+      // Only show for types where the user needs to choose (maintain, retire, adjust)
+      showWhen: (values: Partial<KegTransaction>) =>
+        ["maintain", "retire", "adjust"].includes(values.transaction_type || ""),
     },
     {
       name: "to_state",
       label: "To State",
       type: "select",
       options: KEG_STATES.map((s) => ({ value: s.value, label: s.label })),
-      required: true,
       colSpan: 4,
+      // Only show for adjust (all other types have a fixed to_state)
+      showWhen: (values: Partial<KegTransaction>) =>
+        values.transaction_type === "adjust",
     },
     {
-      name: "location_id",
-      label: "Location",
+      name: "from_location_id",
+      label: "From Location",
+      type: "relation",
+      relation: { entity: "location", displayField: "name" },
+      colSpan: 6,
+    },
+    {
+      name: "to_location_id",
+      label: "To Location",
       type: "relation",
       relation: { entity: "location", displayField: "name" },
       colSpan: 6,
@@ -385,7 +412,7 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
       name: "finished_good_id",
       label: "Finished Good",
       type: "relation",
-      relation: { entity: "finished_good", displayField: "name" },
+      relation: { entity: "finished_good", displayField: "lot_number" },
       description: "Required for fill transactions",
       colSpan: 6,
     },
@@ -408,5 +435,5 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
     "Show fill transactions for batch Y",
   ],
 
-  keyFields: ["transaction_type", "keg_type_id", "quantity", "from_state", "to_state", "created_at"],
+  keyFields: ["transaction_type", "keg_type_id", "keg_owner_id", "quantity", "from_state", "to_state", "created_at"],
 };

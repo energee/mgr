@@ -30,6 +30,10 @@ import { HardDriveDownloadIcon } from "@/components/ui/hard-drive-download";
 import { BellIcon } from "@/components/ui/bell";
 import { UserIcon as AnimatedUserIconBase } from "@/components/ui/user";
 import { LogOutIcon } from "@/components/ui/log-out";
+import { EyeIcon } from "@/components/ui/eye";
+import { SquarePenIcon } from "@/components/ui/square-pen";
+import { DeleteIcon } from "@/components/ui/delete";
+import { CopyIcon } from "@/components/ui/copy";
 
 export interface AnimatedIconHandle {
   startAnimation: () => void;
@@ -94,3 +98,7 @@ export const AnimatedBell = wrap(BellIcon);
 export const AnimatedUser = wrap(AnimatedUserIconBase);
 export const AnimatedLogOut = wrap(LogOutIcon);
 export const AnimatedArrowLeft = wrap(ArrowLeftIcon);
+export const AnimatedEye = wrap(EyeIcon);
+export const AnimatedSquarePen = wrap(SquarePenIcon);
+export const AnimatedDelete = wrap(DeleteIcon);
+export const AnimatedCopy = wrap(CopyIcon);

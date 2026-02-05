@@ -1,12 +1,11 @@
 "use client";
 
 /**
- * RecipeCloneDialog - Clone a recipe or template
+ * RecipeCloneDialog - Clone a recipe
  *
  * Creates a copy of an existing recipe, optionally:
  * - Changing the name
  * - Linking to a different brand
- * - Setting as non-template if cloning from a template
  */
 
 import { useForm } from "react-hook-form";
@@ -51,7 +50,6 @@ type CloneFormValues = z.infer<typeof cloneSchema>;
 interface RecipeCloneDialogProps {
   recipeId: string;
   recipeName: string;
-  isTemplate?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (newRecipeId: string) => void;
@@ -64,7 +62,6 @@ interface RecipeCloneDialogProps {
 export function RecipeCloneDialog({
   recipeId,
   recipeName,
-  isTemplate = false,
   open,
   onOpenChange,
   onSuccess,
@@ -103,7 +100,7 @@ export function RecipeCloneDialog({
         ...recipeData,
         name: values.name,
         brand_id: values.brand_id || recipeData.brand_id,
-        is_template: false, // Cloned recipes are not templates
+        is_template: false,
       };
 
       const { data: cloned, error: cloneError } = await supabase
@@ -191,11 +188,10 @@ export function RecipeCloneDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Copy className="h-5 w-5" />
-            Clone {isTemplate ? "Template" : "Recipe"}
+            Clone Recipe
           </DialogTitle>
           <DialogDescription>
             Create a copy of &quot;{recipeName}&quot; with a new name.
-            {isTemplate && " The cloned recipe will not be a template."}
           </DialogDescription>
         </DialogHeader>
 
