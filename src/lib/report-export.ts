@@ -245,14 +245,6 @@ export function exportBatchDetailsToCSV(
 // =============================================================================
 
 /**
- * Open a print-friendly version of the current page
- * User can then use browser's "Save as PDF" functionality
- */
-export function openPrintView(): void {
-  window.print();
-}
-
-/**
  * Generate print-friendly HTML for TTB report
  */
 export function generateTTBPrintHTML(
