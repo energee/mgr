@@ -20,6 +20,7 @@ import {
   toCanonicalValue,
   getUnitOptions,
   getUnitLabel,
+  getNextUnit,
 } from "../units";
 
 // =============================================================================
@@ -428,6 +429,35 @@ describe("Utility Functions", () => {
 
     it("returns raw string for unknown unit", () => {
       expect(getUnitLabel("unknown")).toBe("unknown");
+    });
+  });
+
+  describe("getNextUnit", () => {
+    it("cycles volume units", () => {
+      expect(getNextUnit("volume", "bbl")).toBe("gal");
+      expect(getNextUnit("volume", "gal")).toBe("l");
+      expect(getNextUnit("volume", "l")).toBe("hl");
+      expect(getNextUnit("volume", "hl")).toBe("bbl");
+    });
+
+    it("cycles weight units", () => {
+      expect(getNextUnit("weight", "lbs")).toBe("kg");
+      expect(getNextUnit("weight", "kg")).toBe("lbs");
+    });
+
+    it("cycles temperature units", () => {
+      expect(getNextUnit("temperature", "f")).toBe("c");
+      expect(getNextUnit("temperature", "c")).toBe("f");
+    });
+
+    it("cycles gravity units", () => {
+      expect(getNextUnit("gravity", "plato")).toBe("sg");
+      expect(getNextUnit("gravity", "sg")).toBe("plato");
+    });
+
+    it("cycles retail_volume units", () => {
+      expect(getNextUnit("retail_volume", "oz")).toBe("ml");
+      expect(getNextUnit("retail_volume", "ml")).toBe("oz");
     });
   });
 });

@@ -23,6 +23,7 @@ import { useUnitPreferences } from "@/hooks/useUnitPreferences";
 import {
   getUnitOptions,
   getUnitLabel,
+  getNextUnit,
   toDisplayValue,
   toCanonicalValue,
   type UnitType,
@@ -205,6 +206,7 @@ function getDefaultUnit(unitType: UnitType): AnyUnit {
 // =============================================================================
 
 interface UnitDisplayProps {
+  /** Canonical value (BBL, lbs, °F, Plato, oz) — always convert from this, never from displayed value */
   value: number | null | undefined;
   unitType: UnitType;
   decimals?: number;
@@ -213,6 +215,8 @@ interface UnitDisplayProps {
 
 /**
  * Display a value with unit conversion (read-only).
+ * Click the unit label to cycle through available units.
+ * Conversion always happens from the canonical `value` prop to prevent rounding drift.
  */
 export function UnitDisplay({
   value,
@@ -221,17 +225,35 @@ export function UnitDisplay({
   className,
 }: UnitDisplayProps) {
   const { data: prefs } = useUnitPreferences();
+  const [localUnit, setLocalUnit] = React.useState<AnyUnit | null>(null);
 
   if (value == null) return <span className={className}>—</span>;
 
   const preferenceKey = getPreferenceKey(unitType);
   const prefValue = prefs?.[preferenceKey];
-  const displayUnit: AnyUnit = (prefValue as AnyUnit | undefined) ?? getDefaultUnit(unitType);
+  const preferredUnit: AnyUnit =
+    (prefValue as AnyUnit | undefined) ?? getDefaultUnit(unitType);
+  const displayUnit = localUnit ?? preferredUnit;
+  // Always convert from canonical value — never from a previously displayed value
   const displayValue = toDisplayValue(value, unitType, displayUnit);
+
+  const cycleUnit = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't trigger row click in tables
+    const next = getNextUnit(unitType, displayUnit);
+    setLocalUnit(next as AnyUnit);
+  };
 
   return (
     <span className={className}>
-      {displayValue.toFixed(decimals)} {getUnitLabel(displayUnit)}
+      {displayValue.toFixed(decimals)}{" "}
+      <button
+        type="button"
+        onClick={cycleUnit}
+        className="cursor-pointer text-muted-foreground underline-offset-2 decoration-dotted hover:underline hover:text-foreground transition-colors"
+        title={`Click to cycle units (${getUnitOptions(unitType).map(getUnitLabel).join(" → ")})`}
+      >
+        {getUnitLabel(displayUnit)}
+      </button>
     </span>
   );
 }
