@@ -12,7 +12,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,16 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Check, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   useUnitPreferences,
   useUpdateUnitPreferences,
 } from "@/hooks/useUnitPreferences";
-import { userKeys } from "@/lib/query-keys";
-
 // =============================================================================
 // Schema
 // =============================================================================
@@ -77,117 +73,6 @@ const RETAIL_VOLUME_OPTIONS = [
   { value: "oz", label: "Fluid Ounces (oz)" },
   { value: "ml", label: "Milliliters (mL)" },
 ];
-
-// =============================================================================
-// API Key Section (separate from unit preferences)
-// =============================================================================
-
-function ApiKeySection() {
-  const queryClient = useQueryClient();
-  const [apiKey, setApiKey] = useState("");
-  const [hasExistingKey, setHasExistingKey] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/settings/api-key?scope=user")
-      .then((res) => res.json())
-      .then((data) => {
-        setHasExistingKey(data.hasKey === true);
-        setLoaded(true);
-      })
-      .catch(() => setLoaded(true));
-  }, []);
-
-  const saveKey = useMutation({
-    mutationFn: async (key: string) => {
-      const res = await fetch("/api/settings/api-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope: "user", key }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save");
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userKeys.preferences() });
-      setHasExistingKey(!!apiKey);
-      setApiKey("");
-      toast.success(apiKey ? "API key saved" : "API key removed");
-    },
-    onError: () => {
-      toast.error("Failed to save API key");
-    },
-  });
-
-  if (!loaded) return null;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>AI Assistant</CardTitle>
-        <CardDescription>
-          Set your personal API key for the AI brewery assistant.
-          This overrides the global key set in System Settings.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {hasExistingKey && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Check className="h-4 w-4 text-green-600" />
-            Personal API key is configured
-          </div>
-        )}
-        <div className="grid gap-2">
-          <Label htmlFor="anthropic_api_key">
-            {hasExistingKey ? "Replace API Key" : "Anthropic API Key"}
-          </Label>
-          <div className="flex gap-2">
-            <Input
-              id="anthropic_api_key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-ant-..."
-              autoComplete="off"
-            />
-            <Button
-              type="button"
-              onClick={() => saveKey.mutate(apiKey)}
-              disabled={!apiKey || saveKey.isPending}
-            >
-              {saveKey.isPending ? "Saving..." : "Save"}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Optional. Get your key from{" "}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              console.anthropic.com
-            </a>
-            . Leave blank to use the brewery&apos;s global key.
-          </p>
-        </div>
-        {hasExistingKey && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => saveKey.mutate("")}
-            disabled={saveKey.isPending}
-          >
-            Remove personal key
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 // =============================================================================
 // Component
@@ -406,8 +291,6 @@ export default function BrewerySettingsPage() {
         </form>
       )}
 
-      {/* API Key — separate from the unit preferences form */}
-      <ApiKeySection />
     </div>
   );
 }
