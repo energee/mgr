@@ -10,7 +10,7 @@
  * - Real-time updates
  */
 
-import { use, useState } from "react";
+import { use, useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { BatchReadingForm } from "@/components/domain/batch-reading-form";
@@ -31,6 +31,7 @@ import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domai
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
 import { batchKeys } from "@/lib/query-keys";
+import { usePrefillStore } from "@/stores/prefill-store";
 
 interface BatchLog {
   id: string;
@@ -50,6 +51,18 @@ export default function BatchReadingsPage({
   const supabase = createClient();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+
+  const consumed = useRef(false);
+  const consume = usePrefillStore((s) => s.consume);
+
+  useEffect(() => {
+    if (consumed.current) return;
+    consumed.current = true;
+    const { prefillData } = consume();
+    if (prefillData) {
+      setShowForm(true);
+    }
+  }, [consume]);
 
   // Fetch batch details
   const { data: batch, isLoading: batchLoading } = useQuery({
