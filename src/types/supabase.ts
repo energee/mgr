@@ -268,6 +268,104 @@ export type Database = {
           },
         ]
       }
+      batch_additions: {
+        Row: {
+          addition_type: string
+          amount: number
+          batch_id: string
+          catalog_id: string | null
+          catalog_table: string | null
+          created_at: string
+          date_added: string | null
+          days: number | null
+          id: string
+          name: string
+          notes: string | null
+          timing: string | null
+          unit: string
+        }
+        Insert: {
+          addition_type: string
+          amount: number
+          batch_id: string
+          catalog_id?: string | null
+          catalog_table?: string | null
+          created_at?: string
+          date_added?: string | null
+          days?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          timing?: string | null
+          unit: string
+        }
+        Update: {
+          addition_type?: string
+          amount?: number
+          batch_id?: string
+          catalog_id?: string | null
+          catalog_table?: string | null
+          created_at?: string
+          date_added?: string | null
+          days?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          timing?: string | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+        ]
+      }
       batch_blends: {
         Row: {
           blend_batch_id: string
@@ -497,6 +595,7 @@ export type Database = {
           notes: string | null
           planned_start_date: string | null
           recipe_id: string | null
+          recipe_variant_id: string | null
           status: string
           target_package_date: string | null
           updated_at: string | null
@@ -521,6 +620,7 @@ export type Database = {
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
+          recipe_variant_id?: string | null
           status?: string
           target_package_date?: string | null
           updated_at?: string | null
@@ -545,6 +645,7 @@ export type Database = {
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
+          recipe_variant_id?: string | null
           status?: string
           target_package_date?: string | null
           updated_at?: string | null
@@ -577,6 +678,20 @@ export type Database = {
             columns: ["recipe_id"]
             isOneToOne: false
             referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants_with_costs"
             referencedColumns: ["id"]
           },
         ]
@@ -3717,6 +3832,291 @@ export type Database = {
           },
         ]
       }
+      recipe_variant_adjuncts: {
+        Row: {
+          adjunct_id: string
+          amount: number
+          created_at: string
+          id: string
+          position: number
+          recipe_variant_id: string
+          timing: string | null
+          unit: string
+        }
+        Insert: {
+          adjunct_id: string
+          amount: number
+          created_at?: string
+          id?: string
+          position?: number
+          recipe_variant_id: string
+          timing?: string | null
+          unit: string
+        }
+        Update: {
+          adjunct_id?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          position?: number
+          recipe_variant_id?: string
+          timing?: string | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_variant_adjuncts_adjunct_id_fkey"
+            columns: ["adjunct_id"]
+            isOneToOne: false
+            referencedRelation: "adjuncts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variant_adjuncts_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variant_adjuncts_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants_with_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_variant_fruits: {
+        Row: {
+          amount: number
+          created_at: string
+          fruit_id: string
+          id: string
+          position: number
+          recipe_variant_id: string
+          timing: string | null
+          unit: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          fruit_id: string
+          id?: string
+          position?: number
+          recipe_variant_id: string
+          timing?: string | null
+          unit: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          fruit_id?: string
+          id?: string
+          position?: number
+          recipe_variant_id?: string
+          timing?: string | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_variant_fruits_fruit_id_fkey"
+            columns: ["fruit_id"]
+            isOneToOne: false
+            referencedRelation: "fruits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variant_fruits_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variant_fruits_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants_with_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_variant_hops: {
+        Row: {
+          created_at: string
+          days: number | null
+          hop_id: string
+          id: string
+          position: number
+          recipe_variant_id: string
+          timing: string
+          weight_oz: number
+        }
+        Insert: {
+          created_at?: string
+          days?: number | null
+          hop_id: string
+          id?: string
+          position?: number
+          recipe_variant_id: string
+          timing?: string
+          weight_oz: number
+        }
+        Update: {
+          created_at?: string
+          days?: number | null
+          hop_id?: string
+          id?: string
+          position?: number
+          recipe_variant_id?: string
+          timing?: string
+          weight_oz?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_variant_hops_hop_id_fkey"
+            columns: ["hop_id"]
+            isOneToOne: false
+            referencedRelation: "hops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variant_hops_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variant_hops_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants_with_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_variant_spices: {
+        Row: {
+          amount: number
+          boil_time_min: number | null
+          created_at: string
+          id: string
+          position: number
+          recipe_variant_id: string
+          spice_id: string
+          timing: string | null
+          unit: string
+        }
+        Insert: {
+          amount: number
+          boil_time_min?: number | null
+          created_at?: string
+          id?: string
+          position?: number
+          recipe_variant_id: string
+          spice_id: string
+          timing?: string | null
+          unit: string
+        }
+        Update: {
+          amount?: number
+          boil_time_min?: number | null
+          created_at?: string
+          id?: string
+          position?: number
+          recipe_variant_id?: string
+          spice_id?: string
+          timing?: string | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_variant_spices_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variant_spices_recipe_variant_id_fkey"
+            columns: ["recipe_variant_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_variants_with_costs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variant_spices_spice_id_fkey"
+            columns: ["spice_id"]
+            isOneToOne: false
+            referencedRelation: "spices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_variants: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          planned_volume_bbl: number | null
+          position: number
+          recipe_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          planned_volume_bbl?: number | null
+          position?: number
+          recipe_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          planned_volume_bbl?: number | null
+          position?: number
+          recipe_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_variants_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_variants_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variants_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_cogs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variants_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_yeasts: {
         Row: {
           created_at: string | null
@@ -5164,6 +5564,107 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      batch_additions_with_costs: {
+        Row: {
+          addition_type: string | null
+          amount: number | null
+          batch_id: string | null
+          catalog_id: string | null
+          catalog_table: string | null
+          created_at: string | null
+          date_added: string | null
+          days: number | null
+          estimated_cost: number | null
+          id: string | null
+          name: string | null
+          notes: string | null
+          timing: string | null
+          unit: string | null
+        }
+        Insert: {
+          addition_type?: string | null
+          amount?: number | null
+          batch_id?: string | null
+          catalog_id?: string | null
+          catalog_table?: string | null
+          created_at?: string | null
+          date_added?: string | null
+          days?: number | null
+          estimated_cost?: never
+          id?: string | null
+          name?: string | null
+          notes?: string | null
+          timing?: string | null
+          unit?: string | null
+        }
+        Update: {
+          addition_type?: string | null
+          amount?: number | null
+          batch_id?: string | null
+          catalog_id?: string | null
+          catalog_table?: string | null
+          created_at?: string | null
+          date_added?: string | null
+          days?: number | null
+          estimated_cost?: never
+          id?: string | null
+          name?: string | null
+          notes?: string | null
+          timing?: string | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
           },
         ]
       }
@@ -7105,6 +7606,52 @@ export type Database = {
           unit: string | null
         }
         Relationships: []
+      }
+      recipe_variants_with_costs: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          est_cost_per_bbl: number | null
+          est_total_cost: number | null
+          hot_side_cost_per_bbl: number | null
+          id: string | null
+          name: string | null
+          planned_volume_bbl: number | null
+          position: number | null
+          recipe_id: string | null
+          updated_at: string | null
+          variant_addition_cost: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_variants_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["recipe_id"]
+          },
+          {
+            foreignKeyName: "recipe_variants_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variants_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_cogs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_variants_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes_with_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recipes_with_cogs: {
         Row: {
