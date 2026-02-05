@@ -15,10 +15,10 @@ import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
-import type { EntityConfig, EntitySectionDef, EntityRelationDef, EntityFieldDisplay } from "@/types/entity";
-import { getStateLabel } from "@/types/entity";
+import type { EntityConfig, EntitySectionDef, EntityRelationDef, EntityFieldDisplay, UnifiedFieldDef } from "@/types/entity";
 import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
+import { FieldDisplay } from "./field-display";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
@@ -492,33 +492,28 @@ function SectionCard<T>({
         <CardTitle>{section.title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-2 gap-4">
+        <dl className="grid grid-cols-12 gap-4">
           {section.fields?.map((field) => {
+            // Adapt EntityFieldDisplay (uses `field`) to UnifiedFieldDef (uses `name`)
+            const unifiedField: UnifiedFieldDef<T> = {
+              name: field.field,
+              label: field.label,
+              format: field.format,
+              unitType: field.unitType,
+              relation: field.relation,
+              render: field.render,
+              fullWidth: field.fullWidth,
+            };
             const value = data[field.field as keyof T];
-            // Check if this field is the state field and format using entity config
-            const isStateField = entity.stateMachine?.stateField === field.field;
-            let displayValue;
-            if (field.render) {
-              displayValue = field.render(value, data);
-            } else if (isStateField && typeof value === "string") {
-              displayValue = getStateLabel(entity, value);
-            } else if (field.relation && relationDisplayValues[field.field]) {
-              displayValue = relationDisplayValues[field.field];
-            } else if (field.format === "unit" && field.unitType) {
-              displayValue = <UnitDisplay value={value as number | null} unitType={field.unitType} />;
-            } else {
-              displayValue = formatValue(value, field.format);
-            }
             return (
-              <div
+              <FieldDisplay<T>
                 key={field.field}
-                className={field.fullWidth ? "col-span-2" : ""}
-              >
-                <dt className="text-sm font-medium text-muted-foreground">
-                  {field.label}
-                </dt>
-                <dd className="mt-1">{displayValue}</dd>
-              </div>
+                field={unifiedField}
+                value={value}
+                record={data}
+                entity={entity}
+                relationDisplayValues={relationDisplayValues}
+              />
             );
           })}
         </dl>
@@ -704,9 +699,9 @@ function EntityDetailSkeleton() {
           <Skeleton className="h-6 w-32" />
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-12 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i}>
+              <div key={i} className="col-span-6">
                 <Skeleton className="h-4 w-24 mb-2" />
                 <Skeleton className="h-5 w-32" />
               </div>

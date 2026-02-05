@@ -256,6 +256,94 @@ export const vesselEntity: EntityConfig<Vessel> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "name",
+          label: "Name",
+          type: "text",
+          placeholder: "e.g., FV-1, Brite-A",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "vessel_type",
+          label: "Type",
+          type: "select",
+          options: vesselTypeOptions,
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "capacity_bbl",
+          label: "Capacity",
+          type: "unit",
+          unitType: "volume",
+          format: "unit",
+          placeholder: "e.g., 7",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: statusOptions,
+          colSpan: 6,
+        },
+        {
+          name: "is_active",
+          label: "Active",
+          type: "switch",
+          defaultValue: true,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "current_batch",
+      title: "Current Batch",
+      component: VesselCurrentBatch,
+    },
+    {
+      id: "location",
+      title: "Location",
+      fields: [
+        {
+          name: "location_id",
+          label: "Location",
+          type: "relation",
+          relation: {
+            entity: "location",
+            displayField: "name",
+          },
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Any special notes about this vessel...",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: vesselSchema,

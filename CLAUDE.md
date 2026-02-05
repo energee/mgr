@@ -51,13 +51,17 @@ export const entityEntity: EntityConfig<EntityType> = {
   defaultSort: { column: "...", direction: "asc" | "desc" },
   searchableFields: [...],
 
-  // Detail View
+  // Detail/Edit View (unified)
   detailHeader: { title: "field", subtitle: "field", badge: "status_field" },
-  detailSections: [...],
+  sections: [
+    { id: "overview", title: "Overview", fields: [
+      { name: "field_name", label: "Label", type: "text", colSpan: 6 },
+      { name: "computed_field", label: "Computed", editable: false, format: "datetime" },
+    ]},
+  ],
 
-  // Form
+  // Form validation
   formSchema: zodSchema,
-  formFields: [...],
 
   // State Machine (if applicable)
   stateMachine: { stateField, states, transitions, stateDisplay },
@@ -78,9 +82,8 @@ All entity pages use universal components:
 ```
 /[domain]/[entity-plural]/
   page.tsx         -> <EntityList entity={config} />
-  new/page.tsx     -> <EntityForm entity={config} />
-  [id]/page.tsx    -> <EntityDetail entity={config} id={id} />
-  [id]/edit/page.tsx -> <EntityForm entity={config} id={id} />
+  new/page.tsx     -> <EntityDetailUnified entity={config} />  (create mode)
+  [id]/page.tsx    -> <EntityDetailUnified entity={config} id={id} />  (view + inline edit)
 ```
 
 ### Migration Naming
@@ -137,8 +140,9 @@ export const transferSchema = z.object({
 
 ### Universal Components (`src/components/universal/`)
 - `EntityList` - Renders any entity list from config
-- `EntityDetail` - Renders any entity detail from config
-- `EntityForm` - Renders any entity form from config
+- `EntityDetailUnified` - Renders entity detail with in-place edit toggle (replaces EntityDetail + EntityForm)
+- `EntityDetail` - Legacy detail view (deprecated, use EntityDetailUnified)
+- `EntityForm` - Legacy form (deprecated, use EntityDetailUnified)
 
 ### State Machines
 Stateful entities use universal state machine pattern. Transitions validated client + server.

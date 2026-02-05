@@ -4,7 +4,7 @@ import { use, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { RecipeCloneDialog } from "@/components/domain/recipe-clone-dialog";
 import { RecipeDeleteDialog } from "@/components/domain/recipe-delete-dialog";
 import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
@@ -68,7 +68,7 @@ export default function RecipeDetailPage({
 
   return (
     <>
-      <EntityDetail
+      <EntityDetailUnifiedWithErrorBoundary
         entity={recipeEntity}
         id={id}
         basePath="/production/recipes"

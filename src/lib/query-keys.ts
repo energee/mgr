@@ -32,6 +32,10 @@ export const entityKeys = {
   /** Timeline view for a table */
   timeline: (table: string, startDate: string) =>
     [table, "list", "timeline", startDate] as const,
+
+  /** Display values for relation fields (FK name resolution) */
+  relationDisplay: (queries: { table: string; id: string }[]) =>
+    ["relation-display", ...queries.map((q) => `${q.table}:${q.id}`)] as const,
 };
 
 // =============================================================================

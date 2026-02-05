@@ -115,6 +115,92 @@ export const kegTypeEntity: EntityConfig<KegType> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Keg Type Details",
+      fields: [
+        {
+          name: "name",
+          label: "Name",
+          type: "text",
+          placeholder: "e.g., 1/2 Barrel, 1/6 Barrel, 50 Liter",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "code",
+          label: "Code",
+          type: "text",
+          placeholder: "e.g., half, sixth, 50L",
+          required: true,
+          description: "Short code for identification",
+          colSpan: 6,
+        },
+        {
+          name: "volume_bbl",
+          label: "Volume",
+          type: "unit",
+          unitType: "volume",
+          format: "unit",
+          placeholder: "e.g., 0.5, 0.1667",
+          required: true,
+          description: "Volume in barrels for TTB reporting",
+          colSpan: 6,
+        },
+        {
+          name: "deposit_amount",
+          label: "Deposit",
+          type: "number",
+          format: "currency",
+          placeholder: "e.g., 30.00",
+          description: "Keg deposit charged to customers",
+          colSpan: 6,
+        },
+        {
+          name: "description",
+          label: "Description",
+          type: "textarea",
+          placeholder: "Optional notes about this keg type",
+          colSpan: 12,
+        },
+        {
+          name: "position",
+          label: "Display Order",
+          type: "number",
+          placeholder: "e.g., 1, 2, 3",
+          description: "Order in dropdown menus (lower numbers appear first)",
+          colSpan: 6,
+        },
+        {
+          name: "is_active",
+          label: "Active",
+          type: "switch",
+          description: "Inactive types won't appear in dropdown menus",
+          defaultValue: true,
+          colSpan: 6,
+        },
+        {
+          name: "created_at",
+          label: "Created",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "updated_at",
+          label: "Last Updated",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: kegTypeSchema,

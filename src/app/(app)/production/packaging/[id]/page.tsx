@@ -1,11 +1,7 @@
 "use client";
 
-/**
- * Packaging Session Detail Page
- */
-
 import { use } from "react";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { packagingSessionEntity } from "@/entities/packaging-session";
 
 export default function PackagingSessionDetailPage({
@@ -14,9 +10,8 @@ export default function PackagingSessionDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-
   return (
-    <EntityDetail
+    <EntityDetailUnifiedWithErrorBoundary
       entity={packagingSessionEntity}
       id={id}
       basePath="/production/packaging"

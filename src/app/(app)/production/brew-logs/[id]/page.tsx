@@ -3,7 +3,7 @@
 /**
  * Brew Log Detail Page
  *
- * Custom detail page that wraps EntityDetail with brew-log-specific
+ * Custom detail page that wraps EntityDetailUnified with brew-log-specific
  * action handling. The "complete_brew" action opens a vessel assignment
  * dialog instead of directly transitioning status.
  */
@@ -11,7 +11,7 @@
 import { use, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { brewLogEntity } from "@/entities/brew-log";
 import { BrewLogCompletionDialog } from "@/components/domain/brew-log-completion-dialog";
 import { brewLogKeys, entityKeys } from "@/lib/query-keys";
@@ -47,7 +47,7 @@ export default function BrewLogDetailPage({
       setShowCompletionDialog(true);
       return true; // Indicates action was handled
     }
-    return false; // Let EntityDetail handle normally
+    return false; // Let EntityDetailUnified handle normally
   }, []);
 
   const handleDialogSuccess = useCallback(() => {
@@ -57,7 +57,7 @@ export default function BrewLogDetailPage({
 
   return (
     <>
-      <EntityDetail
+      <EntityDetailUnifiedWithErrorBoundary
         entity={brewLogEntity}
         id={id}
         basePath="/production/brew-logs"

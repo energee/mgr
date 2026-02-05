@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { locationEntity } from "@/entities/location";
 
 export default function NewLocationPage() {
-  return <EntityForm entity={locationEntity} basePath="/settings/locations" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={locationEntity}
+      basePath="/settings/locations"
+    />
+  );
 }

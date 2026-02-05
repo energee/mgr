@@ -3,7 +3,7 @@
 import { use, useCallback } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { calculateLandedCost } from "@/lib/purchasing/landed-cost";
 import { purchaseOrderKeys, entityKeys } from "@/lib/query-keys";
@@ -50,7 +50,7 @@ export default function PurchaseOrderDetailPage({
   );
 
   return (
-    <EntityDetail
+    <EntityDetailUnifiedWithErrorBoundary
       entity={purchaseOrderEntity}
       id={id}
       basePath="/purchasing/pos"

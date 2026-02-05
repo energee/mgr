@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { supplierEntity } from "@/entities/supplier";
 
 export default function NewSupplierPage() {
-  return <EntityForm entity={supplierEntity} basePath="/purchasing/suppliers" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={supplierEntity}
+      basePath="/purchasing/suppliers"
+    />
+  );
 }

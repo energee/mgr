@@ -45,8 +45,8 @@ export type BatchState = (typeof batchStates)[number];
 
 /** Valid state transitions: { fromState: [toStates] } */
 export const batchTransitions: Record<string, string[]> = {
-  planned: ["fermenting"],
-  fermenting: ["conditioning"],
+  planned: [],
+  fermenting: [],
   conditioning: ["packaging"],
   packaging: ["completed"],
   completed: [],

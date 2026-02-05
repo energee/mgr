@@ -130,6 +130,70 @@ export const locationEntity: EntityConfig<Location> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Location Details",
+      fields: [
+        {
+          name: "name",
+          label: "Name",
+          type: "text",
+          placeholder: "e.g., Main Brewery, Downtown Taproom",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "location_type",
+          label: "Type",
+          type: "select",
+          options: valuesAsOptions(locationTypeDisplayConfig),
+          dynamicOptions: {
+            table: "enum_values",
+            valueField: "value",
+            labelField: "label",
+            filter: { enum_type: "location_type" },
+            orderBy: "sort_order",
+          },
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "is_primary",
+          label: "Primary Location",
+          type: "switch",
+          description: "Default location for new vessels and inventory",
+          colSpan: 6,
+        },
+        {
+          name: "is_active",
+          label: "Active",
+          type: "switch",
+          description: "Inactive locations won't appear in dropdown menus",
+          defaultValue: true,
+          colSpan: 6,
+        },
+        {
+          name: "created_at",
+          label: "Created",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "updated_at",
+          label: "Last Updated",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: locationSchema,

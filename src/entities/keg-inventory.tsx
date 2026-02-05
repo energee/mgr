@@ -170,6 +170,26 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (for EntityDetailUnified) - READ ONLY
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Keg Inventory Details",
+      fields: [
+        { name: "keg_type_name", label: "Keg Type", editable: false },
+        { name: "keg_type_code", label: "Code", editable: false },
+        { name: "keg_owner_name", label: "Owner", editable: false },
+        { name: "state", label: "State", editable: false },
+        { name: "quantity", label: "Quantity", editable: false },
+        { name: "location_name", label: "Location", editable: false },
+        { name: "batch_number", label: "Batch", editable: false },
+        { name: "finished_good_name", label: "Finished Good", editable: false },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form - READ ONLY (inventory is calculated from transactions)
   // ---------------------------------------------------------------------------
   // Note: This is a calculated view. To modify inventory, record a keg transaction.

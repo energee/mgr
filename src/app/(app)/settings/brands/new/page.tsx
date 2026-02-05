@@ -1,8 +1,13 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { brandEntity } from "@/entities/brand";
 
 export default function NewBrandPage() {
-  return <EntityForm entity={brandEntity} basePath="/settings/brands" />;
+  return (
+    <EntityDetailUnifiedWithErrorBoundary
+      entity={brandEntity}
+      basePath="/settings/brands"
+    />
+  );
 }

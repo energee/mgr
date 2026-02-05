@@ -123,6 +123,84 @@ export const brandEntity: EntityConfig<Brand> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Brand Information",
+      fields: [
+        {
+          name: "name",
+          label: "Name",
+          type: "text",
+          placeholder: "e.g., Hop Highway",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "variant",
+          label: "Variant",
+          type: "text",
+          placeholder: "e.g., Session, Double, Nitro",
+          colSpan: 6,
+        },
+        {
+          name: "style_id",
+          label: "Style",
+          type: "relation",
+          relation: {
+            entity: "beer_style",
+            displayField: "name",
+          },
+          colSpan: 6,
+        },
+        {
+          name: "abv",
+          label: "ABV",
+          type: "number",
+          placeholder: "e.g., 6.5",
+          render: (v) => (v ? `${v}%` : "—"),
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "description",
+      title: "Description",
+      fields: [
+        {
+          name: "description",
+          label: "Description",
+          type: "textarea",
+          placeholder: "Beer description, tasting notes, etc.",
+          fullWidth: true,
+        },
+      ],
+    },
+    {
+      id: "untappd",
+      title: "Untappd",
+      collapsible: true,
+      fields: [
+        {
+          name: "untappd_url",
+          label: "Untappd URL",
+          type: "text",
+          placeholder: "https://untappd.com/b/...",
+          colSpan: 6,
+        },
+        {
+          name: "untappd_rating",
+          label: "Rating",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: brandSchema,

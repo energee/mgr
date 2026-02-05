@@ -180,6 +180,98 @@ export const orderEntity: EntityConfig<Order> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "quick-links",
+      title: "Quick Actions",
+      component: OrderQuickLinks,
+    },
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "order_number",
+          label: "Order Number",
+          type: "text",
+          placeholder: "e.g., ORD-2025-001",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: statusOptions,
+          colSpan: 6,
+        },
+        {
+          name: "customer_id",
+          label: "Customer",
+          type: "relation",
+          relation: {
+            entity: "customer",
+            displayField: "name",
+          },
+          colSpan: 6,
+        },
+        {
+          name: "order_date",
+          label: "Order Date",
+          type: "date",
+          format: "date",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "requested_date",
+          label: "Requested Delivery Date",
+          type: "date",
+          format: "date",
+          colSpan: 4,
+        },
+        {
+          name: "scheduled_date",
+          label: "Scheduled Delivery Date",
+          type: "date",
+          format: "date",
+          colSpan: 4,
+        },
+        {
+          name: "fulfilled_date",
+          label: "Fulfilled Date",
+          format: "date",
+          editable: false,
+          colSpan: 4,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Special instructions, delivery notes...",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("orders"),
+      collapsible: true,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: orderSchema,

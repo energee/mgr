@@ -9,7 +9,7 @@
 
 import { useState, use } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
 import { YeastHarvestDialog } from "@/components/domain/yeast-harvest-dialog";
 import { YeastLineageDisplay } from "@/components/domain/yeast-lineage-display";
@@ -66,7 +66,7 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
 
   return (
     <>
-      <EntityDetail
+      <EntityDetailUnifiedWithErrorBoundary
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         entity={yeastPitchEntity as any}
         id={id}
