@@ -11,7 +11,8 @@
  */
 
 import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, StateMachineConfig } from "@/types/entity";
+import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BrewLogTimeline } from "@/components/domain/brew-log-timeline";
@@ -149,6 +150,31 @@ export const metricConfig = {
   pitch_rate: { label: "Pitching Rate", unit: "M/mL/°P" },
   other: { label: "Other", unit: "" },
 } as const;
+
+// =============================================================================
+// State Machine
+// =============================================================================
+
+const brewLogStateMachine: StateMachineConfig<BrewLog> = {
+  stateField: "status",
+  states: ["draft", "in_progress", "completed", "cancelled"],
+  initialState: "draft",
+  transitions: {
+    draft: ["in_progress", "cancelled"],
+    in_progress: ["completed", "cancelled"],
+    completed: [],
+    cancelled: [],
+  },
+  stateDisplay: {
+    draft: { label: "Draft", color: "default" },
+    in_progress: { label: "In Progress", color: "info" },
+    completed: { label: "Completed", color: "success" },
+    cancelled: { label: "Cancelled", color: "error" },
+  },
+};
+
+// Derive status options from state machine (single source of truth)
+const statusOptions = statesAsOptions(brewLogStateMachine);
 
 // =============================================================================
 // Entity Configuration
@@ -302,12 +328,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       name: "status",
       label: "Status",
       type: "select",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "in_progress", label: "In Progress" },
-        { value: "completed", label: "Completed" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: statusOptions,
       colSpan: 6,
     },
     {
@@ -321,23 +342,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------
-  stateMachine: {
-    stateField: "status",
-    states: ["draft", "in_progress", "completed", "cancelled"],
-    initialState: "draft",
-    transitions: {
-      draft: ["in_progress", "cancelled"],
-      in_progress: ["completed", "cancelled"],
-      completed: [],
-      cancelled: [],
-    },
-    stateDisplay: {
-      draft: { label: "Draft", color: "default" },
-      in_progress: { label: "In Progress", color: "info" },
-      completed: { label: "Completed", color: "success" },
-      cancelled: { label: "Cancelled", color: "error" },
-    },
-  },
+  stateMachine: brewLogStateMachine,
 
   // ---------------------------------------------------------------------------
   // Actions
