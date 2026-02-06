@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useContext, useRef, useState } from "react";
-import { Keyboard } from "lucide-react";
+import { AnimatedKeyboard } from "@/components/icons/animated";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -245,6 +245,7 @@ function AnimatedSectionHeader({
 export function AppSidebar() {
   const pathname = usePathname();
   const { openHelp } = useContext(KeyboardShortcutsContext);
+  const keyboardIconRef = useRef<AnimatedIconHandle>(null);
   const activeSection = navigation.find((s) =>
     s.items.some((item) => pathname.startsWith(item.href))
   );
@@ -266,10 +267,12 @@ export function AppSidebar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 hover:bg-transparent hover:text-current"
                 onClick={openHelp}
+                onMouseEnter={() => keyboardIconRef.current?.startAnimation()}
+                onMouseLeave={() => keyboardIconRef.current?.stopAnimation()}
               >
-                <Keyboard className="h-4 w-4" />
+                <AnimatedKeyboard ref={keyboardIconRef} className="h-4 w-4" />
                 <span className="sr-only">Keyboard shortcuts</span>
               </Button>
             </TooltipTrigger>

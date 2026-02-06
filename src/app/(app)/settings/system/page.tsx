@@ -30,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
+import { FileUpload, FileUploadDropzone, FileUploadTrigger } from "@/components/ui/file-upload";
+import { Loader2, Trash2, Upload } from "lucide-react";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
@@ -173,6 +174,8 @@ export default function SystemSettingsPage() {
   const updateSettings = useUpdateSystemSettings();
   const [activeTab, setActiveTab] = useState("general");
   const [isMac, setIsMac] = useState(false);
+  const [logoSvg, setLogoSvg] = useState<string | null>(null);
+  const [uploadResetKey, setUploadResetKey] = useState(0);
   const submitRef = useSubmitShortcut();
 
   useEffect(() => {
@@ -207,6 +210,8 @@ export default function SystemSettingsPage() {
   // Update form when settings load
   useEffect(() => {
     if (settings) {
+      const savedLogo = settings.brewery_logo_svg as string | null;
+      setLogoSvg(savedLogo || null);
       const address = settings.brewery_address as Record<string, string> || {};
       form.reset({
         brewery_name: (settings.brewery_name as string) || "",
@@ -311,6 +316,80 @@ export default function SystemSettingsPage() {
                         {form.formState.errors.brewery_name.message}
                       </p>
                     )}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Brewery Logo</Label>
+                    <div className="flex items-start gap-4">
+                      {logoSvg && (
+                        <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
+                          <div className="h-[120px] w-[120px] rounded-md border bg-white flex items-center justify-center p-3">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(logoSvg)))}`}
+                              alt="Brewery logo"
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={async () => {
+                              setLogoSvg(null);
+                              setUploadResetKey((k) => k + 1);
+                              try {
+                                await updateSettings.mutateAsync({ brewery_logo_svg: "" });
+                                toast.success("Logo removed");
+                              } catch {
+                                toast.error("Failed to remove logo");
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Remove
+                          </Button>
+                        </div>
+                      )}
+                      <FileUpload
+                        key={uploadResetKey}
+                        maxFiles={1}
+                        accept="image/svg+xml"
+                        className="flex-1 min-w-0"
+                        onFileAccept={(file) => {
+                          const reader = new FileReader();
+                          reader.onload = async (ev) => {
+                            const svgText = ev.target?.result as string;
+                            setLogoSvg(svgText);
+                            setUploadResetKey((k) => k + 1);
+                            try {
+                              await updateSettings.mutateAsync({ brewery_logo_svg: svgText });
+                              toast.success("Logo saved");
+                            } catch {
+                              toast.error("Failed to save logo");
+                            }
+                          };
+                          reader.readAsText(file);
+                        }}
+                        onFileReject={(_file, message) => {
+                          toast.error(message);
+                        }}
+                      >
+                        <FileUploadDropzone className="h-[120px] p-4">
+                          <Upload className="size-5 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground text-center">
+                            Drag & drop or click to browse
+                          </p>
+                          <p className="text-xs text-muted-foreground">SVG only</p>
+                          <FileUploadTrigger asChild>
+                            <Button type="button" variant="outline" size="sm">
+                              Browse files
+                            </Button>
+                          </FileUploadTrigger>
+                        </FileUploadDropzone>
+                      </FileUpload>
+                    </div>
                   </div>
 
                   <div className="grid gap-2">
