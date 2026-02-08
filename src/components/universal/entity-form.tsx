@@ -200,7 +200,7 @@ export function EntityForm<T = Record<string, unknown>>({
     const result = entity.formSchema.safeParse(processedValues);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
-      result.error.errors.forEach((err) => {
+      result.error.issues.forEach((err) => {
         const path = err.path.join(".");
         fieldErrors[path] = err.message;
       });

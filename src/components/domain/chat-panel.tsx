@@ -71,6 +71,19 @@ const TOOL_TITLES: Record<string, string> = {
   getBatchTransfers: "Batch Transfers",
   getRecipeCost: "Recipe Cost",
   getLotExpiration: "Lot Expiration",
+  getBatchDetail: "Batch Detail",
+  searchBatches: "Search Batches",
+  getBrands: "Search Brands",
+  getFinishedGoods: "Finished Goods",
+  lookupEntity: "Lookup Entity",
+  searchOrders: "Search Orders",
+  getOrderDetail: "Order Detail",
+  getCustomers: "Search Customers",
+  getAppGuide: "App Guide",
+  createBatch: "Create Batch",
+  transitionBatch: "Transition Batch",
+  addBatchReading: "Add Reading",
+  createPackagingSession: "Create Packaging Session",
 };
 
 export function ChatPanel() {

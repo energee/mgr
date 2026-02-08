@@ -2,34 +2,22 @@ import { streamText, stepCountIs, type UIMessage, convertToModelMessages } from 
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 import { createChatTools } from "./tools";
 
-const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant. You help brewers manage their brewery operations.
+const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant — concise, practical, brewery-focused.
 
-You have deep knowledge of:
-- Brewing science (mashing, fermentation, water chemistry, hop utilization)
-- BJCP style guidelines
-- Production planning and scheduling
-- Inventory management
-- Recipe formulation and optimization
+Knowledge: brewing science, BJCP styles, production planning, inventory, recipe optimization.
 
-You are integrated into the MGR brewery management system. You have access to tools that let you query live brewery data — use them when the user asks about specific recipes, batches, inventory, vessels, or production schedules.
+You have tools to query live brewery data (recipes, batches, inventory, vessels, orders). Use them when the user asks about specific data.
 
-You also have navigation tools that can open forms with pre-filled data:
-- createBatch: Opens the batch creation form with a recipe pre-selected
-- transitionBatch: Opens the appropriate dialog to change batch status (start fermentation, move to conditioning, etc.)
-- addBatchReading: Opens the readings page to record gravity, pH, temperature, etc.
-- createPackagingSession: Opens the packaging session form with a date pre-filled
+Navigation tools open pre-filled forms for the user to review and submit:
+- createBatch, transitionBatch, addBatchReading, createPackagingSession
 
-When a user asks you to create, update, or transition something, use the appropriate navigation tool. The user will review the pre-filled form and submit it themselves.
+Use lookupEntity to resolve names/numbers to UUIDs (e.g., "batch 42" → UUID).
 
-Use the lookupEntity tool to resolve names and numbers to UUIDs when needed (e.g., "batch 42" → UUID).
+When users ask "how do I..." in MGR, use the getAppGuide tool to look up navigation instructions.
 
-Be concise and practical. When you use a tool, summarize the results clearly. Format data in tables when appropriate.
-When users ask how to do something in MGR, give specific navigation instructions using the guide below.
-
-${getHelpContentForSystemPrompt()}`;
+Summarize tool results clearly. Use tables for multi-row data.`;
 
 // Pending type generation — anthropic_api_key is added by migration 00064
 // but not yet in generated Supabase types. Remove after next `supabase gen types`.
@@ -43,12 +31,75 @@ interface PageContext {
   entityId?: string;
 }
 
-function buildSystemPrompt(pageContext?: PageContext): string {
+/** Fetch a lightweight summary for the entity the user is currently viewing. */
+async function fetchEntityContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entityType: string,
+  entityId: string,
+): Promise<string | null> {
+  try {
+    switch (entityType) {
+      case "batch": {
+        const { data } = await supabase
+          .from("batches_with_brew_info")
+          .select("batch_number, name, status, volume_bbl, planned_start_date, brew_date, current_vessel_name, recipe:recipes(name)")
+          .eq("id", entityId)
+          .single();
+        if (!data) return null;
+        const recipe = data.recipe as { name: string } | null;
+        return `Current batch: #${data.batch_number}${data.name ? ` "${data.name}"` : ""}, status=${data.status}, recipe="${recipe?.name}", volume=${data.volume_bbl} bbl, vessel=${data.current_vessel_name || "unassigned"}, planned=${data.planned_start_date || "n/a"}, brewed=${data.brew_date || "n/a"}`;
+      }
+      case "recipe": {
+        const { data } = await supabase
+          .from("recipes_with_estimates")
+          .select("name, status, volume_bbl, est_og, est_fg, est_abv, est_ibu, est_srm, style:beer_styles(name)")
+          .eq("id", entityId)
+          .single();
+        if (!data) return null;
+        const style = data.style as { name: string } | null;
+        return `Current recipe: "${data.name}", status=${data.status}, style="${style?.name || "none"}", volume=${data.volume_bbl} bbl, OG=${data.est_og}, FG=${data.est_fg}, ABV=${data.est_abv}%, IBU=${data.est_ibu}, SRM=${data.est_srm}`;
+      }
+      case "order": {
+        const { data } = await supabase
+          .from("orders")
+          .select("order_number, status, order_date, requested_date, customer:customers(name)")
+          .eq("id", entityId)
+          .single();
+        if (!data) return null;
+        const customer = data.customer as { name: string } | null;
+        return `Current order: #${data.order_number}, status=${data.status}, customer="${customer?.name}", ordered=${data.order_date}, requested=${data.requested_date || "n/a"}`;
+      }
+      case "vessel": {
+        const { data } = await supabase
+          .from("vessels_with_batch")
+          .select("name, vessel_type, capacity_bbl, status, batch_number")
+          .eq("id", entityId)
+          .single();
+        if (!data) return null;
+        return `Current vessel: "${data.name}", type=${data.vessel_type}, capacity=${data.capacity_bbl} bbl, status=${data.status}, batch=${data.batch_number || "empty"}`;
+      }
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function buildSystemPrompt(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  pageContext?: PageContext,
+): Promise<string> {
   if (!pageContext?.section) return BASE_SYSTEM_PROMPT;
 
   let contextLine = "";
   if (pageContext.entityId && pageContext.entityType) {
-    contextLine = `\n\nThe user is currently viewing: ${pageContext.entityType} detail (ID: ${pageContext.entityId}) in the ${pageContext.section} section.`;
+    const entitySummary = await fetchEntityContext(supabase, pageContext.entityType, pageContext.entityId);
+    if (entitySummary) {
+      contextLine = `\n\n${entitySummary}\nEntity ID: ${pageContext.entityId}`;
+    } else {
+      contextLine = `\n\nThe user is viewing a ${pageContext.entityType} detail page (ID: ${pageContext.entityId}).`;
+    }
   } else if (pageContext.entityType) {
     contextLine = `\n\nThe user is browsing the ${pageContext.section} > ${pageContext.entityType} list.`;
   } else {
@@ -131,12 +182,14 @@ export async function POST(req: Request): Promise<Response> {
 
   const anthropic = createAnthropic({ apiKey });
   const tools = createChatTools(supabase);
+  const systemPrompt = await buildSystemPrompt(supabase, pageContext);
 
   const result = streamText({
     model: anthropic("claude-sonnet-4-20250514"),
-    system: buildSystemPrompt(pageContext),
+    system: systemPrompt,
     messages: await convertToModelMessages(messages),
     tools,
+    maxOutputTokens: 2048,
     stopWhen: stepCountIs(5),
   });
 

@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
