@@ -301,10 +301,7 @@ SELECT * FROM get_ai_schema_context('production');
 ```typescript
 import {
   analyzeStyleCompliance,
-  getRecipeSummary,
-  BrewingCalculations,
-  WaterChemistry,
-  AIQueryHelpers
+  getRecipeSuggestions,
 } from '@/lib/ai';
 ```
 
