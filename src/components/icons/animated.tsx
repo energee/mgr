@@ -34,6 +34,7 @@ import { EyeIcon } from "@/components/ui/eye";
 import { SquarePenIcon } from "@/components/ui/square-pen";
 import { DeleteIcon } from "@/components/ui/delete";
 import { CopyIcon } from "@/components/ui/copy";
+import { KeyboardIcon } from "@/components/ui/keyboard";
 
 export interface AnimatedIconHandle {
   startAnimation: () => void;
@@ -102,3 +103,4 @@ export const AnimatedEye = wrap(EyeIcon);
 export const AnimatedSquarePen = wrap(SquarePenIcon);
 export const AnimatedDelete = wrap(DeleteIcon);
 export const AnimatedCopy = wrap(CopyIcon);
+export const AnimatedKeyboard = wrap(KeyboardIcon);

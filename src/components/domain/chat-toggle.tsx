@@ -25,7 +25,7 @@ export function ChatToggle() {
           {isWorking && !isOpen && (
             <span className="absolute inset-0 rounded-full animate-ping bg-[#D97757]/30" />
           )}
-          <ClaudeIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-75" />
+          <ClaudeIcon className={`h-5 w-5 transition-transform duration-300 group-hover:scale-75 ${isOpen ? "" : "text-[#D97757]"}`} />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="left">

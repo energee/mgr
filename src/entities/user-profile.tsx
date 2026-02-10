@@ -267,6 +267,14 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
       fromStates: ["inactive", "pending"],
       toState: "active",
     },
+    {
+      name: "delete",
+      label: "Delete User",
+      icon: "trash",
+      type: "button",
+      variant: "destructive",
+      fromStates: ["inactive"],
+    },
   ],
 
   // ---------------------------------------------------------------------------
