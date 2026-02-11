@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatStateLabel } from "@/types/entity";
+import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 
 /** Escape LIKE/ILIKE wildcard characters so they match literally. */
 function escapeLike(value: string): string {
@@ -135,7 +136,7 @@ export function createChatTools(supabase: SupabaseClient) {
       execute: async ({ query, limit }) => {
         const { data, error } = await supabase
           .from("recipes_with_estimates")
-          .select("*, style:beer_styles(id, name, category)")
+          .select("id, name, status, volume_bbl, est_og, est_fg, est_abv, est_ibu, est_srm, style:beer_styles(id, name, category)")
           .ilike("name", `%${escapeLike(query)}%`)
           .limit(limit);
         if (error) throw new Error(error.message);
@@ -179,14 +180,13 @@ export function createChatTools(supabase: SupabaseClient) {
         );
         const inUse = data?.filter((v) => v.current_batch_id);
         return {
-          all: data,
-          available,
-          inUse,
           summary: {
             total: data?.length || 0,
             available: available?.length || 0,
             inUse: inUse?.length || 0,
           },
+          available: available?.map((v) => ({ id: v.id, name: v.name, type: v.vessel_type, capacity_bbl: v.capacity_bbl })),
+          inUse: inUse?.map((v) => ({ id: v.id, name: v.name, type: v.vessel_type, capacity_bbl: v.capacity_bbl, batch_number: v.batch_number })),
         };
       },
     }),
@@ -215,7 +215,7 @@ export function createChatTools(supabase: SupabaseClient) {
 
     getIngredientInventory: tool({
       description:
-        "Get raw ingredient inventory levels with lot quantities and expiration dates. Optionally filter by category (malt, hop, yeast, adjunct, chemical).",
+        "Get raw ingredient inventory levels. Optionally filter by category (malt, hop, yeast, adjunct, chemical). Returns totals per item.",
       inputSchema: z.object({
         category: z
           .string()
@@ -239,7 +239,11 @@ export function createChatTools(supabase: SupabaseClient) {
           reorder_point: number | null;
           inventory_lots: Array<{ quantity: number; expiration_date: string | null }>;
         }>)?.map((item) => ({
-          ...item,
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          unit: item.unit,
+          reorder_point: item.reorder_point,
           total_quantity:
             item.inventory_lots?.reduce((sum, lot) => sum + lot.quantity, 0) || 0,
           earliest_expiration: item.inventory_lots?.reduce(
@@ -250,6 +254,7 @@ export function createChatTools(supabase: SupabaseClient) {
             },
             null as string | null
           ),
+          lot_count: item.inventory_lots?.length || 0,
         }));
       },
     }),
@@ -323,7 +328,7 @@ export function createChatTools(supabase: SupabaseClient) {
       execute: async ({ recipeId }) => {
         const { data, error } = await supabase
           .from("recipes_with_cogs")
-          .select("*")
+          .select("id, name, volume_bbl, malt_cost, hop_cost, yeast_cost, adjunct_cost, total_cogs, cogs_per_bbl")
           .eq("id", recipeId)
           .single();
         if (error) throw new Error(error.message);
@@ -506,90 +511,84 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("Narrow search to a specific entity type"),
       }),
       execute: async ({ query, entityType }) => {
-        const results: Array<{
-          type: string;
-          id: string;
-          display: string;
-        }> = [];
+        type Result = { type: string; id: string; display: string };
         const escaped = escapeLike(query);
+        const should = (t: string) => !entityType || entityType === t;
 
-        if (!entityType || entityType === "batch") {
-          const { data } = await supabase
-            .from("batches")
-            .select("id, batch_number, name")
-            .or(
-              `batch_number.ilike.%${escaped}%,name.ilike.%${escaped}%`
-            )
-            .limit(5);
-          if (data) {
-            for (const b of data) {
-              results.push({
-                type: "batch",
-                id: b.id,
-                display: `${b.batch_number}${b.name ? ` — ${b.name}` : ""}`,
-              });
-            }
-          }
+        const queries: PromiseLike<Result[]>[] = [];
+
+        if (should("batch")) {
+          queries.push(
+            supabase
+              .from("batches")
+              .select("id, batch_number, name")
+              .or(`batch_number.ilike.%${escaped}%,name.ilike.%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((b) => ({
+                  type: "batch",
+                  id: b.id,
+                  display: `${b.batch_number}${b.name ? ` — ${b.name}` : ""}`,
+                }))
+              )
+          );
         }
 
-        if (!entityType || entityType === "recipe") {
-          const { data } = await supabase
-            .from("recipes")
-            .select("id, name")
-            .ilike("name", `%${escaped}%`)
-            .limit(5);
-          if (data) {
-            for (const r of data) {
-              results.push({ type: "recipe", id: r.id, display: r.name });
-            }
-          }
+        if (should("recipe")) {
+          queries.push(
+            supabase
+              .from("recipes")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((r) => ({ type: "recipe", id: r.id, display: r.name }))
+              )
+          );
         }
 
-        if (!entityType || entityType === "customer") {
-          const { data } = await supabase
-            .from("customers")
-            .select("id, name")
-            .ilike("name", `%${escaped}%`)
-            .eq("is_active", true)
-            .limit(5);
-          if (data) {
-            for (const c of data) {
-              results.push({ type: "customer", id: c.id, display: c.name });
-            }
-          }
+        if (should("customer")) {
+          queries.push(
+            supabase
+              .from("customers")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .eq("is_active", true)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((c) => ({ type: "customer", id: c.id, display: c.name }))
+              )
+          );
         }
 
-        if (!entityType || entityType === "brand") {
-          const { data } = await supabase
-            .from("brands")
-            .select("id, name")
-            .ilike("name", `%${escaped}%`)
-            .limit(5);
-          if (data) {
-            for (const b of data) {
-              results.push({ type: "brand", id: b.id, display: b.name });
-            }
-          }
+        if (should("brand")) {
+          queries.push(
+            supabase
+              .from("brands")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((b) => ({ type: "brand", id: b.id, display: b.name }))
+              )
+          );
         }
 
-        if (!entityType || entityType === "order") {
-          const { data } = await supabase
-            .from("orders")
-            .select("id, order_number")
-            .ilike("order_number", `%${escaped}%`)
-            .limit(5);
-          if (data) {
-            for (const o of data) {
-              results.push({
-                type: "order",
-                id: o.id,
-                display: o.order_number,
-              });
-            }
-          }
+        if (should("order")) {
+          queries.push(
+            supabase
+              .from("orders")
+              .select("id, order_number")
+              .ilike("order_number", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((o) => ({ type: "order", id: o.id, display: o.order_number }))
+              )
+          );
         }
 
-        return results;
+        const allResults = await Promise.all(queries);
+        return allResults.flat();
       },
     }),
 
@@ -688,6 +687,17 @@ export function createChatTools(supabase: SupabaseClient) {
         if (error) throw new Error(error.message);
         return data;
       },
+    }),
+
+    // =========================================================================
+    // Help / Guide Tool
+    // =========================================================================
+
+    getAppGuide: tool({
+      description:
+        "Get the MGR application guide with navigation instructions, feature descriptions, and common workflows. Use when a user asks how to do something in the app.",
+      inputSchema: z.object({}),
+      execute: async () => getHelpContentForSystemPrompt(),
     }),
 
     // =========================================================================
