@@ -43,7 +43,7 @@ export function SignupForm() {
     const result = signupSchema.safeParse({ email, password, confirmPassword });
     if (!result.success) {
       const fieldErrors: { email?: string; password?: string; confirmPassword?: string } = {};
-      result.error.errors.forEach((err) => {
+      result.error.issues.forEach((err) => {
         const field = err.path[0] as keyof typeof fieldErrors;
         fieldErrors[field] = err.message;
       });

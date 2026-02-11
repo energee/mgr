@@ -42,7 +42,7 @@ function parseWithSchema<T>(schema: ZodSchema<T>, data: unknown): T {
     return schema.parse(data);
   } catch (err) {
     if (err instanceof ZodError) {
-      const fieldErrors = err.errors.map((e) => ({
+      const fieldErrors = err.issues.map((e) => ({
         path: e.path.join("."),
         message: e.message,
       }));

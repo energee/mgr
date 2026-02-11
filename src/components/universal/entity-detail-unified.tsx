@@ -25,7 +25,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
 import { entityKeys } from "@/lib/query-keys";
@@ -314,8 +314,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   );
 
   const form = useForm<Record<string, unknown>>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: entity.formSchema ? zodResolver(entity.formSchema as any) : undefined,
+    resolver: entity.formSchema ? zodResolver(entity.formSchema) : undefined,
     defaultValues: formDefaults,
   });
 
@@ -518,7 +517,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     const result = entity.formSchema.safeParse(values);
     if (!result.success) {
       // Set errors on form
-      for (const err of result.error.errors) {
+      for (const err of result.error.issues) {
         const fieldPath = err.path.join(".");
         form.setError(fieldPath, { message: err.message });
       }
