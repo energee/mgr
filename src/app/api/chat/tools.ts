@@ -408,10 +408,13 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, recipeName, startDate, endDate, batchNumber, limit }) => {
+        const recipeJoin = recipeName
+          ? "recipe:recipes!inner(id, name)"
+          : "recipe:recipes(id, name)";
         let query = supabase
           .from("batches_with_brew_info")
           .select(
-            "id, batch_number, name, status, volume_bbl, planned_start_date, brew_date, current_vessel_name, recipe:recipes(id, name)"
+            `id, batch_number, name, status, volume_bbl, planned_start_date, brew_date, current_vessel_name, ${recipeJoin}`
           )
           .order("planned_start_date", { ascending: false })
           .limit(limit);
@@ -421,19 +424,11 @@ export function createChatTools(supabase: SupabaseClient) {
           query = query.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
         if (startDate) query = query.gte("planned_start_date", startDate);
         if (endDate) query = query.lte("planned_start_date", endDate);
+        if (recipeName)
+          query = query.ilike("recipes.name", `%${escapeLike(recipeName)}%`);
 
         const { data, error } = await query;
         if (error) throw new Error(error.message);
-
-        if (recipeName && data) {
-          const lower = recipeName.toLowerCase();
-          return data.filter(
-            (b: Record<string, unknown>) => {
-              const recipe = b.recipe as { name: string } | null;
-              return recipe?.name?.toLowerCase().includes(lower);
-            }
-          );
-        }
         return data;
       },
     }),
@@ -613,10 +608,13 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, customerName, startDate, endDate, limit }) => {
+        const customerJoin = customerName
+          ? "customer:customers!inner(id, name)"
+          : "customer:customers(id, name)";
         let query = supabase
           .from("orders")
           .select(
-            "id, order_number, status, order_date, requested_date, scheduled_date, notes, customer:customers(id, name)"
+            `id, order_number, status, order_date, requested_date, scheduled_date, notes, ${customerJoin}`
           )
           .order("order_date", { ascending: false })
           .limit(limit);
@@ -624,17 +622,11 @@ export function createChatTools(supabase: SupabaseClient) {
         if (status) query = query.eq("status", status);
         if (startDate) query = query.gte("order_date", startDate);
         if (endDate) query = query.lte("order_date", endDate);
+        if (customerName)
+          query = query.ilike("customers.name", `%${escapeLike(customerName)}%`);
 
         const { data, error } = await query;
         if (error) throw new Error(error.message);
-
-        if (customerName && data) {
-          const lower = customerName.toLowerCase();
-          return data.filter((o: Record<string, unknown>) => {
-            const customer = o.customer as { name: string } | null;
-            return customer?.name?.toLowerCase().includes(lower);
-          });
-        }
         return data;
       },
     }),
@@ -753,10 +745,13 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, startDate, endDate, supplierName, limit }) => {
+        const supplierJoin = supplierName
+          ? "supplier:suppliers!inner(id, name)"
+          : "supplier:suppliers(id, name)";
         let query = supabase
           .from("purchase_orders")
           .select(
-            "id, po_number, status, order_date, expected_date, shipping_cost, tax, notes, supplier:suppliers(id, name)"
+            `id, po_number, status, order_date, expected_date, shipping_cost, tax, notes, ${supplierJoin}`
           )
           .order("order_date", { ascending: false })
           .limit(limit);
@@ -764,17 +759,11 @@ export function createChatTools(supabase: SupabaseClient) {
         if (status) query = query.eq("status", status);
         if (startDate) query = query.gte("order_date", startDate);
         if (endDate) query = query.lte("order_date", endDate);
+        if (supplierName)
+          query = query.ilike("suppliers.name", `%${escapeLike(supplierName)}%`);
 
         const { data, error } = await query;
         if (error) throw new Error(error.message);
-
-        if (supplierName && data) {
-          const lower = supplierName.toLowerCase();
-          return data.filter((po: Record<string, unknown>) => {
-            const supplier = po.supplier as { name: string } | null;
-            return supplier?.name?.toLowerCase().includes(lower);
-          });
-        }
         return data;
       },
     }),
