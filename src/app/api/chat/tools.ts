@@ -124,7 +124,7 @@ export function createChatTools(supabase: SupabaseClient) {
     }),
 
     // =========================================================================
-    // Query Helper Tools (direct Supabase queries)
+    // Query Tools (direct Supabase queries)
     // =========================================================================
 
     searchRecipes: tool({
@@ -258,10 +258,6 @@ export function createChatTools(supabase: SupabaseClient) {
         }));
       },
     }),
-
-    // =========================================================================
-    // New Tools (data not previously accessible to AI)
-    // =========================================================================
 
     getBatchLogs: tool({
       description:
@@ -684,6 +680,414 @@ export function createChatTools(supabase: SupabaseClient) {
         if (query) q = q.ilike("name", `%${escapeLike(query)}%`);
 
         const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchBrewLogs: tool({
+      description:
+        "Search brew logs (hot-side brew day records) by status, date range, or brew number. Returns brew log headers with recipe info.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe("Filter by status: draft, in_progress, completed, cancelled"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Brew date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Brew date end (YYYY-MM-DD)"),
+        brewNumber: z
+          .string()
+          .optional()
+          .describe("Filter by brew number (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, brewNumber, limit }) => {
+        let query = supabase
+          .from("brew_logs")
+          .select(
+            "id, brew_number, brew_date, status, notes, recipe:recipes(id, name)"
+          )
+          .order("brew_date", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (brewNumber)
+          query = query.ilike("brew_number", `%${escapeLike(brewNumber)}%`);
+        if (startDate) query = query.gte("brew_date", startDate);
+        if (endDate) query = query.lte("brew_date", endDate);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchPurchaseOrders: tool({
+      description:
+        "Search purchase orders by status, date range, or supplier name. Returns PO headers with supplier info.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by status: draft, submitted, confirmed, partial, fulfilled, cancelled"
+          ),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Order date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Order date end (YYYY-MM-DD)"),
+        supplierName: z
+          .string()
+          .optional()
+          .describe("Filter by supplier name (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, supplierName, limit }) => {
+        let query = supabase
+          .from("purchase_orders")
+          .select(
+            "id, po_number, status, order_date, expected_date, shipping_cost, tax, notes, supplier:suppliers(id, name)"
+          )
+          .order("order_date", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (startDate) query = query.gte("order_date", startDate);
+        if (endDate) query = query.lte("order_date", endDate);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+
+        if (supplierName && data) {
+          const lower = supplierName.toLowerCase();
+          return data.filter((po: Record<string, unknown>) => {
+            const supplier = po.supplier as { name: string } | null;
+            return supplier?.name?.toLowerCase().includes(lower);
+          });
+        }
+        return data;
+      },
+    }),
+
+    searchSuppliers: tool({
+      description:
+        "Search suppliers by name. Returns supplier contact info, payment terms, and lead times.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Search by supplier name"),
+        isActive: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Filter by active status (default true)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ query, isActive, limit }) => {
+        let q = supabase
+          .from("suppliers")
+          .select(
+            "id, name, contact_name, contact_email, contact_phone, payment_terms, default_lead_time_days, is_active"
+          )
+          .order("name")
+          .limit(limit);
+
+        if (isActive !== undefined) q = q.eq("is_active", isActive);
+        if (query) q = q.ilike("name", `%${escapeLike(query)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchPickLists: tool({
+      description:
+        "Search pick lists by status, date range, or customer name. Returns pick list details with order info and progress.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe("Filter by status: pending, in_progress, completed, cancelled"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Generated-at date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Generated-at date end (YYYY-MM-DD)"),
+        customerName: z
+          .string()
+          .optional()
+          .describe("Filter by customer name (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, customerName, limit }) => {
+        let query = supabase
+          .from("pick_list_details")
+          .select(
+            "id, status, generated_at, order_id, order_number, customer_name, total_items, items_picked, assigned_to_name"
+          )
+          .order("generated_at", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (startDate) query = query.gte("generated_at", startDate);
+        if (endDate) query = query.lte("generated_at", endDate);
+        if (customerName)
+          query = query.ilike("customer_name", `%${escapeLike(customerName)}%`);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchYeastPitches: tool({
+      description:
+        "Search yeast pitches with viability and strain details. Filter by status or strain name.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe("Filter by status: available, pitched, harvested, expired, discarded"),
+        strainName: z
+          .string()
+          .optional()
+          .describe("Filter by yeast strain name (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, strainName, limit }) => {
+        let query = supabase
+          .from("yeast_pitches_with_details")
+          .select(
+            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_number, location_name"
+          )
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (strainName)
+          query = query.ilike("strain_name", `%${escapeLike(strainName)}%`);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    getKegInventory: tool({
+      description:
+        "Get keg inventory with type, owner, location, and contents. Filter by state (empty/filled/shipped), keg type, or location.",
+      inputSchema: z.object({
+        state: z
+          .string()
+          .optional()
+          .describe("Filter by keg state: empty, filled, shipped, returned, lost, retired"),
+        kegTypeName: z
+          .string()
+          .optional()
+          .describe("Filter by keg type name (partial match)"),
+        locationName: z
+          .string()
+          .optional()
+          .describe("Filter by location name (partial match)"),
+        limit: z.number().optional().default(50).describe("Max results"),
+      }),
+      execute: async ({ state, kegTypeName, locationName, limit }) => {
+        let query = supabase
+          .from("keg_inventory_with_details")
+          .select(
+            "id, keg_type_name, keg_type_code, volume_bbl, keg_owner_name, state, location_name, quantity, batch_number, finished_good_name"
+          )
+          .order("keg_type_name")
+          .limit(limit);
+
+        if (state) query = query.eq("state", state);
+        if (kegTypeName)
+          query = query.ilike("keg_type_name", `%${escapeLike(kegTypeName)}%`);
+        if (locationName)
+          query = query.ilike("location_name", `%${escapeLike(locationName)}%`);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchDeliveries: tool({
+      description:
+        "Search deliveries by status or date range. Returns delivery info with transfer and order counts.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe("Filter by status: planned, in_transit, delivered, cancelled"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Scheduled date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Scheduled date end (YYYY-MM-DD)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, limit }) => {
+        let query = supabase
+          .from("deliveries_with_summary")
+          .select(
+            "id, delivery_number, status, scheduled_date, driver_name, vehicle, notes, transfer_count, order_count, total_stops"
+          )
+          .order("scheduled_date", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (startDate) query = query.gte("scheduled_date", startDate);
+        if (endDate) query = query.lte("scheduled_date", endDate);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchLocationTransfers: tool({
+      description:
+        "Search location transfers (inventory movements between locations/bins). Filter by status or date range.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe("Filter by status: draft, shipped, received, cancelled"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Ship date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Ship date end (YYYY-MM-DD)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, limit }) => {
+        let query = supabase
+          .from("location_transfers_with_details")
+          .select(
+            "id, status, ship_date, receive_date, from_bin_name, to_bin_name, from_location_name, to_location_name, delivery_number, lines_count"
+          )
+          .order("ship_date", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (startDate) query = query.gte("ship_date", startDate);
+        if (endDate) query = query.lte("ship_date", endDate);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchAllocations: tool({
+      description:
+        "Search inventory allocations (movements between sources and destinations). Filter by status, source/destination type, or date range.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by status: planned, pending_approval, completed, rejected, cancelled"
+          ),
+        sourceType: z
+          .string()
+          .optional()
+          .describe("Filter by source type: inventory_lot, batch, finished_good, external"),
+        destinationType: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by destination type: batch, finished_good, order, taproom_sale, sample, adjustment, destruction, loss, transfer"
+          ),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Created-at date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Created-at date end (YYYY-MM-DD)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, sourceType, destinationType, startDate, endDate, limit }) => {
+        let query = supabase
+          .from("allocations")
+          .select(
+            "id, source_type, source_id, destination_type, destination_id, quantity, volume_bbl, unit_cost, status, reason_code, lot_number, created_at"
+          )
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (sourceType) query = query.eq("source_type", sourceType);
+        if (destinationType) query = query.eq("destination_type", destinationType);
+        if (startDate) query = query.gte("created_at", startDate);
+        if (endDate) query = query.lte("created_at", endDate);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchPackagingSessions: tool({
+      description:
+        "Search packaging sessions by status, date range, or brand. Returns session details with line item summary (brands, planned/actual counts).",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by status: planned, in_progress, completed, revised, cancelled"
+          ),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Session date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Session date end (YYYY-MM-DD)"),
+        brandName: z
+          .string()
+          .optional()
+          .describe("Filter by brand name (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, brandName, limit }) => {
+        let query = supabase
+          .from("packaging_sessions_with_summary")
+          .select(
+            "id, session_date, status, notes, line_count, brands, total_planned, total_actual"
+          )
+          .order("session_date", { ascending: false })
+          .limit(limit);
+
+        if (status) query = query.eq("status", status);
+        if (startDate) query = query.gte("session_date", startDate);
+        if (endDate) query = query.lte("session_date", endDate);
+        if (brandName) query = query.ilike("brands", `%${escapeLike(brandName)}%`);
+
+        const { data, error } = await query;
         if (error) throw new Error(error.message);
         return data;
       },

@@ -53,7 +53,7 @@ export function useDynamicOptions(fields: DynamicOptionsField[]): DynamicOptions
   // Create queries for each dynamic field
   const dynamicQueries = useQueries({
     queries: dynamicFields.map((field) => ({
-      queryKey: dynamicOptionsKeys.field(field.dynamicOptions!.table, field.name as string),
+      queryKey: dynamicOptionsKeys.field(field.dynamicOptions!.table, field.name),
       queryFn: async () => {
         const { table, valueField, labelField, filter, orderBy } = field.dynamicOptions!;
 
@@ -95,7 +95,7 @@ export function useDynamicOptions(fields: DynamicOptionsField[]): DynamicOptions
       const relation = field.relation!;
 
       return {
-        queryKey: dynamicOptionsKeys.field(relation.entity, field.name as string),
+        queryKey: dynamicOptionsKeys.field(relation.entity, field.name),
         queryFn: async () => {
           // Dynamically import to avoid circular dependency
           const { entityRegistry } = await import("@/entities");
@@ -133,7 +133,7 @@ export function useDynamicOptions(fields: DynamicOptionsField[]): DynamicOptions
   const optionsMap: Record<string, { value: string; label: string }[]> = {};
   for (const query of queries) {
     if (query.data) {
-      optionsMap[query.data.fieldName as string] = query.data.options;
+      optionsMap[query.data.fieldName] = query.data.options;
     }
   }
 
