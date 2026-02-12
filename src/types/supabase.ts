@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       _schema_registry: {
@@ -3101,9 +3126,10 @@ export type Database = {
           changed_at: string
           changed_by: string | null
           id: string
+          keg_type_id: string | null
           new_price: number | null
           old_price: number | null
-          package_format_id: string
+          package_format_id: string | null
           pricing_tier_id: string
           pricing_tier_price_id: string | null
           sales_channel_id: string
@@ -3112,9 +3138,10 @@ export type Database = {
           changed_at?: string
           changed_by?: string | null
           id?: string
+          keg_type_id?: string | null
           new_price?: number | null
           old_price?: number | null
-          package_format_id: string
+          package_format_id?: string | null
           pricing_tier_id: string
           pricing_tier_price_id?: string | null
           sales_channel_id: string
@@ -3123,9 +3150,10 @@ export type Database = {
           changed_at?: string
           changed_by?: string | null
           id?: string
+          keg_type_id?: string | null
           new_price?: number | null
           old_price?: number | null
-          package_format_id?: string
+          package_format_id?: string | null
           pricing_tier_id?: string
           pricing_tier_price_id?: string | null
           sales_channel_id?: string
@@ -3144,7 +3172,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          package_format_id: string
+          keg_type_id: string | null
+          package_format_id: string | null
           price: number
           pricing_tier_id: string
           sales_channel_id: string
@@ -3153,7 +3182,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          package_format_id: string
+          keg_type_id?: string | null
+          package_format_id?: string | null
           price: number
           pricing_tier_id: string
           sales_channel_id: string
@@ -3162,13 +3192,49 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          package_format_id?: string
+          keg_type_id?: string | null
+          package_format_id?: string | null
           price?: number
           pricing_tier_id?: string
           sales_channel_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pricing_tier_prices_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "pricing_tier_prices_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "pricing_tier_prices_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "pricing_tier_prices_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "pricing_tier_prices_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pricing_tier_prices_package_format_id_fkey"
             columns: ["package_format_id"]
@@ -7529,6 +7595,15 @@ export type Database = {
           },
         ]
       }
+      pricing_formats: {
+        Row: {
+          format_source: string | null
+          id: string | null
+          name: string | null
+          sort_group: number | null
+        }
+        Relationships: []
+      }
       recent_revisions: {
         Row: {
           change_reason: string | null
@@ -8246,14 +8321,14 @@ export type Database = {
           },
           {
             foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["strain_id"]
+            columns: ["parent_strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["parent_strain_id"]
+            columns: ["strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
             referencedColumns: ["id"]
@@ -8361,6 +8436,10 @@ export type Database = {
       check_low_inventory: { Args: never; Returns: number }
       cleanup_old_notifications: {
         Args: { p_days_old?: number }
+        Returns: number
+      }
+      convert_to_lbs: {
+        Args: { p_amount: number; p_unit: string }
         Returns: number
       }
       create_finished_goods_from_packaging: {
@@ -8723,6 +8802,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       cleaning_type: ["cip", "caustic", "acid", "sanitize", "manual", "rinse"],
