@@ -30,7 +30,6 @@ import { SlackIcon } from "@/components/ui/slack-icon";
 import {
   Loader2,
   ExternalLink,
-  Send,
 } from "lucide-react";
 
 // Notification types with friendly labels
@@ -206,6 +205,8 @@ export function SlackIntegrationCard() {
           onSave={(url) => saveMutation.mutate({ webhook_url: url })}
           onRemove={() => saveMutation.mutate({ webhook_url: null, is_enabled: false })}
           isSaving={saveMutation.isPending}
+          onTest={isConnected ? () => testMutation.mutate() : undefined}
+          isTesting={testMutation.isPending}
           helpText={
             <>
               Create an{" "}
@@ -226,31 +227,16 @@ export function SlackIntegrationCard() {
           <>
             <Separator />
 
-            {/* Enable/Disable + Test */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={isEnabled}
-                  onCheckedChange={(checked) => toggleMutation.mutate(checked)}
-                  disabled={toggleMutation.isPending}
-                />
-                <Label className="text-sm">
-                  {isEnabled ? "Notifications enabled" : "Notifications disabled"}
-                </Label>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => testMutation.mutate()}
-                disabled={testMutation.isPending}
-              >
-                {testMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
-                )}
-                Test Connection
-              </Button>
+            {/* Enable/Disable */}
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={isEnabled}
+                onCheckedChange={(checked) => toggleMutation.mutate(checked)}
+                disabled={toggleMutation.isPending}
+              />
+              <Label className="text-sm">
+                {isEnabled ? "Notifications enabled" : "Notifications disabled"}
+              </Label>
             </div>
 
             <Separator />
