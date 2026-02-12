@@ -181,22 +181,8 @@ export const customerEntity: EntityConfig<Customer> = {
       id: "billing",
       title: "Billing",
       fields: [
-        {
-          name: "payment_terms_days",
-          label: "Payment Terms (days)",
-          type: "number",
-          placeholder: "e.g., 30",
-          description: "Days until invoice is due. Falls back to system default if empty.",
-          colSpan: 6,
-        },
-        {
-          name: "is_tax_exempt",
-          label: "Tax Exempt",
-          type: "switch",
-          description: "Exempt this customer from tax in QuickBooks",
-          defaultValue: false,
-          colSpan: 6,
-        },
+        { field: "payment_terms_days", label: "Payment Terms (days)" },
+        { field: "is_tax_exempt", label: "Tax Exempt" },
       ],
     },
     {

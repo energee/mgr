@@ -60,8 +60,8 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
 
   // Build bill lines
   const lines: QBOBillLine[] = (lineItems || []).map((item) => ({
-    Amount: Number(item.total_cost || item.quantity * (item.unit_cost || 0)),
-    Description: item.description || item.item_name || "Line item",
+    Amount: item.quantity * Number(item.unit_price || 0),
+    Description: `${item.catalog_type} - ${item.catalog_id}`,
     DetailType: "AccountBasedExpenseLineDetail" as const,
     AccountBasedExpenseLineDetail: {
       AccountRef: accountRef,

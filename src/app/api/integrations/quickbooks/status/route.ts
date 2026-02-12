@@ -25,7 +25,8 @@ export const GET = withAuth(async () => {
       "CompanyInfo"
     );
 
-    const companyInfo = result?.QueryResponse?.CompanyInfo?.[0];
+    const companyInfoArr = result?.QueryResponse?.CompanyInfo;
+    const companyInfo = Array.isArray(companyInfoArr) ? companyInfoArr[0] : undefined;
 
     return successResponse({
       connected: true,

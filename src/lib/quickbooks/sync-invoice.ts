@@ -57,7 +57,7 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
     const pkgName = (item.package_type as Record<string, unknown> | null)?.name || "";
     const description = pkgName ? `${brandName} - ${pkgName}` : String(brandName);
     return {
-      Amount: Number(item.total_price || 0),
+      Amount: (item.quantity || 1) * Number(item.unit_price || 0),
       Description: description,
       DetailType: "SalesItemLineDetail" as const,
       SalesItemLineDetail: {
