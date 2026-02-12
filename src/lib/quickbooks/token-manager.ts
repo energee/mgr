@@ -68,35 +68,19 @@ export async function saveTokens(tokens: {
   expiresAt: string;
 }): Promise<void> {
   const admin = await createAdminClient();
-
-  const updates = [
-    { key: SETTINGS_KEYS.accessToken, value: tokens.accessToken },
-    { key: SETTINGS_KEYS.refreshToken, value: tokens.refreshToken },
-    { key: SETTINGS_KEYS.realmId, value: tokens.realmId },
-    { key: SETTINGS_KEYS.expiresAt, value: tokens.expiresAt },
-  ];
-
-  for (const { key, value } of updates) {
-    const { error } = await admin
-      .from("system_settings")
-      .update({ value })
-      .eq("key", key);
-    if (error) throw new Error(`Failed to save ${key}: ${error.message}`);
-  }
+  const { error } = await admin.rpc("save_qbo_tokens", {
+    p_access_token: tokens.accessToken,
+    p_refresh_token: tokens.refreshToken,
+    p_realm_id: tokens.realmId,
+    p_expires_at: tokens.expiresAt,
+  });
+  if (error) throw new Error(`Failed to save QBO tokens: ${error.message}`);
 }
 
 export async function clearTokens(): Promise<void> {
   const admin = await createAdminClient();
-  const keysToNull = [
-    SETTINGS_KEYS.accessToken,
-    SETTINGS_KEYS.refreshToken,
-    SETTINGS_KEYS.realmId,
-    SETTINGS_KEYS.expiresAt,
-  ];
-
-  for (const key of keysToNull) {
-    await admin.from("system_settings").update({ value: null }).eq("key", key);
-  }
+  const { error } = await admin.rpc("clear_qbo_tokens");
+  if (error) throw new Error(`Failed to clear QBO tokens: ${error.message}`);
 }
 
 export async function isTokenExpired(): Promise<boolean> {
@@ -118,17 +102,11 @@ export async function getAutoSyncEnabled(): Promise<boolean> {
 /** Save QBO OAuth client credentials */
 export async function saveClientCredentials(clientId: string, clientSecret: string): Promise<void> {
   const admin = await createAdminClient();
-
-  for (const { key, value } of [
-    { key: SETTINGS_KEYS.clientId, value: clientId },
-    { key: SETTINGS_KEYS.clientSecret, value: clientSecret },
-  ]) {
-    const { error } = await admin
-      .from("system_settings")
-      .update({ value })
-      .eq("key", key);
-    if (error) throw new Error(`Failed to save ${key}: ${error.message}`);
-  }
+  const { error } = await admin.rpc("save_qbo_client_credentials", {
+    p_client_id: clientId,
+    p_client_secret: clientSecret,
+  });
+  if (error) throw new Error(`Failed to save QBO client credentials: ${error.message}`);
 }
 
 /** Refresh the QBO access token using the refresh token */
