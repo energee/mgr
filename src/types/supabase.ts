@@ -9229,6 +9229,20 @@ export type Database = {
         }
         Returns: string
       }
+      save_qbo_client_credentials: {
+        Args: { p_client_id: string; p_client_secret: string }
+        Returns: undefined
+      }
+      save_qbo_tokens: {
+        Args: {
+          p_access_token: string
+          p_refresh_token: string
+          p_realm_id: string
+          p_expires_at: string
+        }
+        Returns: undefined
+      }
+      clear_qbo_tokens: { Args: Record<string, never>; Returns: undefined }
       start_batch_fermentation: {
         Args: {
           p_batch_id: string

@@ -11,6 +11,7 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
+import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
 
 type PurchaseOrder = Database["public"]["Tables"]["purchase_orders"]["Row"];
 
@@ -154,6 +155,11 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       collapsible: true,
     },
     {
+      id: "qbo-sync",
+      title: "QuickBooks",
+      component: createQBOSyncDisplay("purchase_order"),
+    },
+    {
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("purchase_orders"),
@@ -251,6 +257,11 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
           colSpan: 12,
         },
       ],
+    },
+    {
+      id: "qbo-sync",
+      title: "QuickBooks",
+      component: createQBOSyncDisplay("purchase_order"),
     },
     {
       id: "revision-history",

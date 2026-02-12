@@ -14,6 +14,7 @@ import { createRevisionHistoryDisplay } from "@/components/domain/revision-histo
 import { OrderQuickLinks } from "@/components/domain/order-quick-links";
 import { OrderItemsEditor } from "@/components/domain/order-items-editor";
 import { ChangeRequestReview } from "@/components/domain/change-request-review";
+import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
 
 // Wrapper component to adapt OrderItemsEditor to relation component interface
 function OrderItemsRelation({ parentId, data }: { parentId: string; data?: Record<string, unknown> }) {
@@ -179,6 +180,11 @@ export const orderEntity: EntityConfig<Order> = {
       collapsible: true,
     },
     {
+      id: "qbo-sync",
+      title: "QuickBooks",
+      component: createQBOSyncDisplay("order"),
+    },
+    {
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("orders"),
@@ -275,6 +281,11 @@ export const orderEntity: EntityConfig<Order> = {
       title: "Change Requests",
       component: ChangeRequestReview,
       collapsible: true,
+    },
+    {
+      id: "qbo-sync",
+      title: "QuickBooks",
+      component: createQBOSyncDisplay("order"),
     },
     {
       id: "revision-history",
