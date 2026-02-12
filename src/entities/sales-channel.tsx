@@ -9,7 +9,11 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-type SalesChannel = Database["public"]["Tables"]["sales_channels"]["Row"];
+// Extended type — change_request_cutoff_state added by migration 00088
+type SalesChannelBase = Database["public"]["Tables"]["sales_channels"]["Row"];
+type SalesChannel = SalesChannelBase & {
+  change_request_cutoff_state?: string | null;
+};
 
 // =============================================================================
 // Zod Schema

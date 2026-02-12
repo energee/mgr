@@ -9,7 +9,9 @@ export const POST = withRoles(
       return errorResponse("BAD_REQUEST", "Missing request ID", undefined, 400);
     }
 
-    const { error } = await supabase.rpc("apply_change_request", {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabase as any;
+    const { error } = await db.rpc("apply_change_request", {
       p_change_request_id: requestId,
       p_approved_by: user.id,
     });
