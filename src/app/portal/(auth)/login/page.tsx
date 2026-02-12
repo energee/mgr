@@ -1,5 +1,4 @@
-import { Suspense } from "react";
-import { PortalLoginForm } from "./portal-login-form";
+import dynamic from "next/dynamic";
 import {
   Card,
   CardContent,
@@ -7,6 +6,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+const PortalLoginForm = dynamic(() =>
+  import("./portal-login-form").then((m) => m.PortalLoginForm),
+  { ssr: false, loading: () => <div className="h-48 animate-pulse" /> }
+);
 
 export default function PortalLoginPage() {
   return (
@@ -17,9 +21,7 @@ export default function PortalLoginPage() {
           <CardDescription>Enter your email to sign in</CardDescription>
         </CardHeader>
         <CardContent>
-          <Suspense fallback={<div className="h-48 animate-pulse" />}>
-            <PortalLoginForm />
-          </Suspense>
+          <PortalLoginForm />
         </CardContent>
       </Card>
     </div>
