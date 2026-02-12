@@ -3,11 +3,10 @@
 /**
  * Integrations Settings Page
  *
- * AI integration and external service integrations:
- * - Anthropic Claude (Anthropic API key)
- * - Square POS (order sync)
+ * - Anthropic Claude (AI API key)
  * - Slack (notifications)
- * - QuickBooks (accounting)
+ * - Square POS (coming soon)
+ * - QuickBooks (coming soon)
  */
 
 import { useEffect, useState } from "react";
@@ -15,72 +14,20 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
+import { SecretKeyInput } from "@/components/domain/secret-key-input";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { SquareIcon } from "@/components/ui/square-icon";
-import { SlackIcon } from "@/components/ui/slack-icon";
 import { QuickBooksIcon } from "@/components/ui/quickbooks-icon";
-
-const integrationIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  square: SquareIcon,
-  slack: SlackIcon,
-  quickbooks: QuickBooksIcon,
-};
-
-const integrations = [
-  {
-    id: "square",
-    name: "Square POS",
-    description: "Sync orders from Square Point of Sale. Automatically import taproom and retail sales.",
-    status: "beta" as const,
-    keyLabel: "Square Access Token",
-    keyPlaceholder: "sq0atp-...",
-    features: [
-      "Automatic order import",
-      "Real-time inventory sync",
-      "Customer data integration",
-    ],
-  },
-  {
-    id: "slack",
-    name: "Slack",
-    description: "Send notifications to Slack channels. Get alerts for low inventory, batch status changes, and more.",
-    status: "beta" as const,
-    keyLabel: "Slack Webhook URL",
-    keyPlaceholder: "https://hooks.slack.com/services/...",
-    features: [
-      "Channel notifications",
-      "Customizable alerts",
-      "Batch status updates",
-    ],
-  },
-  {
-    id: "quickbooks",
-    name: "QuickBooks",
-    description: "Sync financial data with QuickBooks Online. Automate invoicing and expense tracking.",
-    status: "beta" as const,
-    keyLabel: "QuickBooks Client ID",
-    keyPlaceholder: "AB1cd2EFgh3...",
-    features: [
-      "Invoice sync",
-      "Expense tracking",
-      "Inventory valuation",
-    ],
-  },
-];
+import { SlackIntegrationCard } from "@/components/domain/slack-integration-card";
 
 // =============================================================================
 // Global API Key Section (write-only — key is never read back to the client)
 // =============================================================================
 
 function GlobalApiKeySection() {
-  const [apiKey, setApiKey] = useState("");
   const [hasExistingKey, setHasExistingKey] = useState(false);
   const [keyHint, setKeyHint] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -114,8 +61,6 @@ function GlobalApiKeySection() {
         setHasExistingKey(false);
         setKeyHint(null);
       }
-      setApiKey("");
-      setIsEditing(false);
       toast.success(key ? "Global API key saved" : "Global API key removed");
     },
     onError: () => {
@@ -143,8 +88,6 @@ function GlobalApiKeySection() {
     },
   });
 
-  if (!loaded) return null;
-
   return (
     <Card>
       <CardHeader>
@@ -157,85 +100,21 @@ function GlobalApiKeySection() {
           when individual users don&apos;t have their own key configured.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {hasExistingKey && !isEditing ? (
-          <>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <div className="flex items-center gap-2 text-sm">
-                <Check className="h-4 w-4 text-green-600" />
-                <span>Configured</span>
-                {keyHint && (
-                  <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                    sk-ant-{keyHint}
-                  </code>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => testKey.mutate()}
-                  disabled={testKey.isPending}
-                >
-                  {testKey.isPending ? "Testing..." : "Test"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                >
-                  Change
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => saveKey.mutate("")}
-                  disabled={saveKey.isPending}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Users can override this with their own key in Brewery Settings.
-            </p>
-          </>
-        ) : (
-          <div className="grid gap-2">
-            <Label htmlFor="global_api_key">Anthropic API Key</Label>
-            <div className="flex gap-2">
-              <Input
-                id="global_api_key"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-ant-..."
-                autoComplete="off"
-              />
-              <Button
-                type="button"
-                onClick={() => saveKey.mutate(apiKey)}
-                disabled={!apiKey || saveKey.isPending}
-              >
-                {saveKey.isPending ? "Saving..." : "Save"}
-              </Button>
-              {hasExistingKey && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setApiKey("");
-                  }}
-                >
-                  Cancel
-                </Button>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
+      <CardContent>
+        <SecretKeyInput
+          label="Anthropic API Key"
+          placeholder="sk-ant-..."
+          hintPrefix="sk-ant-"
+          isLoading={!loaded}
+          hasExistingKey={hasExistingKey}
+          keyHint={keyHint}
+          onSave={(key) => saveKey.mutate(key)}
+          onRemove={() => saveKey.mutate("")}
+          isSaving={saveKey.isPending}
+          onTest={() => testKey.mutate()}
+          isTesting={testKey.isPending}
+          helpText={
+            <>
               Get your API key from{" "}
               <a
                 href="https://console.anthropic.com/settings/keys"
@@ -245,27 +124,12 @@ function GlobalApiKeySection() {
               >
                 console.anthropic.com
               </a>
-            </p>
-          </div>
-        )}
+            </>
+          }
+        />
       </CardContent>
     </Card>
   );
-}
-
-// =============================================================================
-// External Integrations
-// =============================================================================
-
-function getStatusBadge(status: "connected" | "beta" | "disconnected") {
-  switch (status) {
-    case "connected":
-      return <Badge variant="default">Connected</Badge>;
-    case "beta":
-      return <Badge variant="secondary">Beta</Badge>;
-    case "disconnected":
-      return <Badge variant="outline">Not Connected</Badge>;
-  }
 }
 
 // =============================================================================
@@ -281,10 +145,8 @@ function IntegrationKeySection({
   keyLabel: string;
   keyPlaceholder: string;
 }) {
-  const [apiKey, setApiKey] = useState("");
   const [hasExistingKey, setHasExistingKey] = useState(false);
   const [keyHint, setKeyHint] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -318,8 +180,6 @@ function IntegrationKeySection({
         setHasExistingKey(false);
         setKeyHint(null);
       }
-      setApiKey("");
-      setIsEditing(false);
       toast.success(key ? `${keyLabel} saved` : `${keyLabel} removed`);
     },
     onError: () => {
@@ -327,75 +187,17 @@ function IntegrationKeySection({
     },
   });
 
-  if (!loaded) return null;
-
-  if (hasExistingKey && !isEditing) {
-    return (
-      <div className="flex items-center justify-between rounded-md border px-3 py-2">
-        <div className="flex items-center gap-2 text-sm">
-          <Check className="h-4 w-4 text-green-600" />
-          <span>Configured</span>
-          {keyHint && (
-            <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-              {keyHint}
-            </code>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsEditing(true)}
-          >
-            Change
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => saveKey.mutate("")}
-            disabled={saveKey.isPending}
-          >
-            Remove
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="grid gap-2">
-      <Label>{keyLabel}</Label>
-      <div className="flex gap-2">
-        <Input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder={keyPlaceholder}
-          autoComplete="off"
-        />
-        <Button
-          type="button"
-          onClick={() => saveKey.mutate(apiKey)}
-          disabled={!apiKey || saveKey.isPending}
-        >
-          {saveKey.isPending ? "Saving..." : "Save"}
-        </Button>
-        {hasExistingKey && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setIsEditing(false);
-              setApiKey("");
-            }}
-          >
-            Cancel
-          </Button>
-        )}
-      </div>
-    </div>
+    <SecretKeyInput
+      label={keyLabel}
+      placeholder={keyPlaceholder}
+      isLoading={!loaded}
+      hasExistingKey={hasExistingKey}
+      keyHint={keyHint}
+      onSave={(key) => saveKey.mutate(key)}
+      onRemove={() => saveKey.mutate("")}
+      isSaving={saveKey.isPending}
+    />
   );
 }
 
@@ -412,49 +214,96 @@ export default function IntegrationsPage() {
       {/* AI Integration */}
       <GlobalApiKeySection />
 
-      {/* Integration Cards */}
-      <div className="space-y-4">
-        {integrations.map((integration) => {
-          const Icon = integrationIcons[integration.id];
-          return (
-            <Card key={integration.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      {Icon && <Icon className="h-5 w-5" />}
-                      {integration.name}
-                    </CardTitle>
-                    <CardDescription>
-                      {integration.description}
-                    </CardDescription>
-                  </div>
-                  {getStatusBadge(integration.status)}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <IntegrationKeySection
-                  integrationId={integration.id}
-                  keyLabel={integration.keyLabel}
-                  keyPlaceholder={integration.keyPlaceholder}
-                />
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Features</h4>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {integration.features.map((feature, index) => (
-                      <li key={index} className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {/* Slack Integration */}
+      <SlackIntegrationCard />
 
+      {/* Square POS */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-muted">
+                <SquareIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Square POS</CardTitle>
+                <CardDescription>
+                  Sync orders from Square Point of Sale. Automatically import taproom and retail sales.
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant="secondary">Beta</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <IntegrationKeySection
+            integrationId="square"
+            keyLabel="Square Access Token"
+            keyPlaceholder="sq0atp-..."
+          />
+          <div>
+            <h4 className="text-sm font-medium mb-2">Features</h4>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                Automatic order import
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                Real-time inventory sync
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                Customer data integration
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* QuickBooks */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-muted">
+                <QuickBooksIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">QuickBooks</CardTitle>
+                <CardDescription>
+                  Sync financial data with QuickBooks Online. Automate invoicing and expense tracking.
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant="secondary">Beta</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <IntegrationKeySection
+            integrationId="quickbooks"
+            keyLabel="QuickBooks Client ID"
+            keyPlaceholder="AB1cd2EFgh3..."
+          />
+          <div>
+            <h4 className="text-sm font-medium mb-2">Features</h4>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                Invoice sync
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                Expense tracking
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                Inventory valuation
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
       {/* Custom Integration Section */}
       <Card>
         <CardHeader>

@@ -132,14 +132,26 @@ export async function POST(req: Request): Promise<Response> {
 
   if (scope === "global") {
     const admin = createAdminDb();
-    const { error } = await admin
-      .from("system_settings")
-      .update({ value: key || null })
-      .eq("key", "anthropic_api_key");
+    if (!key) {
+      const { error } = await admin
+        .from("system_settings")
+        .delete()
+        .eq("key", "anthropic_api_key");
 
-    if (error) {
-      console.error("[api-key] Failed to save global key:", error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        console.error("[api-key] Failed to remove global key:", error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    } else {
+      const { error } = await admin
+        .from("system_settings")
+        .update({ value: key })
+        .eq("key", "anthropic_api_key");
+
+      if (error) {
+        console.error("[api-key] Failed to save global key:", error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
     }
     return NextResponse.json({ success: true });
   }
@@ -175,10 +187,23 @@ export async function POST(req: Request): Promise<Response> {
       .eq("key", settingsKey)
       .maybeSingle();
 
-    if (existing) {
+    if (!key) {
+      // Remove: delete the row (value is NOT NULL so we can't set null)
+      if (existing) {
+        const { error } = await admin
+          .from("system_settings")
+          .delete()
+          .eq("key", settingsKey);
+
+        if (error) {
+          console.error(`[api-key] Failed to remove ${id} key:`, error.message);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+      }
+    } else if (existing) {
       const { error } = await admin
         .from("system_settings")
-        .update({ value: key || null })
+        .update({ value: key })
         .eq("key", settingsKey);
 
       if (error) {
@@ -188,7 +213,7 @@ export async function POST(req: Request): Promise<Response> {
     } else {
       const { error } = await admin
         .from("system_settings")
-        .insert({ key: settingsKey, value: key || null });
+        .insert({ key: settingsKey, value: key });
 
       if (error) {
         console.error(`[api-key] Failed to insert ${id} key:`, error.message);

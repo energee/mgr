@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { useIsMac } from "@/hooks/use-is-mac";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
@@ -116,12 +117,7 @@ export function EntityForm<T = Record<string, unknown>>({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isMac, setIsMac] = useState(true); // Default to Mac, update on mount
-
-  // Detect platform for keyboard shortcut display
-  useEffect(() => {
-    setIsMac(navigator.platform.toLowerCase().includes("mac"));
-  }, []);
+  const isMac = useIsMac();
 
   // Fetch existing record for edit mode
   const { data: existingData, isLoading } = useQuery({
