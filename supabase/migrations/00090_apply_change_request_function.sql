@@ -69,18 +69,32 @@ BEGIN
         WHERE id = v_item.order_item_id;
 
       WHEN 'remove' THEN
-        -- Cancel planned allocations for this item
+        -- Cancel planned allocations for this item, limited to the item's
+        -- quantity to avoid over-cancelling when multiple items share the
+        -- same brand/format.
+        WITH removed_item AS (
+          SELECT oi.quantity, oi.brand_id, oi.package_type_id, oi.keg_type_id
+          FROM order_items oi WHERE oi.id = v_item.order_item_id
+        ),
+        matching_allocations AS (
+          SELECT a.id, a.quantity,
+                 SUM(a.quantity) OVER (ORDER BY a.created_at) AS running_total
+          FROM allocations a, removed_item ri
+          WHERE a.destination_type = 'order'
+            AND a.destination_id = v_request.order_id
+            AND a.status = 'planned'
+            AND a.source_id IN (
+              SELECT fg.id FROM finished_goods fg
+              WHERE fg.brand_id = ri.brand_id
+                AND (fg.package_type_id = ri.package_type_id OR fg.keg_type_id = ri.keg_type_id)
+            )
+        )
         UPDATE allocations
         SET status = 'cancelled'
-        WHERE destination_type = 'order'
-          AND destination_id = v_request.order_id
-          AND status = 'planned'
-          AND source_id IN (
-            SELECT fg.id FROM finished_goods fg
-            JOIN order_items oi ON oi.id = v_item.order_item_id
-            WHERE fg.brand_id = oi.brand_id
-              AND (fg.package_type_id = oi.package_type_id OR fg.keg_type_id = oi.keg_type_id)
-          );
+        WHERE id IN (
+          SELECT ma.id FROM matching_allocations ma, removed_item ri
+          WHERE ma.running_total - ma.quantity < ri.quantity
+        );
 
         DELETE FROM order_items WHERE id = v_item.order_item_id;
 

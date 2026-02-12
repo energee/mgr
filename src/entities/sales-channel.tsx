@@ -8,6 +8,13 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { orderEntity } from "./order";
+import { statesAsOptions } from "@/types/entity";
+
+// Derive cutoff state options from order state machine (DEC-007: single source of truth)
+const cutoffStateOptions = statesAsOptions(orderEntity.stateMachine!).filter(
+  (opt) => opt.value !== "cancelled"
+);
 
 // Extended type — change_request_cutoff_state added by migration 00088
 type SalesChannelBase = Database["public"]["Tables"]["sales_channels"]["Row"];
@@ -164,14 +171,7 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
           label: "Change request cutoff",
           type: "select",
           description: "Customers can request order changes until this state",
-          options: [
-            { value: "draft", label: "Draft" },
-            { value: "confirmed", label: "Confirmed" },
-            { value: "scheduled", label: "Scheduled" },
-            { value: "picking", label: "Picking" },
-            { value: "packed", label: "Packed" },
-            { value: "fulfilled", label: "Fulfilled" },
-          ],
+          options: cutoffStateOptions,
           colSpan: 6,
         },
       ],
@@ -227,14 +227,7 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
       label: "Change Request Cutoff",
       type: "select",
       description: "Customers can request order changes until this state",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "confirmed", label: "Confirmed" },
-        { value: "scheduled", label: "Scheduled" },
-        { value: "picking", label: "Picking" },
-        { value: "packed", label: "Packed" },
-        { value: "fulfilled", label: "Fulfilled" },
-      ],
+      options: cutoffStateOptions,
       colSpan: 6,
     },
   ],
