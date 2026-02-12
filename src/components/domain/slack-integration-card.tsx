@@ -58,7 +58,7 @@ function ConnectionBadge({
   isEnabled: boolean;
 }) {
   if (!isConnected) {
-    return <Badge variant="secondary">Not Connected</Badge>;
+    return <Badge variant="outline">Not Connected</Badge>;
   }
   if (isEnabled) {
     return <Badge variant="default">Active</Badge>;
