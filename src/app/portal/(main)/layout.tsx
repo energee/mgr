@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { PortalShell } from "@/components/portal/portal-shell";
+import type { PortalCustomer } from "@/lib/portal-context";
 
 export default async function PortalLayout({
   children,
@@ -16,38 +17,43 @@ export default async function PortalLayout({
     redirect("/portal/login");
   }
 
-  // Find linked customer
+  // Find linked customers via junction table
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-  let { data: customer } = await db
-    .from("customers")
-    .select("id, name, email")
-    .eq("user_id", user.id)
-    .single();
+  const { data: links } = await db
+    .from("customer_portal_users")
+    .select("customer_id, customers(id, name, email)")
+    .eq("user_id", user.id);
 
-  // Auto-link by email on first login
-  if (!customer && user.email) {
+  let customers: PortalCustomer[] = (links ?? [])
+    .map((l: { customers: PortalCustomer | null }) => l.customers)
+    .filter((c: PortalCustomer | null): c is PortalCustomer => c != null);
+
+  // Auto-link by email on first login (no existing links)
+  if (customers.length === 0 && user.email) {
     const adminDb = await createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const adminAny = adminDb as any;
     const { data: matched } = await adminAny
       .from("customers")
       .select("id, name, email")
-      .eq("email", user.email)
-      .is("user_id", null)
-      .single();
+      .eq("email", user.email);
 
-    if (matched) {
-      await adminAny
-        .from("customers")
-        .update({ user_id: user.id })
-        .eq("id", matched.id);
-      customer = matched;
+    if (matched?.length > 0) {
+      for (const cust of matched) {
+        await adminAny
+          .from("customer_portal_users")
+          .upsert({ customer_id: cust.id, user_id: user.id });
+      }
+      customers = matched.map((c: PortalCustomer) => ({
+        id: c.id,
+        name: c.name,
+      }));
     }
   }
 
-  if (!customer) {
-    return <PortalShell customer={null}>{children}</PortalShell>;
+  if (customers.length === 0) {
+    return <PortalShell customers={[]}>{children}</PortalShell>;
   }
 
   // Get brewery branding
@@ -56,16 +62,15 @@ export default async function PortalLayout({
     .select("key, value")
     .in("key", ["brewery_name", "brewery_logo_svg"]);
 
-  const settingsMap: Record<string, unknown> = {};
-  for (const row of settings || []) {
-    settingsMap[row.key as string] = row.value;
-  }
+  const settingsMap = Object.fromEntries(
+    (settings ?? []).map((row: { key: string; value: unknown }) => [row.key, row.value])
+  );
 
   return (
     <PortalShell
-      customer={{ id: customer.id, name: customer.name }}
-      breweryName={(settingsMap.brewery_name as string) || null}
-      breweryLogo={(settingsMap.brewery_logo_svg as string) || null}
+      customers={customers}
+      breweryName={(settingsMap.brewery_name as string) ?? null}
+      breweryLogo={(settingsMap.brewery_logo_svg as string) ?? null}
     >
       {children}
     </PortalShell>

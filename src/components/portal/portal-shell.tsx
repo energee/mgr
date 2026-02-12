@@ -9,14 +9,14 @@ import { LogOut } from "lucide-react";
 
 interface PortalShellProps {
   children: React.ReactNode;
-  customer: { id: string; name: string } | null;
+  customers: { id: string; name: string }[];
   breweryName?: string | null;
   breweryLogo?: string | null;
 }
 
 export function PortalShell({
   children,
-  customer,
+  customers,
   breweryName,
   breweryLogo,
 }: PortalShellProps) {
@@ -29,7 +29,7 @@ export function PortalShell({
     router.refresh();
   }
 
-  if (!customer) {
+  if (customers.length === 0) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
         <div className="max-w-md space-y-4 text-center">
@@ -49,9 +49,17 @@ export function PortalShell({
     );
   }
 
+  const displayName =
+    customers.length === 1
+      ? customers[0].name
+      : `${customers[0].name} +${customers.length - 1}`;
+
   return (
     <PortalProvider
-      value={{ customerId: customer.id, customerName: customer.name }}
+      value={{
+        customers,
+        customerIds: customers.map((c) => c.id),
+      }}
     >
       <div className="flex min-h-screen flex-col bg-background">
         <header className="sticky top-0 z-50 border-b bg-background">
@@ -80,7 +88,7 @@ export function PortalShell({
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">
-                {customer.name}
+                {displayName}
               </span>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />

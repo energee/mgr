@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { entityKeys } from "@/lib/query-keys";
+import { portalKeys } from "@/lib/query-keys";
 import { usePortalCustomer } from "@/lib/portal-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,45 +13,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/universal/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
-import { format } from "date-fns";
-
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  scheduled: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  picking:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  packed:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  fulfilled:
-    "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-};
-
-const statusLabels: Record<string, string> = {
-  draft: "Draft",
-  confirmed: "Confirmed",
-  scheduled: "Scheduled",
-  picking: "Picking",
-  packed: "Packed",
-  fulfilled: "Fulfilled",
-  cancelled: "Cancelled",
-};
+import { orderEntity } from "@/entities/order";
 
 function formatDate(dateString: string | null): string {
   if (!dateString) return "-";
-  return format(new Date(dateString), "MMM d, yyyy");
+  return new Date(dateString).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function PortalOrdersPage() {
-  const { customerId } = usePortalCustomer();
+  const { customerIds } = usePortalCustomer();
   const supabase = createClient();
 
   const { data: orders, isLoading } = useQuery({
-    queryKey: entityKeys.list("orders"),
+    queryKey: portalKeys.orders(customerIds),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -62,7 +43,7 @@ export default function PortalOrdersPage() {
       if (error) throw error;
       return data;
     },
-    enabled: !!customerId,
+    enabled: customerIds.length > 0,
   });
 
   return (
@@ -110,16 +91,10 @@ export default function PortalOrdersPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          statusColors[order.status ?? ""] ?? statusColors.draft
-                        }
-                      >
-                        {statusLabels[order.status ?? ""] ??
-                          order.status ??
-                          "Unknown"}
-                      </Badge>
+                      <StatusBadge
+                        status={order.status}
+                        config={orderEntity.stateMachine?.stateDisplay}
+                      />
                     </TableCell>
                     <TableCell>{formatDate(order.order_date)}</TableCell>
                     <TableCell>{formatDate(order.requested_date)}</TableCell>

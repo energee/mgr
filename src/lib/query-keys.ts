@@ -505,6 +505,16 @@ export const deliveryKeys = {
 };
 
 // =============================================================================
+// Portal Keys (customer portal)
+// =============================================================================
+
+export const portalKeys = {
+  all: () => ["portal"] as const,
+  orders: (customerIds: string[]) => ["portal", "orders", ...customerIds] as const,
+  cutoff: (orderId: string) => ["portal", "cutoff", orderId] as const,
+};
+
+// =============================================================================
 // Finished Good Keys
 // =============================================================================
 

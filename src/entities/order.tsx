@@ -454,3 +454,19 @@ export const orderEntity: EntityConfig<Order> = {
 
   keyFields: ["order_number", "status", "order_date", "customer_id"],
 };
+
+/**
+ * Change Request Status Display
+ *
+ * Status display config for order_change_requests (not a standalone entity,
+ * but needs consistent status rendering via StatusBadge).
+ */
+export const changeRequestStatusDisplay: Record<
+  string,
+  { label: string; color: "default" | "success" | "warning" | "error" | "info" }
+> = {
+  pending: { label: "Pending Review", color: "warning" },
+  approved: { label: "Approved", color: "success" },
+  rejected: { label: "Rejected", color: "error" },
+  cancelled: { label: "Cancelled", color: "default" },
+};

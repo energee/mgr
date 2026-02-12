@@ -88,8 +88,8 @@ All entity pages use universal components:
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00090`
-Next available: `00091`
+Current highest: `00091`
+Next available: `00092`
 
 ### Reference Files by Pattern
 
@@ -184,7 +184,7 @@ Available key factories:
 - `catalogKeys` - Catalog/lookup data
 - `recipeKeys`, `batchKeys`, `orderKeys` - Domain-specific queries
 
-When adding new queries, add a key factory to `query-keys.ts` first.
+When adding new queries, add a key factory to `query-keys.ts` first. This includes portal queries, one-off queries, and any `useQuery` call — no exceptions.
 
 ## Schema Registry
 
@@ -209,14 +209,20 @@ ORDER BY domain, table_name;
 
 See `docs/spec/architecture.md` for full details on DEC-007 and DEC-008.
 
-### Status labels from entity configs (DEC-007)
+### Status display from entity configs (DEC-007)
+Never hardcode status color maps, label maps, or state arrays. Derive everything from the entity's `stateMachine` config.
 ```typescript
-// CORRECT: Use helper functions
-import { getStateLabel } from "@/types/entity";
-<Badge>{getStateLabel(vesselEntity, status)}</Badge>
+// CORRECT: Use StatusBadge with entity config
+import { StatusBadge } from "@/components/universal/status-badge";
+<StatusBadge status={value} stateDisplay={orderEntity.stateMachine?.stateDisplay} />
 
-// WRONG: Hardcoded status labels in components
+// CORRECT: Derive state lists from config
+const states = Object.keys(orderEntity.stateMachine?.states ?? {});
+
+// WRONG: Hardcoded status labels or colors in components
 const labels = { available: "Available" };
+const colors = { draft: "bg-muted text-muted-foreground" };
+const STATE_RANKS = ["draft", "confirmed", "scheduled", ...];
 ```
 
 ### No empty strings in Select options (DEC-008)

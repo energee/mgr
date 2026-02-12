@@ -3,7 +3,7 @@
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { entityKeys, changeRequestKeys } from "@/lib/query-keys";
+import { entityKeys, changeRequestKeys, portalKeys } from "@/lib/query-keys";
 import { usePortalCustomer } from "@/lib/portal-context";
 import {
   Card,
@@ -19,55 +19,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/universal/status-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { orderEntity, changeRequestStatusDisplay } from "@/entities/order";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const ORDER_STATE_RANKS = [
-  "draft",
-  "confirmed",
-  "scheduled",
-  "picking",
-  "packed",
-  "fulfilled",
-  "cancelled",
-];
-
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  scheduled: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  picking:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  packed:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  fulfilled:
-    "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-};
-
-const changeRequestStatusColors: Record<string, string> = {
-  pending:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  approved:
-    "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  cancelled: "bg-muted text-muted-foreground",
-};
+const ORDER_STATES = orderEntity.stateMachine?.states ?? [];
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function isBelowCutoff(orderStatus: string, cutoffState: string): boolean {
-  const orderRank = ORDER_STATE_RANKS.indexOf(orderStatus);
-  const cutoffRank = ORDER_STATE_RANKS.indexOf(cutoffState);
+  const orderRank = ORDER_STATES.indexOf(orderStatus);
+  const cutoffRank = ORDER_STATES.indexOf(cutoffState);
   if (orderRank === -1 || cutoffRank === -1) return false;
   return orderRank < cutoffRank;
 }
@@ -88,21 +59,8 @@ function formatDate(dateStr: string | null | undefined): string {
   });
 }
 
-function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
 function changeTypeLabel(changeType: string): string {
-  switch (changeType) {
-    case "add":
-      return "Add";
-    case "remove":
-      return "Remove";
-    case "modify":
-      return "Modify";
-    default:
-      return capitalize(changeType);
-  }
+  return changeType.charAt(0).toUpperCase() + changeType.slice(1);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,19 +178,19 @@ export default function PortalOrderDetailPage({
     enabled: !!id,
   });
 
-  // ---- Query 3: Cutoff Check ----
+  // ---- Query 3: Cutoff Check (derive from order's customer) ----
   const { data: cutoffState } = useQuery<string>({
-    queryKey: ["portal", "cutoff", id],
+    queryKey: portalKeys.cutoff(id),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
-      const { data: customer } = await db
-        .from("customers")
-        .select("sales_channel_id, sales_channels(change_request_cutoff_state)")
-        .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      const { data: orderRow } = await db
+        .from("orders")
+        .select("customer_id, customers(sales_channel_id, sales_channels(change_request_cutoff_state))")
+        .eq("id", id)
         .single();
       return (
-        customer?.sales_channels?.change_request_cutoff_state || "confirmed"
+        orderRow?.customers?.sales_channels?.change_request_cutoff_state || "confirmed"
       );
     },
     enabled: !!id,
@@ -307,9 +265,7 @@ export default function PortalOrderDetailPage({
           <h1 className="text-2xl font-semibold tracking-tight">
             Order #{order.order_number}
           </h1>
-          <Badge className={statusColors[order.status] ?? ""}>
-            {capitalize(order.status)}
-          </Badge>
+          <StatusBadge status={order.status} config={orderEntity.stateMachine?.stateDisplay} />
         </div>
       </div>
 
@@ -436,11 +392,10 @@ export default function PortalOrderDetailPage({
           <CardHeader>
             <div className="flex items-center gap-3">
               <CardTitle>Pending Change Request</CardTitle>
-              <Badge
-                className={changeRequestStatusColors.pending}
-              >
-                Pending Review
-              </Badge>
+              <StatusBadge
+                status="pending"
+                config={changeRequestStatusDisplay}
+              />
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -481,9 +436,10 @@ export default function PortalOrderDetailPage({
             <CardHeader>
               <div className="flex items-center gap-3">
                 <CardTitle>Change Request Rejected</CardTitle>
-                <Badge className={changeRequestStatusColors.rejected}>
-                  Rejected
-                </Badge>
+                <StatusBadge
+                  status="rejected"
+                  config={changeRequestStatusDisplay}
+                />
               </div>
             </CardHeader>
             <CardContent>
@@ -512,13 +468,10 @@ export default function PortalOrderDetailPage({
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Badge
-                        className={
-                          changeRequestStatusColors[cr.status] ?? ""
-                        }
-                      >
-                        {capitalize(cr.status)}
-                      </Badge>
+                      <StatusBadge
+                        status={cr.status}
+                        config={changeRequestStatusDisplay}
+                      />
                       <span className="text-sm text-muted-foreground">
                         {formatDate(cr.created_at)}
                       </span>

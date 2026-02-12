@@ -1,9 +1,14 @@
 "use client";
 import { createContext, useContext } from "react";
 
+export interface PortalCustomer {
+  id: string;
+  name: string;
+}
+
 interface PortalContextValue {
-  customerId: string;
-  customerName: string;
+  customers: PortalCustomer[];
+  customerIds: string[];
 }
 
 const PortalContext = createContext<PortalContextValue | null>(null);
