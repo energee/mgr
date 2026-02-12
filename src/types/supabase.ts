@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       _schema_registry: {
@@ -951,6 +926,13 @@ export type Database = {
             referencedRelation: "locations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bins_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       brands: {
@@ -1169,8 +1151,10 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          is_tax_exempt: boolean
           name: string
           notes: string | null
+          payment_terms_days: number | null
           phone: string | null
           price_tier_id: string | null
           sales_channel_id: string | null
@@ -1184,8 +1168,10 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_tax_exempt?: boolean
           name: string
           notes?: string | null
+          payment_terms_days?: number | null
           phone?: string | null
           price_tier_id?: string | null
           sales_channel_id?: string | null
@@ -1199,8 +1185,10 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_tax_exempt?: boolean
           name?: string
           notes?: string | null
+          payment_terms_days?: number | null
           phone?: string | null
           price_tier_id?: string | null
           sales_channel_id?: string | null
@@ -2029,6 +2017,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "keg_transactions_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "keg_transactions_keg_owner_id_fkey"
             columns: ["keg_owner_id"]
             isOneToOne: false
@@ -2103,6 +2098,13 @@ export type Database = {
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
         ]
@@ -2243,6 +2245,8 @@ export type Database = {
           is_primary: boolean | null
           location_type: string
           name: string
+          pos_bin_id: string | null
+          square_location_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2253,6 +2257,8 @@ export type Database = {
           is_primary?: boolean | null
           location_type?: string
           name: string
+          pos_bin_id?: string | null
+          square_location_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2263,9 +2269,26 @@ export type Database = {
           is_primary?: boolean | null
           location_type?: string
           name?: string
+          pos_bin_id?: string | null
+          square_location_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "locations_pos_bin_id_fkey"
+            columns: ["pos_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_pos_bin_id_fkey"
+            columns: ["pos_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       malts: {
         Row: {
@@ -2946,6 +2969,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pick_list_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pick_list_items_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: false
@@ -3340,6 +3370,105 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      qbo_account_mappings: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          qbo_account_id: string | null
+          qbo_account_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          qbo_account_id?: string | null
+          qbo_account_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          qbo_account_id?: string | null
+          qbo_account_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      qbo_sync_log: {
+        Row: {
+          action: string
+          completed_at: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          error_message: string | null
+          id: string
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+        }
+        Insert: {
+          action: string
+          completed_at?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+        }
+        Update: {
+          action?: string
+          completed_at?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
+      qbo_sync_mappings: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          last_synced_at: string
+          qbo_entity_id: string
+          qbo_entity_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          last_synced_at?: string
+          qbo_entity_id: string
+          qbo_entity_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          last_synced_at?: string
+          qbo_entity_id?: string
+          qbo_entity_type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       recipe_additions: {
         Row: {
@@ -4593,6 +4722,87 @@ export type Database = {
           },
         ]
       }
+      slack_notification_log: {
+        Row: {
+          action_url: string | null
+          channel: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          message: string | null
+          metadata: Json | null
+          notification_type: string
+          priority: string
+          sent_at: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          action_url?: string | null
+          channel?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json | null
+          notification_type: string
+          priority?: string
+          sent_at?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          action_url?: string | null
+          channel?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json | null
+          notification_type?: string
+          priority?: string
+          sent_at?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      slack_settings: {
+        Row: {
+          app_url: string | null
+          channel_overrides: Json
+          created_at: string
+          default_channel: string | null
+          id: string
+          internal_secret: string
+          is_enabled: boolean
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          app_url?: string | null
+          channel_overrides?: Json
+          created_at?: string
+          default_channel?: string | null
+          id?: string
+          internal_secret?: string
+          is_enabled?: boolean
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          app_url?: string | null
+          channel_overrides?: Json
+          created_at?: string
+          default_channel?: string | null
+          id?: string
+          internal_secret?: string
+          is_enabled?: boolean
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       spices: {
         Row: {
           cost_per_unit: number | null
@@ -4634,6 +4844,278 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      square_catalog_map: {
+        Row: {
+          brand_id: string
+          created_at: string
+          id: string
+          keg_type_id: string | null
+          last_synced_at: string | null
+          object_type: string
+          package_type_id: string | null
+          square_catalog_id: string
+          square_version: number | null
+          updated_at: string
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          id?: string
+          keg_type_id?: string | null
+          last_synced_at?: string | null
+          object_type: string
+          package_type_id?: string | null
+          square_catalog_id: string
+          square_version?: number | null
+          updated_at?: string
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          id?: string
+          keg_type_id?: string | null
+          last_synced_at?: string | null
+          object_type?: string
+          package_type_id?: string | null
+          square_catalog_id?: string
+          square_version?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "square_catalog_map_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "square_catalog_map_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "square_catalog_map_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "square_catalog_map_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "square_catalog_map_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "square_catalog_map_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "square_catalog_map_package_type_id_fkey"
+            columns: ["package_type_id"]
+            isOneToOne: false
+            referencedRelation: "package_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      square_draft_sales: {
+        Row: {
+          brand_id: string
+          created_at: string
+          id: string
+          keg_type_id: string
+          location_id: string
+          quantity: number
+          sold_at: string
+          square_order_id: string
+          square_payment_id: string | null
+          unit_price_cents: number | null
+          volume_oz: number | null
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          id?: string
+          keg_type_id: string
+          location_id: string
+          quantity: number
+          sold_at: string
+          square_order_id: string
+          square_payment_id?: string | null
+          unit_price_cents?: number | null
+          volume_oz?: number | null
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          id?: string
+          keg_type_id?: string
+          location_id?: string
+          quantity?: number
+          sold_at?: string
+          square_order_id?: string
+          square_payment_id?: string | null
+          unit_price_cents?: number | null
+          volume_oz?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "square_draft_sales_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "square_draft_sales_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "square_draft_sales_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "square_draft_sales_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "square_draft_sales_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["keg_type_id"]
+          },
+          {
+            foreignKeyName: "square_draft_sales_keg_type_id_fkey"
+            columns: ["keg_type_id"]
+            isOneToOne: false
+            referencedRelation: "keg_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "square_draft_sales_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "square_draft_sales_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      square_settings: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          id: string
+          is_enabled: boolean
+          last_catalog_sync_at: string | null
+          last_inventory_sync_at: string | null
+          updated_at: string
+          webhook_signature_key: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          id: string
+          is_enabled?: boolean
+          last_catalog_sync_at?: string | null
+          last_inventory_sync_at?: string | null
+          updated_at?: string
+          webhook_signature_key?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_catalog_sync_at?: string | null
+          last_inventory_sync_at?: string | null
+          updated_at?: string
+          webhook_signature_key?: string | null
+        }
+        Relationships: []
+      }
+      square_sync_log: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          details: Json | null
+          id: string
+          items_failed: number
+          items_synced: number
+          location_id: string | null
+          started_at: string
+          sync_type: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          items_failed?: number
+          items_synced?: number
+          location_id?: string | null
+          started_at?: string
+          sync_type: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          items_failed?: number
+          items_synced?: number
+          location_id?: string | null
+          started_at?: string
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "square_sync_log_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "square_sync_log_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sugars: {
         Row: {
@@ -5285,6 +5767,13 @@ export type Database = {
             referencedRelation: "locations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "vessels_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       water_profiles: {
@@ -5466,6 +5955,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "yeast_pitches_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "yeast_pitches_parent_pitch_id_fkey"
             columns: ["parent_pitch_id"]
             isOneToOne: false
@@ -5629,6 +6125,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
         ]
@@ -6127,6 +6630,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bins_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
         ]
@@ -7040,6 +7550,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "keg_transactions_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "keg_transactions_keg_owner_id_fkey"
             columns: ["keg_owner_id"]
             isOneToOne: false
@@ -7114,6 +7631,13 @@ export type Database = {
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
         ]
@@ -7201,6 +7725,38 @@ export type Database = {
           {
             foreignKeyName: "location_transfers_to_bin_id_fkey"
             columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locations_with_pos: {
+        Row: {
+          address: Json | null
+          created_at: string | null
+          id: string | null
+          is_active: boolean | null
+          is_primary: boolean | null
+          location_type: string | null
+          name: string | null
+          pos_bin_id: string | null
+          pos_bin_name: string | null
+          pos_bin_type: string | null
+          square_location_id: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_pos_bin_id_fkey"
+            columns: ["pos_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_pos_bin_id_fkey"
+            columns: ["pos_bin_id"]
             isOneToOne: false
             referencedRelation: "bins_with_summary"
             referencedColumns: ["id"]
@@ -7604,6 +8160,19 @@ export type Database = {
         }
         Relationships: []
       }
+      qbo_sync_status: {
+        Row: {
+          entity_id: string | null
+          entity_type: string | null
+          last_error: string | null
+          last_sync_attempted_at: string | null
+          last_sync_status: string | null
+          last_synced_at: string | null
+          qbo_entity_id: string | null
+          qbo_entity_type: string | null
+        }
+        Relationships: []
+      }
       recent_revisions: {
         Row: {
           change_reason: string | null
@@ -7868,6 +8437,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      square_settings_safe: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          is_enabled: boolean | null
+          last_catalog_sync_at: string | null
+          last_inventory_sync_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          is_enabled?: boolean | null
+          last_catalog_sync_at?: string | null
+          last_inventory_sync_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          is_enabled?: boolean | null
+          last_catalog_sync_at?: string | null
+          last_inventory_sync_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       ttb_current_month_summary: {
         Row: {
@@ -8196,6 +8792,13 @@ export type Database = {
             referencedRelation: "locations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "vessels_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       yeast_lineage_summary: {
@@ -8306,6 +8909,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "yeast_pitches_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations_with_pos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "yeast_pitches_parent_pitch_id_fkey"
             columns: ["parent_pitch_id"]
             isOneToOne: false
@@ -8321,14 +8931,14 @@ export type Database = {
           },
           {
             foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["parent_strain_id"]
+            columns: ["strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["strain_id"]
+            columns: ["parent_strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
             referencedColumns: ["id"]
@@ -8577,6 +9187,7 @@ export type Database = {
       get_user_role: { Args: { p_user_id?: string }; Returns: string }
       is_admin: { Args: { p_user_id?: string }; Returns: boolean }
       is_admin_rls: { Args: { p_user_id: string }; Returns: boolean }
+      is_sensitive_setting: { Args: { setting_key: string }; Returns: boolean }
       is_valid_enum: {
         Args: { p_enum_type: string; p_value: string }
         Returns: boolean
@@ -8802,9 +9413,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       cleaning_type: ["cip", "caustic", "acid", "sanitize", "manual", "rinse"],

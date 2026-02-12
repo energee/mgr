@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
-// Pending type generation — anthropic_api_key is added by migration 00064
+// Pending type generation -- anthropic_api_key is added by migration 00064
 // but not yet in generated Supabase types. Remove after next `supabase gen types`.
 interface UserPrefsApiKeyRow {
   anthropic_api_key: string | null;
-}
-
-function createAdminDb() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
 }
 
 /** Return last 4 characters of key as a hint, e.g. "...a1b2" */
@@ -21,7 +13,7 @@ function maskKey(key: string | null | undefined): string | null {
   return `...${key.slice(-4)}`;
 }
 
-const VALID_INTEGRATION_IDS = ["square", "slack", "quickbooks"];
+const VALID_INTEGRATION_IDS = ["square", "square-webhook", "slack", "quickbooks"];
 
 /**
  * GET /api/settings/api-key?scope=global|user|integration&id=<integration_id>
@@ -44,7 +36,7 @@ export async function GET(req: Request): Promise<Response> {
   const scope = searchParams.get("scope");
 
   if (scope === "global") {
-    const admin = createAdminDb();
+    const admin = await createAdminClient();
     const { data, error } = await admin
       .from("system_settings")
       .select("value")
@@ -89,7 +81,7 @@ export async function GET(req: Request): Promise<Response> {
     }
 
     const settingsKey = `${id}_api_key`;
-    const admin = createAdminDb();
+    const admin = await createAdminClient();
     const { data, error } = await admin
       .from("system_settings")
       .select("value")
@@ -131,7 +123,7 @@ export async function POST(req: Request): Promise<Response> {
   const { scope, key, id } = (await req.json()) as { scope: string; key: string; id?: string };
 
   if (scope === "global") {
-    const admin = createAdminDb();
+    const admin = await createAdminClient();
     if (!key) {
       const { error } = await admin
         .from("system_settings")
@@ -178,9 +170,9 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const settingsKey = `${id}_api_key`;
-    const admin = createAdminDb();
+    const admin = await createAdminClient();
 
-    // Upsert: try update first, insert if row doesn't exist
+    // Check if row already exists
     const { data: existing } = await admin
       .from("system_settings")
       .select("key")

@@ -532,3 +532,22 @@ export const finishedGoodKeys = {
   commitments: (fgId: string) =>
     ["finished-goods", fgId, "commitments"] as const,
 };
+
+// =============================================================================
+// Square Integration Keys
+// =============================================================================
+
+export const squareKeys = {
+  all: () => ["square"] as const,
+  settings: () => ["square", "settings"] as const,
+  syncStatus: () => ["square", "sync-status"] as const,
+  catalogMap: () => ["square", "catalog-map"] as const,
+  syncLog: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["square", "sync-log", filters] as const)
+      : (["square", "sync-log"] as const),
+  draftSales: (locationId?: string) =>
+    locationId
+      ? (["square", "draft-sales", locationId] as const)
+      : (["square", "draft-sales"] as const),
+};
