@@ -104,7 +104,7 @@ function GlobalApiKeySection() {
           </div>
           {loaded && (
             hasExistingKey ? (
-              <Badge variant="default">Connected</Badge>
+              <Badge variant="outline">Connected</Badge>
             ) : (
               <Badge variant="secondary">Not Connected</Badge>
             )
