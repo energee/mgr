@@ -11,6 +11,10 @@ import { valuesAsOptions, getValueLabel } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
 type Location = Database["public"]["Tables"]["locations"]["Row"];
+type LocationWithPos = Location & Pick<
+  Database["public"]["Views"]["locations_with_pos"]["Row"],
+  "pos_bin_name" | "pos_bin_type"
+>;
 
 // =============================================================================
 // Zod Schema
@@ -51,7 +55,7 @@ export const LOCATION_TYPES = valuesAsOptions(locationTypeDisplayConfig);
 // Entity Configuration
 // =============================================================================
 
-export const locationEntity: EntityConfig<Location> = {
+export const locationEntity: EntityConfig<LocationWithPos> = {
   // ---------------------------------------------------------------------------
   // Identity
   // ---------------------------------------------------------------------------
@@ -205,7 +209,6 @@ export const locationEntity: EntityConfig<Location> = {
     {
       id: "pos",
       title: "POS Integration",
-      description: "Configure this location for Point of Sale integration. The POS inventory bin determines which finished goods appear in your Square catalog for this location.",
       fields: [
         {
           name: "square_location_id",

@@ -96,7 +96,9 @@ export async function resolveTaproomPrices(
     if (!tierPriceMap[tp.pricing_tier_id]) {
       tierPriceMap[tp.pricing_tier_id] = {};
     }
-    tierPriceMap[tp.pricing_tier_id][tp.package_format_id] = Number(tp.price);
+    if (tp.package_format_id != null) {
+      tierPriceMap[tp.pricing_tier_id][tp.package_format_id] = Number(tp.price);
+    }
   }
 
   // 6. Map results back to brands

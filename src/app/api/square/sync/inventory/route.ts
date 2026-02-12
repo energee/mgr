@@ -219,7 +219,7 @@ export const POST = withAuth(async (_request, { user }) => {
         for (const keg of kegItems ?? []) {
           const fg = keg.finished_goods as unknown as FGBrandOnly | null;
           const brandId = fg?.brand_id;
-          if (!brandId || !keg.keg_type_id) continue;
+          if (!brandId || !keg.keg_type_id || !keg.quantity) continue;
 
           if (!kegAggregated.has(brandId)) kegAggregated.set(brandId, new Map());
           const brandMap = kegAggregated.get(brandId)!;

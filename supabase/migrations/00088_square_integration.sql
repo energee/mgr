@@ -227,35 +227,34 @@ CREATE INDEX idx_locations_pos_bin ON locations (pos_bin_id) WHERE pos_bin_id IS
 -- 9. SCHEMA REGISTRY
 -- =============================================================================
 
-INSERT INTO _schema_registry (table_name, description, domain, entity_type, key_fields, relationships, query_examples) VALUES
+INSERT INTO _schema_registry (table_name, description, domain, key_fields, relationships, query_examples) VALUES
   ('square_settings',
    'Merchant-level Square POS settings (singleton)',
-   'integrations', 'system',
+   'integrations',
    '["is_enabled", "last_catalog_sync_at", "last_inventory_sync_at"]'::jsonb,
    '{"singleton": true}'::jsonb,
    '["Is Square integration enabled?", "When was the last catalog sync?"]'::jsonb),
   ('square_catalog_map',
    'Maps MGR brands and package/keg types to Square catalog objects',
-   'integrations', 'system',
+   'integrations',
    '["brand_id", "package_type_id", "keg_type_id", "square_catalog_id", "object_type"]'::jsonb,
    '{"belongs_to": ["brands", "package_types", "keg_types"]}'::jsonb,
    '["What Square catalog ID maps to this brand?", "Show all catalog mappings"]'::jsonb),
   ('square_sync_log',
    'Audit log of Square sync operations with counts and error details',
-   'integrations', 'system',
+   'integrations',
    '["sync_type", "items_synced", "items_failed"]'::jsonb,
    '{"belongs_to": ["locations"]}'::jsonb,
    '["Show recent Square sync errors", "How many items synced in last catalog push?"]'::jsonb),
   ('square_draft_sales',
    'Draft beer sales ingested from Square POS for inventory deduction',
-   'integrations', 'system',
+   'integrations',
    '["square_order_id", "brand_id", "keg_type_id", "quantity", "sold_at"]'::jsonb,
    '{"belongs_to": ["brands", "keg_types", "locations"]}'::jsonb,
    '["Show draft sales for today", "Total volume sold by brand this week"]'::jsonb)
 ON CONFLICT (table_name) DO UPDATE SET
   description = EXCLUDED.description,
   domain = EXCLUDED.domain,
-  entity_type = EXCLUDED.entity_type,
   key_fields = EXCLUDED.key_fields,
   relationships = EXCLUDED.relationships,
   query_examples = EXCLUDED.query_examples;

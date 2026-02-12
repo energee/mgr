@@ -250,6 +250,15 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
         // Draft sale: insert into square_draft_sales
         // ---------------------------------------------------------------
 
+        if (!locationId) {
+          itemsFailed++;
+          errors.push({
+            lineItemUid: lineItem.uid ?? "unknown",
+            error: `Draft sale requires a mapped location but Square location ${squareLocationId} is not mapped to an MGR location`,
+          });
+          continue;
+        }
+
         const volumeOz = calculateVolumeOz(quantity);
 
         await admin.from("square_draft_sales").insert({
@@ -312,7 +321,7 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
       event_type: "inventory.count.updated",
       event_id: event.event_id,
       note: "Logged for informational purposes only. MGR is source of truth for inventory.",
-      raw_data: event.data,
+      raw_data: JSON.parse(JSON.stringify(event.data ?? null)),
     },
     completed_at: new Date().toISOString(),
   });
