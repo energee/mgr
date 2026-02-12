@@ -50,6 +50,22 @@ interface SlackSettingsResponse {
   channel_overrides: Record<string, string>;
 }
 
+function ConnectionBadge({
+  isConnected,
+  isEnabled,
+}: {
+  isConnected: boolean;
+  isEnabled: boolean;
+}) {
+  if (!isConnected) {
+    return <Badge variant="secondary">Not Connected</Badge>;
+  }
+  if (isEnabled) {
+    return <Badge variant="default">Active</Badge>;
+  }
+  return <Badge variant="outline">Connected</Badge>;
+}
+
 export function SlackIntegrationCard() {
   const queryClient = useQueryClient();
   const [defaultChannel, setDefaultChannel] = useState("");
@@ -146,24 +162,6 @@ export function SlackIntegrationCard() {
     setChannelOverrides((prev) => ({ ...prev, [type]: channel }));
   };
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <SlackIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Slack</CardTitle>
-              <CardDescription>Loading...</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-    );
-  }
-
   const isConnected = settings?.has_webhook ?? false;
   const isEnabled = settings?.is_enabled ?? false;
 
@@ -182,15 +180,7 @@ export function SlackIntegrationCard() {
               </CardDescription>
             </div>
           </div>
-          {isConnected ? (
-            isEnabled ? (
-              <Badge variant="default">Active</Badge>
-            ) : (
-              <Badge variant="outline">Connected</Badge>
-            )
-          ) : (
-            <Badge variant="secondary">Not Connected</Badge>
-          )}
+          <ConnectionBadge isConnected={isConnected} isEnabled={isEnabled} />
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -199,7 +189,7 @@ export function SlackIntegrationCard() {
           label="Webhook URL"
           placeholder="https://hooks.slack.com/services/..."
           inputType="url"
-          isLoading={false}
+          isLoading={isLoading}
           hasExistingKey={isConnected}
           keyHint={settings?.webhook_url_masked}
           onSave={(url) => saveMutation.mutate({ webhook_url: url })}
@@ -291,9 +281,9 @@ export function SlackIntegrationCard() {
                 onClick={handleSaveChannels}
                 disabled={saveMutation.isPending}
               >
-                {saveMutation.isPending ? (
+                {saveMutation.isPending && (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
+                )}
                 Save Channel Settings
               </Button>
             </div>
