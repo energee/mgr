@@ -27,7 +27,7 @@ export async function getTokens(): Promise<QBOTokens | null> {
 
   if (error || !data) return null;
 
-  const settings = Object.fromEntries(data.map((r) => [r.key, r.value]));
+  const settings = Object.fromEntries(data.map((r) => [r.key, r.value as string | null]));
 
   const accessToken = settings[SETTINGS_KEYS.accessToken];
   const refreshToken = settings[SETTINGS_KEYS.refreshToken];
@@ -53,7 +53,7 @@ export async function getClientCredentials(): Promise<{ clientId: string; client
 
   if (error || !data) return null;
 
-  const settings = Object.fromEntries(data.map((r) => [r.key, r.value]));
+  const settings = Object.fromEntries(data.map((r) => [r.key, r.value as string | null]));
   const clientId = settings[SETTINGS_KEYS.clientId];
   const clientSecret = settings[SETTINGS_KEYS.clientSecret];
 

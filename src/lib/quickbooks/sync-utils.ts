@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import type { Json } from "@/types/supabase";
 import type { SyncEntityType, QBOEntityType, SyncAction, SyncMapping, QBOAddress } from "./types";
 
 export async function getMapping(
@@ -48,7 +49,7 @@ export async function createSyncLog(
       entity_id: entityId,
       action,
       status: "pending",
-      request_payload: requestPayload ?? null,
+      request_payload: (requestPayload ?? null) as Json,
     })
     .select("id")
     .single();
@@ -68,7 +69,7 @@ export async function updateSyncLog(
     .from("qbo_sync_log")
     .update({
       status,
-      response_payload: responsePayload ?? null,
+      response_payload: (responsePayload ?? null) as Json,
       error_message: errorMessage ?? null,
       completed_at: new Date().toISOString(),
     })
@@ -96,5 +97,5 @@ export async function getDefaultPaymentTermsDays(): Promise<number> {
     .select("value")
     .eq("key", "default_payment_terms_days")
     .single();
-  return parseInt(data?.value || "30", 10);
+  return parseInt(String(data?.value ?? "30"), 10);
 }
