@@ -7,6 +7,7 @@ A customer-facing order portal accessed via magic link authentication. Customers
 ## Decisions
 
 - **Auth**: Reuse existing Supabase `signInWithOtp()` / `verifyOtp()` / `/api/auth/callback` flow. Short-lived magic link sets a 30-day session cookie.
+- **User model**: Admin invites customers via "Send Portal Invite" action on customer detail. New `'customer'` role added to `user_profiles`. `create_user_profile` trigger auto-assigns `'customer'` role when email matches a customer record. Admin app blocks customer role users (redirects to portal). Portal blocks non-customer users.
 - **Access model**: View + request changes. Customers cannot directly edit orders.
 - **Availability ceiling**: Unallocated finished goods only (`finished_goods_with_availability` view). No speculative batches.
 - **Change scope**: Quantity adjustments, add items, remove items. Not delivery dates or addresses.

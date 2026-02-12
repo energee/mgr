@@ -4,7 +4,7 @@
 
 **Goal:** Build a customer-facing order portal with magic link auth, read-only order views, and a change request workflow with admin approval.
 
-**Architecture:** Reuses existing Supabase magic link auth (`signInWithOtp`). New `(portal)` route group with minimal layout. Change requests stored in new tables, applied atomically via DB function. Customer-scoped RLS on existing order tables. Per-sales-channel configurable cutoff state.
+**Architecture:** Reuses existing Supabase magic link auth (`signInWithOtp`). Adds `'customer'` role to `user_profiles`. Admin invites customers via a button on customer detail. New `(portal)` route group with minimal layout blocks non-customer roles; admin app blocks customer role. Change requests stored in new tables, applied atomically via DB function. Customer-scoped RLS on existing order tables. Per-sales-channel configurable cutoff state.
 
 **Tech Stack:** Next.js, Supabase Auth (magic links), PostgreSQL (RLS, functions), React Query, shadcn/ui, Zod
 
@@ -23,19 +23,72 @@
 
 ```sql
 -- =============================================================================
--- Migration: Customer portal schema — user_id link + cutoff config
+-- Migration: Customer portal schema — user_id link, cutoff config, customer role
 -- =============================================================================
 
--- Link customers to Supabase auth users (for portal access)
+-- 1. Link customers to Supabase auth users (for portal access)
 ALTER TABLE customers ADD COLUMN user_id UUID REFERENCES auth.users(id) UNIQUE;
 CREATE INDEX idx_customers_user_id ON customers(user_id) WHERE user_id IS NOT NULL;
 
 COMMENT ON COLUMN customers.user_id IS 'Links to auth.users for customer portal access. Set on first magic link login.';
 
--- Configurable cutoff state per sales channel
+-- 2. Configurable cutoff state per sales channel
 ALTER TABLE sales_channels ADD COLUMN change_request_cutoff_state TEXT NOT NULL DEFAULT 'confirmed';
 
 COMMENT ON COLUMN sales_channels.change_request_cutoff_state IS 'Order state at/beyond which customers cannot submit change requests. Picks from order states: draft, confirmed, scheduled, picking, packed, fulfilled.';
+
+-- 3. Add 'customer' role to user_profiles
+ALTER TABLE user_profiles DROP CONSTRAINT chk_user_role;
+ALTER TABLE user_profiles ADD CONSTRAINT chk_user_role
+  CHECK (role IN ('admin', 'production_manager', 'brewer', 'sales', 'viewer', 'customer'));
+
+COMMENT ON COLUMN user_profiles.role IS 'User role: admin (full access), production_manager (production/inventory/purchasing), brewer (recipes/batches/brewing), sales (orders/customers), viewer (read-only), customer (portal access only)';
+
+-- 4. Update create_user_profile trigger to assign 'customer' role when email matches a customer record
+CREATE OR REPLACE FUNCTION create_user_profile()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role TEXT := 'viewer';
+BEGIN
+  -- If the email matches an existing customer, assign customer role and link
+  IF EXISTS (SELECT 1 FROM customers WHERE email = NEW.email AND user_id IS NULL) THEN
+    v_role := 'customer';
+    UPDATE customers SET user_id = NEW.id WHERE email = NEW.email AND user_id IS NULL;
+  END IF;
+
+  INSERT INTO user_profiles (
+    id,
+    email,
+    display_name,
+    role,
+    status,
+    created_at
+  )
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(
+      NEW.raw_user_meta_data->>'display_name',
+      NEW.raw_user_meta_data->>'full_name',
+      NEW.raw_user_meta_data->>'name',
+      split_part(NEW.email, '@', 1)
+    ),
+    v_role,
+    'active',
+    now()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    display_name = COALESCE(user_profiles.display_name, EXCLUDED.display_name),
+    updated_at = now();
+
+  RETURN NEW;
+END;
+$$;
 ```
 
 **Step 2: Apply migration**
@@ -577,7 +630,41 @@ git commit -m "feat: add portal layout with customer auth and auto-linking"
 
 ---
 
-### Task 7: Portal Login Page
+### Task 7: Guard Admin App Against Customer Role
+
+**Files:**
+- Modify: `src/app/(app)/layout.tsx`
+
+**Step 1: Add customer role redirect**
+
+After the existing auth check that redirects unauthenticated users to `/login`, add a check for customer role. If the user has `role = 'customer'` in `user_profiles`, redirect them to `/portal/orders` instead of showing the admin app.
+
+```typescript
+// After existing auth check:
+const { data: profile } = await supabase
+  .from("user_profiles")
+  .select("role")
+  .eq("id", user.id)
+  .single();
+
+if (profile?.role === "customer") {
+  redirect("/portal/orders");
+}
+```
+
+Reference: existing auth check pattern in `src/app/(app)/layout.tsx`.
+
+**Step 2: Lint and commit**
+
+```bash
+pnpm lint
+git add src/app/\(app\)/layout.tsx
+git commit -m "feat: redirect customer-role users from admin app to portal"
+```
+
+---
+
+### Task 8: Portal Login Page
 
 **Files:**
 - Create: `src/app/(portal)/login/page.tsx`
@@ -604,7 +691,7 @@ git commit -m "feat: add portal magic link login page"
 
 ---
 
-### Task 8: Portal Order List Page
+### Task 9: Portal Order List Page
 
 **Files:**
 - Create: `src/app/(portal)/orders/page.tsx`
@@ -631,7 +718,7 @@ git commit -m "feat: add portal order list page"
 
 ---
 
-### Task 9: Portal Order Detail Page
+### Task 10: Portal Order Detail Page
 
 **Files:**
 - Create: `src/app/(portal)/orders/[id]/page.tsx`
@@ -667,7 +754,7 @@ git commit -m "feat: add portal order detail page with change request status"
 
 ## Phase 3 — Change Requests
 
-### Task 10: Change Request Submission Page
+### Task 11: Change Request Submission Page
 
 **Files:**
 - Create: `src/app/(portal)/orders/[id]/change-request/new/page.tsx`
@@ -719,7 +806,7 @@ git commit -m "feat: add change request builder for customer portal"
 
 ---
 
-### Task 11: Admin Change Request Diff on Order Detail
+### Task 12: Admin Change Request Diff on Order Detail
 
 **Files:**
 - Create: `src/components/domain/change-request-review.tsx`
@@ -765,7 +852,7 @@ git commit -m "feat: add change request inline diff review on admin order detail
 
 ---
 
-### Task 12: Approve/Reject API Routes
+### Task 13: Approve/Reject API Routes
 
 **Files:**
 - Create: `src/app/api/orders/[id]/change-requests/[requestId]/approve/route.ts`
@@ -841,7 +928,7 @@ git commit -m "feat: add approve/reject API routes for change requests"
 
 ## Phase 4 — Settings
 
-### Task 13: Sales Channel Cutoff Config
+### Task 14: Sales Channel Cutoff Config
 
 **Files:**
 - Modify: `src/entities/sales-channel.tsx`
@@ -892,7 +979,86 @@ git commit -m "feat: add change request cutoff state config to sales channel ent
 
 ---
 
-### Task 14: Regenerate TypeScript Types
+### Task 15: Send Portal Invite Action on Customer Detail
+
+**Files:**
+- Modify: `src/entities/customer.tsx` — add "Send Portal Invite" action
+- Create: `src/app/api/customers/[id]/invite/route.ts` — API route to send magic link
+
+**Step 1: Write the invite API route**
+
+```typescript
+import { withRoles } from "@/lib/api/auth";
+import { successResponse, errorResponse } from "@/lib/api/responses";
+import { createAdminClient } from "@/lib/supabase/server";
+
+export const POST = withRoles(
+  ["admin", "sales"],
+  async (_request, { supabase, params }) => {
+    const customerId = params?.id;
+    if (!customerId) return errorResponse("BAD_REQUEST", "Missing customer ID", undefined, 400);
+
+    // Get customer email
+    const { data: customer, error: custErr } = await supabase
+      .from("customers")
+      .select("email, name, user_id")
+      .eq("id", customerId)
+      .single();
+
+    if (custErr || !customer) throw custErr || new Error("Customer not found");
+    if (!customer.email) return errorResponse("BAD_REQUEST", "Customer has no email address", undefined, 400);
+
+    // Use admin client to send magic link (inviteUserByEmail creates the auth user)
+    const adminDb = await createAdminClient();
+    if (customer.user_id) {
+      // Already linked — just resend a magic link
+      const { error } = await adminDb.auth.admin.generateLink({
+        type: "magiclink",
+        email: customer.email,
+        options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback?redirect=/portal/orders` },
+      });
+      if (error) throw error;
+    } else {
+      // First invite — create auth user with invite
+      const { error } = await adminDb.auth.admin.inviteUserByEmail(customer.email, {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback?redirect=/portal/orders`,
+      });
+      if (error) throw error;
+    }
+
+    return successResponse({ invited: true });
+  }
+);
+```
+
+**Step 2: Add invite action to customer entity**
+
+In `src/entities/customer.tsx`, add an action to the `actions` array:
+
+```typescript
+{
+  name: "send_portal_invite",
+  label: "Send Portal Invite",
+  icon: "mail",
+  type: "dropdown",
+  fromStates: undefined, // Available regardless of state
+  confirm: true,
+}
+```
+
+The `onAction` handler in the customer detail/list page will call `POST /api/customers/[id]/invite`.
+
+**Step 3: Lint and commit**
+
+```bash
+pnpm lint
+git add src/app/api/customers/\[id\]/invite/route.ts src/entities/customer.tsx
+git commit -m "feat: add Send Portal Invite action for customers"
+```
+
+---
+
+### Task 16: Regenerate TypeScript Types
 
 **Step 1: Regenerate types**
 
@@ -917,7 +1083,7 @@ git commit -m "chore: regenerate TypeScript types for customer portal schema"
 
 ---
 
-### Task 15: Final Integration Test + Cleanup
+### Task 17: Final Integration Test + Cleanup
 
 **Step 1: Verify the full flow manually**
 
