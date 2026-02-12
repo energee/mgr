@@ -1,7 +1,21 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { qboClient } from "./client";
 import { getMapping, upsertMapping, createSyncLog, updateSyncLog } from "./sync-utils";
-import type { QBOVendor, QBOEntityResponse } from "./types";
+import type { QBOVendor, QBOEntityResponse, QBOQueryResponse } from "./types";
+
+/** Query QBO for an existing vendor by DisplayName. Returns the QBO Id if found. */
+async function findExistingQBOVendor(displayName: string): Promise<string | null> {
+  const escaped = displayName.replace(/'/g, "\\'");
+  const response = await qboClient.query<QBOQueryResponse<QBOVendor>>(
+    "Vendor",
+    `DisplayName = '${escaped}'`
+  );
+  const vendors = response.QueryResponse.Vendor as QBOVendor[] | undefined;
+  if (vendors && vendors.length > 0 && vendors[0].Id) {
+    return vendors[0].Id;
+  }
+  return null;
+}
 
 export async function syncSupplier(supplierId: string): Promise<{ qboId: string; action: "create" | "update" }> {
   const admin = await createAdminClient();
@@ -39,7 +53,20 @@ export async function syncSupplier(supplierId: string): Promise<{ qboId: string;
       qboVendor.sparse = true;
       result = await qboClient.post<QBOEntityResponse<QBOVendor>>("/vendor", qboVendor);
     } else {
-      result = await qboClient.post<QBOEntityResponse<QBOVendor>>("/vendor", qboVendor);
+      // Check for existing QBO vendor with same name to avoid duplicates
+      const existingQboId = await findExistingQBOVendor(supplier.name);
+      if (existingQboId) {
+        // Found existing QBO vendor — link it and update
+        const current = await qboClient.get<QBOEntityResponse<QBOVendor>>(
+          `/vendor/${existingQboId}`
+        );
+        qboVendor.Id = existingQboId;
+        qboVendor.SyncToken = current.Vendor.SyncToken;
+        qboVendor.sparse = true;
+        result = await qboClient.post<QBOEntityResponse<QBOVendor>>("/vendor", qboVendor);
+      } else {
+        result = await qboClient.post<QBOEntityResponse<QBOVendor>>("/vendor", qboVendor);
+      }
     }
 
     const qboId = result.Vendor.Id!;

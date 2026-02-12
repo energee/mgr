@@ -5,10 +5,14 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { qboKeys } from "@/lib/query-keys";
 
-// Map of entity names to their sync entity types and trigger states
+// Map of entity names to their sync entity types and trigger states.
+// Entities with empty triggerStates arrays are manual-sync only.
+// To add auto-sync for a new entity, add it here with the desired trigger states.
 const AUTO_SYNC_CONFIG: Record<string, { entityType: string; triggerStates: string[] }> = {
   order: { entityType: "order", triggerStates: ["fulfilled"] },
-  purchase_order: { entityType: "purchase_order", triggerStates: ["fulfilled"] },
+  purchase_order: { entityType: "purchase_order", triggerStates: ["fulfilled", "closed"] },
+  customer: { entityType: "customer", triggerStates: [] },
+  supplier: { entityType: "supplier", triggerStates: [] },
 };
 
 export function useQBOAutoSync(entityName: string) {

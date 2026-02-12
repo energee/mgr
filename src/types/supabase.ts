@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       _schema_registry: {
@@ -1169,8 +1144,10 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          is_tax_exempt: boolean
           name: string
           notes: string | null
+          payment_terms_days: number | null
           phone: string | null
           price_tier_id: string | null
           sales_channel_id: string | null
@@ -1184,8 +1161,10 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_tax_exempt?: boolean
           name: string
           notes?: string | null
+          payment_terms_days?: number | null
           phone?: string | null
           price_tier_id?: string | null
           sales_channel_id?: string | null
@@ -1199,8 +1178,10 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_tax_exempt?: boolean
           name?: string
           notes?: string | null
+          payment_terms_days?: number | null
           phone?: string | null
           price_tier_id?: string | null
           sales_channel_id?: string | null
@@ -3341,6 +3322,105 @@ export type Database = {
           },
         ]
       }
+      qbo_account_mappings: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          qbo_account_id: string | null
+          qbo_account_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          qbo_account_id?: string | null
+          qbo_account_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          qbo_account_id?: string | null
+          qbo_account_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      qbo_sync_log: {
+        Row: {
+          action: string
+          completed_at: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          error_message: string | null
+          id: string
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+        }
+        Insert: {
+          action: string
+          completed_at?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+        }
+        Update: {
+          action?: string
+          completed_at?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
+      qbo_sync_mappings: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          last_synced_at: string
+          qbo_entity_id: string
+          qbo_entity_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          last_synced_at?: string
+          qbo_entity_id: string
+          qbo_entity_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          last_synced_at?: string
+          qbo_entity_id?: string
+          qbo_entity_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       recipe_additions: {
         Row: {
           additive_id: string
@@ -4592,6 +4672,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      slack_notification_log: {
+        Row: {
+          action_url: string | null
+          channel: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          message: string | null
+          metadata: Json | null
+          notification_type: string
+          priority: string
+          sent_at: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          action_url?: string | null
+          channel?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json | null
+          notification_type: string
+          priority?: string
+          sent_at?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          action_url?: string | null
+          channel?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json | null
+          notification_type?: string
+          priority?: string
+          sent_at?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      slack_settings: {
+        Row: {
+          app_url: string | null
+          channel_overrides: Json
+          created_at: string
+          default_channel: string | null
+          id: string
+          internal_secret: string
+          is_enabled: boolean
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          app_url?: string | null
+          channel_overrides?: Json
+          created_at?: string
+          default_channel?: string | null
+          id?: string
+          internal_secret?: string
+          is_enabled?: boolean
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          app_url?: string | null
+          channel_overrides?: Json
+          created_at?: string
+          default_channel?: string | null
+          id?: string
+          internal_secret?: string
+          is_enabled?: boolean
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
       }
       spices: {
         Row: {
@@ -7604,6 +7765,19 @@ export type Database = {
         }
         Relationships: []
       }
+      qbo_sync_status: {
+        Row: {
+          entity_id: string | null
+          entity_type: string | null
+          last_error: string | null
+          last_sync_attempted_at: string | null
+          last_sync_status: string | null
+          last_synced_at: string | null
+          qbo_entity_id: string | null
+          qbo_entity_type: string | null
+        }
+        Relationships: []
+      }
       recent_revisions: {
         Row: {
           change_reason: string | null
@@ -8577,6 +8751,7 @@ export type Database = {
       get_user_role: { Args: { p_user_id?: string }; Returns: string }
       is_admin: { Args: { p_user_id?: string }; Returns: boolean }
       is_admin_rls: { Args: { p_user_id: string }; Returns: boolean }
+      is_sensitive_setting: { Args: { setting_key: string }; Returns: boolean }
       is_valid_enum: {
         Args: { p_enum_type: string; p_value: string }
         Returns: boolean
@@ -8802,9 +8977,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       cleaning_type: ["cip", "caustic", "acid", "sanitize", "manual", "rinse"],

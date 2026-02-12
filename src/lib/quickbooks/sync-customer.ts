@@ -1,7 +1,21 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { qboClient } from "./client";
 import { getMapping, upsertMapping, createSyncLog, updateSyncLog, mapAddress } from "./sync-utils";
-import type { QBOCustomer, QBOEntityResponse } from "./types";
+import type { QBOCustomer, QBOEntityResponse, QBOQueryResponse } from "./types";
+
+/** Query QBO for an existing customer by DisplayName. Returns the QBO Id if found. */
+async function findExistingQBOCustomer(displayName: string): Promise<string | null> {
+  const escaped = displayName.replace(/'/g, "\\'");
+  const response = await qboClient.query<QBOQueryResponse<QBOCustomer>>(
+    "Customer",
+    `DisplayName = '${escaped}'`
+  );
+  const customers = response.QueryResponse.Customer as QBOCustomer[] | undefined;
+  if (customers && customers.length > 0 && customers[0].Id) {
+    return customers[0].Id;
+  }
+  return null;
+}
 
 export async function syncCustomer(customerId: string): Promise<{ qboId: string; action: "create" | "update" }> {
   const admin = await createAdminClient();
@@ -46,10 +60,26 @@ export async function syncCustomer(customerId: string): Promise<{ qboId: string;
         qboCustomer
       );
     } else {
-      result = await qboClient.post<QBOEntityResponse<QBOCustomer>>(
-        "/customer",
-        qboCustomer
-      );
+      // Check for existing QBO customer with same name to avoid duplicates
+      const existingQboId = await findExistingQBOCustomer(customer.name);
+      if (existingQboId) {
+        // Found existing QBO customer — link it and update
+        const current = await qboClient.get<QBOEntityResponse<QBOCustomer>>(
+          `/customer/${existingQboId}`
+        );
+        qboCustomer.Id = existingQboId;
+        qboCustomer.SyncToken = current.Customer.SyncToken;
+        qboCustomer.sparse = true;
+        result = await qboClient.post<QBOEntityResponse<QBOCustomer>>(
+          "/customer",
+          qboCustomer
+        );
+      } else {
+        result = await qboClient.post<QBOEntityResponse<QBOCustomer>>(
+          "/customer",
+          qboCustomer
+        );
+      }
     }
 
     const qboId = result.Customer.Id!;
