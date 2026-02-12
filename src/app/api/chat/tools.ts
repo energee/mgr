@@ -209,12 +209,12 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("Filter by category: malt, hop, yeast, adjunct, chemical"),
       }),
       execute: async ({ category }) => {
-        let query = supabase.from("inventory_items").select(
+        let q = supabase.from("inventory_items").select(
           "id, name, category, unit, reorder_point, inventory_lots(quantity, expiration_date)"
         );
-        if (category) query = query.eq("category", category);
+        if (category) q = q.eq("category", category);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
 
         interface ItemRow {
@@ -349,21 +349,21 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("The batch number (e.g. '42' or 'B-042')"),
       }),
       execute: async ({ batchId, batchNumber }) => {
-        let query = supabase
+        let q = supabase
           .from("batches_with_brew_info")
           .select(
             "id, batch_number, name, status, volume_bbl, planned_start_date, actual_og, actual_fg, actual_abv, brew_date, current_vessel_name, notes, recipe:recipes(id, name)"
           );
         if (batchId) {
-          query = query.eq("id", batchId);
+          q = q.eq("id", batchId);
         } else if (batchNumber) {
-          query = query.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
+          q = q.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
         } else {
           throw new Error("Either batchId or batchNumber is required");
         }
         const { data, error } = batchId
-          ? await query.single()
-          : await query.limit(5);
+          ? await q.single()
+          : await q.limit(5);
         if (error) throw new Error(error.message);
         return data;
       },
@@ -392,7 +392,7 @@ export function createChatTools(supabase: SupabaseClient) {
         const recipeJoin = recipeName
           ? "recipe:recipes!inner(id, name)"
           : "recipe:recipes(id, name)";
-        let query = supabase
+        let q = supabase
           .from("batches_with_brew_info")
           .select(
             `id, batch_number, name, status, volume_bbl, planned_start_date, brew_date, current_vessel_name, ${recipeJoin}`
@@ -400,15 +400,15 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("planned_start_date", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
+        if (status) q = q.eq("status", status);
         if (batchNumber)
-          query = query.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
-        if (startDate) query = query.gte("planned_start_date", startDate);
-        if (endDate) query = query.lte("planned_start_date", endDate);
+          q = q.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
+        if (startDate) q = q.gte("planned_start_date", startDate);
+        if (endDate) q = q.lte("planned_start_date", endDate);
         if (recipeName)
-          query = query.ilike("recipes.name", `%${escapeLike(recipeName)}%`);
+          q = q.ilike("recipes.name", `%${escapeLike(recipeName)}%`);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -420,14 +420,14 @@ export function createChatTools(supabase: SupabaseClient) {
         query: z.string().optional().describe("Search by brand name"),
         limit: z.number().optional().default(20).describe("Max results"),
       }),
-      execute: async ({ query, limit }) => {
+      execute: async ({ query: searchQuery, limit }) => {
         let q = supabase
           .from("brands")
           .select("id, name, variant, abv, description, style:beer_styles(id, name)")
           .order("name")
           .limit(limit);
 
-        if (query) q = q.ilike("name", `%${escapeLike(query)}%`);
+        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -443,7 +443,7 @@ export function createChatTools(supabase: SupabaseClient) {
         query: z.string().optional().describe("Search by brand name"),
         limit: z.number().optional().default(20).describe("Max results"),
       }),
-      execute: async ({ brandId, query, limit }) => {
+      execute: async ({ brandId, query: searchQuery, limit }) => {
         let q = supabase
           .from("finished_goods_with_availability")
           .select(
@@ -454,7 +454,7 @@ export function createChatTools(supabase: SupabaseClient) {
           .limit(limit);
 
         if (brandId) q = q.eq("brand_id", brandId);
-        if (query) q = q.ilike("brand_name", `%${escapeLike(query)}%`);
+        if (searchQuery) q = q.ilike("brand_name", `%${escapeLike(searchQuery)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -474,9 +474,9 @@ export function createChatTools(supabase: SupabaseClient) {
           .optional()
           .describe("Narrow search to a specific entity type"),
       }),
-      execute: async ({ query, entityType }) => {
+      execute: async ({ query: searchQuery, entityType }) => {
         type Result = { type: string; id: string; display: string };
-        const escaped = escapeLike(query);
+        const escaped = escapeLike(searchQuery);
         const should = (t: string) => !entityType || entityType === t;
 
         const queries: PromiseLike<Result[]>[] = [];
@@ -600,7 +600,7 @@ export function createChatTools(supabase: SupabaseClient) {
         const customerJoin = customerName
           ? "customer:customers!inner(id, name)"
           : "customer:customers(id, name)";
-        let query = supabase
+        let q = supabase
           .from("orders")
           .select(
             `id, order_number, status, order_date, requested_date, scheduled_date, notes, ${customerJoin}`
@@ -608,13 +608,13 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("order_date", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
-        if (startDate) query = query.gte("order_date", startDate);
-        if (endDate) query = query.lte("order_date", endDate);
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("order_date", startDate);
+        if (endDate) q = q.lte("order_date", endDate);
         if (customerName)
-          query = query.ilike("customers.name", `%${escapeLike(customerName)}%`);
+          q = q.ilike("customers.name", `%${escapeLike(customerName)}%`);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -648,7 +648,7 @@ export function createChatTools(supabase: SupabaseClient) {
         query: z.string().optional().describe("Search by customer name"),
         limit: z.number().optional().default(20).describe("Max results"),
       }),
-      execute: async ({ query, limit }) => {
+      execute: async ({ query: searchQuery, limit }) => {
         let q = supabase
           .from("customers_with_order_summary")
           .select(
@@ -658,7 +658,7 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("name")
           .limit(limit);
 
-        if (query) q = q.ilike("name", `%${escapeLike(query)}%`);
+        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -689,7 +689,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, startDate, endDate, brewNumber, limit }) => {
-        let query = supabase
+        let q = supabase
           .from("brew_logs")
           .select(
             "id, brew_number, brew_date, status, notes, recipe:recipes(id, name)"
@@ -697,13 +697,13 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("brew_date", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
+        if (status) q = q.eq("status", status);
         if (brewNumber)
-          query = query.ilike("brew_number", `%${escapeLike(brewNumber)}%`);
-        if (startDate) query = query.gte("brew_date", startDate);
-        if (endDate) query = query.lte("brew_date", endDate);
+          q = q.ilike("brew_number", `%${escapeLike(brewNumber)}%`);
+        if (startDate) q = q.gte("brew_date", startDate);
+        if (endDate) q = q.lte("brew_date", endDate);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -737,7 +737,7 @@ export function createChatTools(supabase: SupabaseClient) {
         const supplierJoin = supplierName
           ? "supplier:suppliers!inner(id, name)"
           : "supplier:suppliers(id, name)";
-        let query = supabase
+        let q = supabase
           .from("purchase_orders")
           .select(
             `id, po_number, status, order_date, expected_date, shipping_cost, tax, notes, ${supplierJoin}`
@@ -745,13 +745,13 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("order_date", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
-        if (startDate) query = query.gte("order_date", startDate);
-        if (endDate) query = query.lte("order_date", endDate);
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("order_date", startDate);
+        if (endDate) q = q.lte("order_date", endDate);
         if (supplierName)
-          query = query.ilike("suppliers.name", `%${escapeLike(supplierName)}%`);
+          q = q.ilike("suppliers.name", `%${escapeLike(supplierName)}%`);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -769,7 +769,7 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("Filter by active status (default true)"),
         limit: z.number().optional().default(20).describe("Max results"),
       }),
-      execute: async ({ query, isActive, limit }) => {
+      execute: async ({ query: searchQuery, isActive, limit }) => {
         let q = supabase
           .from("suppliers")
           .select(
@@ -779,7 +779,7 @@ export function createChatTools(supabase: SupabaseClient) {
           .limit(limit);
 
         if (isActive !== undefined) q = q.eq("is_active", isActive);
-        if (query) q = q.ilike("name", `%${escapeLike(query)}%`);
+        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -810,7 +810,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, startDate, endDate, customerName, limit }) => {
-        let query = supabase
+        let q = supabase
           .from("pick_list_details")
           .select(
             "id, status, generated_at, order_id, order_number, customer_name, total_items, items_picked, assigned_to_name"
@@ -818,13 +818,13 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("generated_at", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
-        if (startDate) query = query.gte("generated_at", startDate);
-        if (endDate) query = query.lte("generated_at", endDate);
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("generated_at", startDate);
+        if (endDate) q = q.lte("generated_at", endDate);
         if (customerName)
-          query = query.ilike("customer_name", `%${escapeLike(customerName)}%`);
+          q = q.ilike("customer_name", `%${escapeLike(customerName)}%`);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -845,7 +845,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, strainName, limit }) => {
-        let query = supabase
+        let q = supabase
           .from("yeast_pitches_with_details")
           .select(
             "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_number, location_name"
@@ -853,11 +853,11 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("created_at", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
+        if (status) q = q.eq("status", status);
         if (strainName)
-          query = query.ilike("strain_name", `%${escapeLike(strainName)}%`);
+          q = q.ilike("strain_name", `%${escapeLike(strainName)}%`);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -882,7 +882,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(50).describe("Max results"),
       }),
       execute: async ({ state, kegTypeName, locationName, limit }) => {
-        let query = supabase
+        let q = supabase
           .from("keg_inventory_with_details")
           .select(
             "id, keg_type_name, keg_type_code, volume_bbl, keg_owner_name, state, location_name, quantity, batch_number, finished_good_name"
@@ -890,13 +890,13 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("keg_type_name")
           .limit(limit);
 
-        if (state) query = query.eq("state", state);
+        if (state) q = q.eq("state", state);
         if (kegTypeName)
-          query = query.ilike("keg_type_name", `%${escapeLike(kegTypeName)}%`);
+          q = q.ilike("keg_type_name", `%${escapeLike(kegTypeName)}%`);
         if (locationName)
-          query = query.ilike("location_name", `%${escapeLike(locationName)}%`);
+          q = q.ilike("location_name", `%${escapeLike(locationName)}%`);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -921,7 +921,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, startDate, endDate, limit }) => {
-        let query = supabase
+        let q = supabase
           .from("deliveries_with_summary")
           .select(
             "id, delivery_number, status, scheduled_date, driver_name, vehicle, notes, transfer_count, order_count, total_stops"
@@ -929,11 +929,11 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("scheduled_date", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
-        if (startDate) query = query.gte("scheduled_date", startDate);
-        if (endDate) query = query.lte("scheduled_date", endDate);
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("scheduled_date", startDate);
+        if (endDate) q = q.lte("scheduled_date", endDate);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -958,7 +958,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, startDate, endDate, limit }) => {
-        let query = supabase
+        let q = supabase
           .from("location_transfers_with_details")
           .select(
             "id, status, ship_date, receive_date, from_bin_name, to_bin_name, from_location_name, to_location_name, delivery_number, lines_count"
@@ -966,11 +966,11 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("ship_date", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
-        if (startDate) query = query.gte("ship_date", startDate);
-        if (endDate) query = query.lte("ship_date", endDate);
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("ship_date", startDate);
+        if (endDate) q = q.lte("ship_date", endDate);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -1007,7 +1007,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, sourceType, destinationType, startDate, endDate, limit }) => {
-        let query = supabase
+        let q = supabase
           .from("allocations")
           .select(
             "id, source_type, source_id, destination_type, destination_id, quantity, volume_bbl, unit_cost, status, reason_code, lot_number, created_at"
@@ -1015,13 +1015,13 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("created_at", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
-        if (sourceType) query = query.eq("source_type", sourceType);
-        if (destinationType) query = query.eq("destination_type", destinationType);
-        if (startDate) query = query.gte("created_at", startDate);
-        if (endDate) query = query.lte("created_at", endDate);
+        if (status) q = q.eq("status", status);
+        if (sourceType) q = q.eq("source_type", sourceType);
+        if (destinationType) q = q.eq("destination_type", destinationType);
+        if (startDate) q = q.gte("created_at", startDate);
+        if (endDate) q = q.lte("created_at", endDate);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
@@ -1052,7 +1052,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, startDate, endDate, brandName, limit }) => {
-        let query = supabase
+        let q = supabase
           .from("packaging_sessions_with_summary")
           .select(
             "id, session_date, status, notes, line_count, brands, total_planned, total_actual"
@@ -1060,12 +1060,12 @@ export function createChatTools(supabase: SupabaseClient) {
           .order("session_date", { ascending: false })
           .limit(limit);
 
-        if (status) query = query.eq("status", status);
-        if (startDate) query = query.gte("session_date", startDate);
-        if (endDate) query = query.lte("session_date", endDate);
-        if (brandName) query = query.ilike("brands", `%${escapeLike(brandName)}%`);
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("session_date", startDate);
+        if (endDate) q = q.lte("session_date", endDate);
+        if (brandName) q = q.ilike("brands", `%${escapeLike(brandName)}%`);
 
-        const { data, error } = await query;
+        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
