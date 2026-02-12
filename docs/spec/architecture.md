@@ -24,8 +24,11 @@
 
 ### Integrations
 - **Accounting**: QuickBooks Online API
-- **Notifications**: Slack API, Email (Resend or similar)
+- **Notifications**: Slack (webhook-based, see [notifications.md](../data-model/notifications.md)), Email (Resend or similar)
 - **POS**: Square API (taproom inventory sync)
+
+#### Slack Integration Architecture
+Database triggers call `notify_all_users()` which creates a `slack_notification_log` entry and fires an async HTTP POST via `pg_net` to `/api/slack/send`. The API route reads `slack_settings` for the webhook URL and channel routing, formats a Slack Block Kit message, and posts to Slack. See migration `00088_slack_integration.sql` for the full implementation.
 
 ### Deployment
 - **Hosting**: Vercel
@@ -243,7 +246,7 @@ All tables include:
 | Sales | customers, orders, sales_channels, price_tiers, tier_prices | [sales.md](../data-model/sales.md) |
 | Purchasing | suppliers, purchase_orders, po_line_items, inventory_lots | [purchasing.md](../data-model/purchasing.md) |
 | Kegs | keg_types, keg_inventory, customer_keg_balances, keg_transactions | [kegs.md](../data-model/kegs.md) |
-| Notifications | notifications, notification_preferences, slack_settings | [notifications.md](../data-model/notifications.md) |
+| Notifications | notifications, notification_preferences, slack_settings, slack_notification_log | [notifications.md](../data-model/notifications.md) |
 | System | settings, locations | [system.md](../data-model/system.md) |
 
 ### Key Design Patterns
@@ -419,7 +422,7 @@ CREATE POLICY admin_access ON admin_table
 | Area | Original | Implementation | Rationale |
 |------|----------|----------------|-----------|
 | Mobile | Separate mobile app | Responsive web + PWA | Single codebase |
-| Notifications | In-app, email, Slack | In-app only (Phase 1) | Ship core first |
+| Notifications | In-app, email, Slack | In-app + Slack | Email deferred |
 | Next.js | 14+ | 16.x | Latest stable |
 | Forms | React Hook Form | TanStack Form | Ecosystem consistency |
 | Tenancy | Multi-tenant SaaS | Single-tenant | Simpler for target use case |
