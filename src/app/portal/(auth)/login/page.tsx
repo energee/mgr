@@ -1,3 +1,5 @@
+"use client";
+
 import dynamic from "next/dynamic";
 import {
   Card,
@@ -7,8 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-const PortalLoginForm = dynamic(() =>
-  import("./portal-login-form").then((m) => m.PortalLoginForm),
+const PortalLoginForm = dynamic(
+  () => import("./portal-login-form").then((m) => m.PortalLoginForm),
   { ssr: false, loading: () => <div className="h-48 animate-pulse" /> }
 );
 

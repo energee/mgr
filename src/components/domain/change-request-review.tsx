@@ -213,6 +213,22 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
     return orderItems.find((oi) => oi.id === changeItem.order_item_id);
   }
 
+  function getRowClassName(changeType: ChangeRequestItem["change_type"]): string {
+    switch (changeType) {
+      case "add": return "bg-green-50 dark:bg-green-950/20";
+      case "remove": return "bg-red-50 dark:bg-red-950/20";
+      default: return "";
+    }
+  }
+
+  function getBadgeVariant(changeType: ChangeRequestItem["change_type"]): "default" | "destructive" | "secondary" {
+    switch (changeType) {
+      case "add": return "default";
+      case "remove": return "destructive";
+      default: return "secondary";
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Rendering
   // ---------------------------------------------------------------------------
@@ -290,24 +306,10 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
                 return (
                   <TableRow
                     key={item.id}
-                    className={
-                      item.change_type === "add"
-                        ? "bg-green-50 dark:bg-green-950/20"
-                        : item.change_type === "remove"
-                          ? "bg-red-50 dark:bg-red-950/20"
-                          : ""
-                    }
+                    className={getRowClassName(item.change_type)}
                   >
                     <TableCell>
-                      <Badge
-                        variant={
-                          item.change_type === "add"
-                            ? "default"
-                            : item.change_type === "remove"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                      >
+                      <Badge variant={getBadgeVariant(item.change_type)}>
                         {item.change_type.charAt(0).toUpperCase() +
                           item.change_type.slice(1)}
                       </Badge>

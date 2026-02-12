@@ -28,7 +28,21 @@ export function PortalLoginForm() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
 
-  const handleSendOtp = async (e: FormEvent) => {
+  async function sendOtp(): Promise<boolean> {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=/portal/orders`,
+      },
+    });
+    if (error) {
+      toast.error(error.message);
+      return false;
+    }
+    return true;
+  }
+
+  async function handleSendOtp(e: FormEvent) {
     e.preventDefault();
     setEmailError(null);
 
@@ -40,52 +54,32 @@ export function PortalLoginForm() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=/portal/orders`,
-        },
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return;
+      if (await sendOtp()) {
+        setOtpSent(true);
+        setOtpCode("");
+        toast.success("Check your email for a login link");
       }
-
-      setOtpSent(true);
-      setOtpCode("");
-      toast.success("Check your email for a login link");
     } catch {
       toast.error("An unexpected error occurred");
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const handleResend = async () => {
+  async function handleResend() {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=/portal/orders`,
-        },
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return;
+      if (await sendOtp()) {
+        toast.success("Login code resent");
       }
-
-      toast.success("Login code resent");
     } catch {
       toast.error("An unexpected error occurred");
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const handleVerifyOtp = async (e: FormEvent) => {
+  async function handleVerifyOtp(e: FormEvent) {
     e.preventDefault();
     if (!otpCode.trim()) return;
 
@@ -109,7 +103,7 @@ export function PortalLoginForm() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return otpSent ? (
     <form onSubmit={handleVerifyOtp} className="space-y-4">
