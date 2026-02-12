@@ -199,9 +199,14 @@ export function renderFieldInput(
       const options = dynamicOptions || [];
       // Build a lookup map so onFilter can match search text against labels (not UUIDs)
       const labelMap = new Map(options.map((o) => [o.value, o.label.toLowerCase()]));
+      // Use undefined (uncontrolled) when no value so the combobox manages its own
+      // internal state for the initial selection — avoids a race condition where the
+      // controlled value="" causes the blur handler to clear the input before React
+      // re-renders with the selected UUID.
+      const comboboxValue = value != null && value !== "" ? String(value) : undefined;
       return (
         <Combobox
-          value={value ? String(value) : ""}
+          value={comboboxValue}
           onValueChange={(v) => onChange(v || null)}
           disabled={disabled}
           onFilter={(values, search) => {
