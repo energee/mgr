@@ -534,6 +534,23 @@ export const finishedGoodKeys = {
 };
 
 // =============================================================================
+// QuickBooks Integration Keys
+// =============================================================================
+
+export const qboKeys = {
+  all: () => ["qbo"] as const,
+  status: () => ["qbo", "status"] as const,
+  syncStatus: (entityType: string, entityId: string) =>
+    ["qbo", "sync-status", entityType, entityId] as const,
+  syncLog: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["qbo", "sync-log", filters] as const)
+      : (["qbo", "sync-log"] as const),
+  accounts: () => ["qbo", "accounts"] as const,
+  accountMappings: () => ["qbo", "account-mappings"] as const,
+};
+
+// =============================================================================
 // Square Integration Keys
 // =============================================================================
 

@@ -33,6 +33,7 @@ import { CACHE_DURATIONS } from "@/lib/constants";
 import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
+import { useQBOAutoSync } from "@/hooks/use-qbo-auto-sync";
 import { toast } from "sonner";
 import type {
   EntityConfig,
@@ -359,6 +360,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Shared cache invalidation helper
   // ---------------------------------------------------------------------------
+  const { triggerSync } = useQBOAutoSync(entity.name);
+
   const invalidateEntityCaches = useCallback(
     (recordId: string) => {
       queryClient.invalidateQueries({ queryKey: entityKeys.detail(fetchTable, recordId) });
@@ -385,8 +388,9 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, { toState }) => {
       invalidateEntityCaches(id || "");
+      triggerSync(id || "", toState);
     },
   });
 
