@@ -206,8 +206,6 @@ export function SlackIntegrationCard() {
           onSave={(url) => saveMutation.mutate({ webhook_url: url })}
           onRemove={() => saveMutation.mutate({ webhook_url: null, is_enabled: false })}
           isSaving={saveMutation.isPending}
-          onTest={isConnected ? () => testMutation.mutate() : undefined}
-          isTesting={testMutation.isPending}
           helpText={
             <>
               Create an{" "}
