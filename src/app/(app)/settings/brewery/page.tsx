@@ -7,7 +7,7 @@
  * Unit preferences are stored per-user in the user_preferences table.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
@@ -24,6 +24,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { useIsMac } from "@/hooks/use-is-mac";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   useUnitPreferences,
@@ -44,34 +45,64 @@ const unitPreferencesSchema = z.object({
 type UnitPreferencesForm = z.infer<typeof unitPreferencesSchema>;
 
 // =============================================================================
-// Unit Options
+// Unit Preference Field Definitions
 // =============================================================================
 
-const VOLUME_OPTIONS = [
-  { value: "bbl", label: "Barrels (BBL)" },
-  { value: "gal", label: "Gallons (gal)" },
-  { value: "l", label: "Liters (L)" },
-  { value: "hl", label: "Hectoliters (hL)" },
-];
+interface UnitField {
+  name: keyof UnitPreferencesForm;
+  label: string;
+  description: string;
+  options: { value: string; label: string }[];
+}
 
-const WEIGHT_OPTIONS = [
-  { value: "lbs", label: "Pounds (lbs)" },
-  { value: "kg", label: "Kilograms (kg)" },
-];
-
-const TEMPERATURE_OPTIONS = [
-  { value: "f", label: "Fahrenheit (°F)" },
-  { value: "c", label: "Celsius (°C)" },
-];
-
-const GRAVITY_OPTIONS = [
-  { value: "plato", label: "Plato (°P)" },
-  { value: "sg", label: "Specific Gravity (SG)" },
-];
-
-const RETAIL_VOLUME_OPTIONS = [
-  { value: "oz", label: "Fluid Ounces (oz)" },
-  { value: "ml", label: "Milliliters (mL)" },
+const UNIT_FIELDS: UnitField[] = [
+  {
+    name: "volume_unit",
+    label: "Production Volume",
+    description: "For batch sizes, vessel capacities, and production reports",
+    options: [
+      { value: "bbl", label: "Barrels (BBL)" },
+      { value: "gal", label: "Gallons (gal)" },
+      { value: "l", label: "Liters (L)" },
+      { value: "hl", label: "Hectoliters (hL)" },
+    ],
+  },
+  {
+    name: "weight_unit",
+    label: "Ingredient Weight",
+    description: "For grain bills, hop additions, and other ingredients",
+    options: [
+      { value: "lbs", label: "Pounds (lbs)" },
+      { value: "kg", label: "Kilograms (kg)" },
+    ],
+  },
+  {
+    name: "temperature_unit",
+    label: "Temperature",
+    description: "For mash temps, fermentation temps, and storage temps",
+    options: [
+      { value: "f", label: "Fahrenheit (\u00b0F)" },
+      { value: "c", label: "Celsius (\u00b0C)" },
+    ],
+  },
+  {
+    name: "gravity_unit",
+    label: "Gravity",
+    description: "For OG, FG, and refractometer readings",
+    options: [
+      { value: "plato", label: "Plato (\u00b0P)" },
+      { value: "sg", label: "Specific Gravity (SG)" },
+    ],
+  },
+  {
+    name: "retail_volume_unit",
+    label: "Retail Volume",
+    description: "For package sizes (cans, bottles, etc.)",
+    options: [
+      { value: "oz", label: "Fluid Ounces (oz)" },
+      { value: "ml", label: "Milliliters (mL)" },
+    ],
+  },
 ];
 
 // =============================================================================
@@ -81,12 +112,8 @@ const RETAIL_VOLUME_OPTIONS = [
 export default function BrewerySettingsPage() {
   const { data: preferences, isLoading } = useUnitPreferences();
   const updatePreferences = useUpdateUnitPreferences();
-  const [isMac, setIsMac] = useState(false);
+  const isMac = useIsMac();
   const submitRef = useSubmitShortcut();
-
-  useEffect(() => {
-    setIsMac(navigator.userAgent.includes("Mac"));
-  }, []);
 
   const form = useForm<UnitPreferencesForm>({
     resolver: zodResolver(unitPreferencesSchema),
@@ -149,131 +176,32 @@ export default function BrewerySettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Volume */}
-              <div className="grid gap-2">
-                <Label htmlFor="volume_unit">Production Volume</Label>
-                <Select
-                  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
-                  value={form.watch("volume_unit")}
-                  onValueChange={(value) =>
-                    form.setValue("volume_unit", value as UnitPreferencesForm["volume_unit"])
-                  }
-                >
-                  <SelectTrigger id="volume_unit" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VOLUME_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  For batch sizes, vessel capacities, and production reports
-                </p>
-              </div>
-
-              {/* Weight */}
-              <div className="grid gap-2">
-                <Label htmlFor="weight_unit">Ingredient Weight</Label>
-                <Select
-                  value={form.watch("weight_unit")}
-                  onValueChange={(value) =>
-                    form.setValue("weight_unit", value as UnitPreferencesForm["weight_unit"])
-                  }
-                >
-                  <SelectTrigger id="weight_unit" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WEIGHT_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  For grain bills, hop additions, and other ingredients
-                </p>
-              </div>
-
-              {/* Temperature */}
-              <div className="grid gap-2">
-                <Label htmlFor="temperature_unit">Temperature</Label>
-                <Select
-                  value={form.watch("temperature_unit")}
-                  onValueChange={(value) =>
-                    form.setValue("temperature_unit", value as UnitPreferencesForm["temperature_unit"])
-                  }
-                >
-                  <SelectTrigger id="temperature_unit" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TEMPERATURE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  For mash temps, fermentation temps, and storage temps
-                </p>
-              </div>
-
-              {/* Gravity */}
-              <div className="grid gap-2">
-                <Label htmlFor="gravity_unit">Gravity</Label>
-                <Select
-                  value={form.watch("gravity_unit")}
-                  onValueChange={(value) =>
-                    form.setValue("gravity_unit", value as UnitPreferencesForm["gravity_unit"])
-                  }
-                >
-                  <SelectTrigger id="gravity_unit" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GRAVITY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  For OG, FG, and refractometer readings
-                </p>
-              </div>
-
-              {/* Retail Volume */}
-              <div className="grid gap-2">
-                <Label htmlFor="retail_volume_unit">Retail Volume</Label>
-                <Select
-                  value={form.watch("retail_volume_unit")}
-                  onValueChange={(value) =>
-                    form.setValue("retail_volume_unit", value as UnitPreferencesForm["retail_volume_unit"])
-                  }
-                >
-                  <SelectTrigger id="retail_volume_unit" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {RETAIL_VOLUME_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  For package sizes (cans, bottles, etc.)
-                </p>
-              </div>
+              {UNIT_FIELDS.map((field) => (
+                <div key={field.name} className="grid gap-2">
+                  <Label htmlFor={field.name}>{field.label}</Label>
+                  <Select
+                    // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
+                    value={form.watch(field.name)}
+                    onValueChange={(value) =>
+                      form.setValue(field.name, value as UnitPreferencesForm[typeof field.name])
+                    }
+                  >
+                    <SelectTrigger id={field.name} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {field.options.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {field.description}
+                  </p>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
