@@ -11,6 +11,10 @@ import { valuesAsOptions, getValueLabel } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
 type Location = Database["public"]["Tables"]["locations"]["Row"];
+type LocationWithPos = Location & Pick<
+  Database["public"]["Views"]["locations_with_pos"]["Row"],
+  "pos_bin_name" | "pos_bin_type"
+>;
 
 // =============================================================================
 // Zod Schema
@@ -21,6 +25,8 @@ export const locationSchema = z.object({
   location_type: z.string().min(1, "Location type is required"),
   is_primary: z.boolean().default(false),
   is_active: z.boolean().default(true),
+  square_location_id: z.string().nullable().optional(),
+  pos_bin_id: z.string().uuid().nullable().optional(),
 });
 
 export type LocationFormValues = z.infer<typeof locationSchema>;
@@ -49,12 +55,13 @@ export const LOCATION_TYPES = valuesAsOptions(locationTypeDisplayConfig);
 // Entity Configuration
 // =============================================================================
 
-export const locationEntity: EntityConfig<Location> = {
+export const locationEntity: EntityConfig<LocationWithPos> = {
   // ---------------------------------------------------------------------------
   // Identity
   // ---------------------------------------------------------------------------
   name: "location",
   table: "locations",
+  viewTable: "locations_with_pos",
   displayName: "Location",
   displayNamePlural: "Locations",
   description: "Physical facilities for production, storage, and sales",
@@ -127,6 +134,14 @@ export const locationEntity: EntityConfig<Location> = {
         { field: "updated_at", label: "Last Updated", format: "datetime" },
       ],
     },
+    {
+      id: "pos",
+      title: "POS Integration",
+      fields: [
+        { field: "square_location_id", label: "Square Location ID" },
+        { field: "pos_bin_name", label: "POS Inventory Bin" },
+      ],
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -191,6 +206,31 @@ export const locationEntity: EntityConfig<Location> = {
         },
       ],
     },
+    {
+      id: "pos",
+      title: "POS Integration",
+      fields: [
+        {
+          name: "square_location_id",
+          label: "Square Location ID",
+          type: "text",
+          placeholder: "e.g., LXXXXXXXXXXXXXXXXX",
+          description: "The Square Location ID from your Square Dashboard",
+          colSpan: 6,
+        },
+        {
+          name: "pos_bin_id",
+          label: "POS Inventory Bin",
+          type: "relation",
+          relation: {
+            entity: "bin",
+            displayField: "name",
+          },
+          description: "Finished goods in this bin will sync to Square at this location",
+          colSpan: 6,
+        },
+      ],
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -237,6 +277,25 @@ export const locationEntity: EntityConfig<Location> = {
       defaultValue: true,
       colSpan: 6,
     },
+    {
+      name: "square_location_id",
+      label: "Square Location ID",
+      type: "text",
+      placeholder: "e.g., LXXXXXXXXXXXXXXXXX",
+      description: "The Square Location ID from your Square Dashboard",
+      colSpan: 6,
+    },
+    {
+      name: "pos_bin_id",
+      label: "POS Inventory Bin",
+      type: "relation",
+      relation: {
+        entity: "bin",
+        displayField: "name",
+      },
+      description: "Finished goods in this bin will sync to Square at this location",
+      colSpan: 6,
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -253,5 +312,5 @@ export const locationEntity: EntityConfig<Location> = {
     "Show all warehouses",
   ],
 
-  keyFields: ["name", "location_type", "is_primary", "is_active"],
+  keyFields: ["name", "location_type", "is_primary", "is_active", "square_location_id"],
 };
