@@ -52,15 +52,11 @@ export default async function PortalLayout({
     }
   }
 
-  if (customers.length === 0) {
-    return <PortalShell customers={[]}>{children}</PortalShell>;
-  }
-
-  // Get brewery branding
+  // Get brewery branding and contact info
   const { data: settings } = await db
     .from("system_settings")
     .select("key, value")
-    .in("key", ["brewery_name", "brewery_logo_svg"]);
+    .in("key", ["brewery_name", "brewery_logo_svg", "brewery_email"]);
 
   const settingsMap = Object.fromEntries(
     (settings ?? []).map((row: { key: string; value: unknown }) => [row.key, row.value])
@@ -71,6 +67,7 @@ export default async function PortalLayout({
       customers={customers}
       breweryName={(settingsMap.brewery_name as string) ?? null}
       breweryLogo={(settingsMap.brewery_logo_svg as string) ?? null}
+      breweryEmail={(settingsMap.brewery_email as string) ?? null}
     >
       {children}
     </PortalShell>

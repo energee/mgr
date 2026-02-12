@@ -12,6 +12,7 @@ interface PortalShellProps {
   customers: { id: string; name: string }[];
   breweryName?: string | null;
   breweryLogo?: string | null;
+  breweryEmail?: string | null;
 }
 
 export function PortalShell({
@@ -19,6 +20,7 @@ export function PortalShell({
   customers,
   breweryName,
   breweryLogo,
+  breweryEmail,
 }: PortalShellProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -37,8 +39,17 @@ export function PortalShell({
             No Account Linked
           </h1>
           <p className="text-muted-foreground">
-            Your email isn&apos;t linked to a customer account. Please contact
-            the brewery for access.
+            Your email isn&apos;t linked to a customer account.
+            {breweryEmail ? (
+              <> Contact us at{" "}
+                <a href={`mailto:${breweryEmail}`} className="font-medium text-foreground underline underline-offset-4">
+                  {breweryEmail}
+                </a>{" "}
+                for access.
+              </>
+            ) : (
+              <> Please contact the brewery for access.</>
+            )}
           </p>
           <Button variant="outline" onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />

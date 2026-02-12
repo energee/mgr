@@ -20,6 +20,20 @@ Customer records.
 
 ---
 
+## `customer_portal_users`
+
+Many-to-many junction linking auth users to customers for portal access.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| customer_id | UUID | FK to customers (PK part 1) |
+| user_id | UUID | FK to auth.users (PK part 2) |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+**Primary key:** (customer_id, user_id)
+
+---
+
 ## `orders`
 
 Sales orders.
@@ -90,6 +104,7 @@ Sales channel definitions.
 | name | TEXT | Channel name |
 | slug | TEXT | URL-safe slug |
 | description | TEXT | Description |
+| change_request_cutoff_state | TEXT | Order state at/beyond which customers cannot submit change requests (default: confirmed) |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
@@ -309,6 +324,43 @@ CREATE INDEX idx_tier_prices_temporal ON tier_prices(effective_from, effective_t
 -- Customer lookups
 CREATE INDEX idx_customers_type_active ON customers(customer_type, is_active);
 CREATE INDEX idx_customers_name ON customers(name) WHERE is_active = true;
+## `order_change_requests`
+
+Customer-submitted change requests for orders. Requires admin approval.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| order_id | UUID | FK to orders |
+| requested_by | UUID | FK to auth.users |
+| status | TEXT | Status: pending, approved, rejected, cancelled |
+| notes | TEXT | Customer notes |
+| reviewed_by | UUID | FK to auth.users (admin who reviewed) |
+| reviewed_at | TIMESTAMPTZ | Review timestamp |
+| rejection_reason | TEXT | Reason for rejection |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+---
+
+## `order_change_request_items`
+
+Individual line-item changes within a change request.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| change_request_id | UUID | FK to order_change_requests |
+| change_type | TEXT | Type: add, modify, remove |
+| order_item_id | UUID | FK to order_items (null for 'add') |
+| brand_id | UUID | FK to brands |
+| package_type_id | UUID | FK to package_types |
+| keg_type_id | UUID | FK to keg_types |
+| quantity | INTEGER | Proposed quantity |
+| original_quantity | INTEGER | Original quantity (snapshot) |
+
+---
+
 ## Square Integration (Taproom POS)
 
 Tables supporting Square POS integration for automatic taproom inventory debit. See `docs/MGR-SPECIFICATION.md` Section 12.3 for implementation details.
