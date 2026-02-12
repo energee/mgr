@@ -67,6 +67,23 @@ cancelled cancelled  cancelled cancelled (adjust only)
 | picking → packed | All items picked, debit inventory |
 | packed → out_the_door | Shipped/picked up/served |
 
+### Change Request States
+
+```
+pending → approved
+    ↓
+rejected
+    ↓
+(customer can resubmit)
+```
+
+| Transition | Trigger |
+|------------|---------|
+| pending → approved | Admin approves; `apply_change_request()` atomically updates order items |
+| pending → rejected | Admin rejects with reason; customer sees rejection on portal |
+
+**Cutoff rule:** Change requests can only be submitted when the order's status is below the sales channel's `change_request_cutoff_state` (default: `confirmed`).
+
 ### Transfer States
 
 ```

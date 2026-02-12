@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { OrderQuickLinks } from "@/components/domain/order-quick-links";
 import { OrderItemsEditor } from "@/components/domain/order-items-editor";
+import { ChangeRequestReview } from "@/components/domain/change-request-review";
 
 // Wrapper component to adapt OrderItemsEditor to relation component interface
 function OrderItemsRelation({ parentId, data }: { parentId: string; data?: Record<string, unknown> }) {
@@ -172,6 +173,12 @@ export const orderEntity: EntityConfig<Order> = {
       collapsible: true,
     },
     {
+      id: "change-requests",
+      title: "Change Requests",
+      component: ChangeRequestReview,
+      collapsible: true,
+    },
+    {
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("orders"),
@@ -262,6 +269,12 @@ export const orderEntity: EntityConfig<Order> = {
           colSpan: 12,
         },
       ],
+    },
+    {
+      id: "change-requests",
+      title: "Change Requests",
+      component: ChangeRequestReview,
+      collapsible: true,
     },
     {
       id: "revision-history",
@@ -440,4 +453,20 @@ export const orderEntity: EntityConfig<Order> = {
   ],
 
   keyFields: ["order_number", "status", "order_date", "customer_id"],
+};
+
+/**
+ * Change Request Status Display
+ *
+ * Status display config for order_change_requests (not a standalone entity,
+ * but needs consistent status rendering via StatusBadge).
+ */
+export const changeRequestStatusDisplay: Record<
+  string,
+  { label: string; color: "default" | "success" | "warning" | "error" | "info" }
+> = {
+  pending: { label: "Pending Review", color: "warning" },
+  approved: { label: "Approved", color: "success" },
+  rejected: { label: "Rejected", color: "error" },
+  cancelled: { label: "Cancelled", color: "default" },
 };

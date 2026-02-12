@@ -14,7 +14,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 // Types
 // =============================================================================
 
-export type UserRole = "admin" | "production_manager" | "brewer" | "sales" | "viewer";
+export type UserRole = "admin" | "production_manager" | "brewer" | "sales" | "viewer" | "customer";
 export type UserStatus = "active" | "inactive" | "pending";
 
 interface UserProfile {
@@ -42,7 +42,7 @@ interface UserProfile {
 
 export const userProfileSchema = z.object({
   display_name: z.string().min(1, "Display name is required"),
-  role: z.enum(["admin", "production_manager", "brewer", "sales", "viewer"]),
+  role: z.enum(["admin", "production_manager", "brewer", "sales", "viewer", "customer"]),
   status: z.enum(["active", "inactive", "pending"]).default("active"),
   avatar_url: z.string().url().nullable().optional(),
 });
@@ -53,12 +53,19 @@ export type UserProfileFormValues = z.infer<typeof userProfileSchema>;
 // Constants
 // =============================================================================
 
+/** Roles assignable by admins in the user form (excludes auto-assigned roles) */
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
   { value: "production_manager", label: "Production Manager" },
   { value: "brewer", label: "Brewer" },
   { value: "sales", label: "Sales" },
   { value: "viewer", label: "Viewer" },
+];
+
+/** All roles including auto-assigned ones, for filters and display */
+const ALL_ROLE_OPTIONS = [
+  ...ROLE_OPTIONS,
+  { value: "customer", label: "Customer" },
 ];
 
 const STATUS_OPTIONS = [
@@ -73,6 +80,7 @@ const ROLE_DISPLAY: Record<string, { label: string; color: "error" | "default" |
   brewer: { label: "Brewer", color: "success" },
   sales: { label: "Sales", color: "warning" },
   viewer: { label: "Viewer", color: "default" },
+  customer: { label: "Customer", color: "info" },
 };
 
 const STATUS_DISPLAY: Record<string, { label: string; color: "error" | "default" | "success" | "warning" | "info" }> = {
@@ -174,7 +182,7 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
       field: "role",
       type: "select",
       label: "Role",
-      options: ROLE_OPTIONS,
+      options: ALL_ROLE_OPTIONS,
     },
     {
       field: "status",

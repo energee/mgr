@@ -26,6 +26,17 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     redirect("/login");
   }
 
+  // Redirect customer-role users to the customer portal
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role === "customer") {
+    redirect("/portal/orders");
+  }
+
   // Get brewery name and logo from system_settings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;

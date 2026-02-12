@@ -7,9 +7,18 @@
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
+import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { orderEntity } from "./order";
 
-type SalesChannel = Database["public"]["Tables"]["sales_channels"]["Row"];
+const cutoffStateOptions = statesAsOptions(orderEntity.stateMachine!).filter(
+  (opt) => opt.value !== "cancelled"
+);
+
+type SalesChannelBase = Database["public"]["Tables"]["sales_channels"]["Row"];
+type SalesChannel = SalesChannelBase & {
+  change_request_cutoff_state?: string | null;
+};
 
 // =============================================================================
 // Zod Schema
@@ -21,6 +30,7 @@ export const salesChannelSchema = z.object({
   description: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
   position: z.coerce.number().int().nullable().optional(),
+  change_request_cutoff_state: z.string().default("confirmed"),
 });
 
 export type SalesChannelFormValues = z.infer<typeof salesChannelSchema>;
@@ -93,6 +103,13 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
         { field: "position", label: "Display Order" },
       ],
     },
+    {
+      id: "customer-portal",
+      title: "Customer Portal",
+      fields: [
+        { field: "change_request_cutoff_state", label: "Change Request Cutoff" },
+      ],
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -143,6 +160,20 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
         },
       ],
     },
+    {
+      id: "customer-portal",
+      title: "Customer Portal",
+      fields: [
+        {
+          name: "change_request_cutoff_state",
+          label: "Change request cutoff",
+          type: "select",
+          description: "Customers can request order changes until this state",
+          options: cutoffStateOptions,
+          colSpan: 6,
+        },
+      ],
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -187,6 +218,14 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
       label: "Active",
       type: "switch",
       defaultValue: true,
+      colSpan: 6,
+    },
+    {
+      name: "change_request_cutoff_state",
+      label: "Change Request Cutoff",
+      type: "select",
+      description: "Customers can request order changes until this state",
+      options: cutoffStateOptions,
       colSpan: 6,
     },
   ],
