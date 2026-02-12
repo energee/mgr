@@ -10,6 +10,13 @@ function addDays(dateStr: string, days: number): string {
   return date.toISOString().split("T")[0];
 }
 
+/** Extract numeric days from a payment terms string like "Net 30" or "COD". Returns NaN if no number found. */
+function parsePaymentTermsDays(terms: string | null | undefined): number {
+  if (!terms) return NaN;
+  const digits = terms.replace(/\D+/g, "");
+  return digits ? parseInt(digits, 10) : NaN;
+}
+
 export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string; action: "create" | "update" }> {
   const admin = await createAdminClient();
 
@@ -61,6 +68,12 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
     },
   }));
 
+  if (!lines.length && !Number(po.shipping_cost || 0)) {
+    throw new Error(
+      `Purchase order ${po.po_number || purchaseOrderId} has no line items. Cannot create an empty bill in QuickBooks.`
+    );
+  }
+
   // Add shipping cost as extra line if present
   const shippingCost = Number(po.shipping_cost || 0);
   if (shippingCost > 0) {
@@ -89,8 +102,8 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
     .eq("id", po.supplier_id)
     .single();
 
-  const paymentTermsDays = (supplier as Record<string, unknown> | null)?.payment_terms as number | null
-    ?? await getDefaultPaymentTermsDays();
+  const parsedDays = parsePaymentTermsDays(supplier?.payment_terms);
+  const paymentTermsDays = parsedDays > 0 ? parsedDays : await getDefaultPaymentTermsDays();
 
   const existing = await getMapping("purchase_order", purchaseOrderId);
   const action = existing ? "update" : "create";

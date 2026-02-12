@@ -22,25 +22,16 @@ export async function upsertMapping(
   qboEntityId: string
 ): Promise<void> {
   const admin = await createAdminClient();
-  const existing = await getMapping(entityType, entityId);
-
-  if (existing) {
-    await admin
-      .from("qbo_sync_mappings")
-      .update({
-        qbo_entity_id: qboEntityId,
-        last_synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existing.id);
-  } else {
-    await admin.from("qbo_sync_mappings").insert({
+  await admin.from("qbo_sync_mappings").upsert(
+    {
       entity_type: entityType,
       entity_id: entityId,
       qbo_entity_type: qboEntityType,
       qbo_entity_id: qboEntityId,
-    });
-  }
+      last_synced_at: new Date().toISOString(),
+    },
+    { onConflict: "entity_type,entity_id" }
+  );
 }
 
 export async function createSyncLog(

@@ -5,16 +5,29 @@ import type { QBOCustomer, QBOEntityResponse, QBOQueryResponse } from "./types";
 
 /** Query QBO for an existing customer by DisplayName. Returns the QBO Id if found. */
 async function findExistingQBOCustomer(displayName: string): Promise<string | null> {
-  const escaped = displayName.replace(/'/g, "\\'");
+  const escaped = displayName.replace(/'/g, "''");
   const response = await qboClient.query<QBOQueryResponse<QBOCustomer>>(
     "Customer",
     `DisplayName = '${escaped}'`
   );
   const customers = response.QueryResponse.Customer as QBOCustomer[] | undefined;
-  if (customers && customers.length > 0 && customers[0].Id) {
-    return customers[0].Id;
-  }
-  return null;
+  return customers?.[0]?.Id ?? null;
+}
+
+/** Fetch the current QBO customer, merge SyncToken, and do a sparse update. */
+async function sparseUpdateCustomer(
+  qboId: string,
+  payload: QBOCustomer
+): Promise<QBOEntityResponse<QBOCustomer>> {
+  const current = await qboClient.get<QBOEntityResponse<QBOCustomer>>(
+    `/customer/${qboId}`
+  );
+  return qboClient.post<QBOEntityResponse<QBOCustomer>>("/customer", {
+    ...payload,
+    Id: qboId,
+    SyncToken: current.Customer.SyncToken,
+    sparse: true,
+  });
 }
 
 export async function syncCustomer(customerId: string): Promise<{ qboId: string; action: "create" | "update" }> {
@@ -45,42 +58,12 @@ export async function syncCustomer(customerId: string): Promise<{ qboId: string;
       Taxable: !(customer as Record<string, unknown>).is_tax_exempt,
     };
 
-    let result: QBOEntityResponse<QBOCustomer>;
+    // Resolve the QBO ID: existing mapping, name match, or create new
+    const existingQboId = existing?.qbo_entity_id ?? await findExistingQBOCustomer(customer.name);
 
-    if (existing) {
-      // Fetch current QBO Customer to get SyncToken
-      const current = await qboClient.get<QBOEntityResponse<QBOCustomer>>(
-        `/customer/${existing.qbo_entity_id}`
-      );
-      qboCustomer.Id = existing.qbo_entity_id;
-      qboCustomer.SyncToken = current.Customer.SyncToken;
-      qboCustomer.sparse = true;
-      result = await qboClient.post<QBOEntityResponse<QBOCustomer>>(
-        "/customer",
-        qboCustomer
-      );
-    } else {
-      // Check for existing QBO customer with same name to avoid duplicates
-      const existingQboId = await findExistingQBOCustomer(customer.name);
-      if (existingQboId) {
-        // Found existing QBO customer — link it and update
-        const current = await qboClient.get<QBOEntityResponse<QBOCustomer>>(
-          `/customer/${existingQboId}`
-        );
-        qboCustomer.Id = existingQboId;
-        qboCustomer.SyncToken = current.Customer.SyncToken;
-        qboCustomer.sparse = true;
-        result = await qboClient.post<QBOEntityResponse<QBOCustomer>>(
-          "/customer",
-          qboCustomer
-        );
-      } else {
-        result = await qboClient.post<QBOEntityResponse<QBOCustomer>>(
-          "/customer",
-          qboCustomer
-        );
-      }
-    }
+    const result = existingQboId
+      ? await sparseUpdateCustomer(existingQboId, qboCustomer)
+      : await qboClient.post<QBOEntityResponse<QBOCustomer>>("/customer", qboCustomer);
 
     const qboId = result.Customer.Id!;
     await upsertMapping("customer", customerId, "Customer", qboId);

@@ -292,7 +292,7 @@ function AccountMappingTab() {
 const PAGE_SIZE = 20;
 
 function SyncLogTab() {
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Reset visible count when filter changes

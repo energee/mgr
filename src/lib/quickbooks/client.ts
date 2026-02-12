@@ -19,38 +19,51 @@ export class QBOClientError extends Error {
   }
 }
 
+let refreshPromise: Promise<string> | null = null;
+
 async function refreshAccessToken(): Promise<string> {
-  const tokens = await getTokens();
-  const creds = await getClientCredentials();
-  if (!tokens || !creds) throw new QBOClientError("QBO not connected");
+  // Dedup concurrent refresh attempts — only one refresh runs at a time
+  if (refreshPromise) return refreshPromise;
 
-  const response = await fetch(OAUTH_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${btoa(`${creds.clientId}:${creds.clientSecret}`)}`,
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: tokens.refreshToken,
-    }),
-  });
+  refreshPromise = (async () => {
+    try {
+      const tokens = await getTokens();
+      const creds = await getClientCredentials();
+      if (!tokens || !creds) throw new QBOClientError("QBO not connected");
 
-  if (!response.ok) {
-    throw new QBOClientError(`Token refresh failed: ${response.status}`, response.status);
-  }
+      const response = await fetch(OAUTH_TOKEN_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${btoa(`${creds.clientId}:${creds.clientSecret}`)}`,
+        },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: tokens.refreshToken,
+        }),
+      });
 
-  const data = await response.json();
-  const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      if (!response.ok) {
+        throw new QBOClientError(`Token refresh failed: ${response.status}`, response.status);
+      }
 
-  await saveTokens({
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token || tokens.refreshToken,
-    realmId: tokens.realmId,
-    expiresAt,
-  });
+      const data = await response.json();
+      const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
 
-  return data.access_token;
+      await saveTokens({
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token || tokens.refreshToken,
+        realmId: tokens.realmId,
+        expiresAt,
+      });
+
+      return data.access_token;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 // Main request function with auto-refresh and retry
