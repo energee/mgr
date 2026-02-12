@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Loader2 } from "lucide-react";
 
 export interface SecretKeyInputProps {
@@ -43,7 +44,17 @@ export function SecretKeyInput({
   const [inputValue, setInputValue] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-24" />
+        <div className="flex gap-2">
+          <Skeleton className="h-9 flex-1" />
+          <Skeleton className="h-9 w-16" />
+        </div>
+      </div>
+    );
+  }
 
   const showConfigured = hasExistingKey && !isEditing;
 

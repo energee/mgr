@@ -102,13 +102,9 @@ function GlobalApiKeySection() {
               when individual users don&apos;t have their own key configured.
             </CardDescription>
           </div>
-          {loaded && (
-            hasExistingKey ? (
-              <Badge variant="outline">Connected</Badge>
-            ) : (
-              <Badge variant="secondary">Not Connected</Badge>
-            )
-          )}
+          <Badge variant={hasExistingKey ? "outline" : "secondary"}>
+            {hasExistingKey ? "Connected" : "Not Connected"}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent>
