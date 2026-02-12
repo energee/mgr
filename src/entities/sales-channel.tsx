@@ -21,6 +21,7 @@ export const salesChannelSchema = z.object({
   description: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
   position: z.coerce.number().int().nullable().optional(),
+  change_request_cutoff_state: z.string().default("confirmed"),
 });
 
 export type SalesChannelFormValues = z.infer<typeof salesChannelSchema>;
@@ -93,6 +94,13 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
         { field: "position", label: "Display Order" },
       ],
     },
+    {
+      id: "customer-portal",
+      title: "Customer Portal",
+      fields: [
+        { field: "change_request_cutoff_state", label: "Change Request Cutoff" },
+      ],
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -143,6 +151,27 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
         },
       ],
     },
+    {
+      id: "customer-portal",
+      title: "Customer Portal",
+      fields: [
+        {
+          name: "change_request_cutoff_state",
+          label: "Change request cutoff",
+          type: "select",
+          description: "Customers can request order changes until this state",
+          options: [
+            { value: "draft", label: "Draft" },
+            { value: "confirmed", label: "Confirmed" },
+            { value: "scheduled", label: "Scheduled" },
+            { value: "picking", label: "Picking" },
+            { value: "packed", label: "Packed" },
+            { value: "fulfilled", label: "Fulfilled" },
+          ],
+          colSpan: 6,
+        },
+      ],
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -187,6 +216,21 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
       label: "Active",
       type: "switch",
       defaultValue: true,
+      colSpan: 6,
+    },
+    {
+      name: "change_request_cutoff_state",
+      label: "Change Request Cutoff",
+      type: "select",
+      description: "Customers can request order changes until this state",
+      options: [
+        { value: "draft", label: "Draft" },
+        { value: "confirmed", label: "Confirmed" },
+        { value: "scheduled", label: "Scheduled" },
+        { value: "picking", label: "Picking" },
+        { value: "packed", label: "Packed" },
+        { value: "fulfilled", label: "Fulfilled" },
+      ],
       colSpan: 6,
     },
   ],
