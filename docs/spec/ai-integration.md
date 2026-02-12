@@ -146,6 +146,15 @@ All tools are defined in `src/app/api/chat/tools.ts` and bound to the authentica
 | `getBrands` | Search brands with style info | `query?: string`, `limit?: number` |
 | `getFinishedGoods` | Finished goods inventory with availability | `brandId?: UUID`, `query?: string`, `limit?: number` |
 | `lookupEntity` | Resolve names/numbers to UUIDs across batches, recipes, customers, brands, orders | `query: string`, `entityType?: enum` |
+| `searchBrewLogs` | Search brew logs by status, date range, or brew number | `status?`, `startDate?`, `endDate?`, `brewNumber?`, `limit?` |
+| `searchPurchaseOrders` | Search purchase orders by status, date, or supplier | `status?`, `startDate?`, `endDate?`, `supplierName?`, `limit?` |
+| `searchSuppliers` | Search suppliers by name with contact info and terms | `query?: string`, `isActive?: boolean`, `limit?` |
+| `searchPickLists` | Search pick lists by status, date, or customer | `status?`, `startDate?`, `endDate?`, `customerName?`, `limit?` |
+| `searchYeastPitches` | Search yeast pitches with viability and strain details | `status?`, `strainName?`, `limit?` |
+| `getKegInventory` | Keg inventory by state, type, or location | `state?`, `kegTypeName?`, `locationName?`, `limit?` |
+| `searchDeliveries` | Search deliveries by status or date range | `status?`, `startDate?`, `endDate?`, `limit?` |
+| `searchLocationTransfers` | Search location transfers by status or date | `status?`, `startDate?`, `endDate?`, `limit?` |
+| `searchAllocations` | Search inventory allocations by status, source/dest type, date | `status?`, `sourceType?`, `destinationType?`, `startDate?`, `endDate?`, `limit?` |
 
 ### Navigation Tools (Write via Form Pre-fill)
 
@@ -162,7 +171,6 @@ Navigation tools validate inputs server-side, then return a `NavigationIntent` o
 - **Write tools are navigation-only** — the assistant pre-fills forms but the user must review and submit
 - **No recipe creation tools** — deferred to future expansion
 - **No order management tools** — deferred to future expansion
-- **No transfer or batch note tools** — no standalone dialogs exist for these yet
 
 ---
 
@@ -583,6 +591,24 @@ SRM = 1.4922 * MCU^0.6859
 - "What's going to expire in the next 30 days?"
 - "Do we have enough [hop] for the planned batches?"
 
+**Purchasing:**
+- "What purchase orders are outstanding?"
+- "When does our next order from [supplier] arrive?"
+- "Show me all suppliers for hops"
+
+**Fulfillment:**
+- "What pick lists need to go out today?"
+- "Show pick lists for [customer]"
+
+**Logistics:**
+- "Show deliveries scheduled this week"
+- "What transfers are in transit?"
+- "How many kegs do we have filled at [location]?"
+
+**Yeast:**
+- "What yeast pitches are available?"
+- "Show me pitches with low viability"
+
 **Analysis:**
 - "Compare actual vs target OG for recent batches"
 - "What's our average fermentation time for IPAs?"
@@ -594,7 +620,7 @@ SRM = 1.4922 * MCU^0.6859
 
 ### API
 - `src/app/api/chat/route.ts` — Chat endpoint (auth, API key resolution, streaming)
-- `src/app/api/chat/tools.ts` — Tool definitions (23 read tools + 3 navigation tools)
+- `src/app/api/chat/tools.ts` — Tool definitions (32 read tools + 3 navigation tools)
 
 ### Prefill Store
 - `src/stores/prefill-store.ts` — Zustand store for NavigationIntent data (prefill + dialog auto-open)

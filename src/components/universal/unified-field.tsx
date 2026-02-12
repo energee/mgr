@@ -37,13 +37,11 @@ export function UnifiedField({
   relationDisplayValues,
   dynamicOptions,
 }: UnifiedFieldProps) {
-  const isEditable = (() => {
-    if (!editing) return false;
-    if (field.editable === false) return false;
-    if (field.editable === "create-only" && !isCreateMode) return false;
-    if (!field.type) return false;
-    return true;
-  })();
+  const isEditable =
+    editing &&
+    field.editable !== false &&
+    !(field.editable === "create-only" && !isCreateMode) &&
+    !!field.type;
 
   if (isEditable && form) {
     return (
