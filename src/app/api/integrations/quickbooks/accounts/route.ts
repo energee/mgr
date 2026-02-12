@@ -62,25 +62,20 @@ export const PUT = withAuth(async (request) => {
 
   const admin = await createAdminClient();
 
-  for (const mapping of mappings) {
-    const { data: existing } = await admin
-      .from("qbo_account_mappings")
-      .select("id")
-      .eq("category", mapping.category)
-      .maybeSingle();
+  const { error } = await admin
+    .from("qbo_account_mappings")
+    .upsert(
+      mappings.map((m) => ({
+        category: m.category,
+        qbo_account_id: m.qbo_account_id,
+        qbo_account_name: m.qbo_account_name,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: "category" }
+    );
 
-    if (existing) {
-      await admin
-        .from("qbo_account_mappings")
-        .update({
-          qbo_account_id: mapping.qbo_account_id,
-          qbo_account_name: mapping.qbo_account_name,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await admin.from("qbo_account_mappings").insert(mapping);
-    }
+  if (error) {
+    return errorResponse("DB_ERROR", `Failed to save mappings: ${error.message}`, undefined, 500);
   }
 
   return successResponse({ updated: mappings.length });
