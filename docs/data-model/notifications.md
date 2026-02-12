@@ -46,25 +46,52 @@ User preferences for notification channels per type.
 
 ## `slack_settings`
 
-Slack integration settings (brewery-wide).
+Slack integration settings (brewery-wide, singleton — enforced by unique index on `(true)`).
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| webhook_url | TEXT | Slack webhook URL |
-| default_channel | TEXT | Default channel |
-| is_enabled | BOOLEAN | Integration enabled |
-| channel_overrides | JSONB | Per-notification-type channel overrides |
+| webhook_url | TEXT | Slack Incoming Webhook URL |
+| default_channel | TEXT | Default Slack channel (overrides webhook default) |
+| is_enabled | BOOLEAN | Master toggle for Slack notifications |
+| channel_overrides | JSONB | Per notification-type channel routing |
+| internal_secret | TEXT | Auto-generated secret for pg_net → API route authentication |
+| app_url | TEXT | App URL for pg_net callbacks (auto-set from request headers) |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
 **channel_overrides schema:**
 ```json
 {
-  "batch_ready": "#production",
-  "order_due": "#sales"
+  "batch_status": "#production",
+  "order_received": "#sales"
 }
 ```
+
+---
+
+## `slack_notification_log`
+
+Audit log of Slack notification delivery attempts. Created by `notify_all_users()` when Slack is enabled, updated by the `/api/slack/send` route after delivery.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| notification_type | TEXT | Notification type (e.g. `batch_status`, `order_received`) |
+| title | TEXT | Notification title |
+| message | TEXT | Notification message body |
+| priority | TEXT | Priority level (default: `normal`) |
+| action_url | TEXT | Deep link URL for the notification |
+| metadata | JSONB | Type-specific data |
+| channel | TEXT | Target Slack channel |
+| status | TEXT | Delivery status: `pending`, `sent`, `failed`, `skipped` |
+| error_message | TEXT | Error details (when status is `failed` or `skipped`) |
+| sent_at | TIMESTAMPTZ | When the message was sent to Slack |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+**Indexes:**
+- `idx_slack_notification_log_status` — Filter by delivery status
+- `idx_slack_notification_log_created` — Sort by creation time (descending)
 
 ---
 

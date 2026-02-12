@@ -9,7 +9,7 @@
  * - Quiet hours configuration
  */
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
@@ -31,6 +31,7 @@ import {
 import { TimePicker } from "@/components/ui/time-picker";
 import { Loader2 } from "lucide-react";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { useIsMac } from "@/hooks/use-is-mac";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
 
@@ -76,12 +77,8 @@ const defaultPreferences: PreferencesFormValues = {
 export default function NotificationPreferencesPage() {
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const [isMac, setIsMac] = useState(false);
+  const isMac = useIsMac();
   const submitRef = useSubmitShortcut();
-
-  useEffect(() => {
-    setIsMac(navigator.userAgent.includes("Mac"));
-  }, []);
 
   // Fetch preferences
   const { data: preferences, isLoading } = useQuery({

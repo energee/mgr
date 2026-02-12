@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileUpload, FileUploadDropzone, FileUploadTrigger } from "@/components/ui/file-upload";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { useIsMac } from "@/hooks/use-is-mac";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 
 // =============================================================================
@@ -173,14 +174,10 @@ export default function SystemSettingsPage() {
   const { data: settings, isLoading } = useSystemSettings();
   const updateSettings = useUpdateSystemSettings();
   const [activeTab, setActiveTab] = useState("general");
-  const [isMac, setIsMac] = useState(false);
+  const isMac = useIsMac();
   const [logoSvg, setLogoSvg] = useState<string | null>(null);
   const [uploadResetKey, setUploadResetKey] = useState(0);
   const submitRef = useSubmitShortcut();
-
-  useEffect(() => {
-    setIsMac(navigator.userAgent.includes("Mac"));
-  }, []);
 
   const form = useForm<SystemSettingsForm>({
     resolver: zodResolver(systemSettingsSchema),
