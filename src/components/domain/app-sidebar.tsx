@@ -152,33 +152,7 @@ const navigation: NavSection[] = [
   },
 ];
 
-function AnimatedNavItem({
-  item,
-  isActive,
-}: {
-  item: NavItem;
-  isActive: boolean;
-}) {
-  const iconRef = useRef<AnimatedIconHandle>(null);
-
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={isActive}
-        onMouseEnter={() => iconRef.current?.startAnimation()}
-        onMouseLeave={() => iconRef.current?.stopAnimation()}
-      >
-        <Link href={item.href}>
-          <item.icon ref={iconRef} className="h-4 w-4" />
-          <span>{item.label}</span>
-        </Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
-}
-
-function AnimatedFooterItem({
+function AnimatedNavLink({
   href,
   icon: Icon,
   label,
@@ -297,16 +271,15 @@ export function AppSidebar() {
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {section.items.map((item) => {
-                      const isItemActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                      return (
-                        <AnimatedNavItem
-                          key={item.href}
-                          item={item}
-                          isActive={isItemActive}
-                        />
-                      );
-                    })}
+                    {section.items.map((item) => (
+                      <AnimatedNavLink
+                        key={item.href}
+                        href={item.href}
+                        icon={item.icon}
+                        label={item.label}
+                        isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
+                      />
+                    ))}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
@@ -318,13 +291,13 @@ export function AppSidebar() {
       {/* Footer */}
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
-          <AnimatedFooterItem
+          <AnimatedNavLink
             href="/help"
             icon={AnimatedHelpCircle}
             label="Help"
             isActive={pathname.startsWith("/help")}
           />
-          <AnimatedFooterItem
+          <AnimatedNavLink
             href="/settings"
             icon={AnimatedSettings}
             label="Settings"

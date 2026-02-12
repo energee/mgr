@@ -43,7 +43,6 @@ import type {
 import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { UnifiedField } from "./unified-field";
-import { EditFooter } from "./edit-footer";
 import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -358,6 +357,21 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   );
 
   // ---------------------------------------------------------------------------
+  // Shared cache invalidation helper
+  // ---------------------------------------------------------------------------
+  const invalidateEntityCaches = useCallback(
+    (recordId: string) => {
+      queryClient.invalidateQueries({ queryKey: entityKeys.detail(fetchTable, recordId) });
+      queryClient.invalidateQueries({ queryKey: entityKeys.detail(entity.table, recordId) });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.table) });
+      if (entity.viewTable) {
+        queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.viewTable) });
+      }
+    },
+    [queryClient, fetchTable, entity.table, entity.viewTable]
+  );
+
+  // ---------------------------------------------------------------------------
   // State transition mutation
   // ---------------------------------------------------------------------------
   const transitionMutation = useMutation({
@@ -372,22 +386,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: entityKeys.detail(fetchTable, id || ""),
-      });
-      if (entity.viewTable) {
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.detail(entity.table, id || ""),
-        });
-      }
-      queryClient.invalidateQueries({
-        queryKey: entityKeys.all(entity.table),
-      });
-      if (entity.viewTable) {
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.all(entity.viewTable),
-        });
-      }
+      invalidateEntityCaches(id || "");
     },
   });
 
@@ -424,14 +423,14 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     const tabMap = new Map<string, UnifiedSectionDef<T>[]>();
     const noTab: UnifiedSectionDef<T>[] = [];
 
-    sections.forEach((section) => {
+    for (const section of sections) {
       if (section.tab) {
         const existing = tabMap.get(section.tab) || [];
         tabMap.set(section.tab, [...existing, section]);
       } else {
         noTab.push(section);
       }
-    });
+    }
 
     return {
       tabs: Array.from(tabMap.entries()),
@@ -575,28 +574,12 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         }
 
         // Invalidate caches
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.detail(fetchTable, id),
-        });
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.detail(entity.table, id),
-        });
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.all(entity.table),
-        });
-        if (entity.viewTable) {
-          queryClient.invalidateQueries({
-            queryKey: entityKeys.all(entity.viewTable),
-          });
-        }
+        invalidateEntityCaches(id);
 
         setEditing(false);
       }
     } catch (err) {
-      let message = "An unexpected error occurred";
-      if (err && typeof err === "object" && "message" in err && typeof (err as Error).message === "string") {
-        message = (err as Error).message;
-      }
+      const message = err instanceof Error ? err.message : "An unexpected error occurred";
       toast.error(message);
       console.error("Form submission error:", err);
     } finally {
@@ -611,7 +594,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     db,
     supabase,
     queryClient,
-    fetchTable,
+    invalidateEntityCaches,
     path,
     router,
     conflictDialog,
@@ -655,45 +638,62 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // Keyboard shortcuts
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    function isInputElement(el: Element | null): boolean {
+      if (!el) return false;
+      const tag = el.tagName.toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select"
+        || (el as HTMLElement).isContentEditable;
+    }
+
+    function confirmDirtyNavigation(): boolean {
+      if (editing && form.formState.isDirty) {
+        return window.confirm("You have unsaved changes. Discard?");
+      }
+      return true;
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
-      // Don't trigger when typing in an input
-      const el = document.activeElement;
-      if (el) {
-        const tag = el.tagName.toLowerCase();
-        if (tag === "input" || tag === "textarea" || tag === "select") {
-          // Only allow Escape while in inputs during edit mode
-          if (editing && e.key === "Escape") {
-            e.preventDefault();
-            handleCancel();
-          }
-          return;
+      const inInput = isInputElement(document.activeElement);
+
+      // Allow Escape from inputs during edit mode
+      if (inInput) {
+        if (editing && e.key === "Escape") {
+          e.preventDefault();
+          handleCancel();
         }
-        if ((el as HTMLElement).isContentEditable) return;
+        return;
       }
 
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      if (editing) {
-        if (e.key === "Escape") {
+      switch (e.key) {
+        case "Backspace":
           e.preventDefault();
-          handleCancel();
-        }
-      } else {
-        // View mode shortcuts
-        if (e.key === "Backspace") {
-          e.preventDefault();
-          router.push(backUrl || path);
-        }
-        if (e.key === "e" || e.key === "E") {
-          e.preventDefault();
-          startEditing();
-        }
+          if (confirmDirtyNavigation()) {
+            router.push(backUrl || path);
+          }
+          break;
+
+        case "Escape":
+          if (editing) {
+            e.preventDefault();
+            handleCancel();
+          }
+          break;
+
+        case "e":
+        case "E":
+          if (!editing) {
+            e.preventDefault();
+            startEditing();
+          }
+          break;
       }
     }
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [editing, router, path, backUrl, handleCancel, startEditing]);
+  }, [editing, router, path, backUrl, handleCancel, startEditing, form.formState.isDirty]);
 
   // ---------------------------------------------------------------------------
   // Rendering guards
@@ -726,7 +726,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const displayData = (data || ({} as T)) as T;
 
   return (
-    <div className={`space-y-6${editing ? " pb-20" : ""}`}>
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
@@ -734,8 +734,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             href={backUrl || path}
             className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
           >
-            &larr; Back
-            {!editing && <Kbd>&lArr;</Kbd>}
+            <Kbd>⌫</Kbd>
+            Back
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">
@@ -756,10 +756,21 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         </div>
 
         <div className="flex items-center gap-2">
+          {editing && (
+            <Button
+              onClick={handleSave}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Saving..." : `Save ${entity.displayName}`}
+              <Kbd>⌘↵</Kbd>
+            </Button>
+          )}
+
           {canEdit && !editing && !isCreateMode && (
-            <Button variant="outline" size="icon" onClick={startEditing} title="Edit">
+            <Button variant="outline" onClick={startEditing}>
               <Pencil className="h-4 w-4" />
-              <span className="sr-only">Edit</span>
+              Edit
+              <Kbd>E</Kbd>
             </Button>
           )}
 
@@ -881,16 +892,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           className="hidden"
           onClick={handleSave}
           aria-hidden
-        />
-      )}
-
-      {/* Edit Footer */}
-      {editing && (
-        <EditFooter
-          form={form as UseFormReturn<Record<string, unknown>>}
-          onSave={handleSave}
-          onCancel={handleCancel}
-          isSubmitting={isSubmitting}
         />
       )}
 
@@ -1138,25 +1139,19 @@ function RelationTable({
       if (!relatedEntity) return [];
 
       try {
-        // Build select with relations for display fields
-        let selectClause = "*";
-        const joins: string[] = [];
+        // Build select with joins for FK display fields
+        const joins = relatedEntity.listColumns
+          .filter((col) => col.relation)
+          .map((col) => {
+            const relEntity = entityRegistry.get(col.relation!.entity);
+            const tableName = relEntity?.table || `${col.relation!.entity}s`;
+            const alias = col.accessorKey?.replace(/_id$/, "") || col.relation!.entity;
+            return `${alias}:${tableName}!${col.accessorKey}(${col.relation!.displayField})`;
+          });
 
-        relatedEntity.listColumns.forEach((col) => {
-          if (col.relation) {
-            const relEntity = entityRegistry.get(col.relation.entity);
-            const tableName = relEntity?.table || `${col.relation.entity}s`;
-            const alias =
-              col.accessorKey?.replace(/_id$/, "") || col.relation.entity;
-            joins.push(
-              `${alias}:${tableName}!${col.accessorKey}(${col.relation.displayField})`
-            );
-          }
-        });
-
-        if (joins.length > 0) {
-          selectClause = `*, ${joins.join(", ")}`;
-        }
+        const selectClause = joins.length > 0
+          ? `*, ${joins.join(", ")}`
+          : "*";
 
         // Use entity's defaultSort or fallback to created_at
         const sortField = relatedEntity.defaultSort?.column || "created_at";
@@ -1166,7 +1161,7 @@ function RelationTable({
         const limit = relation.relationLimit || 50;
 
         const { data, error } = await db
-          .from(relatedEntity.table)
+          .from(relatedEntity.viewTable || relatedEntity.table)
           .select(selectClause)
           .eq(relation.foreignKey, parentId)
           .order(sortField, { ascending: sortAsc })

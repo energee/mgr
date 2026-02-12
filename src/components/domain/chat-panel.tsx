@@ -56,11 +56,13 @@ function isNavigationIntent(result: unknown): result is NavigationIntent {
 }
 
 const TOOL_TITLES: Record<string, string> = {
+  // RPC tools
   analyzeRecipe: "Analyze Recipe",
   getRecipeSummary: "Recipe Summary",
   suggestImprovements: "Suggest Improvements",
   analyzeBatch: "Analyze Batch",
   getInventoryOverview: "Inventory Overview",
+  // Query tools
   searchRecipes: "Search Recipes",
   getBatchStatus: "Batch Status",
   getVesselAvailability: "Vessel Availability",
@@ -79,7 +81,19 @@ const TOOL_TITLES: Record<string, string> = {
   searchOrders: "Search Orders",
   getOrderDetail: "Order Detail",
   getCustomers: "Search Customers",
+  searchBrewLogs: "Search Brew Logs",
+  searchPurchaseOrders: "Search Purchase Orders",
+  searchSuppliers: "Search Suppliers",
+  searchPickLists: "Search Pick Lists",
+  searchYeastPitches: "Search Yeast Pitches",
+  getKegInventory: "Keg Inventory",
+  searchDeliveries: "Search Deliveries",
+  searchLocationTransfers: "Search Transfers",
+  searchAllocations: "Search Allocations",
+  searchPackagingSessions: "Search Packaging Sessions",
+  // Help
   getAppGuide: "App Guide",
+  // Navigation tools
   createBatch: "Create Batch",
   transitionBatch: "Transition Batch",
   addBatchReading: "Add Reading",
