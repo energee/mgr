@@ -16,7 +16,9 @@ const AUTO_SYNC_CONFIG: Record<string, { entityType: string; triggerStates: stri
 };
 
 export function useQBOAutoSync(entityName: string) {
-  // Check QBO connection status (cached, minimal overhead)
+  const isConfigured = entityName in AUTO_SYNC_CONFIG;
+
+  // Only fetch QBO status for entities that support auto-sync
   const { data: connectionStatus } = useQuery({
     queryKey: qboKeys.status(),
     queryFn: async () => {
@@ -24,7 +26,8 @@ export function useQBOAutoSync(entityName: string) {
       if (!res.ok) return { connected: false, autoSyncEnabled: false };
       return (await res.json()).data;
     },
-    staleTime: 60_000, // Cache for 1 minute
+    staleTime: 60_000,
+    enabled: isConfigured,
   });
 
   const triggerSync = useCallback(
