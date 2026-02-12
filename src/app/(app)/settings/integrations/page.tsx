@@ -91,14 +91,25 @@ function GlobalApiKeySection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClaudeIcon className="h-5 w-5 text-[#D97757]" />
-          Anthropic Claude
-        </CardTitle>
-        <CardDescription>
-          Configure Anthropic Claude for AI-powered assistance. This key is used as a fallback
-          when individual users don&apos;t have their own key configured.
-        </CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <ClaudeIcon className="h-5 w-5 text-[#D97757]" />
+              Anthropic Claude
+            </CardTitle>
+            <CardDescription>
+              Configure Anthropic Claude for AI-powered assistance. This key is used as a fallback
+              when individual users don&apos;t have their own key configured.
+            </CardDescription>
+          </div>
+          {loaded && (
+            hasExistingKey ? (
+              <Badge variant="default">Connected</Badge>
+            ) : (
+              <Badge variant="secondary">Not Connected</Badge>
+            )
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <SecretKeyInput
