@@ -1,0 +1,98 @@
+"use client";
+
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { PortalProvider } from "@/lib/portal-context";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+
+interface PortalShellProps {
+  children: React.ReactNode;
+  customer: { id: string; name: string } | null;
+  breweryName?: string | null;
+  breweryLogo?: string | null;
+}
+
+export function PortalShell({
+  children,
+  customer,
+  breweryName,
+  breweryLogo,
+}: PortalShellProps) {
+  const router = useRouter();
+  const supabase = createClient();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/portal/login");
+    router.refresh();
+  }
+
+  if (!customer) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+        <div className="max-w-md space-y-4 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            No Account Linked
+          </h1>
+          <p className="text-muted-foreground">
+            Your email isn&apos;t linked to a customer account. Please contact
+            the brewery for access.
+          </p>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Log Out
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <PortalProvider
+      value={{ customerId: customer.id, customerName: customer.name }}
+    >
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="sticky top-0 z-50 border-b bg-background">
+          <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+            <div className="flex items-center gap-6">
+              <Link href="/portal/orders" className="flex items-center gap-2">
+                {breweryLogo ? (
+                  <span
+                    className="h-8 w-8 [&>svg]:h-full [&>svg]:w-full"
+                    dangerouslySetInnerHTML={{ __html: breweryLogo }}
+                  />
+                ) : (
+                  <span className="text-lg font-semibold tracking-tight">
+                    {breweryName || "Brewery"}
+                  </span>
+                )}
+              </Link>
+              <nav className="flex items-center gap-4">
+                <Link
+                  href="/portal/orders"
+                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Orders
+                </Link>
+              </nav>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                {customer.name}
+              </span>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Log Out
+              </Button>
+            </div>
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+          {children}
+        </main>
+      </div>
+    </PortalProvider>
+  );
+}
