@@ -10,16 +10,19 @@
  */
 
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SecretKeyInput } from "@/components/domain/secret-key-input";
+import { Check, ExternalLink } from "lucide-react";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { SquareIcon } from "@/components/ui/square-icon";
 import { QuickBooksIcon } from "@/components/ui/quickbooks-icon";
 import { SlackIntegrationCard } from "@/components/domain/slack-integration-card";
+import { qboKeys } from "@/lib/query-keys";
 
 // =============================================================================
 // Global API Key Section (write-only — key is never read back to the client)
@@ -208,6 +211,91 @@ function IntegrationKeySection({
   );
 }
 
+// =============================================================================
+// QuickBooks Integration Card (dedicated card with connection status)
+// =============================================================================
+
+function QuickBooksIntegrationCard() {
+  const { data: status, isLoading } = useQuery({
+    queryKey: qboKeys.status(),
+    queryFn: async () => {
+      const res = await fetch("/api/integrations/quickbooks/status");
+      if (!res.ok) return { connected: false };
+      return (await res.json()).data;
+    },
+    staleTime: 30_000,
+  });
+
+  const isConnected = status?.connected === true;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <QuickBooksIcon className="h-5 w-5" />
+              QuickBooks Online
+            </CardTitle>
+            <CardDescription>
+              Sync invoices and bills with QuickBooks Online. Automate accounting
+              for orders and purchase orders.
+            </CardDescription>
+          </div>
+          {isLoading ? (
+            <Badge variant="outline">Checking...</Badge>
+          ) : isConnected ? (
+            <Badge variant="default">Connected</Badge>
+          ) : (
+            <Badge variant="secondary">Not Connected</Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isConnected && status?.companyName && (
+          <div className="flex items-center gap-2 text-sm">
+            <Check className="h-4 w-4 text-green-600" />
+            <span>
+              Connected to <strong>{status.companyName}</strong>
+            </span>
+          </div>
+        )}
+        {!isConnected && (
+          <IntegrationKeySection
+            integrationId="quickbooks"
+            keyLabel="QuickBooks Client ID"
+            keyPlaceholder="AB1cd2EFgh3..."
+          />
+        )}
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-medium mb-2">Features</h4>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              {[
+                "Auto-sync invoices from orders",
+                "Auto-sync bills from purchase orders",
+                "Customer & supplier mapping",
+                "Tax exemption support",
+              ].map((feature, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <Link href="/settings/integrations/quickbooks">
+            <Button variant="outline" size="sm">
+              Settings
+              <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function IntegrationsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
@@ -269,48 +357,7 @@ export default function IntegrationsPage() {
       </Card>
 
       {/* QuickBooks */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <QuickBooksIcon className="h-5 w-5" />
-              </div>
-              <div>
-                <CardTitle className="text-lg">QuickBooks</CardTitle>
-                <CardDescription>
-                  Sync financial data with QuickBooks Online. Automate invoicing and expense tracking.
-                </CardDescription>
-              </div>
-            </div>
-            <Badge variant="secondary">Beta</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <IntegrationKeySection
-            integrationId="quickbooks"
-            keyLabel="QuickBooks Client ID"
-            keyPlaceholder="AB1cd2EFgh3..."
-          />
-          <div>
-            <h4 className="text-sm font-medium mb-2">Features</h4>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                Invoice sync
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                Expense tracking
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                Inventory valuation
-              </li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
+      <QuickBooksIntegrationCard />
       {/* Custom Integration Section */}
       <Card>
         <CardHeader>

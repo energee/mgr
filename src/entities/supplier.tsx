@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { Badge } from "@/components/ui/badge";
+import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
 
 type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
 
@@ -116,6 +117,11 @@ export const supplierEntity: EntityConfig<Supplier> = {
       ],
     },
     {
+      id: "qbo-sync",
+      title: "QuickBooks",
+      component: createQBOSyncDisplay("supplier"),
+    },
+    {
       id: "notes",
       title: "Notes",
       fields: [{ field: "notes", label: "Notes", fullWidth: true }],
@@ -196,6 +202,11 @@ export const supplierEntity: EntityConfig<Supplier> = {
           colSpan: 6,
         },
       ],
+    },
+    {
+      id: "qbo-sync",
+      title: "QuickBooks",
+      component: createQBOSyncDisplay("supplier"),
     },
     {
       id: "notes",
