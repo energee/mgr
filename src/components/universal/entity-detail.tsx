@@ -429,7 +429,7 @@ function useRelationDisplayValues<T>(
   }, [fields, data]);
 
   const { data: relationMap = {} } = useQuery({
-    queryKey: ["relation-display", ...relationQueries.map((q) => `${q.table}:${q.id}`)],
+    queryKey: entityKeys.relationDisplay(relationQueries),
     enabled: relationQueries.length > 0,
     staleTime: CACHE_DURATIONS.STATIC_DATA,
     queryFn: async () => {
