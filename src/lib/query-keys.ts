@@ -135,6 +135,18 @@ export const orderKeys = {
 };
 
 // =============================================================================
+// Change Request Keys
+// =============================================================================
+
+export const changeRequestKeys = {
+  all: () => ["change-requests"] as const,
+  forOrder: (orderId: string) => ["change-requests", "for-order", orderId] as const,
+  detail: (id: string) => ["change-requests", id] as const,
+  items: (id: string) => ["change-requests", id, "items"] as const,
+  pendingForOrder: (orderId: string) => ["change-requests", "pending", orderId] as const,
+};
+
+// =============================================================================
 // Inventory Keys
 // =============================================================================
 
