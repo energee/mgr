@@ -43,7 +43,6 @@ import type {
 import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { UnifiedField } from "./unified-field";
-import { EditFooter } from "./edit-footer";
 import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -358,6 +357,21 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   );
 
   // ---------------------------------------------------------------------------
+  // Shared cache invalidation helper
+  // ---------------------------------------------------------------------------
+  const invalidateEntityCaches = useCallback(
+    (recordId: string) => {
+      queryClient.invalidateQueries({ queryKey: entityKeys.detail(fetchTable, recordId) });
+      queryClient.invalidateQueries({ queryKey: entityKeys.detail(entity.table, recordId) });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.table) });
+      if (entity.viewTable) {
+        queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.viewTable) });
+      }
+    },
+    [queryClient, fetchTable, entity.table, entity.viewTable]
+  );
+
+  // ---------------------------------------------------------------------------
   // State transition mutation
   // ---------------------------------------------------------------------------
   const transitionMutation = useMutation({
@@ -372,22 +386,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: entityKeys.detail(fetchTable, id || ""),
-      });
-      if (entity.viewTable) {
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.detail(entity.table, id || ""),
-        });
-      }
-      queryClient.invalidateQueries({
-        queryKey: entityKeys.all(entity.table),
-      });
-      if (entity.viewTable) {
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.all(entity.viewTable),
-        });
-      }
+      invalidateEntityCaches(id || "");
     },
   });
 
@@ -575,28 +574,12 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         }
 
         // Invalidate caches
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.detail(fetchTable, id),
-        });
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.detail(entity.table, id),
-        });
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.all(entity.table),
-        });
-        if (entity.viewTable) {
-          queryClient.invalidateQueries({
-            queryKey: entityKeys.all(entity.viewTable),
-          });
-        }
+        invalidateEntityCaches(id);
 
         setEditing(false);
       }
     } catch (err) {
-      let message = "An unexpected error occurred";
-      if (err && typeof err === "object" && "message" in err && typeof (err as Error).message === "string") {
-        message = (err as Error).message;
-      }
+      const message = err instanceof Error ? err.message : "An unexpected error occurred";
       toast.error(message);
       console.error("Form submission error:", err);
     } finally {
@@ -611,7 +594,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     db,
     supabase,
     queryClient,
-    fetchTable,
+    invalidateEntityCaches,
     path,
     router,
     conflictDialog,
@@ -673,6 +656,17 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      // Backspace goes back in all modes (with dirty guard in edit mode)
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        if (editing && form.formState.isDirty) {
+          const confirmed = window.confirm("You have unsaved changes. Discard?");
+          if (!confirmed) return;
+        }
+        router.push(backUrl || path);
+        return;
+      }
+
       if (editing) {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -680,10 +674,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         }
       } else {
         // View mode shortcuts
-        if (e.key === "Backspace") {
-          e.preventDefault();
-          router.push(backUrl || path);
-        }
         if (e.key === "e" || e.key === "E") {
           e.preventDefault();
           startEditing();
@@ -693,7 +683,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [editing, router, path, backUrl, handleCancel, startEditing]);
+  }, [editing, router, path, backUrl, handleCancel, startEditing, form.formState.isDirty]);
 
   // ---------------------------------------------------------------------------
   // Rendering guards
@@ -726,7 +716,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const displayData = (data || ({} as T)) as T;
 
   return (
-    <div className={`space-y-6${editing ? " pb-20" : ""}`}>
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
@@ -734,8 +724,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             href={backUrl || path}
             className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
           >
-            &larr; Back
-            {!editing && <Kbd>&lArr;</Kbd>}
+            <Kbd>⌫</Kbd>
+            Back
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">
@@ -756,10 +746,21 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         </div>
 
         <div className="flex items-center gap-2">
+          {editing && (
+            <Button
+              onClick={handleSave}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Saving..." : `Save ${entity.displayName}`}
+              <Kbd>⌘↵</Kbd>
+            </Button>
+          )}
+
           {canEdit && !editing && !isCreateMode && (
-            <Button variant="outline" size="icon" onClick={startEditing} title="Edit">
+            <Button variant="outline" onClick={startEditing}>
               <Pencil className="h-4 w-4" />
-              <span className="sr-only">Edit</span>
+              Edit
+              <Kbd>E</Kbd>
             </Button>
           )}
 
@@ -881,16 +882,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           className="hidden"
           onClick={handleSave}
           aria-hidden
-        />
-      )}
-
-      {/* Edit Footer */}
-      {editing && (
-        <EditFooter
-          form={form as UseFormReturn<Record<string, unknown>>}
-          onSave={handleSave}
-          onCancel={handleCancel}
-          isSubmitting={isSubmitting}
         />
       )}
 
@@ -1166,7 +1157,7 @@ function RelationTable({
         const limit = relation.relationLimit || 50;
 
         const { data, error } = await db
-          .from(relatedEntity.table)
+          .from(relatedEntity.viewTable || relatedEntity.table)
           .select(selectClause)
           .eq(relation.foreignKey, parentId)
           .order(sortField, { ascending: sortAsc })

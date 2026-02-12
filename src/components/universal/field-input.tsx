@@ -288,7 +288,7 @@ export function renderFieldInput(
       return (
         <UnitInput
           value={value as number | null | undefined}
-          onChange={(v) => onChange(v)}
+          onChange={onChange}
           unitType={field.unitType}
           allowSwitch={field.allowUnitSwitch}
           placeholder={field.placeholder}
