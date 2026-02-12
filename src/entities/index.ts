@@ -9,7 +9,7 @@
  * their relationships, and available operations.
  */
 
-import { registerEntity, entityRegistry, type EntityConfig } from "@/types/entity";
+import { registerEntity, entityRegistry } from "@/types/entity";
 
 // Import entity configurations
 import { batchEntity } from "./batch";

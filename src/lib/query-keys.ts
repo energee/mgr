@@ -135,6 +135,18 @@ export const orderKeys = {
 };
 
 // =============================================================================
+// Change Request Keys
+// =============================================================================
+
+export const changeRequestKeys = {
+  all: () => ["change-requests"] as const,
+  forOrder: (orderId: string) => ["change-requests", "for-order", orderId] as const,
+  detail: (id: string) => ["change-requests", id] as const,
+  items: (id: string) => ["change-requests", id, "items"] as const,
+  pendingForOrder: (orderId: string) => ["change-requests", "pending", orderId] as const,
+};
+
+// =============================================================================
 // Inventory Keys
 // =============================================================================
 
@@ -495,6 +507,16 @@ export const deliveryKeys = {
   detail: (id: string) => ["deliveries", id] as const,
   stops: (deliveryId: string) =>
     ["deliveries", deliveryId, "stops"] as const,
+};
+
+// =============================================================================
+// Portal Keys (customer portal)
+// =============================================================================
+
+export const portalKeys = {
+  all: () => ["portal"] as const,
+  orders: (customerIds: string[]) => ["portal", "orders", ...customerIds] as const,
+  cutoff: (orderId: string) => ["portal", "cutoff", orderId] as const,
 };
 
 // =============================================================================
