@@ -319,6 +319,20 @@ export const binEntity: EntityConfig<Bin> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Deactivate Bin",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "soft" as const,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Value Display
   // ---------------------------------------------------------------------------
   valueDisplay: [binTypeDisplayConfig],

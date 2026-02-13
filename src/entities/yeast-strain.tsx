@@ -498,6 +498,20 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Deactivate Yeast Strain",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "soft" as const,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Value Display
   // ---------------------------------------------------------------------------
   valueDisplay: [typeDisplayConfig, formDisplayConfig, flocculationDisplayConfig],

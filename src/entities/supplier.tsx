@@ -281,6 +281,20 @@ export const supplierEntity: EntityConfig<Supplier> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Deactivate Supplier",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "soft" as const,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------
   relations: [

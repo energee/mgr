@@ -355,6 +355,20 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Deactivate Inventory Item",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "soft" as const,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Value Display
   // ---------------------------------------------------------------------------
   valueDisplay: [categoryDisplayConfig],

@@ -267,6 +267,20 @@ export const kegTypeEntity: EntityConfig<KegType> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Deactivate Keg Type",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "soft" as const,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // AI Context
   // ---------------------------------------------------------------------------
   queryExamples: [

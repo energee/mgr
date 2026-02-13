@@ -410,6 +410,20 @@ export const beerStyleEntity: EntityConfig<BeerStyle> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Deactivate Beer Style",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "soft" as const,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // AI Context
   // ---------------------------------------------------------------------------
   queryExamples: [

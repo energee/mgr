@@ -299,6 +299,20 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Deactivate Keg Owner",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "soft" as const,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------
   relations: [
