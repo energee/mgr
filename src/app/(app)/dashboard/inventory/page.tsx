@@ -58,7 +58,6 @@ const MAX_ITEMS_SHOWN = 8;
 // =============================================================================
 
 function getExpiryVariant(days: number): "default" | "warning" | "error" {
-  if (days < 0) return "error";
   if (days <= 7) return "error";
   if (days <= 30) return "warning";
   return "default";

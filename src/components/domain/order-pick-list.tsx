@@ -169,14 +169,14 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
 
       // Create bin map (use first bin with inventory for each FG)
       const binMap = new Map<string, { bin_name: string; location_name: string }>();
-      (binInventory || []).forEach((bi: { finished_good_id: string; bins: { name: string; locations: { name: string } | null } | null }) => {
+      for (const bi of binInventory ?? []) {
         if (!binMap.has(bi.finished_good_id) && bi.bins) {
           binMap.set(bi.finished_good_id, {
             bin_name: bi.bins.name,
             location_name: bi.bins.locations?.name || "Unknown",
           });
         }
-      });
+      }
 
       // Build pick list items
       const fgMap = new Map(finishedGoods?.map((fg) => [fg.id, fg]));

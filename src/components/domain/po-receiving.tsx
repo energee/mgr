@@ -77,9 +77,16 @@ interface POReceivingProps {
 // Helpers
 // =============================================================================
 
-/**
- * Check if a state transition is valid per the state machine config.
- */
+function defaultReceiveEntry(itemId: string): ReceiveEntry {
+  return {
+    po_line_item_id: itemId,
+    quantity: 0,
+    lot_number: "",
+    expiration_date: "",
+    notes: "",
+  };
+}
+
 function isValidTransition(fromState: string, toState: string): boolean {
   const stateMachine = purchaseOrderEntity.stateMachine;
   if (!stateMachine) return false;
@@ -129,31 +136,30 @@ export function POReceiving({
 
       // Calculate received quantity per line item
       const receivedByItem = new Map<string, number>();
-      received?.forEach((r) => {
+      for (const r of received ?? []) {
         const current = receivedByItem.get(r.po_line_item_id) || 0;
         receivedByItem.set(r.po_line_item_id, current + r.quantity);
-      });
+      }
 
-      // Resolve catalog item names
-      // Group items by catalog_type to batch queries
+      // Resolve catalog item names -- group items by catalog_type to batch queries
       const itemsByType = new Map<string, typeof items>();
-      items.forEach((item) => {
+      for (const item of items) {
         const existing = itemsByType.get(item.catalog_type);
         if (existing) {
           existing.push(item);
         } else {
           itemsByType.set(item.catalog_type, [item]);
         }
-      });
+      }
 
       // Fetch names from each catalog table
       const nameMap = new Map<string, string>();
       for (const [catalogType, typeItems] of itemsByType) {
         // For "other" type, use catalog_id directly as name (it's free text)
         if (isFreeTextCatalogType(catalogType)) {
-          typeItems.forEach((item) => {
+          for (const item of typeItems) {
             nameMap.set(`${catalogType}:${item.catalog_id}`, item.catalog_id);
-          });
+          }
           continue;
         }
 
@@ -167,9 +173,9 @@ export function POReceiving({
           .select("id, name")
           .in("id", catalogIds);
 
-        catalogItems?.forEach((ci: { id: string; name: string }) => {
+        for (const ci of catalogItems ?? []) {
           nameMap.set(`${catalogType}:${ci.id}`, ci.name);
-        });
+        }
       }
 
       // Merge with resolved names
@@ -245,10 +251,10 @@ export function POReceiving({
 
       // Calculate accurate totals from database
       const receivedByItem = new Map<string, number>();
-      allReceives?.forEach((r) => {
+      for (const r of allReceives ?? []) {
         const current = receivedByItem.get(r.po_line_item_id) || 0;
         receivedByItem.set(r.po_line_item_id, current + r.quantity);
-      });
+      }
 
       const allFullyReceived = updatedItems.every((item) => {
         const totalReceived = receivedByItem.get(item.id) || 0;
@@ -307,19 +313,12 @@ export function POReceiving({
     setReceives((prev) => ({
       ...prev,
       [itemId]: {
-        ...(prev[itemId] || {
-          po_line_item_id: itemId,
-          quantity: 0,
-          lot_number: "",
-          expiration_date: "",
-          notes: "",
-        }),
+        ...(prev[itemId] || defaultReceiveEntry(itemId)),
         quantity: validQty,
       },
     }));
   };
 
-  // Handle field change
   const handleFieldChange = (
     itemId: string,
     field: keyof ReceiveEntry,
@@ -328,13 +327,7 @@ export function POReceiving({
     setReceives((prev) => ({
       ...prev,
       [itemId]: {
-        ...(prev[itemId] || {
-          po_line_item_id: itemId,
-          quantity: 0,
-          lot_number: "",
-          expiration_date: "",
-          notes: "",
-        }),
+        ...(prev[itemId] || defaultReceiveEntry(itemId)),
         [field]: value,
       },
     }));

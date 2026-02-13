@@ -64,6 +64,16 @@ const MAX_ORDERS_SHOWN = 6;
 const MAX_CUSTOMERS_SHOWN = 6;
 const MAX_QUERY_RESULTS = 10;
 
+const DEFAULT_ORDER_COUNTS: OrderStatusCounts = {
+  draft: 0,
+  confirmed: 0,
+  scheduled: 0,
+  picking: 0,
+  packed: 0,
+  fulfilled: 0,
+  cancelled: 0,
+};
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -78,6 +88,44 @@ function formatCurrency(value: number): string {
 }
 
 // =============================================================================
+// Sub-Components
+// =============================================================================
+
+function ProductMixBars({ products }: { products: ProductMix[] }) {
+  const maxRevenue = Math.max(...products.map((p) => p.total_revenue));
+
+  return (
+    <div className="space-y-3">
+      {products.map((product) => {
+        const percentage = maxRevenue > 0 ? (product.total_revenue / maxRevenue) * 100 : 0;
+
+        return (
+          <div key={product.brand_id} className="space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">{product.brand_name}</span>
+              <div className="flex items-center gap-4">
+                <span className="text-muted-foreground font-mono">
+                  {product.total_quantity.toLocaleString()} units
+                </span>
+                <span className="font-mono font-semibold text-emerald-600">
+                  {formatCurrency(product.total_revenue)}
+                </span>
+              </div>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-500"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -86,8 +134,7 @@ export default function SalesDashboardPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  // Fetch order status counts (pre-aggregated view)
-  const { data: orderCounts = { draft: 0, confirmed: 0, scheduled: 0, picking: 0, packed: 0, fulfilled: 0, cancelled: 0 } } = useQuery({
+  const { data: orderCounts = DEFAULT_ORDER_COUNTS } = useQuery({
     queryKey: dashboardKeys.sales.orderCounts(),
     queryFn: async () => {
       const { data, error } = await db
@@ -96,22 +143,13 @@ export default function SalesDashboardPage() {
 
       if (error) throw error;
 
-      const counts: OrderStatusCounts = {
-        draft: 0,
-        confirmed: 0,
-        scheduled: 0,
-        picking: 0,
-        packed: 0,
-        fulfilled: 0,
-        cancelled: 0,
-      };
-
-      (data ?? []).forEach((row: { status: string; count: number }) => {
+      const counts = { ...DEFAULT_ORDER_COUNTS };
+      for (const row of data ?? []) {
         const status = row.status as keyof OrderStatusCounts;
-        if (counts[status] !== undefined) {
+        if (status in counts) {
           counts[status] = row.count;
         }
-      });
+      }
 
       return counts;
     },
@@ -146,9 +184,9 @@ export default function SalesDashboardPage() {
         .in("order_id", orderIds);
 
       const totalMap = new Map<string, number>();
-      (totals || []).forEach((t: { order_id: string; total_value: number }) => {
+      for (const t of totals ?? []) {
         totalMap.set(t.order_id, t.total_value);
-      });
+      }
 
       return (orders || []).map((order) => ({
         id: order.id,
@@ -200,8 +238,9 @@ export default function SalesDashboardPage() {
   // Calculate summary stats
   const activeOrders = orderCounts.confirmed + orderCounts.scheduled + orderCounts.picking + orderCounts.packed;
   const totalRevenue = customerRevenue.reduce((sum, c) => sum + c.total_revenue, 0);
-  const avgOrderValue = recentOrders.length > 0
-    ? recentOrders.reduce((sum, o) => sum + o.total_value, 0) / recentOrders.filter(o => o.total_value > 0).length
+  const ordersWithValue = recentOrders.filter((o) => o.total_value > 0);
+  const avgOrderValue = ordersWithValue.length > 0
+    ? ordersWithValue.reduce((sum, o) => sum + o.total_value, 0) / ordersWithValue.length
     : 0;
 
   // Build stats for the strip
@@ -348,36 +387,7 @@ export default function SalesDashboardPage() {
         {productMix.length === 0 ? (
           <DashboardEmpty message="No product sales data yet" />
         ) : (
-          <div className="space-y-3">
-            {(() => {
-              const maxRevenue = Math.max(...productMix.map(p => p.total_revenue));
-              return productMix.map((product) => {
-              const percentage = maxRevenue > 0 ? (product.total_revenue / maxRevenue) * 100 : 0;
-
-              return (
-                <div key={product.brand_id} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{product.brand_name}</span>
-                    <div className="flex items-center gap-4">
-                      <span className="text-muted-foreground font-mono">
-                        {product.total_quantity.toLocaleString()} units
-                      </span>
-                      <span className="font-mono font-semibold text-emerald-600">
-                        {formatCurrency(product.total_revenue)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            });
-            })()}
-          </div>
+          <ProductMixBars products={productMix} />
         )}
       </DashboardSection>
     </div>

@@ -58,25 +58,24 @@ interface VesselStatus {
 
 const MAX_BATCHES_SHOWN = 8;
 
+const DEFAULT_BATCH_COUNTS: BatchStatusCounts = {
+  planned: 0,
+  fermenting: 0,
+  conditioning: 0,
+  packaging: 0,
+  completed: 0,
+};
+
 // =============================================================================
 // Component
 // =============================================================================
 
 export default function DashboardPage() {
   const supabase = createClient();
-
-  const defaultCounts: BatchStatusCounts = {
-    planned: 0,
-    fermenting: 0,
-    conditioning: 0,
-    packaging: 0,
-    completed: 0,
-  };
-
-  // Fetch batch status counts (pre-aggregated view)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-  const { data: batchCounts = defaultCounts } = useQuery({
+
+  const { data: batchCounts = DEFAULT_BATCH_COUNTS } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
     queryFn: async () => {
       const { data, error } = await db
@@ -85,7 +84,7 @@ export default function DashboardPage() {
 
       if (error) throw error;
 
-      const counts = { ...defaultCounts };
+      const counts = { ...DEFAULT_BATCH_COUNTS };
       for (const row of data ?? []) {
         const status = row.status as keyof BatchStatusCounts;
         if (status in counts) {

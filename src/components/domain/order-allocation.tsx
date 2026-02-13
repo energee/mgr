@@ -97,16 +97,9 @@ export function OrderAllocation({
   const { data: finishedGoods, isLoading: fgLoading } = useQuery({
     queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
-      // Note: Using type assertion since view may not be in generated types
-      const { data, error } = await (supabase as unknown as {
-        from: (table: string) => {
-          select: (query: string) => {
-            gt: (col: string, val: number) => {
-              order: (col: string, opts: { ascending: boolean }) => Promise<{ data: FinishedGoodAvailable[] | null; error: Error | null }>
-            }
-          }
-        }
-      }).from("finished_goods_with_availability")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("finished_goods_with_availability")
         .select("id, lot_number, brand_id, package_type_id, quantity, available_quantity, production_date")
         .gt("available_quantity", 0)
         .order("production_date", { ascending: true });
@@ -194,13 +187,13 @@ export function OrderAllocation({
   // Pre-compute lookup maps to avoid O(n²) .find() per row
   const brandMap = useMemo(() => {
     const map = new Map<string, string>();
-    brands?.forEach((b) => map.set(b.id, b.name));
+    for (const b of brands ?? []) map.set(b.id, b.name);
     return map;
   }, [brands]);
 
   const packageMap = useMemo(() => {
     const map = new Map<string, string>();
-    packageTypes?.forEach((p) => map.set(p.id, p.name));
+    for (const p of packageTypes ?? []) map.set(p.id, p.name);
     return map;
   }, [packageTypes]);
 
