@@ -11,7 +11,7 @@ import type { EntityConfig } from "@/types/entity";
 interface PricingTierPrice {
   id: string;
   pricing_tier_id: string;
-  package_format_id: string;
+  format_id: string;
   sales_channel_id: string;
   price: number;
   created_at: string;
@@ -24,7 +24,7 @@ interface PricingTierPrice {
 
 export const pricingTierPriceSchema = z.object({
   pricing_tier_id: z.string().uuid("Pricing tier is required"),
-  package_format_id: z.string().uuid("Package format is required"),
+  format_id: z.string().uuid("Package format is required"),
   sales_channel_id: z.string().uuid("Sales channel is required"),
   price: z.coerce.number().min(0, "Price must be positive"),
 });
@@ -57,7 +57,7 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       },
     },
     {
-      accessorKey: "package_format_id",
+      accessorKey: "format_id",
       header: "Format",
       sortable: true,
       relation: {
@@ -98,7 +98,7 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       title: "Overview",
       fields: [
         { field: "pricing_tier_id", label: "Pricing Tier" },
-        { field: "package_format_id", label: "Package Format" },
+        { field: "format_id", label: "Package Format" },
         { field: "sales_channel_id", label: "Sales Channel" },
         { field: "price", label: "Price", format: "currency" },
       ],
@@ -126,14 +126,14 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       },
     },
     {
-      name: "package_format_id",
+      name: "format_id",
       label: "Package Format",
       type: "select",
       placeholder: "Select format...",
       required: true,
       colSpan: 4,
       dynamicOptions: {
-        table: "package_types",
+        table: "packaging_formats",
         valueField: "id",
         labelField: "name",
         orderBy: "name",
@@ -179,7 +179,7 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       name: "package_format",
       entity: "package_type",
       type: "belongsTo",
-      foreignKey: "package_format_id",
+      foreignKey: "format_id",
     },
     {
       name: "sales_channel",
@@ -198,5 +198,5 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
     "List prices for half barrel kegs across all tiers",
   ],
 
-  keyFields: ["pricing_tier_id", "package_format_id", "sales_channel_id", "price"],
+  keyFields: ["pricing_tier_id", "format_id", "sales_channel_id", "price"],
 };
