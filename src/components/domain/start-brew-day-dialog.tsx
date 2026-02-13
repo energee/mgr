@@ -4,6 +4,7 @@
  * StartBrewDayDialog - Multi-step dialog for starting a brew day
  *
  * Creates a brew log + N batches in one guided flow:
+ * Step 0 (optional): Select recipe (when recipeId not provided)
  * Step 1: Confirm recipe & date
  * Step 2: Configure batch splits (from recipe variants or manual)
  * Step 3: Review & create all records
@@ -19,6 +20,7 @@ import {
   batchKeys,
   brewLogKeys,
   vesselKeys,
+  userKeys,
 } from "@/lib/query-keys";
 import {
   Dialog,
@@ -58,8 +60,8 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 // =============================================================================
 
 interface StartBrewDayDialogProps {
-  recipeId: string;
-  recipeName: string;
+  recipeId?: string;
+  recipeName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (brewLogId: string) => void;
@@ -136,9 +138,23 @@ export function StartBrewDayDialog({
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
+  // Recipe Selector State (when recipeId not provided)
+  // ---------------------------------------------------------------------------
+  const [selectedRecipeId, setSelectedRecipeId] = useState(recipeId ?? "");
+  const [selectedRecipeName, setSelectedRecipeName] = useState(
+    recipeName ?? ""
+  );
+
+  const effectiveRecipeId = recipeId ?? selectedRecipeId;
+  const effectiveRecipeName = recipeName ?? selectedRecipeName;
+  const hasRecipeSelector = !recipeId;
+  const totalSteps = hasRecipeSelector ? 4 : 3;
+  const initialStep = hasRecipeSelector ? 0 : 1;
+
+  // ---------------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------------
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialStep);
   const [brewDate, setBrewDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -150,36 +166,63 @@ export function StartBrewDayDialog({
   // Data Fetching
   // ---------------------------------------------------------------------------
 
+  // Fetch current user for brewer default
+  const { data: currentUser } = useQuery({
+    queryKey: userKeys.current(),
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      return user;
+    },
+    enabled: open,
+  });
+
+  // Fetch available recipes (for recipe selector mode)
+  const { data: recipes = [] } = useQuery({
+    queryKey: recipeKeys.list({ status: "complete" }),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("recipes")
+        .select("id, name, style_name")
+        .eq("status", "complete")
+        .order("name");
+      if (error) throw error;
+      return data as { id: string; name: string; style_name: string | null }[];
+    },
+    enabled: open && hasRecipeSelector,
+  });
+
   // Fetch recipe summary from recipes_with_estimates
   const { data: recipeSummary, isLoading: recipeLoading } = useQuery({
-    queryKey: recipeKeys.estimates(recipeId),
+    queryKey: recipeKeys.estimates(effectiveRecipeId),
     queryFn: async () => {
       const { data, error } = await db
         .from("recipes_with_estimates")
         .select(
           "id, name, batch_size_bbl, est_og, est_ibu, est_abv, style_name"
         )
-        .eq("id", recipeId)
+        .eq("id", effectiveRecipeId)
         .single();
       if (error) throw error;
       return data as RecipeSummary;
     },
-    enabled: open,
+    enabled: open && !!effectiveRecipeId,
   });
 
   // Fetch recipe variants
   const { data: variants = [], isLoading: variantsLoading } = useQuery({
-    queryKey: recipeVariantKeys.byRecipe(recipeId),
+    queryKey: recipeVariantKeys.byRecipe(effectiveRecipeId),
     queryFn: async () => {
       const { data, error } = await db
         .from("recipe_variants")
         .select("id, name, planned_volume_bbl, description")
-        .eq("recipe_id", recipeId)
+        .eq("recipe_id", effectiveRecipeId)
         .order("position");
       if (error) throw error;
       return data as RecipeVariant[];
     },
-    enabled: open,
+    enabled: open && !!effectiveRecipeId,
   });
 
   // Fetch available vessels (no current batch)
@@ -215,7 +258,7 @@ export function StartBrewDayDialog({
     } else {
       setSplits([
         {
-          name: recipeName,
+          name: effectiveRecipeName,
           batchNumber: generateBatchNumber(0),
           volumeBbl: recipeSummary?.batch_size_bbl ?? null,
           vesselId: null,
@@ -223,24 +266,41 @@ export function StartBrewDayDialog({
         },
       ]);
     }
-  }, [variants, recipeName, recipeSummary?.batch_size_bbl]);
+  }, [variants, effectiveRecipeName, recipeSummary?.batch_size_bbl]);
 
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      setStep(1);
+      setStep(initialStep);
       setBrewDate(new Date().toISOString().split("T")[0]);
       setBrewNumber(generateBrewNumber());
       setSplits([]);
+      if (!recipeId) {
+        setSelectedRecipeId("");
+        setSelectedRecipeName("");
+      }
     }
-  }, [open]);
+  }, [open, initialStep, recipeId]);
 
   // Initialize splits when data is ready and we move to step 2
   useEffect(() => {
-    if (open && splits.length === 0 && !variantsLoading && !recipeLoading) {
+    if (
+      open &&
+      splits.length === 0 &&
+      !variantsLoading &&
+      !recipeLoading &&
+      !!effectiveRecipeId
+    ) {
       initializeSplits();
     }
-  }, [open, splits.length, variantsLoading, recipeLoading, initializeSplits]);
+  }, [
+    open,
+    splits.length,
+    variantsLoading,
+    recipeLoading,
+    effectiveRecipeId,
+    initializeSplits,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Split Management
@@ -256,7 +316,7 @@ export function StartBrewDayDialog({
     setSplits((prev) => [
       ...prev,
       {
-        name: `${recipeName} - Split ${prev.length + 1}`,
+        name: `${effectiveRecipeName} - Split ${prev.length + 1}`,
         batchNumber: generateBatchNumber(prev.length),
         volumeBbl: null,
         vesselId: null,
@@ -278,6 +338,8 @@ export function StartBrewDayDialog({
     () => splits.reduce((sum, s) => sum + (s.volumeBbl ?? 0), 0),
     [splits]
   );
+
+  const isStep0Valid = !!selectedRecipeId;
 
   const isStep1Valid = brewNumber.trim().length > 0 && brewDate.length > 0;
 
@@ -306,7 +368,8 @@ export function StartBrewDayDialog({
         .insert({
           brew_number: brewNumber.trim(),
           brew_date: brewDate,
-          recipe_id: recipeId,
+          recipe_id: effectiveRecipeId,
+          brewer_id: currentUser?.id ?? null,
           status: "draft",
         })
         .select("id")
@@ -319,7 +382,7 @@ export function StartBrewDayDialog({
       const batchInserts = splits.map((s) => ({
         name: s.name.trim(),
         batch_number: s.batchNumber.trim(),
-        recipe_id: recipeId,
+        recipe_id: effectiveRecipeId,
         recipe_variant_id: s.recipeVariantId || null,
         status: "planned",
         volume_bbl: s.volumeBbl,
@@ -396,16 +459,50 @@ export function StartBrewDayDialog({
 
   const handleClose = () => {
     if (isSubmitting) return;
-    setStep(1);
+    setStep(initialStep);
     setSplits([]);
     setBrewNumber("");
     setBrewDate(new Date().toISOString().split("T")[0]);
+    if (!recipeId) {
+      setSelectedRecipeId("");
+      setSelectedRecipeName("");
+    }
     onOpenChange(false);
   };
 
   // ---------------------------------------------------------------------------
   // Render Helpers
   // ---------------------------------------------------------------------------
+
+  const renderStep0 = () => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Select Recipe</Label>
+        <Select
+          value={selectedRecipeId}
+          onValueChange={(val) => {
+            setSelectedRecipeId(val);
+            const recipe = recipes.find((r) => r.id === val);
+            setSelectedRecipeName(recipe?.name ?? "");
+            // Reset splits when recipe changes so they re-initialize
+            setSplits([]);
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a recipe..." />
+          </SelectTrigger>
+          <SelectContent>
+            {recipes.map((r) => (
+              <SelectItem key={r.id} value={r.id}>
+                {r.name}
+                {r.style_name ? ` (${r.style_name})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
 
   const renderStep1 = () => (
     <div className="space-y-4">
@@ -414,7 +511,7 @@ export function StartBrewDayDialog({
         <Label>Recipe</Label>
         <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/30">
           <Beer className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{recipeName}</span>
+          <span className="font-medium">{effectiveRecipeName}</span>
         </div>
       </div>
 
@@ -429,7 +526,11 @@ export function StartBrewDayDialog({
           <div className="p-3 rounded-md border text-center">
             <div className="text-xs text-muted-foreground">Volume</div>
             <div className="font-medium">
-              <UnitDisplay value={recipeSummary.batch_size_bbl} unitType="volume" decimals={1} />
+              <UnitDisplay
+                value={recipeSummary.batch_size_bbl}
+                unitType="volume"
+                decimals={1}
+              />
             </div>
           </div>
           <div className="p-3 rounded-md border text-center">
@@ -584,9 +685,19 @@ export function StartBrewDayDialog({
                         .map((v) => (
                           <SelectItem key={v.id} value={v.id}>
                             {v.name}
-                            {v.capacity_bbl
-                              ? <>{" "}(<UnitDisplay value={v.capacity_bbl} unitType="volume" />)</>
-                              : ""}
+                            {v.capacity_bbl ? (
+                              <>
+                                {" "}
+                                (
+                                <UnitDisplay
+                                  value={v.capacity_bbl}
+                                  unitType="volume"
+                                />
+                                )
+                              </>
+                            ) : (
+                              ""
+                            )}
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -601,7 +712,9 @@ export function StartBrewDayDialog({
       {/* Volume total */}
       <div className="flex items-center justify-between p-3 rounded-md border bg-muted/30">
         <span className="text-sm text-muted-foreground">Total Volume</span>
-        <span className="font-medium"><UnitDisplay value={totalVolume} unitType="volume" decimals={1} /></span>
+        <span className="font-medium">
+          <UnitDisplay value={totalVolume} unitType="volume" decimals={1} />
+        </span>
       </div>
     </div>
   );
@@ -628,7 +741,7 @@ export function StartBrewDayDialog({
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Recipe</span>
-            <span className="font-medium">{recipeName}</span>
+            <span className="font-medium">{effectiveRecipeName}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Status</span>
@@ -664,7 +777,13 @@ export function StartBrewDayDialog({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Volume</span>
-                    <span><UnitDisplay value={split.volumeBbl} unitType="volume" decimals={1} /></span>
+                    <span>
+                      <UnitDisplay
+                        value={split.volumeBbl}
+                        unitType="volume"
+                        decimals={1}
+                      />
+                    </span>
                   </div>
                   {vessel && (
                     <div className="flex justify-between col-span-2">
@@ -682,20 +801,41 @@ export function StartBrewDayDialog({
       {/* Totals */}
       <div className="flex items-center justify-between p-3 rounded-md border bg-muted/30">
         <span className="text-sm text-muted-foreground">Total Volume</span>
-        <span className="font-medium"><UnitDisplay value={totalVolume} unitType="volume" decimals={1} /></span>
+        <span className="font-medium">
+          <UnitDisplay value={totalVolume} unitType="volume" decimals={1} />
+        </span>
       </div>
     </div>
   );
 
   // ---------------------------------------------------------------------------
-  // Render
+  // Step Navigation Helpers
   // ---------------------------------------------------------------------------
 
-  const stepTitles = [
-    "Confirm Recipe & Date",
-    "Configure Splits",
-    "Review & Create",
-  ];
+  const stepTitles = hasRecipeSelector
+    ? [
+        "Select Recipe",
+        "Confirm Recipe & Date",
+        "Configure Splits",
+        "Review & Create",
+      ]
+    : ["Confirm Recipe & Date", "Configure Splits", "Review & Create"];
+
+  // Map current step number to a display index for titles and progress bar
+  const stepDisplayIndex = hasRecipeSelector ? step : step - 1;
+  const lastStep = hasRecipeSelector ? 3 : 3;
+  const firstStep = hasRecipeSelector ? 0 : 1;
+
+  const isCurrentStepValid = () => {
+    if (step === 0) return isStep0Valid;
+    if (step === 1) return isStep1Valid;
+    if (step === 2) return isStep2Valid;
+    return true;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -706,30 +846,32 @@ export function StartBrewDayDialog({
             Start Brew Day
           </DialogTitle>
           <DialogDescription>
-            Step {step} of 3: {stepTitles[step - 1]}
+            Step {stepDisplayIndex + 1} of {totalSteps}:{" "}
+            {stepTitles[stepDisplayIndex]}
           </DialogDescription>
         </DialogHeader>
 
         {/* Step indicators */}
         <div className="flex items-center gap-1 px-1">
-          {[1, 2, 3].map((s) => (
+          {Array.from({ length: totalSteps }, (_, i) => (
             <div
-              key={s}
+              key={i}
               className={`h-1.5 flex-1 rounded-full transition-colors ${
-                s <= step ? "bg-primary" : "bg-muted"
+                i <= stepDisplayIndex ? "bg-primary" : "bg-muted"
               }`}
             />
           ))}
         </div>
 
         {/* Step content */}
+        {hasRecipeSelector && step === 0 && renderStep0()}
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
 
         <DialogFooter className="flex-row justify-between sm:justify-between">
           <div>
-            {step > 1 && (
+            {step > firstStep && (
               <Button
                 type="button"
                 variant="outline"
@@ -752,11 +894,11 @@ export function StartBrewDayDialog({
             >
               Cancel
             </Button>
-            {step < 3 ? (
+            {step < lastStep ? (
               <Button
                 type="button"
                 onClick={() => setStep((s) => s + 1)}
-                disabled={step === 1 ? !isStep1Valid : !isStep2Valid}
+                disabled={!isCurrentStepValid()}
                 className="min-h-[44px]"
               >
                 Next
