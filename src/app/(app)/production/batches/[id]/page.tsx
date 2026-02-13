@@ -68,8 +68,9 @@ export default function BatchDetailPage({
   });
 
   // Fetch linked brew logs for banner logic and breadcrumb
+  // Use a separate key from BrewLogLinker to avoid cache shape conflicts
   const { data: linkedBrewLogs } = useQuery({
-    queryKey: batchKeys.brewLogs(id),
+    queryKey: ["batch-brew-log-links", id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_log_batches")
