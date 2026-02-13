@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  withAuth,
+  withPermission,
   successResponse,
   errorResponse,
   validateBody,
@@ -12,7 +12,7 @@ const transitionSchema = z.object({
   to_status: z.enum(batchStates),
 });
 
-export const POST = withAuth(async (request, { supabase, params }) => {
+export const POST = withPermission("batches:write", async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Batch ID required", undefined, 400);
 

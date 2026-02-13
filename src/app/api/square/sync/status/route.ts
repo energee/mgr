@@ -8,12 +8,12 @@
  * - Recent sync log entries
  */
 
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateSquareSettings } from "@/lib/square/client";
 
-export const GET = withAuth(async () => {
+export const GET = withPermission("integrations:manage", async () => {
   const admin = await createAdminClient();
 
   // 1. Get Square settings (use safe view to avoid exposing tokens)
@@ -51,7 +51,7 @@ export const GET = withAuth(async () => {
   });
 });
 
-export const POST = withAuth(async (request) => {
+export const POST = withPermission("integrations:manage", async (request) => {
   const body = await request.json();
   const isEnabled = body?.is_enabled;
 

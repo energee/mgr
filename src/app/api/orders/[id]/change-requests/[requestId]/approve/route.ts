@@ -1,8 +1,8 @@
-import { withRoles } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 
-export const POST = withRoles(
-  ["admin", "sales"],
+export const POST = withPermission(
+  "orders:write",
   async (_request, { user, supabase, params }) => {
     const requestId = params?.requestId;
     if (!requestId) {

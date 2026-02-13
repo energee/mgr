@@ -22,7 +22,7 @@ interface UserProfile {
   email: string | null;
   display_name: string | null;
   avatar_url: string | null;
-  role: UserRole;
+  roles: UserRole[];
   status: UserStatus;
   last_active_at: string | null;
   invited_at: string | null;
@@ -42,7 +42,9 @@ interface UserProfile {
 
 export const userProfileSchema = z.object({
   display_name: z.string().min(1, "Display name is required"),
-  role: z.enum(["admin", "production_manager", "brewer", "sales", "viewer", "customer"]),
+  roles: z.array(
+    z.enum(["admin", "production_manager", "brewer", "sales", "viewer", "customer"])
+  ).min(1, "At least one role is required"),
   status: z.enum(["active", "inactive", "pending"]).default("active"),
   avatar_url: z.string().url().nullable().optional(),
 });
@@ -141,12 +143,19 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
       },
     },
     {
-      accessorKey: "role",
-      header: "Role",
-      sortable: true,
-      render: (value) => (
-        <StatusBadge status={String(value)} config={ROLE_DISPLAY} />
-      ),
+      accessorKey: "roles",
+      header: "Roles",
+      sortable: false,
+      render: (value) => {
+        const roles = (Array.isArray(value) ? value : [value]) as string[];
+        return (
+          <div className="flex flex-wrap gap-1">
+            {roles.map((r) => (
+              <StatusBadge key={r} status={r} config={ROLE_DISPLAY} />
+            ))}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "status",
@@ -179,7 +188,7 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
 
   listFilters: [
     {
-      field: "role",
+      field: "roles",
       type: "select",
       label: "Role",
       options: ALL_ROLE_OPTIONS,
@@ -216,7 +225,7 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
       fields: [
         { field: "display_name", label: "Display Name" },
         { field: "email", label: "Email" },
-        { field: "role_display", label: "Role" },
+        { field: "role_display", label: "Roles" },
         { field: "status_display", label: "Status" },
       ],
     },
@@ -300,13 +309,13 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
       colSpan: 6,
     },
     {
-      name: "role",
-      label: "Role",
+      name: "roles",
+      label: "Roles",
       type: "select",
       options: ROLE_OPTIONS,
       required: true,
-      colSpan: 6,
-      description: "Determines access permissions throughout the app",
+      colSpan: 12,
+      description: "Select one or more roles. Permissions are additive across roles.",
     },
     {
       name: "status",
@@ -336,5 +345,5 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
     "Show pending invitations",
   ],
 
-  keyFields: ["display_name", "email", "role", "status", "last_active_at"],
+  keyFields: ["display_name", "email", "roles", "status", "last_active_at"],
 };

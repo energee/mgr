@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
-import { createClient } from "@/lib/supabase/server";
+import { withPermission } from "@/lib/api/auth";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 /**
@@ -10,17 +10,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
  * Body: { scope: "global" | "user" }
  * Tests the stored API key by making a minimal Anthropic API call.
  */
-export async function POST(req: Request): Promise<Response> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const POST = withPermission("settings:manage", async (req, { supabase, user }) => {
   const { scope } = (await req.json()) as { scope: string };
 
   let apiKey: string | null = null;
@@ -75,4 +65,4 @@ export async function POST(req: Request): Promise<Response> {
       { status: 400 },
     );
   }
-}
+});

@@ -1,5 +1,5 @@
 import {
-  withRoles,
+  withPermission,
   successResponse,
   ApiError,
 } from "@/lib/api";
@@ -9,9 +9,9 @@ import { createAdminClient } from "@/lib/supabase/server";
  * DELETE /api/users/:id
  *
  * Deletes a user profile and their auth.users entry.
- * Requires admin role. Only allows deleting inactive users.
+ * Requires users:manage permission. Only allows deleting inactive users.
  */
-export const DELETE = withRoles(["admin"], async (_request, { user, params }) => {
+export const DELETE = withPermission("users:manage", async (_request, { user, params }) => {
   const id = params?.id;
   if (!id) throw new ApiError("VALIDATION_ERROR", "User ID required");
 

@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useContext, useRef, useState } from "react";
+import { usePermissions } from "@/contexts/permissions";
 import { AnimatedKeyboard } from "@/components/icons/animated";
 import { Button } from "@/components/ui/button";
 import {
@@ -218,6 +219,7 @@ function AnimatedSectionHeader({
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { can } = usePermissions();
   const { openHelp } = useContext(KeyboardShortcutsContext);
   const keyboardIconRef = useRef<AnimatedIconHandle>(null);
   const activeSection = navigation.find((s) =>
@@ -297,12 +299,14 @@ export function AppSidebar() {
             label="Help"
             isActive={pathname.startsWith("/help")}
           />
-          <AnimatedNavLink
-            href="/settings"
-            icon={AnimatedSettings}
-            label="Settings"
-            isActive={pathname.startsWith("/settings")}
-          />
+          {can("settings:manage") && (
+            <AnimatedNavLink
+              href="/settings"
+              icon={AnimatedSettings}
+              label="Settings"
+              isActive={pathname.startsWith("/settings")}
+            />
+          )}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
