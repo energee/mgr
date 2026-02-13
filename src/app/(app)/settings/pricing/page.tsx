@@ -220,9 +220,14 @@ function PriceCell({
     <button
       ref={buttonRef}
       onClick={startEditing}
-      className="w-full h-8 text-right text-sm px-2 rounded hover:bg-muted/50 transition-colors cursor-text tabular-nums"
+      className={cn(
+        "w-full h-8 text-right text-sm px-2 rounded transition-colors cursor-text tabular-nums",
+        price != null
+          ? "hover:bg-muted/50"
+          : "text-muted-foreground/30 hover:bg-muted/30"
+      )}
     >
-      {price != null ? `$${price.toFixed(2)}` : "—"}
+      {price != null ? `$${price.toFixed(2)}` : "·"}
     </button>
   );
 }
@@ -852,7 +857,7 @@ export default function PricingPage() {
           {!!tiers?.length && !!formats?.length && (
             <div ref={tableRef} className="border rounded-lg">
               <Table className="table-fixed">
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-20">
                   {(packagedFormats.length > 0 && kegFormats.length > 0) && (
                     <TableRow className="bg-muted/50 hover:bg-muted/50 border-b-0">
                       <TableHead className="sticky left-0 z-10 bg-muted/50" />
@@ -901,8 +906,15 @@ export default function PricingPage() {
                           : "bg-muted/25 hover:bg-muted/50"
                       }
                     >
-                      <TableCell className="sticky left-0 z-10 bg-inherit border-r px-3 py-1 font-medium">
-                        {tier.name}
+                      <TableCell className="sticky left-0 z-10 bg-inherit border-r px-3 py-1">
+                        <div>
+                          <div className="font-medium">{tier.name}</div>
+                          {tier.cogs_max != null && (
+                            <div className="text-[10px] text-muted-foreground">
+                              &le; ${Number(tier.cogs_max).toFixed(2)}/unit
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       {allFormats.map((fmt, fmtIdx) => {
                         const priceObj = priceMap.get(tier.id)?.get(fmt.id);
