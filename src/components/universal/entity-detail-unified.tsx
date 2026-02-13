@@ -308,6 +308,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
   // Cmd+Enter save shortcut - the ref is attached to a hidden save button
   const submitRef = useSubmitShortcut();
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const [formErrors, setFormErrors] = useState<{ field: string; message: string }[]>([]);
 
   // ---------------------------------------------------------------------------
   // Fetch record (skip in create mode)
@@ -496,6 +498,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         loadedVersionRef.current = record.version;
       }
     }
+    setFormErrors([]);
     setEditing(true);
   }, [canEdit, data, form, formDefaults]);
 
@@ -524,7 +527,14 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const handleSave = useCallback(async () => {
     // Trigger validation
     const isValid = await form.trigger();
-    if (!isValid) return;
+    if (!isValid) {
+      const errors = Object.entries(form.formState.errors)
+        .filter(([, err]) => err?.message)
+        .map(([field, err]) => ({ field, message: err!.message as string }));
+      setFormErrors(errors);
+      requestAnimationFrame(() => errorSummaryRef.current?.focus());
+      return;
+    }
 
     const values = form.getValues();
 
@@ -541,11 +551,14 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     if (!entity.formSchema) return;
     const result = entity.formSchema.safeParse(values);
     if (!result.success) {
-      // Set errors on form
+      const errors: { field: string; message: string }[] = [];
       for (const err of result.error.issues) {
         const fieldPath = err.path.join(".");
         form.setError(fieldPath, { message: err.message });
+        errors.push({ field: fieldPath, message: err.message });
       }
+      setFormErrors(errors);
+      requestAnimationFrame(() => errorSummaryRef.current?.focus());
       return;
     }
 
@@ -559,6 +572,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           .select()
           .single();
         if (error) throw error;
+        setFormErrors([]);
         toast.success(`${entity.displayName} created successfully`);
         const newId = (newRow as Record<string, unknown>).id as string;
         invalidateEntityCaches(newId);
@@ -584,6 +598,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             throw new Error(lockResult.error);
           }
 
+          setFormErrors([]);
           toast.success(`${entity.displayName} updated successfully`);
         } else {
           // Standard update (no version field)
@@ -594,6 +609,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             .select()
             .single();
           if (error) throw error;
+          setFormErrors([]);
           toast.success(`${entity.displayName} updated successfully`);
         }
 
@@ -757,7 +773,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             href={backUrl || path}
             className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
           >
-            <Kbd>⌫</Kbd>
+            <span aria-hidden="true"><Kbd>⌫</Kbd></span>
             Back
           </Link>
           <div className="flex items-center gap-3">
@@ -785,7 +801,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
               disabled={isSubmitting}
             >
               {isSubmitting ? "Saving..." : `Save ${entity.displayName}`}
-              <Kbd>⌘↵</Kbd>
+              <span aria-hidden="true"><Kbd>⌘↵</Kbd></span>
             </Button>
           )}
 
@@ -793,7 +809,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             <Button variant="outline" onClick={startEditing}>
               <Pencil className="h-4 w-4" />
               Edit
-              <Kbd>E</Kbd>
+              <span aria-hidden="true"><Kbd>E</Kbd></span>
             </Button>
           )}
 
@@ -878,6 +894,29 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         </div>
       </div>
 
+      {/* Form error summary */}
+      {formErrors.length > 0 && (
+        <div
+          ref={errorSummaryRef}
+          role="alert"
+          tabIndex={-1}
+          className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive outline-none"
+        >
+          <p className="font-medium">
+            Please fix {formErrors.length} {formErrors.length === 1 ? "error" : "errors"}:
+          </p>
+          <ul className="mt-1 list-disc pl-5">
+            {formErrors.map((err) => (
+              <li key={err.field}>
+                <a href={`#${err.field}`} className="underline hover:no-underline">
+                  {err.message}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Content */}
       {tabs.length > 0 || relationTabs.length > 0 ? (
         <UnifiedTabsWithRelations
@@ -918,7 +957,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           type="button"
           className="hidden"
           onClick={handleSave}
-          aria-hidden
+          aria-hidden="true"
         />
       )}
 
