@@ -1,0 +1,159 @@
+/**
+ * Permission Map Module
+ *
+ * Defines roles, permissions, and the mapping between them.
+ * Pure TypeScript — no external dependencies.
+ *
+ * Consumed by:
+ * - API middleware (src/lib/api/auth.ts)
+ * - React context (src/contexts/permissions.tsx)
+ * - Postgres migration (mirrors this map in SQL)
+ */
+
+// =============================================================================
+// Roles
+// =============================================================================
+
+/** Staff roles that can be assigned to brewery team members. */
+export const STAFF_ROLES = [
+  "admin",
+  "production_manager",
+  "brewer",
+  "sales",
+  "viewer",
+] as const;
+
+/** All roles including customer portal access. */
+export const ALL_ROLES = [...STAFF_ROLES, "customer"] as const;
+
+/** A role that can be assigned to a staff member. */
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+/** Any role in the system, including customer. */
+export type UserRole = (typeof ALL_ROLES)[number];
+
+// =============================================================================
+// Permissions
+// =============================================================================
+
+/**
+ * Every granular permission string in the system.
+ *
+ * Format: `<resource>:<action>`
+ */
+export type Permission =
+  | "recipes:read"
+  | "recipes:write"
+  | "batches:read"
+  | "batches:write"
+  | "orders:read"
+  | "orders:write"
+  | "customers:read"
+  | "customers:write"
+  | "inventory:read"
+  | "inventory:write"
+  | "purchasing:read"
+  | "purchasing:write"
+  | "vessels:read"
+  | "vessels:write"
+  | "integrations:manage"
+  | "settings:manage"
+  | "users:manage";
+
+// =============================================================================
+// Permission Map
+// =============================================================================
+
+/**
+ * Maps each permission to the staff roles that grant it.
+ *
+ * Customer role is intentionally excluded — customers access data through
+ * the portal with its own RLS policies, not through staff permissions.
+ */
+export const PERMISSION_MAP: Record<Permission, readonly StaffRole[]> = {
+  "recipes:read": ["admin", "production_manager", "brewer", "sales", "viewer"],
+  "recipes:write": ["admin", "brewer"],
+
+  "batches:read": ["admin", "production_manager", "brewer", "sales", "viewer"],
+  "batches:write": ["admin", "production_manager", "brewer"],
+
+  "orders:read": ["admin", "production_manager", "sales", "viewer"],
+  "orders:write": ["admin", "sales"],
+
+  "customers:read": ["admin", "production_manager", "sales", "viewer"],
+  "customers:write": ["admin", "sales"],
+
+  "inventory:read": [
+    "admin",
+    "production_manager",
+    "brewer",
+    "sales",
+    "viewer",
+  ],
+  "inventory:write": ["admin", "production_manager"],
+
+  "purchasing:read": ["admin", "production_manager", "viewer"],
+  "purchasing:write": ["admin", "production_manager"],
+
+  "vessels:read": [
+    "admin",
+    "production_manager",
+    "brewer",
+    "sales",
+    "viewer",
+  ],
+  "vessels:write": ["admin", "production_manager", "brewer"],
+
+  "integrations:manage": ["admin"],
+  "settings:manage": ["admin"],
+  "users:manage": ["admin"],
+} as const;
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Check whether any of the given roles grants a specific permission.
+ *
+ * Customer-only users receive no staff permissions — they access data
+ * through portal-specific RLS policies instead.
+ */
+export function hasPermission(
+  roles: UserRole[],
+  permission: Permission,
+): boolean {
+  const allowedRoles = PERMISSION_MAP[permission];
+  return roles.some((role) =>
+    (allowedRoles as readonly string[]).includes(role),
+  );
+}
+
+/**
+ * Return every permission granted by a set of roles.
+ *
+ * Useful for populating a permission context on login so that UI
+ * components can check capabilities without repeated map lookups.
+ */
+export function getPermissions(roles: UserRole[]): Permission[] {
+  const permissions: Permission[] = [];
+
+  for (const [permission, allowedRoles] of Object.entries(PERMISSION_MAP)) {
+    if (
+      roles.some((role) => (allowedRoles as readonly string[]).includes(role))
+    ) {
+      permissions.push(permission as Permission);
+    }
+  }
+
+  return permissions;
+}
+
+/**
+ * Return the staff roles that grant a given permission.
+ *
+ * Useful for building role-selection UIs or SQL policy conditions.
+ */
+export function getRolesForPermission(permission: Permission): StaffRole[] {
+  return [...PERMISSION_MAP[permission]];
+}
