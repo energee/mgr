@@ -50,6 +50,97 @@ CREATE POLICY qbo_account_mappings_select ON qbo_account_mappings
     )
   );
 
+-- QBO sync mappings: restrict INSERT/UPDATE/DELETE to admin/owner roles only
+DROP POLICY IF EXISTS qbo_sync_mappings_insert ON qbo_sync_mappings;
+CREATE POLICY qbo_sync_mappings_insert ON qbo_sync_mappings
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_sync_mappings_update ON qbo_sync_mappings;
+CREATE POLICY qbo_sync_mappings_update ON qbo_sync_mappings
+  FOR UPDATE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_sync_mappings_delete ON qbo_sync_mappings;
+CREATE POLICY qbo_sync_mappings_delete ON qbo_sync_mappings
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_sync_log_insert ON qbo_sync_log;
+CREATE POLICY qbo_sync_log_insert ON qbo_sync_log
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_sync_log_update ON qbo_sync_log;
+CREATE POLICY qbo_sync_log_update ON qbo_sync_log
+  FOR UPDATE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_sync_log_delete ON qbo_sync_log;
+CREATE POLICY qbo_sync_log_delete ON qbo_sync_log
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_account_mappings_insert ON qbo_account_mappings;
+CREATE POLICY qbo_account_mappings_insert ON qbo_account_mappings
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_account_mappings_update ON qbo_account_mappings;
+CREATE POLICY qbo_account_mappings_update ON qbo_account_mappings
+  FOR UPDATE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_account_mappings_delete ON qbo_account_mappings;
+CREATE POLICY qbo_account_mappings_delete ON qbo_account_mappings
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
 -- ---------------------------------------------------------------------------
 -- H3: Change ON DELETE CASCADE to RESTRICT on high-risk FKs
 -- ---------------------------------------------------------------------------
