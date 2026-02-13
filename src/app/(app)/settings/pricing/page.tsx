@@ -239,14 +239,12 @@ function PriceCell({
 
 function FormatManagement() {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const queryClient = useQueryClient();
 
   const { data: formats, isLoading } = useQuery({
     queryKey: settingsKeys.pricingFormatsAll(),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("packaging_formats")
         .select("id, name, format_source, container_type, volume_oz, units_per_case, show_in_pricing")
         .eq("is_active", true)
@@ -263,7 +261,7 @@ function FormatManagement() {
       show_in_pricing: boolean;
     }) => {
       const table = format_source === "keg_type" ? "keg_types" : "package_types";
-      const { error } = await db
+      const { error } = await supabase
         .from(table)
         .update({ show_in_pricing })
         .eq("id", id);
@@ -337,8 +335,6 @@ function FormatManagement() {
 
 export default function PricingPage() {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const queryClient = useQueryClient();
 
   const [channelOverride, setChannelOverride] = useState<string | null>(null);
@@ -356,7 +352,7 @@ export default function PricingPage() {
   const { data: channels, isLoading: channelsLoading } = useQuery({
     queryKey: settingsKeys.pricingChannels(),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("sales_channels")
         .select("id, name, code, position, is_active")
         .eq("is_active", true)
@@ -372,7 +368,7 @@ export default function PricingPage() {
   const { data: tiers, isLoading: tiersLoading } = useQuery({
     queryKey: settingsKeys.pricingTiers(),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("pricing_tiers")
         .select("id, name, cogs_max")
         .order("cogs_max", { nullsFirst: false });
@@ -384,7 +380,7 @@ export default function PricingPage() {
   const { data: formats, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormats(),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("packaging_formats")
         .select("id, name, format_source, container_type, volume_oz, units_per_case")
         .eq("is_active", true)
@@ -399,7 +395,7 @@ export default function PricingPage() {
     queryKey: settingsKeys.pricingMatrix(activeChannelId ?? undefined),
     queryFn: async () => {
       if (!activeChannelId) return [];
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("pricing_tier_prices")
         .select("id, pricing_tier_id, format_id, sales_channel_id, price")
         .eq("sales_channel_id", activeChannelId);
@@ -438,21 +434,21 @@ export default function PricingPage() {
 
       if (value === null && existing) {
         // Delete
-        const { error } = await db
+        const { error } = await supabase
           .from("pricing_tier_prices")
           .delete()
           .eq("id", existing.id);
         if (error) throw error;
       } else if (value !== null && existing) {
         // Update
-        const { error } = await db
+        const { error } = await supabase
           .from("pricing_tier_prices")
           .update({ price: value, updated_at: new Date().toISOString() })
           .eq("id", existing.id);
         if (error) throw error;
       } else if (value !== null && !existing) {
         // Insert
-        const { error } = await db.from("pricing_tier_prices").insert({
+        const { error } = await supabase.from("pricing_tier_prices").insert({
           pricing_tier_id: tierId,
           format_id: formatId,
           sales_channel_id: channelId,
@@ -491,7 +487,7 @@ export default function PricingPage() {
       channelId: string;
     }) => {
       // Fetch all prices for this channel
-      const { data: channelPrices, error: fetchError } = await db
+      const { data: channelPrices, error: fetchError } = await supabase
         .from("pricing_tier_prices")
         .select("id, price")
         .eq("sales_channel_id", channelId);
@@ -504,7 +500,7 @@ export default function PricingPage() {
             ? Math.round(p.price * (1 + amount / 100) * 100) / 100
             : Math.round((p.price + amount) * 100) / 100;
         if (newPrice < 0) continue;
-        const { error } = await db
+        const { error } = await supabase
           .from("pricing_tier_prices")
           .update({ price: newPrice, updated_at: new Date().toISOString() })
           .eq("id", p.id);
@@ -535,7 +531,7 @@ export default function PricingPage() {
       toChannelId: string;
     }) => {
       // Fetch source prices
-      const { data: sourcePrices, error: fetchError } = await db
+      const { data: sourcePrices, error: fetchError } = await supabase
         .from("pricing_tier_prices")
         .select("pricing_tier_id, format_id, price")
         .eq("sales_channel_id", fromChannelId);
@@ -548,7 +544,7 @@ export default function PricingPage() {
 
       // Upsert each price into the target channel
       for (const sp of sourcePrices) {
-        const { error } = await db.from("pricing_tier_prices").upsert(
+        const { error } = await supabase.from("pricing_tier_prices").upsert(
           {
             pricing_tier_id: sp.pricing_tier_id,
             format_id: sp.format_id,
