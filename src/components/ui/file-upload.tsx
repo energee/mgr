@@ -11,6 +11,7 @@ import {
   FileTextIcon,
   FileVideoIcon,
 } from "lucide-react";
+import Image from "next/image";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { useAsRef } from "@/hooks/use-as-ref";
@@ -1073,8 +1074,7 @@ function FileUploadItemPreview(props: FileUploadItemPreviewProps) {
           context.urlCache.set(file, url);
         }
 
-        // eslint-disable-next-line @next/next/no-img-element -- dynamic blob URLs from user uploads don't work with Next.js Image optimization
-        return <img src={url} alt={file.name} className="size-full object-cover" />;
+        return <Image src={url} alt={file.name} fill className="object-cover" unoptimized />;
       }
 
       return getFileIcon(file);
