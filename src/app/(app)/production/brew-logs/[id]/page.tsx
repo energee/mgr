@@ -8,13 +8,17 @@
  * dialog instead of directly transitioning status.
  */
 
-import { use, useState, useCallback } from "react";
+import { use, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { brewLogEntity } from "@/entities/brew-log";
 import { BrewLogCompletionDialog } from "@/components/domain/brew-log-completion-dialog";
-import { brewLogKeys, entityKeys } from "@/lib/query-keys";
+import { NextStepBanner } from "@/components/domain/next-step-banner";
+import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
+import { brewLogKeys, entityKeys, recipeKeys } from "@/lib/query-keys";
 
 export default function BrewLogDetailPage({
   params,
@@ -23,23 +27,72 @@ export default function BrewLogDetailPage({
 }) {
   const { id } = use(params);
   const queryClient = useQueryClient();
+  const router = useRouter();
   const supabase = createClient();
 
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
 
-  // Fetch brew log data for the dialog props
+  // Fetch brew log data for banner logic and dialog props
   const { data: brewLog } = useQuery({
     queryKey: brewLogKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_logs")
-        .select("id, brew_number, status")
+        .select("id, brew_number, status, events, recipe_id")
         .eq("id", id)
         .single();
       if (error) throw error;
       return data;
     },
   });
+
+  // Fetch recipe name for breadcrumb
+  const { data: recipe } = useQuery({
+    queryKey: recipeKeys.detail(brewLog?.recipe_id ?? ""),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("recipes")
+        .select("id, name")
+        .eq("id", brewLog!.recipe_id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!brewLog?.recipe_id,
+  });
+
+  // Fetch linked batches (needed for "View batch" link and breadcrumb)
+  const { data: linkedBatches } = useQuery({
+    queryKey: brewLogKeys.batches(id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("brew_log_batches")
+        .select("batch_id, batch:batches(batch_number)")
+        .eq("brew_log_id", id);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        batch_id: string;
+        batch: { batch_number: string } | null;
+      }>;
+    },
+  });
+
+  // Direct state transition for "Start Brew" from the banner
+  const handleStartBrew = useCallback(async () => {
+    const { error } = await supabase
+      .from("brew_logs")
+      .update({ status: "in_progress" })
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to start brew");
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
+    queryClient.invalidateQueries({
+      queryKey: entityKeys.detail("brew_logs", id),
+    });
+    toast.success("Brew started");
+  }, [supabase, id, queryClient]);
 
   // Intercept the complete_brew action to open the dialog
   const handleAction = useCallback((actionName: string) => {
@@ -50,13 +103,86 @@ export default function BrewLogDetailPage({
     return false; // Let EntityDetailUnified handle normally
   }, []);
 
-  const handleDialogSuccess = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
-    queryClient.invalidateQueries({ queryKey: entityKeys.detail("brew_logs", id) });
-  }, [queryClient, id]);
+  const handleDialogSuccess = useCallback(
+    (navigateToBatchId?: string) => {
+      queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.detail("brew_logs", id),
+      });
+      if (navigateToBatchId) {
+        router.push(`/production/batches/${navigateToBatchId}`);
+      }
+    },
+    [queryClient, id, router]
+  );
+
+  // Breadcrumb: Recipe -> Brew Log -> Batch
+  const breadcrumbSegments = useMemo(() => {
+    const segments: { label: string; href?: string }[] = [];
+    if (recipe) {
+      segments.push({ label: recipe.name, href: `/production/recipes/${recipe.id}` });
+    }
+    segments.push({ label: brewLog?.brew_number ?? "Brew Log" }); // current page, no href
+    if (linkedBatches?.length === 1) {
+      const b = linkedBatches[0];
+      const batchNumber = b.batch?.batch_number ?? "Batch";
+      segments.push({ label: batchNumber, href: `/production/batches/${b.batch_id}` });
+    }
+    return segments;
+  }, [recipe, brewLog, linkedBatches]);
+
+  // Banner config based on brew log state
+  const bannerConfig = useMemo(() => {
+    if (!brewLog) return null;
+    const events = (brewLog.events as unknown[]) || [];
+
+    if (brewLog.status === "draft") {
+      return {
+        message: "Ready to start brewing? Begin recording your brew day.",
+        variant: "info" as const,
+        actions: [{ label: "Start Brew", onClick: handleStartBrew }],
+      };
+    }
+    if (brewLog.status === "in_progress" && events.length > 0) {
+      return {
+        message:
+          "Done brewing? Complete your brew log to move wort to fermenters.",
+        variant: "info" as const,
+        actions: [
+          {
+            label: "Complete Brew",
+            onClick: () => setShowCompletionDialog(true),
+          },
+        ],
+      };
+    }
+    if (brewLog.status === "completed" && linkedBatches?.length) {
+      const message = linkedBatches.length === 1
+        ? "Brew complete. View your batch in the fermenter."
+        : `Brew complete. ${linkedBatches.length} batches are in fermentation.`;
+      const actions = linkedBatches.length === 1
+        ? [{ label: "View Batch", href: `/production/batches/${linkedBatches[0].batch_id}` }]
+        : linkedBatches.map((b, i) => ({
+            label: `Batch ${i + 1}`,
+            href: `/production/batches/${b.batch_id}`,
+          }));
+      return { message, variant: "success" as const, actions };
+    }
+    return null;
+  }, [brewLog, linkedBatches, handleStartBrew]);
 
   return (
-    <>
+    <div className="space-y-4">
+      <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+
+      {bannerConfig && (
+        <NextStepBanner
+          message={bannerConfig.message}
+          actions={bannerConfig.actions}
+          variant={bannerConfig.variant}
+        />
+      )}
+
       <EntityDetailUnifiedWithErrorBoundary
         entity={brewLogEntity}
         id={id}
@@ -73,6 +199,6 @@ export default function BrewLogDetailPage({
           onSuccess={handleDialogSuccess}
         />
       )}
-    </>
+    </div>
   );
 }
