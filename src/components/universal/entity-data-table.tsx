@@ -32,12 +32,13 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, EntityActionDef } from "@/types/entity";
 import { getStateLabel } from "@/types/entity";
 import type { ExtendedColumnFilter } from "@/types/data-table";
 import { getFiltersStateParser } from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { EntityKanban } from "@/components/universal/entity-kanban";
+import { EntityDeleteDialog } from "./entity-delete-dialog";
 import { BulkStatusActionBar } from "./bulk-status-action-bar";
 import {
   buildDataTableColumns,
@@ -106,6 +107,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const db = supabase as any;
   const path = basePath || `/${entity.domain}/${entity.table}`;
   const router = useRouter();
+  const [deleteTarget, setDeleteTarget] = useState<{ record: T; action: EntityActionDef<T> } | null>(null);
 
   const hasBulkActions = !!entity.stateMachine;
   const fetchTable = entity.viewTable || entity.table;
@@ -244,7 +246,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const columns = useMemo((): ColumnDef<T, any>[] => {
     const dataColumns = buildDataTableColumns(entity, dynamicFilterOptions);
-    const actionsColumn = buildActionsColumn(entity, path, onAction, handleSingleTransition);
+    const actionsColumn = buildActionsColumn(
+      entity,
+      path,
+      onAction,
+      handleSingleTransition,
+      (record, action) => setDeleteTarget({ record, action })
+    );
 
     if (hasBulkActions) {
       return [buildSelectColumn<T>(), ...dataColumns, actionsColumn];
@@ -750,6 +758,32 @@ export function EntityDataTable<T = Record<string, unknown>>({
           </DataTable>
         )}
       </div>
+
+      {/* Entity Delete Dialog */}
+      {deleteTarget?.action.deleteMode && (
+        <EntityDeleteDialog
+          entityTable={entity.table}
+          entityDisplayName={entity.displayName}
+          recordId={String((deleteTarget.record as Record<string, unknown>).id)}
+          recordTitle={String(
+            (deleteTarget.record as Record<string, unknown>)[
+              entity.detailHeader?.title ?? "name"
+            ] ?? entity.displayName
+          )}
+          deleteMode={deleteTarget.action.deleteMode}
+          open={!!deleteTarget}
+          onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          onSuccess={() => {
+            setDeleteTarget(null);
+            queryClient.invalidateQueries({
+              queryKey: entityKeys.all(entity.viewTable ?? entity.table),
+            });
+            queryClient.invalidateQueries({
+              queryKey: entityKeys.all(entity.table),
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
