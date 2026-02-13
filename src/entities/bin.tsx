@@ -209,8 +209,15 @@ export const binEntity: EntityConfig<Bin> = {
         {
           name: "location_id",
           label: "Location",
-          type: "relation",
+          type: "select",
           relation: { entity: "location", displayField: "name" },
+          dynamicOptions: {
+            table: "locations",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "name",
+            filter: { is_active: true },
+          },
           required: true,
           colSpan: 6,
         },
@@ -277,10 +284,14 @@ export const binEntity: EntityConfig<Bin> = {
     {
       name: "location_id",
       label: "Location",
-      type: "relation",
-      relation: {
-        entity: "location",
-        displayField: "name",
+      type: "select",
+      relation: { entity: "location", displayField: "name" },
+      dynamicOptions: {
+        table: "locations",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "name",
+        filter: { is_active: true },
       },
       required: true,
       colSpan: 6,

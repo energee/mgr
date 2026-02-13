@@ -17,6 +17,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/integration-badge";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, RefreshCw } from "lucide-react";
 import { SecretKeyInput } from "@/components/domain/secret-key-input";
@@ -108,9 +109,7 @@ function GlobalApiKeySection() {
               when individual users don&apos;t have their own key configured.
             </CardDescription>
           </div>
-          <Badge variant={hasExistingKey ? "outline" : "secondary"}>
-            {hasExistingKey ? "Connected" : "Not Connected"}
-          </Badge>
+          <IntegrationBadge status={hasExistingKey ? "connected" : "not_connected"} />
         </div>
       </CardHeader>
       <CardContent>
@@ -268,6 +267,13 @@ function SquareIntegrationCard() {
 
   const isConnected = status?.isEnabled && status?.catalogItemCount > 0;
 
+  let squareStatus: IntegrationStatus = "not_connected";
+  if (isConnected) {
+    squareStatus = "connected";
+  } else if (status?.isEnabled) {
+    squareStatus = "enabled";
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -281,13 +287,7 @@ function SquareIntegrationCard() {
               Sync products, prices, and inventory from MGR to Square. Track taproom sales for reconciliation.
             </CardDescription>
           </div>
-          {isConnected ? (
-            <Badge variant="default">Connected</Badge>
-          ) : status?.isEnabled ? (
-            <Badge variant="secondary">Enabled</Badge>
-          ) : (
-            <Badge variant="outline">Not Connected</Badge>
-          )}
+          <IntegrationBadge status={squareStatus} />
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -422,7 +422,7 @@ function SquareIntegrationCard() {
 // =============================================================================
 
 function QuickBooksIntegrationCard() {
-  const { data: status, isLoading } = useQuery({
+  const { data: status } = useQuery({
     queryKey: qboKeys.status(),
     queryFn: async () => {
       const res = await fetch("/api/integrations/quickbooks/status");
@@ -448,13 +448,7 @@ function QuickBooksIntegrationCard() {
               for orders and purchase orders.
             </CardDescription>
           </div>
-          {isLoading ? (
-            <Badge variant="outline">Checking...</Badge>
-          ) : isConnected ? (
-            <Badge variant="default">Connected</Badge>
-          ) : (
-            <Badge variant="secondary">Not Connected</Badge>
-          )}
+          <IntegrationBadge status={isConnected ? "connected" : "not_connected"} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
