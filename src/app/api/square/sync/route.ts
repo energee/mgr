@@ -5,7 +5,7 @@
  * This is a convenience endpoint that calls the individual sync endpoints.
  */
 
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 
 interface SyncResponse {
@@ -13,7 +13,7 @@ interface SyncResponse {
   error?: { message?: string; details?: unknown };
 }
 
-export const POST = withAuth(async (request) => {
+export const POST = withPermission("integrations:manage", async (request) => {
   const origin = new URL(request.url).origin;
   const headers: Record<string, string> = {
     "content-type": "application/json",

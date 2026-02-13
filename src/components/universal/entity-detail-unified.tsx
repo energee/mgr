@@ -21,6 +21,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePermissions } from "@/contexts/permissions";
+import type { Permission } from "@/lib/permissions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -93,6 +95,18 @@ export interface EntityDetailUnifiedProps<T = Record<string, unknown>> {
     form: UseFormReturn<Record<string, unknown>>,
   ) => void;
 }
+
+// =============================================================================
+// Domain-to-write-permission mapping (cosmetic gating only)
+// =============================================================================
+
+const DOMAIN_WRITE_PERMISSIONS: Record<string, Permission> = {
+  production: "batches:write",
+  inventory: "inventory:write",
+  sales: "orders:write",
+  purchasing: "purchasing:write",
+  system: "settings:manage",
+};
 
 // =============================================================================
 // Config Resolution - Legacy to Unified conversion
@@ -266,7 +280,12 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const path = basePath || `/${entity.domain}/${entity.name}s`;
 
   const isCreateMode = !id;
-  const canEdit = showEdit && !!entity.formSchema;
+  const { can } = usePermissions();
+  const writePermission = entity.domain
+    ? DOMAIN_WRITE_PERMISSIONS[entity.domain]
+    : undefined;
+  const hasWritePermission = writePermission ? can(writePermission) : true;
+  const canEdit = showEdit && !!entity.formSchema && hasWritePermission;
 
   // Cast to any for dynamic table access - universal components work with any entity
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

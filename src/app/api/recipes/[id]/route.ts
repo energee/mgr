@@ -1,12 +1,12 @@
 import {
-  withAuth,
+  withPermission,
   successResponse,
   errorResponse,
   validateBody,
 } from "@/lib/api";
 import { recipeSchema } from "@/lib/schemas/recipe";
 
-export const GET = withAuth(async (request, { supabase, params }) => {
+export const GET = withPermission("recipes:read", async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Recipe ID required", undefined, 400);
 
@@ -26,7 +26,7 @@ export const GET = withAuth(async (request, { supabase, params }) => {
   return successResponse(data);
 });
 
-export const PATCH = withAuth(async (request, { supabase, params }) => {
+export const PATCH = withPermission("recipes:write", async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Recipe ID required", undefined, 400);
 
@@ -49,7 +49,7 @@ export const PATCH = withAuth(async (request, { supabase, params }) => {
   return successResponse(data);
 });
 
-export const DELETE = withAuth(async (request, { supabase, params }) => {
+export const DELETE = withPermission("recipes:write", async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Recipe ID required", undefined, 400);
 

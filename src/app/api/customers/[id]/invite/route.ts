@@ -1,11 +1,11 @@
-import { withRoles } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 
 const PORTAL_REDIRECT_URL = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback?redirect=/portal/orders`;
 
-export const POST = withRoles(
-  ["admin", "sales"],
+export const POST = withPermission(
+  "customers:write",
   async (_request, { supabase, params }) => {
     const customerId = params?.id;
     if (!customerId) {
