@@ -13,6 +13,7 @@
 
 import { use, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
@@ -28,6 +29,7 @@ export default function BrewLogDetailPage({
 }) {
   const { id } = use(params);
   const queryClient = useQueryClient();
+  const router = useRouter();
   const supabase = createClient();
 
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
@@ -85,12 +87,18 @@ export default function BrewLogDetailPage({
     return false; // Let EntityDetailUnified handle normally
   }, []);
 
-  const handleDialogSuccess = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
-    queryClient.invalidateQueries({
-      queryKey: entityKeys.detail("brew_logs", id),
-    });
-  }, [queryClient, id]);
+  const handleDialogSuccess = useCallback(
+    (navigateToBatchId?: string) => {
+      queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.detail("brew_logs", id),
+      });
+      if (navigateToBatchId) {
+        router.push(`/production/batches/${navigateToBatchId}`);
+      }
+    },
+    [queryClient, id, router]
+  );
 
   // Banner config based on brew log state
   const bannerConfig = useMemo(() => {

@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * BrewLogCompletionDialog - Complete a brew log and start fermentation
+ * BrewLogCompletionDialog - 3-step wizard for completing a brew log
  *
- * When a brew log is completed, this dialog:
- * 1. Shows all linked batches with their current vessel assignments
- * 2. Requires vessel assignment for any batch without one
- * 3. Creates vessel_transfer records for newly assigned vessels
- * 4. Transitions each batch to "fermenting" status
- * 5. Marks the brew log as "completed"
+ * Step 1: Review Measurements - shows key measurements from brew day events
+ * Step 2: Assign Vessels - vessel assignment for each linked batch
+ * Step 3: Confirm & Complete - review summary before finalizing
+ *
+ * After completion, navigates to the first batch detail page.
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -39,7 +38,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, Loader2 } from "lucide-react";
+import {
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
@@ -52,7 +56,7 @@ interface BrewLogCompletionDialogProps {
   brewNumber: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (firstBatchId?: string) => void;
 }
 
 interface LinkedBatch {
@@ -73,6 +77,66 @@ interface AvailableVessel {
   capacity_bbl: number | null;
 }
 
+interface KeyMeasurement {
+  label: string;
+  value: string;
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function extractKeyMeasurements(events: unknown[]): KeyMeasurement[] {
+  const measurements: KeyMeasurement[] = [];
+  const typedEvents = events as Array<{
+    phase?: string;
+    measurements?: Array<{ metric?: string; value?: number | string }>;
+  }>;
+
+  // Mash temp
+  const mashEvent = typedEvents.find(
+    (e) => e.phase === "mash_in" || e.phase === "mash_rest"
+  );
+  const mashTemp = mashEvent?.measurements?.find(
+    (m) => m.metric === "temp_f"
+  );
+  if (mashTemp)
+    measurements.push({ label: "Mash Temp", value: `${mashTemp.value}\u00B0F` });
+
+  // Pre-boil gravity
+  const kettleEvent = typedEvents.find(
+    (e) => e.phase === "kettle_full" || e.phase === "boil_start"
+  );
+  const preBoilGravity = kettleEvent?.measurements?.find(
+    (m) => m.metric === "gravity_plato"
+  );
+  if (preBoilGravity)
+    measurements.push({
+      label: "Pre-Boil Gravity",
+      value: `${preBoilGravity.value}\u00B0P`,
+    });
+
+  // Post-boil OG
+  const boilEnd = typedEvents.find(
+    (e) => e.phase === "boil_end" || e.phase === "ko_start"
+  );
+  const og = boilEnd?.measurements?.find((m) => m.metric === "gravity_plato");
+  if (og) measurements.push({ label: "Post-Boil OG", value: `${og.value}\u00B0P` });
+
+  // Post-boil volume
+  const vol = boilEnd?.measurements?.find((m) => m.metric === "volume_bbl");
+  if (vol)
+    measurements.push({ label: "Post-Boil Volume", value: `${vol.value} BBL` });
+
+  // Knockout temp
+  const koEnd = typedEvents.find((e) => e.phase === "ko_end");
+  const temp = koEnd?.measurements?.find((m) => m.metric === "temp_f");
+  if (temp)
+    measurements.push({ label: "Knockout Temp", value: `${temp.value}\u00B0F` });
+
+  return measurements;
+}
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -89,14 +153,38 @@ export function BrewLogCompletionDialog({
   const db = supabase as any;
   const queryClient = useQueryClient();
 
+  const [step, setStep] = useState(1);
   const [vesselAssignments, setVesselAssignments] = useState<
     Record<string, string>
   >({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Reset step when dialog opens
+  useEffect(() => {
+    if (open) {
+      setStep(1);
+      setVesselAssignments({});
+    }
+  }, [open]);
+
   // ---------------------------------------------------------------------------
   // Data Fetching
   // ---------------------------------------------------------------------------
+
+  // Fetch brew log with events for step 1
+  const { data: brewLogFull } = useQuery({
+    queryKey: brewLogKeys.detail(brewLogId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("brew_logs")
+        .select("id, brew_number, status, events")
+        .eq("id", brewLogId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
 
   // Fetch linked batches with current vessel info
   const { data: linkedBatches = [], isLoading: batchesLoading } = useQuery<
@@ -188,6 +276,7 @@ export function BrewLogCompletionDialog({
   const allBatchesHaveVessels = batchesNeedingVessel.length === 0;
 
   // Filter out vessels already assigned to other batches in this dialog
+  // Sort by best capacity fit for the target batch
   const getAvailableVesselsForBatch = useCallback(
     (batchId: string) => {
       const assignedVesselIds = Object.entries(vesselAssignments)
@@ -201,10 +290,36 @@ export function BrewLogCompletionDialog({
 
       const excludedIds = [...assignedVesselIds, ...preAssignedVesselIds];
 
-      return availableVessels.filter((v) => !excludedIds.includes(v.id));
+      const filtered = availableVessels.filter(
+        (v) => !excludedIds.includes(v.id)
+      );
+
+      // Sort by best capacity fit
+      const batch = linkedBatches.find((b) => b.id === batchId);
+      const targetVolume = batch?.link_volume_bbl ?? batch?.volume_bbl ?? 0;
+
+      return filtered.sort((a, b) => {
+        const aFit = (a.capacity_bbl ?? Infinity) - targetVolume;
+        const bFit = (b.capacity_bbl ?? Infinity) - targetVolume;
+        // Prefer vessels that can hold the batch (positive fit)
+        if (aFit >= 0 && bFit < 0) return -1;
+        if (aFit < 0 && bFit >= 0) return 1;
+        // Among same-sign fits, prefer closest to target
+        return Math.abs(aFit) - Math.abs(bFit);
+      });
     },
     [availableVessels, vesselAssignments, linkedBatches]
   );
+
+  // ---------------------------------------------------------------------------
+  // Step titles and progress
+  // ---------------------------------------------------------------------------
+
+  const stepTitles = [
+    "Review Measurements",
+    "Assign Vessels",
+    "Confirm & Complete",
+  ];
 
   // ---------------------------------------------------------------------------
   // Submission
@@ -272,7 +387,7 @@ export function BrewLogCompletionDialog({
       );
 
       onOpenChange(false);
-      onSuccess();
+      onSuccess(linkedBatches[0]?.id);
     } catch (error) {
       console.error("Complete brew error:", error);
       const message =
@@ -282,6 +397,191 @@ export function BrewLogCompletionDialog({
       setIsSubmitting(false);
     }
   };
+
+  // ---------------------------------------------------------------------------
+  // Render Steps
+  // ---------------------------------------------------------------------------
+
+  const renderStep1 = () => {
+    const events = (brewLogFull?.events as unknown[]) || [];
+    const keyMeasurements = extractKeyMeasurements(events);
+
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Review the key measurements from your brew day before completing.
+        </p>
+        {keyMeasurements.length === 0 ? (
+          <div className="py-6 text-center text-muted-foreground text-sm">
+            No key measurements recorded. You can proceed to vessel assignment.
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {keyMeasurements.map((m) => (
+              <div
+                key={m.label}
+                className="flex items-center justify-between p-3 rounded-md border"
+              >
+                <span className="text-sm font-medium">{m.label}</span>
+                <span className="text-sm">{m.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderStep2 = () => {
+    if (linkedBatches.length === 0) {
+      return (
+        <div className="py-8 text-center text-muted-foreground">
+          No batches are linked to this brew log. Link batches before
+          completing.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {linkedBatches.map((batch) => {
+          const hasVessel = !!batch.current_vessel_id;
+          const assignedVesselId = vesselAssignments[batch.id];
+          const batchVessels = getAvailableVesselsForBatch(batch.id);
+          const targetVolume =
+            batch.link_volume_bbl ?? batch.volume_bbl ?? 0;
+
+          return (
+            <Card key={batch.id}>
+              <CardContent className="pt-4 pb-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium text-sm">
+                      {batch.batch_number}
+                    </span>
+                    {batch.name && batch.name !== batch.batch_number && (
+                      <span className="text-muted-foreground text-sm ml-2">
+                        {batch.name}
+                      </span>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    <UnitDisplay
+                      value={batch.link_volume_bbl ?? batch.volume_bbl}
+                      unitType="volume"
+                    />
+                  </Badge>
+                </div>
+
+                {hasVessel ? (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-muted-foreground">Vessel:</span>
+                    <span className="font-medium">
+                      {batch.current_vessel_name}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      Assign Vessel{" "}
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Select
+                      value={assignedVesselId ?? "_none"}
+                      onValueChange={(val) =>
+                        setVesselAssignments((prev) => ({
+                          ...prev,
+                          [batch.id]:
+                            val === "_none" ? undefined! : val,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Select vessel..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">
+                          Select vessel...
+                        </SelectItem>
+                        {batchVessels.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}
+                            {v.capacity_bbl && targetVolume ? (
+                              <>
+                                {" "}
+                                (
+                                {Math.round(
+                                  (targetVolume / v.capacity_bbl) * 100
+                                )}
+                                % full)
+                              </>
+                            ) : v.capacity_bbl ? (
+                              <>
+                                {" "}
+                                (
+                                <UnitDisplay
+                                  value={v.capacity_bbl}
+                                  unitType="volume"
+                                />
+                                )
+                              </>
+                            ) : (
+                              ""
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!assignedVesselId && (
+                      <p className="text-xs text-muted-foreground">
+                        A vessel must be assigned to start fermentation
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderStep3 = () => (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Review and confirm the following actions:
+      </p>
+      <div className="p-4 rounded-md border space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Brew Log</span>
+          <span className="font-medium">
+            {brewNumber} &rarr; Completed
+          </span>
+        </div>
+        {linkedBatches.map((batch) => {
+          const vesselId =
+            vesselAssignments[batch.id] || batch.current_vessel_id;
+          const vessel = vesselId
+            ? availableVessels.find((v) => v.id === vesselId)
+            : null;
+          const vesselName =
+            vessel?.name || batch.current_vessel_name || "\u2014";
+          return (
+            <div key={batch.id} className="flex justify-between text-sm">
+              <span className="text-muted-foreground">
+                {batch.batch_number}
+              </span>
+              <span className="font-medium">
+                &rarr; Fermenting in {vesselName}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   // ---------------------------------------------------------------------------
   // Render
@@ -298,133 +598,98 @@ export function BrewLogCompletionDialog({
             Complete Brew &amp; Start Fermentation
           </DialogTitle>
           <DialogDescription>
-            Complete brew {brewNumber} and transition all linked batches to
-            fermentation. Each batch must be assigned to a vessel.
+            Step {step} of 3: {stepTitles[step - 1]}
           </DialogDescription>
         </DialogHeader>
 
+        {/* Step progress bar */}
+        <div className="flex items-center gap-1 px-1">
+          {[1, 2, 3].map((s) => (
+            <div
+              key={s}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                s <= step ? "bg-primary" : "bg-muted"
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Step content */}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : linkedBatches.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground">
-            No batches are linked to this brew log. Link batches before
-            completing.
-          </div>
         ) : (
-          <div className="space-y-3">
-            {linkedBatches.map((batch) => {
-              const hasVessel = !!batch.current_vessel_id;
-              const assignedVesselId = vesselAssignments[batch.id];
-              const batchVessels = getAvailableVesselsForBatch(batch.id);
-
-              return (
-                <Card key={batch.id}>
-                  <CardContent className="pt-4 pb-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium text-sm">
-                          {batch.batch_number}
-                        </span>
-                        {batch.name && batch.name !== batch.batch_number && (
-                          <span className="text-muted-foreground text-sm ml-2">
-                            {batch.name}
-                          </span>
-                        )}
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        <UnitDisplay value={batch.link_volume_bbl ?? batch.volume_bbl} unitType="volume" />
-                      </Badge>
-                    </div>
-
-                    {hasVessel ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-muted-foreground">Vessel:</span>
-                        <span className="font-medium">
-                          {batch.current_vessel_name}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">
-                          Assign Vessel{" "}
-                          <span className="text-destructive">*</span>
-                        </Label>
-                        <Select
-                          value={assignedVesselId ?? "_none"}
-                          onValueChange={(val) =>
-                            setVesselAssignments((prev) => ({
-                              ...prev,
-                              [batch.id]:
-                                val === "_none" ? undefined! : val,
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Select vessel..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="_none">
-                              Select vessel...
-                            </SelectItem>
-                            {batchVessels.map((v) => (
-                              <SelectItem key={v.id} value={v.id}>
-                                {v.name}
-                                {v.capacity_bbl
-                                  ? <>{" "}(<UnitDisplay value={v.capacity_bbl} unitType="volume" />)</>
-                                  : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {!assignedVesselId && (
-                          <p className="text-xs text-muted-foreground">
-                            A vessel must be assigned to start fermentation
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <>
+            {step === 1 && renderStep1()}
+            {step === 2 && renderStep2()}
+            {step === 3 && renderStep3()}
+          </>
         )}
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-            className="min-h-[44px]"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={
-              isSubmitting ||
-              !allBatchesHaveVessels ||
-              linkedBatches.length === 0
-            }
-            className="min-h-[44px]"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Completing...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Complete Brew &amp; Start Fermentation
-              </>
+        <DialogFooter className="flex-row justify-between sm:justify-between">
+          <div>
+            {step > 1 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep((s) => s - 1)}
+                disabled={isSubmitting}
+                className="min-h-[44px]"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
             )}
-          </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            {step < 3 ? (
+              <Button
+                type="button"
+                onClick={() => setStep((s) => s + 1)}
+                disabled={
+                  step === 2 &&
+                  (!allBatchesHaveVessels || linkedBatches.length === 0)
+                }
+                className="min-h-[44px]"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={
+                  isSubmitting ||
+                  !allBatchesHaveVessels ||
+                  linkedBatches.length === 0
+                }
+                className="min-h-[44px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Completing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Complete Brew Day
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
