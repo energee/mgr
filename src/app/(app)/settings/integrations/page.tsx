@@ -214,64 +214,6 @@ function IntegrationKeySection({
 }
 
 // =============================================================================
-// QuickBooks Integration Card
-// =============================================================================
-
-function QuickBooksIntegrationCard() {
-  const [hasExistingKey, setHasExistingKey] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/settings/api-key?scope=integration&id=quickbooks")
-      .then((res) => res.json())
-      .then((data) => setHasExistingKey(data.hasKey === true))
-      .catch(() => {});
-  }, []);
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <QuickBooksIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">QuickBooks</CardTitle>
-              <CardDescription>
-                Sync financial data with QuickBooks Online. Automate invoicing and expense tracking.
-              </CardDescription>
-            </div>
-          </div>
-          <IntegrationBadge status={hasExistingKey ? "connected" : "not_connected"} />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <IntegrationKeySection
-          integrationId="quickbooks"
-          keyLabel="QuickBooks Client ID"
-          keyPlaceholder="AB1cd2EFgh3..."
-        />
-        <div>
-          <h4 className="text-sm font-medium mb-2">Features</h4>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            {[
-              "Invoice sync",
-              "Expense tracking",
-              "Inventory valuation",
-            ].map((feature, index) => (
-              <li key={index} className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                {feature}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// =============================================================================
 // Square Integration Card (dedicated card with sync controls)
 // =============================================================================
 
@@ -480,7 +422,7 @@ function SquareIntegrationCard() {
 // =============================================================================
 
 function QuickBooksIntegrationCard() {
-  const { data: status, isLoading } = useQuery({
+  const { data: status } = useQuery({
     queryKey: qboKeys.status(),
     queryFn: async () => {
       const res = await fetch("/api/integrations/quickbooks/status");
@@ -506,13 +448,7 @@ function QuickBooksIntegrationCard() {
               for orders and purchase orders.
             </CardDescription>
           </div>
-          {isLoading ? (
-            <Badge variant="outline">Checking...</Badge>
-          ) : isConnected ? (
-            <Badge variant="default">Connected</Badge>
-          ) : (
-            <Badge variant="secondary">Not Connected</Badge>
-          )}
+          <IntegrationBadge status={isConnected ? "connected" : "not_connected"} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
