@@ -536,6 +536,21 @@ CREATE POLICY "Users can insert own records" ON my_table
   WITH CHECK (auth.uid() = user_id);
 ```
 
+### DEC-SEC-007: Permission-Based Role System
+
+**Status:** Implemented
+**Date:** 2026-02-12
+
+Multi-role permission system with defense-in-depth enforcement:
+- Users hold multiple roles (`roles TEXT[]` in `user_profiles`)
+- Permissions are code-defined in `src/lib/permissions.ts` (not database-configurable)
+- API routes use `withPermission("domain:action")` middleware
+- RLS policies use `user_has_permission()` Postgres function
+- Customer role is hardcoded to portal-only access
+- Frontend uses `usePermissions()` hook for cosmetic UI gating
+
+See `docs/spec/auth.md` for the full permission matrix.
+
 ### Automated Security Checks
 
 The project includes CI checks that run `supabase db lint` on every PR. All ERROR-level findings must be resolved before merging.

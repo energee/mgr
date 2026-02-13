@@ -3,101 +3,97 @@
 ## Authentication
 
 - Supabase Auth with email/password
-- Magic link option for passwordless login
+- Magic link option for passwordless login (used by customer portal)
 - Session management via Supabase
 
 ## Roles
 
+Users hold one or more roles in `user_profiles.roles TEXT[]`. Permissions are additive across all assigned roles.
+
 | Role | Description |
 |------|-------------|
-| **Admin** | Full system access including setup, users, integrations |
-| **Production Manager** | Scheduling, packaging, inventory, purchasing, order review |
-| **Brewer** | Recipes, batches, brew logs, readings, additions, vessels |
-| **Sales** | Orders, customers, pricing, sales channels |
-| **Viewer** | Read-only access to all data |
-| **Customer** | Portal access only — view own orders, submit change requests |
+| **admin** | Full system access including setup, users, integrations |
+| **production_manager** | Scheduling, packaging, inventory, purchasing, order review |
+| **brewer** | Recipes, batches, brew logs, readings, additions, vessels |
+| **sales** | Orders, customers, pricing, sales channels |
+| **viewer** | Read-only access to all data |
+| **customer** | Portal access only -- not part of the permission system (see [Customer Portal](#customer-portal)) |
 
-## Role Capabilities Matrix
+Staff roles (`admin` through `viewer`) participate in the permission system. The `customer` role is hardcoded to portal-only access with its own RLS policies.
 
-| Capability | Admin | Prod Mgr | Brewer | Sales |
-|------------|-------|----------|--------|-------|
-| **System Setup** |
-| Manage locations | ✓ | | | |
-| Manage formats | ✓ | | | |
-| Manage keg types | ✓ | | | |
-| Manage users | ✓ | | | |
-| Manage integrations | ✓ | | | |
-| System settings | ✓ | | | |
-| **Production** |
-| Create/edit recipes | ✓ | ✓ | ✓ | |
-| Create/edit batches | ✓ | ✓ | ✓ | |
-| Record brew logs | ✓ | ✓ | ✓ | |
-| Record batch readings | ✓ | ✓ | ✓ | |
-| Add batch additions | ✓ | ✓ | ✓ | |
-| Manage vessels | ✓ | ✓ | ✓ | |
-| Schedule batches | ✓ | ✓ | | |
-| **Packaging & Inventory** |
-| Manage packaging sessions | ✓ | ✓ | | |
-| Manage finished goods | ✓ | ✓ | | |
-| Manage bins | ✓ | ✓ | | |
-| Create transfers | ✓ | ✓ | | |
-| **Purchasing** |
-| Create purchase orders | ✓ | ✓ | | |
-| Receive inventory | ✓ | ✓ | | |
-| Manage suppliers | ✓ | ✓ | | |
-| Manage ingredients | ✓ | ✓ | | |
-| **Sales** |
-| Create/edit orders | ✓ | | | ✓ |
-| Review orders | ✓ | ✓ | | ✓ |
-| Manage customers | ✓ | | | ✓ |
-| Manage price tiers | ✓ | | | ✓ |
-| Manage sales channels | ✓ | | | ✓ |
-| **Reporting** |
-| View all reports | ✓ | ✓ | | |
-| View production reports | ✓ | ✓ | ✓ | |
-| View sales reports | ✓ | | | ✓ |
+## Permissions
 
-## Multi-Role Support
+Permissions are strings in `resource:action` format. The source of truth is `src/lib/permissions.ts`.
 
-- Users can have multiple roles assigned
-- Permissions are additive (union of all role capabilities)
-- Roles stored in `users.roles` array field
+### Permission Matrix
 
-## Row Level Security (RLS)
+| Permission | admin | production_manager | brewer | sales | viewer |
+|---|---|---|---|---|---|
+| `recipes:read` | x | x | x | x | x |
+| `recipes:write` | x | | x | | |
+| `batches:read` | x | x | x | x | x |
+| `batches:write` | x | x | x | | |
+| `orders:read` | x | x | | x | x |
+| `orders:write` | x | | | x | |
+| `customers:read` | x | x | | x | x |
+| `customers:write` | x | | | x | |
+| `inventory:read` | x | x | x | x | x |
+| `inventory:write` | x | x | | | |
+| `purchasing:read` | x | x | | | x |
+| `purchasing:write` | x | x | | | |
+| `vessels:read` | x | x | x | x | x |
+| `vessels:write` | x | x | x | | |
+| `integrations:manage` | x | | | | |
+| `settings:manage` | x | | | | |
+| `users:manage` | x | | | | |
 
-All tables must have RLS policies ensuring:
-- Role-based access control
-- Service role bypasses RLS for system operations
+## Enforcement
 
-```sql
--- Example RLS policy pattern
-CREATE POLICY "Users with appropriate role can view batches"
-ON batches FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM users
-    WHERE users.id = auth.uid()
-    AND (
-      'Admin' = ANY(users.roles) OR
-      'Production Manager' = ANY(users.roles) OR
-      'Brewer' = ANY(users.roles)
-    )
-  )
-);
+Defense-in-depth: permissions are enforced at three layers.
+
+### 1. API Layer (enforcement)
+
+`withPermission("domain:action")` middleware in `src/lib/api/auth.ts` wraps route handlers. It loads `user_profiles.roles`, calls `hasPermission()`, and returns 403 if denied.
+
+```typescript
+// src/lib/api/auth.ts
+export const GET = withPermission("recipes:read", async (request, context) => {
+  // context.roles, context.permissions available
+});
 ```
 
-## Users Table
+### 2. Database Layer (enforcement)
+
+`user_has_permission(p_permission TEXT)` Postgres function is used in RLS policies. It checks `user_profiles.roles` against a SQL mirror of the permission map via `get_roles_for_permission()`.
 
 ```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id),
-  email TEXT NOT NULL,
-  full_name TEXT,
-  roles TEXT[] NOT NULL DEFAULT '{}',
-  avatar_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- RLS policy using permission function
+CREATE POLICY "Permission-based access" ON batches
+  FOR SELECT USING (user_has_permission('batches:read'));
+
+-- The function (from migration 00092):
+CREATE FUNCTION user_has_permission(p_permission TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM user_profiles
+    WHERE id = (SELECT auth.uid())
+    AND roles && get_roles_for_permission(p_permission)
+  );
+$$;
+```
+
+### 3. Frontend (cosmetic gating only)
+
+`usePermissions()` hook from `src/contexts/permissions.tsx` provides `can()` and `hasRole()` for UI gating. This is convenience only -- not a security boundary.
+
+```typescript
+const { can } = usePermissions();
+
+// Hide button if user lacks permission
+{can("batches:write") && <Button>Create Batch</Button>}
 ```
 
 ## Customer Portal
@@ -113,9 +109,9 @@ The customer portal (`/portal`) provides a separate interface for brewery custom
 
 ### Portal Features
 
-- **Order list** (`/portal/orders`) — all orders for linked customers
-- **Order detail** (`/portal/orders/[id]`) — items, totals, change request status
-- **Change requests** (`/portal/orders/[id]/change-request/new`) — add, modify, or remove items (subject to cutoff state)
+- **Order list** (`/portal/orders`) -- all orders for linked customers
+- **Order detail** (`/portal/orders/[id]`) -- items, totals, change request status
+- **Change requests** (`/portal/orders/[id]/change-request/new`) -- add, modify, or remove items (subject to cutoff state)
 
 ### Many-to-Many User Mapping
 
@@ -132,8 +128,17 @@ Each sales channel has a `change_request_cutoff_state` (default: `confirmed`). C
 - Users with `customer` role are redirected from the admin app to `/portal`
 - The `customer` role is auto-assigned when an auth user's email matches an existing customer record
 - Brewery contact email (from Settings > System > `brewery_email`) is shown on the "No Account Linked" page
+- Customer role does not participate in the `PERMISSION_MAP` -- portal access is governed by dedicated RLS policies on `customer_portal_users`
+
+## How to Add a New Permission
+
+1. **TypeScript**: Add the permission string to the `Permission` type and `PERMISSION_MAP` in `src/lib/permissions.ts`
+2. **SQL**: Update `get_roles_for_permission()` in a new migration to mirror the TypeScript map
+3. **RLS**: Add/update RLS policies on affected tables using `user_has_permission('new:permission')`
+4. **API**: Wrap relevant route handlers with `withPermission("new:permission", handler)`
+5. **Frontend** (optional): Use `can("new:permission")` in components for UI gating
 
 ## Related Documents
 
-- [Architecture](./architecture.md) - Single-tenant decision (DEC-005)
+- [Architecture](./architecture.md) - DEC-005 (single-tenant), DEC-SEC-007 (permission-based roles)
 - [Data Model: System](../data-model/system.md) - Full schema details
