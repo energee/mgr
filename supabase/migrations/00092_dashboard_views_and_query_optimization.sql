@@ -52,7 +52,7 @@ SELECT
   COUNT(o.id)::integer AS order_count,
   COALESCE(SUM(ot.total_value), 0) AS total_revenue
 FROM customers c
-JOIN orders o ON o.customer_id = c.id AND o.status IN ('fulfilled', 'out_the_door')
+JOIN orders o ON o.customer_id = c.id AND o.status = 'fulfilled'
 LEFT JOIN order_totals ot ON ot.order_id = o.id
 LEFT JOIN sales_channels sc ON c.sales_channel_id = sc.id
 GROUP BY c.id, c.name, sc.name;
@@ -67,7 +67,7 @@ SELECT
   SUM(oi.quantity)::integer AS total_quantity,
   SUM(oi.quantity * oi.unit_price) AS total_revenue
 FROM order_items oi
-JOIN orders o ON o.id = oi.order_id AND o.status IN ('fulfilled', 'out_the_door')
+JOIN orders o ON o.id = oi.order_id AND o.status = 'fulfilled'
 JOIN brands b ON b.id = oi.brand_id
 GROUP BY b.id, b.name;
 
@@ -131,12 +131,12 @@ order_stats AS (
   SELECT
     o.customer_id,
     COUNT(*)::integer AS total_orders,
-    SUM(CASE WHEN o.status IN ('fulfilled', 'out_the_door')
+    SUM(CASE WHEN o.status = 'fulfilled'
       THEN COALESCE(ot.total_value, 0)
       ELSE 0 END) AS total_revenue,
     MAX(o.order_date) AS last_order_date,
-    COUNT(*) FILTER (WHERE o.status NOT IN ('fulfilled', 'out_the_door', 'cancelled'))::integer AS pending_orders,
-    SUM(CASE WHEN o.status NOT IN ('fulfilled', 'out_the_door', 'cancelled')
+    COUNT(*) FILTER (WHERE o.status NOT IN ('fulfilled', 'cancelled'))::integer AS pending_orders,
+    SUM(CASE WHEN o.status NOT IN ('fulfilled', 'cancelled')
       THEN COALESCE(ot.total_value, 0)
       ELSE 0 END) AS pending_revenue
   FROM orders o
