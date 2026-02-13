@@ -144,39 +144,39 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
       const brandIds = [...new Set(finishedGoods?.map((fg) => fg.brand_id).filter((id): id is string => !!id))];
       const packageIds = [...new Set(finishedGoods?.map((fg) => fg.package_type_id).filter((id): id is string => !!id))];
 
-      const [brandsResult, packagesResult] = await Promise.all([
+      const [brandsResult, packagesResult, binInventoryResult] = await Promise.all([
         brandIds.length > 0
           ? supabase.from("brands").select("id, name").in("id", brandIds)
           : { data: [] },
         packageIds.length > 0
           ? supabase.from("package_types").select("id, name").in("id", packageIds)
           : { data: [] },
+        db
+          .from("bin_inventory")
+          .select(`
+            finished_good_id,
+            quantity,
+            bins:bin_id(name, locations:location_id(name))
+          `)
+          .in("finished_good_id", fgIds)
+          .gt("quantity", 0),
       ]);
 
       const brandMap = new Map((brandsResult.data || []).map((b) => [b.id, b.name]));
       const packageMap = new Map((packagesResult.data || []).map((p) => [p.id, p.name]));
 
-      // Get bin locations for finished goods
-      const { data: binInventory } = await db
-        .from("bin_inventory")
-        .select(`
-          finished_good_id,
-          quantity,
-          bins:bin_id(name, locations:location_id(name))
-        `)
-        .in("finished_good_id", fgIds)
-        .gt("quantity", 0);
+      const binInventory = binInventoryResult.data;
 
       // Create bin map (use first bin with inventory for each FG)
       const binMap = new Map<string, { bin_name: string; location_name: string }>();
-      (binInventory || []).forEach((bi: { finished_good_id: string; bins: { name: string; locations: { name: string } | null } | null }) => {
+      for (const bi of binInventory ?? []) {
         if (!binMap.has(bi.finished_good_id) && bi.bins) {
           binMap.set(bi.finished_good_id, {
             bin_name: bi.bins.name,
             location_name: bi.bins.locations?.name || "Unknown",
           });
         }
-      });
+      }
 
       // Build pick list items
       const fgMap = new Map(finishedGoods?.map((fg) => [fg.id, fg]));

@@ -64,6 +64,16 @@ const MAX_ORDERS_SHOWN = 6;
 const MAX_CUSTOMERS_SHOWN = 6;
 const MAX_QUERY_RESULTS = 10;
 
+const DEFAULT_ORDER_COUNTS: OrderStatusCounts = {
+  draft: 0,
+  confirmed: 0,
+  scheduled: 0,
+  picking: 0,
+  packed: 0,
+  fulfilled: 0,
+  cancelled: 0,
+};
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -78,6 +88,44 @@ function formatCurrency(value: number): string {
 }
 
 // =============================================================================
+// Sub-Components
+// =============================================================================
+
+function ProductMixBars({ products }: { products: ProductMix[] }) {
+  const maxRevenue = Math.max(...products.map((p) => p.total_revenue));
+
+  return (
+    <div className="space-y-3">
+      {products.map((product) => {
+        const percentage = maxRevenue > 0 ? (product.total_revenue / maxRevenue) * 100 : 0;
+
+        return (
+          <div key={product.brand_id} className="space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">{product.brand_name}</span>
+              <div className="flex items-center gap-4">
+                <span className="text-muted-foreground font-mono">
+                  {product.total_quantity.toLocaleString()} units
+                </span>
+                <span className="font-mono font-semibold text-emerald-600">
+                  {formatCurrency(product.total_revenue)}
+                </span>
+              </div>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-500"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -86,39 +134,30 @@ export default function SalesDashboardPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  // Fetch order status counts
-  const { data: orderCounts = { draft: 0, confirmed: 0, scheduled: 0, picking: 0, packed: 0, fulfilled: 0, cancelled: 0 } } = useQuery({
+  const { data: orderCounts = DEFAULT_ORDER_COUNTS } = useQuery({
     queryKey: dashboardKeys.sales.orderCounts(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("status");
+      const { data, error } = await db
+        .from("order_status_counts")
+        .select("status, count");
 
       if (error) throw error;
 
-      const counts: OrderStatusCounts = {
-        draft: 0,
-        confirmed: 0,
-        scheduled: 0,
-        picking: 0,
-        packed: 0,
-        fulfilled: 0,
-        cancelled: 0,
-      };
-
-      data?.forEach((order) => {
-        const status = order.status as keyof OrderStatusCounts;
-        if (counts[status] !== undefined) {
-          counts[status]++;
+      const counts = { ...DEFAULT_ORDER_COUNTS };
+      for (const row of data ?? []) {
+        const status = row.status as keyof OrderStatusCounts;
+        if (status in counts) {
+          counts[status] = row.count;
         }
-      });
+      }
 
       return counts;
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
-  // Fetch recent orders with totals
+  // Fetch recent orders with totals (uses order_totals view via join)
   const { data: recentOrders = [] } = useQuery({
     queryKey: dashboardKeys.sales.recentOrders(),
     queryFn: async () => {
@@ -137,16 +176,17 @@ export default function SalesDashboardPage() {
 
       if (ordersError) throw ordersError;
 
-      const { data: items } = await supabase
-        .from("order_items")
-        .select("order_id, quantity, unit_price");
+      // Fetch pre-aggregated totals only for displayed orders
+      const orderIds = (orders || []).map((o) => o.id);
+      const { data: totals } = await db
+        .from("order_totals")
+        .select("order_id, total_value")
+        .in("order_id", orderIds);
 
-      const orderTotals = new Map<string, number>();
-      (items || []).forEach((item) => {
-        const current = orderTotals.get(item.order_id) || 0;
-        const lineTotal = (item.quantity || 0) * (item.unit_price || 0);
-        orderTotals.set(item.order_id, current + lineTotal);
-      });
+      const totalMap = new Map<string, number>();
+      for (const t of totals ?? []) {
+        totalMap.set(t.order_id, t.total_value);
+      }
 
       return (orders || []).map((order) => ({
         id: order.id,
@@ -154,136 +194,53 @@ export default function SalesDashboardPage() {
         status: order.status,
         order_date: order.order_date,
         customer_name: (order.customers as { name: string } | null)?.name || "Walk-in",
-        total_value: orderTotals.get(order.id) || 0,
+        total_value: totalMap.get(order.id) || 0,
       })) as RecentOrder[];
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
-  // Fetch revenue by customer (top 10)
+  // Fetch revenue by customer (pre-aggregated view, top 10)
   const { data: customerRevenue = [] } = useQuery({
     queryKey: dashboardKeys.sales.customerRevenue(),
     queryFn: async () => {
-      const { data: orders, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          customer_id,
-          customers:customer_id(name, sales_channel_id)
-        `)
-        .eq("status", "fulfilled");
+      const { data, error } = await db
+        .from("customer_revenue_summary")
+        .select("customer_id, customer_name, sales_channel, order_count, total_revenue")
+        .order("total_revenue", { ascending: false })
+        .limit(MAX_QUERY_RESULTS);
 
-      if (ordersError) throw ordersError;
-
-      const { data: items } = await supabase
-        .from("order_items")
-        .select("order_id, quantity, unit_price");
-
-      const orderTotals = new Map<string, number>();
-      (items || []).forEach((item) => {
-        const current = orderTotals.get(item.order_id) || 0;
-        const lineTotal = (item.quantity || 0) * (item.unit_price || 0);
-        orderTotals.set(item.order_id, current + lineTotal);
-      });
-
-      const { data: channels } = await db
-        .from("sales_channels")
-        .select("id, name");
-
-      const channelMap = new Map<string, string>();
-      (channels || []).forEach((ch: { id: string; name: string }) => {
-        channelMap.set(ch.id, ch.name);
-      });
-
-      const customerMap = new Map<string, { name: string; channel?: string; orders: number; revenue: number }>();
-      (orders || []).forEach((order) => {
-        const customerId = order.customer_id || "walk-in";
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const customerInfo = order.customers as any;
-        const current = customerMap.get(customerId) || {
-          name: customerInfo?.name || "Walk-in",
-          channel: customerInfo?.sales_channel_id ? channelMap.get(customerInfo.sales_channel_id) : undefined,
-          orders: 0,
-          revenue: 0,
-        };
-        current.orders += 1;
-        current.revenue += orderTotals.get(order.id) || 0;
-        customerMap.set(customerId, current);
-      });
-
-      return Array.from(customerMap.entries())
-        .map(([id, data]) => ({
-          customer_id: id,
-          customer_name: data.name,
-          order_count: data.orders,
-          total_revenue: data.revenue,
-          sales_channel: data.channel,
-        }))
-        .sort((a, b) => b.total_revenue - a.total_revenue)
-        .slice(0, MAX_QUERY_RESULTS) as CustomerRevenue[];
+      if (error) throw error;
+      return (data || []) as CustomerRevenue[];
     },
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 
-  // Fetch product mix (revenue by brand)
+  // Fetch product mix (pre-aggregated view, revenue by brand)
   const { data: productMix = [] } = useQuery({
     queryKey: dashboardKeys.sales.productMix(),
     queryFn: async () => {
-      const { data: fulfilledOrders, error: ordersError } = await supabase
-        .from("orders")
-        .select("id")
-        .eq("status", "fulfilled");
+      const { data, error } = await db
+        .from("product_mix_by_brand")
+        .select("brand_id, brand_name, total_quantity, total_revenue")
+        .order("total_revenue", { ascending: false })
+        .limit(MAX_QUERY_RESULTS);
 
-      if (ordersError) throw ordersError;
-
-      const fulfilledIds = (fulfilledOrders || []).map((o) => o.id);
-      if (fulfilledIds.length === 0) return [];
-
-      const { data: items, error: itemsError } = await supabase
-        .from("order_items")
-        .select(`
-          brand_id,
-          quantity,
-          unit_price,
-          brands:brand_id(name)
-        `)
-        .in("order_id", fulfilledIds);
-
-      if (itemsError) throw itemsError;
-
-      const brandMap = new Map<string, { name: string; quantity: number; revenue: number }>();
-      (items || []).forEach((item) => {
-        const brandId = item.brand_id || "other";
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const brandInfo = item.brands as any;
-        const current = brandMap.get(brandId) || {
-          name: brandInfo?.name || "Other",
-          quantity: 0,
-          revenue: 0,
-        };
-        current.quantity += item.quantity || 0;
-        current.revenue += (item.quantity || 0) * (item.unit_price || 0);
-        brandMap.set(brandId, current);
-      });
-
-      return Array.from(brandMap.entries())
-        .map(([id, data]) => ({
-          brand_id: id,
-          brand_name: data.name,
-          total_quantity: data.quantity,
-          total_revenue: data.revenue,
-        }))
-        .sort((a, b) => b.total_revenue - a.total_revenue)
-        .slice(0, MAX_QUERY_RESULTS) as ProductMix[];
+      if (error) throw error;
+      return (data || []) as ProductMix[];
     },
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 
   // Calculate summary stats
   const activeOrders = orderCounts.confirmed + orderCounts.scheduled + orderCounts.picking + orderCounts.packed;
   const totalRevenue = customerRevenue.reduce((sum, c) => sum + c.total_revenue, 0);
-  const avgOrderValue = recentOrders.length > 0
-    ? recentOrders.reduce((sum, o) => sum + o.total_value, 0) / recentOrders.filter(o => o.total_value > 0).length
+  const ordersWithValue = recentOrders.filter((o) => o.total_value > 0);
+  const avgOrderValue = ordersWithValue.length > 0
+    ? ordersWithValue.reduce((sum, o) => sum + o.total_value, 0) / ordersWithValue.length
     : 0;
 
   // Build stats for the strip
@@ -430,34 +387,7 @@ export default function SalesDashboardPage() {
         {productMix.length === 0 ? (
           <DashboardEmpty message="No product sales data yet" />
         ) : (
-          <div className="space-y-3">
-            {productMix.map((product) => {
-              const maxRevenue = Math.max(...productMix.map(p => p.total_revenue));
-              const percentage = maxRevenue > 0 ? (product.total_revenue / maxRevenue) * 100 : 0;
-
-              return (
-                <div key={product.brand_id} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{product.brand_name}</span>
-                    <div className="flex items-center gap-4">
-                      <span className="text-muted-foreground font-mono">
-                        {product.total_quantity.toLocaleString()} units
-                      </span>
-                      <span className="font-mono font-semibold text-emerald-600">
-                        {formatCurrency(product.total_revenue)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <ProductMixBars products={productMix} />
         )}
       </DashboardSection>
     </div>

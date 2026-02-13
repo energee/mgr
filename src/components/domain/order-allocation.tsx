@@ -10,7 +10,7 @@
  * - Creates allocation records on save
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -97,16 +97,9 @@ export function OrderAllocation({
   const { data: finishedGoods, isLoading: fgLoading } = useQuery({
     queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
-      // Note: Using type assertion since view may not be in generated types
-      const { data, error } = await (supabase as unknown as {
-        from: (table: string) => {
-          select: (query: string) => {
-            gt: (col: string, val: number) => {
-              order: (col: string, opts: { ascending: boolean }) => Promise<{ data: FinishedGoodAvailable[] | null; error: Error | null }>
-            }
-          }
-        }
-      }).from("finished_goods_with_availability")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("finished_goods_with_availability")
         .select("id, lot_number, brand_id, package_type_id, quantity, available_quantity, production_date")
         .gt("available_quantity", 0)
         .order("production_date", { ascending: true });
@@ -191,9 +184,21 @@ export function OrderAllocation({
   // Calculate total allocated
   const totalAllocated = Object.values(allocations).reduce((sum, qty) => sum + qty, 0);
 
-  // Helper to get brand/package names
-  const getBrandName = (id: string) => brands?.find((b) => b.id === id)?.name || "—";
-  const getPackageName = (id: string) => packageTypes?.find((p) => p.id === id)?.name || "—";
+  // Pre-compute lookup maps to avoid O(n²) .find() per row
+  const brandMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of brands ?? []) map.set(b.id, b.name);
+    return map;
+  }, [brands]);
+
+  const packageMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of packageTypes ?? []) map.set(p.id, p.name);
+    return map;
+  }, [packageTypes]);
+
+  const getBrandName = (id: string) => brandMap.get(id) || "—";
+  const getPackageName = (id: string) => packageMap.get(id) || "—";
 
   const isLoading = orderLoading || fgLoading;
 
