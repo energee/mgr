@@ -8,6 +8,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/supabase";
+import {
+  type UserRole,
+  type Permission,
+  hasPermission,
+  getPermissions,
+} from "@/lib/permissions";
 import { errorResponse } from "./response";
 import { ApiError, handleApiError } from "./errors";
 
@@ -28,6 +34,16 @@ type AuthHandler = (
 type RoleHandler = (
   request: NextRequest,
   context: RoleContext & { params?: Record<string, string> }
+) => Promise<NextResponse>;
+
+export interface PermissionContext extends AuthContext {
+  roles: UserRole[];
+  permissions: Permission[];
+}
+
+type PermissionHandler = (
+  request: NextRequest,
+  context: PermissionContext & { params?: Record<string, string> }
 ) => Promise<NextResponse>;
 
 export function withAuth(handler: AuthHandler) {
@@ -93,6 +109,44 @@ export function withRoles(roles: string[], handler: RoleHandler) {
     return handler(request, {
       ...context,
       role: profile.role,
+    });
+  });
+}
+
+export function withPermission(
+  permission: Permission,
+  handler: PermissionHandler,
+) {
+  return withAuth(async (request, context) => {
+    const { user, supabase } = context;
+
+    const { data: profile, error } = await supabase
+      .from("user_profiles")
+      .select("roles")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !profile) {
+      throw new ApiError("FORBIDDEN", "Unable to determine user roles", 403);
+    }
+
+    const roles = (profile.roles ?? []) as UserRole[];
+
+    if (!hasPermission(roles, permission)) {
+      throw new ApiError(
+        "FORBIDDEN",
+        `This action requires the ${permission} permission`,
+        403,
+      );
+    }
+
+    const params = context.params;
+    return handler(request, {
+      user,
+      supabase,
+      roles,
+      permissions: getPermissions(roles),
+      params,
     });
   });
 }
