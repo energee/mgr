@@ -121,7 +121,6 @@ export function PortalLoginForm() {
           value={otpCode}
           onChange={(e) => setOtpCode(e.target.value)}
           disabled={isLoading}
-          autoFocus
         />
       </div>
       <Button
@@ -169,7 +168,6 @@ export function PortalLoginForm() {
             if (emailError) setEmailError(null);
           }}
           disabled={isLoading}
-          autoFocus
         />
         {emailError && (
           <p className="text-sm text-destructive">{emailError}</p>

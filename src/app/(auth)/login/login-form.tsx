@@ -157,7 +157,6 @@ export function LoginForm() {
             value={otpCode}
             onChange={(e) => setOtpCode(e.target.value)}
             disabled={isLoading}
-            autoFocus
           />
         </div>
         <Button ref={submitRef} type="submit" className="w-full" disabled={isLoading || !otpCode.trim()}>

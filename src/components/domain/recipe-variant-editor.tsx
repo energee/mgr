@@ -762,10 +762,11 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                   {/* Basic Fields */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium">
+                      <label htmlFor={`variant-${vIndex}-volume`} className="text-sm font-medium">
                         Planned Volume (BBL)
                       </label>
                       <Input
+                        id={`variant-${vIndex}-volume`}
                         type="number"
                         step="0.5"
                         min="0"
@@ -783,8 +784,9 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Description</label>
+                      <label htmlFor={`variant-${vIndex}-description`} className="text-sm font-medium">Description</label>
                       <Textarea
+                        id={`variant-${vIndex}-description`}
                         value={variant.description ?? ""}
                         onChange={(e) =>
                           updateVariantField(
