@@ -304,11 +304,11 @@ export const locationEntity: EntityConfig<LocationWithPos> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Location",
+      label: "Delete Location",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 
