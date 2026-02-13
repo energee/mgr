@@ -308,7 +308,7 @@ export const locationEntity: EntityConfig<LocationWithPos> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

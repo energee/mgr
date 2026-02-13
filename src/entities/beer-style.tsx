@@ -419,7 +419,7 @@ export const beerStyleEntity: EntityConfig<BeerStyle> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

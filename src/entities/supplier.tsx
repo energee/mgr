@@ -290,7 +290,7 @@ export const supplierEntity: EntityConfig<Supplier> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

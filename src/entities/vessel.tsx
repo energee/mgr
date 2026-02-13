@@ -477,7 +477,7 @@ export const vesselEntity: EntityConfig<Vessel> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

@@ -284,7 +284,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const loadedVersionRef = useRef<number | null>(null);
   const conflictDialog = useConflictDialog();
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteAction, setDeleteAction] = useState<EntityActionDef<T> | null>(null);
 
   // Cmd+Enter save shortcut - the ref is attached to a hidden save button
@@ -831,7 +830,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
                           if (disabledReason) return;
                           if (action.name === "delete" && action.deleteMode) {
                             setDeleteAction(action);
-                            setDeleteDialogOpen(true);
                             return;
                           }
                           if (
@@ -922,9 +920,10 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             ] ?? entity.displayName
           )}
           deleteMode={deleteAction.deleteMode}
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
+          open={!!deleteAction}
+          onOpenChange={(open) => { if (!open) setDeleteAction(null); }}
           onSuccess={() => {
+            setDeleteAction(null);
             queryClient.invalidateQueries({
               queryKey: entityKeys.all(entity.viewTable ?? entity.table),
             });

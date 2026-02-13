@@ -364,7 +364,7 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

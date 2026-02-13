@@ -328,7 +328,7 @@ export const binEntity: EntityConfig<Bin> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

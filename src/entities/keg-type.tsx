@@ -276,7 +276,7 @@ export const kegTypeEntity: EntityConfig<KegType> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

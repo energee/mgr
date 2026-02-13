@@ -415,7 +415,7 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

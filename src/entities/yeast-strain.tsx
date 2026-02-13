@@ -507,7 +507,7 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 

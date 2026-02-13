@@ -40,26 +40,23 @@ export function EntityDeleteDialog({
   // Cast to any for dynamic table access - universal components work with any entity
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isSoft = deleteMode === "soft";
   const verb = isSoft ? "Deactivate" : "Delete";
   const verbing = isSoft ? "Deactivating..." : "Deleting...";
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (isSoft) {
-        const { error } = await db
-          .from(entityTable)
-          .update({ is_active: false } as Record<string, unknown>)
-          .eq("id", recordId);
-        if (error) throw error;
-      } else {
-        const { error } = await db
-          .from(entityTable)
-          .delete()
-          .eq("id", recordId);
-        if (error) throw error;
-      }
+      const result = isSoft
+        ? await db
+            .from(entityTable)
+            .update({ is_active: false } as Record<string, unknown>)
+            .eq("id", recordId)
+        : await db
+            .from(entityTable)
+            .delete()
+            .eq("id", recordId);
+      if (result.error) throw result.error;
     },
     onSuccess: () => {
       const pastVerb = isSoft ? "deactivated" : "deleted";
@@ -70,11 +67,11 @@ export function EntityDeleteDialog({
     onError: (err: unknown) => {
       const pgError = err as { code?: string; message?: string };
       if (pgError.code === "23503") {
-        setError(
+        setErrorMessage(
           `Cannot delete — this ${entityDisplayName.toLowerCase()} is referenced by other records.`
         );
       } else {
-        setError(pgError.message ?? "An unexpected error occurred");
+        setErrorMessage(pgError.message ?? "An unexpected error occurred");
       }
     },
   });
@@ -83,7 +80,7 @@ export function EntityDeleteDialog({
     <AlertDialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) setError(null);
+        if (!next) setErrorMessage(null);
         onOpenChange(next);
       }}
     >
@@ -98,7 +95,7 @@ export function EntityDeleteDialog({
               : `This will permanently delete "${recordTitle}". This action cannot be undone.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
         <AlertDialogFooter>
           <AlertDialogCancel variant="outline" disabled={mutation.isPending}>
             Cancel

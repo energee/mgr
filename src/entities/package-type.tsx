@@ -340,7 +340,7 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "hard" as const,
+      deleteMode: "hard",
     },
   ],
 
