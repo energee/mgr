@@ -80,11 +80,16 @@ export async function resolveTaproomPrices(
   }
 
   // 4. Get pricing_tier_prices for those tiers and the taproom channel
+  // Cast needed: auto-generated types still reference old column name (package_format_id)
+  // until supabase types are regenerated after migration 00092.
   const { data: tierPrices, error: pricesError } = await admin
     .from("pricing_tier_prices")
     .select("pricing_tier_id, format_id, price")
     .in("pricing_tier_id", tierIds)
-    .eq("sales_channel_id", taproomChannelId);
+    .eq("sales_channel_id", taproomChannelId) as unknown as {
+      data: { pricing_tier_id: string; format_id: string; price: number }[] | null;
+      error: Error | null;
+    };
 
   if (pricesError || !tierPrices || tierPrices.length === 0) {
     return [];

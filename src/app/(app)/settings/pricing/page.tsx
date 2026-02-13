@@ -78,6 +78,7 @@ interface PackageFormat {
   id: string;
   name: string;
   format_source: "package_type" | "keg_type";
+  container_type: string | null;
   volume_oz: number | null;
   units_per_case: number | null;
 }
@@ -297,7 +298,7 @@ function FormatManagement() {
               <TableCell className="font-medium">{f.name}</TableCell>
               <TableCell className="text-muted-foreground capitalize">{f.container_type}</TableCell>
               <TableCell className="text-muted-foreground">
-                {f.format_source === "keg_type" ? "Per keg" : f.units_per_case ? `Case/${f.units_per_case}` : "Each"}
+                {formatColumnLabel(f).unit}
               </TableCell>
               <TableCell className="text-right">
                 <Switch

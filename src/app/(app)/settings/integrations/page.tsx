@@ -17,7 +17,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { IntegrationBadge } from "@/components/domain/integration-badge";
+import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/integration-badge";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, RefreshCw } from "lucide-react";
 import { SecretKeyInput } from "@/components/domain/secret-key-input";
@@ -325,6 +325,13 @@ function SquareIntegrationCard() {
 
   const isConnected = status?.isEnabled && status?.catalogItemCount > 0;
 
+  let squareStatus: IntegrationStatus = "not_connected";
+  if (isConnected) {
+    squareStatus = "connected";
+  } else if (status?.isEnabled) {
+    squareStatus = "enabled";
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -338,7 +345,7 @@ function SquareIntegrationCard() {
               Sync products, prices, and inventory from MGR to Square. Track taproom sales for reconciliation.
             </CardDescription>
           </div>
-          <IntegrationBadge status={isConnected ? "connected" : status?.isEnabled ? "enabled" : "not_connected"} />
+          <IntegrationBadge status={squareStatus} />
         </div>
       </CardHeader>
       <CardContent className="space-y-6">

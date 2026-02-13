@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { settingsKeys } from "@/lib/query-keys";
-import { IntegrationBadge } from "@/components/domain/integration-badge";
+import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/integration-badge";
 import { SecretKeyInput } from "@/components/domain/secret-key-input";
 import { SlackIcon } from "@/components/ui/slack-icon";
 import {
@@ -57,7 +57,12 @@ function ConnectionBadge({
   isConnected: boolean;
   isEnabled: boolean;
 }) {
-  const status = !isConnected ? "not_connected" : isEnabled ? "active" : "connected";
+  let status: IntegrationStatus = "not_connected";
+  if (isConnected && isEnabled) {
+    status = "active";
+  } else if (isConnected) {
+    status = "connected";
+  }
   return <IntegrationBadge status={status} />;
 }
 

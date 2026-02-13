@@ -47,7 +47,7 @@ export async function createClient() {
  * Uses @supabase/supabase-js directly (no cookie binding) so the service role
  * key is the sole auth credential and RLS is truly bypassed.
  */
-export async function createAdminClient() {
+export function createAdminClient() {
   return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
