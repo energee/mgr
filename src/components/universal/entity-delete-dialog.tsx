@@ -37,6 +37,9 @@ export function EntityDeleteDialog({
   onSuccess,
 }: EntityDeleteDialogProps) {
   const supabase = createClient();
+  // Cast to any for dynamic table access - universal components work with any entity
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
   const [error, setError] = useState<string | null>(null);
   const isSoft = deleteMode === "soft";
   const verb = isSoft ? "Deactivate" : "Delete";
@@ -45,13 +48,13 @@ export function EntityDeleteDialog({
   const mutation = useMutation({
     mutationFn: async () => {
       if (isSoft) {
-        const { error } = await supabase
+        const { error } = await db
           .from(entityTable)
           .update({ is_active: false } as Record<string, unknown>)
           .eq("id", recordId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await db
           .from(entityTable)
           .delete()
           .eq("id", recordId);
