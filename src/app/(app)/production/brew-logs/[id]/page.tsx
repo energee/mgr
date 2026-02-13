@@ -20,7 +20,8 @@ import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/ent
 import { brewLogEntity } from "@/entities/brew-log";
 import { BrewLogCompletionDialog } from "@/components/domain/brew-log-completion-dialog";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
-import { brewLogKeys, entityKeys } from "@/lib/query-keys";
+import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
+import { brewLogKeys, entityKeys, recipeKeys } from "@/lib/query-keys";
 
 export default function BrewLogDetailPage({
   params,
@@ -40,7 +41,7 @@ export default function BrewLogDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_logs")
-        .select("id, brew_number, status, events")
+        .select("id, brew_number, status, events, recipe_id")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -48,13 +49,28 @@ export default function BrewLogDetailPage({
     },
   });
 
-  // Fetch linked batches (needed for "View batch" link after completion)
+  // Fetch recipe name for breadcrumb
+  const { data: recipe } = useQuery({
+    queryKey: recipeKeys.detail(brewLog?.recipe_id ?? ""),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("recipes")
+        .select("id, name")
+        .eq("id", brewLog!.recipe_id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!brewLog?.recipe_id,
+  });
+
+  // Fetch linked batches (needed for "View batch" link and breadcrumb)
   const { data: linkedBatches } = useQuery({
     queryKey: brewLogKeys.batches(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_log_batches")
-        .select("batch_id")
+        .select("batch_id, batch:batches(batch_number)")
         .eq("brew_log_id", id);
       if (error) throw error;
       return data ?? [];
@@ -99,6 +115,22 @@ export default function BrewLogDetailPage({
     },
     [queryClient, id, router]
   );
+
+  // Breadcrumb: Recipe -> Brew Log -> Batch
+  const breadcrumbSegments = useMemo(() => {
+    const segments: { label: string; href?: string }[] = [];
+    if (recipe) {
+      segments.push({ label: recipe.name, href: `/production/recipes/${recipe.id}` });
+    }
+    segments.push({ label: brewLog?.brew_number ?? "Brew Log" }); // current page, no href
+    if (linkedBatches?.length === 1) {
+      const b = linkedBatches[0];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const batchNumber = (b as any)?.batch?.batch_number ?? "Batch";
+      segments.push({ label: batchNumber, href: `/production/batches/${b.batch_id}` });
+    }
+    return segments;
+  }, [recipe, brewLog, linkedBatches]);
 
   // Banner config based on brew log state
   const bannerConfig = useMemo(() => {
@@ -162,6 +194,8 @@ export default function BrewLogDetailPage({
 
   return (
     <div className="space-y-4">
+      <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+
       {bannerConfig && (
         <NextStepBanner
           message={bannerConfig.message}

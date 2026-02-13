@@ -21,6 +21,7 @@ import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/vessel-transfer-dialog";
 import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
+import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
 import { batchKeys, recipeKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
 
@@ -66,13 +67,13 @@ export default function BatchDetailPage({
     },
   });
 
-  // Fetch linked brew logs count for banner logic
+  // Fetch linked brew logs for banner logic and breadcrumb
   const { data: linkedBrewLogs } = useQuery({
     queryKey: batchKeys.brewLogs(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_log_batches")
-        .select("brew_log_id")
+        .select("brew_log_id, brew_log:brew_logs(brew_number)")
         .eq("batch_id", id);
       if (error) throw error;
       return data ?? [];
@@ -94,6 +95,22 @@ export default function BatchDetailPage({
     },
     enabled: !!batch?.recipe_id,
   });
+
+  // Breadcrumb: Recipe -> Brew Log -> Batch
+  const breadcrumbSegments = useMemo(() => {
+    const segments: { label: string; href?: string }[] = [];
+    if (recipe) {
+      segments.push({ label: recipe.name, href: `/production/recipes/${recipe.id}` });
+    }
+    if (linkedBrewLogs?.length) {
+      const primary = linkedBrewLogs[0];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const brewNumber = (primary as any)?.brew_log?.brew_number ?? "Brew Log";
+      segments.push({ label: brewNumber, href: `/production/brew-logs/${primary.brew_log_id}` });
+    }
+    segments.push({ label: batch?.batch_number ?? "Batch" }); // current page, no href
+    return segments;
+  }, [recipe, linkedBrewLogs, batch]);
 
   // Banner config based on batch status and brew log linkage
   const bannerConfig = useMemo(() => {
@@ -156,6 +173,8 @@ export default function BatchDetailPage({
 
   return (
     <div className="space-y-4">
+      <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+
       {bannerConfig && (
         <NextStepBanner
           message={bannerConfig.message}
