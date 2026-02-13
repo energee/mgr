@@ -17,7 +17,7 @@ interface TaproomPrice {
  *   -> price (in dollars) -> convert to cents (* 100)
  *
  * Package formats come from package_types and keg_types referenced
- * via pricing_tier_prices.package_format_id (which references package_types).
+ * via pricing_tier_prices.format_id (which references packaging_formats).
  */
 export async function resolveTaproomPrices(
   brandIds: string[]
@@ -82,7 +82,7 @@ export async function resolveTaproomPrices(
   // 4. Get pricing_tier_prices for those tiers and the taproom channel
   const { data: tierPrices, error: pricesError } = await admin
     .from("pricing_tier_prices")
-    .select("pricing_tier_id, package_format_id, price")
+    .select("pricing_tier_id, format_id, price")
     .in("pricing_tier_id", tierIds)
     .eq("sales_channel_id", taproomChannelId);
 
@@ -96,17 +96,15 @@ export async function resolveTaproomPrices(
     if (!tierPriceMap[tp.pricing_tier_id]) {
       tierPriceMap[tp.pricing_tier_id] = {};
     }
-    if (tp.package_format_id != null) {
-      tierPriceMap[tp.pricing_tier_id][tp.package_format_id] = Number(tp.price);
+    if (tp.format_id != null) {
+      tierPriceMap[tp.pricing_tier_id][tp.format_id] = Number(tp.price);
     }
   }
 
   // 6. Map results back to brands
-  // package_format_id references package_types. We need to determine if it's
-  // a package type or keg type. Since pricing_tier_prices.package_format_id
-  // references package_types, we treat all as packageTypeId.
-  // TODO: If keg types are priced separately (via a different format reference),
-  // add a lookup here to distinguish package vs keg.
+  // format_id references the packaging_formats view which includes both
+  // package_types and keg_types. We treat all as packageTypeId for now.
+  // TODO: Use format_source from packaging_formats to distinguish package vs keg.
   const results: TaproomPrice[] = [];
 
   for (const [brandId, tierId] of Object.entries(brandTierMap)) {

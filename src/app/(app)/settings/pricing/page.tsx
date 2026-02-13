@@ -74,12 +74,15 @@ interface PricingTier {
 interface PackageFormat {
   id: string;
   name: string;
+  format_source: "package_type" | "keg_type";
+  volume_oz: number | null;
+  units_per_case: number | null;
 }
 
 interface PricingTierPrice {
   id: string;
   pricing_tier_id: string;
-  package_format_id: string;
+  format_id: string;
   sales_channel_id: string;
   price: number;
 }
@@ -261,8 +264,8 @@ export default function PricingPage() {
     queryKey: settingsKeys.pricingFormats(),
     queryFn: async () => {
       const { data, error } = await db
-        .from("package_types")
-        .select("id, name")
+        .from("packaging_formats")
+        .select("id, name, format_source, container_type, volume_oz, units_per_case")
         .eq("is_active", true)
         .eq("show_in_pricing", true)
         .order("name");
@@ -277,7 +280,7 @@ export default function PricingPage() {
       if (!activeChannelId) return [];
       const { data, error } = await db
         .from("pricing_tier_prices")
-        .select("id, pricing_tier_id, package_format_id, sales_channel_id, price")
+        .select("id, pricing_tier_id, format_id, sales_channel_id, price")
         .eq("sales_channel_id", activeChannelId);
       if (error) throw error;
       return data as PricingTierPrice[];
@@ -291,7 +294,7 @@ export default function PricingPage() {
     if (!priceMap.has(p.pricing_tier_id)) {
       priceMap.set(p.pricing_tier_id, new Map());
     }
-    priceMap.get(p.pricing_tier_id)!.set(p.package_format_id, p);
+    priceMap.get(p.pricing_tier_id)!.set(p.format_id, p);
   });
 
   // ---------------------------------------------------------------------------
@@ -330,7 +333,7 @@ export default function PricingPage() {
         // Insert
         const { error } = await db.from("pricing_tier_prices").insert({
           pricing_tier_id: tierId,
-          package_format_id: formatId,
+          format_id: formatId,
           sales_channel_id: channelId,
           price: value,
         });
@@ -413,7 +416,7 @@ export default function PricingPage() {
       // Fetch source prices
       const { data: sourcePrices, error: fetchError } = await db
         .from("pricing_tier_prices")
-        .select("pricing_tier_id, package_format_id, price")
+        .select("pricing_tier_id, format_id, price")
         .eq("sales_channel_id", fromChannelId);
       if (fetchError) throw fetchError;
 
@@ -427,12 +430,12 @@ export default function PricingPage() {
         const { error } = await db.from("pricing_tier_prices").upsert(
           {
             pricing_tier_id: sp.pricing_tier_id,
-            package_format_id: sp.package_format_id,
+            format_id: sp.format_id,
             sales_channel_id: toChannelId,
             price: sp.price,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: "pricing_tier_id,package_format_id,sales_channel_id" }
+          { onConflict: "pricing_tier_id,format_id,sales_channel_id" }
         );
         if (error) throw error;
       }
