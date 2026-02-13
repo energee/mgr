@@ -104,6 +104,7 @@ export const batchKeys = {
   additions: (id: string) => ["batch-additions", id] as const,
   performance: (id: string) => ["batch-performance", id] as const,
   brewLogs: (id: string) => ["batch-brew-logs", id] as const,
+  brewSummary: (id: string) => ["batch-brew-summary", id] as const,
   availableBrewLogs: (id: string) => ["available-brew-logs", id] as const,
 };
 

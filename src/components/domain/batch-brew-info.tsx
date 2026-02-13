@@ -1,14 +1,20 @@
 "use client";
 
 /**
- * BatchBrewInfo - Display Brew Info Section for Batch Detail
+ * BatchBrewInfo - Display per-brew-log summary cards on Batch Detail
  *
  * Shows:
- * - Linked brew logs with BrewLogLinker
- * - Aggregated brew metrics (brew date, OG)
+ * - Per-brew-log cards with brewer, measurements, and phase highlights
+ * - Collapsible BrewLogLinker for managing linked brew logs
  */
 
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
+import { batchKeys } from "@/lib/query-keys";
 import { BrewLogLinker } from "./brew-log-linker";
+import { Badge } from "@/components/ui/badge";
+import { UnitDisplay } from "@/components/ui/unit-input";
+import Link from "next/link";
 
 interface BatchBrewInfoProps {
   data: {
@@ -22,56 +28,202 @@ interface BatchBrewInfoProps {
   };
 }
 
+interface BrewSummaryLink {
+  id: string;
+  volume_bbl: number;
+  notes: string | null;
+  brew_log: {
+    id: string;
+    brew_number: string;
+    brew_date: string;
+    status: string;
+    events: unknown[] | null;
+    brewer_id: string | null;
+    recipe: { name: string } | null;
+  };
+  brewer_name: string | null;
+}
+
+function extractPhaseHighlights(
+  events: unknown[] | null
+): { label: string; value: string }[] {
+  if (!events || !Array.isArray(events)) return [];
+
+  const highlights: { label: string; value: string }[] = [];
+  const typedEvents = events as Array<{
+    phase?: string;
+    measurements?: Array<{ metric?: string; value?: number | string }>;
+  }>;
+
+  // Find mash temp
+  const mashEvent = typedEvents.find(
+    (e) => e.phase === "mash_in" || e.phase === "mash_rest"
+  );
+  const mashTemp = mashEvent?.measurements?.find((m) => m.metric === "temp_f");
+  if (mashTemp) highlights.push({ label: "Mash Temp", value: `${mashTemp.value}\u00B0F` });
+
+  // Find pre-boil gravity
+  const kettleEvent = typedEvents.find(
+    (e) => e.phase === "kettle_full" || e.phase === "boil_start"
+  );
+  const preBoilGravity = kettleEvent?.measurements?.find(
+    (m) => m.metric === "gravity_plato"
+  );
+  if (preBoilGravity)
+    highlights.push({ label: "Pre-Boil", value: `${preBoilGravity.value}\u00B0P` });
+
+  // Find post-boil volume
+  const boilEndEvent = typedEvents.find(
+    (e) => e.phase === "boil_end" || e.phase === "ko_end"
+  );
+  const postBoilVol = boilEndEvent?.measurements?.find(
+    (m) => m.metric === "volume_bbl"
+  );
+  if (postBoilVol)
+    highlights.push({ label: "Post-Boil Vol", value: `${postBoilVol.value} BBL` });
+
+  return highlights;
+}
+
 export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
-  const hasBrewData = data.brew_date || data.actual_og;
+  const supabase = createClient();
+
+  // Fetch linked brew logs with events data
+  const { data: linkedBrews = [], isLoading } = useQuery({
+    queryKey: batchKeys.brewSummary(data.id),
+    queryFn: async () => {
+      const { data: links, error } = await supabase
+        .from("brew_log_batches")
+        .select(
+          `
+          id, volume_bbl, notes,
+          brew_log:brew_logs(
+            id, brew_number, brew_date, status, events, brewer_id,
+            recipe:recipes(name)
+          )
+        `
+        )
+        .eq("batch_id", data.id);
+      if (error) throw error;
+      if (!links || links.length === 0) return [];
+
+      // Collect unique brewer_ids to fetch display names
+      const brewerIds = [
+        ...new Set(
+          links
+            .map((l) => {
+              const bl = l.brew_log as unknown as BrewSummaryLink["brew_log"];
+              return bl?.brewer_id;
+            })
+            .filter((id): id is string => !!id)
+        ),
+      ];
+
+      let brewerMap: Record<string, string> = {};
+      if (brewerIds.length > 0) {
+        const { data: brewers } = await supabase
+          .from("user_profiles")
+          .select("id, display_name")
+          .in("id", brewerIds);
+        if (brewers) {
+          brewerMap = Object.fromEntries(
+            brewers.map((b) => [b.id, b.display_name ?? ""])
+          );
+        }
+      }
+
+      return links.map((link) => {
+        const bl = link.brew_log as unknown as BrewSummaryLink["brew_log"];
+        return {
+          id: link.id,
+          volume_bbl: link.volume_bbl,
+          notes: link.notes,
+          brew_log: bl,
+          brewer_name: bl?.brewer_id ? (brewerMap[bl.brewer_id] ?? null) : null,
+        } as BrewSummaryLink;
+      });
+    },
+  });
 
   return (
     <div className="space-y-6">
-      {/* Aggregated metrics from linked brews */}
-      {hasBrewData && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {data.brew_date && (
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">
-                Brew Date
+      {/* Per-brew-log summary cards */}
+      {isLoading ? (
+        <div className="animate-pulse h-24 bg-muted rounded-md" />
+      ) : linkedBrews.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          No brew logs linked yet.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {linkedBrews.map((link) => {
+            const brew = link.brew_log;
+            if (!brew) return null;
+            const highlights = extractPhaseHighlights(brew.events);
+
+            return (
+              <div key={link.id} className="rounded-lg border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Link
+                    href={`/production/brew-logs/${brew.id}`}
+                    className="font-medium hover:text-primary transition-colors"
+                  >
+                    {brew.brew_number}
+                  </Link>
+                  <Badge variant="outline">
+                    <UnitDisplay value={link.volume_bbl} unitType="volume" />
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Brew Date</span>
+                    <span className="ml-2">
+                      {new Date(brew.brew_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Brewer</span>
+                    <span className="ml-2">
+                      {link.brewer_name || "\u2014"}
+                    </span>
+                  </div>
+                </div>
+                {highlights.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {highlights.map((h) => (
+                      <Badge
+                        key={h.label}
+                        variant="secondary"
+                        className="text-xs font-normal"
+                      >
+                        {h.label}: {h.value}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {link.notes && (
+                  <p className="text-sm text-muted-foreground italic">
+                    {link.notes}
+                  </p>
+                )}
               </div>
-              <div className="text-lg">
-                {new Date(data.brew_date).toLocaleDateString()}
-              </div>
-            </div>
-          )}
-          {data.actual_og && (
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">
-                Actual OG
-              </div>
-              <div className="text-lg">{data.actual_og.toFixed(1)}°P</div>
-            </div>
-          )}
-          {data.volume_from_brews_bbl != null && (
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">
-                Volume from Brews
-              </div>
-              <div className="text-lg">{data.volume_from_brews_bbl} BBL</div>
-            </div>
-          )}
-          {data.brew_count != null && data.brew_count > 1 && (
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">
-                Contributing Brews
-              </div>
-              <div className="text-lg">{data.brew_count}</div>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 
-      {/* Brew log linker */}
-      <BrewLogLinker
-        batchId={data.id}
-        batchName={`${data.batch_number} - ${data.name}`}
-      />
+      {/* Collapsible BrewLogLinker */}
+      <details className="group">
+        <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+          Manage linked brew logs
+        </summary>
+        <div className="mt-3">
+          <BrewLogLinker
+            batchId={data.id}
+            batchName={`${data.batch_number} - ${data.name}`}
+          />
+        </div>
+      </details>
     </div>
   );
 }
