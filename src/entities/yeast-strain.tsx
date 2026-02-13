@@ -503,11 +503,11 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Yeast Strain",
+      label: "Delete Yeast Strain",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

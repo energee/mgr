@@ -304,11 +304,11 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Keg Owner",
+      label: "Delete Keg Owner",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

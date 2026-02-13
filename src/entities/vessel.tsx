@@ -473,11 +473,11 @@ export const vesselEntity: EntityConfig<Vessel> = {
     },
     {
       name: "delete",
-      label: "Deactivate Vessel",
+      label: "Delete Vessel",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

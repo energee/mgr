@@ -236,11 +236,11 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Sales Channel",
+      label: "Delete Sales Channel",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

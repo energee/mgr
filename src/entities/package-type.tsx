@@ -336,11 +336,11 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Package Type",
+      label: "Delete Package Type",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

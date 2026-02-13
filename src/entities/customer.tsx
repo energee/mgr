@@ -496,11 +496,11 @@ export const customerEntity: EntityConfig<Customer> = {
     },
     {
       name: "delete",
-      label: "Deactivate Customer",
+      label: "Delete Customer",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

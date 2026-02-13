@@ -324,11 +324,11 @@ export const binEntity: EntityConfig<Bin> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Bin",
+      label: "Delete Bin",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

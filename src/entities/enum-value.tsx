@@ -411,11 +411,11 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Enum Value",
+      label: "Delete Enum Value",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

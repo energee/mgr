@@ -415,11 +415,11 @@ export const beerStyleEntity: EntityConfig<BeerStyle> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Beer Style",
+      label: "Delete Beer Style",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

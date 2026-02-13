@@ -286,11 +286,11 @@ export const supplierEntity: EntityConfig<Supplier> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Supplier",
+      label: "Delete Supplier",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

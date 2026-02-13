@@ -360,11 +360,11 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Inventory Item",
+      label: "Delete Inventory Item",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 

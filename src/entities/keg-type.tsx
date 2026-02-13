@@ -272,11 +272,11 @@ export const kegTypeEntity: EntityConfig<KegType> = {
   actions: [
     {
       name: "delete",
-      label: "Deactivate Keg Type",
+      label: "Delete Keg Type",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
-      deleteMode: "soft" as const,
+      deleteMode: "hard" as const,
     },
   ],
 
