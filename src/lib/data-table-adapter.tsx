@@ -8,6 +8,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import type {
   EntityConfig,
+  EntityActionDef,
   EntityColumnDef,
   EntityFilterDef,
 } from "@/types/entity";
@@ -157,7 +158,8 @@ export function buildActionsColumn<T>(
   entity: EntityConfig<T>,
   basePath: string,
   onAction?: (actionName: string, record: T) => boolean,
-  onTransition?: (id: string, toState: string) => void
+  onTransition?: (id: string, toState: string) => void,
+  onDelete?: (record: T, action: EntityActionDef<T>) => void
 ): ColumnDef<T, unknown> {
   return {
     id: "actions",
@@ -204,6 +206,10 @@ export function buildActionsColumn<T>(
                   title={disabledReason || undefined}
                   onClick={() => {
                     if (disabledReason) return;
+                    if (action.name === "delete" && action.deleteMode && onDelete) {
+                      onDelete(record, action);
+                      return;
+                    }
                     if (onAction && onAction(action.name, record)) {
                       return;
                     }

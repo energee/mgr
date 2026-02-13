@@ -803,6 +803,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
+      deleteMode: "hard",
       disabledWhen: (data) =>
         data.batch_count ? `Has ${data.batch_count} associated batch${data.batch_count === 1 ? "" : "es"}` : false,
     },

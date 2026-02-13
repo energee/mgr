@@ -299,6 +299,20 @@ export const locationEntity: EntityConfig<LocationWithPos> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Delete Location",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "hard",
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Value Display
   // ---------------------------------------------------------------------------
   valueDisplay: [locationTypeDisplayConfig],
