@@ -478,12 +478,15 @@ function Kanban<T>(props: KanbanProps<T>) {
   );
 
   const announcements: Announcements = React.useMemo(
-    () => ({
+    () => {
+      const columnKeys = Object.keys(value);
+      const columnCount = columnKeys.length;
+      return {
       onDragStart({ active }) {
         const isColumn = active.id in value;
         const itemType = isColumn ? "column" : "item";
         const position = isColumn
-          ? Object.keys(value).indexOf(active.id as string) + 1
+          ? columnKeys.indexOf(active.id as string) + 1
           : (() => {
               const column = getColumn(active.id);
               if (!column || !value[column]) return 1;
@@ -494,7 +497,7 @@ function Kanban<T>(props: KanbanProps<T>) {
               );
             })();
         const total = isColumn
-          ? Object.keys(value).length
+          ? columnCount
           : (() => {
               const column = getColumn(active.id);
               return column ? (value[column]?.length ?? 0) : 0;
@@ -508,7 +511,7 @@ function Kanban<T>(props: KanbanProps<T>) {
         const isColumn = active.id in value;
         const itemType = isColumn ? "column" : "item";
         const position = isColumn
-          ? Object.keys(value).indexOf(over.id as string) + 1
+          ? columnKeys.indexOf(over.id as string) + 1
           : (() => {
               const column = getColumn(over.id);
               if (!column || !value[column]) return 1;
@@ -519,7 +522,7 @@ function Kanban<T>(props: KanbanProps<T>) {
               );
             })();
         const total = isColumn
-          ? Object.keys(value).length
+          ? columnCount
           : (() => {
               const column = getColumn(over.id);
               return column ? (value[column]?.length ?? 0) : 0;
@@ -544,7 +547,7 @@ function Kanban<T>(props: KanbanProps<T>) {
         const isColumn = active.id in value;
         const itemType = isColumn ? "column" : "item";
         const position = isColumn
-          ? Object.keys(value).indexOf(over.id as string) + 1
+          ? columnKeys.indexOf(over.id as string) + 1
           : (() => {
               const column = getColumn(over.id);
               if (!column || !value[column]) return 1;
@@ -555,7 +558,7 @@ function Kanban<T>(props: KanbanProps<T>) {
               );
             })();
         const total = isColumn
-          ? Object.keys(value).length
+          ? columnCount
           : (() => {
               const column = getColumn(over.id);
               return column ? (value[column]?.length ?? 0) : 0;
@@ -579,7 +582,8 @@ function Kanban<T>(props: KanbanProps<T>) {
         const itemType = isColumn ? "column" : "item";
         return `Dragging was cancelled. ${itemType} was dropped.`;
       },
-    }),
+    };
+    },
     [value, getColumn, getItemValue],
   );
 

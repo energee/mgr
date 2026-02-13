@@ -471,6 +471,14 @@ export const vesselEntity: EntityConfig<Vessel> = {
       fromStates: ["maintenance"],
       toState: "dirty",
     },
+    {
+      name: "delete",
+      label: "Delete Vessel",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "hard",
+    },
   ],
 
   // ---------------------------------------------------------------------------

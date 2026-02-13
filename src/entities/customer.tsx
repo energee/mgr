@@ -10,6 +10,7 @@ import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
 import { valuesAsOptions, getValueDisplay } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
 
 // Base type from customers table
 type CustomerBase = Database["public"]["Tables"]["customers"]["Row"];
@@ -46,6 +47,8 @@ export const customerSchema = z.object({
   price_tier_id: z.string().uuid().nullable().optional(),
   notes: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
+  is_tax_exempt: z.boolean().default(false),
+  payment_terms_days: z.coerce.number().nullable().optional(),
 });
 
 export type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -172,6 +175,14 @@ export const customerEntity: EntityConfig<Customer> = {
       fields: [
         { field: "sales_channel_name", label: "Sales Channel" },
         { field: "price_tier_name", label: "Price Tier" },
+      ],
+    },
+    {
+      id: "billing",
+      title: "Billing",
+      fields: [
+        { field: "payment_terms_days", label: "Payment Terms (days)" },
+        { field: "is_tax_exempt", label: "Tax Exempt" },
       ],
     },
     {
@@ -302,6 +313,28 @@ export const customerEntity: EntityConfig<Customer> = {
       ],
     },
     {
+      id: "billing",
+      title: "Billing",
+      fields: [
+        {
+          name: "payment_terms_days",
+          label: "Payment Terms (days)",
+          type: "number",
+          placeholder: "e.g., 30",
+          description: "Days until invoice is due. Falls back to system default if empty.",
+          colSpan: 6,
+        },
+        {
+          name: "is_tax_exempt",
+          label: "Tax Exempt",
+          type: "switch",
+          description: "Exempt this customer from tax in QuickBooks",
+          defaultValue: false,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
       id: "order_summary",
       title: "Order Summary",
       fields: [
@@ -361,6 +394,11 @@ export const customerEntity: EntityConfig<Customer> = {
           colSpan: 6,
         },
       ],
+    },
+    {
+      id: "qbo-sync",
+      title: "QuickBooks",
+      component: createQBOSyncDisplay("customer"),
     },
     {
       id: "notes",
@@ -456,6 +494,22 @@ export const customerEntity: EntityConfig<Customer> = {
       colSpan: 6,
     },
     {
+      name: "payment_terms_days",
+      label: "Payment Terms (days)",
+      type: "number",
+      placeholder: "e.g., 30",
+      description: "Days until invoice is due",
+      colSpan: 6,
+    },
+    {
+      name: "is_tax_exempt",
+      label: "Tax Exempt",
+      type: "switch",
+      description: "Exempt this customer from tax in QuickBooks",
+      defaultValue: false,
+      colSpan: 6,
+    },
+    {
       name: "notes",
       label: "Notes",
       type: "textarea",
@@ -493,6 +547,14 @@ export const customerEntity: EntityConfig<Customer> = {
       icon: "mail",
       type: "dropdown",
       confirm: true,
+    },
+    {
+      name: "delete",
+      label: "Delete Customer",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "hard",
     },
   ],
 
