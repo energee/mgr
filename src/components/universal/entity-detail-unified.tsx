@@ -538,10 +538,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           .single();
         if (error) throw error;
         toast.success(`${entity.displayName} created successfully`);
-        queryClient.invalidateQueries({
-          queryKey: entityKeys.all(entity.table),
-        });
-        const newId = (newRow as Record<string, unknown>).id;
+        const newId = (newRow as Record<string, unknown>).id as string;
+        invalidateEntityCaches(newId);
         router.push(`${path}/${newId}`);
       } else if (id) {
         // UPDATE
@@ -597,7 +595,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     id,
     db,
     supabase,
-    queryClient,
     invalidateEntityCaches,
     path,
     router,
