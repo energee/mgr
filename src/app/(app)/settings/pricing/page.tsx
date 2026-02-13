@@ -42,6 +42,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import {
   DollarSign,
@@ -49,6 +51,7 @@ import {
   Copy,
   Settings2,
   Grid3X3,
+  Package,
 } from "lucide-react";
 import { EntityList } from "@/components/universal/entity-list";
 import { pricingTierEntity } from "@/entities/pricing-tier";
@@ -74,14 +77,32 @@ interface PricingTier {
 interface PackageFormat {
   id: string;
   name: string;
+  format_source: "package_type" | "keg_type";
+  container_type: string | null;
+  volume_oz: number | null;
+  units_per_case: number | null;
 }
 
 interface PricingTierPrice {
   id: string;
   pricing_tier_id: string;
-  package_format_id: string;
+  format_id: string;
   sales_channel_id: string;
   price: number;
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function formatColumnLabel(f: PackageFormat): { name: string; unit: string } {
+  if (f.format_source === "keg_type") {
+    return { name: f.name, unit: "per keg" };
+  }
+  if (f.units_per_case) {
+    return { name: f.name, unit: `case/${f.units_per_case}` };
+  }
+  return { name: f.name, unit: "each" };
 }
 
 // =============================================================================
@@ -200,10 +221,111 @@ function PriceCell({
     <button
       ref={buttonRef}
       onClick={startEditing}
-      className="w-full h-8 text-right text-sm px-2 rounded hover:bg-muted/50 transition-colors cursor-text tabular-nums"
+      className={cn(
+        "w-full h-8 text-right text-sm px-2 rounded transition-colors cursor-text tabular-nums",
+        price != null
+          ? "hover:bg-muted/50"
+          : "text-muted-foreground/30 hover:bg-muted/30"
+      )}
     >
-      {price != null ? `$${price.toFixed(2)}` : "—"}
+      {price != null ? `$${price.toFixed(2)}` : "·"}
     </button>
+  );
+}
+
+// =============================================================================
+// Format Management Component
+// =============================================================================
+
+function FormatManagement() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  const { data: formats, isLoading } = useQuery({
+    queryKey: settingsKeys.pricingFormatsAll(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("packaging_formats")
+        .select("id, name, format_source, container_type, volume_oz, units_per_case, show_in_pricing")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data as (PackageFormat & { show_in_pricing: boolean })[];
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, format_source, show_in_pricing }: {
+      id: string;
+      format_source: string;
+      show_in_pricing: boolean;
+    }) => {
+      const table = format_source === "keg_type" ? "keg_types" : "package_types";
+      const { error } = await supabase
+        .from(table)
+        .update({ show_in_pricing })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: settingsKeys.pricingFormatsAll() });
+      queryClient.invalidateQueries({ queryKey: settingsKeys.pricingFormats() });
+    },
+  });
+
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+
+  const packaged = formats?.filter(f => f.format_source === "package_type") ?? [];
+  const kegs = formats?.filter(f => f.format_source === "keg_type") ?? [];
+
+  const renderSection = (title: string, items: typeof packaged) => (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Format</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Unit</TableHead>
+            <TableHead className="w-[100px] text-right">In Pricing</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map(f => (
+            <TableRow key={f.id}>
+              <TableCell className="font-medium">{f.name}</TableCell>
+              <TableCell className="text-muted-foreground capitalize">{f.container_type}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {formatColumnLabel(f).unit}
+              </TableCell>
+              <TableCell className="text-right">
+                <Switch
+                  checked={f.show_in_pricing}
+                  onCheckedChange={(checked) =>
+                    toggleMutation.mutate({
+                      id: f.id,
+                      format_source: f.format_source,
+                      show_in_pricing: checked,
+                    })
+                  }
+                  disabled={toggleMutation.isPending}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        Toggle which formats appear as columns in the pricing matrix.
+      </p>
+      {renderSection("Packaged Formats", packaged)}
+      {renderSection("Keg Formats", kegs)}
+    </div>
   );
 }
 
@@ -213,12 +335,10 @@ function PriceCell({
 
 export default function PricingPage() {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const queryClient = useQueryClient();
 
   const [channelOverride, setChannelOverride] = useState<string | null>(null);
-  const [view, setView] = useState<"matrix" | "tiers">("matrix");
+  const [view, setView] = useState<"matrix" | "tiers" | "formats">("matrix");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkType, setBulkType] = useState<"percent" | "flat">("percent");
   const [bulkValue, setBulkValue] = useState("");
@@ -232,7 +352,7 @@ export default function PricingPage() {
   const { data: channels, isLoading: channelsLoading } = useQuery({
     queryKey: settingsKeys.pricingChannels(),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("sales_channels")
         .select("id, name, code, position, is_active")
         .eq("is_active", true)
@@ -248,7 +368,7 @@ export default function PricingPage() {
   const { data: tiers, isLoading: tiersLoading } = useQuery({
     queryKey: settingsKeys.pricingTiers(),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("pricing_tiers")
         .select("id, name, cogs_max")
         .order("cogs_max", { nullsFirst: false });
@@ -260,9 +380,9 @@ export default function PricingPage() {
   const { data: formats, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormats(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("package_types")
-        .select("id, name")
+      const { data, error } = await supabase
+        .from("packaging_formats")
+        .select("id, name, format_source, container_type, volume_oz, units_per_case")
         .eq("is_active", true)
         .eq("show_in_pricing", true)
         .order("name");
@@ -275,9 +395,9 @@ export default function PricingPage() {
     queryKey: settingsKeys.pricingMatrix(activeChannelId ?? undefined),
     queryFn: async () => {
       if (!activeChannelId) return [];
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("pricing_tier_prices")
-        .select("id, pricing_tier_id, package_format_id, sales_channel_id, price")
+        .select("id, pricing_tier_id, format_id, sales_channel_id, price")
         .eq("sales_channel_id", activeChannelId);
       if (error) throw error;
       return data as PricingTierPrice[];
@@ -291,7 +411,7 @@ export default function PricingPage() {
     if (!priceMap.has(p.pricing_tier_id)) {
       priceMap.set(p.pricing_tier_id, new Map());
     }
-    priceMap.get(p.pricing_tier_id)!.set(p.package_format_id, p);
+    priceMap.get(p.pricing_tier_id)!.set(p.format_id, p);
   });
 
   // ---------------------------------------------------------------------------
@@ -314,23 +434,23 @@ export default function PricingPage() {
 
       if (value === null && existing) {
         // Delete
-        const { error } = await db
+        const { error } = await supabase
           .from("pricing_tier_prices")
           .delete()
           .eq("id", existing.id);
         if (error) throw error;
       } else if (value !== null && existing) {
         // Update
-        const { error } = await db
+        const { error } = await supabase
           .from("pricing_tier_prices")
           .update({ price: value, updated_at: new Date().toISOString() })
           .eq("id", existing.id);
         if (error) throw error;
       } else if (value !== null && !existing) {
         // Insert
-        const { error } = await db.from("pricing_tier_prices").insert({
+        const { error } = await supabase.from("pricing_tier_prices").insert({
           pricing_tier_id: tierId,
-          package_format_id: formatId,
+          format_id: formatId,
           sales_channel_id: channelId,
           price: value,
         });
@@ -367,7 +487,7 @@ export default function PricingPage() {
       channelId: string;
     }) => {
       // Fetch all prices for this channel
-      const { data: channelPrices, error: fetchError } = await db
+      const { data: channelPrices, error: fetchError } = await supabase
         .from("pricing_tier_prices")
         .select("id, price")
         .eq("sales_channel_id", channelId);
@@ -380,7 +500,7 @@ export default function PricingPage() {
             ? Math.round(p.price * (1 + amount / 100) * 100) / 100
             : Math.round((p.price + amount) * 100) / 100;
         if (newPrice < 0) continue;
-        const { error } = await db
+        const { error } = await supabase
           .from("pricing_tier_prices")
           .update({ price: newPrice, updated_at: new Date().toISOString() })
           .eq("id", p.id);
@@ -411,9 +531,9 @@ export default function PricingPage() {
       toChannelId: string;
     }) => {
       // Fetch source prices
-      const { data: sourcePrices, error: fetchError } = await db
+      const { data: sourcePrices, error: fetchError } = await supabase
         .from("pricing_tier_prices")
-        .select("pricing_tier_id, package_format_id, price")
+        .select("pricing_tier_id, format_id, price")
         .eq("sales_channel_id", fromChannelId);
       if (fetchError) throw fetchError;
 
@@ -424,15 +544,15 @@ export default function PricingPage() {
 
       // Upsert each price into the target channel
       for (const sp of sourcePrices) {
-        const { error } = await db.from("pricing_tier_prices").upsert(
+        const { error } = await supabase.from("pricing_tier_prices").upsert(
           {
             pricing_tier_id: sp.pricing_tier_id,
-            package_format_id: sp.package_format_id,
+            format_id: sp.format_id,
             sales_channel_id: toChannelId,
             price: sp.price,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: "pricing_tier_id,package_format_id,sales_channel_id" }
+          { onConflict: "pricing_tier_id,format_id,sales_channel_id" }
         );
         if (error) throw error;
       }
@@ -494,6 +614,11 @@ export default function PricingPage() {
 
   const isLoading = channelsLoading || tiersLoading || formatsLoading;
 
+  // Derived format groups: packaged first, then kegs
+  const packagedFormats = formats?.filter(f => f.format_source === "package_type") ?? [];
+  const kegFormats = formats?.filter(f => f.format_source === "keg_type") ?? [];
+  const allFormats = [...packagedFormats, ...kegFormats];
+
   if (isLoading) {
     return (
       <div className="space-y-6 max-w-6xl">
@@ -550,6 +675,14 @@ export default function PricingPage() {
             <Settings2 className="h-4 w-4 mr-1" />
             Tier Settings
           </Button>
+          <Button
+            variant={view === "formats" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("formats")}
+          >
+            <Package className="h-4 w-4 mr-1" />
+            Formats
+          </Button>
         </div>
       </div>
 
@@ -558,6 +691,8 @@ export default function PricingPage() {
           entity={pricingTierEntity}
           basePath="/settings/pricing/tiers"
         />
+      ) : view === "formats" ? (
+        <FormatManagement />
       ) : (
         <>
           {/* Channel Tabs */}
@@ -708,31 +843,54 @@ export default function PricingPage() {
 
           {!!tiers?.length && !formats?.length && (
             <p className="text-muted-foreground py-8 text-center">
-              No package formats marked for pricing. Enable{" "}
-              <code className="text-xs">show_in_pricing</code> on package formats in{" "}
-              <Link href="/settings/formats" className="underline">
-                Settings &gt; Package Formats
-              </Link>
-              .
+              No formats enabled for pricing. Switch to the{" "}
+              <button onClick={() => setView("formats")} className="underline">
+                Formats
+              </button>{" "}
+              tab to select which formats appear in the matrix.
             </p>
           )}
 
           {!!tiers?.length && !!formats?.length && (
             <div ref={tableRef} className="border rounded-lg">
               <Table className="table-fixed">
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-20">
+                  {(packagedFormats.length > 0 && kegFormats.length > 0) && (
+                    <TableRow className="bg-muted/50 hover:bg-muted/50 border-b-0">
+                      <TableHead className="sticky left-0 z-10 bg-muted/50" />
+                      <TableHead
+                        colSpan={packagedFormats.length}
+                        className="text-center text-xs font-medium text-muted-foreground border-b-0"
+                      >
+                        Packaged
+                      </TableHead>
+                      <TableHead
+                        colSpan={kegFormats.length}
+                        className="text-center text-xs font-medium text-muted-foreground border-l border-b-0"
+                      >
+                        Draft / Kegs
+                      </TableHead>
+                    </TableRow>
+                  )}
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead className="sticky left-0 z-10 bg-muted/50 min-w-[120px]">
                       Tier
                     </TableHead>
-                    {formats.map((f) => (
-                      <TableHead
-                        key={f.id}
-                        className="text-right w-[120px]"
-                      >
-                        {f.name}
-                      </TableHead>
-                    ))}
+                    {allFormats.map((f) => {
+                      const label = formatColumnLabel(f);
+                      const isFirstKeg = kegFormats.length > 0 && f.id === kegFormats[0].id;
+                      return (
+                        <TableHead
+                          key={f.id}
+                          className={cn("text-right w-[120px]", isFirstKeg && "border-l")}
+                        >
+                          <div className="leading-tight">
+                            <div className="text-xs font-medium">{label.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-normal">{label.unit}</div>
+                          </div>
+                        </TableHead>
+                      );
+                    })}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -745,13 +903,21 @@ export default function PricingPage() {
                           : "bg-muted/25 hover:bg-muted/50"
                       }
                     >
-                      <TableCell className="sticky left-0 z-10 bg-inherit border-r px-3 py-1 font-medium">
-                        {tier.name}
+                      <TableCell className="sticky left-0 z-10 bg-inherit border-r px-3 py-1">
+                        <div>
+                          <div className="font-medium">{tier.name}</div>
+                          {tier.cogs_max != null && (
+                            <div className="text-[10px] text-muted-foreground">
+                              &le; ${Number(tier.cogs_max).toFixed(2)}/unit
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
-                      {formats.map((fmt, fmtIdx) => {
+                      {allFormats.map((fmt, fmtIdx) => {
                         const priceObj = priceMap.get(tier.id)?.get(fmt.id);
+                        const isFirstKeg = kegFormats.length > 0 && fmt.id === kegFormats[0].id;
                         return (
-                          <TableCell key={fmt.id} className="px-1 py-0.5">
+                          <TableCell key={fmt.id} className={cn("px-1 py-0.5", isFirstKeg && "border-l")}>
                             <PriceCell
                               price={priceObj?.price ?? null}
                               tierId={tier.id}
