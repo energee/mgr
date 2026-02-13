@@ -10,7 +10,7 @@
  * After completion, navigates to the first batch detail page.
  */
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -81,7 +81,7 @@ interface AvailableVessel {
 function formatVesselCapacity(
   capacityBbl: number | null,
   targetVolume: number,
-): JSX.Element | string | null {
+): React.ReactNode {
   if (capacityBbl && targetVolume) {
     return ` (${Math.round((targetVolume / capacityBbl) * 100)}% full)`;
   }
