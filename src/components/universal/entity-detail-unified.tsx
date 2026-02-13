@@ -36,6 +36,7 @@ import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { toast } from "sonner";
 import type {
   EntityConfig,
+  EntityActionDef,
   EntityRelationDef,
   UnifiedSectionDef,
   UnifiedFieldDef,
@@ -43,6 +44,7 @@ import type {
 import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { UnifiedField } from "./unified-field";
+import { EntityDeleteDialog } from "./entity-delete-dialog";
 import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -282,6 +284,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const loadedVersionRef = useRef<number | null>(null);
   const conflictDialog = useConflictDialog();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteAction, setDeleteAction] = useState<EntityActionDef<T> | null>(null);
 
   // Cmd+Enter save shortcut - the ref is attached to a hidden save button
   const submitRef = useSubmitShortcut();
@@ -828,6 +832,11 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
                         title={disabledReason || undefined}
                         onClick={() => {
                           if (disabledReason) return;
+                          if (action.name === "delete" && action.deleteMode) {
+                            setDeleteAction(action);
+                            setDeleteDialogOpen(true);
+                            return;
+                          }
                           if (
                             onAction &&
                             onAction(action.name, displayData)
@@ -903,6 +912,33 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         onDiscard={handleConflictDiscard}
         isRefreshing={conflictDialog.isRefreshing}
       />
+
+      {/* Entity Delete Dialog */}
+      {deleteAction?.deleteMode && (
+        <EntityDeleteDialog
+          entityTable={entity.table}
+          entityDisplayName={entity.displayName}
+          recordId={id!}
+          recordTitle={String(
+            (displayData as Record<string, unknown>)[
+              entity.detailHeader?.title ?? "name"
+            ] ?? entity.displayName
+          )}
+          deleteMode={deleteAction.deleteMode}
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onSuccess={() => {
+            queryClient.invalidateQueries({
+              queryKey: entityKeys.all(entity.viewTable ?? entity.table),
+            });
+            queryClient.invalidateQueries({
+              queryKey: entityKeys.all(entity.table),
+            });
+            const listPath = backUrl ?? basePath ?? `/${entity.domain}/${entity.table.replace(/_/g, "-")}`;
+            router.push(listPath);
+          }}
+        />
+      )}
     </div>
   );
 }
