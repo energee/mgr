@@ -5,10 +5,13 @@
  *
  * Custom batch detail that wraps EntityDetail with batch-specific
  * action handling (e.g., start fermentation dialog, cancellation dialog).
+ * Includes NextStepBanner for contextual guidance and StartBrewDayDialog
+ * entry point for planned batches without linked brew logs.
  */
 
-import { use, useState, useCallback } from "react";
+import { use, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { batchEntity } from "@/entities/batch";
@@ -16,7 +19,9 @@ import { StartFermentationDialog } from "@/components/domain/start-fermentation-
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/vessel-transfer-dialog";
-import { batchKeys } from "@/lib/query-keys";
+import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
+import { NextStepBanner } from "@/components/domain/next-step-banner";
+import { batchKeys, recipeKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
 
 export default function BatchDetailPage({
@@ -41,9 +46,11 @@ export default function BatchDetailPage({
   const [showTransfer, setShowTransfer] = useState(
     prefillDialog === "transfer_vessel"
   );
+  const [showStartBrewDay, setShowStartBrewDay] = useState(false);
 
   const queryClient = useQueryClient();
   const supabase = createClient();
+  const router = useRouter();
 
   // Fetch batch data for the dialogs (use view to get vessel info)
   const { data: batch } = useQuery({
@@ -51,13 +58,75 @@ export default function BatchDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
-        .select("id, batch_number, name, status, volume_bbl, current_vessel_id, current_vessel_name")
+        .select("id, batch_number, name, status, volume_bbl, current_vessel_id, current_vessel_name, recipe_id")
         .eq("id", id)
         .single();
       if (error) throw error;
       return data;
     },
   });
+
+  // Fetch linked brew logs count for banner logic
+  const { data: linkedBrewLogs } = useQuery({
+    queryKey: batchKeys.brewLogs(id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("brew_log_batches")
+        .select("brew_log_id")
+        .eq("batch_id", id);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Fetch recipe info for StartBrewDayDialog
+  const { data: recipe } = useQuery({
+    queryKey: recipeKeys.detail(batch?.recipe_id ?? ""),
+    queryFn: async () => {
+      if (!batch?.recipe_id) return null;
+      const { data, error } = await supabase
+        .from("recipes")
+        .select("id, name")
+        .eq("id", batch.recipe_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!batch?.recipe_id,
+  });
+
+  // Banner config based on batch status and brew log linkage
+  const bannerConfig = useMemo(() => {
+    if (!batch) return null;
+
+    if (batch.status === "planned" && (!linkedBrewLogs || linkedBrewLogs.length === 0)) {
+      return {
+        message: "This batch needs a brew. Start a brew day or link an existing brew log.",
+        variant: "info" as const,
+        actions: [
+          { label: "Start Brew Day", onClick: () => setShowStartBrewDay(true) },
+        ],
+      };
+    }
+    if (batch.status === "planned" && linkedBrewLogs && linkedBrewLogs.length > 0) {
+      return {
+        message: "Brew is linked. Start fermentation when ready.",
+        variant: "info" as const,
+        actions: [{ label: "Start Fermentation", onClick: () => setShowStartFermentation(true) }],
+      };
+    }
+    if (batch.status === "fermenting") {
+      return {
+        message: "Track fermentation progress with readings and additions.",
+        variant: "default" as const,
+        actions: [
+          { label: "Readings", href: `/production/batches/${id}/readings` },
+          { label: "Additions", href: `/production/batches/${id}/additions` },
+        ],
+      };
+    }
+    return null;
+  }, [batch, linkedBrewLogs, id]);
 
   // Custom action handler for batch-specific actions
   const handleAction = useCallback((actionName: string) => {
@@ -86,7 +155,15 @@ export default function BatchDetailPage({
   }, [queryClient, id]);
 
   return (
-    <>
+    <div className="space-y-4">
+      {bannerConfig && (
+        <NextStepBanner
+          message={bannerConfig.message}
+          actions={bannerConfig.actions}
+          variant={bannerConfig.variant}
+        />
+      )}
+
       <EntityDetailUnifiedWithErrorBoundary
         entity={batchEntity}
         id={id}
@@ -138,6 +215,26 @@ export default function BatchDetailPage({
           />
         </>
       )}
-    </>
+
+      {recipe && (
+        <StartBrewDayDialog
+          recipeId={recipe.id}
+          recipeName={recipe.name}
+          open={showStartBrewDay}
+          onOpenChange={setShowStartBrewDay}
+          onSuccess={async (brewLogId) => {
+            // Link the new brew log to this batch
+            await supabase.from("brew_log_batches").insert({
+              brew_log_id: brewLogId,
+              batch_id: id,
+              volume_bbl: batch?.volume_bbl ?? 0,
+            });
+            queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
+            queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+            router.push(`/production/brew-logs/${brewLogId}`);
+          }}
+        />
+      )}
+    </div>
   );
 }
