@@ -8,11 +8,8 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { brewLogKeys } from "@/lib/query-keys";
-import { Button } from "@/components/ui/button";
-import { Clock } from "lucide-react";
 import { BrewEventTimeline } from "./brew-event-timeline";
 import type { BrewEvent } from "@/entities/brew-log";
 import type { Database } from "@/types/supabase";
@@ -62,23 +59,15 @@ export function BrewLogTimeline({ data }: BrewLogTimelineProps) {
     await updateEventsMutation.mutateAsync(newEvents);
   };
 
-  // Show compact view if no events
-  if (events.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-6 text-center">
-        <Clock className="h-10 w-10 text-muted-foreground/50 mb-3" />
-        <p className="text-muted-foreground mb-4">No brew events recorded yet.</p>
-        <Button asChild>
-          <Link href={`/production/brew-logs/${data.id}/events`}>
-            Record Events
-          </Link>
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
+      {isReadOnly && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            This brew log is {data.status}. Events are read-only.
+          </p>
+        </div>
+      )}
       <BrewEventTimeline
         events={events}
         onAddEvent={!isReadOnly ? handleAddEvent : undefined}
@@ -86,13 +75,6 @@ export function BrewLogTimeline({ data }: BrewLogTimelineProps) {
         onDeleteEvent={!isReadOnly ? handleDeleteEvent : undefined}
         readOnly={isReadOnly}
       />
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/production/brew-logs/${data.id}/events`}>
-            View Full Timeline
-          </Link>
-        </Button>
-      </div>
     </div>
   );
 }
