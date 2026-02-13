@@ -2,14 +2,13 @@
 
 import { use, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { RecipeCloneDialog } from "@/components/domain/recipe-clone-dialog";
-import { RecipeDeleteDialog } from "@/components/domain/recipe-delete-dialog";
 import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
 import { recipeEntity } from "@/entities/recipe";
-import { recipeKeys, entityKeys } from "@/lib/query-keys";
+import { recipeKeys } from "@/lib/query-keys";
 
 export default function RecipeDetailPage({
   params,
@@ -18,13 +17,11 @@ export default function RecipeDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showBrewDay, setShowBrewDay] = useState(false);
   const supabase = createClient();
 
-  // Fetch recipe name for clone/delete dialogs
+  // Fetch recipe name for clone dialog
   const { data: recipe } = useQuery({
     queryKey: recipeKeys.detail(id),
     queryFn: async () => {
@@ -48,22 +45,12 @@ export default function RecipeDetailPage({
       setCloneDialogOpen(true);
       return true;
     }
-    if (actionName === "delete") {
-      setDeleteDialogOpen(true);
-      return true;
-    }
     return false;
   }, []);
 
   // Navigate to new recipe after successful clone
   const handleCloneSuccess = (newRecipeId: string) => {
     router.push(`/production/recipes/${newRecipeId}`);
-  };
-
-  const handleDeleteSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: entityKeys.all("recipes") });
-    queryClient.invalidateQueries({ queryKey: entityKeys.all("recipes_with_estimates") });
-    router.push("/production/recipes");
   };
 
   return (
@@ -93,13 +80,6 @@ export default function RecipeDetailPage({
             open={cloneDialogOpen}
             onOpenChange={setCloneDialogOpen}
             onSuccess={handleCloneSuccess}
-          />
-          <RecipeDeleteDialog
-            recipeId={id}
-            recipeName={recipe.name}
-            open={deleteDialogOpen}
-            onOpenChange={setDeleteDialogOpen}
-            onSuccess={handleDeleteSuccess}
           />
         </>
       )}
