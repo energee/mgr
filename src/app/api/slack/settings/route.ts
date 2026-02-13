@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createServerSupabase } from "@/lib/supabase/server";
+import { withPermission } from "@/lib/api/auth";
 
 function createAdminDb() {
   return createClient(
@@ -14,13 +14,7 @@ function createAdminDb() {
  *
  * Returns Slack configuration with the webhook URL masked for security.
  */
-export async function GET(): Promise<Response> {
-  const supabase = await createServerSupabase();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const GET = withPermission("integrations:manage", async () => {
   const admin = createAdminDb();
   const { data, error } = await admin
     .from("slack_settings")
@@ -43,7 +37,7 @@ export async function GET(): Promise<Response> {
     webhook_url_masked: masked,
     has_webhook: !!data.webhook_url,
   });
-}
+});
 
 /**
  * Derive the canonical app URL from Vercel env vars or request headers.
@@ -68,13 +62,7 @@ function deriveAppUrl(req: Request): string | null {
  * Updates Slack configuration fields. Auto-populates app_url from
  * Vercel environment variables so pg_net knows where to POST.
  */
-export async function PUT(req: Request): Promise<Response> {
-  const supabase = await createServerSupabase();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const PUT = withPermission("integrations:manage", async (req) => {
   const body = await req.json();
   const { webhook_url, default_channel, is_enabled, channel_overrides } = body as {
     webhook_url?: string | null;
@@ -107,4 +95,4 @@ export async function PUT(req: Request): Promise<Response> {
   }
 
   return NextResponse.json({ success: true });
-}
+});

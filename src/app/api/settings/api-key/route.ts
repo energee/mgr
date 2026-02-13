@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { withPermission } from "@/lib/api/auth";
+import { createAdminClient } from "@/lib/supabase/server";
 
 // Pending type generation -- anthropic_api_key is added by migration 00064
 // but not yet in generated Supabase types. Remove after next `supabase gen types`.
@@ -21,17 +22,7 @@ const VALID_INTEGRATION_IDS = ["square", "square-webhook", "slack", "quickbooks"
  * Returns { hasKey: boolean, keyHint: string | null }.
  * keyHint shows the last 4 characters so users can identify which key is saved.
  */
-export async function GET(req: Request): Promise<Response> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const GET = withPermission("settings:manage", async (req, { supabase, user }) => {
   const { searchParams } = new URL(req.url);
   const scope = searchParams.get("scope");
 
@@ -101,7 +92,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
-}
+});
 
 /**
  * POST /api/settings/api-key
@@ -109,17 +100,7 @@ export async function GET(req: Request): Promise<Response> {
  * Body: { scope: "global" | "user" | "integration", key: string, id?: string }
  * Saves or removes an API key. Empty string removes the key.
  */
-export async function POST(req: Request): Promise<Response> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const POST = withPermission("settings:manage", async (req, { supabase, user }) => {
   const { scope, key, id } = (await req.json()) as { scope: string; key: string; id?: string };
 
   if (scope === "global") {
@@ -217,4 +198,4 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
-}
+});
