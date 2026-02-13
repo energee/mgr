@@ -548,6 +548,14 @@ export const customerEntity: EntityConfig<Customer> = {
       type: "dropdown",
       confirm: true,
     },
+    {
+      name: "delete",
+      label: "Delete Customer",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "hard",
+    },
   ],
 
   // ---------------------------------------------------------------------------

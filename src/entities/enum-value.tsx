@@ -406,6 +406,20 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Delete Enum Value",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "hard",
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // AI Context
   // ---------------------------------------------------------------------------
   queryExamples: [

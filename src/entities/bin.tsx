@@ -62,7 +62,7 @@ export const binTypeDisplay = binTypeDisplayConfig.display;
 
 export const binSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  location_id: z.string().uuid("Location is required"),
+  location_id: z.string({ error: "Location is required" }).uuid("Location is required"),
   bin_type: z.enum([
     "storage",
     "cold_room",
@@ -315,6 +315,20 @@ export const binEntity: EntityConfig<Bin> = {
       type: "textarea",
       placeholder: "Any special notes about this bin...",
       colSpan: 12,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      name: "delete",
+      label: "Delete Bin",
+      icon: "trash",
+      type: "dropdown",
+      variant: "destructive",
+      deleteMode: "hard",
     },
   ],
 

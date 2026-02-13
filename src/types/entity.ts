@@ -597,6 +597,9 @@ export interface EntityActionDef<T> {
 
   /** Opens a dialog instead of direct action */
   dialog?: string;
+
+  /** Delete mode: 'hard' issues DELETE, 'soft' sets is_active=false. Only used when name='delete'. */
+  deleteMode?: "hard" | "soft";
 }
 
 // =============================================================================
