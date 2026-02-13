@@ -9,15 +9,18 @@
 
 import { type ReactNode, useEffect } from "react";
 import { NotificationsProvider } from "@/contexts/notifications";
+import { PermissionProvider } from "@/contexts/permissions";
 import { KeyboardShortcutsProvider } from "@/components/domain/keyboard-shortcuts-provider";
 import { ChatProvider } from "@/contexts/chat-context";
 import { createClient } from "@/lib/supabase/client";
+import type { UserRole } from "@/lib/permissions";
 
 interface AppProvidersProps {
+  roles: UserRole[];
   children: ReactNode;
 }
 
-export function AppProviders({ children }: AppProvidersProps) {
+export function AppProviders({ roles, children }: AppProvidersProps) {
   useEffect(() => {
     createClient()
       .rpc("update_last_active")
@@ -29,10 +32,12 @@ export function AppProviders({ children }: AppProvidersProps) {
   }, []);
 
   return (
-    <NotificationsProvider>
-      <KeyboardShortcutsProvider>
-        <ChatProvider>{children}</ChatProvider>
-      </KeyboardShortcutsProvider>
-    </NotificationsProvider>
+    <PermissionProvider roles={roles}>
+      <NotificationsProvider>
+        <KeyboardShortcutsProvider>
+          <ChatProvider>{children}</ChatProvider>
+        </KeyboardShortcutsProvider>
+      </NotificationsProvider>
+    </PermissionProvider>
   );
 }

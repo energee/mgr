@@ -8,6 +8,7 @@
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import type { UserRole } from "@/lib/permissions";
 import { AppSidebar } from "@/components/domain/app-sidebar";
 import { AppHeader } from "@/components/domain/app-header";
 import { AppProviders } from "@/components/domain/app-providers";
@@ -29,11 +30,14 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   // Redirect customer-role users to the customer portal
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("role")
+    .select("roles")
     .eq("id", user.id)
     .single();
 
-  if (profile?.role === "customer") {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const roles = ((profile as any)?.roles ?? ["viewer"]) as UserRole[];
+
+  if (roles.length === 1 && roles[0] === "customer") {
     redirect("/portal/orders");
   }
 
@@ -53,7 +57,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   const breweryLogoSvg = (settingsMap.brewery_logo_svg as string) || null;
 
   return (
-    <AppProviders>
+    <AppProviders roles={roles}>
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
