@@ -42,6 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import {
@@ -50,6 +51,7 @@ import {
   Copy,
   Settings2,
   Grid3X3,
+  Package,
 } from "lucide-react";
 import { EntityList } from "@/components/universal/entity-list";
 import { pricingTierEntity } from "@/entities/pricing-tier";
@@ -226,6 +228,104 @@ function PriceCell({
 }
 
 // =============================================================================
+// Format Management Component
+// =============================================================================
+
+function FormatManagement() {
+  const supabase = createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+  const queryClient = useQueryClient();
+
+  const { data: formats, isLoading } = useQuery({
+    queryKey: settingsKeys.pricingFormatsAll(),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("packaging_formats")
+        .select("id, name, format_source, container_type, volume_oz, units_per_case, show_in_pricing")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data as (PackageFormat & { show_in_pricing: boolean })[];
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, format_source, show_in_pricing }: {
+      id: string;
+      format_source: string;
+      show_in_pricing: boolean;
+    }) => {
+      const table = format_source === "keg_type" ? "keg_types" : "package_types";
+      const { error } = await db
+        .from(table)
+        .update({ show_in_pricing })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: settingsKeys.pricingFormatsAll() });
+      queryClient.invalidateQueries({ queryKey: settingsKeys.pricingFormats() });
+    },
+  });
+
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+
+  const packaged = formats?.filter(f => f.format_source === "package_type") ?? [];
+  const kegs = formats?.filter(f => f.format_source === "keg_type") ?? [];
+
+  const renderSection = (title: string, items: typeof packaged) => (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Format</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Unit</TableHead>
+            <TableHead className="w-[100px] text-right">In Pricing</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map(f => (
+            <TableRow key={f.id}>
+              <TableCell className="font-medium">{f.name}</TableCell>
+              <TableCell className="text-muted-foreground capitalize">{f.container_type}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {f.format_source === "keg_type" ? "Per keg" : f.units_per_case ? `Case/${f.units_per_case}` : "Each"}
+              </TableCell>
+              <TableCell className="text-right">
+                <Switch
+                  checked={f.show_in_pricing}
+                  onCheckedChange={(checked) =>
+                    toggleMutation.mutate({
+                      id: f.id,
+                      format_source: f.format_source,
+                      show_in_pricing: checked,
+                    })
+                  }
+                  disabled={toggleMutation.isPending}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        Toggle which formats appear as columns in the pricing matrix.
+      </p>
+      {renderSection("Packaged Formats", packaged)}
+      {renderSection("Keg Formats", kegs)}
+    </div>
+  );
+}
+
+// =============================================================================
 // Main Component
 // =============================================================================
 
@@ -236,7 +336,7 @@ export default function PricingPage() {
   const queryClient = useQueryClient();
 
   const [channelOverride, setChannelOverride] = useState<string | null>(null);
-  const [view, setView] = useState<"matrix" | "tiers">("matrix");
+  const [view, setView] = useState<"matrix" | "tiers" | "formats">("matrix");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkType, setBulkType] = useState<"percent" | "flat">("percent");
   const [bulkValue, setBulkValue] = useState("");
@@ -573,6 +673,14 @@ export default function PricingPage() {
             <Settings2 className="h-4 w-4 mr-1" />
             Tier Settings
           </Button>
+          <Button
+            variant={view === "formats" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("formats")}
+          >
+            <Package className="h-4 w-4 mr-1" />
+            Formats
+          </Button>
         </div>
       </div>
 
@@ -581,6 +689,8 @@ export default function PricingPage() {
           entity={pricingTierEntity}
           basePath="/settings/pricing/tiers"
         />
+      ) : view === "formats" ? (
+        <FormatManagement />
       ) : (
         <>
           {/* Channel Tabs */}
@@ -731,12 +841,11 @@ export default function PricingPage() {
 
           {!!tiers?.length && !formats?.length && (
             <p className="text-muted-foreground py-8 text-center">
-              No package formats marked for pricing. Enable{" "}
-              <code className="text-xs">show_in_pricing</code> on package formats in{" "}
-              <Link href="/settings/formats" className="underline">
-                Settings &gt; Package Formats
-              </Link>
-              .
+              No formats enabled for pricing. Switch to the{" "}
+              <button onClick={() => setView("formats")} className="underline">
+                Formats
+              </button>{" "}
+              tab to select which formats appear in the matrix.
             </p>
           )}
 

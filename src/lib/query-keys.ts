@@ -199,6 +199,7 @@ export const settingsKeys = {
       : (["pricing-matrix"] as const),
   pricingTiers: () => ["pricing-tiers"] as const,
   pricingFormats: () => ["pricing-formats"] as const,
+  pricingFormatsAll: () => ["pricing-formats-all"] as const,
   notificationPreferences: () => ["notification-preferences"] as const,
   slackSettings: () => ["settings", "slack"] as const,
   slackLog: (filters?: Record<string, unknown>) =>
