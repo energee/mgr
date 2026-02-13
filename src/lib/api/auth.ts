@@ -120,7 +120,8 @@ export function withPermission(
   return withAuth(async (request, context) => {
     const { user, supabase } = context;
 
-    const { data: profile, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: profile, error } = await (supabase as any)
       .from("user_profiles")
       .select("roles")
       .eq("id", user.id)

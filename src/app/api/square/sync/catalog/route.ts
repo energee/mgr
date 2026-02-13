@@ -12,7 +12,7 @@
  * 7. Logs sync result
  */
 
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, updateSquareSettings } from "@/lib/square/client";
@@ -34,7 +34,7 @@ interface FGWithBrand {
   brands: BrandJoin;
 }
 
-export const POST = withAuth(async (_request, { user }) => {
+export const POST = withPermission("integrations:manage", async (_request, { user }) => {
   const client = await getSquareClient();
   if (!client) {
     return errorResponse(

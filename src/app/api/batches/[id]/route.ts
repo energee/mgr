@@ -1,12 +1,12 @@
 import {
-  withAuth,
+  withPermission,
   successResponse,
   errorResponse,
   validateBody,
 } from "@/lib/api";
 import { batchSchema } from "@/lib/schemas/batch";
 
-export const GET = withAuth(async (request, { supabase, params }) => {
+export const GET = withPermission("batches:read", async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Batch ID required", undefined, 400);
 
@@ -26,7 +26,7 @@ export const GET = withAuth(async (request, { supabase, params }) => {
   return successResponse(data);
 });
 
-export const PATCH = withAuth(async (request, { supabase, params }) => {
+export const PATCH = withPermission("batches:write", async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Batch ID required", undefined, 400);
 
@@ -49,7 +49,7 @@ export const PATCH = withAuth(async (request, { supabase, params }) => {
   return successResponse(data);
 });
 
-export const DELETE = withAuth(async (request, { supabase, params }) => {
+export const DELETE = withPermission("batches:write", async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Batch ID required", undefined, 400);
 

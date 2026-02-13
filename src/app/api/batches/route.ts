@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  withAuth,
+  withPermission,
   paginatedResponse,
   validateBody,
   validateSearchParams,
@@ -18,7 +18,7 @@ const listParamsSchema = z.object({
   search: z.string().optional(),
 });
 
-export const GET = withAuth(async (request, { supabase }) => {
+export const GET = withPermission("batches:read", async (request, { supabase }) => {
   const {
     page = 1,
     per_page = 25,
@@ -57,7 +57,7 @@ export const GET = withAuth(async (request, { supabase }) => {
   return paginatedResponse(data ?? [], page, per_page, count ?? 0);
 });
 
-export const POST = withAuth(async (request, { supabase }) => {
+export const POST = withPermission("batches:write", async (request, { supabase }) => {
   const body = await validateBody(batchSchema, request);
 
   const { data, error } = await supabase
