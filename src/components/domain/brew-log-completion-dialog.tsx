@@ -431,11 +431,15 @@ export function BrewLogCompletionDialog({
                     <Select
                       value={assignedVesselId ?? "_none"}
                       onValueChange={(val) =>
-                        setVesselAssignments((prev) => ({
-                          ...prev,
-                          [batch.id]:
-                            val === "_none" ? undefined! : val,
-                        }))
+                        setVesselAssignments((prev) => {
+                          const next = { ...prev };
+                          if (val === "_none") {
+                            delete next[batch.id];
+                          } else {
+                            next[batch.id] = val;
+                          }
+                          return next;
+                        })
                       }
                     >
                       <SelectTrigger className="h-9">

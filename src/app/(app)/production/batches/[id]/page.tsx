@@ -24,6 +24,7 @@ import { NextStepBanner } from "@/components/domain/next-step-banner";
 import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
 import { batchKeys, recipeKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
+import { toast } from "sonner";
 
 export default function BatchDetailPage({
   params,
@@ -242,18 +243,20 @@ export default function BatchDetailPage({
         <StartBrewDayDialog
           recipeId={recipe.id}
           recipeName={recipe.name}
+          existingBatchId={id}
+          existingBatchVolume={batch?.volume_bbl ?? undefined}
           open={showStartBrewDay}
           onOpenChange={setShowStartBrewDay}
           onSuccess={async (brewLogId) => {
-            // Link the new brew log to this batch
-            await supabase.from("brew_log_batches").insert({
-              brew_log_id: brewLogId,
-              batch_id: id,
-              volume_bbl: batch?.volume_bbl ?? 0,
-            });
-            queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
-            queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-            router.push(`/production/brew-logs/${brewLogId}`);
+            try {
+              queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
+              queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
+              queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+              router.push(`/production/brew-logs/${brewLogId}`);
+            } catch (error) {
+              console.error("Post-brew-day error:", error);
+              toast.error("Failed to update batch data");
+            }
           }}
         />
       )}

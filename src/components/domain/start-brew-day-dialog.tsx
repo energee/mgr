@@ -62,6 +62,8 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 interface StartBrewDayDialogProps {
   recipeId?: string;
   recipeName?: string;
+  existingBatchId?: string;
+  existingBatchVolume?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (brewLogId: string) => void;
@@ -128,6 +130,8 @@ function generateBatchNumber(index: number): string {
 export function StartBrewDayDialog({
   recipeId,
   recipeName,
+  existingBatchId,
+  existingBatchVolume,
   open,
   onOpenChange,
   onSuccess,
@@ -148,7 +152,8 @@ export function StartBrewDayDialog({
   const effectiveRecipeId = recipeId ?? selectedRecipeId;
   const effectiveRecipeName = recipeName ?? selectedRecipeName;
   const hasRecipeSelector = !recipeId;
-  const totalSteps = hasRecipeSelector ? 4 : 3;
+  const hasExistingBatch = !!existingBatchId;
+  const totalSteps = (hasRecipeSelector ? 4 : 3) - (hasExistingBatch ? 1 : 0);
   const initialStep = hasRecipeSelector ? 0 : 1;
 
   // ---------------------------------------------------------------------------
@@ -358,7 +363,7 @@ export function StartBrewDayDialog({
   // ---------------------------------------------------------------------------
 
   const handleSubmit = async () => {
-    if (!isStep2Valid) return;
+    if (!hasExistingBatch && !isStep2Valid) return;
     setIsSubmitting(true);
 
     try {
@@ -378,60 +383,73 @@ export function StartBrewDayDialog({
       if (brewLogError) throw brewLogError;
       const brewLogId = brewLog.id as string;
 
-      // 2. Insert batches
-      const batchInserts = splits.map((s) => ({
-        name: s.name.trim(),
-        batch_number: s.batchNumber.trim(),
-        recipe_id: effectiveRecipeId,
-        recipe_variant_id: s.recipeVariantId || null,
-        status: "planned",
-        volume_bbl: s.volumeBbl,
-        planned_start_date: brewDate,
-      }));
+      if (hasExistingBatch) {
+        // Link existing batch to new brew log (no new batch creation)
+        const { error: junctionError } = await db
+          .from("brew_log_batches")
+          .insert({
+            brew_log_id: brewLogId,
+            batch_id: existingBatchId,
+            volume_bbl: existingBatchVolume ?? 0,
+          });
 
-      const { data: batches, error: batchesError } = await db
-        .from("batches")
-        .insert(batchInserts)
-        .select("id");
+        if (junctionError) throw junctionError;
+      } else {
+        // 2. Insert batches
+        const batchInserts = splits.map((s) => ({
+          name: s.name.trim(),
+          batch_number: s.batchNumber.trim(),
+          recipe_id: effectiveRecipeId,
+          recipe_variant_id: s.recipeVariantId || null,
+          status: "planned",
+          volume_bbl: s.volumeBbl,
+          planned_start_date: brewDate,
+        }));
 
-      if (batchesError) throw batchesError;
+        const { data: batches, error: batchesError } = await db
+          .from("batches")
+          .insert(batchInserts)
+          .select("id");
 
-      // 3. Insert brew_log_batches junction records
-      const junctionInserts = (batches as { id: string }[]).map(
-        (batch, index) => ({
-          brew_log_id: brewLogId,
-          batch_id: batch.id,
-          volume_bbl: splits[index].volumeBbl ?? 0,
-        })
-      );
+        if (batchesError) throw batchesError;
 
-      const { error: junctionError } = await db
-        .from("brew_log_batches")
-        .insert(junctionInserts);
-
-      if (junctionError) throw junctionError;
-
-      // 4. Insert vessel_transfers for any assigned vessels
-      const vesselTransfers = splits
-        .map((s, index) => {
-          if (!s.vesselId) return null;
-          const batch = (batches as { id: string }[])[index];
-          return {
+        // 3. Insert brew_log_batches junction records
+        const junctionInserts = (batches as { id: string }[]).map(
+          (batch, index) => ({
+            brew_log_id: brewLogId,
             batch_id: batch.id,
-            to_vessel_id: s.vesselId,
-            volume_bbl: s.volumeBbl ?? 0,
-            transferred_at: `${brewDate}T00:00:00`,
-            notes: `Initial vessel assignment from brew day ${brewNumber}`,
-          };
-        })
-        .filter(Boolean);
+            volume_bbl: splits[index].volumeBbl ?? 0,
+          })
+        );
 
-      if (vesselTransfers.length > 0) {
-        const { error: transferError } = await db
-          .from("vessel_transfers")
-          .insert(vesselTransfers);
+        const { error: junctionError } = await db
+          .from("brew_log_batches")
+          .insert(junctionInserts);
 
-        if (transferError) throw transferError;
+        if (junctionError) throw junctionError;
+
+        // 4. Insert vessel_transfers for any assigned vessels
+        const vesselTransfers = splits
+          .map((s, index) => {
+            if (!s.vesselId) return null;
+            const batch = (batches as { id: string }[])[index];
+            return {
+              batch_id: batch.id,
+              to_vessel_id: s.vesselId,
+              volume_bbl: s.volumeBbl ?? 0,
+              transferred_at: `${brewDate}T00:00:00`,
+              notes: `Initial vessel assignment from brew day ${brewNumber}`,
+            };
+          })
+          .filter(Boolean);
+
+        if (vesselTransfers.length > 0) {
+          const { error: transferError } = await db
+            .from("vessel_transfers")
+            .insert(vesselTransfers);
+
+          if (transferError) throw transferError;
+        }
       }
 
       // Invalidate caches
@@ -442,7 +460,9 @@ export function StartBrewDayDialog({
       queryClient.invalidateQueries({ queryKey: vesselKeys.all() });
 
       toast.success(
-        `Brew day started with ${splits.length} batch${splits.length > 1 ? "es" : ""}`
+        hasExistingBatch
+          ? "Brew day started and linked to existing batch"
+          : `Brew day started with ${splits.length} batch${splits.length > 1 ? "es" : ""}`
       );
 
       handleClose();
@@ -753,58 +773,81 @@ export function StartBrewDayDialog({
       <Separator />
 
       {/* Batches summary */}
-      <div className="space-y-2">
-        <h4 className="text-sm font-medium">
-          {splits.length} Batch{splits.length > 1 ? "es" : ""}
-        </h4>
-        <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1">
-          {splits.map((split, index) => {
-            const vessel = split.vesselId
-              ? availableVessels.find((v) => v.id === split.vesselId)
-              : null;
-            return (
-              <div key={index} className="p-3 rounded-md border space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm">{split.name}</span>
-                  <Badge variant="outline" className="text-xs">
-                    Planned
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Batch #</span>
-                    <span>{split.batchNumber}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Volume</span>
-                    <span>
-                      <UnitDisplay
-                        value={split.volumeBbl}
-                        unitType="volume"
-                        decimals={1}
-                      />
-                    </span>
-                  </div>
-                  {vessel && (
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-muted-foreground">Vessel</span>
-                      <span>{vessel.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {hasExistingBatch ? (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Existing Batch</h4>
+          <div className="p-3 rounded-md border space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Volume</span>
+              <span>
+                <UnitDisplay
+                  value={existingBatchVolume ?? null}
+                  unitType="volume"
+                  decimals={1}
+                />
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This brew log will be linked to the existing batch.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium">
+              {splits.length} Batch{splits.length > 1 ? "es" : ""}
+            </h4>
+            <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-1">
+              {splits.map((split, index) => {
+                const vessel = split.vesselId
+                  ? availableVessels.find((v) => v.id === split.vesselId)
+                  : null;
+                return (
+                  <div key={index} className="p-3 rounded-md border space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">{split.name}</span>
+                      <Badge variant="outline" className="text-xs">
+                        Planned
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Batch #</span>
+                        <span>{split.batchNumber}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Volume</span>
+                        <span>
+                          <UnitDisplay
+                            value={split.volumeBbl}
+                            unitType="volume"
+                            decimals={1}
+                          />
+                        </span>
+                      </div>
+                      {vessel && (
+                        <div className="flex justify-between col-span-2">
+                          <span className="text-muted-foreground">Vessel</span>
+                          <span>{vessel.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-      {/* Totals */}
-      <div className="flex items-center justify-between p-3 rounded-md border bg-muted/30">
-        <span className="text-sm text-muted-foreground">Total Volume</span>
-        <span className="font-medium">
-          <UnitDisplay value={totalVolume} unitType="volume" decimals={1} />
-        </span>
-      </div>
+          {/* Totals */}
+          <div className="flex items-center justify-between p-3 rounded-md border bg-muted/30">
+            <span className="text-sm text-muted-foreground">Total Volume</span>
+            <span className="font-medium">
+              <UnitDisplay value={totalVolume} unitType="volume" decimals={1} />
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 
@@ -812,17 +855,39 @@ export function StartBrewDayDialog({
   // Step Navigation Helpers
   // ---------------------------------------------------------------------------
 
-  const stepTitles = hasRecipeSelector
-    ? [
-        "Select Recipe",
-        "Confirm Recipe & Date",
-        "Configure Splits",
-        "Review & Create",
-      ]
-    : ["Confirm Recipe & Date", "Configure Splits", "Review & Create"];
+  const stepTitles = (() => {
+    const titles: string[] = [];
+    if (hasRecipeSelector) titles.push("Select Recipe");
+    titles.push("Confirm Recipe & Date");
+    if (!hasExistingBatch) titles.push("Configure Splits");
+    titles.push("Review & Create");
+    return titles;
+  })();
 
   // Map current step number to a display index for titles and progress bar
-  const stepDisplayIndex = hasRecipeSelector ? step : step - 1;
+  const stepDisplayIndex = (() => {
+    let idx = hasRecipeSelector ? step : step - 1;
+    if (hasExistingBatch && step >= 3) idx--; // step 2 is skipped
+    return idx;
+  })();
+
+  const nextStep = () => {
+    setStep((s) => {
+      const next = s + 1;
+      // Skip step 2 when linking existing batch
+      if (hasExistingBatch && next === 2) return 3;
+      return next;
+    });
+  };
+
+  const prevStep = () => {
+    setStep((s) => {
+      const prev = s - 1;
+      // Skip step 2 when going back from step 3
+      if (hasExistingBatch && prev === 2) return 1;
+      return prev;
+    });
+  };
 
   const isCurrentStepValid = () => {
     if (step === 0) return isStep0Valid;
@@ -873,7 +938,7 @@ export function StartBrewDayDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setStep((s) => s - 1)}
+                onClick={prevStep}
                 disabled={isSubmitting}
                 className="min-h-[44px]"
               >
@@ -895,7 +960,7 @@ export function StartBrewDayDialog({
             {step < 3 ? (
               <Button
                 type="button"
-                onClick={() => setStep((s) => s + 1)}
+                onClick={nextStep}
                 disabled={!isCurrentStepValid()}
                 className="min-h-[44px]"
               >
@@ -906,7 +971,7 @@ export function StartBrewDayDialog({
               <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting || !isStep2Valid}
+                disabled={isSubmitting || (!hasExistingBatch && !isStep2Valid)}
                 className="min-h-[44px]"
               >
                 {isSubmitting ? (
