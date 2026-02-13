@@ -6,9 +6,6 @@
  * Custom detail page that wraps EntityDetailUnified with brew-log-specific
  * action handling. The "complete_brew" action opens a vessel assignment
  * dialog instead of directly transitioning status.
- *
- * Includes a NextStepBanner that provides contextual guidance based on
- * the brew log's current state.
  */
 
 import { use, useState, useCallback, useMemo } from "react";
@@ -154,42 +151,22 @@ export default function BrewLogDetailPage({
         actions: [
           {
             label: "Complete Brew",
-            onClick: () => {
-              setShowCompletionDialog(true);
-            },
+            onClick: () => setShowCompletionDialog(true),
           },
         ],
       };
     }
-    if (
-      brewLog.status === "completed" &&
-      linkedBatches &&
-      linkedBatches.length === 1
-    ) {
-      return {
-        message: "Brew complete. View your batch in the fermenter.",
-        variant: "success" as const,
-        actions: [
-          {
-            label: "View Batch",
-            href: `/production/batches/${linkedBatches[0].batch_id}`,
-          },
-        ],
-      };
-    }
-    if (
-      brewLog.status === "completed" &&
-      linkedBatches &&
-      linkedBatches.length > 1
-    ) {
-      return {
-        message: `Brew complete. ${linkedBatches.length} batches are in fermentation.`,
-        variant: "success" as const,
-        actions: linkedBatches.map((b, i) => ({
-          label: `Batch ${i + 1}`,
-          href: `/production/batches/${b.batch_id}`,
-        })),
-      };
+    if (brewLog.status === "completed" && linkedBatches?.length) {
+      const message = linkedBatches.length === 1
+        ? "Brew complete. View your batch in the fermenter."
+        : `Brew complete. ${linkedBatches.length} batches are in fermentation.`;
+      const actions = linkedBatches.length === 1
+        ? [{ label: "View Batch", href: `/production/batches/${linkedBatches[0].batch_id}` }]
+        : linkedBatches.map((b, i) => ({
+            label: `Batch ${i + 1}`,
+            href: `/production/batches/${b.batch_id}`,
+          }));
+      return { message, variant: "success" as const, actions };
     }
     return null;
   }, [brewLog, linkedBatches, handleStartBrew]);

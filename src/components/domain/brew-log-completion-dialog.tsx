@@ -78,6 +78,19 @@ interface AvailableVessel {
   capacity_bbl: number | null;
 }
 
+function formatVesselCapacity(
+  capacityBbl: number | null,
+  targetVolume: number,
+): JSX.Element | string | null {
+  if (capacityBbl && targetVolume) {
+    return ` (${Math.round((targetVolume / capacityBbl) * 100)}% full)`;
+  }
+  if (capacityBbl) {
+    return <> (<UnitDisplay value={capacityBbl} unitType="volume" />)</>;
+  }
+  return null;
+}
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -452,28 +465,7 @@ export function BrewLogCompletionDialog({
                         {batchVessels.map((v) => (
                           <SelectItem key={v.id} value={v.id}>
                             {v.name}
-                            {v.capacity_bbl && targetVolume ? (
-                              <>
-                                {" "}
-                                (
-                                {Math.round(
-                                  (targetVolume / v.capacity_bbl) * 100
-                                )}
-                                % full)
-                              </>
-                            ) : v.capacity_bbl ? (
-                              <>
-                                {" "}
-                                (
-                                <UnitDisplay
-                                  value={v.capacity_bbl}
-                                  unitType="volume"
-                                />
-                                )
-                              </>
-                            ) : (
-                              ""
-                            )}
+                            {formatVesselCapacity(v.capacity_bbl, targetVolume)}
                           </SelectItem>
                         ))}
                       </SelectContent>

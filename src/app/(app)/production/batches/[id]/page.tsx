@@ -5,8 +5,6 @@
  *
  * Custom batch detail that wraps EntityDetail with batch-specific
  * action handling (e.g., start fermentation dialog, cancellation dialog).
- * Includes NextStepBanner for contextual guidance and StartBrewDayDialog
- * entry point for planned batches without linked brew logs.
  */
 
 import { use, useState, useCallback, useMemo } from "react";
@@ -24,7 +22,6 @@ import { NextStepBanner } from "@/components/domain/next-step-banner";
 import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
 import { batchKeys, recipeKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
-import { toast } from "sonner";
 
 export default function BatchDetailPage({
   params,
@@ -120,7 +117,7 @@ export default function BatchDetailPage({
   const bannerConfig = useMemo(() => {
     if (!batch) return null;
 
-    if (batch.status === "planned" && (!linkedBrewLogs || linkedBrewLogs.length === 0)) {
+    if (batch.status === "planned" && (!linkedBrewLogs?.length)) {
       return {
         message: "This batch needs a brew. Start a brew day or link an existing brew log.",
         variant: "info" as const,
@@ -129,7 +126,7 @@ export default function BatchDetailPage({
         ],
       };
     }
-    if (batch.status === "planned" && linkedBrewLogs && linkedBrewLogs.length > 0) {
+    if (batch.status === "planned" && linkedBrewLogs?.length) {
       return {
         message: "Brew is linked. Start fermentation when ready.",
         variant: "info" as const,
@@ -247,16 +244,11 @@ export default function BatchDetailPage({
           existingBatchVolume={batch?.volume_bbl ?? undefined}
           open={showStartBrewDay}
           onOpenChange={setShowStartBrewDay}
-          onSuccess={async (brewLogId) => {
-            try {
-              queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
-              queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
-              queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-              router.push(`/production/brew-logs/${brewLogId}`);
-            } catch (error) {
-              console.error("Post-brew-day error:", error);
-              toast.error("Failed to update batch data");
-            }
+          onSuccess={(brewLogId) => {
+            queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
+            queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
+            queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+            router.push(`/production/brew-logs/${brewLogId}`);
           }}
         />
       )}

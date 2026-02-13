@@ -705,18 +705,8 @@ export function StartBrewDayDialog({
                         .map((v) => (
                           <SelectItem key={v.id} value={v.id}>
                             {v.name}
-                            {v.capacity_bbl ? (
-                              <>
-                                {" "}
-                                (
-                                <UnitDisplay
-                                  value={v.capacity_bbl}
-                                  unitType="volume"
-                                />
-                                )
-                              </>
-                            ) : (
-                              ""
+                            {v.capacity_bbl && (
+                              <> (<UnitDisplay value={v.capacity_bbl} unitType="volume" />)</>
                             )}
                           </SelectItem>
                         ))}
@@ -855,21 +845,20 @@ export function StartBrewDayDialog({
   // Step Navigation Helpers
   // ---------------------------------------------------------------------------
 
-  const stepTitles = (() => {
+  const stepTitles = useMemo(() => {
     const titles: string[] = [];
     if (hasRecipeSelector) titles.push("Select Recipe");
     titles.push("Confirm Recipe & Date");
     if (!hasExistingBatch) titles.push("Configure Splits");
     titles.push("Review & Create");
     return titles;
-  })();
+  }, [hasRecipeSelector, hasExistingBatch]);
 
-  // Map current step number to a display index for titles and progress bar
-  const stepDisplayIndex = (() => {
+  const stepDisplayIndex = useMemo(() => {
     let idx = hasRecipeSelector ? step : step - 1;
-    if (hasExistingBatch && step >= 3) idx--; // step 2 is skipped
+    if (hasExistingBatch && step >= 3) idx--;
     return idx;
-  })();
+  }, [hasRecipeSelector, hasExistingBatch, step]);
 
   const nextStep = () => {
     setStep((s) => {
