@@ -1,0 +1,89 @@
+-- =============================================================================
+-- 00094: Codebase Audit Fixes
+-- Tighten RLS policies, add CHECK constraints, change cascades, register tables
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- H1: Tighten overly permissive RLS policies
+-- ---------------------------------------------------------------------------
+
+-- Notifications: restrict INSERT so users can only create notifications for themselves
+DROP POLICY IF EXISTS notifications_insert ON notifications;
+CREATE POLICY notifications_insert ON notifications
+  FOR INSERT TO authenticated
+  WITH CHECK (user_id = (SELECT auth.uid()));
+
+-- Entity revisions: restrict INSERT to the user who made the change
+DROP POLICY IF EXISTS entity_revisions_insert ON entity_revisions;
+CREATE POLICY entity_revisions_insert ON entity_revisions
+  FOR INSERT TO authenticated
+  WITH CHECK (changed_by = (SELECT auth.uid()));
+
+-- QBO sync mappings: restrict to admin/owner roles only
+DROP POLICY IF EXISTS qbo_sync_mappings_select ON qbo_sync_mappings;
+CREATE POLICY qbo_sync_mappings_select ON qbo_sync_mappings
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_sync_log_select ON qbo_sync_log;
+CREATE POLICY qbo_sync_log_select ON qbo_sync_log
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+DROP POLICY IF EXISTS qbo_account_mappings_select ON qbo_account_mappings;
+CREATE POLICY qbo_account_mappings_select ON qbo_account_mappings
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'owner')
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- H3: Change ON DELETE CASCADE to RESTRICT on high-risk FKs
+-- ---------------------------------------------------------------------------
+
+-- Purchase orders: prevent accidental supplier deletion from cascading
+ALTER TABLE purchase_orders
+  DROP CONSTRAINT IF EXISTS purchase_orders_supplier_id_fkey,
+  ADD CONSTRAINT purchase_orders_supplier_id_fkey
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT;
+
+-- Inventory lots: prevent accidental item deletion from cascading
+ALTER TABLE inventory_lots
+  DROP CONSTRAINT IF EXISTS inventory_lots_inventory_item_id_fkey,
+  ADD CONSTRAINT inventory_lots_inventory_item_id_fkey
+    FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE RESTRICT;
+
+-- ---------------------------------------------------------------------------
+-- H4: Add CHECK constraint on allocations quantity
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE allocations
+  ADD CONSTRAINT allocations_quantity_positive CHECK (quantity > 0);
+
+-- ---------------------------------------------------------------------------
+-- H6: Register missing integration tables in _schema_registry
+-- ---------------------------------------------------------------------------
+
+INSERT INTO _schema_registry (table_name, description, domain, relationships)
+VALUES
+  ('slack_notification_log', 'Log of Slack notification delivery attempts and outcomes', 'integrations',
+   '[{"table": "notifications", "type": "many-to-one", "description": "Source notification that triggered the Slack message"}]'::jsonb),
+  ('square_catalog_map', 'Mapping between MGR catalog items and Square catalog objects', 'integrations',
+   '[{"table": "packaging_formats", "type": "many-to-one", "description": "Local packaging format mapped to Square"}]'::jsonb)
+ON CONFLICT (table_name) DO UPDATE
+  SET description = EXCLUDED.description,
+      domain = EXCLUDED.domain,
+      relationships = EXCLUDED.relationships;

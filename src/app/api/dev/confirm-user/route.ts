@@ -9,9 +9,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request: NextRequest) {
-  // Only allow in development
-  if (process.env.NODE_ENV !== "development") {
-    return NextResponse.json({ error: "Not available in production" }, { status: 403 });
+  // Defense-in-depth: require both NODE_ENV=development AND explicit opt-in
+  if (process.env.NODE_ENV !== "development" || process.env.ENABLE_DEV_ENDPOINTS !== "true") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const { email } = await request.json();

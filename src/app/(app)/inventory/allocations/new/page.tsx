@@ -1,8 +1,8 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
 import { allocationEntity } from "@/entities/allocation";
 
 export default function NewAllocationPage() {
-  return <EntityForm entity={allocationEntity} basePath="/inventory/allocations" />;
+  return <EntityDetailUnified entity={allocationEntity} basePath="/inventory/allocations" />;
 }

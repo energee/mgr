@@ -8,6 +8,7 @@
  * redirect - we verify the user session manually via Supabase cookies.
  */
 
+import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens, saveTokens } from "@/lib/quickbooks";
@@ -28,8 +29,19 @@ export async function GET(request: NextRequest): Promise<Response> {
   const code = searchParams.get("code");
   const realmId = searchParams.get("realmId");
   const error = searchParams.get("error");
+  const state = searchParams.get("state");
 
   const settingsUrl = new URL("/settings/integrations", request.url);
+
+  // Validate CSRF state token from cookie
+  const cookieStore = await cookies();
+  const storedState = cookieStore.get("qbo_oauth_state")?.value;
+  cookieStore.delete("qbo_oauth_state");
+
+  if (!state || state !== storedState) {
+    settingsUrl.searchParams.set("qbo_error", "Invalid OAuth state");
+    return NextResponse.redirect(settingsUrl);
+  }
 
   if (error) {
     settingsUrl.searchParams.set("qbo_error", error);
