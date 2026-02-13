@@ -210,6 +210,7 @@ export const binEntity: EntityConfig<Bin> = {
           name: "location_id",
           label: "Location",
           type: "select",
+          relation: { entity: "location", displayField: "name" },
           dynamicOptions: {
             table: "locations",
             valueField: "id",
@@ -284,6 +285,7 @@ export const binEntity: EntityConfig<Bin> = {
       name: "location_id",
       label: "Location",
       type: "select",
+      relation: { entity: "location", displayField: "name" },
       dynamicOptions: {
         table: "locations",
         valueField: "id",

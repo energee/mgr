@@ -96,6 +96,12 @@ export function resolveDisplayValue<T = Record<string, unknown>>(
     return relationDisplayValues[field.name];
   }
 
+  // 3b. Select options: resolve key to display label
+  if (field.options && typeof value === "string") {
+    const opt = field.options.find((o) => o.value === value);
+    if (opt) return opt.label;
+  }
+
   // 4. Unit display: interactive unit conversion component
   if (field.format === "unit" && field.unitType) {
     return <UnitDisplay value={value as number | null} unitType={field.unitType} />;
