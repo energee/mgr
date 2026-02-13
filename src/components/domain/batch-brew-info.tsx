@@ -14,6 +14,7 @@ import { batchKeys } from "@/lib/query-keys";
 import { BrewLogLinker } from "./brew-log-linker";
 import { Badge } from "@/components/ui/badge";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { extractBrewMeasurements } from "@/lib/brew-events";
 import Link from "next/link";
 
 interface BatchBrewInfoProps {
@@ -42,47 +43,6 @@ interface BrewSummaryLink {
     recipe: { name: string } | null;
   };
   brewer_name: string | null;
-}
-
-function extractPhaseHighlights(
-  events: unknown[] | null
-): { label: string; value: string }[] {
-  if (!events || !Array.isArray(events)) return [];
-
-  const highlights: { label: string; value: string }[] = [];
-  const typedEvents = events as Array<{
-    phase?: string;
-    measurements?: Array<{ metric?: string; value?: number | string }>;
-  }>;
-
-  // Find mash temp
-  const mashEvent = typedEvents.find(
-    (e) => e.phase === "mash_in" || e.phase === "mash_rest"
-  );
-  const mashTemp = mashEvent?.measurements?.find((m) => m.metric === "temp_f");
-  if (mashTemp) highlights.push({ label: "Mash Temp", value: `${mashTemp.value}\u00B0F` });
-
-  // Find pre-boil gravity
-  const kettleEvent = typedEvents.find(
-    (e) => e.phase === "kettle_full" || e.phase === "boil_start"
-  );
-  const preBoilGravity = kettleEvent?.measurements?.find(
-    (m) => m.metric === "gravity_plato"
-  );
-  if (preBoilGravity)
-    highlights.push({ label: "Pre-Boil", value: `${preBoilGravity.value}\u00B0P` });
-
-  // Find post-boil volume
-  const boilEndEvent = typedEvents.find(
-    (e) => e.phase === "boil_end" || e.phase === "ko_end"
-  );
-  const postBoilVol = boilEndEvent?.measurements?.find(
-    (m) => m.metric === "volume_bbl"
-  );
-  if (postBoilVol)
-    highlights.push({ label: "Post-Boil Vol", value: `${postBoilVol.value} BBL` });
-
-  return highlights;
 }
 
 export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
@@ -159,7 +119,9 @@ export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
           {linkedBrews.map((link) => {
             const brew = link.brew_log;
             if (!brew) return null;
-            const highlights = extractPhaseHighlights(brew.events);
+            const highlights = Array.isArray(brew.events)
+              ? extractBrewMeasurements(brew.events)
+              : [];
 
             return (
               <div key={link.id} className="rounded-lg border p-4 space-y-3">

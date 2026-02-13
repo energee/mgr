@@ -73,7 +73,10 @@ export default function BrewLogDetailPage({
         .select("batch_id, batch:batches(batch_number)")
         .eq("brew_log_id", id);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Array<{
+        batch_id: string;
+        batch: { batch_number: string } | null;
+      }>;
     },
   });
 
@@ -125,8 +128,7 @@ export default function BrewLogDetailPage({
     segments.push({ label: brewLog?.brew_number ?? "Brew Log" }); // current page, no href
     if (linkedBatches?.length === 1) {
       const b = linkedBatches[0];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const batchNumber = (b as any)?.batch?.batch_number ?? "Batch";
+      const batchNumber = b.batch?.batch_number ?? "Batch";
       segments.push({ label: batchNumber, href: `/production/batches/${b.batch_id}` });
     }
     return segments;

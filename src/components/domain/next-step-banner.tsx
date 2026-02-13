@@ -1,13 +1,5 @@
 "use client";
 
-/**
- * NextStepBanner - Contextual guidance banner for entity detail pages
- *
- * Displays a colored strip with a message and action button(s) to guide
- * users to the next logical step in a workflow (e.g., "Start brewing" or
- * "Record your first reading").
- */
-
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";

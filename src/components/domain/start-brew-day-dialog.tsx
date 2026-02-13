@@ -823,8 +823,6 @@ export function StartBrewDayDialog({
 
   // Map current step number to a display index for titles and progress bar
   const stepDisplayIndex = hasRecipeSelector ? step : step - 1;
-  const lastStep = hasRecipeSelector ? 3 : 3;
-  const firstStep = hasRecipeSelector ? 0 : 1;
 
   const isCurrentStepValid = () => {
     if (step === 0) return isStep0Valid;
@@ -871,7 +869,7 @@ export function StartBrewDayDialog({
 
         <DialogFooter className="flex-row justify-between sm:justify-between">
           <div>
-            {step > firstStep && (
+            {step > initialStep && (
               <Button
                 type="button"
                 variant="outline"
@@ -894,7 +892,7 @@ export function StartBrewDayDialog({
             >
               Cancel
             </Button>
-            {step < lastStep ? (
+            {step < 3 ? (
               <Button
                 type="button"
                 onClick={() => setStep((s) => s + 1)}

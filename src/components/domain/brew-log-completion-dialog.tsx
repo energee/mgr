@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { extractBrewMeasurements } from "@/lib/brew-events";
 
 // =============================================================================
 // Types
@@ -75,66 +76,6 @@ interface AvailableVessel {
   name: string;
   vessel_type: string | null;
   capacity_bbl: number | null;
-}
-
-interface KeyMeasurement {
-  label: string;
-  value: string;
-}
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function extractKeyMeasurements(events: unknown[]): KeyMeasurement[] {
-  const measurements: KeyMeasurement[] = [];
-  const typedEvents = events as Array<{
-    phase?: string;
-    measurements?: Array<{ metric?: string; value?: number | string }>;
-  }>;
-
-  // Mash temp
-  const mashEvent = typedEvents.find(
-    (e) => e.phase === "mash_in" || e.phase === "mash_rest"
-  );
-  const mashTemp = mashEvent?.measurements?.find(
-    (m) => m.metric === "temp_f"
-  );
-  if (mashTemp)
-    measurements.push({ label: "Mash Temp", value: `${mashTemp.value}\u00B0F` });
-
-  // Pre-boil gravity
-  const kettleEvent = typedEvents.find(
-    (e) => e.phase === "kettle_full" || e.phase === "boil_start"
-  );
-  const preBoilGravity = kettleEvent?.measurements?.find(
-    (m) => m.metric === "gravity_plato"
-  );
-  if (preBoilGravity)
-    measurements.push({
-      label: "Pre-Boil Gravity",
-      value: `${preBoilGravity.value}\u00B0P`,
-    });
-
-  // Post-boil OG
-  const boilEnd = typedEvents.find(
-    (e) => e.phase === "boil_end" || e.phase === "ko_start"
-  );
-  const og = boilEnd?.measurements?.find((m) => m.metric === "gravity_plato");
-  if (og) measurements.push({ label: "Post-Boil OG", value: `${og.value}\u00B0P` });
-
-  // Post-boil volume
-  const vol = boilEnd?.measurements?.find((m) => m.metric === "volume_bbl");
-  if (vol)
-    measurements.push({ label: "Post-Boil Volume", value: `${vol.value} BBL` });
-
-  // Knockout temp
-  const koEnd = typedEvents.find((e) => e.phase === "ko_end");
-  const temp = koEnd?.measurements?.find((m) => m.metric === "temp_f");
-  if (temp)
-    measurements.push({ label: "Knockout Temp", value: `${temp.value}\u00B0F` });
-
-  return measurements;
 }
 
 // =============================================================================
@@ -404,7 +345,7 @@ export function BrewLogCompletionDialog({
 
   const renderStep1 = () => {
     const events = (brewLogFull?.events as unknown[]) || [];
-    const keyMeasurements = extractKeyMeasurements(events);
+    const keyMeasurements = extractBrewMeasurements(events);
 
     return (
       <div className="space-y-4">

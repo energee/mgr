@@ -68,16 +68,19 @@ export default function BatchDetailPage({
   });
 
   // Fetch linked brew logs for banner logic and breadcrumb
-  // Use a separate key from BrewLogLinker to avoid cache shape conflicts
+  // Uses a separate key from BrewLogLinker to avoid cache shape conflicts
   const { data: linkedBrewLogs } = useQuery({
-    queryKey: ["batch-brew-log-links", id],
+    queryKey: batchKeys.brewLogLinks(id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_log_batches")
         .select("brew_log_id, brew_log:brew_logs(brew_number)")
         .eq("batch_id", id);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Array<{
+        brew_log_id: string;
+        brew_log: { brew_number: string } | null;
+      }>;
     },
   });
 
@@ -105,8 +108,7 @@ export default function BatchDetailPage({
     }
     if (linkedBrewLogs?.length) {
       const primary = linkedBrewLogs[0];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const brewNumber = (primary as any)?.brew_log?.brew_number ?? "Brew Log";
+      const brewNumber = primary.brew_log?.brew_number ?? "Brew Log";
       segments.push({ label: brewNumber, href: `/production/brew-logs/${primary.brew_log_id}` });
     }
     segments.push({ label: batch?.batch_number ?? "Batch" }); // current page, no href

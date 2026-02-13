@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { batchKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Thermometer,
@@ -32,7 +33,7 @@ export function BatchQuickLinks({ data }: BatchQuickLinksProps) {
   const supabase = createClient();
 
   const { data: brewLogLinks } = useQuery({
-    queryKey: ["batch-primary-brew-log", data.id],
+    queryKey: batchKeys.brewLogs(data.id),
     queryFn: async () => {
       const { data: links, error } = await supabase
         .from("brew_log_batches")
