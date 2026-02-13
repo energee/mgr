@@ -77,45 +77,27 @@ function getExpiryText(days: number): string {
 export default function InventoryDashboardPage() {
   const supabase = createClient();
 
-  // Fetch low stock items
+  // Fetch low stock items (pre-filtered view)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
   const { data: lowStockItems = [] } = useQuery({
     queryKey: dashboardKeys.lowStock(),
     queryFn: async () => {
-      const { data: items, error: itemsError } = await supabase
-        .from("inventory_items")
-        .select("id, name, category, reorder_point, unit")
-        .not("reorder_point", "is", null)
+      const { data, error } = await db
+        .from("inventory_low_stock_items")
+        .select("id, name, category, unit, reorder_point, current_qty")
         .order("name");
 
-      if (itemsError) throw itemsError;
+      if (error) throw error;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data: lotsData } = await db
-        .from("inventory_lots_with_quantities")
-        .select("item_id, remaining_quantity");
-
-      const quantityByItem = new Map<string, number>();
-      (lotsData || []).forEach((lot: { item_id: string; remaining_quantity: number }) => {
-        const current = quantityByItem.get(lot.item_id) || 0;
-        quantityByItem.set(lot.item_id, current + (lot.remaining_quantity || 0));
-      });
-
-      return (items || [])
-        .filter((item) => {
-          const currentQty = quantityByItem.get(item.id) || 0;
-          return currentQty <= (item.reorder_point || 0);
-        })
-        .map((item) => ({
-          id: item.id,
-          name: item.name,
-          category: item.category || "other",
-          current_qty: quantityByItem.get(item.id) || 0,
-          reorder_point: item.reorder_point || 0,
-          unit: item.unit || "units",
-        })) as LowStockItem[];
+      return (data || []).map((item: LowStockItem) => ({
+        ...item,
+        category: item.category || "other",
+        unit: item.unit || "units",
+      })) as LowStockItem[];
     },
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 
   // Fetch expiring lots (lots expiring within 90 days)
@@ -169,48 +151,22 @@ export default function InventoryDashboardPage() {
         }) as ExpiringLot[];
     },
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 
-  // Fetch inventory summary by category
+  // Fetch inventory summary by category (pre-aggregated view)
   const { data: inventorySummary = [] } = useQuery({
     queryKey: dashboardKeys.inventorySummary(),
     queryFn: async () => {
-      const { data: items, error: itemsError } = await supabase
-        .from("inventory_items")
-        .select("id, category");
+      const { data, error } = await db
+        .from("inventory_summary_by_category")
+        .select("category, item_count, total_value");
 
-      if (itemsError) throw itemsError;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data: lotsData } = await db
-        .from("inventory_lots")
-        .select("inventory_item_id, quantity, unit_cost");
-
-      const valueByItem = new Map<string, number>();
-      (lotsData || []).forEach((lot: { inventory_item_id: string; quantity: number; unit_cost: number | null }) => {
-        if (lot.unit_cost != null && lot.quantity > 0) {
-          const current = valueByItem.get(lot.inventory_item_id) || 0;
-          valueByItem.set(lot.inventory_item_id, current + lot.quantity * lot.unit_cost);
-        }
-      });
-
-      const categoryMap = new Map<string, { count: number; value: number }>();
-      (items || []).forEach((item) => {
-        const category = item.category || "other";
-        const existing = categoryMap.get(category) || { count: 0, value: 0 };
-        existing.count += 1;
-        existing.value += valueByItem.get(item.id) || 0;
-        categoryMap.set(category, existing);
-      });
-
-      return Array.from(categoryMap.entries()).map(([category, { count, value }]) => ({
-        category,
-        item_count: count,
-        total_value: Math.round(value * 100) / 100,
-      })) as InventorySummary[];
+      if (error) throw error;
+      return (data || []) as InventorySummary[];
     },
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 
   // Calculate totals

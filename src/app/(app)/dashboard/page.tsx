@@ -73,26 +73,29 @@ export default function DashboardPage() {
     completed: 0,
   };
 
-  // Fetch batch status counts
+  // Fetch batch status counts (pre-aggregated view)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
   const { data: batchCounts = defaultCounts } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batches")
-        .select("status");
+      const { data, error } = await db
+        .from("batch_status_counts")
+        .select("status, count");
 
       if (error) throw error;
 
       const counts = { ...defaultCounts };
-      for (const batch of data ?? []) {
-        const status = batch.status as keyof BatchStatusCounts;
+      for (const row of data ?? []) {
+        const status = row.status as keyof BatchStatusCounts;
         if (status in counts) {
-          counts[status]++;
+          counts[status] = row.count;
         }
       }
       return counts;
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   // Fetch active batches (not completed or cancelled)
@@ -122,14 +125,13 @@ export default function DashboardPage() {
       })) as ActiveBatch[];
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   // Fetch vessel status
   const { data: vessels = [] } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
       const { data, error } = await db
         .from("vessels_with_batch")
         .select("*")
@@ -146,6 +148,7 @@ export default function DashboardPage() {
       return data as VesselStatus[];
     },
     refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   // Fetch production shortfalls
@@ -161,6 +164,7 @@ export default function DashboardPage() {
       return (data || []) as ProductionShortfall[];
     },
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 
   // Calculate per-type vessel utilization

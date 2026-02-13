@@ -138,8 +138,12 @@ export function POReceiving({
       // Group items by catalog_type to batch queries
       const itemsByType = new Map<string, typeof items>();
       items.forEach((item) => {
-        const existing = itemsByType.get(item.catalog_type) || [];
-        itemsByType.set(item.catalog_type, [...existing, item]);
+        const existing = itemsByType.get(item.catalog_type);
+        if (existing) {
+          existing.push(item);
+        } else {
+          itemsByType.set(item.catalog_type, [item]);
+        }
       });
 
       // Fetch names from each catalog table

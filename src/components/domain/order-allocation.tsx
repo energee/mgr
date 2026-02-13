@@ -10,7 +10,7 @@
  * - Creates allocation records on save
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -191,9 +191,21 @@ export function OrderAllocation({
   // Calculate total allocated
   const totalAllocated = Object.values(allocations).reduce((sum, qty) => sum + qty, 0);
 
-  // Helper to get brand/package names
-  const getBrandName = (id: string) => brands?.find((b) => b.id === id)?.name || "—";
-  const getPackageName = (id: string) => packageTypes?.find((p) => p.id === id)?.name || "—";
+  // Pre-compute lookup maps to avoid O(n²) .find() per row
+  const brandMap = useMemo(() => {
+    const map = new Map<string, string>();
+    brands?.forEach((b) => map.set(b.id, b.name));
+    return map;
+  }, [brands]);
+
+  const packageMap = useMemo(() => {
+    const map = new Map<string, string>();
+    packageTypes?.forEach((p) => map.set(p.id, p.name));
+    return map;
+  }, [packageTypes]);
+
+  const getBrandName = (id: string) => brandMap.get(id) || "—";
+  const getPackageName = (id: string) => packageMap.get(id) || "—";
 
   const isLoading = orderLoading || fgLoading;
 
