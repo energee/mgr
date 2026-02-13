@@ -17,6 +17,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { IntegrationBadge } from "@/components/domain/integration-badge";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, RefreshCw } from "lucide-react";
 import { SecretKeyInput } from "@/components/domain/secret-key-input";
@@ -108,9 +109,7 @@ function GlobalApiKeySection() {
               when individual users don&apos;t have their own key configured.
             </CardDescription>
           </div>
-          <Badge variant={hasExistingKey ? "default" : "outline"}>
-            {hasExistingKey ? "Connected" : "Not Connected"}
-          </Badge>
+          <IntegrationBadge status={hasExistingKey ? "connected" : "not_connected"} />
         </div>
       </CardHeader>
       <CardContent>
@@ -215,6 +214,64 @@ function IntegrationKeySection({
 }
 
 // =============================================================================
+// QuickBooks Integration Card
+// =============================================================================
+
+function QuickBooksIntegrationCard() {
+  const [hasExistingKey, setHasExistingKey] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings/api-key?scope=integration&id=quickbooks")
+      .then((res) => res.json())
+      .then((data) => setHasExistingKey(data.hasKey === true))
+      .catch(() => {});
+  }, []);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-muted">
+              <QuickBooksIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">QuickBooks</CardTitle>
+              <CardDescription>
+                Sync financial data with QuickBooks Online. Automate invoicing and expense tracking.
+              </CardDescription>
+            </div>
+          </div>
+          <IntegrationBadge status={hasExistingKey ? "connected" : "not_connected"} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <IntegrationKeySection
+          integrationId="quickbooks"
+          keyLabel="QuickBooks Client ID"
+          keyPlaceholder="AB1cd2EFgh3..."
+        />
+        <div>
+          <h4 className="text-sm font-medium mb-2">Features</h4>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            {[
+              "Invoice sync",
+              "Expense tracking",
+              "Inventory valuation",
+            ].map((feature, index) => (
+              <li key={index} className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                {feature}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================================
 // Square Integration Card (dedicated card with sync controls)
 // =============================================================================
 
@@ -281,13 +338,7 @@ function SquareIntegrationCard() {
               Sync products, prices, and inventory from MGR to Square. Track taproom sales for reconciliation.
             </CardDescription>
           </div>
-          {isConnected ? (
-            <Badge variant="default">Connected</Badge>
-          ) : status?.isEnabled ? (
-            <Badge variant="secondary">Enabled</Badge>
-          ) : (
-            <Badge variant="outline">Not Connected</Badge>
-          )}
+          <IntegrationBadge status={isConnected ? "connected" : status?.isEnabled ? "enabled" : "not_connected"} />
         </div>
       </CardHeader>
       <CardContent className="space-y-6">

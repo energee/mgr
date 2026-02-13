@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -25,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { settingsKeys } from "@/lib/query-keys";
+import { IntegrationBadge } from "@/components/domain/integration-badge";
 import { SecretKeyInput } from "@/components/domain/secret-key-input";
 import { SlackIcon } from "@/components/ui/slack-icon";
 import {
@@ -57,13 +57,8 @@ function ConnectionBadge({
   isConnected: boolean;
   isEnabled: boolean;
 }) {
-  if (!isConnected) {
-    return <Badge variant="outline">Not Connected</Badge>;
-  }
-  if (isEnabled) {
-    return <Badge variant="default">Active</Badge>;
-  }
-  return <Badge variant="outline">Connected</Badge>;
+  const status = !isConnected ? "not_connected" : isEnabled ? "active" : "connected";
+  return <IntegrationBadge status={status} />;
 }
 
 export function SlackIntegrationCard() {
