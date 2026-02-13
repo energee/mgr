@@ -42,6 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import {
   DollarSign,
@@ -85,6 +86,20 @@ interface PricingTierPrice {
   format_id: string;
   sales_channel_id: string;
   price: number;
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function formatColumnLabel(f: PackageFormat): { name: string; unit: string } {
+  if (f.format_source === "keg_type") {
+    return { name: f.name, unit: "per keg" };
+  }
+  if (f.units_per_case) {
+    return { name: f.name, unit: `case/${f.units_per_case}` };
+  }
+  return { name: f.name, unit: "each" };
 }
 
 // =============================================================================
@@ -497,6 +512,11 @@ export default function PricingPage() {
 
   const isLoading = channelsLoading || tiersLoading || formatsLoading;
 
+  // Derived format groups: packaged first, then kegs
+  const packagedFormats = formats?.filter(f => f.format_source === "package_type") ?? [];
+  const kegFormats = formats?.filter(f => f.format_source === "keg_type") ?? [];
+  const allFormats = [...packagedFormats, ...kegFormats];
+
   if (isLoading) {
     return (
       <div className="space-y-6 max-w-6xl">
@@ -724,18 +744,42 @@ export default function PricingPage() {
             <div ref={tableRef} className="border rounded-lg">
               <Table className="table-fixed">
                 <TableHeader>
+                  {(packagedFormats.length > 0 && kegFormats.length > 0) && (
+                    <TableRow className="bg-muted/50 hover:bg-muted/50 border-b-0">
+                      <TableHead className="sticky left-0 z-10 bg-muted/50" />
+                      <TableHead
+                        colSpan={packagedFormats.length}
+                        className="text-center text-xs font-medium text-muted-foreground border-b-0"
+                      >
+                        Packaged
+                      </TableHead>
+                      <TableHead
+                        colSpan={kegFormats.length}
+                        className="text-center text-xs font-medium text-muted-foreground border-l border-b-0"
+                      >
+                        Draft / Kegs
+                      </TableHead>
+                    </TableRow>
+                  )}
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead className="sticky left-0 z-10 bg-muted/50 min-w-[120px]">
                       Tier
                     </TableHead>
-                    {formats.map((f) => (
-                      <TableHead
-                        key={f.id}
-                        className="text-right w-[120px]"
-                      >
-                        {f.name}
-                      </TableHead>
-                    ))}
+                    {allFormats.map((f) => {
+                      const label = formatColumnLabel(f);
+                      const isFirstKeg = kegFormats.length > 0 && f.id === kegFormats[0].id;
+                      return (
+                        <TableHead
+                          key={f.id}
+                          className={cn("text-right w-[120px]", isFirstKeg && "border-l")}
+                        >
+                          <div className="leading-tight">
+                            <div className="text-xs font-medium">{label.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-normal">{label.unit}</div>
+                          </div>
+                        </TableHead>
+                      );
+                    })}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -751,10 +795,11 @@ export default function PricingPage() {
                       <TableCell className="sticky left-0 z-10 bg-inherit border-r px-3 py-1 font-medium">
                         {tier.name}
                       </TableCell>
-                      {formats.map((fmt, fmtIdx) => {
+                      {allFormats.map((fmt, fmtIdx) => {
                         const priceObj = priceMap.get(tier.id)?.get(fmt.id);
+                        const isFirstKeg = kegFormats.length > 0 && fmt.id === kegFormats[0].id;
                         return (
-                          <TableCell key={fmt.id} className="px-1 py-0.5">
+                          <TableCell key={fmt.id} className={cn("px-1 py-0.5", isFirstKeg && "border-l")}>
                             <PriceCell
                               price={priceObj?.price ?? null}
                               tierId={tier.id}
