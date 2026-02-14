@@ -93,7 +93,9 @@ function NotificationItem({
           "w-2 h-2 rounded-full mt-2 flex-shrink-0",
           getPriorityColor(notification.priority)
         )}
+        aria-hidden="true"
       />
+      <span className="sr-only">{notification.priority} priority</span>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
@@ -129,7 +131,7 @@ function NotificationItem({
             e.stopPropagation();
             onMarkAsRead(notification.id);
           }}
-          title="Mark as read"
+          aria-label="Mark as read"
         >
           <Check className="h-3 w-3" />
         </Button>
@@ -142,7 +144,7 @@ function NotificationItem({
             e.stopPropagation();
             onDismiss(notification.id);
           }}
-          title="Dismiss"
+          aria-label="Dismiss"
         >
           <X className="h-3 w-3" />
         </Button>
@@ -250,7 +252,7 @@ export function NotificationBell() {
             </div>
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <AnimatedBell className="h-8 w-8 mb-2 opacity-50" />
+              <AnimatedBell className="h-8 w-8 mb-2 opacity-50" aria-hidden="true" />
               <p className="text-sm">No notifications</p>
             </div>
           ) : (

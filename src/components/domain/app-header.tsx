@@ -58,7 +58,7 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(breweryLogoSvg)))}`}
-            alt=""
+            alt={breweryName || "Brewery logo"}
             className="h-8 w-8 object-contain"
           />
         )}

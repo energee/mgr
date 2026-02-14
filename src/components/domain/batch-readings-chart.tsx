@@ -183,69 +183,88 @@ export function BatchReadingsChart({
             Add more readings to see the chart
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="h-[250px] w-full">
-            <LineChart
-              data={chartData}
-              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                minTickGap={32}
-              />
-              <YAxis
-                domain={yDomain}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                tickFormatter={(value) =>
-                  activeMetric === "gravity"
-                    ? `${value}°P`
-                    : `${value}°`
-                }
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(_, payload) => {
-                      if (payload && payload[0]) {
-                        return payload[0].payload.fullDate;
-                      }
-                      return "";
-                    }}
-                    formatter={(value) => {
-                      const unit = activeMetric === "gravity" ? "°P" : "°F";
-                      return [`${value}${unit}`, chartConfig[activeMetric].label];
+          <figure aria-label={`${chartConfig[activeMetric]?.label ?? activeMetric} readings over time`}>
+            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+              <LineChart
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={32}
+                />
+                <YAxis
+                  domain={yDomain}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tickFormatter={(value) =>
+                    activeMetric === "gravity"
+                      ? `${value}°P`
+                      : `${value}°`
+                  }
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      labelFormatter={(_, payload) => {
+                        if (payload && payload[0]) {
+                          return payload[0].payload.fullDate;
+                        }
+                        return "";
+                      }}
+                      formatter={(value) => {
+                        const unit = activeMetric === "gravity" ? "°P" : "°F";
+                        return [`${value}${unit}`, chartConfig[activeMetric].label];
+                      }}
+                    />
+                  }
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke={`var(--color-${activeMetric})`}
+                  strokeWidth={2}
+                  dot={{ fill: `var(--color-${activeMetric})`, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+                {activeMetric === "gravity" && targetFG && (
+                  <ReferenceLine
+                    y={targetFG}
+                    stroke="hsl(var(--muted-foreground))"
+                    strokeDasharray="5 5"
+                    label={{
+                      value: `Target FG: ${targetFG}°P`,
+                      position: "right",
+                      fill: "hsl(var(--muted-foreground))",
+                      fontSize: 12,
                     }}
                   />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke={`var(--color-${activeMetric})`}
-                strokeWidth={2}
-                dot={{ fill: `var(--color-${activeMetric})`, r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-              {activeMetric === "gravity" && targetFG && (
-                <ReferenceLine
-                  y={targetFG}
-                  stroke="hsl(var(--muted-foreground))"
-                  strokeDasharray="5 5"
-                  label={{
-                    value: `Target FG: ${targetFG}°P`,
-                    position: "right",
-                    fill: "hsl(var(--muted-foreground))",
-                    fontSize: 12,
-                  }}
-                />
-              )}
-            </LineChart>
-          </ChartContainer>
+                )}
+              </LineChart>
+            </ChartContainer>
+            <table className="sr-only">
+              <caption>{chartConfig[activeMetric]?.label ?? activeMetric} readings</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {chartData.map((point) => (
+                  <tr key={point.timestamp}>
+                    <td>{point.fullDate}</td>
+                    <td>{point.value}{point.unit}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </figure>
         )}
       </CardContent>
     </Card>

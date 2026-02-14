@@ -609,6 +609,8 @@ export function EntityDataTable<T = Record<string, unknown>>({
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setViewMode("table")}
+                aria-label="Table view"
+                aria-pressed={viewMode === "table"}
               >
                 <LayoutList className="h-4 w-4" />
               </Button>
@@ -617,6 +619,8 @@ export function EntityDataTable<T = Record<string, unknown>>({
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setViewMode("board")}
+                aria-label="Board view"
+                aria-pressed={viewMode === "board"}
               >
                 <KanbanIcon className="h-4 w-4" />
               </Button>
@@ -627,12 +631,12 @@ export function EntityDataTable<T = Record<string, unknown>>({
               {onCreateClick ? (
                 <>
                   New {entity.displayName}
-                  <Kbd>N</Kbd>
+                  <span aria-hidden="true"><Kbd>N</Kbd></span>
                 </>
               ) : (
                 <Link href={`${path}/new`}>
                   New {entity.displayName}
-                  <Kbd>N</Kbd>
+                  <span aria-hidden="true"><Kbd>N</Kbd></span>
                 </Link>
               )}
             </Button>
@@ -664,7 +668,10 @@ export function EntityDataTable<T = Record<string, unknown>>({
         {/* Refetch indicator */}
         {isFetching && !isLoading && (
           <div className="absolute top-2 right-2 z-10">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <div role="status">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <span className="sr-only">Loading</span>
+            </div>
           </div>
         )}
 
@@ -746,7 +753,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
                       className="pl-10 pr-8 h-8"
                     />
                     {!globalFilter && (
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
                         <Kbd>/</Kbd>
                       </div>
                     )}

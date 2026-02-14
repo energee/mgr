@@ -91,7 +91,7 @@
 
   /* Muted: Soft warm gray */
   --muted: oklch(0.955 0.008 85);
-  --muted-foreground: oklch(0.50 0.015 60);
+  --muted-foreground: oklch(0.40 0.015 60);
 
   /* Accent: Neutral warm gray for hover states (ghost buttons, etc.) */
   --accent: oklch(0.95 0.008 85);
@@ -152,7 +152,7 @@
 
   /* Muted */
   --muted: oklch(0.26 0.02 60);
-  --muted-foreground: oklch(0.65 0.015 60);
+  --muted-foreground: oklch(0.72 0.015 60);
 
   /* Accent: Neutral warm gray for hover states */
   --accent: oklch(0.26 0.02 60);
@@ -334,5 +334,17 @@
 
   .dark ::-webkit-scrollbar-thumb:hover {
     background: oklch(0.60 0.01 60 / 0.5);
+  }
+}
+
+/* Reduced motion: disable all animations for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

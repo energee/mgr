@@ -64,6 +64,16 @@ interface FieldDef {
 }
 
 // =============================================================================
+// ARIA props for accessible form fields
+// =============================================================================
+
+interface FieldAriaProps {
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
+  "aria-required"?: boolean;
+}
+
+// =============================================================================
 // FieldInput Props
 // =============================================================================
 
@@ -99,22 +109,45 @@ export function FieldInput({
   disabled,
   dynamicOptions,
 }: FieldInputProps) {
+  // Build aria-describedby from present elements
+  const describedByParts: string[] = [];
+  if (error) describedByParts.push(`${field.name}-error`);
+  if (field.description) describedByParts.push(`${field.name}-description`);
+  const describedBy = describedByParts.length > 0 ? describedByParts.join(" ") : undefined;
+
+  const ariaProps: FieldAriaProps = {
+    ...(describedBy && { "aria-describedby": describedBy }),
+    ...(error && { "aria-invalid": true }),
+    ...(field.required && { "aria-required": true }),
+  };
+
   return (
     <div className={getColSpanClass(field.colSpan, field.fullWidth)}>
       <Label htmlFor={field.name} className={field.required ? "required" : ""}>
         {field.label}
-        {field.required && <span className="text-destructive ml-1">*</span>}
+        {field.required && (
+          <>
+            <span className="text-destructive ml-1" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </>
+        )}
       </Label>
 
       <div className="mt-1.5">
-        {renderFieldInput(field, value, onChange, disabled, dynamicOptions)}
+        {renderFieldInput(field, value, onChange, disabled, dynamicOptions, ariaProps)}
       </div>
 
       {field.description && (
-        <p className="text-sm text-muted-foreground mt-1">{field.description}</p>
+        <p id={`${field.name}-description`} className="text-sm text-muted-foreground mt-1">
+          {field.description}
+        </p>
       )}
 
-      {error && <p className="text-sm text-destructive mt-1">{error}</p>}
+      {error && (
+        <p id={`${field.name}-error`} role="alert" className="text-sm text-destructive mt-1">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -128,7 +161,8 @@ export function renderFieldInput(
   value: unknown,
   onChange: (value: unknown) => void,
   disabled?: boolean,
-  dynamicOptions?: { value: string; label: string }[]
+  dynamicOptions?: { value: string; label: string }[],
+  ariaProps?: FieldAriaProps
 ) {
   switch (field.type) {
     case "text":
@@ -140,6 +174,7 @@ export function renderFieldInput(
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder}
           disabled={disabled}
+          {...ariaProps}
         />
       );
 
@@ -151,6 +186,7 @@ export function renderFieldInput(
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder}
           disabled={disabled}
+          {...ariaProps}
         />
       );
 
@@ -163,6 +199,7 @@ export function renderFieldInput(
           onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
           placeholder={field.placeholder}
           disabled={disabled}
+          {...ariaProps}
         />
       );
 
@@ -181,7 +218,7 @@ export function renderFieldInput(
           onValueChange={(v) => onChange(v === "_none" ? null : v)}
           disabled={disabled}
         >
-          <SelectTrigger id={field.name}>
+          <SelectTrigger id={field.name} {...ariaProps}>
             <SelectValue placeholder={field.placeholder || "Select..."} />
           </SelectTrigger>
           <SelectContent>
@@ -218,6 +255,7 @@ export function renderFieldInput(
             <ComboboxInput
               id={field.name}
               placeholder={field.placeholder || "Search..."}
+              {...ariaProps}
             />
             {!field.required && !!value && (
               <button
@@ -251,6 +289,7 @@ export function renderFieldInput(
           checked={Boolean(value)}
           onCheckedChange={onChange}
           disabled={disabled}
+          {...ariaProps}
         />
       );
 
@@ -262,6 +301,7 @@ export function renderFieldInput(
           onChange={onChange}
           disabled={disabled}
           placeholder={field.placeholder}
+          {...ariaProps}
         />
       );
 
@@ -273,6 +313,7 @@ export function renderFieldInput(
           onChange={onChange}
           disabled={disabled}
           placeholder={field.placeholder}
+          {...ariaProps}
         />
       );
 
@@ -287,6 +328,7 @@ export function renderFieldInput(
             onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
             placeholder={field.placeholder}
             disabled={disabled}
+            {...ariaProps}
           />
         );
       }
@@ -298,6 +340,7 @@ export function renderFieldInput(
           allowSwitch={field.allowUnitSwitch}
           placeholder={field.placeholder}
           disabled={disabled}
+          {...ariaProps}
         />
       );
 
@@ -310,6 +353,7 @@ export function renderFieldInput(
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder}
           disabled={disabled}
+          {...ariaProps}
         />
       );
   }

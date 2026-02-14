@@ -259,6 +259,7 @@ export function AppSidebar() {
 
       {/* Navigation */}
       <SidebarContent>
+        <nav aria-label="Main navigation">
         {navigation.map((section) => (
           <Collapsible
             key={section.label}
@@ -288,6 +289,7 @@ export function AppSidebar() {
             </SidebarGroup>
           </Collapsible>
         ))}
+        </nav>
       </SidebarContent>
 
       {/* Footer */}

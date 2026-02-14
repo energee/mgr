@@ -93,8 +93,16 @@ function KanbanCardContent<T = Record<string, unknown>>({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       className="bg-card rounded-md border p-3 shadow-sm cursor-pointer hover:border-primary/50 transition-colors"
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
       <div className="font-medium text-sm truncate">
         {title != null ? String(title) : "-"}

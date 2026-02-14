@@ -855,7 +855,8 @@ function FileUploadDropzone(props: FileUploadDropzoneProps) {
 
   return (
     <DropzonePrimitive
-      role="region"
+      role="group"
+      aria-label="File upload dropzone"
       id={context.dropzoneId}
       aria-controls={`${context.inputId} ${context.listId}`}
       data-disabled={context.disabled ? "" : undefined}
