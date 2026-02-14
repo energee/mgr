@@ -2,8 +2,8 @@
  * FieldInput - Universal Field Input Component
  *
  * Renders a single form field with label, input, error, and description.
- * Handles all input types: text, textarea, number, select, relation,
- * switch, checkbox, date, datetime, unit.
+ * Handles all input types: text, textarea, number, select, multiselect,
+ * relation, switch, checkbox, date, datetime, unit.
  *
  * Shared between EntityForm (legacy) and EntityDetailUnified (new).
  *
@@ -18,6 +18,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -229,6 +230,36 @@ export function renderFieldInput(
             ))}
           </SelectContent>
         </Select>
+      );
+    }
+
+    case "multiselect": {
+      const options = dynamicOptions || field.options || [];
+      const selected = Array.isArray(value) ? (value as string[]) : [];
+      return (
+        <div role="group" aria-label={field.label} className="flex flex-wrap gap-3" {...ariaProps}>
+          {options.map((option) => {
+            const checked = selected.includes(option.value);
+            return (
+              <label
+                key={option.value}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <Checkbox
+                  checked={checked}
+                  onCheckedChange={(c) => {
+                    const next = c
+                      ? [...selected, option.value]
+                      : selected.filter((v) => v !== option.value);
+                    onChange(next);
+                  }}
+                  disabled={disabled}
+                />
+                <span className="text-sm">{option.label}</span>
+              </label>
+            );
+          })}
+        </div>
       );
     }
 

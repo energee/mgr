@@ -5,16 +5,18 @@
  * Caches auth.users info per CLAUDE.md security guidelines.
  */
 
+import type { ReactNode } from "react";
 import { z } from "zod";
 import Image from "next/image";
 import type { EntityConfig } from "@/types/entity";
+import type { UserRole } from "@/lib/permissions";
 import { StatusBadge } from "@/components/universal/status-badge";
 
 // =============================================================================
 // Types
 // =============================================================================
 
-export type UserRole = "admin" | "production_manager" | "brewer" | "sales" | "viewer" | "customer";
+export type { UserRole };
 export type UserStatus = "active" | "inactive" | "pending";
 
 interface UserProfile {
@@ -91,6 +93,18 @@ const STATUS_DISPLAY: Record<string, { label: string; color: "error" | "default"
   pending: { label: "Pending", color: "warning" },
 };
 
+/** Renders an array of role strings as colored badges. */
+function renderRoleBadges(value: unknown): ReactNode {
+  const roles = (Array.isArray(value) ? value : [value]) as string[];
+  return (
+    <div className="flex flex-wrap gap-1">
+      {roles.map((r) => (
+        <StatusBadge key={r} status={r} config={ROLE_DISPLAY} />
+      ))}
+    </div>
+  );
+}
+
 // =============================================================================
 // Entity Configuration
 // =============================================================================
@@ -146,16 +160,7 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
       accessorKey: "roles",
       header: "Roles",
       sortable: false,
-      render: (value) => {
-        const roles = (Array.isArray(value) ? value : [value]) as string[];
-        return (
-          <div className="flex flex-wrap gap-1">
-            {roles.map((r) => (
-              <StatusBadge key={r} status={r} config={ROLE_DISPLAY} />
-            ))}
-          </div>
-        );
-      },
+      render: renderRoleBadges,
     },
     {
       accessorKey: "status",
@@ -225,7 +230,7 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
       fields: [
         { field: "display_name", label: "Display Name" },
         { field: "email", label: "Email" },
-        { field: "role_display", label: "Roles" },
+        { field: "roles", label: "Roles", render: renderRoleBadges },
         { field: "status_display", label: "Status" },
       ],
     },
@@ -311,7 +316,7 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
     {
       name: "roles",
       label: "Roles",
-      type: "select",
+      type: "multiselect",
       options: ROLE_OPTIONS,
       required: true,
       colSpan: 12,

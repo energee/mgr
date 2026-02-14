@@ -34,6 +34,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     .eq("id", user.id)
     .single();
 
+  // Cast needed: generated types don't include the `roles` column yet
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const roles = ((profile as any)?.roles ?? ["viewer"]) as UserRole[];
 
