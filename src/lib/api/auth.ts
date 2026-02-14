@@ -22,18 +22,9 @@ export interface AuthContext {
   supabase: SupabaseClient<Database>;
 }
 
-export interface RoleContext extends AuthContext {
-  role: string;
-}
-
 type AuthHandler = (
   request: NextRequest,
   context: AuthContext & { params?: Record<string, string> }
-) => Promise<NextResponse>;
-
-type RoleHandler = (
-  request: NextRequest,
-  context: RoleContext & { params?: Record<string, string> }
 ) => Promise<NextResponse>;
 
 export interface PermissionContext extends AuthContext {
@@ -84,35 +75,6 @@ export function withAuth(handler: AuthHandler) {
   };
 }
 
-export function withRoles(roles: string[], handler: RoleHandler) {
-  return withAuth(async (request, context) => {
-    const { user, supabase } = context;
-
-    const { data: profile, error } = await supabase
-      .from("user_profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (error || !profile) {
-      throw new ApiError("FORBIDDEN", "Unable to determine user role", 403);
-    }
-
-    if (!roles.includes(profile.role)) {
-      throw new ApiError(
-        "FORBIDDEN",
-        `This action requires one of the following roles: ${roles.join(", ")}`,
-        403
-      );
-    }
-
-    return handler(request, {
-      ...context,
-      role: profile.role,
-    });
-  });
-}
-
 export function withPermission(
   permission: Permission,
   handler: PermissionHandler,
@@ -120,6 +82,7 @@ export function withPermission(
   return withAuth(async (request, context) => {
     const { user, supabase } = context;
 
+    // Cast needed: generated types don't include the `roles` column yet
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: profile, error } = await (supabase as any)
       .from("user_profiles")
@@ -141,13 +104,10 @@ export function withPermission(
       );
     }
 
-    const params = context.params;
     return handler(request, {
-      user,
-      supabase,
+      ...context,
       roles,
       permissions: getPermissions(roles),
-      params,
     });
   });
 }

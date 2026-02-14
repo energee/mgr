@@ -123,10 +123,8 @@ export function hasPermission(
   roles: UserRole[],
   permission: Permission,
 ): boolean {
-  const allowedRoles = PERMISSION_MAP[permission];
-  return roles.some((role) =>
-    (allowedRoles as readonly string[]).includes(role),
-  );
+  const allowedRoles: readonly string[] = PERMISSION_MAP[permission];
+  return roles.some((role) => allowedRoles.includes(role));
 }
 
 /**
@@ -136,17 +134,9 @@ export function hasPermission(
  * components can check capabilities without repeated map lookups.
  */
 export function getPermissions(roles: UserRole[]): Permission[] {
-  const permissions: Permission[] = [];
-
-  for (const [permission, allowedRoles] of Object.entries(PERMISSION_MAP)) {
-    if (
-      roles.some((role) => (allowedRoles as readonly string[]).includes(role))
-    ) {
-      permissions.push(permission as Permission);
-    }
-  }
-
-  return permissions;
+  return (Object.keys(PERMISSION_MAP) as Permission[]).filter((permission) =>
+    hasPermission(roles, permission),
+  );
 }
 
 /**
