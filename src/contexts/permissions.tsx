@@ -4,7 +4,6 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import {
   type UserRole,
   type Permission,
-  hasPermission as checkPermission,
   getPermissions,
 } from "@/lib/permissions";
 
@@ -25,10 +24,11 @@ interface PermissionProviderProps {
 export function PermissionProvider({ roles, children }: PermissionProviderProps) {
   const value = useMemo(() => {
     const permissions = getPermissions(roles);
+    const permissionSet = new Set<Permission>(permissions);
     return {
       roles,
       permissions,
-      can: (permission: Permission) => checkPermission(roles, permission),
+      can: (permission: Permission) => permissionSet.has(permission),
       hasRole: (role: UserRole) => roles.includes(role),
     };
   }, [roles]);

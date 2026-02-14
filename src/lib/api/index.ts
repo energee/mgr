@@ -10,8 +10,8 @@
 export { successResponse, errorResponse, paginatedResponse } from "./response";
 export type { PaginationMeta, SuccessBody, ErrorBody } from "./response";
 
-export { withAuth, withRoles, withPermission } from "./auth";
-export type { AuthContext, RoleContext, PermissionContext } from "./auth";
+export { withAuth, withPermission } from "./auth";
+export type { AuthContext, PermissionContext } from "./auth";
 
 export {
   validateBody,
