@@ -7,7 +7,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
 import { userProfileEntity } from "@/entities/user-profile";
 
 interface EditUserPageProps {
@@ -18,9 +18,8 @@ export default function EditUserPage({ params }: EditUserPageProps) {
   const { id } = use(params);
 
   return (
-    <EntityForm
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      entity={userProfileEntity as any}
+    <EntityDetailUnified
+      entity={userProfileEntity}
       id={id}
       basePath="/settings/users"
     />

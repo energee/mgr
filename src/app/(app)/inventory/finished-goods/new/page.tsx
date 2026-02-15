@@ -1,8 +1,8 @@
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
 import { finishedGoodEntity } from "@/entities/finished-good";
 
 export default function NewFinishedGoodPage() {
-  return <EntityForm entity={finishedGoodEntity} basePath="/inventory/finished-goods" />;
+  return <EntityDetailUnified entity={finishedGoodEntity} basePath="/inventory/finished-goods" />;
 }

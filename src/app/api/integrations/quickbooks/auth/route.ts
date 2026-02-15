@@ -5,6 +5,7 @@
  * Does not redirect directly - the frontend controls the flow.
  */
 
+import { cookies } from "next/headers";
 import { withAuth } from "@/lib/api/auth";
 import { errorResponse, successResponse } from "@/lib/api/response";
 import { getClientCredentials } from "@/lib/quickbooks";
@@ -27,12 +28,24 @@ export const GET = withAuth(async (request) => {
     process.env.NEXT_PUBLIC_QBO_REDIRECT_URI ||
     `${new URL(request.url).origin}/api/integrations/quickbooks/callback`;
 
+  const state = crypto.randomUUID();
+
+  // Store state in httpOnly cookie for CSRF validation in the callback
+  const cookieStore = await cookies();
+  cookieStore.set("qbo_oauth_state", state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 600, // 10 minutes
+    path: "/api/integrations/quickbooks",
+  });
+
   const params = new URLSearchParams({
     client_id: creds.clientId,
     response_type: "code",
     scope: SCOPES,
     redirect_uri: redirectUri,
-    state: crypto.randomUUID(), // CSRF protection
+    state,
   });
 
   return successResponse({ url: `${QBO_AUTH_URL}?${params.toString()}` });

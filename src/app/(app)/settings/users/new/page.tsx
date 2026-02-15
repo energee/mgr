@@ -8,14 +8,13 @@
 
 "use client";
 
-import { EntityForm } from "@/components/universal/entity-form";
+import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
 import { userProfileEntity } from "@/entities/user-profile";
 
 export default function NewUserPage() {
   return (
-    <EntityForm
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      entity={userProfileEntity as any}
+    <EntityDetailUnified
+      entity={userProfileEntity}
       basePath="/settings/users"
     />
   );
