@@ -8,11 +8,13 @@ import { brandKeys, packageTypeKeys, packagingFormatKeys, entityKeys } from "@/l
  * Generic hook for fetching active catalog items from a Supabase table.
  * Note: Uses `as any` cast because table name is dynamic, not a literal type.
  */
+const DEFAULT_ORDER_BY = ["name"];
+
 export function useCatalog<T>(
   queryKey: readonly unknown[],
   table: string,
   select: string,
-  orderBy: string[] = ["name"]
+  orderBy: string[] = DEFAULT_ORDER_BY
 ): UseQueryResult<T[]> {
   const supabase = createClient();
 

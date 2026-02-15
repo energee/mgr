@@ -104,7 +104,6 @@ export function handleApiError(error: unknown): ApiError {
     if (mapped) {
       return new ApiError(mapped.code, mapped.message, mapped.status, {
         pg_code: error.code,
-        detail: error.details ?? error.message,
       });
     }
   }

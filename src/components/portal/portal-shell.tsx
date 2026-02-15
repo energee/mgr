@@ -1,5 +1,6 @@
 "use client";
 
+import DOMPurify from "isomorphic-dompurify";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -80,7 +81,7 @@ export function PortalShell({
                 {breweryLogo ? (
                   <span
                     className="h-8 w-8 [&>svg]:h-full [&>svg]:w-full"
-                    dangerouslySetInnerHTML={{ __html: breweryLogo }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(breweryLogo) }}
                   />
                 ) : (
                   <span className="text-lg font-semibold tracking-tight">

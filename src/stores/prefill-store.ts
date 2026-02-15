@@ -45,7 +45,6 @@ function readFromBacking(): {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (raw) {
-      sessionStorage.removeItem(STORAGE_KEY);
       return JSON.parse(raw);
     }
   } catch {
