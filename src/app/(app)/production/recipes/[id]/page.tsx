@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { RecipeCloneDialog } from "@/components/domain/recipe-clone-dialog";
-import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
 import { recipeEntity } from "@/entities/recipe";
 import { recipeKeys } from "@/lib/query-keys";
 
@@ -18,7 +17,6 @@ export default function RecipeDetailPage({
   const { id } = use(params);
   const router = useRouter();
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
-  const [showBrewDay, setShowBrewDay] = useState(false);
   const supabase = createClient();
 
   // Fetch recipe name for clone dialog
@@ -37,10 +35,6 @@ export default function RecipeDetailPage({
 
   // Handle custom actions
   const handleAction = useCallback((actionName: string) => {
-    if (actionName === "start_brew_day") {
-      setShowBrewDay(true);
-      return true;
-    }
     if (actionName === "clone") {
       setCloneDialogOpen(true);
       return true;
@@ -63,25 +57,13 @@ export default function RecipeDetailPage({
       />
 
       {recipe && (
-        <>
-          <StartBrewDayDialog
-            recipeId={id}
-            recipeName={recipe.name}
-            open={showBrewDay}
-            onOpenChange={setShowBrewDay}
-            onSuccess={(brewLogId) => {
-              setShowBrewDay(false);
-              router.push(`/production/brew-logs/${brewLogId}`);
-            }}
-          />
-          <RecipeCloneDialog
-            recipeId={id}
-            recipeName={recipe.name}
-            open={cloneDialogOpen}
-            onOpenChange={setCloneDialogOpen}
-            onSuccess={handleCloneSuccess}
-          />
-        </>
+        <RecipeCloneDialog
+          recipeId={id}
+          recipeName={recipe.name}
+          open={cloneDialogOpen}
+          onOpenChange={setCloneDialogOpen}
+          onSuccess={handleCloneSuccess}
+        />
       )}
     </>
   );
