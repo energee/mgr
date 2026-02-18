@@ -8,7 +8,10 @@
 -- Drop recipe_id from brew_logs
 -- =============================================================================
 
--- Drop indexes first (some were created with different names in different migrations)
+-- Drop dependent views first (they reference recipe_id)
+DROP VIEW IF EXISTS brew_log_metrics CASCADE;
+
+-- Drop indexes (some were created with different names in different migrations)
 DROP INDEX IF EXISTS idx_brew_logs_recipe;
 DROP INDEX IF EXISTS idx_brew_logs_recipe_id;
 
@@ -51,7 +54,7 @@ COMMENT ON VIEW brew_logs_with_batches IS 'Brew logs enriched with batch/recipe 
 -- Remove JOIN on recipes (recipe_id no longer on brew_logs).
 -- Derive recipe info from batches instead.
 
-DROP VIEW IF EXISTS brew_log_metrics CASCADE;
+-- Recreate brew_log_metrics without recipe_id dependency
 CREATE VIEW brew_log_metrics
 WITH (security_invoker = true)
 AS
