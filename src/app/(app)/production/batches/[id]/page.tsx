@@ -165,6 +165,10 @@ export default function BatchDetailPage({
       setShowTransfer(true);
       return true;
     }
+    if (actionName === "start_brew_day") {
+      setShowStartBrewDay(true);
+      return true;
+    }
     return false; // Let EntityDetail handle normally
   }, []);
 
