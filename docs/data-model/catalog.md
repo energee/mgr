@@ -345,6 +345,29 @@ Fruit additions.
 
 ---
 
+## `water_addition_profiles`
+
+Named, reusable sets of water chemistry additions (salts, acids). Distinct from `water_profiles` which represent source water chemistry. Addition profiles define what salts/acids to add to achieve target water chemistry for a style of beer.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| name | TEXT | Profile name (e.g., "IPA Salts", "Lager Additions") |
+| description | TEXT | Notes about this profile |
+| is_active | BOOLEAN | Active flag (default: true) |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**RLS**: Enabled. Authenticated users have full CRUD access.
+
+**Relationships:**
+- Has many `recipe_additions` (via `profile_id`) — the individual salt/acid items in this profile
+- Has many `recipes` (via `water_addition_profile_id`) — recipes that use this profile
+
+**Default profile**: The brewery's default water addition profile is set via `system_settings` key `default_water_profile_id`.
+
+---
+
 ## `additives`
 
 All brewing additives: water chemistry (salts, acids), clarifiers, nutrients, enzymes, etc.
