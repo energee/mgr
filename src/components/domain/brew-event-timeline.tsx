@@ -228,12 +228,11 @@ export function BrewEventTimeline({
     }
   };
 
-  const getPhaseIcon = (phase: string) => {
+  function getPhaseIcon(phase: string): React.ComponentType<{ className?: string }> {
     const config = phaseConfig[phase as keyof typeof phaseConfig];
     const iconName = config?.icon || "more-horizontal";
-    const Icon = iconMap[iconName] || MoreHorizontal;
-    return Icon;
-  };
+    return iconMap[iconName] || MoreHorizontal;
+  }
 
   if (isLoading) {
     return (
@@ -246,37 +245,38 @@ export function BrewEventTimeline({
   return (
     <>
       <div>
-          {sortedEvents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No events recorded yet.</p>
-              {!readOnly && onAddEvent && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddForm(true)}
-                  className="mt-4"
-                >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Record First Event
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="relative">
-              {/* Timeline line */}
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+        {sortedEvents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground">No events recorded yet.</p>
+            {!readOnly && onAddEvent && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddForm(true)}
+                className="mt-4"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Record First Event
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="relative">
+            {/* Timeline line */}
+            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
 
-              {/* Events */}
-              <div className="space-y-4">
-                {sortedEvents.map((event, index) => {
-                  const eventId = event.id || `event-${index}`;
-                  const isExpanded = expandedEvents.has(eventId);
-                  const PhaseIcon = getPhaseIcon(event.phase);
-                  const phaseLabel = event.phase === "other"
-                    ? event.custom_phase || "Other"
-                    : phaseConfig[event.phase as keyof typeof phaseConfig]?.label || event.phase;
-                  const colorClass = phaseColors[event.phase] || phaseColors.other;
+            {/* Events */}
+            <div className="space-y-4">
+              {sortedEvents.map((event, index) => {
+                const eventId = event.id || `event-${index}`;
+                const isExpanded = expandedEvents.has(eventId);
+                const PhaseIcon = getPhaseIcon(event.phase);
+                const phaseLabel =
+                  event.phase === "other"
+                    ? (event.custom_phase || "Other")
+                    : (phaseConfig[event.phase as keyof typeof phaseConfig]?.label || event.phase);
+                const colorClass = phaseColors[event.phase] || phaseColors.other;
 
                   return (
                     <Collapsible
@@ -406,7 +406,7 @@ export function BrewEventTimeline({
               </div>
             </div>
           )}
-      </div>
+        </div>
 
       {/* Add Event Dialog */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
@@ -443,7 +443,7 @@ export function BrewEventTimeline({
       <AlertDialog open={!!deletingEventId} onOpenChange={() => setDeletingEventId(null)}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-<AlertDialogTitle>Delete event?</AlertDialogTitle>
+            <AlertDialogTitle>Delete event?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete this brew event. This action cannot
               be undone.

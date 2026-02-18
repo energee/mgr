@@ -146,30 +146,24 @@ export default function BatchDetailPage({
     return null;
   }, [batch, linkedBrewLogs, id]);
 
-  // Custom action handler for batch-specific actions
+  // Custom action handler for batch-specific actions.
+  // Returns true when the action is handled by a dialog, false to let EntityDetail handle it.
   const handleAction = useCallback((actionName: string) => {
-    if (actionName === "start_fermentation") {
-      setShowStartFermentation(true);
-      return true; // Indicates action was handled
-    }
-    // Both cancel and archive use the same dialog (it adapts based on status)
-    if (actionName === "cancel" || actionName === "archive") {
-      setShowCancellation(true);
-      return true; // Indicates action was handled
-    }
-    if (actionName === "blend") {
-      setShowBlend(true);
-      return true; // Indicates action was handled
-    }
-    if (actionName === "transfer_vessel") {
-      setShowTransfer(true);
+    const dialogSetters: Record<string, (open: boolean) => void> = {
+      start_fermentation: setShowStartFermentation,
+      cancel: setShowCancellation,
+      archive: setShowCancellation, // Same dialog adapts based on batch status
+      blend: setShowBlend,
+      transfer_vessel: setShowTransfer,
+      start_brew_day: setShowStartBrewDay,
+    };
+
+    const setter = dialogSetters[actionName];
+    if (setter) {
+      setter(true);
       return true;
     }
-    if (actionName === "start_brew_day") {
-      setShowStartBrewDay(true);
-      return true;
-    }
-    return false; // Let EntityDetail handle normally
+    return false;
   }, []);
 
   const handleDialogSuccess = useCallback(() => {
@@ -237,25 +231,23 @@ export default function BatchDetailPage({
             onOpenChange={setShowTransfer}
             onSuccess={handleDialogSuccess}
           />
-        </>
-      )}
 
-      {batch && batch.id && batch.batch_number && (
-        <StartBrewDayDialog
-          batchId={batch.id}
-          batchNumber={batch.batch_number}
-          batchName={batch.name}
-          recipeName={recipe?.name ?? null}
-          volumeBbl={batch.volume_bbl}
-          open={showStartBrewDay}
-          onOpenChange={setShowStartBrewDay}
-          onSuccess={(brewLogId) => {
-            queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
-            queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
-            queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-            router.push(`/production/brew-logs/${brewLogId}`);
-          }}
-        />
+          <StartBrewDayDialog
+            batchId={batch.id}
+            batchNumber={batch.batch_number}
+            batchName={batch.name}
+            recipeName={recipe?.name ?? null}
+            volumeBbl={batch.volume_bbl}
+            open={showStartBrewDay}
+            onOpenChange={setShowStartBrewDay}
+            onSuccess={(brewLogId) => {
+              queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
+              queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
+              queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+              router.push(`/production/brew-logs/${brewLogId}`);
+            }}
+          />
+        </>
       )}
     </div>
   );

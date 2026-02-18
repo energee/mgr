@@ -679,9 +679,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   useEffect(() => {
     function isInputElement(el: Element | null): boolean {
       if (!el) return false;
-      const tag = el.tagName.toLowerCase();
-      return tag === "input" || tag === "textarea" || tag === "select"
-        || (el as HTMLElement).isContentEditable;
+      return el.matches("input, textarea, select, [contenteditable]");
     }
 
     function confirmDirtyNavigation(): boolean {
@@ -1133,16 +1131,24 @@ function UnifiedSectionCard<T>({
   );
 
   const HeaderActions = section.headerActions;
+  const headerClassName = HeaderActions
+    ? "flex flex-row items-center justify-between"
+    : undefined;
+
+  // Shared section header for all rendering paths
+  const sectionHeader = (
+    <CardHeader className={headerClassName}>
+      <CardTitle>{section.title}</CardTitle>
+      {HeaderActions && <HeaderActions data={data} />}
+    </CardHeader>
+  );
 
   // Custom component handling
   if (editing && section.editComponent) {
     const EditComponent = section.editComponent;
     return (
       <Card>
-        <CardHeader className={HeaderActions ? "flex flex-row items-center justify-between" : undefined}>
-          <CardTitle>{section.title}</CardTitle>
-          {HeaderActions && <HeaderActions data={data} />}
-        </CardHeader>
+        {sectionHeader}
         <CardContent>
           <EditComponent data={data} editing={true} form={form} />
         </CardContent>
@@ -1154,10 +1160,7 @@ function UnifiedSectionCard<T>({
     const CustomComponent = section.component;
     return (
       <Card>
-        <CardHeader className={HeaderActions ? "flex flex-row items-center justify-between" : undefined}>
-          <CardTitle>{section.title}</CardTitle>
-          {HeaderActions && <HeaderActions data={data} />}
-        </CardHeader>
+        {sectionHeader}
         <CardContent>
           <CustomComponent
             data={data}
@@ -1172,10 +1175,7 @@ function UnifiedSectionCard<T>({
   // Render fields using UnifiedField
   return (
     <Card>
-      <CardHeader className={HeaderActions ? "flex flex-row items-center justify-between" : undefined}>
-        <CardTitle>{section.title}</CardTitle>
-        {HeaderActions && <HeaderActions data={data} />}
-      </CardHeader>
+      {sectionHeader}
       <CardContent>
         <dl className="grid grid-cols-12 gap-4">
           {section.fields?.map((field) => {
