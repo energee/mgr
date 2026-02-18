@@ -3,13 +3,17 @@
 /**
  * AdditionsEditor - Recipe Additions Management Component
  *
- * Editor for managing recipe additions (water chemistry, clarifiers, nutrients).
+ * General-purpose editor for managing recipe additions (clarifiers, nutrients, etc.).
+ * Water salts and acids are typically managed via water addition profiles; use the
+ * `excludeTypes` prop to filter them from the catalog on recipe pages.
+ *
  * Features:
  * - Searchable additive selector from catalog grouped by type
  * - Amount input with unit selection
  * - Timing selection (mash, sparge, boil, whirlpool, fermentation, packaging)
  * - Target selection for water salts (mash, sparge, kettle)
  * - Reorder support
+ * - Optional type exclusion via `excludeTypes` prop
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -81,6 +85,8 @@ interface AdditionsEditorProps {
   items: AdditionItem[];
   onChange: (items: AdditionItem[]) => void;
   disabled?: boolean;
+  /** Additive types to exclude from the catalog (e.g., ["water_salt", "acid"]) */
+  excludeTypes?: string[];
 }
 
 const TIMING_OPTIONS = [
@@ -124,12 +130,21 @@ export function AdditionsEditor({
   items,
   onChange,
   disabled = false,
+  excludeTypes = [],
 }: AdditionsEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Fetch additives catalog
-  const { data: additiveCatalog = [], isLoading } = useCatalog<AdditiveCatalogItem>(catalogKeys.additives(), "additives", "id, name, type, description, typical_amount, typical_unit", ["type", "name"]);
+  // Fetch additives catalog, optionally excluding certain types
+  const { data: rawCatalog = [], isLoading } = useCatalog<AdditiveCatalogItem>(catalogKeys.additives(), "additives", "id, name, type, description, typical_amount, typical_unit", ["type", "name"]);
+
+  const additiveCatalog = useMemo(
+    () =>
+      excludeTypes.length > 0
+        ? rawCatalog.filter((a) => !excludeTypes.includes(a.type))
+        : rawCatalog,
+    [rawCatalog, excludeTypes]
+  );
 
   // Add additive
   const handleAdd = useCallback(

@@ -3,11 +3,11 @@
 /**
  * Recipe Additions Page
  *
- * Manage water chemistry, clarifiers, and nutrient additions for a recipe.
- * Uses the AdditionsEditor component for inline editing of recipe_additions.
+ * Manage clarifiers, nutrients, and other non-water-chemistry additions for a recipe.
+ * Water salts and acids are managed via water addition profiles (Settings > Addition Profiles).
  */
 
-import { use, useState } from "react";
+import { use, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { AdditionsEditor, type AdditionItem } from "@/components/domain/additions-editor";
@@ -15,10 +15,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Info } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { recipeKeys } from "@/lib/query-keys";
+
+/** Additive types managed via water addition profiles, excluded from this editor */
+const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
 
 export default function RecipeAdditionsPage({
   params,
@@ -75,13 +78,22 @@ export default function RecipeAdditionsPage({
     },
   });
 
+  // Filter to non-water-chemistry additions only
+  const nonWaterAdditions = useMemo(
+    () =>
+      (additions || []).filter(
+        (a) => !WATER_CHEMISTRY_TYPES.includes(a.additives?.type || "")
+      ),
+    [additions]
+  );
+
   // Sync fetched data to local editable state (React recommended pattern:
   // https://react.dev/reference/react/useState#storing-information-from-previous-renders)
-  const [prevAdditions, setPrevAdditions] = useState(additions);
-  if (additions && additions !== prevAdditions) {
-    setPrevAdditions(additions);
+  const [prevAdditions, setPrevAdditions] = useState(nonWaterAdditions);
+  if (nonWaterAdditions !== prevAdditions && nonWaterAdditions.length >= 0) {
+    setPrevAdditions(nonWaterAdditions);
     setItems(
-      additions.map((a) => ({
+      nonWaterAdditions.map((a) => ({
         id: a.id,
         additive_id: a.additive_id,
         amount: a.amount,
@@ -101,15 +113,23 @@ export default function RecipeAdditionsPage({
     setHasChanges(true);
   };
 
-  // Save mutation
+  // Save mutation — only touches non-water-chemistry items
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Delete all existing additions for this recipe
-      const { error: deleteError } = await supabase
-        .from("recipe_additions")
-        .delete()
-        .eq("recipe_id", id);
-      if (deleteError) throw deleteError;
+      // Get IDs of existing non-water-chemistry additions to delete
+      const existingNonWaterIds = (additions || [])
+        .filter((a) => !WATER_CHEMISTRY_TYPES.includes(a.additives?.type || ""))
+        .map((a) => a.id)
+        .filter(Boolean) as string[];
+
+      // Delete existing non-water additions for this recipe
+      if (existingNonWaterIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("recipe_additions")
+          .delete()
+          .in("id", existingNonWaterIds);
+        if (deleteError) throw deleteError;
+      }
 
       // Insert new additions
       if (items.length > 0) {
@@ -162,7 +182,7 @@ export default function RecipeAdditionsPage({
           <div className="flex-1">
             <h1 className="text-2xl font-bold">{recipe?.name}</h1>
             <p className="text-muted-foreground">
-              Water Chemistry & Additions
+              Clarifiers, Nutrients & Other Additions
             </p>
           </div>
           <Button
@@ -178,13 +198,33 @@ export default function RecipeAdditionsPage({
           </Button>
         </div>
 
+        {/* Info about water chemistry */}
+        {recipe?.water_addition_profile_id && (
+          <div className="flex items-start gap-3 rounded-lg border bg-muted/50 p-4">
+            <Info className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="text-sm text-muted-foreground">
+              Water salts and acids are managed via the linked{" "}
+              <Link
+                href={`/settings/water-addition-profiles/${recipe.water_addition_profile_id}`}
+                className="underline hover:text-foreground"
+              >
+                water addition profile
+              </Link>
+              . This page manages clarifiers, nutrients, and other recipe-specific
+              additions.
+            </div>
+          </div>
+        )}
+
         {/* Additions Editor */}
         <Card>
           <CardHeader>
             <CardTitle>Recipe Additions</CardTitle>
             <CardDescription>
-              Add water salts, acids, clarifiers, and nutrients. These additions
-              will be part of the recipe specification.
+              Add clarifiers, nutrients, and other additions to this recipe.
+              {!recipe?.water_addition_profile_id && (
+                <> Water salts and acids are managed via addition profiles in Settings.</>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -199,6 +239,7 @@ export default function RecipeAdditionsPage({
                 items={items}
                 onChange={handleChange}
                 disabled={saveMutation.isPending}
+                excludeTypes={WATER_CHEMISTRY_TYPES}
               />
             )}
           </CardContent>
@@ -211,17 +252,24 @@ export default function RecipeAdditionsPage({
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              <strong>Water Salts:</strong> Gypsum (CaSO₄), Calcium Chloride (CaCl₂),
-              Epsom Salt (MgSO₄), etc. for water chemistry adjustment.
-            </p>
-            <p>
-              <strong>Acids:</strong> Lactic acid, phosphoric acid for mash pH adjustment.
-            </p>
-            <p>
               <strong>Clarifiers:</strong> Whirlfloc, Irish Moss, gelatin for clarity.
             </p>
             <p>
               <strong>Nutrients:</strong> Yeast nutrients, Fermaid-O, etc. for healthy fermentation.
+            </p>
+            <p>
+              <strong>Other:</strong> Antifoam, enzymes, or other process additions.
+            </p>
+            <p className="text-xs border-t pt-2 mt-2">
+              Water salts (Gypsum, CaCl₂, etc.) and acids (lactic, phosphoric) are managed
+              via{" "}
+              <Link
+                href="/settings/water-addition-profiles"
+                className="underline hover:text-foreground"
+              >
+                addition profiles
+              </Link>
+              .
             </p>
           </CardContent>
         </Card>
