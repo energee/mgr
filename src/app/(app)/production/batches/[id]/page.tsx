@@ -236,12 +236,13 @@ export default function BatchDetailPage({
         </>
       )}
 
-      {recipe && (
+      {batch && batch.id && batch.batch_number && (
         <StartBrewDayDialog
-          recipeId={recipe.id}
-          recipeName={recipe.name}
-          existingBatchId={id}
-          existingBatchVolume={batch?.volume_bbl ?? undefined}
+          batchId={batch.id}
+          batchNumber={batch.batch_number}
+          batchName={batch.name}
+          recipeName={recipe?.name ?? null}
+          volumeBbl={batch.volume_bbl}
           open={showStartBrewDay}
           onOpenChange={setShowStartBrewDay}
           onSuccess={(brewLogId) => {
