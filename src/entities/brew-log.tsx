@@ -226,12 +226,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       field: "status",
       type: "multiselect",
       label: "Status",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "in_progress", label: "In Progress" },
-        { value: "completed", label: "Completed" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: statusOptions,
     },
   ],
 

@@ -51,7 +51,7 @@ interface LinkedBatch {
     status: string;
     volume_bbl: number | null;
     current_vessel_name: string | null;
-    recipe_name: string | null;
+    recipe: { name: string } | null;
   } | null;
 }
 
@@ -77,7 +77,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
             status,
             volume_bbl,
             current_vessel_name,
-            recipe_name
+            recipe:recipes(name)
           )
         `
         )
@@ -126,10 +126,10 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
   return (
     <div className="space-y-5">
       {/* Recipe (derived from linked batches) */}
-      {validBatches[0]?.batch?.recipe_name && (
+      {validBatches[0]?.batch?.recipe?.name && (
         <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-4 py-3">
           <Beer className="h-5 w-5 shrink-0 text-muted-foreground" />
-          <span className="font-medium">{validBatches[0].batch.recipe_name}</span>
+          <span className="font-medium">{validBatches[0].batch.recipe.name}</span>
         </div>
       )}
 
