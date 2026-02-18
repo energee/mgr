@@ -3,15 +3,18 @@
 /**
  * Brewery Settings Page
  *
- * Configure brewery preferences including measurement units.
- * Unit preferences are stored per-user in the user_preferences table.
+ * Configure brewery preferences including measurement units and
+ * default water profile (stored in system_settings).
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
+import { settingsKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -219,6 +222,139 @@ export default function BrewerySettingsPage() {
         </form>
       )}
 
+      <DefaultWaterProfileCard />
     </div>
+  );
+}
+
+// =============================================================================
+// Default Water Profile Card
+// =============================================================================
+
+/** Manages the default_water_profile_id system setting */
+function DefaultWaterProfileCard() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Fetch current default from system_settings
+  const { data: currentDefault, isLoading: settingLoading } = useQuery({
+    queryKey: settingsKeys.systemSetting("default_water_profile_id"),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "default_water_profile_id")
+        .single();
+      if (error) throw error;
+      const val = data?.value;
+      return typeof val === "string" && val !== "null" ? val : null;
+    },
+  });
+
+  // Fetch water profiles for dropdown
+  const { data: profiles = [], isLoading: profilesLoading } = useQuery({
+    queryKey: ["water_profiles", "options"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("water_profiles")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Sync server state to local
+  const [prevDefault, setPrevDefault] = useState(currentDefault);
+  if (currentDefault !== prevDefault) {
+    setPrevDefault(currentDefault);
+    setSelectedId(currentDefault ?? null);
+    setHasChanges(false);
+  }
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("system_settings")
+        .update({ value: selectedId || "null" })
+        .eq("key", "default_water_profile_id");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: settingsKeys.systemSetting("default_water_profile_id"),
+      });
+      setHasChanges(false);
+      toast.success("Default water profile saved");
+    },
+    onError: (error) => {
+      toast.error("Failed to save: " + error.message);
+    },
+  });
+
+  const isLoading = settingLoading || profilesLoading;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Default Water Profile</CardTitle>
+        <CardDescription>
+          Select the default source water profile for new recipes.
+          Individual recipes can override this.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        ) : (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="default_water_profile">Source Water</Label>
+              <Select
+                value={selectedId || "_none"}
+                onValueChange={(value) => {
+                  setSelectedId(value === "_none" ? null : value);
+                  setHasChanges(true);
+                }}
+              >
+                <SelectTrigger id="default_water_profile" className="w-full">
+                  <SelectValue placeholder="No default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">No default</SelectItem>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                New recipes will use this water profile by default. Manage profiles
+                in Settings &gt; Water Profiles.
+              </p>
+            </div>
+            {hasChanges && (
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={() => saveMutation.mutate()}
+                  disabled={saveMutation.isPending}
+                >
+                  {saveMutation.isPending && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Save
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

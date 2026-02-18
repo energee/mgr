@@ -340,15 +340,13 @@ export const recipeEntity: EntityConfig<Recipe> = {
         {
           name: "water_profile_id",
           label: "Water Profile",
-          type: "select",
+          type: "relation",
+          relation: {
+            entity: "water_profile",
+            displayField: "name",
+          },
           placeholder: "Select water profile...",
           colSpan: 6,
-          dynamicOptions: {
-            table: "water_profiles",
-            valueField: "id",
-            labelField: "name",
-            orderBy: "name",
-          },
         },
         {
           name: "pricing_tier_id",

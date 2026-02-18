@@ -50,6 +50,7 @@ import { binEntity } from "./bin";
 import { deliveryEntity } from "./delivery";
 import { locationTransferEntity } from "./location-transfer";
 import { waterAdditionProfileEntity } from "./water-addition-profile";
+import { waterProfileEntity } from "./water-profile";
 
 // =============================================================================
 // Register All Entities
@@ -102,6 +103,7 @@ registerEntity(locationEntity);
 registerEntity(userProfileEntity);
 registerEntity(enumValueEntity);
 registerEntity(waterAdditionProfileEntity);
+registerEntity(waterProfileEntity);
 
 // =============================================================================
 // Exports
@@ -179,3 +181,5 @@ export { locationTransferEntity } from "./location-transfer";
 export type { LocationTransferFormValues } from "./location-transfer";
 export { waterAdditionProfileEntity } from "./water-addition-profile";
 export type { WaterAdditionProfileFormValues } from "./water-addition-profile";
+export { waterProfileEntity } from "./water-profile";
+export type { WaterProfileFormValues } from "./water-profile";

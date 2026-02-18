@@ -198,6 +198,7 @@ export const settingsKeys = {
   enums: () => ["settings", "enums"] as const,
   enumValues: (enumType: string) => ["settings", "enums", enumType] as const,
   systemSettings: () => ["system-settings"] as const,
+  systemSetting: (key: string) => ["system-settings", key] as const,
   pricingChannels: () => ["pricing-channels"] as const,
   pricingMatrix: (channelId?: string) =>
     channelId
