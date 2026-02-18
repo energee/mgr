@@ -2,10 +2,8 @@
  * Brew Log Entity Configuration
  *
  * Brew logs capture the hot-side brewing process (mash through knockout).
- * They are decoupled from batches to support:
- * - Split fermentation (1 brew → multiple batches)
- * - Parti-gyle brewing
- * - Blend at knockout
+ * They are linked to batches via brew_log_batches junction table.
+ * Recipe is derived from linked batches (not stored on brew_logs).
  *
  * Lifecycle: draft → in_progress → completed
  */
@@ -90,7 +88,6 @@ const brewEventSchema = z.object({
 export const brewLogSchema = z.object({
   brew_number: z.string().min(1, "Brew number is required"),
   brew_date: z.string().min(1, "Brew date is required"),
-  recipe_id: z.string().uuid().nullable().optional(),
   brewer_id: z.string().uuid().nullable().optional(),
   status: z.string().default("draft"),
   events: z.array(brewEventSchema).default([]),
@@ -186,6 +183,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
   // ---------------------------------------------------------------------------
   name: "brew_log",
   table: "brew_logs",
+  viewTable: "brew_logs_with_batches",
   displayName: "Brew Log",
   displayNamePlural: "Brew Logs",
   description: "Brew day records capturing the hot-side process from mash through knockout",
@@ -218,12 +216,8 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       ),
     },
     {
-      accessorKey: "recipe_id",
-      header: "Recipe",
-      relation: {
-        entity: "recipe",
-        displayField: "name",
-      },
+      accessorKey: "batch_numbers",
+      header: "Batches",
     },
   ],
 
@@ -308,13 +302,6 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           colSpan: 6,
         },
         {
-          name: "recipe_id",
-          label: "Recipe",
-          type: "relation",
-          relation: { entity: "recipe", displayField: "name" },
-          colSpan: 6,
-        },
-        {
           name: "brewer_id",
           label: "Brewer",
           type: "relation",
@@ -375,16 +362,6 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       label: "Brew Date",
       type: "date",
       required: true,
-      colSpan: 6,
-    },
-    {
-      name: "recipe_id",
-      label: "Recipe",
-      type: "relation",
-      relation: {
-        entity: "recipe",
-        displayField: "name",
-      },
       colSpan: 6,
     },
     {
@@ -454,13 +431,6 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
   // ---------------------------------------------------------------------------
   relations: [
     {
-      name: "recipe",
-      entity: "recipe",
-      type: "belongsTo",
-      foreignKey: "recipe_id",
-      showInDetail: true,
-    },
-    {
       name: "brewer",
       entity: "user_profile",
       type: "belongsTo",
@@ -475,9 +445,9 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
   queryExamples: [
     "Show me all brews from this week",
     "What brews are currently in progress?",
-    "Find brews for the Hazy IPA recipe",
+    "Find brews linked to batch B-20240115-01",
     "Which brewer did BRW-2024-015?",
   ],
 
-  keyFields: ["brew_number", "brew_date", "status", "recipe_id"],
+  keyFields: ["brew_number", "brew_date", "status"],
 };

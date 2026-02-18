@@ -40,7 +40,6 @@ interface BrewSummaryLink {
     status: string;
     events: unknown[] | null;
     brewer_id: string | null;
-    recipe: { name: string } | null;
   };
   brewer_name: string | null;
 }
@@ -58,8 +57,7 @@ export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
           `
           id, volume_bbl, notes,
           brew_log:brew_logs(
-            id, brew_number, brew_date, status, events, brewer_id,
-            recipe:recipes(name)
+            id, brew_number, brew_date, status, events, brewer_id
           )
         `
         )

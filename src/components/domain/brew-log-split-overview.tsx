@@ -4,7 +4,7 @@
  * BrewLogSplitOverview - Visual split overview for brew log detail
  *
  * Shows how a single brew's wort was split across batches with:
- * - Recipe reference at top (linked to recipe detail)
+ * - Recipe name derived from linked batches
  * - Horizontal volume bar showing proportional splits
  * - Per-batch cards with status, volume, and vessel info
  */
@@ -12,13 +12,13 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { brewLogKeys, recipeKeys } from "@/lib/query-keys";
+import { brewLogKeys } from "@/lib/query-keys";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
-import { Beer, FlaskConical, ExternalLink } from "lucide-react";
+import { Beer, FlaskConical } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 // Segment colors for the volume bar
@@ -36,7 +36,6 @@ const SEGMENT_COLORS = [
 interface BrewLogSplitOverviewProps {
   data: {
     id: string;
-    recipe_id?: string | null;
     [key: string]: unknown;
   };
 }
@@ -52,20 +51,12 @@ interface LinkedBatch {
     status: string;
     volume_bbl: number | null;
     current_vessel_name: string | null;
+    recipe_name: string | null;
   } | null;
-}
-
-interface RecipeSummary {
-  id: string;
-  name: string;
-  batch_size_bbl: number | null;
-  est_og: number | null;
-  style_name: string | null;
 }
 
 export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
   const brewLogId = data.id;
-  const recipeId = data.recipe_id;
   const supabase = createClient();
 
   // Fetch linked batches with brew info (includes current_vessel_name)
@@ -85,7 +76,8 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
             name,
             status,
             volume_bbl,
-            current_vessel_name
+            current_vessel_name,
+            recipe_name
           )
         `
         )
@@ -93,22 +85,6 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
 
       if (error) throw error;
       return (links ?? []) as unknown as LinkedBatch[];
-    },
-  });
-
-  // Fetch recipe summary if recipe_id exists
-  const { data: recipe } = useQuery({
-    queryKey: recipeKeys.summary(recipeId!),
-    enabled: !!recipeId,
-    queryFn: async () => {
-      const { data: rec, error } = await supabase
-        .from("recipes_with_estimates")
-        .select("id, name, batch_size_bbl, est_og, style_name")
-        .eq("id", recipeId!)
-        .single();
-
-      if (error) throw error;
-      return rec as RecipeSummary;
     },
   });
 
@@ -149,30 +125,11 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
 
   return (
     <div className="space-y-5">
-      {/* Recipe reference */}
-      {recipe && (
+      {/* Recipe (derived from linked batches) */}
+      {validBatches[0]?.batch?.recipe_name && (
         <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-4 py-3">
           <Beer className="h-5 w-5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/production/recipes/${recipe.id}`}
-                className="truncate font-medium hover:underline"
-              >
-                {recipe.name}
-              </Link>
-              <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
-            </div>
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              {recipe.style_name && <span>{recipe.style_name}</span>}
-              {recipe.batch_size_bbl != null && (
-                <span><UnitDisplay value={recipe.batch_size_bbl} unitType="volume" /></span>
-              )}
-              {recipe.est_og != null && (
-                <span>Est. OG <UnitDisplay value={recipe.est_og} unitType="gravity" decimals={1} /></span>
-              )}
-            </div>
-          </div>
+          <span className="font-medium">{validBatches[0].batch.recipe_name}</span>
         </div>
       )}
 

@@ -18,7 +18,7 @@ import { brewLogEntity } from "@/entities/brew-log";
 import { BrewLogCompletionDialog } from "@/components/domain/brew-log-completion-dialog";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
 import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
-import { brewLogKeys, entityKeys, recipeKeys } from "@/lib/query-keys";
+import { brewLogKeys, entityKeys } from "@/lib/query-keys";
 
 export default function BrewLogDetailPage({
   params,
@@ -38,27 +38,12 @@ export default function BrewLogDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_logs")
-        .select("id, brew_number, status, events, recipe_id")
+        .select("id, brew_number, status, events")
         .eq("id", id)
         .single();
       if (error) throw error;
       return data;
     },
-  });
-
-  // Fetch recipe name for breadcrumb
-  const { data: recipe } = useQuery({
-    queryKey: recipeKeys.detail(brewLog?.recipe_id ?? ""),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipes")
-        .select("id, name")
-        .eq("id", brewLog!.recipe_id!)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!brewLog?.recipe_id,
   });
 
   // Fetch linked batches (needed for "View batch" link and breadcrumb)
@@ -67,12 +52,16 @@ export default function BrewLogDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_log_batches")
-        .select("batch_id, batch:batches(batch_number)")
+        .select("batch_id, batch:batches(batch_number, recipe_id, recipe:recipes(name))")
         .eq("brew_log_id", id);
       if (error) throw error;
       return (data ?? []) as Array<{
         batch_id: string;
-        batch: { batch_number: string } | null;
+        batch: {
+          batch_number: string;
+          recipe_id: string | null;
+          recipe: { name: string } | null;
+        } | null;
       }>;
     },
   });
@@ -116,20 +105,25 @@ export default function BrewLogDetailPage({
     [queryClient, id, router]
   );
 
-  // Breadcrumb: Recipe -> Brew Log -> Batch
+  // Breadcrumb: Recipe -> Brew Log -> Batch (recipe derived from linked batches)
   const breadcrumbSegments = useMemo(() => {
     const segments: { label: string; href?: string }[] = [];
-    if (recipe) {
-      segments.push({ label: recipe.name, href: `/production/recipes/${recipe.id}` });
+    // Recipe derived from first linked batch
+    const firstBatch = linkedBatches?.[0];
+    if (firstBatch?.batch?.recipe) {
+      segments.push({
+        label: firstBatch.batch.recipe.name,
+        href: `/production/recipes/${firstBatch.batch.recipe_id}`,
+      });
     }
-    segments.push({ label: brewLog?.brew_number ?? "Brew Log" }); // current page, no href
+    segments.push({ label: brewLog?.brew_number ?? "Brew Log" });
     if (linkedBatches?.length === 1) {
       const b = linkedBatches[0];
       const batchNumber = b.batch?.batch_number ?? "Batch";
       segments.push({ label: batchNumber, href: `/production/batches/${b.batch_id}` });
     }
     return segments;
-  }, [recipe, brewLog, linkedBatches]);
+  }, [brewLog, linkedBatches]);
 
   // Banner config based on brew log state
   const bannerConfig = useMemo(() => {
