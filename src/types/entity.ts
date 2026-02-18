@@ -482,6 +482,9 @@ export interface UnifiedSectionDef<T = Record<string, unknown>> {
   /** Default collapsed state */
   defaultCollapsed?: boolean;
 
+  /** Optional render function for header actions (buttons, badges) displayed next to the title */
+  headerActions?: ComponentType<{ data: T }>;
+
   /** Tab name if using tabbed layout */
   tab?: string;
 }

@@ -14,6 +14,7 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BrewLogTimeline } from "@/components/domain/brew-log-timeline";
+import { BrewEventTimelineActions } from "@/components/domain/brew-event-timeline";
 import { BrewLogSplitOverview } from "@/components/domain/brew-log-split-overview";
 
 // Use generated type from Supabase (will need regeneration after migration)
@@ -284,8 +285,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           name: "brew_number",
           label: "Brew Number",
           type: "text",
-          placeholder: "e.g., BRW-2024-001",
-          required: true,
+          editable: false,
           colSpan: 6,
         },
         {
@@ -293,7 +293,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           label: "Brew Date",
           type: "date",
           format: "date",
-          required: true,
+          editable: false,
           colSpan: 6,
         },
         {
@@ -316,6 +316,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       id: "timeline",
       title: "Brew Day Timeline",
       component: BrewLogTimeline,
+      headerActions: BrewEventTimelineActions,
     },
     {
       id: "batches",
@@ -348,15 +349,12 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       name: "brew_number",
       label: "Brew Number",
       type: "text",
-      placeholder: "e.g., BRW-2024-001",
-      required: true,
       colSpan: 6,
     },
     {
       name: "brew_date",
       label: "Brew Date",
       type: "date",
-      required: true,
       colSpan: 6,
     },
     {

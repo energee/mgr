@@ -10,13 +10,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -254,50 +248,45 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
   const totalMetrics = 2; // FG and ABV
 
   return (
-    <Card>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Batch Insights</CardTitle>
-            </div>
-            <div className="flex items-center gap-2">
-              {hasAnalyzed && !isLoading && performance && (
-                <Badge
-                  variant={onTargetCount === totalMetrics ? "default" : "secondary"}
-                  className="gap-1"
-                >
-                  <Target className="h-3 w-3" />
-                  {onTargetCount}/{totalMetrics} on target
-                </Badge>
-              )}
-              {!hasAnalyzed ? (
-                <Button size="sm" onClick={handleAnalyze}>
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Analyze Batch
-                </Button>
-              ) : (
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                    />
-                  </Button>
-                </CollapsibleTrigger>
-              )}
-            </div>
-          </div>
-          {hasAnalyzed && (
-            <CardDescription>
-              {batchNumber || performance?.batch_number || "Batch"} &bull;{" "}
-              {performance?.recipe?.name || "Recipe"}
-            </CardDescription>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="flex items-center justify-between pb-3">
+        <div className="flex items-center gap-2">
+          {hasAnalyzed && !isLoading && performance && (
+            <Badge
+              variant={onTargetCount === totalMetrics ? "default" : "secondary"}
+              className="gap-1"
+            >
+              <Target className="h-3 w-3" />
+              {onTargetCount}/{totalMetrics} on target
+            </Badge>
           )}
-        </CardHeader>
+        </div>
+        <div className="flex items-center gap-2">
+          {!hasAnalyzed ? (
+            <Button size="sm" onClick={handleAnalyze}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analyze Batch
+            </Button>
+          ) : (
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                />
+              </Button>
+            </CollapsibleTrigger>
+          )}
+        </div>
+      </div>
+      {hasAnalyzed && (
+        <CardDescription className="pb-3">
+          {batchNumber || performance?.batch_number || "Batch"} &bull;{" "}
+          {performance?.recipe?.name || "Recipe"}
+        </CardDescription>
+      )}
 
-        <CollapsibleContent>
-          <CardContent className="space-y-6">
+      <CollapsibleContent>
+        <div className="space-y-6">
             {isLoading ? (
               <div className="space-y-3">
                 <Skeleton className="h-8 w-full" />
@@ -366,9 +355,8 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
                 </div>
               </>
             ) : null}
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

@@ -10,9 +10,8 @@
  * - Edit/delete capabilities
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -125,6 +124,33 @@ interface BrewEventTimelineProps {
 }
 
 // =============================================================================
+// Custom event for cross-component communication
+// =============================================================================
+
+const BREW_TIMELINE_ADD_EVENT = "brew-timeline:add-event";
+
+// =============================================================================
+// Header Actions (rendered by the unified section card next to the title)
+// =============================================================================
+
+/** Header action button for adding brew events, used via section headerActions */
+export function BrewEventTimelineActions({ data }: { data: Record<string, unknown> }) {
+  const isReadOnly = data.status === "completed" || data.status === "cancelled";
+  if (isReadOnly) return null;
+
+  return (
+    <Button
+      size="sm"
+      onClick={() => document.dispatchEvent(new CustomEvent(BREW_TIMELINE_ADD_EVENT))}
+      className="h-9"
+    >
+      <Plus className="mr-1 h-4 w-4" />
+      Add Event
+    </Button>
+  );
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -141,6 +167,13 @@ export function BrewEventTimeline({
   const [editingEvent, setEditingEvent] = useState<BrewEvent | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Listen for add-event trigger from header actions
+  useEffect(() => {
+    const handler = () => setShowAddForm(true);
+    document.addEventListener(BREW_TIMELINE_ADD_EVENT, handler);
+    return () => document.removeEventListener(BREW_TIMELINE_ADD_EVENT, handler);
+  }, []);
 
   // Sort events by time
   const sortedEvents = useMemo(() => {
@@ -204,33 +237,15 @@ export function BrewEventTimeline({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="flex items-center justify-center">
-            <div className="animate-pulse text-muted-foreground">Loading events...</div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-pulse text-muted-foreground">Loading events...</div>
+      </div>
     );
   }
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-lg">Brew Day Timeline</CardTitle>
-          {!readOnly && onAddEvent && (
-            <Button
-              size="sm"
-              onClick={() => setShowAddForm(true)}
-              className="h-9"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Add Event
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
+      <div>
           {sortedEvents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -391,8 +406,7 @@ export function BrewEventTimeline({
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Add Event Dialog */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>

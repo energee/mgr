@@ -15,6 +15,7 @@ export default function BrewLogsPage() {
     <EntityList
       entity={brewLogEntity}
       basePath="/production/brew-logs"
+      showCreate={false}
     />
   );
 }

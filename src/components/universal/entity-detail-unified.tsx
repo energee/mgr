@@ -1132,13 +1132,16 @@ function UnifiedSectionCard<T>({
     data
   );
 
+  const HeaderActions = section.headerActions;
+
   // Custom component handling
   if (editing && section.editComponent) {
     const EditComponent = section.editComponent;
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className={HeaderActions ? "flex flex-row items-center justify-between" : undefined}>
           <CardTitle>{section.title}</CardTitle>
+          {HeaderActions && <HeaderActions data={data} />}
         </CardHeader>
         <CardContent>
           <EditComponent data={data} editing={true} form={form} />
@@ -1151,8 +1154,9 @@ function UnifiedSectionCard<T>({
     const CustomComponent = section.component;
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className={HeaderActions ? "flex flex-row items-center justify-between" : undefined}>
           <CardTitle>{section.title}</CardTitle>
+          {HeaderActions && <HeaderActions data={data} />}
         </CardHeader>
         <CardContent>
           <CustomComponent
@@ -1168,8 +1172,9 @@ function UnifiedSectionCard<T>({
   // Render fields using UnifiedField
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className={HeaderActions ? "flex flex-row items-center justify-between" : undefined}>
         <CardTitle>{section.title}</CardTitle>
+        {HeaderActions && <HeaderActions data={data} />}
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-12 gap-4">
