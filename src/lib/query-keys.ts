@@ -67,6 +67,10 @@ export const recipeKeys = {
   hopSchedule: (id: string) => ["recipes", id, "hop-schedule"] as const,
   yeasts: (id: string) => ["recipes", id, "yeasts"] as const,
   additions: (id: string) => ["recipes", id, "additions"] as const,
+  adjuncts: (id: string) => ["recipes", id, "adjuncts"] as const,
+  sugars: (id: string) => ["recipes", id, "sugars"] as const,
+  spices: (id: string) => ["recipes", id, "spices"] as const,
+  fruits: (id: string) => ["recipes", id, "fruits"] as const,
   styleCompliance: (id: string) => ["recipe-style-compliance", id] as const,
   suggestions: (id: string) => ["recipe-suggestions", id] as const,
   cogs: (id: string) => ["recipe-cogs", id] as const,
@@ -566,6 +570,22 @@ export const qboKeys = {
 // =============================================================================
 // Square Integration Keys
 // =============================================================================
+
+// =============================================================================
+// Water Addition Profile Keys
+// =============================================================================
+
+export const waterAdditionProfileKeys = {
+  all: () => ["water_addition_profiles"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters
+      ? ([...waterAdditionProfileKeys.all(), "list", filters] as const)
+      : ([...waterAdditionProfileKeys.all(), "list"] as const),
+  detail: (id: string) =>
+    [...waterAdditionProfileKeys.all(), "detail", id] as const,
+  items: (profileId: string) =>
+    [...waterAdditionProfileKeys.all(), "items", profileId] as const,
+};
 
 export const squareKeys = {
   all: () => ["square"] as const,

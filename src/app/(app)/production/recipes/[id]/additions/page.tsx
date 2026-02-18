@@ -37,7 +37,7 @@ export default function RecipeAdditionsPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipes")
-        .select("id, name, use_default_additions")
+        .select("id, name, water_addition_profile_id")
         .eq("id", id)
         .single();
       if (error) throw error;

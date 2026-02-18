@@ -13,10 +13,14 @@ import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
+import { MashScheduleEditWrapper, FermentationScheduleEditWrapper } from "@/components/domain/recipe-schedule-edit";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
 import { RecipeVariantEditor } from "@/components/domain/recipe-variant-editor";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
+import { GrainBillSection } from "@/components/domain/grain-bill-section";
+import { HopScheduleSection } from "@/components/domain/hop-schedule-section";
+import { OtherIngredientsSection } from "@/components/domain/other-ingredients-section";
 import { RecipeProductionHistory } from "@/components/domain/recipe-production-history";
 import { StatusBadge } from "@/components/universal/status-badge";
 
@@ -168,10 +172,10 @@ export const recipeEntity: EntityConfig<Recipe> = {
       title: "Overview",
       fields: [
         { field: "name", label: "Name" },
-        { field: "brand_id", label: "Brand" },
-        { field: "style_id", label: "Style" },
-        { field: "yeast_id", label: "Yeast" },
-        { field: "water_profile_id", label: "Water Profile" },
+        { field: "brand_id", label: "Brand", relation: { entity: "brand", displayField: "name" } },
+        { field: "style_id", label: "Style", relation: { entity: "beer_style", displayField: "name" } },
+        { field: "yeast_id", label: "Yeast", relation: { entity: "yeast_strain", displayField: "name" } },
+        { field: "water_profile_id", label: "Water Profile", relation: { entity: "water_profile", displayField: "name" } },
         { field: "is_active", label: "Active" },
       ],
     },
@@ -330,7 +334,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
             table: "yeasts",
             valueField: "id",
             labelField: "name",
-            orderBy: "lab,name",
+            orderBy: "manufacturer,name",
           },
         },
         {
@@ -377,6 +381,23 @@ export const recipeEntity: EntityConfig<Recipe> = {
           colSpan: 6,
         },
       ],
+    },
+    {
+      id: "grain-bill",
+      title: "Grain Bill",
+      component: GrainBillSection,
+    },
+    {
+      id: "hop-schedule",
+      title: "Hop Schedule",
+      component: HopScheduleSection,
+    },
+    {
+      id: "other-ingredients",
+      title: "Other Ingredients",
+      component: OtherIngredientsSection,
+      collapsible: true,
+      defaultCollapsed: true,
     },
     {
       id: "estimates",
@@ -501,10 +522,14 @@ export const recipeEntity: EntityConfig<Recipe> = {
           colSpan: 6,
         },
         {
-          name: "use_default_additions",
-          label: "Use Default Water Additions",
-          type: "switch",
-          defaultValue: true,
+          name: "water_addition_profile_id",
+          label: "Water Addition Profile",
+          type: "relation",
+          relation: {
+            entity: "water_addition_profile",
+            displayField: "name",
+          },
+          placeholder: "Select addition profile...",
           colSpan: 6,
         },
       ],
@@ -513,11 +538,13 @@ export const recipeEntity: EntityConfig<Recipe> = {
       id: "mash_schedule",
       title: "Mash Schedule",
       component: MashScheduleDisplay,
+      editComponent: MashScheduleEditWrapper,
     },
     {
       id: "fermentation_schedule",
       title: "Fermentation Schedule",
       component: FermentationScheduleDisplay,
+      editComponent: FermentationScheduleEditWrapper,
     },
     {
       id: "additions",
@@ -613,7 +640,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
         table: "yeasts",
         valueField: "id",
         labelField: "name",
-        orderBy: "lab,name",
+        orderBy: "manufacturer,name",
       },
     },
     {
@@ -737,10 +764,14 @@ export const recipeEntity: EntityConfig<Recipe> = {
       colSpan: 3,
     },
     {
-      name: "use_default_additions",
-      label: "Use Default Water Additions",
-      type: "switch",
-      defaultValue: true,
+      name: "water_addition_profile_id",
+      label: "Water Addition Profile",
+      type: "relation",
+      relation: {
+        entity: "water_addition_profile",
+        displayField: "name",
+      },
+      placeholder: "Select addition profile...",
       colSpan: 3,
     },
     // Notes

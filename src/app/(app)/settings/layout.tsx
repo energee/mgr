@@ -30,6 +30,7 @@ const settingsNav = [
       { label: "Package Formats", href: "/settings/formats" },
       { label: "Keg Types", href: "/settings/keg-types" },
       { label: "Yeast Strains", href: "/settings/yeasts" },
+      { label: "Water Profiles", href: "/settings/water-addition-profiles" },
       { label: "Beer Styles", href: "/settings/beer-styles" },
       { label: "Brands", href: "/settings/brands" },
     ],
