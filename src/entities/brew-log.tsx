@@ -300,7 +300,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           name: "brewer_id",
           label: "Brewer",
           type: "relation",
-          relation: { entity: "user", displayField: "full_name" },
+          relation: { entity: "user_profile", displayField: "display_name" },
           colSpan: 6,
         },
         {
@@ -364,8 +364,8 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       label: "Brewer",
       type: "relation",
       relation: {
-        entity: "user",
-        displayField: "full_name",
+        entity: "user_profile",
+        displayField: "display_name",
       },
       colSpan: 6,
     },
