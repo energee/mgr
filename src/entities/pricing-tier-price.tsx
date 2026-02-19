@@ -60,10 +60,6 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       accessorKey: "format_id",
       header: "Format",
       sortable: true,
-      relation: {
-        entity: "package_type",
-        displayField: "name",
-      },
     },
     {
       accessorKey: "sales_channel_id",
@@ -184,12 +180,6 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       entity: "pricing_tier",
       type: "belongsTo",
       foreignKey: "pricing_tier_id",
-    },
-    {
-      name: "package_format",
-      entity: "package_type",
-      type: "belongsTo",
-      foreignKey: "format_id",
     },
     {
       name: "sales_channel",
