@@ -189,6 +189,28 @@ interface SimpleAdditionCatalog {
   name: string;
 }
 
+/**
+ * Maps fetched Supabase rows for a simple addition type into the local state shape.
+ * The `idField`, `nameField`, and `relationName` vary by type but the structure is identical.
+ */
+function mapSimpleAdditionRows(
+  rows: Record<string, unknown>[],
+  idField: string,
+  nameField: string,
+  relationName: string
+): Record<string, unknown>[] {
+  return [...rows]
+    .sort((a, b) => (a.position as number) - (b.position as number))
+    .map((row) => ({
+      [idField]: row[idField] as string,
+      [nameField]: (row[relationName] as { name: string } | null)?.name,
+      amount: row.amount as number,
+      unit: row.unit as string,
+      timing: row.timing as string | null,
+      position: row.position as number,
+    }));
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
@@ -201,8 +223,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
   const [expandedVariants, setExpandedVariants] = useState<Set<number>>(
     new Set([0])
   );
-
-  // ── Fetch variants with additions ─────────────────────────────────────
 
   const { data: fetchedVariants, isLoading } = useQuery({
     queryKey: recipeVariantKeys.byRecipe(recipeId),
@@ -258,8 +278,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
     },
   });
 
-  // ── Fetch cost data ───────────────────────────────────────────────────
-
   const { data: costData } = useQuery({
     queryKey: recipeVariantKeys.withCosts(recipeId),
     queryFn: async () => {
@@ -278,8 +296,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
     return map;
   }, [costData]);
 
-  // ── Sync fetched -> local state ───────────────────────────────────────
-
+  // Sync fetched -> local state
   const [prevFetched, setPrevFetched] = useState(fetchedVariants);
   if (fetchedVariants && fetchedVariants !== prevFetched) {
     setPrevFetched(fetchedVariants);
@@ -300,42 +317,13 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
             days: h.days as number | null,
             position: h.position as number,
           })),
-        adjuncts: (v.recipe_variant_adjuncts || [])
-          .sort((a: VariantAdjunctItem, b: VariantAdjunctItem) => a.position - b.position)
-          .map((a: Record<string, unknown>) => ({
-            adjunct_id: a.adjunct_id as string,
-            adjunct_name: (a.adjuncts as { name: string } | null)?.name,
-            amount: a.amount as number,
-            unit: a.unit as string,
-            timing: a.timing as string | null,
-            position: a.position as number,
-          })),
-        fruits: (v.recipe_variant_fruits || [])
-          .sort((a: VariantFruitItem, b: VariantFruitItem) => a.position - b.position)
-          .map((f: Record<string, unknown>) => ({
-            fruit_id: f.fruit_id as string,
-            fruit_name: (f.fruits as { name: string } | null)?.name,
-            amount: f.amount as number,
-            unit: f.unit as string,
-            timing: f.timing as string | null,
-            position: f.position as number,
-          })),
-        spices: (v.recipe_variant_spices || [])
-          .sort((a: VariantSpiceItem, b: VariantSpiceItem) => a.position - b.position)
-          .map((s: Record<string, unknown>) => ({
-            spice_id: s.spice_id as string,
-            spice_name: (s.spices as { name: string } | null)?.name,
-            amount: s.amount as number,
-            unit: s.unit as string,
-            timing: s.timing as string | null,
-            position: s.position as number,
-          })),
+        adjuncts: mapSimpleAdditionRows(v.recipe_variant_adjuncts || [], "adjunct_id", "adjunct_name", "adjuncts") as unknown as VariantAdjunctItem[],
+        fruits: mapSimpleAdditionRows(v.recipe_variant_fruits || [], "fruit_id", "fruit_name", "fruits") as unknown as VariantFruitItem[],
+        spices: mapSimpleAdditionRows(v.recipe_variant_spices || [], "spice_id", "spice_name", "spices") as unknown as VariantSpiceItem[],
       }))
     );
     setIsDirty(false);
   }
-
-  // ── Fetch catalogs ────────────────────────────────────────────────────
 
   const { data: hopCatalog = [] } = useCatalog<HopCatalogItem>(
     catalogKeys.hops(),
@@ -365,8 +353,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
     ["name"]
   );
 
-  // ── Mutation ──────────────────────────────────────────────────────────
-
   const saveMutation = useMutation({
     mutationFn: async (items: VariantItem[]) => {
       const client = createClient();
@@ -378,7 +364,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
         .eq("recipe_id", recipeId);
       if (deleteError) throw deleteError;
 
-      // Insert each variant and its additions
       for (const [index, variant] of items.entries()) {
         const { data: inserted, error: insertError } = await client
           .from("recipe_variants")
@@ -411,7 +396,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
           if (error) throw error;
         }
 
-        // Insert adjuncts
         if (variant.adjuncts.length > 0) {
           const { error } = await client
             .from("recipe_variant_adjuncts")
@@ -428,7 +412,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
           if (error) throw error;
         }
 
-        // Insert fruits
         if (variant.fruits.length > 0) {
           const { error } = await client
             .from("recipe_variant_fruits")
@@ -445,7 +428,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
           if (error) throw error;
         }
 
-        // Insert spices
         if (variant.spices.length > 0) {
           const { error } = await client
             .from("recipe_variant_spices")
@@ -477,8 +459,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
       toast.error("Failed to save variants: " + error.message);
     },
   });
-
-  // ── Handlers: Variant-level ───────────────────────────────────────────
 
   const addVariant = useCallback(() => {
     const newVariant: VariantItem = {
@@ -524,8 +504,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
       return next;
     });
   }, []);
-
-  // ── Handlers: Addition-level ──────────────────────────────────────────
 
   const addHop = useCallback(
     (variantIndex: number, hop: HopCatalogItem) => {
@@ -653,8 +631,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
     []
   );
 
-  // ── Render ────────────────────────────────────────────────────────────
-
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -759,7 +735,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
 
               <CollapsibleContent>
                 <CardContent className="space-y-6">
-                  {/* Basic Fields */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label htmlFor={`variant-${vIndex}-volume`} className="text-sm font-medium">
@@ -801,7 +776,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     </div>
                   </div>
 
-                  {/* Hops Additions */}
                   <VariantAdditionSection
                     title="Hops"
                     icon={<Leaf className="h-4 w-4" />}
@@ -836,7 +810,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     tableHeaders={["Hop", "Oz", "Timing", "Days", ""]}
                   />
 
-                  {/* Adjuncts */}
                   <SimpleAdditionSection
                     title="Adjuncts"
                     icon={<Droplets className="h-4 w-4" />}
@@ -850,7 +823,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     nameField="adjunct_name"
                   />
 
-                  {/* Fruits */}
                   <SimpleAdditionSection
                     title="Fruits"
                     icon={<Cherry className="h-4 w-4" />}
@@ -864,7 +836,6 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     nameField="fruit_name"
                   />
 
-                  {/* Spices */}
                   <SimpleAdditionSection
                     title="Spices"
                     icon={<Flame className="h-4 w-4" />}

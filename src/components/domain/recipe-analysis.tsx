@@ -144,35 +144,26 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
   const [isOpen, setIsOpen] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
-  // Fetch style compliance
-  // Note: Hooks must be called before any early returns (Rules of Hooks)
   const {
-    data: complianceData,
+    data: compliance,
     isLoading: complianceLoading,
     error: complianceError,
     refetch: refetchCompliance,
   } = useQuery({
     queryKey: recipeKeys.styleCompliance(recipeId!),
-    queryFn: () => {
-      if (!recipeId) return null;
-      return analyzeStyleCompliance(recipeId);
-    },
+    queryFn: () => analyzeStyleCompliance(recipeId!),
     enabled: hasAnalyzed && !!recipeId,
     retry: false,
   });
 
-  // Fetch suggestions
   const {
-    data: suggestionsData,
+    data: suggestions,
     isLoading: suggestionsLoading,
     error: suggestionsError,
     refetch: refetchSuggestions,
   } = useQuery({
     queryKey: recipeKeys.suggestions(recipeId!),
-    queryFn: () => {
-      if (!recipeId) return null;
-      return getRecipeSuggestions(recipeId);
-    },
+    queryFn: () => getRecipeSuggestions(recipeId!),
     enabled: hasAnalyzed && !!recipeId,
     retry: false,
   });
@@ -191,9 +182,6 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
 
   const isLoading = complianceLoading || suggestionsLoading;
   const hasError = complianceError || suggestionsError;
-
-  const compliance = complianceData;
-  const suggestions = suggestionsData;
 
   const complianceCount = compliance
     ? Object.values(compliance.analysis).filter((a) => a.status === "in_range").length

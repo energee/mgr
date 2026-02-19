@@ -3,13 +3,8 @@
 /**
  * GrainBillEditor - Recipe Grain Bill Management Component
  *
- * A specialized editor for managing recipe malts in junction table format.
- * Features:
- * - Searchable malt selector from catalog
- * - Inline weight editing
- * - Automatic percentage calculation
- * - Drag-to-reorder (position)
- * - Real-time totals
+ * Manages recipe malts in junction table format with searchable malt selector,
+ * inline weight editing, automatic percentage calculation, and drag-to-reorder.
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -50,13 +45,12 @@ import { Plus, Trash2, GripVertical, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";
 
-// Types for grain bill entries
 export interface GrainBillItem {
   id?: string;
   malt_id: string;
   weight_lbs: number;
   position: number;
-  // Joined data (read-only)
+  /** Joined data (read-only) */
   malt?: {
     id: string;
     name: string;
@@ -88,14 +82,9 @@ const MALT_TYPE_LABELS: Record<string, string> = {
 };
 
 interface GrainBillEditorProps {
-  /** Current grain bill items */
   items: GrainBillItem[];
-  /** Callback when items change */
   onChange: (items: GrainBillItem[]) => void;
-  /** Whether the editor is disabled */
   disabled?: boolean;
-  /** Recipe ID for context */
-  recipeId?: string;
 }
 
 export function GrainBillEditor({
@@ -106,28 +95,23 @@ export function GrainBillEditor({
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Fetch malt catalog
   const { data: maltCatalog = [], isLoading: loadingMalts } = useCatalog<MaltCatalogItem>(catalogKeys.malts(), "malts", "id, name, maltster, type, color_lovibond, potential_ppg, bag_weight_lbs", ["type", "name"]);
 
-  // Calculate totals
-  const totals = useMemo(() => {
-    const totalWeight = items.reduce((sum, item) => sum + (item.weight_lbs || 0), 0);
-    return { totalWeight };
-  }, [items]);
-
-  // Get percentage for an item
-  const getPercentage = useCallback(
-    (weight: number) => {
-      if (totals.totalWeight === 0) return 0;
-      return (weight / totals.totalWeight) * 100;
-    },
-    [totals.totalWeight]
+  const totalWeight = useMemo(
+    () => items.reduce((sum, item) => sum + (item.weight_lbs || 0), 0),
+    [items]
   );
 
-  // Add a new malt to the grain bill
+  const getPercentage = useCallback(
+    (weight: number) => {
+      if (totalWeight === 0) return 0;
+      return (weight / totalWeight) * 100;
+    },
+    [totalWeight]
+  );
+
   const handleAddMalt = useCallback(
     (malt: MaltCatalogItem) => {
-      // Check if already added
       if (items.some((item) => item.malt_id === malt.id)) {
         setAddOpen(false);
         return;
@@ -148,7 +132,6 @@ export function GrainBillEditor({
     [items, onChange]
   );
 
-  // Update weight for an item
   const handleWeightChange = useCallback(
     (index: number, weight: number) => {
       const updated = [...items];
@@ -158,11 +141,9 @@ export function GrainBillEditor({
     [items, onChange]
   );
 
-  // Remove an item
   const handleRemove = useCallback(
     (index: number) => {
       const updated = items.filter((_, i) => i !== index);
-      // Update positions
       updated.forEach((item, i) => {
         item.position = i;
       });
@@ -171,7 +152,6 @@ export function GrainBillEditor({
     [items, onChange]
   );
 
-  // Handle reorder from drag-and-drop
   const handleReorder = useCallback(
     (reordered: GrainBillItem[]) => {
       const updated = reordered.map((item, i) => ({
@@ -183,7 +163,7 @@ export function GrainBillEditor({
     [onChange]
   );
 
-  // Group available (not-yet-added) malts by type for the selector
+  /** Available (not-yet-added) malts grouped by type for the selector */
   const availableMaltsByType = useMemo(() => {
     const addedIds = new Set(items.map((item) => item.malt_id));
     const groups: Record<string, MaltCatalogItem[]> = {};
@@ -353,7 +333,7 @@ export function GrainBillEditor({
                   Total
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {totals.totalWeight.toFixed(2)} lbs
+                  {totalWeight.toFixed(2)} lbs
                 </TableCell>
                 <TableCell></TableCell>
                 <TableCell className="text-right font-medium">100%</TableCell>
@@ -381,15 +361,13 @@ export function GrainBillEditor({
         </Sortable>
       )}
 
-      {/* Warnings */}
       {items.length > 0 && (
-        <GrainBillWarnings items={items} totalWeight={totals.totalWeight} />
+        <GrainBillWarnings items={items} totalWeight={totalWeight} />
       )}
     </div>
   );
 }
 
-// Component for showing grain bill warnings/suggestions
 function GrainBillWarnings({
   items,
   totalWeight,
@@ -399,7 +377,6 @@ function GrainBillWarnings({
 }) {
   const warnings: string[] = [];
 
-  // Check for base malt percentage (should be 70-90% typically)
   const baseMalts = items.filter((item) => item.malt?.type === "base");
   const baseWeight = baseMalts.reduce((sum, item) => sum + (item.weight_lbs || 0), 0);
   const basePercent = totalWeight > 0 ? (baseWeight / totalWeight) * 100 : 0;
@@ -410,7 +387,6 @@ function GrainBillWarnings({
     );
   }
 
-  // Check for any items with 0 weight
   const zeroWeightItems = items.filter((item) => !item.weight_lbs || item.weight_lbs === 0);
   if (zeroWeightItems.length > 0) {
     warnings.push(

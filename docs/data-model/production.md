@@ -101,7 +101,7 @@ Brewing recipes with all parameters. Ingredients are stored in junction tables f
 | **Flags** | | |
 | is_active | BOOLEAN | Active flag |
 | **Profiles** | | |
-| water_addition_profile_id | UUID | FK to [water_addition_profiles](./catalog.md#water_addition_profiles), ON DELETE SET NULL |
+| target_water_profile_id | UUID | FK to [water_profiles](#water_profiles), ON DELETE SET NULL |
 | **Meta** | | |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
@@ -430,13 +430,12 @@ Users who collaborated on a recipe.
 
 ## `recipe_additions`
 
-Water chemistry and other additive additions. Each row belongs to either a recipe or a water addition profile, never both.
+Recipe-specific additive additions: water salts, acids, clarifiers, nutrients, etc.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| recipe_id | UUID | FK to recipes (NULL if profile addition) |
-| profile_id | UUID | FK to [water_addition_profiles](./catalog.md#water_addition_profiles), ON DELETE CASCADE |
+| recipe_id | UUID | FK to recipes (NOT NULL) |
 | additive_id | UUID | FK to additives |
 | position | INTEGER | Sort order |
 | amount | DECIMAL(8,4) | Amount |
@@ -445,10 +444,7 @@ Water chemistry and other additive additions. Each row belongs to either a recip
 | target | TEXT | Target (for water salts): mash, sparge, kettle |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
-**Mutual exclusivity constraint:** Each row must have exactly one of `recipe_id` or `profile_id` set (not both, not neither). This is enforced by a CHECK constraint.
-
-- When `profile_id` is set, the addition belongs to a reusable water addition profile.
-- When `recipe_id` is set, this is a recipe-specific addition (e.g., clarifiers, nutrients, or recipe-specific salts not covered by a profile).
+Water salt additions can be auto-calculated from the recipe's source and target water profiles, then applied via the "Apply to Recipe" button on the recipe detail page.
 
 ---
 

@@ -341,13 +341,12 @@ export const planningKeys = {
   batchesInProduction: () => ["planning", "batches-in-production"] as const,
   demandDetail: (brandId: string, packageTypeId: string, week: string) =>
     ["planning", "demand-detail", brandId, packageTypeId, week] as const,
-  // Backward planning from orders
   orderDemand: (horizonWeeks: number) =>
-    [...planningKeys.all(), "orderDemand", horizonWeeks] as const,
+    ["planning", "orderDemand", horizonWeeks] as const,
   productionRequirements: (horizonWeeks: number) =>
-    [...planningKeys.all(), "productionRequirements", horizonWeeks] as const,
+    ["planning", "productionRequirements", horizonWeeks] as const,
   materialRequirements: (horizonWeeks: number) =>
-    [...planningKeys.all(), "materialRequirements", horizonWeeks] as const,
+    ["planning", "materialRequirements", horizonWeeks] as const,
 };
 
 // =============================================================================
@@ -566,22 +565,6 @@ export const qboKeys = {
       : (["qbo", "sync-log"] as const),
   accounts: () => ["qbo", "accounts"] as const,
   accountMappings: () => ["qbo", "account-mappings"] as const,
-};
-
-// =============================================================================
-// Water Addition Profile Keys
-// =============================================================================
-
-export const waterAdditionProfileKeys = {
-  all: () => ["water_addition_profiles"] as const,
-  list: (filters?: Record<string, unknown>) =>
-    filters
-      ? ([...waterAdditionProfileKeys.all(), "list", filters] as const)
-      : ([...waterAdditionProfileKeys.all(), "list"] as const),
-  detail: (id: string) =>
-    [...waterAdditionProfileKeys.all(), "detail", id] as const,
-  items: (profileId: string) =>
-    [...waterAdditionProfileKeys.all(), "items", profileId] as const,
 };
 
 // =============================================================================

@@ -15,6 +15,20 @@ type WaterProfile = Database["public"]["Tables"]["water_profiles"]["Row"];
 export { waterProfileSchema };
 export type { WaterProfileFormValues } from "@/lib/schemas/water-profile";
 
+/** Render a numeric value or em-dash for null/undefined */
+const ppm = (value: unknown): string => (value != null ? `${value}` : "—");
+
+/** Mineral field definitions shared between sections and formFields */
+const mineralFields = [
+  { name: "calcium_ppm", label: "Ca²⁺", type: "number", placeholder: "0", colSpan: 2 },
+  { name: "magnesium_ppm", label: "Mg²⁺", type: "number", placeholder: "0", colSpan: 2 },
+  { name: "sodium_ppm", label: "Na⁺", type: "number", placeholder: "0", colSpan: 2 },
+  { name: "sulfate_ppm", label: "SO₄²⁻", type: "number", placeholder: "0", colSpan: 2 },
+  { name: "chloride_ppm", label: "Cl⁻", type: "number", placeholder: "0", colSpan: 1 },
+  { name: "bicarbonate_ppm", label: "HCO₃⁻", type: "number", placeholder: "0", colSpan: 2 },
+  { name: "ph", label: "pH", type: "number", placeholder: "7.0", colSpan: 1 },
+] as const;
+
 export const waterProfileEntity: EntityConfig<WaterProfile> = {
   name: "water_profile",
   table: "water_profiles",
@@ -23,33 +37,15 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
   description: "Source water chemistry profiles with mineral content",
   domain: "system",
 
-  // List View
   listColumns: [
     { accessorKey: "name", header: "Name", sortable: true },
-    {
-      accessorKey: "calcium_ppm",
-      header: "Ca²⁺",
-      sortable: true,
-      render: (value) => (value != null ? `${value}` : "—"),
-    },
-    {
-      accessorKey: "sulfate_ppm",
-      header: "SO₄²⁻",
-      sortable: true,
-      render: (value) => (value != null ? `${value}` : "—"),
-    },
-    {
-      accessorKey: "chloride_ppm",
-      header: "Cl⁻",
-      sortable: true,
-      render: (value) => (value != null ? `${value}` : "—"),
-    },
-    {
-      accessorKey: "ph",
-      header: "pH",
-      sortable: true,
-      render: (value) => (value != null ? `${value}` : "—"),
-    },
+    { accessorKey: "calcium_ppm", header: "Ca²⁺", sortable: true, render: ppm },
+    { accessorKey: "magnesium_ppm", header: "Mg²⁺", sortable: true, render: ppm },
+    { accessorKey: "sodium_ppm", header: "Na⁺", sortable: true, render: ppm },
+    { accessorKey: "sulfate_ppm", header: "SO₄²⁻", sortable: true, render: ppm },
+    { accessorKey: "chloride_ppm", header: "Cl⁻", sortable: true, render: ppm },
+    { accessorKey: "bicarbonate_ppm", header: "HCO₃⁻", sortable: true, render: ppm },
+    { accessorKey: "ph", header: "pH", sortable: true, render: ppm },
     {
       accessorKey: "is_active",
       header: "Active",
@@ -65,7 +61,6 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
   defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name", "description"],
 
-  // Detail View
   detailHeader: { title: "name" },
 
   sections: [
@@ -102,15 +97,7 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
     {
       id: "minerals",
       title: "Mineral Content (ppm)",
-      fields: [
-        { name: "calcium_ppm", label: "Ca²⁺", type: "number", placeholder: "0", colSpan: 2 },
-        { name: "magnesium_ppm", label: "Mg²⁺", type: "number", placeholder: "0", colSpan: 2 },
-        { name: "sodium_ppm", label: "Na⁺", type: "number", placeholder: "0", colSpan: 2 },
-        { name: "sulfate_ppm", label: "SO₄²⁻", type: "number", placeholder: "0", colSpan: 2 },
-        { name: "chloride_ppm", label: "Cl⁻", type: "number", placeholder: "0", colSpan: 1 },
-        { name: "bicarbonate_ppm", label: "HCO₃⁻", type: "number", placeholder: "0", colSpan: 2 },
-        { name: "ph", label: "pH", type: "number", placeholder: "7.0", colSpan: 1 },
-      ],
+      fields: [...mineralFields],
     },
   ],
 
@@ -140,13 +127,7 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
       placeholder: "Describe this water source...",
       colSpan: 12,
     },
-    { name: "calcium_ppm", label: "Ca²⁺", type: "number", placeholder: "0", colSpan: 2 },
-    { name: "magnesium_ppm", label: "Mg²⁺", type: "number", placeholder: "0", colSpan: 2 },
-    { name: "sodium_ppm", label: "Na⁺", type: "number", placeholder: "0", colSpan: 2 },
-    { name: "sulfate_ppm", label: "SO₄²⁻", type: "number", placeholder: "0", colSpan: 2 },
-    { name: "chloride_ppm", label: "Cl⁻", type: "number", placeholder: "0", colSpan: 1 },
-    { name: "bicarbonate_ppm", label: "HCO₃⁻", type: "number", placeholder: "0", colSpan: 2 },
-    { name: "ph", label: "pH", type: "number", placeholder: "7.0", colSpan: 1 },
+    ...mineralFields,
   ],
 
   actions: [

@@ -59,8 +59,8 @@ export const recipeSchema = z.object({
     notes: z.string().optional(),
     position: z.number(),
   })).nullable().optional(),
-  // Water Addition Profile
-  water_addition_profile_id: z.string().uuid().nullable().optional(),
+  // Target Water Profile (for salt addition calculations)
+  target_water_profile_id: z.string().uuid().nullable().optional(),
   is_active: z.boolean().default(true),
   // Status
   status: z.enum(["draft", "spec", "complete"]).default("complete"),

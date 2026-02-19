@@ -27,13 +27,11 @@ import {
 } from "@/components/ui/timeline";
 
 /**
- * Create a Supabase client with dynamic table access.
+ * Supabase client with dynamic table access.
  * entity_revisions is not yet in the generated types, so we cast once here.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function createDynamicClient(): any {
-  return createClient();
-}
+const db: any = createClient();
 
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago").
@@ -184,9 +182,6 @@ function formatValue(value: unknown, resolvedNames?: Map<string, string>): strin
     }
     return value;
   }
-  if (typeof value === "number") {
-    return String(value);
-  }
   if (Array.isArray(value)) {
     if (value.length === 0) return "Empty";
     return `${value.length} item${value.length !== 1 ? "s" : ""}`;
@@ -251,7 +246,6 @@ function collectFkUuids(revisions: Revision[]): Map<string, Set<string>> {
  * Returns a Map<uuid, displayName>.
  */
 function useResolvedNames(revisions: Revision[]): Map<string, string> {
-  const db = createDynamicClient();
 
   const fkGroups = useMemo(() => {
     const grouped = collectFkUuids(revisions);
@@ -427,7 +421,6 @@ export function RevisionHistory({
   maxInitial = 5,
 }: RevisionHistoryProps) {
   const [showAll, setShowAll] = useState(false);
-  const db = createDynamicClient();
 
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntity(entityType, entityId),
@@ -501,8 +494,6 @@ export function RevisionHistoryCompact({
   entityId: string;
   limit?: number;
 }) {
-  const db = createDynamicClient();
-
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntityCompact(entityType, entityId),
     queryFn: async () => {

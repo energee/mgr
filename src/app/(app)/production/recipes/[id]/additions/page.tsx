@@ -4,7 +4,7 @@
  * Recipe Additions Page
  *
  * Manage clarifiers, nutrients, and other non-water-chemistry additions for a recipe.
- * Water salts and acids are managed via water addition profiles (Settings > Addition Profiles).
+ * Water salt additions are calculated from source/target water profiles on the recipe detail page.
  */
 
 import { use, useState, useMemo } from "react";
@@ -15,12 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { ArrowLeft, Save, Loader2, Info } from "lucide-react";
+import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { recipeKeys } from "@/lib/query-keys";
 
-/** Additive types managed via water addition profiles, excluded from this editor */
+/** Additive types managed via water chemistry calculations, excluded from this editor */
 const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
 
 export default function RecipeAdditionsPage({
@@ -40,7 +40,7 @@ export default function RecipeAdditionsPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipes")
-        .select("id, name, water_addition_profile_id")
+        .select("id, name, target_water_profile_id")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -198,33 +198,13 @@ export default function RecipeAdditionsPage({
           </Button>
         </div>
 
-        {/* Info about water chemistry */}
-        {recipe?.water_addition_profile_id && (
-          <div className="flex items-start gap-3 rounded-lg border bg-muted/50 p-4">
-            <Info className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-            <div className="text-sm text-muted-foreground">
-              Water salts and acids are managed via the linked{" "}
-              <Link
-                href={`/settings/water-profiles/additions/${recipe.water_addition_profile_id}`}
-                className="underline hover:text-foreground"
-              >
-                water addition profile
-              </Link>
-              . This page manages clarifiers, nutrients, and other recipe-specific
-              additions.
-            </div>
-          </div>
-        )}
-
         {/* Additions Editor */}
         <Card>
           <CardHeader>
             <CardTitle>Recipe Additions</CardTitle>
             <CardDescription>
               Add clarifiers, nutrients, and other additions to this recipe.
-              {!recipe?.water_addition_profile_id && (
-                <> Water salts and acids are managed via addition profiles in Settings.</>
-              )}
+              Water salt additions are calculated automatically from source and target water profiles.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -261,15 +241,14 @@ export default function RecipeAdditionsPage({
               <strong>Other:</strong> Antifoam, enzymes, or other process additions.
             </p>
             <p className="text-xs border-t pt-2 mt-2">
-              Water salts (Gypsum, CaCl₂, etc.) and acids (lactic, phosphoric) are managed
-              via{" "}
+              Water salts (Gypsum, CaCl&#x2082;, etc.) and acids are calculated from source and target{" "}
               <Link
-                href="/settings/water-profiles/additions"
+                href="/settings/water-profiles"
                 className="underline hover:text-foreground"
               >
-                addition profiles
+                water profiles
               </Link>
-              .
+              {" "}set on the recipe.
             </p>
           </CardContent>
         </Card>

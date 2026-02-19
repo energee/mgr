@@ -121,7 +121,6 @@ function getUnifiedSections<T>(
 ): UnifiedSectionDef<T>[] {
   if (entity.sections) return entity.sections;
 
-  // Convert legacy detailSections to unified format
   return (entity.detailSections || []).map((section) => ({
     id: section.id,
     title: section.title,
@@ -129,7 +128,7 @@ function getUnifiedSections<T>(
     defaultCollapsed: section.defaultCollapsed,
     tab: section.tab,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    component: section.component as any, // Legacy components accept { data: T }
+    component: section.component as any,
     fields: section.fields?.map((f) => ({
       name: f.field,
       label: f.label,
@@ -138,30 +137,21 @@ function getUnifiedSections<T>(
       relation: f.relation,
       render: f.render,
       fullWidth: f.fullWidth,
-      editable: false as const, // Legacy fields are display-only in this context
+      editable: false as const,
     })),
   }));
 }
 
 // =============================================================================
-// Helper: Extract editable fields from sections for useDynamicOptions
+// Helper: Extract editable fields from sections
 // =============================================================================
 
 function getEditableFieldsFromSections<T>(
   sections: UnifiedSectionDef<T>[]
 ): UnifiedFieldDef<T>[] {
-  const fields: UnifiedFieldDef<T>[] = [];
-  for (const section of sections) {
-    if (section.fields) {
-      for (const field of section.fields) {
-        // Only include fields that have a type (i.e., they are editable)
-        if (field.type) {
-          fields.push(field);
-        }
-      }
-    }
-  }
-  return fields;
+  return sections
+    .flatMap((s) => s.fields ?? [])
+    .filter((f) => f.type);
 }
 
 // =============================================================================
@@ -195,9 +185,8 @@ function groupSectionsForDisplay<T>(
 
   const flushFieldRun = () => {
     if (currentFieldRun.length > 1) {
-      groups.push({ type: "field-group", sections: [...currentFieldRun] });
+      groups.push({ type: "field-group", sections: currentFieldRun });
     } else if (currentFieldRun.length === 1) {
-      // A single field section — still render standalone for visual consistency
       groups.push({ type: "standalone", section: currentFieldRun[0] });
     }
     currentFieldRun = [];
@@ -228,7 +217,7 @@ function buildDefaultValues<T>(
   for (const section of sections) {
     if (!section.fields) continue;
     for (const field of section.fields) {
-      if (!field.type) continue; // Skip display-only fields
+      if (!field.type) continue;
       if (field.defaultValue !== undefined) {
         initial[field.name] =
           typeof field.defaultValue === "function"
@@ -258,18 +247,33 @@ function buildDefaultValues<T>(
 }
 
 // =============================================================================
+// Helper: Reset form from loaded record data and store optimistic lock version
+// =============================================================================
+
+function resetFormFromRecord(
+  form: UseFormReturn<Record<string, unknown>>,
+  record: Record<string, unknown>,
+  formDefaults: Record<string, unknown>,
+  loadedVersionRef: React.MutableRefObject<number | null>
+): void {
+  form.reset({ ...formDefaults, ...record });
+  if (typeof record.version === "number") {
+    loadedVersionRef.current = record.version;
+  }
+}
+
+// =============================================================================
 // Hook: Fetch relation display values for FK fields
 // =============================================================================
 
 function useRelationDisplayValues<T>(
   fields: UnifiedFieldDef<T>[] | undefined,
   data: T | null
-) {
+): Record<string, string> {
   const supabase = createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  // Collect all relation fields that have a UUID value
   const relationQueries = useMemo(() => {
     if (!fields || !data) return [];
     return fields
@@ -343,14 +347,9 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const hasWritePermission = writePermission ? can(writePermission) : true;
   const canEdit = showEdit && !!entity.formSchema && hasWritePermission;
 
-  // Cast to any for dynamic table access - universal components work with any entity
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-
-  // Use viewTable if available (includes computed/joined fields), otherwise base table
   const fetchTable = entity.viewTable || entity.table;
-
-  // Resolve sections (unified or legacy)
   const sections = useMemo(() => getUnifiedSections(entity), [entity]);
 
   // ---------------------------------------------------------------------------
@@ -362,10 +361,18 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const conflictDialog = useConflictDialog();
   const [deleteAction, setDeleteAction] = useState<EntityActionDef<T> | null>(null);
 
-  // Cmd+Enter save shortcut - the ref is attached to a hidden save button
   const submitRef = useSubmitShortcut();
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const [formErrors, setFormErrors] = useState<{ field: string; message: string }[]>([]);
+
+  /** Set form errors and focus the error summary panel. */
+  const showFormErrors = useCallback(
+    (errors: { field: string; message: string }[]) => {
+      setFormErrors(errors);
+      requestAnimationFrame(() => errorSummaryRef.current?.focus());
+    },
+    []
+  );
 
   // ---------------------------------------------------------------------------
   // Fetch record (skip in create mode)
@@ -398,23 +405,17 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     defaultValues: formDefaults,
   });
 
-  // When data loads (edit mode), reset form with record values + store version
+  // When data loads, reset form with record values + store version
   const prevDataRef = useRef<T | null>(null);
   useEffect(() => {
     if (data && data !== prevDataRef.current) {
       prevDataRef.current = data;
-      const record = data as Record<string, unknown>;
-      // Merge defaults with loaded data
-      const merged = { ...formDefaults, ...record };
-      form.reset(merged);
-      if (typeof record.version === "number") {
-        loadedVersionRef.current = record.version;
-      }
+      resetFormFromRecord(form, data as Record<string, unknown>, formDefaults, loadedVersionRef);
     }
   }, [data, form, formDefaults]);
 
   // ---------------------------------------------------------------------------
-  // onFieldChange subscription - notify parent when form fields change
+  // onFieldChange subscription
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!onFieldChange || !editing) return;
@@ -428,7 +429,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
   // ---------------------------------------------------------------------------
   // Dynamic options for fields with dynamicOptions or relation type
-  // (unconditional so read-only mode can resolve UUIDs to display labels)
   // ---------------------------------------------------------------------------
   const dynamicFields = useMemo(
     () =>
@@ -454,7 +454,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       if (entity.viewTable) {
         queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.viewTable) });
       }
-      // Invalidate revision history so the timeline updates after saves
       queryClient.invalidateQueries({ queryKey: revisionKeys.forEntity(entity.table, recordId) });
     },
     [queryClient, fetchTable, entity.table, entity.viewTable]
@@ -493,18 +492,15 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     };
   }, [data, entity.detailHeader]);
 
-  // Get current state info
   const stateInfo = useMemo(() => {
     if (!data || !entity.stateMachine) return null;
     const currentState = data[entity.stateMachine.stateField] as string;
     const display = entity.stateMachine.stateDisplay?.[currentState];
-    const validTransitions =
-      entity.stateMachine.transitions[currentState] || [];
     return {
       currentState,
       label: display?.label || currentState,
       color: display?.color || "default",
-      validTransitions,
+      validTransitions: entity.stateMachine.transitions[currentState] || [],
     };
   }, [data, entity.stateMachine]);
 
@@ -515,8 +511,12 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
     for (const section of sections) {
       if (section.tab) {
-        const existing = tabMap.get(section.tab) || [];
-        tabMap.set(section.tab, [...existing, section]);
+        let group = tabMap.get(section.tab);
+        if (!group) {
+          group = [];
+          tabMap.set(section.tab, group);
+        }
+        group.push(section);
       } else {
         noTab.push(section);
       }
@@ -528,7 +528,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     };
   }, [sections]);
 
-  // Get relations that should show as tabs
   const relationTabs = useMemo(() => {
     if (!entity.relations) return [];
     return entity.relations.filter(
@@ -536,7 +535,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     );
   }, [entity.relations]);
 
-  // Get available actions
   const availableActions = useMemo(() => {
     if (!data || !entity.actions) return [];
     return entity.actions.filter((action) => {
@@ -554,11 +552,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const startEditing = useCallback(() => {
     if (!canEdit) return;
     if (data) {
-      const record = data as Record<string, unknown>;
-      form.reset({ ...formDefaults, ...record });
-      if (typeof record.version === "number") {
-        loadedVersionRef.current = record.version;
-      }
+      resetFormFromRecord(form, data as Record<string, unknown>, formDefaults, loadedVersionRef);
     }
     setFormErrors([]);
     setEditing(true);
@@ -569,13 +563,9 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   const handleCancel = useCallback(() => {
     if (form.formState.isDirty) {
-      const confirmed = window.confirm(
-        "You have unsaved changes. Discard?"
-      );
-      if (!confirmed) return;
+      if (!window.confirm("You have unsaved changes. Discard?")) return;
     }
     if (isCreateMode) {
-      // In create mode, go back to list
       router.push(backUrl || path);
       return;
     }
@@ -587,29 +577,25 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // Save handler
   // ---------------------------------------------------------------------------
   const handleSave = useCallback(async () => {
-    // Trigger validation
     const isValid = await form.trigger();
     if (!isValid) {
       const errors = Object.entries(form.formState.errors)
         .filter(([, err]) => err?.message)
         .map(([field, err]) => ({ field, message: err!.message as string }));
-      setFormErrors(errors);
-      requestAnimationFrame(() => errorSummaryRef.current?.focus());
+      showFormErrors(errors);
       return;
     }
 
     const values = form.getValues();
 
     // Pre-process: convert empty strings to null for optional fields
-    const editableFieldsList = getEditableFieldsFromSections(sections);
-    for (const field of editableFieldsList) {
+    for (const field of getEditableFieldsFromSections(sections)) {
       const key = field.name as string;
       if (values[key] === "" && !field.required) {
         values[key] = null;
       }
     }
 
-    // Validate with Zod
     if (!entity.formSchema) return;
     const result = entity.formSchema.safeParse(values);
     if (!result.success) {
@@ -619,15 +605,13 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         form.setError(fieldPath, { message: err.message });
         errors.push({ field: fieldPath, message: err.message });
       }
-      setFormErrors(errors);
-      requestAnimationFrame(() => errorSummaryRef.current?.focus());
+      showFormErrors(errors);
       return;
     }
 
     setIsSubmitting(true);
     try {
       if (isCreateMode) {
-        // INSERT
         const { data: newRow, error } = await db
           .from(entity.table)
           .insert(result.data)
@@ -640,9 +624,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         invalidateEntityCaches(newId);
         router.push(`${path}/${newId}`);
       } else if (id) {
-        // UPDATE
         if (loadedVersionRef.current !== null) {
-          // Optimistic locking
           const lockResult = await updateWithOptimisticLock(
             supabase,
             entity.table,
@@ -659,11 +641,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             }
             throw new Error(lockResult.error);
           }
-
-          setFormErrors([]);
-          toast.success(`${entity.displayName} updated successfully`);
         } else {
-          // Standard update (no version field)
           const { error } = await db
             .from(entity.table)
             .update(result.data)
@@ -671,13 +649,11 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             .select()
             .single();
           if (error) throw error;
-          setFormErrors([]);
-          toast.success(`${entity.displayName} updated successfully`);
         }
 
-        // Invalidate caches
+        setFormErrors([]);
+        toast.success(`${entity.displayName} updated successfully`);
         invalidateEntityCaches(id);
-
         setEditing(false);
       }
     } catch (err) {
@@ -699,6 +675,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     path,
     router,
     conflictDialog,
+    showFormErrors,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -716,11 +693,12 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         .eq("id", id)
         .single();
       if (freshData) {
-        const record = freshData as Record<string, unknown>;
-        form.reset({ ...formDefaults, ...record });
-        if (typeof record.version === "number") {
-          loadedVersionRef.current = record.version;
-        }
+        resetFormFromRecord(
+          form,
+          freshData as Record<string, unknown>,
+          formDefaults,
+          loadedVersionRef
+        );
         toast.info("Data refreshed. Please re-apply your changes.");
       }
     } catch {
@@ -744,17 +722,9 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       return el.matches("input, textarea, select, [contenteditable]");
     }
 
-    function confirmDirtyNavigation(): boolean {
-      if (editing && form.formState.isDirty) {
-        return window.confirm("You have unsaved changes. Discard?");
-      }
-      return true;
-    }
-
     function handleKeyDown(e: KeyboardEvent) {
       const inInput = isInputElement(document.activeElement);
 
-      // Allow Escape from inputs during edit mode
       if (inInput) {
         if (editing && e.key === "Escape") {
           e.preventDefault();
@@ -768,7 +738,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       switch (e.key) {
         case "Backspace":
           e.preventDefault();
-          if (confirmDirtyNavigation()) {
+          if (!editing || !form.formState.isDirty || window.confirm("You have unsaved changes. Discard?")) {
             router.push(backUrl || path);
           }
           break;
@@ -797,8 +767,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Rendering guards
   // ---------------------------------------------------------------------------
-
-  // In create mode, don't show loading/error for data fetch
   if (!isCreateMode) {
     if (error) {
       return (
@@ -821,7 +789,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     }
   }
 
-  // For display purposes, use data or empty object for create mode
   const displayData = (data || ({} as T)) as T;
 
   return (
@@ -892,7 +859,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {/* State transitions */}
                   {stateInfo && stateInfo.validTransitions.length > 0 && (
                     <>
                       {stateInfo.validTransitions.map((toState) => {
@@ -915,7 +881,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
                     </>
                   )}
 
-                  {/* Custom actions */}
                   {availableActions.map((action) => {
                     const disabledReason = action.disabledWhen?.(
                       displayData
@@ -1184,11 +1149,7 @@ function UnifiedSectionCard<T>({
   optionsMap?: Record<string, { value: string; label: string }[]>;
   disabledFields?: string[];
 }) {
-  // Always call the relation hook (rules of hooks)
-  const relationDisplayValues = useRelationDisplayValues(
-    section.fields,
-    data
-  );
+  const relationDisplayValues = useRelationDisplayValues(section.fields, data);
 
   const HeaderActions = section.headerActions;
   const headerClassName = HeaderActions
@@ -1228,7 +1189,6 @@ function UnifiedSectionCard<T>({
   if (section.component) {
     const CustomComponent = section.component;
 
-    // Collapsible custom component sections (view mode only)
     if (section.collapsible && !editing) {
       return (
         <Collapsible defaultOpen={!section.defaultCollapsed}>
@@ -1264,33 +1224,73 @@ function UnifiedSectionCard<T>({
     );
   }
 
-  // Render fields using UnifiedField
   return (
     <Card>
       {sectionHeader}
       <CardContent>
-        <dl className="grid grid-cols-12 gap-4">
-          {section.fields?.map((field) => {
-            const effectiveField = disabledFields?.includes(field.name)
-              ? { ...field, disabled: true }
-              : field;
-            return (
-              <UnifiedField
-                key={field.name}
-                field={effectiveField as UnifiedFieldDef<Record<string, unknown>>}
-                editing={editing}
-                isCreateMode={isCreateMode}
-                form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
-                record={data as Record<string, unknown>}
-                entity={entity as EntityConfig<Record<string, unknown>>}
-                relationDisplayValues={relationDisplayValues}
-                dynamicOptions={optionsMap[field.name]}
-              />
-            );
-          })}
-        </dl>
+        <FieldGrid
+          fields={section.fields}
+          data={data}
+          entity={entity}
+          editing={editing}
+          isCreateMode={isCreateMode}
+          form={form}
+          optionsMap={optionsMap}
+          disabledFields={disabledFields}
+          relationDisplayValues={relationDisplayValues}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+// =============================================================================
+// Shared Field Grid - renders a list of UnifiedField items in a 12-col grid
+// =============================================================================
+
+/** Renders a `dl` grid of UnifiedField elements. Shared across section variants. */
+function FieldGrid<T>({
+  fields,
+  data,
+  entity,
+  editing,
+  isCreateMode,
+  form,
+  optionsMap = {},
+  disabledFields,
+  relationDisplayValues,
+}: {
+  fields: UnifiedFieldDef<T>[] | undefined;
+  data: T;
+  entity: EntityConfig<T>;
+  editing: boolean;
+  isCreateMode: boolean;
+  form?: UseFormReturn<Record<string, unknown>>;
+  optionsMap?: Record<string, { value: string; label: string }[]>;
+  disabledFields?: string[];
+  relationDisplayValues: Record<string, string>;
+}) {
+  return (
+    <dl className="grid grid-cols-12 gap-4">
+      {fields?.map((field) => {
+        const effectiveField = disabledFields?.includes(field.name)
+          ? { ...field, disabled: true }
+          : field;
+        return (
+          <UnifiedField
+            key={field.name}
+            field={effectiveField as UnifiedFieldDef<Record<string, unknown>>}
+            editing={editing}
+            isCreateMode={isCreateMode}
+            form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
+            record={data as Record<string, unknown>}
+            entity={entity as EntityConfig<Record<string, unknown>>}
+            relationDisplayValues={relationDisplayValues}
+            dynamicOptions={optionsMap[field.name]}
+          />
+        );
+      })}
+    </dl>
   );
 }
 
@@ -1367,35 +1367,20 @@ function FieldSectionGroup<T>({
     <Card>
       <CardContent className="pt-6">
         <div className="space-y-6">
-          {sections.map((section, idx) =>
-            section.collapsible ? (
-              <CollapsibleFieldSection
-                key={section.id}
-                section={section}
-                data={data}
-                entity={entity}
-                editing={editing}
-                isCreateMode={isCreateMode}
-                form={form}
-                optionsMap={optionsMap}
-                disabledFields={disabledFields}
-                showDivider={idx > 0}
-              />
-            ) : (
-              <CompactFieldSection
-                key={section.id}
-                section={section}
-                data={data}
-                entity={entity}
-                editing={editing}
-                isCreateMode={isCreateMode}
-                form={form}
-                optionsMap={optionsMap}
-                disabledFields={disabledFields}
-                showDivider={idx > 0}
-              />
-            )
-          )}
+          {sections.map((section, idx) => (
+            <InlineFieldSection
+              key={section.id}
+              section={section}
+              data={data}
+              entity={entity}
+              editing={editing}
+              isCreateMode={isCreateMode}
+              form={form}
+              optionsMap={optionsMap}
+              disabledFields={disabledFields}
+              showDivider={idx > 0}
+            />
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -1404,9 +1389,10 @@ function FieldSectionGroup<T>({
 
 /**
  * Renders a single field section with a compact header (no Card wrapper).
+ * Supports optional collapsible behavior via the section config.
  * Used inside FieldSectionGroup.
  */
-function CompactFieldSection<T>({
+function InlineFieldSection<T>({
   section,
   data,
   entity,
@@ -1421,6 +1407,37 @@ function CompactFieldSection<T>({
   showDivider: boolean;
 }) {
   const relationDisplayValues = useRelationDisplayValues(section.fields, data);
+
+  const fieldGrid = (
+    <FieldGrid
+      fields={section.fields}
+      data={data}
+      entity={entity}
+      editing={editing}
+      isCreateMode={isCreateMode}
+      form={form}
+      optionsMap={optionsMap}
+      disabledFields={disabledFields}
+      relationDisplayValues={relationDisplayValues}
+    />
+  );
+
+  if (section.collapsible) {
+    return (
+      <Collapsible defaultOpen={!section.defaultCollapsed}>
+        <div>
+          {showDivider && <Separator className="mb-6" />}
+          <CollapsibleTrigger className="flex items-center gap-1.5 group cursor-pointer w-full text-left mb-3">
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              {section.title}
+            </h3>
+          </CollapsibleTrigger>
+          <CollapsibleContent>{fieldGrid}</CollapsibleContent>
+        </div>
+      </Collapsible>
+    );
+  }
 
   return (
     <div>
@@ -1428,89 +1445,13 @@ function CompactFieldSection<T>({
       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
         {section.title}
       </h3>
-      <dl className="grid grid-cols-12 gap-4">
-        {section.fields?.map((field) => {
-          const effectiveField = disabledFields?.includes(field.name)
-            ? { ...field, disabled: true }
-            : field;
-          return (
-            <UnifiedField
-              key={field.name}
-              field={effectiveField as UnifiedFieldDef<Record<string, unknown>>}
-              editing={editing}
-              isCreateMode={isCreateMode}
-              form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
-              record={data as Record<string, unknown>}
-              entity={entity as EntityConfig<Record<string, unknown>>}
-              relationDisplayValues={relationDisplayValues}
-              dynamicOptions={optionsMap[field.name]}
-            />
-          );
-        })}
-      </dl>
+      {fieldGrid}
     </div>
   );
 }
 
-/**
- * Collapsible variant of CompactFieldSection for sections with collapsible: true.
- * Uses Radix Collapsible with a rotating chevron indicator.
- */
-function CollapsibleFieldSection<T>({
-  section,
-  data,
-  entity,
-  editing,
-  isCreateMode,
-  form,
-  optionsMap = {},
-  disabledFields,
-  showDivider,
-}: SectionRenderProps<T> & {
-  section: UnifiedSectionDef<T>;
-  showDivider: boolean;
-}) {
-  const relationDisplayValues = useRelationDisplayValues(section.fields, data);
-
-  return (
-    <Collapsible defaultOpen={!section.defaultCollapsed}>
-      <div>
-        {showDivider && <Separator className="mb-6" />}
-        <CollapsibleTrigger className="flex items-center gap-1.5 group cursor-pointer w-full text-left mb-3">
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            {section.title}
-          </h3>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <dl className="grid grid-cols-12 gap-4">
-            {section.fields?.map((field) => {
-              const effectiveField = disabledFields?.includes(field.name)
-                ? { ...field, disabled: true }
-                : field;
-              return (
-                <UnifiedField
-                  key={field.name}
-                  field={effectiveField as UnifiedFieldDef<Record<string, unknown>>}
-                  editing={editing}
-                  isCreateMode={isCreateMode}
-                  form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
-                  record={data as Record<string, unknown>}
-                  entity={entity as EntityConfig<Record<string, unknown>>}
-                  relationDisplayValues={relationDisplayValues}
-                  dynamicOptions={optionsMap[field.name]}
-                />
-              );
-            })}
-          </dl>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
-  );
-}
-
 // =============================================================================
-// Relation Table (identical to EntityDetail's RelationTable)
+// Relation Table (renders related entity records in a tabular format)
 // =============================================================================
 
 function RelationTable({
@@ -1528,7 +1469,6 @@ function RelationTable({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  // Fetch related records with pagination limit - only fetch when tab is active
   const {
     data: items,
     isLoading,
@@ -1545,7 +1485,6 @@ function RelationTable({
       if (!relatedEntity) return [];
 
       try {
-        // Build select with joins for FK display fields
         const joins = relatedEntity.listColumns
           .filter((col) => col.relation)
           .map((col) => {
@@ -1559,11 +1498,8 @@ function RelationTable({
           ? `*, ${joins.join(", ")}`
           : "*";
 
-        // Use entity's defaultSort or fallback to created_at
         const sortField = relatedEntity.defaultSort?.column || "created_at";
         const sortAsc = relatedEntity.defaultSort?.direction === "asc";
-
-        // Use configured limit or default to 50
         const limit = relation.relationLimit || 50;
 
         const { data, error } = await db
@@ -1600,7 +1536,6 @@ function RelationTable({
     (col) => col.accessorKey && col.accessorKey !== relation.foreignKey
   );
 
-  // Convert snake_case entity name to kebab-case for URL routes
   const routeName = relatedEntity.name.replace(/_/g, "-");
 
   return (
@@ -1660,7 +1595,6 @@ function RelationTable({
 
                     let value = item[key];
 
-                    // Handle relation display - data comes back keyed by alias
                     if (col.relation) {
                       const alias = key.replace(/_id$/, "");
                       const relData = item[alias] as Record<

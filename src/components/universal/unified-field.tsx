@@ -1,11 +1,9 @@
 /**
  * UnifiedField - Delegates to FieldDisplay or FieldInput
  *
- * Simple wrapper that renders a field in either view mode (FieldDisplay)
- * or edit mode (FieldInput) based on editing state and field editability.
- *
- * Bridges react-hook-form's Controller to FieldInput's value/onChange/error
- * interface.
+ * Renders a field in either view mode (FieldDisplay) or edit mode (FieldInput)
+ * based on editing state and field editability. Bridges react-hook-form's
+ * Controller to FieldInput's value/onChange/error interface.
  */
 
 "use client";
@@ -27,6 +25,23 @@ interface UnifiedFieldProps {
   dynamicOptions?: { value: string; label: string }[];
 }
 
+/**
+ * Determine whether a field should render in edit mode.
+ * A field is editable when: editing is on, the field has a type,
+ * it is not explicitly non-editable, and create-only fields are
+ * only editable during creation.
+ */
+function isFieldEditable(
+  field: UnifiedFieldDef<Record<string, unknown>>,
+  editing: boolean,
+  isCreateMode: boolean,
+): boolean {
+  if (!editing || !field.type) return false;
+  if (field.editable === false) return false;
+  if (field.editable === "create-only" && !isCreateMode) return false;
+  return true;
+}
+
 export function UnifiedField({
   field,
   editing,
@@ -37,13 +52,7 @@ export function UnifiedField({
   relationDisplayValues,
   dynamicOptions,
 }: UnifiedFieldProps) {
-  const isEditable =
-    editing &&
-    field.editable !== false &&
-    !(field.editable === "create-only" && !isCreateMode) &&
-    !!field.type;
-
-  if (isEditable && form) {
+  if (isFieldEditable(field, editing, isCreateMode) && form) {
     return (
       <Controller
         control={form.control}

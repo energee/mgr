@@ -3,13 +3,8 @@
 /**
  * HopScheduleEditor - Recipe Hop Schedule Management Component
  *
- * A specialized editor for managing recipe hops in junction table format.
- * Features:
- * - Searchable hop selector from catalog
- * - Timing selection (boil, whirlpool, dry hop)
- * - Boil time input for boil additions
- * - IBU contribution estimates
- * - Drag-to-reorder (position)
+ * Manages recipe hops in junction table format with searchable selector,
+ * timing/boil-time inputs, IBU estimates (Tinseth), and drag-to-reorder.
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -58,7 +53,6 @@ import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
-// Hop timing options
 export const HOP_TIMINGS = [
   { value: "first_wort", label: "First Wort", description: "Added during lautering" },
   { value: "boil", label: "Boil", description: "Added during boil" },
@@ -78,7 +72,6 @@ const TIMING_DISPLAY: Record<string, string> = {
   dry_hop: "\u2014",
 };
 
-// Types for hop schedule entries
 export interface HopScheduleItem {
   id?: string;
   hop_id: string;
@@ -86,7 +79,7 @@ export interface HopScheduleItem {
   timing: HopTiming;
   boil_time_min: number | null;
   position: number;
-  // Joined data (read-only)
+  /** Joined data (read-only) */
   hop?: {
     id: string;
     name: string;
@@ -116,11 +109,8 @@ const HOP_TYPE_LABELS: Record<string, string> = {
 };
 
 interface HopScheduleEditorProps {
-  /** Current hop schedule items */
   items: HopScheduleItem[];
-  /** Callback when items change */
   onChange: (items: HopScheduleItem[]) => void;
-  /** Whether the editor is disabled */
   disabled?: boolean;
   /** Recipe batch size in gallons (for IBU calculation) */
   batchSizeGal?: number;
@@ -138,19 +128,16 @@ export function HopScheduleEditor({
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Fetch hop catalog
   const { data: hopCatalog = [], isLoading: loadingHops } = useCatalog<HopCatalogItem>(catalogKeys.hops(), "hops", "id, name, origin, type, alpha_acid_typical, flavor_profile, bag_weight_lbs", ["type", "name"]);
 
-  // Calculate IBU for a single hop addition (Tinseth formula)
+  /** IBU contribution for a single hop addition (Tinseth formula) */
   const calculateIBU = useCallback(
     (item: HopScheduleItem): number => {
       if (!item.hop?.alpha_acid_typical || !item.weight_oz) return 0;
 
-      // Only boil and first wort contribute significant IBU
       if (item.timing === "dry_hop") return 0;
       if (item.timing === "whirlpool") {
-        // Whirlpool contributes ~15-20% of a 20-min boil
-        const utilization = 0.05;
+        const utilization = 0.05; // ~15-20% of a 20-min boil
         const aau = item.weight_oz * item.hop.alpha_acid_typical;
         return (aau * utilization * 74.89) / batchSizeGal;
       }
@@ -158,26 +145,20 @@ export function HopScheduleEditor({
       const boilTime = item.timing === "first_wort" ? 60 : (item.boil_time_min || 0);
       if (boilTime <= 0) return 0;
 
-      // Tinseth utilization formula
       const bigness = 1.65 * Math.pow(0.000125, estimatedOG - 1);
       const boilFactor = (1 - Math.exp(-0.04 * boilTime)) / 4.15;
       const utilization = bigness * boilFactor;
-
-      // IBU = (AAU × Utilization × 74.89) / Gallons
       const aau = item.weight_oz * item.hop.alpha_acid_typical;
       return (aau * utilization * 74.89) / batchSizeGal;
     },
     [batchSizeGal, estimatedOG]
   );
 
-  // Calculate totals
-  const totals = useMemo(() => {
-    const totalWeight = items.reduce((sum, item) => sum + (item.weight_oz || 0), 0);
-    const totalIBU = items.reduce((sum, item) => sum + calculateIBU(item), 0);
-    return { totalWeight, totalIBU };
-  }, [items, calculateIBU]);
+  const totals = useMemo(() => ({
+    totalWeight: items.reduce((sum, item) => sum + (item.weight_oz || 0), 0),
+    totalIBU: items.reduce((sum, item) => sum + calculateIBU(item), 0),
+  }), [items, calculateIBU]);
 
-  // Add a new hop to the schedule
   const handleAddHop = useCallback(
     (hop: HopCatalogItem) => {
       const newItem: HopScheduleItem = {
@@ -197,17 +178,14 @@ export function HopScheduleEditor({
     [items, onChange]
   );
 
-  // Update a field for an item
   const handleFieldChange = useCallback(
     (index: number, field: keyof HopScheduleItem, value: unknown) => {
       const updated = [...items];
       updated[index] = { ...updated[index], [field]: value };
 
-      // Clear boil time if timing is not boil
       if (field === "timing" && value !== "boil" && value !== "first_wort") {
         updated[index].boil_time_min = null;
       }
-      // Set default boil time when switching to boil
       if (field === "timing" && value === "boil" && !updated[index].boil_time_min) {
         updated[index].boil_time_min = 60;
       }
@@ -217,11 +195,9 @@ export function HopScheduleEditor({
     [items, onChange]
   );
 
-  // Remove an item
   const handleRemove = useCallback(
     (index: number) => {
       const updated = items.filter((_, i) => i !== index);
-      // Update positions
       updated.forEach((item, i) => {
         item.position = i;
       });
@@ -230,7 +206,6 @@ export function HopScheduleEditor({
     [items, onChange]
   );
 
-  // Handle reorder from drag-and-drop
   const handleReorder = useCallback(
     (reordered: HopScheduleItem[]) => {
       const updated = reordered.map((item, i) => ({
@@ -242,14 +217,14 @@ export function HopScheduleEditor({
     [onChange]
   );
 
-  // Group hops by type for the selector
+  /** Hops grouped by type for the selector */
   const hopsByType = useMemo(() => {
     const groups: Record<string, HopCatalogItem[]> = {};
-    hopCatalog.forEach((hop) => {
+    for (const hop of hopCatalog) {
       const type = hop.type || "dual";
       if (!groups[type]) groups[type] = [];
       groups[type].push(hop);
-    });
+    }
     return groups;
   }, [hopCatalog]);
 
@@ -344,12 +319,10 @@ export function HopScheduleEditor({
                           </SortableItemHandle>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <div className="font-medium">{hop?.name || "Unknown"}</div>
-                              <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                {hop?.flavor_profile}
-                              </div>
+                          <div>
+                            <div className="font-medium">{hop?.name || "Unknown"}</div>
+                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {hop?.flavor_profile}
                             </div>
                           </div>
                         </TableCell>
@@ -487,7 +460,6 @@ export function HopScheduleEditor({
         </Sortable>
       )}
 
-      {/* Legend for timings */}
       {items.length > 0 && (
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
           {HOP_TIMINGS.map((timing) => (

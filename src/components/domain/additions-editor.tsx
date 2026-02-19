@@ -6,14 +6,6 @@
  * General-purpose editor for managing recipe additions (clarifiers, nutrients, etc.).
  * Water salts and acids are typically managed via water addition profiles; use the
  * `excludeTypes` prop to filter them from the catalog on recipe pages.
- *
- * Features:
- * - Searchable additive selector from catalog grouped by type
- * - Amount input with unit selection
- * - Timing selection (mash, sparge, boil, whirlpool, fermentation, packaging)
- * - Target selection for water salts (mash, sparge, kettle)
- * - Reorder support
- * - Optional type exclusion via `excludeTypes` prop
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -50,10 +42,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, GripVertical, ChevronsUpDown } from "lucide-react";
 import { catalogKeys } from "@/lib/query-keys";
 
-// Types for addition entries
 export interface AdditionItem {
   id?: string;
   additive_id: string;
@@ -85,7 +76,7 @@ interface AdditionsEditorProps {
   items: AdditionItem[];
   onChange: (items: AdditionItem[]) => void;
   disabled?: boolean;
-  /** Additive types to exclude from the catalog (e.g., ["water_salt", "acid"]) */
+  /** Additive types to exclude from the catalog (e.g. ["water_salt", "acid"]) */
   excludeTypes?: string[];
 }
 
@@ -123,7 +114,7 @@ const TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-// Types that typically need target selection (water chemistry)
+/** Additive types that need target selection (mash/sparge/kettle) */
 const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
 
 export function AdditionsEditor({
@@ -135,7 +126,6 @@ export function AdditionsEditor({
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Fetch additives catalog, optionally excluding certain types
   const { data: rawCatalog = [], isLoading } = useCatalog<AdditiveCatalogItem>(catalogKeys.additives(), "additives", "id, name, type, description, typical_amount, typical_unit", ["type", "name"]);
 
   const additiveCatalog = useMemo(
@@ -146,7 +136,6 @@ export function AdditionsEditor({
     [rawCatalog, excludeTypes]
   );
 
-  // Add additive
   const handleAdd = useCallback(
     (additive: AdditiveCatalogItem) => {
       if (items.some((item) => item.additive_id === additive.id)) {
@@ -154,12 +143,9 @@ export function AdditionsEditor({
         return;
       }
 
-      // Determine default timing based on type
       let defaultTiming = "boil";
       if (additive.type === "water_salt" || additive.type === "acid") {
         defaultTiming = "mash";
-      } else if (additive.type === "clarifier") {
-        defaultTiming = "boil";
       } else if (additive.type === "nutrient") {
         defaultTiming = "fermentation";
       }
@@ -181,7 +167,6 @@ export function AdditionsEditor({
     [items, onChange]
   );
 
-  /** Update a single field on an item by index */
   const handleFieldChange = useCallback(
     (index: number, field: keyof AdditionItem, value: string | number) => {
       const updated = [...items];
@@ -191,7 +176,6 @@ export function AdditionsEditor({
     [items, onChange]
   );
 
-  // Remove item
   const handleRemove = useCallback(
     (index: number) => {
       const updated = items.filter((_, i) => i !== index);
@@ -203,7 +187,6 @@ export function AdditionsEditor({
     [items, onChange]
   );
 
-  // Move item
   const handleMove = useCallback(
     (index: number, direction: "up" | "down") => {
       if (direction === "up" && index === 0) return;
@@ -220,28 +203,18 @@ export function AdditionsEditor({
     [items, onChange]
   );
 
-  // Group additives by type
-  const additivesByType = useMemo(() => {
+  /** Available (not-yet-added) additives grouped by type for the selector */
+  const availableByType = useMemo(() => {
+    const addedIds = new Set(items.map((item) => item.additive_id));
     const groups: Record<string, AdditiveCatalogItem[]> = {};
-    additiveCatalog.forEach((add) => {
+    for (const add of additiveCatalog) {
+      if (addedIds.has(add.id)) continue;
       const type = add.type || "other";
       if (!groups[type]) groups[type] = [];
       groups[type].push(add);
-    });
+    }
     return groups;
-  }, [additiveCatalog]);
-
-  // Filter out already-added
-  const availableAdditives = useMemo(() => {
-    const addedIds = new Set(items.map((item) => item.additive_id));
-    return additiveCatalog.filter((add) => !addedIds.has(add.id));
   }, [additiveCatalog, items]);
-
-  // Check if item needs target selection
-  const needsTarget = (item: AdditionItem) => {
-    const additive = item.additive || additiveCatalog.find((a) => a.id === item.additive_id);
-    return additive && WATER_CHEMISTRY_TYPES.includes(additive.type);
-  };
 
   return (
     <div className="space-y-4">
@@ -269,37 +242,27 @@ export function AdditionsEditor({
               />
               <CommandList>
                 <CommandEmpty>No additives found.</CommandEmpty>
-                {Object.entries(additivesByType).map(([type, additives]) => {
-                  const available = additives.filter((a) =>
-                    availableAdditives.some((aa) => aa.id === a.id)
-                  );
-                  if (available.length === 0) return null;
-
-                  return (
-                    <CommandGroup key={type} heading={TYPE_LABELS[type] || type}>
-                      {available.map((additive) => (
-                        <CommandItem
-                          key={additive.id}
-                          value={additive.name}
-                          onSelect={() => handleAdd(additive)}
-                          className="flex items-center justify-between"
-                        >
-                          <div className="flex flex-col">
-                            <span>{additive.name}</span>
-                            {additive.description && (
-                              <span className="text-xs text-muted-foreground line-clamp-1">
-                                {additive.description}
-                              </span>
-                            )}
-                          </div>
-                          {items.some((item) => item.additive_id === additive.id) && (
-                            <Check className="h-4 w-4 text-primary" />
+                {Object.entries(availableByType).map(([type, additives]) => (
+                  <CommandGroup key={type} heading={TYPE_LABELS[type] || type}>
+                    {additives.map((additive) => (
+                      <CommandItem
+                        key={additive.id}
+                        value={additive.name}
+                        onSelect={() => handleAdd(additive)}
+                        className="flex items-center justify-between"
+                      >
+                        <div className="flex flex-col">
+                          <span>{additive.name}</span>
+                          {additive.description && (
+                            <span className="text-xs text-muted-foreground line-clamp-1">
+                              {additive.description}
+                            </span>
                           )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  );
-                })}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                ))}
               </CommandList>
             </Command>
           </PopoverContent>
@@ -330,7 +293,7 @@ export function AdditionsEditor({
             {items.map((item, index) => {
               const additive =
                 item.additive || additiveCatalog.find((a) => a.id === item.additive_id);
-              const showTarget = needsTarget(item);
+              const showTarget = additive && WATER_CHEMISTRY_TYPES.includes(additive.type);
 
               return (
                 <TableRow key={item.additive_id}>

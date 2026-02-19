@@ -41,6 +41,7 @@ import {
   calculateAdditions,
   calculateResultingProfile,
   calculateSulfateChlorideRatio,
+  formatRatio,
   getRatioDescription,
   calculateResidualAlkalinity,
   estimateMashPH,
@@ -92,7 +93,7 @@ function ProfileDisplay({ profile, label }: { profile: WaterProfile; label: stri
       </div>
       <div className="flex items-center gap-2 text-sm">
         <Badge variant="outline" className="text-xs">
-          SO₄:Cl = {ratio === Infinity ? "∞" : `${ratio}:1`}
+          SO₄:Cl = {formatRatio(ratio)}
         </Badge>
         <span className="text-muted-foreground">{ratioLabel}</span>
       </div>

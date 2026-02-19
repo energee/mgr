@@ -3386,8 +3386,7 @@ export type Database = {
           created_at: string | null
           id: string
           position: number | null
-          profile_id: string | null
-          recipe_id: string | null
+          recipe_id: string
           target: string | null
           timing: string
           unit: string
@@ -3398,8 +3397,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           position?: number | null
-          profile_id?: string | null
-          recipe_id?: string | null
+          recipe_id: string
           target?: string | null
           timing: string
           unit: string
@@ -3410,8 +3408,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           position?: number | null
-          profile_id?: string | null
-          recipe_id?: string | null
+          recipe_id?: string
           target?: string | null
           timing?: string
           unit?: string
@@ -3422,13 +3419,6 @@ export type Database = {
             columns: ["additive_id"]
             isOneToOne: false
             referencedRelation: "additives"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_additions_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "water_addition_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -4341,10 +4331,10 @@ export type Database = {
           target_og: number | null
           target_pitching_rate: number | null
           target_srm: number | null
+          target_water_profile_id: string | null
           tasting_notes: string | null
           updated_at: string | null
           volume_bbl: number | null
-          water_addition_profile_id: string | null
           water_profile_id: string | null
           water_to_grain_ratio: number | null
           whirlpool_rest_min: number | null
@@ -4393,10 +4383,10 @@ export type Database = {
           target_og?: number | null
           target_pitching_rate?: number | null
           target_srm?: number | null
+          target_water_profile_id?: string | null
           tasting_notes?: string | null
           updated_at?: string | null
           volume_bbl?: number | null
-          water_addition_profile_id?: string | null
           water_profile_id?: string | null
           water_to_grain_ratio?: number | null
           whirlpool_rest_min?: number | null
@@ -4445,10 +4435,10 @@ export type Database = {
           target_og?: number | null
           target_pitching_rate?: number | null
           target_srm?: number | null
+          target_water_profile_id?: string | null
           tasting_notes?: string | null
           updated_at?: string | null
           volume_bbl?: number | null
-          water_addition_profile_id?: string | null
           water_profile_id?: string | null
           water_to_grain_ratio?: number | null
           whirlpool_rest_min?: number | null
@@ -4487,10 +4477,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "recipes_water_addition_profile_id_fkey"
-            columns: ["water_addition_profile_id"]
+            foreignKeyName: "recipes_target_water_profile_id_fkey"
+            columns: ["target_water_profile_id"]
             isOneToOne: false
-            referencedRelation: "water_addition_profiles"
+            referencedRelation: "water_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -5730,65 +5720,6 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations_with_pos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      water_addition_profiles: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          target_bicarbonate_ppm: number | null
-          target_calcium_ppm: number | null
-          target_chloride_ppm: number | null
-          target_magnesium_ppm: number | null
-          target_ph: number | null
-          target_sodium_ppm: number | null
-          target_sulfate_ppm: number | null
-          updated_at: string | null
-          water_profile_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          target_bicarbonate_ppm?: number | null
-          target_calcium_ppm?: number | null
-          target_chloride_ppm?: number | null
-          target_magnesium_ppm?: number | null
-          target_ph?: number | null
-          target_sodium_ppm?: number | null
-          target_sulfate_ppm?: number | null
-          updated_at?: string | null
-          water_profile_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          target_bicarbonate_ppm?: number | null
-          target_calcium_ppm?: number | null
-          target_chloride_ppm?: number | null
-          target_magnesium_ppm?: number | null
-          target_ph?: number | null
-          target_sodium_ppm?: number | null
-          target_sulfate_ppm?: number | null
-          updated_at?: string | null
-          water_profile_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "water_addition_profiles_water_profile_id_fkey"
-            columns: ["water_profile_id"]
-            isOneToOne: false
-            referencedRelation: "water_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -8404,10 +8335,10 @@ export type Database = {
           target_og: number | null
           target_pitching_rate: number | null
           target_srm: number | null
+          target_water_profile_id: string | null
           tasting_notes: string | null
           updated_at: string | null
           volume_bbl: number | null
-          water_addition_profile_id: string | null
           water_profile_id: string | null
           water_to_grain_ratio: number | null
           whirlpool_rest_min: number | null
@@ -8446,10 +8377,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "recipes_water_addition_profile_id_fkey"
-            columns: ["water_addition_profile_id"]
+            foreignKeyName: "recipes_target_water_profile_id_fkey"
+            columns: ["target_water_profile_id"]
             isOneToOne: false
-            referencedRelation: "water_addition_profiles"
+            referencedRelation: "water_profiles"
             referencedColumns: ["id"]
           },
           {
