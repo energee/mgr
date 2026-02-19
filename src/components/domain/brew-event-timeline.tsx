@@ -121,8 +121,8 @@ interface BrewEventTimelineProps {
   onDeleteEvent?: (eventId: string) => Promise<void>;
   readOnly?: boolean;
   isLoading?: boolean;
-  /** Action string from headerActions via UnifiedSectionCard */
-  actionTrigger?: string | null;
+  /** Action trigger from headerActions via UnifiedSectionCard */
+  actionTrigger?: { action: string; seq: number } | null;
 }
 
 // =============================================================================
@@ -173,7 +173,7 @@ export function BrewEventTimeline({
 
   // Handle action triggers from headerActions via UnifiedSectionCard
   useEffect(() => {
-    if (actionTrigger === "add-event") {
+    if (actionTrigger?.action === "add-event") {
       setShowAddForm(true);
     }
   }, [actionTrigger]);

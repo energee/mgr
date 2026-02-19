@@ -8,8 +8,9 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { brewLogKeys } from "@/lib/query-keys";
+import { brewLogKeys, entityKeys } from "@/lib/query-keys";
 import { BrewEventTimeline } from "./brew-event-timeline";
 import type { BrewEvent } from "@/entities/brew-log";
 import type { Database } from "@/types/supabase";
@@ -18,8 +19,8 @@ type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
 
 interface BrewLogTimelineProps {
   data: BrewLog;
-  /** Action string from headerActions via UnifiedSectionCard */
-  actionTrigger?: string | null;
+  /** Action trigger from headerActions via UnifiedSectionCard */
+  actionTrigger?: { action: string; seq: number } | null;
 }
 
 export function BrewLogTimeline({ data, actionTrigger }: BrewLogTimelineProps) {
@@ -29,7 +30,37 @@ export function BrewLogTimeline({ data, actionTrigger }: BrewLogTimelineProps) {
   const events = (data.events as BrewEvent[]) || [];
   const isReadOnly = data.status === "completed" || data.status === "cancelled";
 
-  // Mutation for updating events
+  // The entity detail view table (may be viewTable or base table)
+  const viewTable = "brew_logs_with_batches";
+  const baseTable = "brew_logs";
+
+  /**
+   * Optimistically update the brew log's events in all relevant query caches.
+   * Returns a rollback function in case the mutation fails.
+   */
+  function optimisticUpdate(newEvents: BrewEvent[]) {
+    const patchEvents = (old: unknown) => {
+      if (!old || typeof old !== "object") return old;
+      return { ...(old as Record<string, unknown>), events: newEvents };
+    };
+
+    // Snapshot previous values for rollback
+    const prevView = queryClient.getQueryData(entityKeys.detail(viewTable, data.id));
+    const prevBase = queryClient.getQueryData(entityKeys.detail(baseTable, data.id));
+    const prevBrewLog = queryClient.getQueryData(brewLogKeys.detail(data.id));
+
+    queryClient.setQueryData(entityKeys.detail(viewTable, data.id), patchEvents);
+    queryClient.setQueryData(entityKeys.detail(baseTable, data.id), patchEvents);
+    queryClient.setQueryData(brewLogKeys.detail(data.id), patchEvents);
+
+    return () => {
+      queryClient.setQueryData(entityKeys.detail(viewTable, data.id), prevView);
+      queryClient.setQueryData(entityKeys.detail(baseTable, data.id), prevBase);
+      queryClient.setQueryData(brewLogKeys.detail(data.id), prevBrewLog);
+    };
+  }
+
+  // Mutation for updating events with optimistic updates
   const updateEventsMutation = useMutation({
     mutationFn: async (newEvents: BrewEvent[]) => {
       const { error } = await supabase
@@ -40,25 +71,46 @@ export function BrewLogTimeline({ data, actionTrigger }: BrewLogTimelineProps) {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Refetch to ensure server state is canonical
       queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: entityKeys.detail(viewTable, data.id) });
+      queryClient.invalidateQueries({ queryKey: entityKeys.detail(baseTable, data.id) });
     },
   });
 
   const handleAddEvent = async (event: BrewEvent) => {
     const newEvents = [...events, event];
-    await updateEventsMutation.mutateAsync(newEvents);
+    const rollback = optimisticUpdate(newEvents);
+    try {
+      await updateEventsMutation.mutateAsync(newEvents);
+    } catch {
+      rollback();
+      toast.error("Failed to add event");
+    }
   };
 
   const handleUpdateEvent = async (updatedEvent: BrewEvent) => {
     const newEvents = events.map((e) =>
       e.id === updatedEvent.id ? updatedEvent : e
     );
-    await updateEventsMutation.mutateAsync(newEvents);
+    const rollback = optimisticUpdate(newEvents);
+    try {
+      await updateEventsMutation.mutateAsync(newEvents);
+    } catch {
+      rollback();
+      toast.error("Failed to update event");
+    }
   };
 
   const handleDeleteEvent = async (eventId: string) => {
     const newEvents = events.filter((e) => e.id !== eventId);
-    await updateEventsMutation.mutateAsync(newEvents);
+    const rollback = optimisticUpdate(newEvents);
+    try {
+      await updateEventsMutation.mutateAsync(newEvents);
+    } catch {
+      rollback();
+      toast.error("Failed to delete event");
+    }
   };
 
   return (

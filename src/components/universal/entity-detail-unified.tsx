@@ -1137,14 +1137,20 @@ function UnifiedSectionCard<T>({
     ? "flex flex-row items-center justify-between"
     : undefined;
 
-  // Action trigger state for headerActions → component communication
-  const [actionTrigger, setActionTrigger] = useState<string | null>(null);
+  // Action trigger state for headerActions → component communication.
+  // Uses a counter to ensure repeated clicks of the same action always trigger.
+  const [actionTrigger, setActionTrigger] = useState<{ action: string; seq: number } | null>(null);
+  const actionSeqRef = useRef(0);
+  const fireAction = useCallback((action: string) => {
+    actionSeqRef.current += 1;
+    setActionTrigger({ action, seq: actionSeqRef.current });
+  }, []);
 
   // Shared section header for all rendering paths
   const sectionHeader = (
     <CardHeader className={headerClassName}>
       <CardTitle>{section.title}</CardTitle>
-      {HeaderActions && <HeaderActions data={data} onAction={setActionTrigger} />}
+      {HeaderActions && <HeaderActions data={data} onAction={fireAction} />}
     </CardHeader>
   );
 

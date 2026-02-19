@@ -465,7 +465,7 @@ export interface UnifiedSectionDef<T = Record<string, unknown>> {
     data: T;
     editing?: boolean;
     form?: unknown; // UseFormReturn - typed as unknown to avoid import
-    actionTrigger?: string | null;
+    actionTrigger?: { action: string; seq: number } | null;
   }>;
 
   /**
@@ -476,7 +476,7 @@ export interface UnifiedSectionDef<T = Record<string, unknown>> {
     data: T;
     editing?: boolean;
     form?: unknown;
-    actionTrigger?: string | null;
+    actionTrigger?: { action: string; seq: number } | null;
   }>;
 
   /** Whether this section is collapsible */
