@@ -790,11 +790,13 @@ export default function PricingPage() {
 
       {view === "channels" ? (
         <EntityList
+          key="channels"
           entity={salesChannelEntity}
           basePath="/settings/sales-channels"
         />
       ) : view === "tiers" ? (
         <EntityList
+          key="tiers"
           entity={pricingTierEntity}
           basePath="/settings/pricing/tiers"
         />
