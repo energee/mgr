@@ -353,8 +353,8 @@ export function BrewEventForm({
                               ) : (
                                 <div className="flex items-center gap-1">
                                   <Input
-                                    type="number"
-                                    step="any"
+                                    type="text"
+                                    inputMode="decimal"
                                     placeholder="Value"
                                     className="h-10"
                                     {...field}

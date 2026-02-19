@@ -146,13 +146,13 @@ export function UnitInput({
   return (
     <div className={cn("flex gap-2", wrapperClassName)}>
       <Input
-        type="number"
+        type="text"
+        inputMode="decimal"
         value={displayValue}
         onChange={handleInputChange}
         placeholder={placeholder}
         disabled={disabled}
         className={cn("flex-1", className)}
-        step="any"
         {...props}
       />
 
