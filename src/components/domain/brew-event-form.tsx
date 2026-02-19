@@ -44,16 +44,27 @@ import {
 } from "@/entities/brew-log";
 
 // =============================================================================
-// Schema (enum values derived from entity config to avoid duplication)
+// Schema — enum values listed inline to avoid circular dependency
+// (brew-log.tsx -> brew-log-timeline -> brew-event-timeline -> brew-event-form
+//  -> phaseConfig from brew-log.tsx would cause "before initialization" error)
 // =============================================================================
 
-type PhaseKey = keyof typeof phaseConfig;
-type MetricKey = keyof typeof metricConfig;
-const phaseKeys = Object.keys(phaseConfig) as [PhaseKey, ...PhaseKey[]];
-const metricKeys = Object.keys(metricConfig) as [MetricKey, ...MetricKey[]];
-
 const measurementFormSchema = z.object({
-  metric: z.enum(metricKeys),
+  metric: z.enum([
+    "temp_f",
+    "ph",
+    "volume_bbl",
+    "volume_l",
+    "gravity_plato",
+    "flow_rate",
+    "pump_speed",
+    "amount_lbs",
+    "amount_oz",
+    "amount_g",
+    "viability",
+    "pitch_rate",
+    "other",
+  ]),
   value: z.union([z.coerce.number(), z.string()]).refine(
     (val) => val !== "" && val !== undefined,
     { message: "Value is required" }
@@ -62,7 +73,31 @@ const measurementFormSchema = z.object({
 });
 
 const eventFormSchema = z.object({
-  phase: z.enum(phaseKeys),
+  phase: z.enum([
+    "strike_water",
+    "mash_in",
+    "mash_rest",
+    "mash_step",
+    "vorlauf",
+    "runoff_start",
+    "runoff_end",
+    "sparge_start",
+    "sparge_end",
+    "kettle_full",
+    "boil_start",
+    "boil_end",
+    "hop_addition",
+    "adjunct_addition",
+    "whirlpool_start",
+    "whirlpool_rest",
+    "whirlpool_end",
+    "ko_start",
+    "ko_end",
+    "yeast_pitch",
+    "hourly_check",
+    "flow_rate_change",
+    "other",
+  ]),
   custom_phase: z.string().nullable().optional(),
   time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
   measurements: z.array(measurementFormSchema),
