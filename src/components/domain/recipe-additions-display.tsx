@@ -4,14 +4,25 @@
  * RecipeAdditionsDisplay - Display component for recipe additions
  *
  * Split into two sections:
- * 1. Water Treatment — read-only display of linked addition profile's items (with link to profile)
+ * 1. Water Treatment — read-only display of linked addition profile's items (with link to profile),
+ *    including a water chemistry summary showing source/target/resulting ion concentrations
+ *    when the recipe has a source water profile and the addition profile has target values.
  * 2. Other Additions — recipe-specific non-water additions (clarifiers, nutrients, etc.)
  */
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { recipeKeys, waterAdditionProfileKeys } from "@/lib/query-keys";
+import { entityKeys, recipeKeys, waterAdditionProfileKeys } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
+import {
+  calculateResultingProfile,
+  calculateSulfateChlorideRatio,
+  getRatioDescription,
+  SALT_ADDITIVE_MAP,
+  type WaterProfile,
+  type SaltAdditions,
+} from "@/lib/water-chemistry";
 import Link from "next/link";
 import {
   Table,
@@ -86,6 +97,9 @@ interface RecipeAdditionsDisplayProps {
   data: {
     id: string | null;
     water_addition_profile_id?: string | null;
+    water_profile_id?: string | null;
+    mash_water_volume_gal?: number | null;
+    sparge_water_volume_gal?: number | null;
   };
 }
 
@@ -124,13 +138,13 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
     enabled: !!recipeId,
   });
 
-  // Fetch profile name when a profile is linked
+  // Fetch profile details (name + target water chemistry values) when a profile is linked
   const { data: profile } = useQuery({
     queryKey: waterAdditionProfileKeys.detail(profileId!),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("water_addition_profiles")
-        .select("id, name")
+        .select("id, name, water_profile_id, target_calcium_ppm, target_magnesium_ppm, target_sodium_ppm, target_sulfate_ppm, target_chloride_ppm, target_bicarbonate_ppm, target_ph")
         .eq("id", profileId!)
         .single();
       if (error) throw error;
@@ -168,6 +182,80 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
     },
     enabled: !!profileId,
   });
+
+  // Fetch the recipe's source water profile for chemistry calculations
+  const sourceWaterProfileId = data.water_profile_id;
+
+  const { data: sourceWaterProfile } = useQuery({
+    queryKey: entityKeys.detail("water_profiles", sourceWaterProfileId!),
+    queryFn: async () => {
+      const { data: row, error } = await supabase
+        .from("water_profiles")
+        .select("name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, ph")
+        .eq("id", sourceWaterProfileId!)
+        .single();
+      if (error) throw error;
+      return row;
+    },
+    enabled: !!sourceWaterProfileId,
+  });
+
+  // Reverse-map additive names to SaltAdditions keys for chemistry calculations
+  const ADDITIVE_TO_SALT_KEY = useMemo(() => {
+    const map: Record<string, keyof SaltAdditions> = {};
+    for (const [key, name] of Object.entries(SALT_ADDITIVE_MAP)) {
+      map[name.toLowerCase()] = key as keyof SaltAdditions;
+    }
+    return map;
+  }, []);
+
+  // Build SaltAdditions from the profile's addition items
+  const saltAdditionsFromItems = useMemo((): SaltAdditions | null => {
+    if (!profileItems || profileItems.length === 0) return null;
+    const additions: SaltAdditions = {
+      gypsum_g: 0,
+      calcium_chloride_g: 0,
+      epsom_salt_g: 0,
+      baking_soda_g: 0,
+      chalk_g: 0,
+      table_salt_g: 0,
+      magnesium_chloride_g: 0,
+    };
+    let hasAnySalt = false;
+    for (const item of profileItems) {
+      const name = item.additive?.name?.toLowerCase();
+      if (name && ADDITIVE_TO_SALT_KEY[name] && item.unit === "g") {
+        additions[ADDITIVE_TO_SALT_KEY[name]] = item.amount;
+        hasAnySalt = true;
+      }
+    }
+    return hasAnySalt ? additions : null;
+  }, [profileItems, ADDITIVE_TO_SALT_KEY]);
+
+  // Calculate the resulting water profile after salt additions, scaled to recipe volume
+  const totalVolumeGal =
+    (data.mash_water_volume_gal ?? 0) + (data.sparge_water_volume_gal ?? 0);
+
+  const resultingProfile = useMemo((): WaterProfile | null => {
+    if (!sourceWaterProfile || !saltAdditionsFromItems || totalVolumeGal <= 0)
+      return null;
+    const source: WaterProfile = {
+      calcium_ppm: sourceWaterProfile.calcium_ppm ?? 0,
+      magnesium_ppm: sourceWaterProfile.magnesium_ppm ?? 0,
+      sodium_ppm: sourceWaterProfile.sodium_ppm ?? 0,
+      sulfate_ppm: sourceWaterProfile.sulfate_ppm ?? 0,
+      chloride_ppm: sourceWaterProfile.chloride_ppm ?? 0,
+      bicarbonate_ppm: sourceWaterProfile.bicarbonate_ppm ?? 0,
+    };
+    return calculateResultingProfile(source, saltAdditionsFromItems, totalVolumeGal);
+  }, [sourceWaterProfile, saltAdditionsFromItems, totalVolumeGal]);
+
+  // Check whether the addition profile has any target ppm values set
+  const hasProfileTargets =
+    profile &&
+    (profile.target_calcium_ppm != null ||
+      profile.target_sulfate_ppm != null ||
+      profile.target_chloride_ppm != null);
 
   // Filter recipe additions to non-water-chemistry types only
   const otherAdditions = useMemo(
@@ -230,6 +318,34 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
         profileId={profileId}
         profileName={profile?.name}
         profileItems={profileItems || []}
+        sourceWaterProfile={
+          sourceWaterProfile
+            ? {
+                ...(({
+                  calcium_ppm: sourceWaterProfile.calcium_ppm ?? 0,
+                  magnesium_ppm: sourceWaterProfile.magnesium_ppm ?? 0,
+                  sodium_ppm: sourceWaterProfile.sodium_ppm ?? 0,
+                  sulfate_ppm: sourceWaterProfile.sulfate_ppm ?? 0,
+                  chloride_ppm: sourceWaterProfile.chloride_ppm ?? 0,
+                  bicarbonate_ppm: sourceWaterProfile.bicarbonate_ppm ?? 0,
+                }) satisfies WaterProfile),
+                name: sourceWaterProfile.name ?? undefined,
+              }
+            : null
+        }
+        profileTargets={
+          hasProfileTargets
+            ? {
+                calcium_ppm: profile!.target_calcium_ppm,
+                magnesium_ppm: profile!.target_magnesium_ppm,
+                sodium_ppm: profile!.target_sodium_ppm,
+                sulfate_ppm: profile!.target_sulfate_ppm,
+                chloride_ppm: profile!.target_chloride_ppm,
+                bicarbonate_ppm: profile!.target_bicarbonate_ppm,
+              }
+            : null
+        }
+        resultingProfile={resultingProfile}
       />
 
       {/* Other Additions Section */}
@@ -252,15 +368,31 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
   );
 }
 
-/** Water treatment section — shows linked profile items or empty state */
+/** Target ppm values from an addition profile */
+interface ProfileTargets {
+  calcium_ppm: number | null;
+  magnesium_ppm: number | null;
+  sodium_ppm: number | null;
+  sulfate_ppm: number | null;
+  chloride_ppm: number | null;
+  bicarbonate_ppm: number | null;
+}
+
+/** Water treatment section — shows linked profile items, chemistry summary, or empty state */
 function WaterTreatmentSection({
   profileId,
   profileName,
   profileItems,
+  sourceWaterProfile,
+  profileTargets,
+  resultingProfile,
 }: {
   profileId: string | null | undefined;
   profileName: string | undefined;
   profileItems: AdditionRow[];
+  sourceWaterProfile?: (WaterProfile & { name?: string }) | null;
+  profileTargets?: ProfileTargets | null;
+  resultingProfile?: WaterProfile | null;
 }) {
   if (!profileId) {
     return (
@@ -297,6 +429,13 @@ function WaterTreatmentSection({
           <ExternalLink className="h-3 w-3" />
         </Link>
       </div>
+      {sourceWaterProfile && profileTargets && resultingProfile && (
+        <WaterChemistrySummary
+          source={sourceWaterProfile}
+          target={profileTargets}
+          resulting={resultingProfile}
+        />
+      )}
       {profileItems.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Profile has no additions defined yet.{" "}
@@ -310,6 +449,118 @@ function WaterTreatmentSection({
       ) : (
         <AdditionsTable additions={profileItems} />
       )}
+    </div>
+  );
+}
+
+/**
+ * WaterChemistrySummary — read-only table comparing source, target, and resulting
+ * ion concentrations (ppm) plus the sulfate:chloride ratio.
+ * Values within 10% of target are highlighted green; those outside are amber.
+ */
+function WaterChemistrySummary({
+  source,
+  target,
+  resulting,
+}: {
+  source: WaterProfile & { name?: string };
+  target: ProfileTargets;
+  resulting: WaterProfile;
+}) {
+  const ions = [
+    { key: "calcium_ppm", label: "Ca\u00B2\u207A" },
+    { key: "magnesium_ppm", label: "Mg\u00B2\u207A" },
+    { key: "sodium_ppm", label: "Na\u207A" },
+    { key: "sulfate_ppm", label: "SO\u2084\u00B2\u207B" },
+    { key: "chloride_ppm", label: "Cl\u207B" },
+    { key: "bicarbonate_ppm", label: "HCO\u2083\u207B" },
+  ] as const;
+
+  const ratio = calculateSulfateChlorideRatio(
+    resulting.sulfate_ppm,
+    resulting.chloride_ppm
+  );
+  const ratioDesc = getRatioDescription(ratio);
+
+  return (
+    <div className="space-y-2 mb-4">
+      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        Water Chemistry
+      </h4>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-20" />
+            {ions.map((ion) => (
+              <TableHead key={ion.key} className="text-center w-16">
+                {ion.label}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell className="text-xs text-muted-foreground font-medium">
+              Source
+            </TableCell>
+            {ions.map((ion) => (
+              <TableCell
+                key={ion.key}
+                className="text-center font-mono text-sm"
+              >
+                {Math.round(source[ion.key] ?? 0)}
+              </TableCell>
+            ))}
+          </TableRow>
+          <TableRow>
+            <TableCell className="text-xs text-muted-foreground font-medium">
+              Target
+            </TableCell>
+            {ions.map((ion) => (
+              <TableCell
+                key={ion.key}
+                className="text-center font-mono text-sm"
+              >
+                {target[ion.key] != null
+                  ? Math.round(target[ion.key]!)
+                  : "\u2014"}
+              </TableCell>
+            ))}
+          </TableRow>
+          <TableRow>
+            <TableCell className="text-xs text-muted-foreground font-medium">
+              Result
+            </TableCell>
+            {ions.map((ion) => {
+              const result = Math.round(resulting[ion.key]);
+              const tgt = target[ion.key];
+              const withinRange =
+                tgt != null &&
+                tgt > 0 &&
+                Math.abs(result - tgt) / tgt <= 0.1;
+              return (
+                <TableCell
+                  key={ion.key}
+                  className={cn(
+                    "text-center font-mono text-sm font-medium",
+                    tgt != null &&
+                      (withinRange
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-amber-600 dark:text-amber-400")
+                  )}
+                >
+                  {result}
+                </TableCell>
+              );
+            })}
+          </TableRow>
+        </TableBody>
+      </Table>
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">SO&#x2084;:Cl Ratio:</span>
+        <span className="font-mono font-medium">{ratio}</span>
+        <Badge variant="outline">{ratioDesc.label}</Badge>
+      </div>
     </div>
   );
 }
