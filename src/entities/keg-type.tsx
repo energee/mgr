@@ -21,6 +21,7 @@ export const kegTypeSchema = z.object({
   volume_bbl: z.coerce.number().positive("Volume must be positive"),
   deposit_amount: z.coerce.number().min(0, "Deposit cannot be negative").default(0),
   description: z.string().nullable().optional(),
+  show_in_pricing: z.boolean().default(false),
   is_active: z.boolean().default(true),
   position: z.coerce.number().int().nullable().optional(),
 });
@@ -75,6 +76,12 @@ export const kegTypeEntity: EntityConfig<KegType> = {
       sortable: true,
       render: (value) => (value ? "Yes" : "No"),
     },
+    {
+      accessorKey: "show_in_pricing",
+      header: "In Pricing",
+      sortable: true,
+      render: (value) => (value ? "Yes" : "—"),
+    },
   ],
 
   listFilters: [
@@ -107,6 +114,7 @@ export const kegTypeEntity: EntityConfig<KegType> = {
         { field: "deposit_amount", label: "Deposit", format: "currency" },
         { field: "description", label: "Description" },
         { field: "is_active", label: "Active" },
+        { field: "show_in_pricing", label: "Show in Pricing" },
         { field: "position", label: "Display Order" },
         { field: "created_at", label: "Created", format: "datetime" },
         { field: "updated_at", label: "Last Updated", format: "datetime" },
@@ -172,6 +180,13 @@ export const kegTypeEntity: EntityConfig<KegType> = {
           type: "number",
           placeholder: "e.g., 1, 2, 3",
           description: "Order in dropdown menus (lower numbers appear first)",
+          colSpan: 6,
+        },
+        {
+          name: "show_in_pricing",
+          label: "Show in Pricing",
+          type: "switch",
+          description: "Include this keg type in the pricing matrix",
           colSpan: 6,
         },
         {
@@ -254,6 +269,13 @@ export const kegTypeEntity: EntityConfig<KegType> = {
       type: "number",
       placeholder: "e.g., 1, 2, 3",
       description: "Order in dropdown menus (lower numbers appear first)",
+      colSpan: 6,
+    },
+    {
+      name: "show_in_pricing",
+      label: "Show in Pricing",
+      type: "switch",
+      description: "Include this keg type in the pricing matrix",
       colSpan: 6,
     },
     {
