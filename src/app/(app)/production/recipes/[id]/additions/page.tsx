@@ -90,7 +90,7 @@ export default function RecipeAdditionsPage({
   // Sync fetched data to local editable state (React recommended pattern:
   // https://react.dev/reference/react/useState#storing-information-from-previous-renders)
   const [prevAdditions, setPrevAdditions] = useState(nonWaterAdditions);
-  if (nonWaterAdditions !== prevAdditions && nonWaterAdditions.length >= 0) {
+  if (nonWaterAdditions !== prevAdditions) {
     setPrevAdditions(nonWaterAdditions);
     setItems(
       nonWaterAdditions.map((a) => ({

@@ -13,18 +13,10 @@ import { ProfileAdditionsEditor } from "@/components/domain/profile-additions-ed
 
 type WaterAdditionProfile = Database["public"]["Tables"]["water_addition_profiles"]["Row"];
 
-// Re-export schema types for external consumers
 export { waterAdditionProfileSchema };
 export type { WaterAdditionProfileFormValues } from "@/lib/schemas/water-addition-profile";
 
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
 export const waterAdditionProfileEntity: EntityConfig<WaterAdditionProfile> = {
-  // ---------------------------------------------------------------------------
-  // Identity
-  // ---------------------------------------------------------------------------
   name: "water_addition_profile",
   table: "water_addition_profiles",
   displayName: "Water Addition Profile",
@@ -32,9 +24,7 @@ export const waterAdditionProfileEntity: EntityConfig<WaterAdditionProfile> = {
   description: "Named profiles of water salt/acid additions shared across recipes",
   domain: "system",
 
-  // ---------------------------------------------------------------------------
   // List View
-  // ---------------------------------------------------------------------------
   listColumns: [
     {
       accessorKey: "name",
@@ -66,33 +56,10 @@ export const waterAdditionProfileEntity: EntityConfig<WaterAdditionProfile> = {
   defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name", "description"],
 
-  // ---------------------------------------------------------------------------
   // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "name",
-  },
+  detailHeader: { title: "name" },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "description", label: "Description" },
-        { field: "is_active", label: "Active" },
-      ],
-    },
-    {
-      id: "additions",
-      title: "Additions",
-      component: ProfileAdditionsEditor,
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
-  // ---------------------------------------------------------------------------
   sections: [
     {
       id: "overview",
@@ -130,9 +97,7 @@ export const waterAdditionProfileEntity: EntityConfig<WaterAdditionProfile> = {
     },
   ],
 
-  // ---------------------------------------------------------------------------
   // Form
-  // ---------------------------------------------------------------------------
   formSchema: waterAdditionProfileSchema,
 
   formFields: [
@@ -161,9 +126,7 @@ export const waterAdditionProfileEntity: EntityConfig<WaterAdditionProfile> = {
     },
   ],
 
-  // ---------------------------------------------------------------------------
   // Actions
-  // ---------------------------------------------------------------------------
   actions: [
     {
       name: "delete",
@@ -175,9 +138,7 @@ export const waterAdditionProfileEntity: EntityConfig<WaterAdditionProfile> = {
     },
   ],
 
-  // ---------------------------------------------------------------------------
   // AI Context
-  // ---------------------------------------------------------------------------
   queryExamples: [
     "Show all water addition profiles",
     "What profiles are active?",
