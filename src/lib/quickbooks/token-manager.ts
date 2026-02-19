@@ -68,18 +68,24 @@ export async function saveTokens(tokens: {
   expiresAt: string;
 }): Promise<void> {
   const admin = await createAdminClient();
-  const { error } = await admin.rpc("save_qbo_tokens", {
-    p_access_token: tokens.accessToken,
-    p_refresh_token: tokens.refreshToken,
-    p_realm_id: tokens.realmId,
-    p_expires_at: tokens.expiresAt,
-  });
+  const rows = [
+    { key: SETTINGS_KEYS.accessToken, value: tokens.accessToken },
+    { key: SETTINGS_KEYS.refreshToken, value: tokens.refreshToken },
+    { key: SETTINGS_KEYS.realmId, value: tokens.realmId },
+    { key: SETTINGS_KEYS.expiresAt, value: tokens.expiresAt },
+  ];
+  const { error } = await admin
+    .from("system_settings")
+    .upsert(rows, { onConflict: "key" });
   if (error) throw new Error(`Failed to save QBO tokens: ${error.message}`);
 }
 
 export async function clearTokens(): Promise<void> {
   const admin = await createAdminClient();
-  const { error } = await admin.rpc("clear_qbo_tokens");
+  const { error } = await admin
+    .from("system_settings")
+    .delete()
+    .in("key", Object.values(SETTINGS_KEYS));
   if (error) throw new Error(`Failed to clear QBO tokens: ${error.message}`);
 }
 
@@ -102,10 +108,13 @@ export async function getAutoSyncEnabled(): Promise<boolean> {
 /** Save QBO OAuth client credentials */
 export async function saveClientCredentials(clientId: string, clientSecret: string): Promise<void> {
   const admin = await createAdminClient();
-  const { error } = await admin.rpc("save_qbo_client_credentials", {
-    p_client_id: clientId,
-    p_client_secret: clientSecret,
-  });
+  const rows = [
+    { key: SETTINGS_KEYS.clientId, value: clientId },
+    { key: SETTINGS_KEYS.clientSecret, value: clientSecret },
+  ];
+  const { error } = await admin
+    .from("system_settings")
+    .upsert(rows, { onConflict: "key" });
   if (error) throw new Error(`Failed to save QBO client credentials: ${error.message}`);
 }
 
