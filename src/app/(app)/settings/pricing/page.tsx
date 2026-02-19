@@ -52,9 +52,11 @@ import {
   Settings2,
   Grid3X3,
   Package,
+  Store,
 } from "lucide-react";
 import { EntityList } from "@/components/universal/entity-list";
 import { pricingTierEntity } from "@/entities/pricing-tier";
+import { salesChannelEntity } from "@/entities/sales-channel";
 
 // =============================================================================
 // Types
@@ -409,7 +411,7 @@ export default function PricingPage() {
   const queryClient = useQueryClient();
 
   const [channelOverride, setChannelOverride] = useState<string | null>(null);
-  const [view, setView] = useState<"matrix" | "tiers" | "formats">("matrix");
+  const [view, setView] = useState<"matrix" | "tiers" | "formats" | "channels">("matrix");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkType, setBulkType] = useState<"percent" | "flat">("percent");
   const [bulkValue, setBulkValue] = useState("");
@@ -775,10 +777,23 @@ export default function PricingPage() {
             <Package className="h-4 w-4 mr-1" />
             Formats
           </Button>
+          <Button
+            variant={view === "channels" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("channels")}
+          >
+            <Store className="h-4 w-4 mr-1" />
+            Channels
+          </Button>
         </div>
       </div>
 
-      {view === "tiers" ? (
+      {view === "channels" ? (
+        <EntityList
+          entity={salesChannelEntity}
+          basePath="/settings/sales-channels"
+        />
+      ) : view === "tiers" ? (
         <EntityList
           entity={pricingTierEntity}
           basePath="/settings/pricing/tiers"
