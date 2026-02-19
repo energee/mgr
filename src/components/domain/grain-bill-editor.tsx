@@ -41,7 +41,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, GripVertical, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, GripVertical, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";
 
@@ -95,20 +95,22 @@ export function GrainBillEditor({
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  const { data: maltCatalog = [], isLoading: loadingMalts } = useCatalog<MaltCatalogItem>(catalogKeys.malts(), "malts", "id, name, maltster, type, color_lovibond, potential_ppg, bag_weight_lbs", ["type", "name"]);
+  const { data: maltCatalog = [], isLoading: loadingMalts } = useCatalog<MaltCatalogItem>(
+    catalogKeys.malts(),
+    "malts",
+    "id, name, maltster, type, color_lovibond, potential_ppg, bag_weight_lbs",
+    ["type", "name"]
+  );
 
   const totalWeight = useMemo(
     () => items.reduce((sum, item) => sum + (item.weight_lbs || 0), 0),
     [items]
   );
 
-  const getPercentage = useCallback(
-    (weight: number) => {
-      if (totalWeight === 0) return 0;
-      return (weight / totalWeight) * 100;
-    },
-    [totalWeight]
-  );
+  function getPercentage(weight: number): number {
+    if (totalWeight === 0) return 0;
+    return (weight / totalWeight) * 100;
+  }
 
   const handleAddMalt = useCallback(
     (malt: MaltCatalogItem) => {
@@ -122,7 +124,7 @@ export function GrainBillEditor({
         malt_id: malt.id,
         weight_lbs: 0,
         position: items.length,
-        malt: malt,
+        malt,
       };
 
       onChange([...items, newItem]);
@@ -143,10 +145,9 @@ export function GrainBillEditor({
 
   const handleRemove = useCallback(
     (index: number) => {
-      const updated = items.filter((_, i) => i !== index);
-      updated.forEach((item, i) => {
-        item.position = i;
-      });
+      const updated = items
+        .filter((_, i) => i !== index)
+        .map((item, i) => ({ ...item, position: i }));
       onChange(updated);
     },
     [items, onChange]
@@ -387,7 +388,7 @@ function GrainBillWarnings({
     );
   }
 
-  const zeroWeightItems = items.filter((item) => !item.weight_lbs || item.weight_lbs === 0);
+  const zeroWeightItems = items.filter((item) => !item.weight_lbs);
   if (zeroWeightItems.length > 0) {
     warnings.push(
       `${zeroWeightItems.length} item(s) have no weight specified.`
@@ -399,7 +400,10 @@ function GrainBillWarnings({
   return (
     <div className="text-sm text-amber-600 dark:text-amber-400 space-y-1">
       {warnings.map((warning, i) => (
-        <p key={i}>⚠️ {warning}</p>
+        <p key={i} className="flex items-center gap-1">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {warning}
+        </p>
       ))}
     </div>
   );

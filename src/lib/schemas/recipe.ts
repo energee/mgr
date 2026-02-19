@@ -29,6 +29,9 @@ export const recipeSchema = z.object({
   // Whirlpool
   whirlpool_time_min: z.coerce.number().int().nullable().optional(),
   whirlpool_temp_f: z.coerce.number().int().nullable().optional(),
+  whirlpool_rest_min: z.coerce.number().int().nullable().optional(),
+  // Knock-Out
+  target_ko_temp_f: z.coerce.number().nullable().optional(),
   // Mash
   mash_temp_f: z.coerce.number().int().nullable().optional(),
   target_mash_ph: z.coerce.number().nullable().optional(),

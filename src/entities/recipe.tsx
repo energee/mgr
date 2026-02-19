@@ -18,6 +18,7 @@ import { createRevisionHistoryDisplay } from "@/components/domain/revision-histo
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
 import { StatusBadge } from "@/components/universal/status-badge";
 
+import { WaterProfileQuickCreate } from "@/components/domain/water-profile-quick-create";
 import { recipeSchema } from "@/lib/schemas/recipe";
 
 export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
@@ -192,13 +193,27 @@ export const recipeEntity: EntityConfig<Recipe> = {
         },
         {
           name: "water_profile_id",
-          label: "Water Profile",
+          label: "Source Water Profile",
           type: "relation",
           relation: {
             entity: "water_profile",
             displayField: "name",
           },
           placeholder: "Select water profile...",
+          quickCreate: WaterProfileQuickCreate,
+          colSpan: 6,
+        },
+        {
+          name: "target_water_profile_id",
+          label: "Target Water Profile",
+          type: "relation",
+          relation: {
+            entity: "water_profile",
+            displayField: "name",
+          },
+          placeholder: "Select target profile...",
+          description: "Target water chemistry for salt addition calculations",
+          quickCreate: WaterProfileQuickCreate,
           colSpan: 6,
         },
         {
@@ -353,18 +368,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
           label: "Conditioning Days",
           type: "number",
           placeholder: "e.g., 7",
-          colSpan: 6,
-        },
-        {
-          name: "target_water_profile_id",
-          label: "Target Water Profile",
-          type: "relation",
-          relation: {
-            entity: "water_profile",
-            displayField: "name",
-          },
-          placeholder: "Select target profile...",
-          description: "Target water chemistry for salt addition calculations",
           colSpan: 6,
         },
       ],

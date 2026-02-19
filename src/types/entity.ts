@@ -17,7 +17,7 @@
  * - Custom detail sections via `sections[].component`
  */
 
-import type { ReactNode, ComponentType } from "react";
+import type { ReactNode, ComponentType, FC } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { ZodSchema } from "zod";
 
@@ -440,6 +440,15 @@ export interface UnifiedFieldDef<T = Record<string, unknown>> {
    * - "create-only": editable in create mode, display-only in edit mode
    */
   editable?: boolean | "create-only";
+
+  // -- Quick create --
+
+  /**
+   * Quick-create component for relation fields. Renders a "+" button that
+   * opens a popover/dialog to create a new related record inline.
+   * After creation, calls `onCreated(newId)` to auto-select the new record.
+   */
+  quickCreate?: FC<{ onCreated: (id: string) => void }>;
 }
 
 /**

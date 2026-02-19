@@ -119,6 +119,9 @@ interface CatalogItem {
   type: string;
 }
 
+/** Gallons per barrel */
+const GAL_PER_BBL = 31.0;
+
 interface RecipeAdditionsDisplayProps {
   data: {
     id: string | null;
@@ -126,6 +129,8 @@ interface RecipeAdditionsDisplayProps {
     target_water_profile_id?: string | null;
     mash_water_volume_gal?: number | null;
     sparge_water_volume_gal?: number | null;
+    batch_size_bbl?: number | null;
+    volume_bbl?: number | null;
   };
 }
 
@@ -190,9 +195,14 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
     ["type", "name"]
   );
 
-  // Calculate total water volume for salt addition scaling
-  const totalVolumeGal =
+  // Calculate total water volume for salt addition scaling.
+  // Prefer explicit mash+sparge volumes; fall back to batch_size or recipe volume in BBL.
+  const explicitWaterGal =
     (data.mash_water_volume_gal ?? 0) + (data.sparge_water_volume_gal ?? 0);
+  const totalVolumeGal =
+    explicitWaterGal > 0
+      ? explicitWaterGal
+      : ((data.batch_size_bbl ?? data.volume_bbl ?? 0) * GAL_PER_BBL);
 
   // Calculate additions from source -> target delta
   const calculatedAdditions = useMemo((): SaltAdditions | null => {
