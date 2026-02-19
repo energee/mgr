@@ -21,7 +21,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { Beer } from "lucide-react";
 
 // =============================================================================
 // Types
@@ -211,10 +210,7 @@ export function BrewLogRecipeSheet({
         }}
       >
         <SheetHeader>
-          <div className="flex items-center gap-2">
-            <Beer className="h-5 w-5 text-muted-foreground" />
-            <SheetTitle className="text-lg">{recipeName}</SheetTitle>
-          </div>
+          <SheetTitle className="text-lg">{recipeName}</SheetTitle>
           {recipe?.style_name && (
             <SheetDescription>{recipe.style_name}</SheetDescription>
           )}
