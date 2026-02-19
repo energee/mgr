@@ -117,7 +117,7 @@ export default function BatchDetailPage({
   const bannerConfig = useMemo(() => {
     if (!batch) return null;
 
-    if (batch.status === "planned" && (!linkedBrewLogs?.length)) {
+    if (batch.status === "planned" && !linkedBrewLogs?.length) {
       return {
         message: "This batch needs a brew. Start a brew day or link an existing brew log.",
         variant: "info" as const,
@@ -130,47 +130,72 @@ export default function BatchDetailPage({
       return {
         message: "Brew is linked. Start fermentation when ready.",
         variant: "info" as const,
-        actions: [{ label: "Start Fermentation", onClick: () => setShowStartFermentation(true) }],
+        actions: [
+          { label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` },
+          { label: "Start Fermentation", onClick: () => setShowStartFermentation(true) },
+        ],
       };
     }
     if (batch.status === "fermenting") {
+      const actions: { label: string; href?: string; onClick?: () => void }[] = [];
+      if (linkedBrewLogs?.length) {
+        actions.push({ label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` });
+      }
+      actions.push(
+        { label: "Readings", href: `/production/batches/${id}/readings` },
+        { label: "Additions", href: `/production/batches/${id}/additions` },
+      );
       return {
         message: "Track fermentation progress with readings and additions.",
         variant: "default" as const,
+        actions,
+      };
+    }
+    if (linkedBrewLogs?.length) {
+      return {
+        message: `Linked to brew ${linkedBrewLogs[0].brew_log?.brew_number ?? "log"}.`,
+        variant: "default" as const,
         actions: [
-          { label: "Readings", href: `/production/batches/${id}/readings` },
-          { label: "Additions", href: `/production/batches/${id}/additions` },
+          { label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` },
         ],
       };
     }
     return null;
   }, [batch, linkedBrewLogs, id]);
 
-  // Custom action handler for batch-specific actions
+  // Custom action handler for batch-specific actions.
+  // Returns true when the action is handled by a dialog, false to let EntityDetail handle it.
   const handleAction = useCallback((actionName: string) => {
-    if (actionName === "start_fermentation") {
-      setShowStartFermentation(true);
-      return true; // Indicates action was handled
-    }
-    // Both cancel and archive use the same dialog (it adapts based on status)
-    if (actionName === "cancel" || actionName === "archive") {
-      setShowCancellation(true);
-      return true; // Indicates action was handled
-    }
-    if (actionName === "blend") {
-      setShowBlend(true);
-      return true; // Indicates action was handled
-    }
-    if (actionName === "transfer_vessel") {
-      setShowTransfer(true);
+    const dialogSetters: Record<string, (open: boolean) => void> = {
+      start_fermentation: setShowStartFermentation,
+      cancel: setShowCancellation,
+      archive: setShowCancellation, // Same dialog adapts based on batch status
+      blend: setShowBlend,
+      transfer_vessel: setShowTransfer,
+      start_brew_day: setShowStartBrewDay,
+    };
+
+    const setter = dialogSetters[actionName];
+    if (setter) {
+      setter(true);
       return true;
     }
-    return false; // Let EntityDetail handle normally
+    return false;
   }, []);
 
   const handleDialogSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
   }, [queryClient, id]);
+
+  const handleBrewDayCreated = useCallback(
+    (brewLogId: string) => {
+      queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
+      queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
+      queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+      router.push(`/production/brew-logs/${brewLogId}`);
+    },
+    [queryClient, id, router]
+  );
 
   return (
     <div className="space-y-4">
@@ -233,24 +258,18 @@ export default function BatchDetailPage({
             onOpenChange={setShowTransfer}
             onSuccess={handleDialogSuccess}
           />
-        </>
-      )}
 
-      {recipe && (
-        <StartBrewDayDialog
-          recipeId={recipe.id}
-          recipeName={recipe.name}
-          existingBatchId={id}
-          existingBatchVolume={batch?.volume_bbl ?? undefined}
-          open={showStartBrewDay}
-          onOpenChange={setShowStartBrewDay}
-          onSuccess={(brewLogId) => {
-            queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
-            queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
-            queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-            router.push(`/production/brew-logs/${brewLogId}`);
-          }}
-        />
+          <StartBrewDayDialog
+            batchId={batch.id}
+            batchNumber={batch.batch_number}
+            batchName={batch.name}
+            recipeName={recipe?.name ?? null}
+            volumeBbl={batch.volume_bbl}
+            open={showStartBrewDay}
+            onOpenChange={setShowStartBrewDay}
+            onSuccess={handleBrewDayCreated}
+          />
+        </>
       )}
     </div>
   );

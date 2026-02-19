@@ -458,12 +458,14 @@ export interface UnifiedSectionDef<T = Record<string, unknown>> {
 
   /**
    * Custom component for view mode (or both modes if editComponent is not set).
-   * Receives { data, editing, form } props.
+   * Receives { data, editing, form } props. When headerActions triggers an action,
+   * the component receives it via `actionTrigger`.
    */
   component?: ComponentType<{
     data: T;
     editing?: boolean;
     form?: unknown; // UseFormReturn - typed as unknown to avoid import
+    actionTrigger?: { action: string; seq: number } | null;
   }>;
 
   /**
@@ -474,6 +476,7 @@ export interface UnifiedSectionDef<T = Record<string, unknown>> {
     data: T;
     editing?: boolean;
     form?: unknown;
+    actionTrigger?: { action: string; seq: number } | null;
   }>;
 
   /** Whether this section is collapsible */
@@ -481,6 +484,13 @@ export interface UnifiedSectionDef<T = Record<string, unknown>> {
 
   /** Default collapsed state */
   defaultCollapsed?: boolean;
+
+  /**
+   * Optional component rendered next to the section title (e.g., action buttons).
+   * Receives `onAction` callback to trigger actions in the section body component.
+   * The body component receives the action string via `actionTrigger` prop.
+   */
+  headerActions?: ComponentType<{ data: T; onAction: (action: string) => void }>;
 
   /** Tab name if using tabbed layout */
   tab?: string;

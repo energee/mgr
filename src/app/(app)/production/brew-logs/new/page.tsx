@@ -1,13 +1,6 @@
-"use client";
+import { notFound } from "next/navigation";
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
-import { brewLogEntity } from "@/entities/brew-log";
-
-export default function NewBrewLogPage() {
-  return (
-    <EntityDetailUnifiedWithErrorBoundary
-      entity={brewLogEntity}
-      basePath="/production/brew-logs"
-    />
-  );
+/** Brew logs are created via "Start Brew Day" on a batch — no standalone creation. */
+export default function BrewLogNewPage() {
+  notFound();
 }

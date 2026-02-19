@@ -458,6 +458,13 @@ export const batchEntity: EntityConfig<Batch> = {
   // ---------------------------------------------------------------------------
   actions: [
     {
+      name: "start_brew_day",
+      label: "Start Brew Day",
+      icon: "play",
+      type: "button",
+      fromStates: ["planned"],
+    },
+    {
       name: "start_fermentation",
       label: "Start Fermentation",
       icon: "flask",

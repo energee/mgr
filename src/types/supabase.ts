@@ -1041,6 +1041,13 @@ export type Database = {
             referencedRelation: "brew_logs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "brew_log_batches_brew_log_id_fkey"
+            columns: ["brew_log_id"]
+            isOneToOne: false
+            referencedRelation: "brew_logs_with_batches"
+            referencedColumns: ["id"]
+          },
         ]
       }
       brew_logs: {
@@ -1053,7 +1060,6 @@ export type Database = {
           id: string
           legacy_data: Json | null
           notes: string | null
-          recipe_id: string | null
           status: string
           updated_at: string | null
         }
@@ -1066,7 +1072,6 @@ export type Database = {
           id?: string
           legacy_data?: Json | null
           notes?: string | null
-          recipe_id?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -1079,40 +1084,10 @@ export type Database = {
           id?: string
           legacy_data?: Json | null
           notes?: string | null
-          recipe_id?: string | null
           status?: string
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "brew_logs_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["recipe_id"]
-          },
-          {
-            foreignKeyName: "brew_logs_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "brew_logs_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_cogs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "brew_logs_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_estimates"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       customers: {
         Row: {
@@ -3410,8 +3385,8 @@ export type Database = {
           amount: number
           created_at: string | null
           id: string
-          is_default: boolean | null
           position: number | null
+          profile_id: string | null
           recipe_id: string | null
           target: string | null
           timing: string
@@ -3422,8 +3397,8 @@ export type Database = {
           amount: number
           created_at?: string | null
           id?: string
-          is_default?: boolean | null
           position?: number | null
+          profile_id?: string | null
           recipe_id?: string | null
           target?: string | null
           timing: string
@@ -3434,8 +3409,8 @@ export type Database = {
           amount?: number
           created_at?: string | null
           id?: string
-          is_default?: boolean | null
           position?: number | null
+          profile_id?: string | null
           recipe_id?: string | null
           target?: string | null
           timing?: string
@@ -3447,6 +3422,13 @@ export type Database = {
             columns: ["additive_id"]
             isOneToOne: false
             referencedRelation: "additives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_additions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "water_addition_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -4363,6 +4345,7 @@ export type Database = {
           updated_at: string | null
           use_default_additions: boolean | null
           volume_bbl: number | null
+          water_addition_profile_id: string | null
           water_profile_id: string | null
           water_to_grain_ratio: number | null
           whirlpool_rest_min: number | null
@@ -4415,6 +4398,7 @@ export type Database = {
           updated_at?: string | null
           use_default_additions?: boolean | null
           volume_bbl?: number | null
+          water_addition_profile_id?: string | null
           water_profile_id?: string | null
           water_to_grain_ratio?: number | null
           whirlpool_rest_min?: number | null
@@ -4467,6 +4451,7 @@ export type Database = {
           updated_at?: string | null
           use_default_additions?: boolean | null
           volume_bbl?: number | null
+          water_addition_profile_id?: string | null
           water_profile_id?: string | null
           water_to_grain_ratio?: number | null
           whirlpool_rest_min?: number | null
@@ -4502,6 +4487,13 @@ export type Database = {
             columns: ["style_id"]
             isOneToOne: false
             referencedRelation: "beer_styles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_water_addition_profile_id_fkey"
+            columns: ["water_addition_profile_id"]
+            isOneToOne: false
+            referencedRelation: "water_addition_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -5384,7 +5376,7 @@ export type Database = {
           invited_at: string | null
           invited_by: string | null
           last_active_at: string | null
-          role: string
+          roles: string[]
           status: string
           updated_at: string
         }
@@ -5397,7 +5389,7 @@ export type Database = {
           invited_at?: string | null
           invited_by?: string | null
           last_active_at?: string | null
-          role?: string
+          roles?: string[]
           status?: string
           updated_at?: string
         }
@@ -5410,7 +5402,7 @@ export type Database = {
           invited_at?: string | null
           invited_by?: string | null
           last_active_at?: string | null
-          role?: string
+          roles?: string[]
           status?: string
           updated_at?: string
         }
@@ -5744,6 +5736,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      water_addition_profiles: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       water_profiles: {
         Row: {
@@ -6481,44 +6500,38 @@ export type Database = {
       }
       brew_log_metrics: {
         Row: {
+          actual_mash_ph: number | null
+          actual_og: number | null
+          allocated_volume_bbl: number | null
           batch_count: number | null
           brew_date: string | null
           id: string | null
           phases_completed: Json | null
+          pre_boil_gravity: number | null
+          recipe_name: string | null
+          status: string | null
+          volume_to_fermenter_bbl: number | null
+        }
+        Relationships: []
+      }
+      brew_logs_with_batches: {
+        Row: {
+          batch_count: number | null
+          batch_numbers: string | null
+          brew_date: string | null
+          brew_number: string | null
+          brewer_id: string | null
+          created_at: string | null
+          events: Json | null
+          id: string | null
+          legacy_data: Json | null
+          notes: string | null
           recipe_id: string | null
           recipe_name: string | null
           status: string | null
+          updated_at: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "brew_logs_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["recipe_id"]
-          },
-          {
-            foreignKeyName: "brew_logs_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "brew_logs_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_cogs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "brew_logs_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_estimates"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       customer_keg_balance_summary: {
         Row: {
@@ -8346,6 +8359,7 @@ export type Database = {
           name: string | null
           notes: string | null
           preboil_volume_bbl: number | null
+          pricing_tier_id: string | null
           sparge_water_volume_gal: number | null
           status: string | null
           style: string | null
@@ -8365,6 +8379,7 @@ export type Database = {
           updated_at: string | null
           use_default_additions: boolean | null
           volume_bbl: number | null
+          water_addition_profile_id: string | null
           water_profile_id: string | null
           water_to_grain_ratio: number | null
           whirlpool_rest_min: number | null
@@ -8389,10 +8404,24 @@ export type Database = {
             referencedColumns: ["brand_id"]
           },
           {
+            foreignKeyName: "recipes_pricing_tier_id_fkey"
+            columns: ["pricing_tier_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_tiers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "recipes_style_id_fkey"
             columns: ["style_id"]
             isOneToOne: false
             referencedRelation: "beer_styles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_water_addition_profile_id_fkey"
+            columns: ["water_addition_profile_id"]
+            isOneToOne: false
+            referencedRelation: "water_addition_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -8495,8 +8524,8 @@ export type Database = {
           invited_by: string | null
           invited_by_name: string | null
           last_active_at: string | null
-          role: string | null
           role_display: string | null
+          roles: string[] | null
           status: string | null
           status_display: string | null
           updated_at: string | null
@@ -9083,6 +9112,10 @@ export type Database = {
         }[]
       }
       get_recipe_summary: { Args: { p_recipe_id: string }; Returns: Json }
+      get_roles_for_permission: {
+        Args: { p_permission: string }
+        Returns: string[]
+      }
       get_system_setting: { Args: { setting_key: string }; Returns: Json }
       get_system_setting_text: {
         Args: { setting_key: string }
@@ -9206,6 +9239,9 @@ export type Database = {
         Args: { brewery_id: string }
         Returns: boolean
       }
+      user_has_permission: { Args: { p_permission: string }; Returns: boolean }
+      user_has_role: { Args: { p_role: string }; Returns: boolean }
+      validate_user_roles: { Args: { p_roles: string[] }; Returns: boolean }
       save_qbo_tokens: {
         Args: {
           p_access_token: string

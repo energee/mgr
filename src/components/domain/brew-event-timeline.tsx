@@ -10,14 +10,8 @@
  * - Edit/delete capabilities
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -35,8 +29,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  ChevronDown,
-  ChevronRight,
   Clock,
   Droplet,
   Flame,
@@ -52,16 +44,22 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import {
-  phaseConfig,
-  metricConfig,
-  type BrewEvent,
-} from "@/entities/brew-log";
+import type { BrewEvent } from "@/entities/brew-log";
+import { useBrewPhases, useBrewMetrics } from "@/hooks/use-brew-enums";
 import { BrewEventForm } from "./brew-event-form";
 
 // =============================================================================
 // Icon Mapping
 // =============================================================================
+
+/** Convert "HH:MM" (24hr) to "h:MM AM/PM" */
+function formatTime12(time: string): string {
+  const [hStr, mStr] = time.split(":");
+  let h = parseInt(hStr, 10);
+  const suffix = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}:${mStr} ${suffix}`;
+}
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   droplet: Droplet,
@@ -70,7 +68,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   thermometer: Thermometer,
   refresh: RotateCw,
   "arrow-down": ArrowRight,
-  check: ChevronRight,
+  check: ArrowRight,
   container: FlaskConical,
   flame: Flame,
   leaf: Leaf,
@@ -122,6 +120,35 @@ interface BrewEventTimelineProps {
   onDeleteEvent?: (eventId: string) => Promise<void>;
   readOnly?: boolean;
   isLoading?: boolean;
+  /** Action trigger from headerActions via UnifiedSectionCard */
+  actionTrigger?: { action: string; seq: number } | null;
+}
+
+// =============================================================================
+// Header Actions (rendered by the unified section card next to the title)
+// =============================================================================
+
+/** Header action button for adding brew events, used via section headerActions */
+export function BrewEventTimelineActions({
+  data,
+  onAction,
+}: {
+  data: Record<string, unknown>;
+  onAction: (action: string) => void;
+}) {
+  const isReadOnly = data.status === "completed" || data.status === "cancelled";
+  if (isReadOnly) return null;
+
+  return (
+    <Button
+      size="sm"
+      onClick={() => onAction("add-event")}
+      className="h-9"
+    >
+      <Plus className="mr-1 h-4 w-4" />
+      Add Event
+    </Button>
+  );
 }
 
 // =============================================================================
@@ -135,12 +162,22 @@ export function BrewEventTimeline({
   onDeleteEvent,
   readOnly = false,
   isLoading = false,
+  actionTrigger,
 }: BrewEventTimelineProps) {
-  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
+  const { data: phaseData } = useBrewPhases();
+  const { data: metricData } = useBrewMetrics();
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<BrewEvent | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Handle action triggers from headerActions via UnifiedSectionCard
+  useEffect(() => {
+    if (actionTrigger?.action === "add-event") {
+      setShowAddForm(true);
+    }
+  }, [actionTrigger]);
 
   // Sort events by time
   const sortedEvents = useMemo(() => {
@@ -149,18 +186,6 @@ export function BrewEventTimeline({
       return a.time.localeCompare(b.time);
     });
   }, [events]);
-
-  const toggleExpanded = (eventId: string) => {
-    setExpandedEvents((prev) => {
-      const next = new Set(prev);
-      if (next.has(eventId)) {
-        next.delete(eventId);
-      } else {
-        next.add(eventId);
-      }
-      return next;
-    });
-  };
 
   const handleAddEvent = async (event: BrewEvent) => {
     if (!onAddEvent) return;
@@ -195,204 +220,158 @@ export function BrewEventTimeline({
     }
   };
 
-  const getPhaseIcon = (phase: string) => {
-    const config = phaseConfig[phase as keyof typeof phaseConfig];
-    const iconName = config?.icon || "more-horizontal";
-    const Icon = iconMap[iconName] || MoreHorizontal;
-    return Icon;
-  };
+  function getPhaseIcon(phase: string): React.ComponentType<{ className?: string }> {
+    const phaseEntry = phaseData?.phases.find((p) => p.value === phase);
+    const iconName = phaseEntry?.icon || "more-horizontal";
+    return iconMap[iconName] || MoreHorizontal;
+  }
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="flex items-center justify-center">
-            <div className="animate-pulse text-muted-foreground">Loading events...</div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-pulse text-muted-foreground">Loading events...</div>
+      </div>
     );
   }
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <CardTitle className="text-lg">Brew Day Timeline</CardTitle>
-          {!readOnly && onAddEvent && (
-            <Button
-              size="sm"
-              onClick={() => setShowAddForm(true)}
-              className="h-9"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Add Event
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          {sortedEvents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No events recorded yet.</p>
-              {!readOnly && onAddEvent && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddForm(true)}
-                  className="mt-4"
-                >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Record First Event
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="relative">
-              {/* Timeline line */}
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+      <div>
+        {sortedEvents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground">No events recorded yet.</p>
+            {!readOnly && onAddEvent && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddForm(true)}
+                className="mt-4"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Record First Event
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="relative">
+            {/* Timeline line */}
+            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
 
-              {/* Events */}
-              <div className="space-y-4">
-                {sortedEvents.map((event, index) => {
-                  const eventId = event.id || `event-${index}`;
-                  const isExpanded = expandedEvents.has(eventId);
-                  const PhaseIcon = getPhaseIcon(event.phase);
-                  const phaseLabel = event.phase === "other"
-                    ? event.custom_phase || "Other"
-                    : phaseConfig[event.phase as keyof typeof phaseConfig]?.label || event.phase;
-                  const colorClass = phaseColors[event.phase] || phaseColors.other;
+            {/* Events */}
+            <div className="space-y-4">
+              {sortedEvents.map((event, index) => {
+                const eventId = event.id || `event-${index}`;
+                const PhaseIcon = getPhaseIcon(event.phase);
+                const phaseLabelMap = phaseData?.labelMap ?? new Map<string, string>();
+                const phaseLabel =
+                  event.phase === "other"
+                    ? (event.custom_phase || "Other")
+                    : (phaseLabelMap.get(event.phase) || event.phase);
+                const colorClass = phaseColors[event.phase] || phaseColors.other;
 
                   return (
-                    <Collapsible
-                      key={eventId}
-                      open={isExpanded}
-                      onOpenChange={() => toggleExpanded(eventId)}
-                    >
-                      <div className="relative pl-10">
-                        {/* Timeline dot */}
-                        <div
-                          className={cn(
-                            "absolute left-2 top-3 h-5 w-5 rounded-full border-2 flex items-center justify-center",
-                            colorClass
-                          )}
-                        >
-                          <PhaseIcon className="h-3 w-3" />
-                        </div>
+                    <div key={eventId} className="relative pl-10">
+                      {/* Timeline dot */}
+                      <div
+                        className={cn(
+                          "absolute left-2 top-2.5 h-5 w-5 rounded-full border-2 flex items-center justify-center",
+                          colorClass
+                        )}
+                      >
+                        <PhaseIcon className="h-3 w-3" />
+                      </div>
 
-                        {/* Event card */}
-                        <div
-                          className={cn(
-                            "rounded-lg border p-3 transition-colors",
-                            colorClass
-                          )}
-                        >
-                          <CollapsibleTrigger asChild>
-                            <div className="flex items-center justify-between cursor-pointer">
-                              <div className="flex items-center gap-3">
-                                <span className="font-mono text-sm text-muted-foreground">
-                                  {event.time}
-                                </span>
-                                <span className="font-medium">{phaseLabel}</span>
-                                {event.measurements && event.measurements.length > 0 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    ({event.measurements.length} measurement
-                                    {event.measurements.length !== 1 ? "s" : ""})
+                      {/* Event row */}
+                      <div
+                        className={cn(
+                          "rounded-lg border px-3 py-2 transition-colors",
+                          colorClass
+                        )}
+                      >
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="font-mono text-sm text-muted-foreground shrink-0">
+                            {formatTime12(event.time)}
+                          </span>
+                          <span className="font-medium shrink-0">{phaseLabel}</span>
+
+                          {/* Inline measurements */}
+                          {event.measurements && event.measurements.length > 0 && (
+                            <>
+                              <span className="text-muted-foreground/40">|</span>
+                              {event.measurements.map((m, mIndex) => {
+                                const metricConfigMap = metricData?.configMap ?? new Map();
+                                const config = metricConfigMap.get(m.metric);
+                                const unitType = config?.unitType;
+                                const decimals = config?.decimals ?? 2;
+                                const label = m.metric === "other"
+                                  ? m.custom_metric || "Other"
+                                  : config?.label || m.metric;
+
+                                return (
+                                  <span
+                                    key={mIndex}
+                                    className="inline-flex items-center gap-1 text-sm"
+                                  >
+                                    <span className="font-medium">
+                                      {unitType && typeof m.value === "number" ? (
+                                        <UnitDisplay
+                                          value={m.value}
+                                          unitType={unitType}
+                                          decimals={decimals}
+                                        />
+                                      ) : (
+                                        <>
+                                          {m.value}
+                                          {config?.unit ? ` ${config.unit}` : ""}
+                                        </>
+                                      )}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">{label}</span>
                                   </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {!readOnly && (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingEvent(event);
-                                      }}
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeletingEventId(eventId);
-                                      }}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
+                                );
+                              })}
+                            </>
+                          )}
+
+                          {/* Inline notes */}
+                          {event.notes && (
+                            <>
+                              <span className="text-muted-foreground/40">|</span>
+                              <span className="text-sm text-muted-foreground truncate">{event.notes}</span>
+                            </>
+                          )}
+
+                          {/* Spacer + actions */}
+                          {!readOnly && (
+                            <div className="ml-auto flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setEditingEvent(event)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeletingEventId(eventId)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
-                          </CollapsibleTrigger>
-
-                          <CollapsibleContent className="mt-3 space-y-2">
-                            {/* Measurements */}
-                            {event.measurements && event.measurements.length > 0 && (
-                              <div className="space-y-1">
-                                {event.measurements.map((m, mIndex) => {
-                                  const config = metricConfig[m.metric as keyof typeof metricConfig];
-                                  const unitType = config && "unitType" in config ? config.unitType : undefined;
-                                  const decimals = config && "decimals" in config ? config.decimals : 2;
-                                  const label = m.metric === "other"
-                                    ? m.custom_metric || "Other"
-                                    : config?.label || m.metric;
-
-                                  return (
-                                    <div
-                                      key={mIndex}
-                                      className="text-sm flex items-center gap-2"
-                                    >
-                                      <Thermometer className="h-3 w-3 text-muted-foreground" />
-                                      <span>
-                                        {label}:{" "}
-                                        {unitType && typeof m.value === "number" ? (
-                                          <UnitDisplay
-                                            value={m.value}
-                                            unitType={unitType}
-                                            decimals={decimals}
-                                          />
-                                        ) : (
-                                          <>
-                                            {m.value}
-                                            {config?.unit ? ` ${config.unit}` : ""}
-                                          </>
-                                        )}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Notes */}
-                            {event.notes && (
-                              <div className="text-sm text-muted-foreground border-t pt-2 mt-2">
-                                {event.notes}
-                              </div>
-                            )}
-                          </CollapsibleContent>
+                          )}
                         </div>
                       </div>
-                    </Collapsible>
+                    </div>
                   );
                 })}
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Add Event Dialog */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
@@ -429,7 +408,7 @@ export function BrewEventTimeline({
       <AlertDialog open={!!deletingEventId} onOpenChange={() => setDeletingEventId(null)}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-<AlertDialogTitle>Delete event?</AlertDialogTitle>
+            <AlertDialogTitle>Delete event?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete this brew event. This action cannot
               be undone.

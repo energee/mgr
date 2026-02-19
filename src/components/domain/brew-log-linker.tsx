@@ -45,9 +45,6 @@ interface BrewLog {
   brew_number: string;
   brew_date: string;
   status: string;
-  recipe?: {
-    name: string;
-  };
 }
 
 interface LinkedBrewLog {
@@ -89,8 +86,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
             id,
             brew_number,
             brew_date,
-            status,
-            recipe:recipes(name)
+            status
           )
         `)
         .eq("batch_id", batchId);
@@ -105,7 +101,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_logs")
-        .select("id, brew_number, brew_date, status, recipe:recipes(name)")
+        .select("id, brew_number, brew_date, status")
         .eq("status", "completed")
         .order("brew_date", { ascending: false })
         .limit(50);
@@ -219,7 +215,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
                   <SelectContent>
                     {availableBrewLogs.map((bl) => (
                       <SelectItem key={bl.id} value={bl.id}>
-                        {bl.brew_number} - {bl.recipe?.name || "No Recipe"} (
+                        {bl.brew_number} (
                         {new Date(bl.brew_date).toLocaleDateString()})
                       </SelectItem>
                     ))}
@@ -289,7 +285,6 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
                     <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {link.brew_log.recipe?.name || "No recipe"} &bull;{" "}
                     {new Date(link.brew_log.brew_date).toLocaleDateString()}
                   </div>
                   {link.notes && (

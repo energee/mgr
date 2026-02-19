@@ -12,13 +12,16 @@ Brew logs capture the hot-side brewing process. They are **decoupled from batche
 │  brew_logs  │────────▶│ brew_log_batches │◀────────│   batches   │
 │  (hot side) │   1:M   │   (allocation)   │   M:1   │ (cold side) │
 └─────────────┘         └──────────────────┘         └─────────────┘
-       │
-       │ belongs to
-       ▼
-┌─────────────┐
-│   recipes   │
-└─────────────┘
+                                                            │
+                                                            │ belongs to
+                                                            ▼
+                                                     ┌─────────────┐
+                                                     │   recipes   │
+                                                     └─────────────┘
 ```
+
+**Note:** Recipe is owned by batches, not brew logs. Brew logs derive recipe info
+from their linked batches via the `brew_logs_with_batches` view.
 
 ---
 
@@ -30,7 +33,6 @@ The brew day record - everything from strike water through knockout.
 |--------|------|-------------|
 | id | UUID | Primary key |
 | brew_number | TEXT | Unique brew identifier (e.g., "BRW-2024-001") |
-| recipe_id | UUID | FK to recipes |
 | brew_date | DATE | Date of brew day |
 | brewer_id | UUID | FK to users (operator) |
 | status | TEXT | Status: draft, in_progress, completed, cancelled |
@@ -311,7 +313,7 @@ With brew logs decoupled, the `batches` table focuses on **fermentation and pack
 | batch_number | Batch identity |
 | name | Batch name |
 | status | Lifecycle state |
-| recipe_id | Keep for convenience (may differ from brew log recipe in blends) |
+| recipe_id | Single source of truth for recipe (brew logs derive recipe from here) |
 | volume_bbl | Target/actual volume |
 | actual_fg | Final gravity (derived from fermentation readings) |
 | actual_abv | ABV (calculated from OG/FG) |
@@ -363,7 +365,6 @@ draft → in_progress → completed
 
 ```sql
 CREATE INDEX idx_brew_logs_brew_date ON brew_logs(brew_date);
-CREATE INDEX idx_brew_logs_recipe_id ON brew_logs(recipe_id);
 CREATE INDEX idx_brew_logs_brewer_id ON brew_logs(brewer_id);
 CREATE INDEX idx_brew_log_batches_brew_log_id ON brew_log_batches(brew_log_id);
 CREATE INDEX idx_brew_log_batches_batch_id ON brew_log_batches(batch_id);
