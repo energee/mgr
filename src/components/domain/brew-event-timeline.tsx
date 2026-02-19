@@ -306,97 +306,95 @@ export function BrewEventTimeline({
                           )}
                         >
                           <CollapsibleTrigger asChild>
-                            <div className="flex items-center justify-between cursor-pointer">
-                              <div className="flex items-center gap-3">
-                                <span className="font-mono text-sm text-muted-foreground">
-                                  {event.time}
-                                </span>
-                                <span className="font-medium">{phaseLabel}</span>
-                                {event.measurements && event.measurements.length > 0 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    ({event.measurements.length} measurement
-                                    {event.measurements.length !== 1 ? "s" : ""})
+                            <div className="cursor-pointer space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-mono text-sm text-muted-foreground">
+                                    {event.time}
                                   </span>
-                                )}
+                                  <span className="font-medium">{phaseLabel}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {!readOnly && (
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingEvent(event);
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDeletingEventId(eventId);
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {(event.notes) && (
+                                    isExpanded ? (
+                                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    )
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                {!readOnly && (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingEvent(event);
-                                      }}
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeletingEventId(eventId);
-                                      }}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
+
+                              {/* Measurements shown inline (always visible) */}
+                              {event.measurements && event.measurements.length > 0 && (
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                                  {event.measurements.map((m, mIndex) => {
+                                    const config = metricConfig[m.metric as keyof typeof metricConfig];
+                                    const unitType = config && "unitType" in config ? config.unitType : undefined;
+                                    const decimals = config && "decimals" in config ? config.decimals : 2;
+                                    const label = m.metric === "other"
+                                      ? m.custom_metric || "Other"
+                                      : config?.label || m.metric;
+
+                                    return (
+                                      <span
+                                        key={mIndex}
+                                        className="inline-flex items-center gap-1 text-muted-foreground"
+                                      >
+                                        <Thermometer className="h-3 w-3" />
+                                        <span className="font-medium text-foreground">
+                                          {unitType && typeof m.value === "number" ? (
+                                            <UnitDisplay
+                                              value={m.value}
+                                              unitType={unitType}
+                                              decimals={decimals}
+                                            />
+                                          ) : (
+                                            <>
+                                              {m.value}
+                                              {config?.unit ? ` ${config.unit}` : ""}
+                                            </>
+                                          )}
+                                        </span>
+                                        <span className="text-xs">{label}</span>
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           </CollapsibleTrigger>
 
-                          <CollapsibleContent className="mt-3 space-y-2">
-                            {/* Measurements */}
-                            {event.measurements && event.measurements.length > 0 && (
-                              <div className="space-y-1">
-                                {event.measurements.map((m, mIndex) => {
-                                  const config = metricConfig[m.metric as keyof typeof metricConfig];
-                                  const unitType = config && "unitType" in config ? config.unitType : undefined;
-                                  const decimals = config && "decimals" in config ? config.decimals : 2;
-                                  const label = m.metric === "other"
-                                    ? m.custom_metric || "Other"
-                                    : config?.label || m.metric;
-
-                                  return (
-                                    <div
-                                      key={mIndex}
-                                      className="text-sm flex items-center gap-2"
-                                    >
-                                      <Thermometer className="h-3 w-3 text-muted-foreground" />
-                                      <span>
-                                        {label}:{" "}
-                                        {unitType && typeof m.value === "number" ? (
-                                          <UnitDisplay
-                                            value={m.value}
-                                            unitType={unitType}
-                                            decimals={decimals}
-                                          />
-                                        ) : (
-                                          <>
-                                            {m.value}
-                                            {config?.unit ? ` ${config.unit}` : ""}
-                                          </>
-                                        )}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Notes */}
+                          {/* Notes expand on click */}
+                          <CollapsibleContent className="mt-2">
                             {event.notes && (
-                              <div className="text-sm text-muted-foreground border-t pt-2 mt-2">
+                              <div className="text-sm text-muted-foreground border-t pt-2">
                                 {event.notes}
                               </div>
                             )}
