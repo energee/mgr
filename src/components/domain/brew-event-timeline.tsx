@@ -55,6 +55,15 @@ import { BrewEventForm } from "./brew-event-form";
 // Icon Mapping
 // =============================================================================
 
+/** Convert "HH:MM" (24hr) to "h:MM AM/PM" */
+function formatTime12(time: string): string {
+  const [hStr, mStr] = time.split(":");
+  let h = parseInt(hStr, 10);
+  const suffix = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}:${mStr} ${suffix}`;
+}
+
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   droplet: Droplet,
   grain: FlaskConical,
@@ -281,7 +290,7 @@ export function BrewEventTimeline({
                       >
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className="font-mono text-sm text-muted-foreground shrink-0">
-                            {event.time}
+                            {formatTime12(event.time)}
                           </span>
                           <span className="font-medium shrink-0">{phaseLabel}</span>
 
