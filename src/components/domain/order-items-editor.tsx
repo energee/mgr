@@ -258,10 +258,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     }
   }, [effectiveCustomerId, db]);
 
-  // Auto-lookup price when brand or format changes in new item (package_type only)
+  // Auto-lookup price when brand or format changes in new item
   useEffect(() => {
     const lookupPrice = async () => {
-      if (newItem.brand_id && newItem.format_id && newItem.format_source === "package_type") {
+      if (newItem.brand_id && newItem.format_id) {
         const result = await lookupTierPrice(newItem.brand_id, newItem.format_id);
         if (result) {
           setNewItem((prev) => ({
@@ -277,17 +277,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
             tierName: null,
           }));
         }
-      } else if (newItem.format_source === "keg_type") {
-        // No auto-pricing for keg types
-        setNewItem((prev) => ({
-          ...prev,
-          suggestedPrice: null,
-          tierName: null,
-        }));
       }
     };
     lookupPrice();
-  }, [newItem.brand_id, newItem.format_id, newItem.format_source, lookupTierPrice]);
+  }, [newItem.brand_id, newItem.format_id, lookupTierPrice]);
 
   // Fetch catalog data
   const { data: brands } = useBrands();
@@ -619,7 +612,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       className="h-8 w-full"
                       placeholder="0.00"
                     />
-                    {effectiveCustomerId && item.brand_id && item.package_type_id && (
+                    {effectiveCustomerId && item.brand_id && (item.package_type_id || item.keg_type_id) && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -627,7 +620,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 shrink-0"
-                              onClick={() => applyTierPrice(item.id, item.brand_id, item.package_type_id)}
+                              onClick={() => applyTierPrice(item.id, item.brand_id, item.keg_type_id ?? item.package_type_id)}
                             >
                               <RefreshCw className="h-3 w-3" />
                             </Button>
