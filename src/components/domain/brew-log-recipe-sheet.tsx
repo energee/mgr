@@ -209,6 +209,8 @@ export function BrewLogRecipeSheet({
         side="right"
         overlay={false}
         className="w-full sm:max-w-md overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+        onFocusOutside={(e) => e.preventDefault()}
       >
         <SheetHeader>
           <div className="flex items-center gap-2">
