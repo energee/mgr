@@ -242,11 +242,20 @@ function PriceCell({
 // Format Management Component
 // =============================================================================
 
-function FormatManagement() {
+function FormatManagement({
+  channels,
+  activeChannelId,
+  onChannelChange,
+}: {
+  channels: SalesChannel[];
+  activeChannelId: string | null;
+  onChannelChange: (id: string) => void;
+}) {
   const supabase = createClient();
   const queryClient = useQueryClient();
 
-  const { data: formats, isLoading } = useQuery({
+  // All active formats (master list gated by show_in_pricing)
+  const { data: formats, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormatsAll(),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -259,75 +268,132 @@ function FormatManagement() {
     },
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: async ({ id, format_source, show_in_pricing }: {
-      id: string;
-      format_source: string;
-      show_in_pricing: boolean;
-    }) => {
-      const table = format_source === "keg_type" ? "keg_types" : "package_types";
-      const { error } = await supabase
-        .from(table)
-        .update({ show_in_pricing })
-        .eq("id", id);
+  // Per-channel enabled formats
+  const { data: channelFormats, isLoading: channelFormatsLoading } = useQuery({
+    queryKey: settingsKeys.pricingChannelFormats(activeChannelId ?? ""),
+    queryFn: async () => {
+      if (!activeChannelId) return [];
+      // Table not yet in generated types — cast until types are regenerated
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("pricing_channel_formats")
+        .select("format_id")
+        .eq("sales_channel_id", activeChannelId);
       if (error) throw error;
+      return (data as { format_id: string }[]).map((r) => r.format_id);
+    },
+    enabled: !!activeChannelId,
+  });
+
+  const enabledSet = new Set(channelFormats ?? []);
+
+  // Toggle per-channel visibility (insert/delete from junction table)
+  const toggleChannelFormatMutation = useMutation({
+    mutationFn: async ({ formatId, enabled }: { formatId: string; enabled: boolean }) => {
+      if (!activeChannelId) return;
+      // Table not yet in generated types — cast until types are regenerated
+      if (enabled) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase as any)
+          .from("pricing_channel_formats")
+          .insert({ sales_channel_id: activeChannelId, format_id: formatId });
+        if (error) throw error;
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase as any)
+          .from("pricing_channel_formats")
+          .delete()
+          .eq("sales_channel_id", activeChannelId)
+          .eq("format_id", formatId);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: settingsKeys.pricingFormatsAll() });
+      queryClient.invalidateQueries({
+        queryKey: settingsKeys.pricingChannelFormats(activeChannelId ?? ""),
+      });
+      // Also refresh matrix formats when toggling
       queryClient.invalidateQueries({ queryKey: settingsKeys.pricingFormats() });
     },
   });
 
+  const isLoading = formatsLoading || channelFormatsLoading;
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
-  const packaged = formats?.filter(f => f.format_source === "package_type") ?? [];
-  const kegs = formats?.filter(f => f.format_source === "keg_type") ?? [];
+  // Only show formats where show_in_pricing = true
+  const priceable = formats?.filter(f => f.show_in_pricing) ?? [];
+  const packaged = priceable.filter(f => f.format_source === "package_type");
+  const kegs = priceable.filter(f => f.format_source === "keg_type");
 
   const renderSection = (title: string, items: typeof packaged) => (
     <div className="space-y-2">
       <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Format</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Unit</TableHead>
-            <TableHead className="w-[100px] text-right">In Pricing</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map(f => (
-            <TableRow key={f.id}>
-              <TableCell className="font-medium">{f.name}</TableCell>
-              <TableCell className="text-muted-foreground capitalize">{f.container_type}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {formatColumnLabel(f).unit}
-              </TableCell>
-              <TableCell className="text-right">
-                <Switch
-                  checked={f.show_in_pricing}
-                  onCheckedChange={(checked) =>
-                    toggleMutation.mutate({
-                      id: f.id,
-                      format_source: f.format_source,
-                      show_in_pricing: checked,
-                    })
-                  }
-                  disabled={toggleMutation.isPending}
-                />
-              </TableCell>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-2">
+          No {title.toLowerCase()} have &quot;Show in Pricing&quot; enabled.
+        </p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Format</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Unit</TableHead>
+              <TableHead className="w-[100px] text-right">Enabled</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {items.map(f => (
+              <TableRow key={f.id}>
+                <TableCell className="font-medium">{f.name}</TableCell>
+                <TableCell className="text-muted-foreground capitalize">{f.container_type}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {formatColumnLabel(f).unit}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Switch
+                    checked={enabledSet.has(f.id)}
+                    onCheckedChange={(checked) =>
+                      toggleChannelFormatMutation.mutate({
+                        formatId: f.id,
+                        enabled: checked,
+                      })
+                    }
+                    disabled={toggleChannelFormatMutation.isPending}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Channel tabs */}
+      <Tabs
+        value={activeChannelId ?? undefined}
+        onValueChange={onChannelChange}
+      >
+        <TabsList>
+          {channels.map((ch) => (
+            <TabsTrigger key={ch.id} value={ch.id}>
+              {ch.name}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
       <p className="text-sm text-muted-foreground">
-        Toggle which formats appear as columns in the pricing matrix.
+        Toggle which formats appear in the pricing matrix for{" "}
+        <span className="font-medium text-foreground">
+          {channels.find(c => c.id === activeChannelId)?.name ?? "this channel"}
+        </span>.
+        Only formats with &quot;Show in Pricing&quot; enabled in their catalog settings appear here.
       </p>
+
       {renderSection("Packaged Formats", packaged)}
       {renderSection("Keg Formats", kegs)}
     </div>
@@ -382,7 +448,24 @@ export default function PricingPage() {
     },
   });
 
-  const { data: formats, isLoading: formatsLoading } = useQuery({
+  // Fetch channel-specific format IDs from junction table
+  const { data: channelFormatIds, isLoading: channelFormatsLoading } = useQuery({
+    queryKey: settingsKeys.pricingChannelFormats(activeChannelId ?? ""),
+    queryFn: async () => {
+      if (!activeChannelId) return [];
+      // Table not yet in generated types — cast until types are regenerated
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("pricing_channel_formats")
+        .select("format_id")
+        .eq("sales_channel_id", activeChannelId);
+      if (error) throw error;
+      return (data as { format_id: string }[]).map((r) => r.format_id);
+    },
+    enabled: !!activeChannelId,
+  });
+
+  const { data: allPricingFormats, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormats(),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -395,6 +478,10 @@ export default function PricingPage() {
       return data as PackageFormat[];
     },
   });
+
+  // Filter formats to only those enabled for the active channel
+  const channelFormatSet = new Set(channelFormatIds ?? []);
+  const formats = allPricingFormats?.filter(f => channelFormatSet.has(f.id)) ?? undefined;
 
   const { data: prices } = useQuery({
     queryKey: settingsKeys.pricingMatrix(activeChannelId ?? undefined),
@@ -617,7 +704,7 @@ export default function PricingPage() {
   // Render
   // ---------------------------------------------------------------------------
 
-  const isLoading = channelsLoading || tiersLoading || formatsLoading;
+  const isLoading = channelsLoading || tiersLoading || formatsLoading || channelFormatsLoading;
 
   // Derived format groups: packaged first, then kegs
   const packagedFormats = formats?.filter(f => f.format_source === "package_type") ?? [];
@@ -697,7 +784,11 @@ export default function PricingPage() {
           basePath="/settings/pricing/tiers"
         />
       ) : view === "formats" ? (
-        <FormatManagement />
+        <FormatManagement
+          channels={channels ?? []}
+          activeChannelId={activeChannelId}
+          onChannelChange={setChannelOverride}
+        />
       ) : (
         <>
           {/* Channel Tabs */}
