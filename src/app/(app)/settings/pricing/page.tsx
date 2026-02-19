@@ -132,11 +132,13 @@ function PriceCell({
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
+  const dirtyRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const startEditing = useCallback(() => {
     setValue(price != null ? price.toFixed(2) : "");
+    dirtyRef.current = false;
     setEditing(true);
   }, [price]);
 
@@ -158,6 +160,9 @@ function PriceCell({
 
   const commit = useCallback(() => {
     setEditing(false);
+    // If the user never typed anything, treat as cancel — prevents accidental
+    // deletes when a cell is opened before price data has loaded.
+    if (!dirtyRef.current) return;
     const trimmed = value.trim();
     const parsed = trimmed === "" ? null : parseFloat(trimmed);
     if (trimmed !== "" && (isNaN(parsed!) || parsed! < 0)) {
@@ -209,7 +214,7 @@ function PriceCell({
         type="text"
         inputMode="decimal"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => { dirtyRef.current = true; setValue(e.target.value); }}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         className="h-8 w-full text-right text-sm px-2 py-0 tabular-nums"
