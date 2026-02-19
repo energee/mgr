@@ -112,7 +112,7 @@ export function StartBrewDayDialog({
           brew_number: brewNumber.trim(),
           brew_date: brewDate,
           brewer_id: currentUser?.id ?? null,
-          status: "draft",
+          status: "in_progress",
         })
         .select("id")
         .single();

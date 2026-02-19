@@ -34,8 +34,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { UnitInput } from "@/components/ui/unit-input";
 import {
   phaseConfig,
@@ -193,26 +192,8 @@ export function BrewEventForm({
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="text-xl">
-          {initialData?.id ? "Edit Event" : "Add Event"}
-        </CardTitle>
-        {onCancel && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onCancel}
-            className="h-10 w-10"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             {/* Phase Selector - Grouped */}
             <FormField
               control={form.control}
@@ -448,9 +429,7 @@ export function BrewEventForm({
                 {isSubmitting ? "Saving..." : "Save Event"}
               </Button>
             </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+      </form>
+    </Form>
   );
 }
