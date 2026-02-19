@@ -115,6 +115,7 @@ export const kegTypeEntity: EntityConfig<KegType> = {
         { field: "description", label: "Description" },
         { field: "is_active", label: "Active" },
         { field: "show_in_pricing", label: "Show in Pricing" },
+        { field: "position", label: "Display Order" },
         { field: "created_at", label: "Created", format: "datetime" },
         { field: "updated_at", label: "Last Updated", format: "datetime" },
       ],
@@ -172,6 +173,14 @@ export const kegTypeEntity: EntityConfig<KegType> = {
           type: "textarea",
           placeholder: "Optional notes about this keg type",
           colSpan: 12,
+        },
+        {
+          name: "position",
+          label: "Display Order",
+          type: "number",
+          placeholder: "e.g., 1, 2, 3",
+          description: "Order in dropdown menus (lower numbers appear first)",
+          colSpan: 6,
         },
         {
           name: "show_in_pricing",
@@ -253,6 +262,14 @@ export const kegTypeEntity: EntityConfig<KegType> = {
       type: "textarea",
       placeholder: "Optional notes about this keg type",
       colSpan: 12,
+    },
+    {
+      name: "position",
+      label: "Display Order",
+      type: "number",
+      placeholder: "e.g., 1, 2, 3",
+      description: "Order in dropdown menus (lower numbers appear first)",
+      colSpan: 6,
     },
     {
       name: "show_in_pricing",

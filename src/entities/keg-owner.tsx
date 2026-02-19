@@ -135,6 +135,7 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
         { field: "name", label: "Name" },
         { field: "code", label: "Code" },
         { field: "is_active", label: "Active" },
+        { field: "position", label: "Display Order" },
       ],
     },
     {
@@ -182,6 +183,13 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
           name: "is_active",
           label: "Active",
           type: "switch",
+          colSpan: 6,
+        },
+        {
+          name: "position",
+          label: "Display Order",
+          type: "number",
+          placeholder: "1",
           colSpan: 6,
         },
       ],
@@ -272,6 +280,13 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
       name: "is_active",
       label: "Active",
       type: "switch",
+      colSpan: 6,
+    },
+    {
+      name: "position",
+      label: "Display Order",
+      type: "number",
+      placeholder: "1",
       colSpan: 6,
     },
     {
