@@ -27,8 +27,6 @@ const settingsNav = [
     heading: "Catalogs",
     items: [
       { label: "Locations", href: "/settings/locations" },
-      { label: "Package Formats", href: "/settings/formats" },
-      { label: "Kegs", href: "/settings/keg-types" },
       { label: "Yeast Strains", href: "/settings/yeasts" },
       { label: "Water", href: "/settings/water-profiles" },
       { label: "Beer Styles", href: "/settings/beer-styles" },
@@ -38,7 +36,8 @@ const settingsNav = [
   {
     heading: "Commerce",
     items: [
-      { label: "Sales Channels", href: "/settings/sales-channels" },
+      { label: "Package Formats", href: "/settings/formats" },
+      { label: "Kegs", href: "/settings/keg-types" },
       { label: "Pricing", href: "/settings/pricing" },
     ],
   },
