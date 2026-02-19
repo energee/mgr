@@ -134,3 +134,29 @@ SET
   relationships = '["belongs_to: auth.users (brewer)", "has_many: brew_log_batches"]',
   key_fields = '["brew_number", "brew_date", "status", "events"]'
 WHERE table_name = 'brew_logs';
+
+INSERT INTO _schema_registry (table_name, description, domain, relationships, key_fields)
+VALUES (
+  'brew_logs_with_batches',
+  'View: brew logs enriched with batch/recipe data derived from brew_log_batches junction. Primary view for list and detail pages (used as viewTable).',
+  'production',
+  '["extends: brew_logs", "joins: brew_log_batches -> batches -> recipes"]',
+  '["brew_number", "brew_date", "status", "recipe_name", "batch_numbers"]'
+)
+ON CONFLICT (table_name) DO UPDATE SET
+  description = EXCLUDED.description,
+  relationships = EXCLUDED.relationships,
+  key_fields = EXCLUDED.key_fields;
+
+INSERT INTO _schema_registry (table_name, description, domain, relationships, key_fields)
+VALUES (
+  'brew_log_metrics',
+  'View: brew logs with calculated metrics extracted from events JSONB (OG, pH, volumes) and batch data. Used for reports and analytics.',
+  'production',
+  '["extends: brew_logs", "joins: brew_log_batches -> batches -> recipes"]',
+  '["brew_date", "recipe_name", "actual_og", "actual_mash_ph", "volume_to_fermenter_bbl"]'
+)
+ON CONFLICT (table_name) DO UPDATE SET
+  description = EXCLUDED.description,
+  relationships = EXCLUDED.relationships,
+  key_fields = EXCLUDED.key_fields;

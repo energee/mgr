@@ -86,6 +86,9 @@ All entity pages use universal components:
   [id]/page.tsx    -> <EntityDetailUnified entity={config} id={id} />  (view + inline edit)
 ```
 
+**Exceptions:** Brew logs have no `new/page.tsx` — they are created exclusively via
+"Start Brew Day" on a batch detail page. The list page passes `showCreate={false}`.
+
 ### Migration Naming
 Pattern: `00XXX_description.sql`
 Current highest: `00091`

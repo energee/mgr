@@ -55,7 +55,9 @@ interface EntityConfig<T> {
 **Customization Escape Hatches**:
 - `dialogs[action].component` - Custom dialog component when config isn't enough
 - `listColumns[].render` - Custom cell renderer
-- `detailSections[].component` - Custom section component
+- `sections[].component` - Custom section component for complex views
+- `sections[].headerActions` - Component rendered next to section title (e.g., action buttons)
+- `sections[].editComponent` - Separate component for edit mode when view/edit differ
 
 ### DEC-002: Schema Registry for AI Integration
 `_schema_registry` table contains self-documenting metadata:

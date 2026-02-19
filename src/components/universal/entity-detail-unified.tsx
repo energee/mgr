@@ -12,6 +12,8 @@
  * - Edit mode: inline form editing with react-hook-form, Zod validation,
  *   optimistic locking, dirty form guard, keyboard shortcuts
  * - Create mode: when id is undefined, starts in edit mode with INSERT on save
+ * - Section headerActions: optional component rendered next to section title
+ *   (e.g., "Add Event" button on brew day timeline)
  *
  * Keyboard shortcuts:
  * - Backspace: go back (view mode only)
