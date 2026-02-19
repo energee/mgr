@@ -60,7 +60,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
 
   // Fetch linked batches
   const { data: linkedBatches, isLoading: batchesLoading } = useQuery({
-    queryKey: brewLogKeys.batches(brewLogId),
+    queryKey: brewLogKeys.batchSplitOverview(brewLogId),
     queryFn: async () => {
       const { data: links, error } = await supabase
         .from("brew_log_batches")
