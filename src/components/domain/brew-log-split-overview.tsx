@@ -50,7 +50,6 @@ interface LinkedBatch {
     name: string;
     status: string;
     volume_bbl: number | null;
-    current_vessel_name: string | null;
     recipe: { name: string } | null;
   } | null;
 }
@@ -59,7 +58,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
   const brewLogId = data.id;
   const supabase = createClient();
 
-  // Fetch linked batches with brew info (includes current_vessel_name)
+  // Fetch linked batches
   const { data: linkedBatches, isLoading: batchesLoading } = useQuery({
     queryKey: brewLogKeys.batches(brewLogId),
     queryFn: async () => {
@@ -70,13 +69,12 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
           id,
           volume_bbl,
           notes,
-          batch:batches_with_brew_info!brew_log_batches_batch_id_fkey (
+          batch:batches!brew_log_batches_batch_id_fkey (
             id,
             batch_number,
             name,
             status,
             volume_bbl,
-            current_vessel_name,
             recipe:recipes(name)
           )
         `
@@ -210,12 +208,6 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
                       </Badge>
                     </p>
                   </div>
-                  {batch.current_vessel_name && (
-                    <div>
-                      <span className="text-muted-foreground">Vessel</span>
-                      <p className="font-medium">{batch.current_vessel_name}</p>
-                    </div>
-                  )}
                 </div>
 
                 {lb.notes && (
