@@ -486,3 +486,46 @@ export function getIonRecommendations(styleCategory: string): {
     bicarbonate: [50, 150],
   };
 }
+
+// =============================================================================
+// Salt-to-Additive Mapping
+// =============================================================================
+
+/** Maps SaltAdditions field names to additive catalog names */
+export const SALT_ADDITIVE_MAP: Record<keyof SaltAdditions, string> = {
+  gypsum_g: "Gypsum",
+  calcium_chloride_g: "Calcium Chloride",
+  epsom_salt_g: "Epsom Salt",
+  baking_soda_g: "Baking Soda",
+  chalk_g: "Chalk",
+  table_salt_g: "Table Salt",
+  magnesium_chloride_g: "Magnesium Chloride",
+};
+
+/** Convert SaltAdditions to recipe_additions-compatible items */
+export function mapSaltAdditionsToItems(
+  additions: SaltAdditions,
+  catalog: { id: string; name: string }[]
+): { additive_id: string; amount: number; unit: string; timing: string; target: string }[] {
+  const items: { additive_id: string; amount: number; unit: string; timing: string; target: string }[] = [];
+
+  for (const [field, additiveName] of Object.entries(SALT_ADDITIVE_MAP)) {
+    const grams = additions[field as keyof SaltAdditions];
+    if (grams <= 0) continue;
+
+    const catalogEntry = catalog.find(
+      (a) => a.name.toLowerCase() === additiveName.toLowerCase()
+    );
+    if (!catalogEntry) continue;
+
+    items.push({
+      additive_id: catalogEntry.id,
+      amount: grams,
+      unit: "g",
+      timing: "mash",
+      target: "mash",
+    });
+  }
+
+  return items;
+}
