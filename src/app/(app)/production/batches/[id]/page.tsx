@@ -137,16 +137,18 @@ export default function BatchDetailPage({
       };
     }
     if (batch.status === "fermenting") {
+      const actions: { label: string; href?: string; onClick?: () => void }[] = [];
+      if (linkedBrewLogs?.length) {
+        actions.push({ label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` });
+      }
+      actions.push(
+        { label: "Readings", href: `/production/batches/${id}/readings` },
+        { label: "Additions", href: `/production/batches/${id}/additions` },
+      );
       return {
         message: "Track fermentation progress with readings and additions.",
         variant: "default" as const,
-        actions: [
-          linkedBrewLogs?.length
-            ? { label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` }
-            : null,
-          { label: "Readings", href: `/production/batches/${id}/readings` },
-          { label: "Additions", href: `/production/batches/${id}/additions` },
-        ].filter(Boolean) as { label: string; href?: string; onClick?: () => void }[],
+        actions,
       };
     }
     if (linkedBrewLogs?.length) {

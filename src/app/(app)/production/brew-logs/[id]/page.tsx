@@ -172,11 +172,12 @@ export default function BrewLogDetailPage({
     return null;
   }, [brewLog, linkedBatches, handleStartBrew]);
 
-  // Recipe info derived from linked batches
+  // Recipe info derived from first linked batch
   const recipeInfo = useMemo(() => {
-    const firstBatch = linkedBatches?.[0];
-    if (!firstBatch?.batch?.recipe_id || !firstBatch.batch.recipe) return null;
-    return { id: firstBatch.batch.recipe_id, name: firstBatch.batch.recipe.name };
+    const recipe = linkedBatches?.[0]?.batch?.recipe;
+    const recipeId = linkedBatches?.[0]?.batch?.recipe_id;
+    if (!recipe || !recipeId) return null;
+    return { id: recipeId, name: recipe.name };
   }, [linkedBatches]);
 
   return (

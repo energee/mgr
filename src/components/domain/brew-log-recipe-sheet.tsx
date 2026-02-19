@@ -101,21 +101,14 @@ interface BrewLogRecipeSheetProps {
 }
 
 // =============================================================================
-// Timing labels and sort order
+// Timing display config (label + sort order)
 // =============================================================================
 
-const TIMING_LABELS: Record<string, string> = {
-  first_wort: "First Wort",
-  boil: "Boil",
-  whirlpool: "Whirlpool",
-  dry_hop: "Dry Hop",
-};
-
-const TIMING_ORDER: Record<string, number> = {
-  first_wort: 0,
-  boil: 1,
-  whirlpool: 2,
-  dry_hop: 3,
+const TIMING_CONFIG: Record<string, { label: string; order: number }> = {
+  first_wort: { label: "First Wort", order: 0 },
+  boil: { label: "Boil", order: 1 },
+  whirlpool: { label: "Whirlpool", order: 2 },
+  dry_hop: { label: "Dry Hop", order: 3 },
 };
 
 // =============================================================================
@@ -191,7 +184,7 @@ export function BrewLogRecipeSheet({
   // Sort hops by timing order, then by boil time descending
   const sortedHops = [...(hopSchedule ?? [])].sort((a, b) => {
     const orderDiff =
-      (TIMING_ORDER[a.timing] ?? 99) - (TIMING_ORDER[b.timing] ?? 99);
+      (TIMING_CONFIG[a.timing]?.order ?? 99) - (TIMING_CONFIG[b.timing]?.order ?? 99);
     if (orderDiff !== 0) return orderDiff;
     return (b.boil_time_min ?? 0) - (a.boil_time_min ?? 0);
   });
@@ -344,7 +337,7 @@ export function BrewLogRecipeSheet({
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="truncate">{h.hop?.name ?? "Unknown"}</span>
                           <Badge variant="outline" className="text-[10px] shrink-0">
-                            {TIMING_LABELS[h.timing] ?? h.timing}
+                            {TIMING_CONFIG[h.timing]?.label ?? h.timing}
                             {h.timing === "boil" && h.boil_time_min != null && ` ${h.boil_time_min}m`}
                           </Badge>
                         </div>

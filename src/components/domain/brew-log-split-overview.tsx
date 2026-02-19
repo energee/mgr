@@ -99,8 +99,10 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
     );
   }
 
-  // Filter to only valid linked batches
-  const validBatches = (linkedBatches ?? []).filter((lb) => lb.batch);
+  // Filter to only linked batches with resolved batch data
+  const validBatches = (linkedBatches ?? []).filter(
+    (lb): lb is LinkedBatch & { batch: NonNullable<LinkedBatch["batch"]> } => lb.batch != null
+  );
 
   if (validBatches.length === 0) {
     return (
@@ -150,10 +152,10 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
                 key={lb.id}
                 className={`${color} relative flex items-center justify-center text-[10px] font-medium text-white transition-all`}
                 style={{ width: `${pct}%` }}
-                title={`${lb.batch!.name}: ${volume.toFixed(2)} BBL (${pct.toFixed(0)}%)`}
+                title={`${lb.batch.name}: ${volume.toFixed(2)} BBL (${pct.toFixed(0)}%)`}
               >
                 {pct > 15 && (
-                  <span className="truncate px-1">{lb.batch!.name}</span>
+                  <span className="truncate px-1">{lb.batch.name}</span>
                 )}
               </div>
             );
@@ -164,13 +166,13 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
       {/* Per-batch cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {validBatches.map((lb, index) => {
-          const batch = lb.batch!;
+          const batch = lb.batch;
           const volume = Number(lb.volume_bbl) || 0;
           const pct = totalVolume > 0 ? (volume / totalVolume) * 100 : 0;
           const dotColor = SEGMENT_COLORS[index % SEGMENT_COLORS.length];
 
           return (
-            <Card key={lb.id ?? `batch-${index}`} className="overflow-hidden">
+            <Card key={lb.id} className="overflow-hidden">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">

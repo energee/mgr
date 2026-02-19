@@ -44,25 +44,16 @@ import {
 } from "@/entities/brew-log";
 
 // =============================================================================
-// Schema
+// Schema (enum values derived from entity config to avoid duplication)
 // =============================================================================
 
+type PhaseKey = keyof typeof phaseConfig;
+type MetricKey = keyof typeof metricConfig;
+const phaseKeys = Object.keys(phaseConfig) as [PhaseKey, ...PhaseKey[]];
+const metricKeys = Object.keys(metricConfig) as [MetricKey, ...MetricKey[]];
+
 const measurementFormSchema = z.object({
-  metric: z.enum([
-    "temp_f",
-    "ph",
-    "volume_bbl",
-    "volume_l",
-    "gravity_plato",
-    "flow_rate",
-    "pump_speed",
-    "amount_lbs",
-    "amount_oz",
-    "amount_g",
-    "viability",
-    "pitch_rate",
-    "other",
-  ]),
+  metric: z.enum(metricKeys),
   value: z.union([z.coerce.number(), z.string()]).refine(
     (val) => val !== "" && val !== undefined,
     { message: "Value is required" }
@@ -71,31 +62,7 @@ const measurementFormSchema = z.object({
 });
 
 const eventFormSchema = z.object({
-  phase: z.enum([
-    "strike_water",
-    "mash_in",
-    "mash_rest",
-    "mash_step",
-    "vorlauf",
-    "runoff_start",
-    "runoff_end",
-    "sparge_start",
-    "sparge_end",
-    "kettle_full",
-    "boil_start",
-    "boil_end",
-    "hop_addition",
-    "adjunct_addition",
-    "whirlpool_start",
-    "whirlpool_rest",
-    "whirlpool_end",
-    "ko_start",
-    "ko_end",
-    "yeast_pitch",
-    "hourly_check",
-    "flow_rate_change",
-    "other",
-  ]),
+  phase: z.enum(phaseKeys),
   custom_phase: z.string().nullable().optional(),
   time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
   measurements: z.array(measurementFormSchema),
@@ -128,6 +95,13 @@ interface BrewEventFormProps {
   initialData?: Partial<BrewEvent>;
 }
 
+function getCurrentTime(): string {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 export function BrewEventForm({
   onSubmit,
   onCancel,
@@ -137,13 +111,6 @@ export function BrewEventForm({
   const [selectedPhase, setSelectedPhase] = useState<string>(
     initialData?.phase || "mash_in"
   );
-
-  function getCurrentTime(): string {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, "0");
-    const mm = String(now.getMinutes()).padStart(2, "0");
-    return `${hh}:${mm}`;
-  }
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
