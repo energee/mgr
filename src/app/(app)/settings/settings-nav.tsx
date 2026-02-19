@@ -42,7 +42,7 @@ const settingsNav = [
     items: [
       { label: "Locations", href: "/settings/locations" },
       { label: "Package Formats", href: "/settings/formats" },
-      { label: "Keg Types", href: "/settings/keg-types" },
+      { label: "Kegs", href: "/settings/keg-types" },
       { label: "Yeast Strains", href: "/settings/yeasts" },
       { label: "Water", href: "/settings/water-profiles" },
       { label: "Beer Styles", href: "/settings/beer-styles" },
