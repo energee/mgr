@@ -18,9 +18,11 @@ type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
 
 interface BrewLogTimelineProps {
   data: BrewLog;
+  /** Action string from headerActions via UnifiedSectionCard */
+  actionTrigger?: string | null;
 }
 
-export function BrewLogTimeline({ data }: BrewLogTimelineProps) {
+export function BrewLogTimeline({ data, actionTrigger }: BrewLogTimelineProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -74,6 +76,7 @@ export function BrewLogTimeline({ data }: BrewLogTimelineProps) {
         onUpdateEvent={!isReadOnly ? handleUpdateEvent : undefined}
         onDeleteEvent={!isReadOnly ? handleDeleteEvent : undefined}
         readOnly={isReadOnly}
+        actionTrigger={actionTrigger}
       />
     </div>
   );

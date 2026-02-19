@@ -121,27 +121,29 @@ interface BrewEventTimelineProps {
   onDeleteEvent?: (eventId: string) => Promise<void>;
   readOnly?: boolean;
   isLoading?: boolean;
+  /** Action string from headerActions via UnifiedSectionCard */
+  actionTrigger?: string | null;
 }
-
-// =============================================================================
-// Custom event for cross-component communication
-// =============================================================================
-
-const BREW_TIMELINE_ADD_EVENT = "brew-timeline:add-event";
 
 // =============================================================================
 // Header Actions (rendered by the unified section card next to the title)
 // =============================================================================
 
 /** Header action button for adding brew events, used via section headerActions */
-export function BrewEventTimelineActions({ data }: { data: Record<string, unknown> }) {
+export function BrewEventTimelineActions({
+  data,
+  onAction,
+}: {
+  data: Record<string, unknown>;
+  onAction: (action: string) => void;
+}) {
   const isReadOnly = data.status === "completed" || data.status === "cancelled";
   if (isReadOnly) return null;
 
   return (
     <Button
       size="sm"
-      onClick={() => document.dispatchEvent(new CustomEvent(BREW_TIMELINE_ADD_EVENT))}
+      onClick={() => onAction("add-event")}
       className="h-9"
     >
       <Plus className="mr-1 h-4 w-4" />
@@ -161,6 +163,7 @@ export function BrewEventTimeline({
   onDeleteEvent,
   readOnly = false,
   isLoading = false,
+  actionTrigger,
 }: BrewEventTimelineProps) {
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const [showAddForm, setShowAddForm] = useState(false);
@@ -168,12 +171,12 @@ export function BrewEventTimeline({
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Listen for add-event trigger from header actions
+  // Handle action triggers from headerActions via UnifiedSectionCard
   useEffect(() => {
-    const handler = () => setShowAddForm(true);
-    document.addEventListener(BREW_TIMELINE_ADD_EVENT, handler);
-    return () => document.removeEventListener(BREW_TIMELINE_ADD_EVENT, handler);
-  }, []);
+    if (actionTrigger === "add-event") {
+      setShowAddForm(true);
+    }
+  }, [actionTrigger]);
 
   // Sort events by time
   const sortedEvents = useMemo(() => {

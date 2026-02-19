@@ -1137,11 +1137,14 @@ function UnifiedSectionCard<T>({
     ? "flex flex-row items-center justify-between"
     : undefined;
 
+  // Action trigger state for headerActions → component communication
+  const [actionTrigger, setActionTrigger] = useState<string | null>(null);
+
   // Shared section header for all rendering paths
   const sectionHeader = (
     <CardHeader className={headerClassName}>
       <CardTitle>{section.title}</CardTitle>
-      {HeaderActions && <HeaderActions data={data} />}
+      {HeaderActions && <HeaderActions data={data} onAction={setActionTrigger} />}
     </CardHeader>
   );
 
@@ -1152,7 +1155,7 @@ function UnifiedSectionCard<T>({
       <Card>
         {sectionHeader}
         <CardContent>
-          <EditComponent data={data} editing={true} form={form} />
+          <EditComponent data={data} editing={true} form={form} actionTrigger={actionTrigger} />
         </CardContent>
       </Card>
     );
@@ -1168,6 +1171,7 @@ function UnifiedSectionCard<T>({
             data={data}
             editing={editing}
             form={editing ? form : undefined}
+            actionTrigger={actionTrigger}
           />
         </CardContent>
       </Card>
