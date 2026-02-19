@@ -3,16 +3,55 @@
 /**
  * Keg Settings Page
  *
- * Tabbed view for managing keg-related catalogs:
+ * Tabbed view for managing keg-related catalogs with reorder handles:
  * - Keg Types: keg sizes used for packaging and inventory tracking
  * - Keg Owners: fleet providers (e.g., House, Microstar, One-Way)
  */
 
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { EntityList } from "@/components/universal/entity-list";
-import { kegTypeEntity } from "@/entities/keg-type";
-import { kegOwnerEntity } from "@/entities/keg-owner";
+import { ReorderableCatalogList } from "@/components/domain/reorderable-catalog-list";
+
+const kegTypeColumns = [
+  { key: "name", header: "Name" },
+  { key: "code", header: "Code" },
+  {
+    key: "volume_bbl",
+    header: "Volume (BBL)",
+    render: (value: unknown) => (value != null ? String(value) : "—"),
+  },
+  {
+    key: "deposit_amount",
+    header: "Deposit",
+    render: (value: unknown) =>
+      value != null ? `$${Number(value).toFixed(2)}` : "—",
+  },
+  {
+    key: "is_active",
+    header: "Active",
+    render: (value: unknown) => (value ? "Yes" : "No"),
+  },
+  {
+    key: "show_in_pricing",
+    header: "In Pricing",
+    render: (value: unknown) => (value ? "Yes" : "—"),
+  },
+];
+
+const kegOwnerColumns = [
+  { key: "name", header: "Name" },
+  { key: "code", header: "Code" },
+  {
+    key: "contact_name",
+    header: "Contact",
+    render: (value: unknown) => (value ? String(value) : "—"),
+  },
+  {
+    key: "is_active",
+    header: "Active",
+    render: (value: unknown) => (value ? "Yes" : "No"),
+  },
+];
 
 export default function KegTypesPage() {
   const [tab, setTab] = useState("types");
@@ -25,15 +64,19 @@ export default function KegTypesPage() {
           <TabsTrigger value="owners">Keg Owners</TabsTrigger>
         </TabsList>
         <TabsContent value="types">
-          <EntityList
-            entity={kegTypeEntity}
+          <ReorderableCatalogList
+            table="keg_types"
+            columns={kegTypeColumns}
             basePath="/settings/keg-types"
+            displayName="Keg Type"
           />
         </TabsContent>
         <TabsContent value="owners">
-          <EntityList
-            entity={kegOwnerEntity}
-            basePath="/inventory/kegs/owners"
+          <ReorderableCatalogList
+            table="keg_owners"
+            columns={kegOwnerColumns}
+            basePath="/settings/keg-types/owners"
+            displayName="Keg Owner"
           />
         </TabsContent>
       </Tabs>
