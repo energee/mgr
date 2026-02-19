@@ -16,6 +16,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { BrewLogTimeline } from "@/components/domain/brew-log-timeline";
 import { BrewEventTimelineActions } from "@/components/domain/brew-event-timeline";
 import { BrewLogSplitOverview } from "@/components/domain/brew-log-split-overview";
+import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 // Use generated type from Supabase (will need regeneration after migration)
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
@@ -336,6 +337,13 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           colSpan: 12,
         },
       ],
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("brew_logs"),
+      collapsible: true,
+      defaultCollapsed: true,
     },
   ],
 
