@@ -195,7 +195,8 @@ export function renderFieldInput(
       return (
         <Input
           id={field.name}
-          type="number"
+          type="text"
+          inputMode="decimal"
           value={value !== undefined && value !== null ? String(value) : ""}
           onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
           placeholder={field.placeholder}
@@ -354,7 +355,8 @@ export function renderFieldInput(
         return (
           <Input
             id={field.name}
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={value !== undefined && value !== null ? String(value) : ""}
             onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
             placeholder={field.placeholder}
