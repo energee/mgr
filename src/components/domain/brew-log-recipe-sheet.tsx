@@ -197,10 +197,10 @@ export function BrewLogRecipeSheet({
   });
 
   const mashSteps = Array.isArray(recipe?.mash_schedule)
-    ? (recipe.mash_schedule as MashStep[])
+    ? recipe.mash_schedule
     : [];
   const fermStages = Array.isArray(recipe?.fermentation_schedule)
-    ? (recipe.fermentation_schedule as FermentationStage[])
+    ? recipe.fermentation_schedule
     : [];
 
   return (

@@ -117,7 +117,7 @@ export default function BatchDetailPage({
   const bannerConfig = useMemo(() => {
     if (!batch) return null;
 
-    if (batch.status === "planned" && (!linkedBrewLogs?.length)) {
+    if (batch.status === "planned" && !linkedBrewLogs?.length) {
       return {
         message: "This batch needs a brew. Start a brew day or link an existing brew log.",
         variant: "info" as const,
@@ -137,18 +137,16 @@ export default function BatchDetailPage({
       };
     }
     if (batch.status === "fermenting") {
-      const actions: { label: string; href?: string; onClick?: () => void }[] = [];
-      if (linkedBrewLogs?.length) {
-        actions.push({ label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` });
-      }
-      actions.push(
-        { label: "Readings", href: `/production/batches/${id}/readings` },
-        { label: "Additions", href: `/production/batches/${id}/additions` },
-      );
       return {
         message: "Track fermentation progress with readings and additions.",
         variant: "default" as const,
-        actions,
+        actions: [
+          linkedBrewLogs?.length
+            ? { label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` }
+            : null,
+          { label: "Readings", href: `/production/batches/${id}/readings` },
+          { label: "Additions", href: `/production/batches/${id}/additions` },
+        ].filter(Boolean) as { label: string; href?: string; onClick?: () => void }[],
       };
     }
     if (linkedBrewLogs?.length) {
@@ -186,6 +184,16 @@ export default function BatchDetailPage({
   const handleDialogSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
   }, [queryClient, id]);
+
+  const handleBrewDayCreated = useCallback(
+    (brewLogId: string) => {
+      queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
+      queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
+      queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+      router.push(`/production/brew-logs/${brewLogId}`);
+    },
+    [queryClient, id, router]
+  );
 
   return (
     <div className="space-y-4">
@@ -257,12 +265,7 @@ export default function BatchDetailPage({
             volumeBbl={batch.volume_bbl}
             open={showStartBrewDay}
             onOpenChange={setShowStartBrewDay}
-            onSuccess={(brewLogId) => {
-              queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
-              queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
-              queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-              router.push(`/production/brew-logs/${brewLogId}`);
-            }}
+            onSuccess={handleBrewDayCreated}
           />
         </>
       )}
