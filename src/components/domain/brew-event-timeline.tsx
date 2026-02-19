@@ -44,11 +44,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import {
-  phaseConfig,
-  metricConfig,
-  type BrewEvent,
-} from "@/entities/brew-log";
+import type { BrewEvent } from "@/entities/brew-log";
+import { useBrewPhases, useBrewMetrics } from "@/hooks/use-brew-enums";
 import { BrewEventForm } from "./brew-event-form";
 
 // =============================================================================
@@ -167,6 +164,9 @@ export function BrewEventTimeline({
   isLoading = false,
   actionTrigger,
 }: BrewEventTimelineProps) {
+  const { data: phaseData } = useBrewPhases();
+  const { data: metricData } = useBrewMetrics();
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<BrewEvent | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
@@ -221,8 +221,8 @@ export function BrewEventTimeline({
   };
 
   function getPhaseIcon(phase: string): React.ComponentType<{ className?: string }> {
-    const config = phaseConfig[phase as keyof typeof phaseConfig];
-    const iconName = config?.icon || "more-horizontal";
+    const phaseEntry = phaseData?.phases.find((p) => p.value === phase);
+    const iconName = phaseEntry?.icon || "more-horizontal";
     return iconMap[iconName] || MoreHorizontal;
   }
 
@@ -263,10 +263,11 @@ export function BrewEventTimeline({
               {sortedEvents.map((event, index) => {
                 const eventId = event.id || `event-${index}`;
                 const PhaseIcon = getPhaseIcon(event.phase);
+                const phaseLabelMap = phaseData?.labelMap ?? new Map<string, string>();
                 const phaseLabel =
                   event.phase === "other"
                     ? (event.custom_phase || "Other")
-                    : (phaseConfig[event.phase as keyof typeof phaseConfig]?.label || event.phase);
+                    : (phaseLabelMap.get(event.phase) || event.phase);
                 const colorClass = phaseColors[event.phase] || phaseColors.other;
 
                   return (
@@ -299,9 +300,10 @@ export function BrewEventTimeline({
                             <>
                               <span className="text-muted-foreground/40">|</span>
                               {event.measurements.map((m, mIndex) => {
-                                const config = metricConfig[m.metric as keyof typeof metricConfig];
-                                const unitType = config && "unitType" in config ? config.unitType : undefined;
-                                const decimals = config && "decimals" in config ? config.decimals : 2;
+                                const metricConfigMap = metricData?.configMap ?? new Map();
+                                const config = metricConfigMap.get(m.metric);
+                                const unitType = config?.unitType;
+                                const decimals = config?.decimals ?? 2;
                                 const label = m.metric === "other"
                                   ? m.custom_metric || "Other"
                                   : config?.label || m.metric;

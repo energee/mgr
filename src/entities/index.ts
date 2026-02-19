@@ -109,7 +109,7 @@ export { entityRegistry };
 
 // Re-export individual entities for direct import
 export { batchEntity } from "./batch";
-export { brewLogEntity, phaseConfig, metricConfig } from "./brew-log";
+export { brewLogEntity } from "./brew-log";
 export type { BrewEvent, BrewMeasurement, BrewLogFormValues } from "./brew-log";
 export { recipeEntity } from "./recipe";
 export { vesselEntity, VESSEL_TYPES } from "./vessel";

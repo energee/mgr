@@ -26,52 +26,14 @@ type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
 // =============================================================================
 
 const measurementSchema = z.object({
-  metric: z.enum([
-    "temp_f",
-    "ph",
-    "volume_bbl",
-    "volume_l",
-    "gravity_plato",
-    "flow_rate",
-    "pump_speed",
-    "amount_lbs",
-    "amount_oz",
-    "amount_g",
-    "viability",
-    "pitch_rate",
-    "other",
-  ]),
+  metric: z.string().min(1, "Metric is required"),
   value: z.union([z.number(), z.string()]),
   custom_metric: z.string().nullable().optional(),
 });
 
 const brewEventSchema = z.object({
   id: z.string().uuid().optional(),
-  phase: z.enum([
-    "strike_water",
-    "mash_in",
-    "mash_rest",
-    "mash_step",
-    "vorlauf",
-    "runoff_start",
-    "runoff_end",
-    "sparge_start",
-    "sparge_end",
-    "kettle_full",
-    "boil_start",
-    "boil_end",
-    "hop_addition",
-    "adjunct_addition",
-    "whirlpool_start",
-    "whirlpool_rest",
-    "whirlpool_end",
-    "ko_start",
-    "ko_end",
-    "yeast_pitch",
-    "hourly_check",
-    "flow_rate_change",
-    "other",
-  ]),
+  phase: z.string().min(1, "Phase is required"),
   custom_phase: z.string().nullable().optional(),
   time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
   measurements: z.array(measurementSchema).default([]),
@@ -99,56 +61,6 @@ export const brewLogSchema = z.object({
 export type BrewLogFormValues = z.infer<typeof brewLogSchema>;
 export type BrewEvent = z.infer<typeof brewEventSchema>;
 export type BrewMeasurement = z.infer<typeof measurementSchema>;
-
-// =============================================================================
-// Phase Display Config
-// =============================================================================
-
-export const phaseConfig = {
-  strike_water: { label: "Strike Water", icon: "droplet" },
-  mash_in: { label: "Mash In", icon: "grain" },
-  mash_rest: { label: "Mash Rest", icon: "clock" },
-  mash_step: { label: "Mash Step", icon: "thermometer" },
-  vorlauf: { label: "Vorlauf", icon: "refresh" },
-  runoff_start: { label: "Runoff Start", icon: "arrow-down" },
-  runoff_end: { label: "Runoff End", icon: "check" },
-  sparge_start: { label: "Sparge Start", icon: "droplet" },
-  sparge_end: { label: "Sparge End", icon: "check" },
-  kettle_full: { label: "Kettle Full", icon: "container" },
-  boil_start: { label: "Boil Start", icon: "flame" },
-  boil_end: { label: "Boil End", icon: "check" },
-  hop_addition: { label: "Hop Addition", icon: "leaf" },
-  adjunct_addition: { label: "Adjunct Addition", icon: "plus" },
-  whirlpool_start: { label: "Whirlpool Start", icon: "refresh" },
-  whirlpool_rest: { label: "Whirlpool Rest", icon: "clock" },
-  whirlpool_end: { label: "Whirlpool End", icon: "check" },
-  ko_start: { label: "Knock Out Start", icon: "arrow-right" },
-  ko_end: { label: "Knock Out End", icon: "check" },
-  yeast_pitch: { label: "Yeast Pitch", icon: "flask" },
-  hourly_check: { label: "Hourly Check", icon: "clock" },
-  flow_rate_change: { label: "Flow Rate Change", icon: "sliders" },
-  other: { label: "Other", icon: "more-horizontal" },
-} as const;
-
-// =============================================================================
-// Metric Display Config
-// =============================================================================
-
-export const metricConfig = {
-  temp_f: { label: "Temperature", unit: "°F", unitType: "temperature" as const, decimals: 1 },
-  ph: { label: "pH", unit: "" },
-  volume_bbl: { label: "Volume (BBL)", unit: "BBL", unitType: "volume" as const, decimals: 2 },
-  volume_l: { label: "Volume (L)", unit: "L", unitType: "volume" as const, decimals: 2 },
-  gravity_plato: { label: "Gravity", unit: "°P", unitType: "gravity" as const, decimals: 1 },
-  flow_rate: { label: "Flow Rate", unit: "" },
-  pump_speed: { label: "Pump Speed", unit: "" },
-  amount_lbs: { label: "Amount (lbs)", unit: "lbs", unitType: "weight" as const, decimals: 2 },
-  amount_oz: { label: "Amount (oz)", unit: "oz" },
-  amount_g: { label: "Amount (g)", unit: "g" },
-  viability: { label: "Viability", unit: "%" },
-  pitch_rate: { label: "Pitching Rate", unit: "M/mL/°P" },
-  other: { label: "Other", unit: "" },
-} as const;
 
 // =============================================================================
 // State Machine (defined separately to derive options)

@@ -4,11 +4,8 @@
  * BrewEventForm - Mobile-First Brew Day Event Entry
  *
  * Touch-friendly form for recording brew day events on brewery floor.
- * Features:
- * - Large touch targets (min 48px)
- * - Phase selector with common brewing phases
- * - Multiple measurements per event
- * - Timestamp with time-only input (brew day is known)
+ * Phases and metrics are fetched from the enum_values table so breweries
+ * can customize them via Settings > Status & Options.
  */
 
 import { useState } from "react";
@@ -36,35 +33,16 @@ import {
 } from "@/components/ui/form";
 import { Plus, Trash2 } from "lucide-react";
 import { UnitInput } from "@/components/ui/unit-input";
-import {
-  phaseConfig,
-  metricConfig,
-  type BrewEvent,
-  type BrewMeasurement,
-} from "@/entities/brew-log";
+import { useBrewPhases, useBrewMetrics } from "@/hooks/use-brew-enums";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { BrewEvent, BrewMeasurement } from "@/entities/brew-log";
 
 // =============================================================================
-// Schema — enum values listed inline to avoid circular dependency
-// (brew-log.tsx -> brew-log-timeline -> brew-event-timeline -> brew-event-form
-//  -> phaseConfig from brew-log.tsx would cause "before initialization" error)
+// Schema — uses z.string() since valid values come from the database
 // =============================================================================
 
 const measurementFormSchema = z.object({
-  metric: z.enum([
-    "temp_f",
-    "ph",
-    "volume_bbl",
-    "volume_l",
-    "gravity_plato",
-    "flow_rate",
-    "pump_speed",
-    "amount_lbs",
-    "amount_oz",
-    "amount_g",
-    "viability",
-    "pitch_rate",
-    "other",
-  ]),
+  metric: z.string().min(1, "Metric is required"),
   value: z.union([z.coerce.number(), z.string()]).refine(
     (val) => val !== "" && val !== undefined,
     { message: "Value is required" }
@@ -73,31 +51,7 @@ const measurementFormSchema = z.object({
 });
 
 const eventFormSchema = z.object({
-  phase: z.enum([
-    "strike_water",
-    "mash_in",
-    "mash_rest",
-    "mash_step",
-    "vorlauf",
-    "runoff_start",
-    "runoff_end",
-    "sparge_start",
-    "sparge_end",
-    "kettle_full",
-    "boil_start",
-    "boil_end",
-    "hop_addition",
-    "adjunct_addition",
-    "whirlpool_start",
-    "whirlpool_rest",
-    "whirlpool_end",
-    "ko_start",
-    "ko_end",
-    "yeast_pitch",
-    "hourly_check",
-    "flow_rate_change",
-    "other",
-  ]),
+  phase: z.string().min(1, "Phase is required"),
   custom_phase: z.string().nullable().optional(),
   time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
   measurements: z.array(measurementFormSchema),
@@ -105,19 +59,6 @@ const eventFormSchema = z.object({
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
-
-// =============================================================================
-// Phase Groups for Better UX
-// =============================================================================
-
-const phaseGroups = {
-  mash: ["strike_water", "mash_in", "mash_rest", "mash_step"],
-  lauter: ["vorlauf", "runoff_start", "runoff_end", "sparge_start", "sparge_end"],
-  boil: ["kettle_full", "boil_start", "hop_addition", "adjunct_addition", "boil_end"],
-  whirlpool: ["whirlpool_start", "whirlpool_rest", "whirlpool_end"],
-  knockout: ["ko_start", "ko_end", "yeast_pitch"],
-  other: ["hourly_check", "flow_rate_change", "other"],
-} as const;
 
 // =============================================================================
 // Component
@@ -143,6 +84,9 @@ export function BrewEventForm({
   isSubmitting = false,
   initialData,
 }: BrewEventFormProps) {
+  const { data: phaseData, isLoading: phasesLoading } = useBrewPhases();
+  const { data: metricData, isLoading: metricsLoading } = useBrewMetrics();
+
   const [selectedPhase, setSelectedPhase] = useState<string>(
     initialData?.phase || "mash_in"
   );
@@ -150,7 +94,7 @@ export function BrewEventForm({
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: {
-      phase: (initialData?.phase as EventFormValues["phase"]) || "mash_in",
+      phase: initialData?.phase || "mash_in",
       custom_phase: initialData?.custom_phase || "",
       time: initialData?.time || getCurrentTime(),
       measurements: (initialData?.measurements as BrewMeasurement[]) || [],
@@ -181,7 +125,7 @@ export function BrewEventForm({
   };
 
   const addMeasurement = () => {
-    let defaultMetric: BrewMeasurement["metric"] = "temp_f";
+    let defaultMetric = "temp_f";
 
     if (selectedPhase === "boil_end" || selectedPhase === "ko_end") {
       defaultMetric = "gravity_plato";
@@ -191,6 +135,20 @@ export function BrewEventForm({
 
     append({ metric: defaultMetric, value: "", custom_metric: null });
   };
+
+  if (phasesLoading || metricsLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    );
+  }
+
+  const phaseGroups = phaseData?.groups ?? [];
+  const metricsList = metricData?.metrics ?? [];
+  const metricConfigMap = metricData?.configMap ?? new Map();
 
   return (
     <Form {...form}>
@@ -213,14 +171,14 @@ export function BrewEventForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(phaseGroups).map(([group, phases]) => (
+                  {phaseGroups.map(({ group, phases }) => (
                     <div key={group}>
                       <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">
                         {group}
                       </div>
                       {phases.map((phase) => (
-                        <SelectItem key={phase} value={phase}>
-                          {phaseConfig[phase as keyof typeof phaseConfig]?.label || phase}
+                        <SelectItem key={phase.value} value={phase.value}>
+                          {phase.label}
                         </SelectItem>
                       ))}
                     </div>
@@ -316,9 +274,9 @@ export function BrewEventForm({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(metricConfig).map(([key, config]) => (
-                            <SelectItem key={key} value={key}>
-                              {config.label}
+                          {metricsList.map((metric) => (
+                            <SelectItem key={metric.value} value={metric.value}>
+                              {metric.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -336,20 +294,18 @@ export function BrewEventForm({
                   name={`measurements.${index}.value`}
                   render={({ field }) => {
                     // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
-                    const metricKey = form.watch(`measurements.${index}.metric`) as keyof typeof metricConfig;
-                    const config = metricConfig[metricKey];
-                    const unitType = config && "unitType" in config ? config.unitType : undefined;
-                    const decimals = config && "decimals" in config ? config.decimals : 2;
+                    const metricKey = form.watch(`measurements.${index}.metric`);
+                    const config = metricConfigMap.get(metricKey);
 
                     return (
                       <FormItem>
                         <FormControl>
-                          {unitType ? (
+                          {config?.unitType ? (
                             <UnitInput
                               value={typeof field.value === "number" ? field.value : null}
                               onChange={(val) => field.onChange(val ?? "")}
-                              unitType={unitType}
-                              decimals={decimals}
+                              unitType={config.unitType}
+                              decimals={config.decimals ?? 2}
                             />
                           ) : (
                             <div className="flex items-center gap-1">

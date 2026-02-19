@@ -57,6 +57,10 @@ export const ENUM_TYPES = {
   KEG_STATE: "keg_state",
   NOTIFICATION_STATUS: "notification_status",
 
+  // Brew day
+  BREW_PHASE: "brew_phase",
+  BREW_METRIC: "brew_metric",
+
   // Classifications
   VESSEL_TYPE: "vessel_type",
   YEAST_TYPE: "yeast_type",
