@@ -130,16 +130,33 @@ export default function BatchDetailPage({
       return {
         message: "Brew is linked. Start fermentation when ready.",
         variant: "info" as const,
-        actions: [{ label: "Start Fermentation", onClick: () => setShowStartFermentation(true) }],
+        actions: [
+          { label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` },
+          { label: "Start Fermentation", onClick: () => setShowStartFermentation(true) },
+        ],
       };
     }
     if (batch.status === "fermenting") {
+      const actions: { label: string; href?: string; onClick?: () => void }[] = [];
+      if (linkedBrewLogs?.length) {
+        actions.push({ label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` });
+      }
+      actions.push(
+        { label: "Readings", href: `/production/batches/${id}/readings` },
+        { label: "Additions", href: `/production/batches/${id}/additions` },
+      );
       return {
         message: "Track fermentation progress with readings and additions.",
         variant: "default" as const,
+        actions,
+      };
+    }
+    if (linkedBrewLogs?.length) {
+      return {
+        message: `Linked to brew ${linkedBrewLogs[0].brew_log?.brew_number ?? "log"}.`,
+        variant: "default" as const,
         actions: [
-          { label: "Readings", href: `/production/batches/${id}/readings` },
-          { label: "Additions", href: `/production/batches/${id}/additions` },
+          { label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` },
         ],
       };
     }
