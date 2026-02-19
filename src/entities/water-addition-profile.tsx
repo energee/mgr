@@ -91,6 +91,30 @@ export const waterAdditionProfileEntity: EntityConfig<WaterAdditionProfile> = {
       ],
     },
     {
+      id: "targets",
+      title: "Water Chemistry Targets",
+      fields: [
+        {
+          name: "water_profile_id",
+          label: "Source Water Profile",
+          type: "relation",
+          relation: {
+            entity: "water_profile",
+            displayField: "name",
+          },
+          colSpan: 12,
+          description: "Baseline water chemistry for auto-calculation",
+        },
+        { name: "target_calcium_ppm", label: "Ca\u00B2\u207A", type: "number", placeholder: "0", colSpan: 2 },
+        { name: "target_magnesium_ppm", label: "Mg\u00B2\u207A", type: "number", placeholder: "0", colSpan: 2 },
+        { name: "target_sodium_ppm", label: "Na\u207A", type: "number", placeholder: "0", colSpan: 2 },
+        { name: "target_sulfate_ppm", label: "SO\u2084\u00B2\u207B", type: "number", placeholder: "0", colSpan: 2 },
+        { name: "target_chloride_ppm", label: "Cl\u207B", type: "number", placeholder: "0", colSpan: 1 },
+        { name: "target_bicarbonate_ppm", label: "HCO\u2083\u207B", type: "number", placeholder: "0", colSpan: 2 },
+        { name: "target_ph", label: "pH", type: "number", placeholder: "7.0", colSpan: 1 },
+      ],
+    },
+    {
       id: "additions",
       title: "Additions",
       component: ProfileAdditionsEditor,
@@ -124,6 +148,23 @@ export const waterAdditionProfileEntity: EntityConfig<WaterAdditionProfile> = {
       placeholder: "Describe the target water chemistry or use case...",
       colSpan: 12,
     },
+    {
+      name: "water_profile_id",
+      label: "Source Water Profile",
+      type: "relation",
+      relation: {
+        entity: "water_profile",
+        displayField: "name",
+      },
+      colSpan: 12,
+    },
+    { name: "target_calcium_ppm", label: "Ca\u00B2\u207A", type: "number", placeholder: "0", colSpan: 2 },
+    { name: "target_magnesium_ppm", label: "Mg\u00B2\u207A", type: "number", placeholder: "0", colSpan: 2 },
+    { name: "target_sodium_ppm", label: "Na\u207A", type: "number", placeholder: "0", colSpan: 2 },
+    { name: "target_sulfate_ppm", label: "SO\u2084\u00B2\u207B", type: "number", placeholder: "0", colSpan: 2 },
+    { name: "target_chloride_ppm", label: "Cl\u207B", type: "number", placeholder: "0", colSpan: 1 },
+    { name: "target_bicarbonate_ppm", label: "HCO\u2083\u207B", type: "number", placeholder: "0", colSpan: 2 },
+    { name: "target_ph", label: "pH", type: "number", placeholder: "7.0", colSpan: 1 },
   ],
 
   // Actions
