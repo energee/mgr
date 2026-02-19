@@ -13,13 +13,27 @@
  * - Table with amount, unit, timing, target, and delete columns
  * - Local state management with explicit "Save Additions" button
  * - Delete-all then re-insert save pattern
+ * - Auto-calculates salt additions from source water profile + target ppm values
+ * - Override tracking: manually edited amounts persist across recalculations
+ * - Per-row reset button to revert overridden amounts to calculated values
+ * - Resulting water profile summary with ion concentrations and SO4:Cl ratio
  */
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useCatalog } from "@/hooks/use-catalog";
-import { waterAdditionProfileKeys, catalogKeys } from "@/lib/query-keys";
+import { waterAdditionProfileKeys, catalogKeys, entityKeys } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
+import {
+  calculateAdditions,
+  calculateResultingProfile,
+  calculateSulfateChlorideRatio,
+  getRatioDescription,
+  mapSaltAdditionsToItems,
+  type WaterProfile,
+  type SaltAdditions,
+} from "@/lib/water-chemistry";
 import {
   Table,
   TableBody,
@@ -52,7 +66,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Check, ChevronsUpDown, Save, FlaskConical } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Save, FlaskConical, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 interface AdditiveCatalogItem {
@@ -76,7 +90,17 @@ interface ProfileAdditionItem {
 }
 
 interface ProfileAdditionsEditorProps {
-  data: { id: string | null };
+  data: {
+    id: string | null;
+    water_profile_id?: string | null;
+    target_calcium_ppm?: number | null;
+    target_magnesium_ppm?: number | null;
+    target_sodium_ppm?: number | null;
+    target_sulfate_ppm?: number | null;
+    target_chloride_ppm?: number | null;
+    target_bicarbonate_ppm?: number | null;
+    target_ph?: number | null;
+  };
 }
 
 const TIMING_OPTIONS = [
@@ -173,6 +197,83 @@ export function ProfileAdditionsEditor({ data }: ProfileAdditionsEditorProps) {
     [additiveCatalog]
   );
 
+  // =========================================================================
+  // Water chemistry auto-calculation
+  // =========================================================================
+
+  /** Fetch the source water profile when water_profile_id is set */
+  const { data: sourceProfile } = useQuery({
+    queryKey: entityKeys.detail("water_profiles", data.water_profile_id!),
+    queryFn: async () => {
+      const { data: row, error } = await supabase
+        .from("water_profiles")
+        .select(
+          "calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, ph"
+        )
+        .eq("id", data.water_profile_id!)
+        .single();
+      if (error) throw error;
+      return row;
+    },
+    enabled: !!data.water_profile_id,
+  });
+
+  /** Build a WaterProfile from the target ppm fields (null if no key targets set) */
+  const targetProfile = useMemo((): WaterProfile | null => {
+    if (
+      data.target_calcium_ppm == null &&
+      data.target_sulfate_ppm == null &&
+      data.target_chloride_ppm == null
+    )
+      return null;
+    return {
+      calcium_ppm: data.target_calcium_ppm ?? 0,
+      magnesium_ppm: data.target_magnesium_ppm ?? 0,
+      sodium_ppm: data.target_sodium_ppm ?? 0,
+      sulfate_ppm: data.target_sulfate_ppm ?? 0,
+      chloride_ppm: data.target_chloride_ppm ?? 0,
+      bicarbonate_ppm: data.target_bicarbonate_ppm ?? 0,
+    };
+  }, [
+    data.target_calcium_ppm,
+    data.target_magnesium_ppm,
+    data.target_sodium_ppm,
+    data.target_sulfate_ppm,
+    data.target_chloride_ppm,
+    data.target_bicarbonate_ppm,
+  ]);
+
+  /** Calculated salt additions (grams per gallon) from source -> target */
+  const calculatedAdditions = useMemo((): SaltAdditions | null => {
+    if (!sourceProfile || !targetProfile) return null;
+    const source: WaterProfile = {
+      calcium_ppm: sourceProfile.calcium_ppm ?? 0,
+      magnesium_ppm: sourceProfile.magnesium_ppm ?? 0,
+      sodium_ppm: sourceProfile.sodium_ppm ?? 0,
+      sulfate_ppm: sourceProfile.sulfate_ppm ?? 0,
+      chloride_ppm: sourceProfile.chloride_ppm ?? 0,
+      bicarbonate_ppm: sourceProfile.bicarbonate_ppm ?? 0,
+    };
+    return calculateAdditions(source, targetProfile, 1); // 1 gal unit rate
+  }, [sourceProfile, targetProfile]);
+
+  /** Resulting water profile after applying calculated additions to source */
+  const resultingProfile = useMemo((): WaterProfile | null => {
+    if (!sourceProfile || !calculatedAdditions) return null;
+    const source: WaterProfile = {
+      calcium_ppm: sourceProfile.calcium_ppm ?? 0,
+      magnesium_ppm: sourceProfile.magnesium_ppm ?? 0,
+      sodium_ppm: sourceProfile.sodium_ppm ?? 0,
+      sulfate_ppm: sourceProfile.sulfate_ppm ?? 0,
+      chloride_ppm: sourceProfile.chloride_ppm ?? 0,
+      bicarbonate_ppm: sourceProfile.bicarbonate_ppm ?? 0,
+    };
+    return calculateResultingProfile(source, calculatedAdditions, 1);
+  }, [sourceProfile, calculatedAdditions]);
+
+  /** Set of additive IDs whose amounts have been manually overridden */
+  const [overriddenIds, setOverriddenIds] = useState<Set<string>>(new Set());
+
   // Sync fetched data to local editable state (React recommended pattern:
   // https://react.dev/reference/react/useState#storing-information-from-previous-renders)
   const [prevSavedItems, setPrevSavedItems] = useState(savedItems);
@@ -180,6 +281,48 @@ export function ProfileAdditionsEditor({ data }: ProfileAdditionsEditorProps) {
     setPrevSavedItems(savedItems);
     setLocalItems(savedItems);
     setHasChanges(false);
+
+    // Detect overrides when saved items load by comparing to calculated amounts
+    if (calculatedAdditions && filteredCatalog.length > 0) {
+      const calcItems = mapSaltAdditionsToItems(calculatedAdditions, filteredCatalog);
+      const overrides = new Set<string>();
+      for (const saved of savedItems) {
+        const calc = calcItems.find((c) => c.additive_id === saved.additive_id);
+        if (calc && Math.abs(calc.amount - saved.amount) > 0.01) {
+          overrides.add(saved.additive_id);
+        }
+      }
+      setOverriddenIds(overrides);
+    }
+  }
+
+  // Auto-populate non-overridden items when calculatedAdditions changes
+  const [prevCalcAdditions, setPrevCalcAdditions] = useState(calculatedAdditions);
+  if (calculatedAdditions !== prevCalcAdditions) {
+    setPrevCalcAdditions(calculatedAdditions);
+    if (calculatedAdditions && filteredCatalog.length > 0) {
+      const calcItems = mapSaltAdditionsToItems(calculatedAdditions, filteredCatalog);
+      setLocalItems((prev) => {
+        const overridden = prev.filter((item) => overriddenIds.has(item.additive_id));
+        const result = [...overridden];
+        for (const calcItem of calcItems) {
+          if (!overriddenIds.has(calcItem.additive_id)) {
+            const existing = prev.find((p) => p.additive_id === calcItem.additive_id);
+            result.push({
+              additive_id: calcItem.additive_id,
+              amount: calcItem.amount,
+              unit: calcItem.unit,
+              timing: existing?.timing ?? calcItem.timing,
+              target: existing?.target ?? calcItem.target,
+              position: result.length,
+              additive: filteredCatalog.find((a) => a.id === calcItem.additive_id),
+            });
+          }
+        }
+        return result;
+      });
+      setHasChanges(true);
+    }
   }
 
   // Save mutation (delete-all + re-insert)
@@ -258,9 +401,15 @@ export function ProfileAdditionsEditor({ data }: ProfileAdditionsEditorProps) {
         updated[index] = { ...updated[index], [field]: value };
         return updated;
       });
+      if (field === "amount") {
+        const item = localItems[index];
+        if (item) {
+          setOverriddenIds((prev) => new Set(prev).add(item.additive_id));
+        }
+      }
       setHasChanges(true);
     },
-    []
+    [localItems]
   );
 
   const handleRemove = useCallback((index: number) => {
@@ -428,16 +577,49 @@ export function ProfileAdditionsEditor({ data }: ProfileAdditionsEditorProps) {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={item.amount || ""}
-                      onChange={(e) =>
-                        handleFieldChange(index, "amount", parseFloat(e.target.value) || 0)
-                      }
-                      className="w-20 text-right ml-auto"
-                    />
+                    <div className="flex items-center justify-end gap-1">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={item.amount || ""}
+                        onChange={(e) =>
+                          handleFieldChange(index, "amount", parseFloat(e.target.value) || 0)
+                        }
+                        className={cn(
+                          "w-20 text-right ml-auto",
+                          overriddenIds.has(item.additive_id) && "ring-1 ring-amber-400/50"
+                        )}
+                      />
+                      {overriddenIds.has(item.additive_id) && calculatedAdditions && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const calcItems = mapSaltAdditionsToItems(
+                              calculatedAdditions,
+                              filteredCatalog
+                            );
+                            const calcItem = calcItems.find(
+                              (c) => c.additive_id === item.additive_id
+                            );
+                            if (calcItem) {
+                              handleFieldChange(index, "amount", calcItem.amount);
+                              setOverriddenIds((prev) => {
+                                const next = new Set(prev);
+                                next.delete(item.additive_id);
+                                return next;
+                              });
+                            }
+                          }}
+                          className="h-6 w-6 p-0 text-muted-foreground"
+                          title="Reset to calculated value"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Select
@@ -513,6 +695,70 @@ export function ProfileAdditionsEditor({ data }: ProfileAdditionsEditorProps) {
             </TableRow>
           </TableFooter>
         </Table>
+      )}
+
+      {/* Resulting water profile summary */}
+      {resultingProfile && sourceProfile && targetProfile && (
+        <div className="border rounded-md p-4 space-y-2">
+          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Resulting Water Profile (per gallon)
+          </h4>
+          <div className="grid grid-cols-7 gap-2 text-sm">
+            {(
+              [
+                ["calcium_ppm", "Ca\u00B2\u207A"],
+                ["magnesium_ppm", "Mg\u00B2\u207A"],
+                ["sodium_ppm", "Na\u207A"],
+                ["sulfate_ppm", "SO\u2084\u00B2\u207B"],
+                ["chloride_ppm", "Cl\u207B"],
+                ["bicarbonate_ppm", "HCO\u2083\u207B"],
+              ] as const
+            ).map(([ion, label]) => {
+              const result = resultingProfile[ion];
+              const target = targetProfile[ion];
+              const withinRange =
+                target > 0 && Math.abs(result - target) / target <= 0.1;
+              return (
+                <div key={ion} className="text-center">
+                  <div className="text-xs text-muted-foreground">{label}</div>
+                  <div
+                    className={cn(
+                      "font-mono",
+                      withinRange
+                        ? "text-green-600 dark:text-green-400"
+                        : target > 0
+                          ? "text-amber-600 dark:text-amber-400"
+                          : ""
+                    )}
+                  >
+                    {Math.round(result)}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground">
+                SO{"\u2084"}:Cl
+              </div>
+              <div className="font-mono">
+                {calculateSulfateChlorideRatio(
+                  resultingProfile.sulfate_ppm,
+                  resultingProfile.chloride_ppm
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {
+                  getRatioDescription(
+                    calculateSulfateChlorideRatio(
+                      resultingProfile.sulfate_ppm,
+                      resultingProfile.chloride_ppm
+                    )
+                  ).label
+                }
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
