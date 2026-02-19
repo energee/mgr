@@ -13,11 +13,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -34,8 +29,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  ChevronDown,
-  ChevronRight,
   Clock,
   Droplet,
   Flame,
@@ -69,7 +62,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   thermometer: Thermometer,
   refresh: RotateCw,
   "arrow-down": ArrowRight,
-  check: ChevronRight,
+  check: ArrowRight,
   container: FlaskConical,
   flame: Flame,
   leaf: Leaf,
@@ -165,7 +158,6 @@ export function BrewEventTimeline({
   isLoading = false,
   actionTrigger,
 }: BrewEventTimelineProps) {
-  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<BrewEvent | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
@@ -185,18 +177,6 @@ export function BrewEventTimeline({
       return a.time.localeCompare(b.time);
     });
   }, [events]);
-
-  const toggleExpanded = (eventId: string) => {
-    setExpandedEvents((prev) => {
-      const next = new Set(prev);
-      if (next.has(eventId)) {
-        next.delete(eventId);
-      } else {
-        next.add(eventId);
-      }
-      return next;
-    });
-  };
 
   const handleAddEvent = async (event: BrewEvent) => {
     if (!onAddEvent) return;
@@ -273,7 +253,6 @@ export function BrewEventTimeline({
             <div className="space-y-4">
               {sortedEvents.map((event, index) => {
                 const eventId = event.id || `event-${index}`;
-                const isExpanded = expandedEvents.has(eventId);
                 const PhaseIcon = getPhaseIcon(event.phase);
                 const phaseLabel =
                   event.phase === "other"
@@ -282,126 +261,100 @@ export function BrewEventTimeline({
                 const colorClass = phaseColors[event.phase] || phaseColors.other;
 
                   return (
-                    <Collapsible
-                      key={eventId}
-                      open={isExpanded}
-                      onOpenChange={() => toggleExpanded(eventId)}
-                    >
-                      <div className="relative pl-10">
-                        {/* Timeline dot */}
-                        <div
-                          className={cn(
-                            "absolute left-2 top-3 h-5 w-5 rounded-full border-2 flex items-center justify-center",
-                            colorClass
-                          )}
-                        >
-                          <PhaseIcon className="h-3 w-3" />
-                        </div>
+                    <div key={eventId} className="relative pl-10">
+                      {/* Timeline dot */}
+                      <div
+                        className={cn(
+                          "absolute left-2 top-2.5 h-5 w-5 rounded-full border-2 flex items-center justify-center",
+                          colorClass
+                        )}
+                      >
+                        <PhaseIcon className="h-3 w-3" />
+                      </div>
 
-                        {/* Event card */}
-                        <div
-                          className={cn(
-                            "rounded-lg border p-3 transition-colors",
-                            colorClass
-                          )}
-                        >
-                          <CollapsibleTrigger asChild>
-                            <div className="cursor-pointer space-y-1.5">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <span className="font-mono text-sm text-muted-foreground">
-                                    {event.time}
+                      {/* Event row */}
+                      <div
+                        className={cn(
+                          "rounded-lg border px-3 py-2 transition-colors",
+                          colorClass
+                        )}
+                      >
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="font-mono text-sm text-muted-foreground shrink-0">
+                            {event.time}
+                          </span>
+                          <span className="font-medium shrink-0">{phaseLabel}</span>
+
+                          {/* Inline measurements */}
+                          {event.measurements && event.measurements.length > 0 && (
+                            <>
+                              <span className="text-muted-foreground/40">|</span>
+                              {event.measurements.map((m, mIndex) => {
+                                const config = metricConfig[m.metric as keyof typeof metricConfig];
+                                const unitType = config && "unitType" in config ? config.unitType : undefined;
+                                const decimals = config && "decimals" in config ? config.decimals : 2;
+                                const label = m.metric === "other"
+                                  ? m.custom_metric || "Other"
+                                  : config?.label || m.metric;
+
+                                return (
+                                  <span
+                                    key={mIndex}
+                                    className="inline-flex items-center gap-1 text-sm"
+                                  >
+                                    <span className="font-medium">
+                                      {unitType && typeof m.value === "number" ? (
+                                        <UnitDisplay
+                                          value={m.value}
+                                          unitType={unitType}
+                                          decimals={decimals}
+                                        />
+                                      ) : (
+                                        <>
+                                          {m.value}
+                                          {config?.unit ? ` ${config.unit}` : ""}
+                                        </>
+                                      )}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">{label}</span>
                                   </span>
-                                  <span className="font-medium">{phaseLabel}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {!readOnly && (
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingEvent(event);
-                                        }}
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDeletingEventId(eventId);
-                                        }}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  )}
-                                  {(event.notes) && (
-                                    isExpanded ? (
-                                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                    )
-                                  )}
-                                </div>
-                              </div>
+                                );
+                              })}
+                            </>
+                          )}
 
-                              {/* Measurements shown inline (always visible) */}
-                              {event.measurements && event.measurements.length > 0 && (
-                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                                  {event.measurements.map((m, mIndex) => {
-                                    const config = metricConfig[m.metric as keyof typeof metricConfig];
-                                    const unitType = config && "unitType" in config ? config.unitType : undefined;
-                                    const decimals = config && "decimals" in config ? config.decimals : 2;
-                                    const label = m.metric === "other"
-                                      ? m.custom_metric || "Other"
-                                      : config?.label || m.metric;
+                          {/* Inline notes */}
+                          {event.notes && (
+                            <>
+                              <span className="text-muted-foreground/40">|</span>
+                              <span className="text-sm text-muted-foreground truncate">{event.notes}</span>
+                            </>
+                          )}
 
-                                    return (
-                                      <span
-                                        key={mIndex}
-                                        className="inline-flex items-center gap-1 text-muted-foreground"
-                                      >
-                                        <Thermometer className="h-3 w-3" />
-                                        <span className="font-medium text-foreground">
-                                          {unitType && typeof m.value === "number" ? (
-                                            <UnitDisplay
-                                              value={m.value}
-                                              unitType={unitType}
-                                              decimals={decimals}
-                                            />
-                                          ) : (
-                                            <>
-                                              {m.value}
-                                              {config?.unit ? ` ${config.unit}` : ""}
-                                            </>
-                                          )}
-                                        </span>
-                                        <span className="text-xs">{label}</span>
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              )}
+                          {/* Spacer + actions */}
+                          {!readOnly && (
+                            <div className="ml-auto flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setEditingEvent(event)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeletingEventId(eventId)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
-                          </CollapsibleTrigger>
-
-                          {/* Notes expand on click */}
-                          <CollapsibleContent className="mt-2">
-                            {event.notes && (
-                              <div className="text-sm text-muted-foreground border-t pt-2">
-                                {event.notes}
-                              </div>
-                            )}
-                          </CollapsibleContent>
+                          )}
                         </div>
                       </div>
-                    </Collapsible>
+                    </div>
                   );
                 })}
               </div>
