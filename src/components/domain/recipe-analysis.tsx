@@ -30,15 +30,12 @@ import {
   XCircle,
   ChevronDown,
   Sparkles,
-  Target,
   Lightbulb,
   RefreshCw,
 } from "lucide-react";
 import {
   analyzeStyleCompliance,
   getRecipeSuggestions,
-  type StyleComplianceResult,
-  type RecipeSuggestionsResult,
   type ParameterAnalysis,
 } from "@/lib/ai/recipe-analyzer";
 import { recipeKeys } from "@/lib/query-keys";
@@ -63,6 +60,18 @@ interface RecipeAnalysisProps {
 // Helper Components
 // =============================================================================
 
+function StatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case "in_range":
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    case "below_range":
+    case "above_range":
+      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+    default:
+      return <XCircle className="h-4 w-4 text-muted-foreground" />;
+  }
+}
+
 function ParameterRow({
   label,
   analysis,
@@ -70,35 +79,37 @@ function ParameterRow({
   label: string;
   analysis: ParameterAnalysis;
 }) {
-  const getStatusIcon = () => {
-    switch (analysis.status) {
-      case "in_range":
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case "below_range":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      case "above_range":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <XCircle className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
+  const decimals = label === "OG" || label === "FG" ? 3 : 1;
 
   return (
     <div className="flex items-center justify-between py-2 border-b last:border-b-0">
       <div className="flex items-center gap-2">
-        {getStatusIcon()}
+        <StatusIcon status={analysis.status} />
         <span className="font-medium">{label}</span>
       </div>
       <div className="text-right">
         <div className="font-mono text-sm">
-          {analysis.value?.toFixed(label === "OG" || label === "FG" ? 3 : 1) ?? "—"}
+          {analysis.value?.toFixed(decimals) ?? "—"}
         </div>
         <div className="text-xs text-muted-foreground">
-          Range: {analysis.min.toFixed(label === "OG" || label === "FG" ? 3 : 1)} - {analysis.max.toFixed(label === "OG" || label === "FG" ? 3 : 1)}
+          {analysis.min != null && analysis.max != null
+            ? `Range: ${analysis.min.toFixed(decimals)} - ${analysis.max.toFixed(decimals)}`
+            : "Range: —"}
         </div>
       </div>
     </div>
   );
+}
+
+function SeverityIcon({ severity }: { severity: string }) {
+  switch (severity) {
+    case "error":
+      return <XCircle className="h-4 w-4 text-red-500" />;
+    case "warning":
+      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+    default:
+      return <Lightbulb className="h-4 w-4 text-blue-500" />;
+  }
 }
 
 function SuggestionItem({
@@ -106,20 +117,11 @@ function SuggestionItem({
 }: {
   suggestion: { category: string; severity: string; message: string };
 }) {
-  const getIcon = () => {
-    switch (suggestion.severity) {
-      case "error":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case "warning":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <Lightbulb className="h-4 w-4 text-blue-500" />;
-    }
-  };
-
   return (
     <div className="flex items-start gap-3 py-2 border-b last:border-b-0">
-      <div className="mt-0.5">{getIcon()}</div>
+      <div className="mt-0.5">
+        <SeverityIcon severity={suggestion.severity} />
+      </div>
       <div className="flex-1">
         <Badge variant="outline" className="mb-1">
           {suggestion.category}
@@ -190,9 +192,8 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
   const isLoading = complianceLoading || suggestionsLoading;
   const hasError = complianceError || suggestionsError;
 
-  // Calculate overall compliance
-  const compliance = complianceData as StyleComplianceResult | undefined;
-  const suggestions = suggestionsData as RecipeSuggestionsResult | undefined;
+  const compliance = complianceData;
+  const suggestions = suggestionsData;
 
   const complianceCount = compliance
     ? Object.values(compliance.analysis).filter((a) => a.status === "in_range").length
@@ -205,17 +206,13 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Recipe Analysis</CardTitle>
-            </div>
+            <CardTitle className="text-lg">Recipe Analysis</CardTitle>
             <div className="flex items-center gap-2">
               {hasAnalyzed && !isLoading && compliance && (
                 <Badge
                   variant={compliancePercent === 100 ? "default" : "secondary"}
                   className="gap-1"
                 >
-                  <Target className="h-3 w-3" />
                   {compliancePercent}% on target
                 </Badge>
               )}
@@ -275,10 +272,7 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
                 {/* Style Compliance */}
                 {compliance && (
                   <div>
-                    <h4 className="font-medium mb-3 flex items-center gap-2">
-                      <Target className="h-4 w-4" />
-                      Style Compliance
-                    </h4>
+                    <h4 className="font-medium mb-3">Style Compliance</h4>
                     <div className="border rounded-lg p-3">
                       <ParameterRow label="OG" analysis={compliance.analysis.og} />
                       <ParameterRow label="FG" analysis={compliance.analysis.fg} />

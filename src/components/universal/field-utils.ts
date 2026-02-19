@@ -5,6 +5,8 @@
 // Map of colSpan values to responsive Tailwind classes.
 // Full width on mobile, specified colSpan on md+ breakpoint.
 const COL_SPAN_CLASSES: Record<number, string> = {
+  1: "col-span-6 md:col-span-1",
+  2: "col-span-6 md:col-span-2",
   3: "col-span-12 md:col-span-3",
   4: "col-span-12 md:col-span-4",
   6: "col-span-12 md:col-span-6",

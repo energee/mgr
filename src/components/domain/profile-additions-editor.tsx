@@ -55,10 +55,6 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Check, ChevronsUpDown, Save, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 
-// =============================================================================
-// Types
-// =============================================================================
-
 interface AdditiveCatalogItem {
   id: string;
   name: string;
@@ -81,12 +77,7 @@ interface ProfileAdditionItem {
 
 interface ProfileAdditionsEditorProps {
   data: { id: string | null };
-  editing?: boolean;
 }
-
-// =============================================================================
-// Constants
-// =============================================================================
 
 const TIMING_OPTIONS = [
   { value: "mash", label: "Mash" },
@@ -116,11 +107,7 @@ const TYPE_LABELS: Record<string, string> = {
 /** Only water chemistry additive types are shown in profiles */
 const PROFILE_ADDITIVE_TYPES = ["water_salt", "acid"];
 
-// =============================================================================
-// Component
-// =============================================================================
-
-export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditorProps) {
+export function ProfileAdditionsEditor({ data }: ProfileAdditionsEditorProps) {
   const profileId = data.id;
   const supabase = createClient();
   const queryClient = useQueryClient();
@@ -130,11 +117,7 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // ---------------------------------------------------------------------------
-  // Data fetching
-  // ---------------------------------------------------------------------------
-
-  /** Fetch existing profile addition items */
+  // Fetch existing profile addition items
   const { data: savedItems, isLoading: itemsLoading } = useQuery({
     queryKey: waterAdditionProfileKeys.items(profileId!),
     queryFn: async () => {
@@ -199,10 +182,7 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
     setHasChanges(false);
   }
 
-  // ---------------------------------------------------------------------------
   // Save mutation (delete-all + re-insert)
-  // ---------------------------------------------------------------------------
-
   const saveMutation = useMutation({
     mutationFn: async (items: ProfileAdditionItem[]) => {
       // Step 1: Delete all existing items for this profile
@@ -244,10 +224,6 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
     },
   });
 
-  // ---------------------------------------------------------------------------
-  // Handlers
-  // ---------------------------------------------------------------------------
-
   const handleAdd = useCallback(
     (additive: AdditiveCatalogItem) => {
       // Prevent duplicates
@@ -256,13 +232,11 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
         return;
       }
 
-      const defaultTiming = additive.type === "acid" ? "mash" : "mash";
-
       const newItem: ProfileAdditionItem = {
         additive_id: additive.id,
         amount: additive.typical_amount || 0,
         unit: additive.typical_unit || "g",
-        timing: defaultTiming,
+        timing: "mash",
         target: "mash",
         position: localItems.length,
         additive,
@@ -276,41 +250,18 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
     [localItems]
   );
 
-  const handleAmountChange = useCallback((index: number, amount: number) => {
-    setLocalItems((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], amount };
-      return updated;
-    });
-    setHasChanges(true);
-  }, []);
-
-  const handleUnitChange = useCallback((index: number, unit: string) => {
-    setLocalItems((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], unit };
-      return updated;
-    });
-    setHasChanges(true);
-  }, []);
-
-  const handleTimingChange = useCallback((index: number, timing: string) => {
-    setLocalItems((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], timing };
-      return updated;
-    });
-    setHasChanges(true);
-  }, []);
-
-  const handleTargetChange = useCallback((index: number, target: string) => {
-    setLocalItems((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], target };
-      return updated;
-    });
-    setHasChanges(true);
-  }, []);
+  /** Update a single field on an item by index */
+  const handleFieldChange = useCallback(
+    (index: number, field: keyof ProfileAdditionItem, value: string | number) => {
+      setLocalItems((prev) => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], [field]: value };
+        return updated;
+      });
+      setHasChanges(true);
+    },
+    []
+  );
 
   const handleRemove = useCallback((index: number) => {
     setLocalItems((prev) => {
@@ -324,11 +275,7 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
     saveMutation.mutate(localItems);
   }, [saveMutation, localItems]);
 
-  // ---------------------------------------------------------------------------
   // Derived data
-  // ---------------------------------------------------------------------------
-
-  /** Group additives by type for the command palette */
   const additivesByType = useMemo(() => {
     const groups: Record<string, AdditiveCatalogItem[]> = {};
     filteredCatalog.forEach((add) => {
@@ -345,11 +292,6 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
     return filteredCatalog.filter((add) => !addedIds.has(add.id));
   }, [filteredCatalog, localItems]);
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
-
-  // Show "save the profile first" when no profile ID yet (create mode)
   if (!profileId) {
     return (
       <div className="text-center text-muted-foreground py-6">
@@ -368,8 +310,6 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
     );
   }
 
-  const isDisabled = !editing;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -387,8 +327,7 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
             </Button>
           )}
         </div>
-        {!isDisabled && (
-          <Popover open={addOpen} onOpenChange={setAddOpen}>
+        <Popover open={addOpen} onOpenChange={setAddOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -444,7 +383,6 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
               </Command>
             </PopoverContent>
           </Popover>
-        )}
       </div>
 
       {localItems.length === 0 ? (
@@ -464,7 +402,7 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
               <TableHead className="w-20">Unit</TableHead>
               <TableHead className="w-28">Timing</TableHead>
               <TableHead className="w-28">Target</TableHead>
-              {!isDisabled && <TableHead className="w-16" />}
+              <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -490,108 +428,86 @@ export function ProfileAdditionsEditor({ data, editing }: ProfileAdditionsEditor
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    {isDisabled ? (
-                      <span className="font-mono">{item.amount}</span>
-                    ) : (
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        value={item.amount || ""}
-                        onChange={(e) =>
-                          handleAmountChange(index, parseFloat(e.target.value) || 0)
-                        }
-                        className="w-20 text-right ml-auto"
-                      />
-                    )}
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={item.amount || ""}
+                      onChange={(e) =>
+                        handleFieldChange(index, "amount", parseFloat(e.target.value) || 0)
+                      }
+                      className="w-20 text-right ml-auto"
+                    />
                   </TableCell>
                   <TableCell>
-                    {isDisabled ? (
-                      <span>{item.unit}</span>
-                    ) : (
-                      <Select
-                        value={item.unit}
-                        onValueChange={(value) => handleUnitChange(index, value)}
-                      >
-                        <SelectTrigger className="w-20">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {UNIT_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                    <Select
+                      value={item.unit}
+                      onValueChange={(value) => handleFieldChange(index, "unit", value)}
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UNIT_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
-                    {isDisabled ? (
-                      <span className="capitalize">{item.timing}</span>
-                    ) : (
-                      <Select
-                        value={item.timing}
-                        onValueChange={(value) => handleTimingChange(index, value)}
-                      >
-                        <SelectTrigger className="w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIMING_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                    <Select
+                      value={item.timing}
+                      onValueChange={(value) => handleFieldChange(index, "timing", value)}
+                    >
+                      <SelectTrigger className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIMING_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
-                    {isDisabled ? (
-                      <span>
-                        {item.target
-                          ? TARGET_OPTIONS.find((o) => o.value === item.target)?.label || item.target
-                          : "—"}
-                      </span>
-                    ) : (
-                      <Select
-                        value={item.target || "mash"}
-                        onValueChange={(value) => handleTargetChange(index, value)}
-                      >
-                        <SelectTrigger className="w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TARGET_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                    <Select
+                      value={item.target || "mash"}
+                      onValueChange={(value) => handleFieldChange(index, "target", value)}
+                    >
+                      <SelectTrigger className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TARGET_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
-                  {!isDisabled && (
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemove(index)}
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemove(index)}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
           <TableFooter>
             <TableRow>
-              <TableCell colSpan={isDisabled ? 5 : 6} className="text-sm text-muted-foreground">
+              <TableCell colSpan={6} className="text-sm text-muted-foreground">
                 {localItems.length} addition{localItems.length !== 1 ? "s" : ""}
               </TableCell>
             </TableRow>

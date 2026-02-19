@@ -69,6 +69,7 @@ export function UnifiedField({
       record={record}
       entity={entity}
       relationDisplayValues={relationDisplayValues}
+      dynamicOptions={dynamicOptions}
     />
   );
 }

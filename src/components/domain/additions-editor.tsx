@@ -181,41 +181,11 @@ export function AdditionsEditor({
     [items, onChange]
   );
 
-  // Update amount
-  const handleAmountChange = useCallback(
-    (index: number, amount: number) => {
+  /** Update a single field on an item by index */
+  const handleFieldChange = useCallback(
+    (index: number, field: keyof AdditionItem, value: string | number) => {
       const updated = [...items];
-      updated[index] = { ...updated[index], amount };
-      onChange(updated);
-    },
-    [items, onChange]
-  );
-
-  // Update unit
-  const handleUnitChange = useCallback(
-    (index: number, unit: string) => {
-      const updated = [...items];
-      updated[index] = { ...updated[index], unit };
-      onChange(updated);
-    },
-    [items, onChange]
-  );
-
-  // Update timing
-  const handleTimingChange = useCallback(
-    (index: number, timing: string) => {
-      const updated = [...items];
-      updated[index] = { ...updated[index], timing };
-      onChange(updated);
-    },
-    [items, onChange]
-  );
-
-  // Update target
-  const handleTargetChange = useCallback(
-    (index: number, target: string) => {
-      const updated = [...items];
-      updated[index] = { ...updated[index], target };
+      updated[index] = { ...updated[index], [field]: value };
       onChange(updated);
     },
     [items, onChange]
@@ -406,7 +376,7 @@ export function AdditionsEditor({
                       min="0"
                       value={item.amount || ""}
                       onChange={(e) =>
-                        handleAmountChange(index, parseFloat(e.target.value) || 0)
+                        handleFieldChange(index, "amount", parseFloat(e.target.value) || 0)
                       }
                       disabled={disabled}
                       className="w-20 text-right ml-auto"
@@ -415,7 +385,7 @@ export function AdditionsEditor({
                   <TableCell>
                     <Select
                       value={item.unit}
-                      onValueChange={(value) => handleUnitChange(index, value)}
+                      onValueChange={(value) => handleFieldChange(index, "unit", value)}
                       disabled={disabled}
                     >
                       <SelectTrigger className="w-20">
@@ -433,7 +403,7 @@ export function AdditionsEditor({
                   <TableCell>
                     <Select
                       value={item.timing}
-                      onValueChange={(value) => handleTimingChange(index, value)}
+                      onValueChange={(value) => handleFieldChange(index, "timing", value)}
                       disabled={disabled}
                     >
                       <SelectTrigger className="w-28">
@@ -452,7 +422,7 @@ export function AdditionsEditor({
                     {showTarget ? (
                       <Select
                         value={item.target || "mash"}
-                        onValueChange={(value) => handleTargetChange(index, value)}
+                        onValueChange={(value) => handleFieldChange(index, "target", value)}
                         disabled={disabled}
                       >
                         <SelectTrigger className="w-28">

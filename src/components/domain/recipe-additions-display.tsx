@@ -272,7 +272,7 @@ function WaterTreatmentSection({
           No water addition profile selected. Choose one in the Fermentation
           section above, or{" "}
           <Link
-            href="/settings/water-addition-profiles"
+            href="/settings/water-profiles/additions"
             className="underline hover:text-foreground"
           >
             manage profiles
@@ -290,7 +290,7 @@ function WaterTreatmentSection({
           Water Treatment
         </h4>
         <Link
-          href={`/settings/water-addition-profiles/${profileId}`}
+          href={`/settings/water-profiles/additions/${profileId}`}
           className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
         >
           {profileName || "Profile"}
@@ -301,7 +301,7 @@ function WaterTreatmentSection({
         <p className="text-sm text-muted-foreground">
           Profile has no additions defined yet.{" "}
           <Link
-            href={`/settings/water-addition-profiles/${profileId}`}
+            href={`/settings/water-profiles/additions/${profileId}`}
             className="underline hover:text-foreground"
           >
             Add items

@@ -35,6 +35,9 @@ export interface FieldDisplayProps<T = Record<string, unknown>> {
 
   /** Pre-fetched relation display values keyed by field name */
   relationDisplayValues?: Record<string, string>;
+
+  /** Fetched dynamic options (from useDynamicOptions) for resolving UUIDs to labels */
+  dynamicOptions?: { value: string; label: string }[];
 }
 
 // =============================================================================
@@ -47,8 +50,9 @@ export function FieldDisplay<T = Record<string, unknown>>({
   record,
   entity,
   relationDisplayValues,
+  dynamicOptions,
 }: FieldDisplayProps<T>) {
-  const displayValue = resolveDisplayValue(field, value, record, entity, relationDisplayValues);
+  const displayValue = resolveDisplayValue(field, value, record, entity, relationDisplayValues, dynamicOptions);
 
   return (
     <div className={getColSpanClass(field.colSpan, field.fullWidth)}>
@@ -79,6 +83,7 @@ export function resolveDisplayValue<T = Record<string, unknown>>(
   record: T,
   entity: EntityConfig<T>,
   relationDisplayValues?: Record<string, string>,
+  dynamicOptions?: { value: string; label: string }[],
 ): ReactNode {
   // 1. Custom render function takes highest priority
   if (field.render) {
@@ -96,7 +101,13 @@ export function resolveDisplayValue<T = Record<string, unknown>>(
     return relationDisplayValues[field.name];
   }
 
-  // 3b. Select options: resolve key to display label
+  // 3b. Dynamic options: resolve UUID to label from fetched options
+  if (dynamicOptions && typeof value === "string") {
+    const opt = dynamicOptions.find((o) => o.value === value);
+    if (opt) return opt.label;
+  }
+
+  // 3c. Select options: resolve key to display label
   if (field.options && typeof value === "string") {
     const opt = field.options.find((o) => o.value === value);
     if (opt) return opt.label;

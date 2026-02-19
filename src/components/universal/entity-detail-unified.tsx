@@ -32,7 +32,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { formatValue } from "@/lib/utils";
-import { entityKeys } from "@/lib/query-keys";
+import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
@@ -72,7 +72,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Pencil } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
+import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -160,6 +162,58 @@ function getEditableFieldsFromSections<T>(
     }
   }
   return fields;
+}
+
+// =============================================================================
+// View-mode section grouping
+// =============================================================================
+
+/** Discriminated union for grouped vs standalone sections in view mode. */
+type SectionGroup<T> =
+  | { type: "field-group"; sections: UnifiedSectionDef<T>[] }
+  | { type: "standalone"; section: UnifiedSectionDef<T> };
+
+/**
+ * Groups consecutive field-based sections into a single "field-group" run.
+ * Custom component sections (those with `component` or `editComponent`) stay
+ * standalone so they keep their own Card. In edit mode, every section is
+ * standalone to preserve clear form boundaries.
+ */
+function groupSectionsForDisplay<T>(
+  sections: UnifiedSectionDef<T>[],
+  editing: boolean
+): SectionGroup<T>[] {
+  if (editing) {
+    return sections.map((s) => ({ type: "standalone" as const, section: s }));
+  }
+
+  const isFieldBased = (s: UnifiedSectionDef<T>) =>
+    !!s.fields && !s.component && !s.editComponent;
+
+  const groups: SectionGroup<T>[] = [];
+  let currentFieldRun: UnifiedSectionDef<T>[] = [];
+
+  const flushFieldRun = () => {
+    if (currentFieldRun.length > 1) {
+      groups.push({ type: "field-group", sections: [...currentFieldRun] });
+    } else if (currentFieldRun.length === 1) {
+      // A single field section — still render standalone for visual consistency
+      groups.push({ type: "standalone", section: currentFieldRun[0] });
+    }
+    currentFieldRun = [];
+  };
+
+  for (const section of sections) {
+    if (isFieldBased(section)) {
+      currentFieldRun.push(section);
+    } else {
+      flushFieldRun();
+      groups.push({ type: "standalone", section });
+    }
+  }
+  flushFieldRun();
+
+  return groups;
 }
 
 // =============================================================================
@@ -373,14 +427,18 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   }, [onFieldChange, editing, form]);
 
   // ---------------------------------------------------------------------------
-  // Dynamic options for editable fields
+  // Dynamic options for fields with dynamicOptions or relation type
+  // (unconditional so read-only mode can resolve UUIDs to display labels)
   // ---------------------------------------------------------------------------
-  const editableFields = useMemo(
-    () => (editing ? getEditableFieldsFromSections(sections) : []),
-    [editing, sections]
+  const dynamicFields = useMemo(
+    () =>
+      sections
+        .flatMap((s) => s.fields ?? [])
+        .filter((f) => f.dynamicOptions || (f.type === "relation" && f.relation)),
+    [sections]
   );
   const { optionsMap } = useDynamicOptions(
-    editableFields as { name: string; type?: string; dynamicOptions?: { table: string; valueField: string; labelField: string; filter?: Record<string, unknown>; orderBy?: string }; relation?: { entity: string; displayField: string } }[]
+    dynamicFields as { name: string; type?: string; dynamicOptions?: { table: string; valueField: string; labelField: string; filter?: Record<string, unknown>; orderBy?: string }; relation?: { entity: string; displayField: string } }[]
   );
 
   // ---------------------------------------------------------------------------
@@ -396,6 +454,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       if (entity.viewTable) {
         queryClient.invalidateQueries({ queryKey: entityKeys.all(entity.viewTable) });
       }
+      // Invalidate revision history so the timeline updates after saves
+      queryClient.invalidateQueries({ queryKey: revisionKeys.forEntity(entity.table, recordId) });
     },
     [queryClient, fetchTable, entity.table, entity.viewTable]
   );
@@ -795,6 +855,13 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         </div>
 
         <div className="flex items-center gap-2">
+          {editing && !isCreateMode && (
+            <Button variant="outline" onClick={handleCancel} disabled={isSubmitting}>
+              Cancel
+              <span aria-hidden="true"><Kbd>Esc</Kbd></span>
+            </Button>
+          )}
+
           {editing && (
             <Button
               onClick={handleSave}
@@ -934,19 +1001,16 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         />
       ) : (
         <div className="space-y-4">
-          {defaultSections.map((section) => (
-            <UnifiedSectionCard
-              key={section.id}
-              section={section}
-              data={displayData}
-              entity={entity}
-              editing={editing}
-              isCreateMode={isCreateMode}
-              form={form}
-              optionsMap={optionsMap}
-              disabledFields={disabledFields}
-            />
-          ))}
+          <SectionGroupRenderer
+            sections={defaultSections}
+            data={displayData}
+            entity={entity}
+            editing={editing}
+            isCreateMode={isCreateMode}
+            form={form}
+            optionsMap={optionsMap}
+            disabledFields={disabledFields}
+          />
         </div>
       )}
 
@@ -1049,10 +1113,22 @@ function UnifiedTabsWithRelations<T>({
       </TabsList>
 
       <TabsContent value="details" className="space-y-4">
-        {defaultSections.map((section) => (
-          <UnifiedSectionCard
-            key={section.id}
-            section={section}
+        <SectionGroupRenderer
+          sections={defaultSections}
+          data={data}
+          entity={entity}
+          editing={editing}
+          isCreateMode={isCreateMode}
+          form={form}
+          optionsMap={optionsMap}
+          disabledFields={disabledFields}
+        />
+      </TabsContent>
+
+      {tabs.map(([tabName, tabSections]) => (
+        <TabsContent key={tabName} value={tabName} className="space-y-4">
+          <SectionGroupRenderer
+            sections={tabSections}
             data={data}
             entity={entity}
             editing={editing}
@@ -1061,24 +1137,6 @@ function UnifiedTabsWithRelations<T>({
             optionsMap={optionsMap}
             disabledFields={disabledFields}
           />
-        ))}
-      </TabsContent>
-
-      {tabs.map(([tabName, tabSections]) => (
-        <TabsContent key={tabName} value={tabName} className="space-y-4">
-          {tabSections.map((section) => (
-            <UnifiedSectionCard
-              key={section.id}
-              section={section}
-              data={data}
-              entity={entity}
-              editing={editing}
-              isCreateMode={isCreateMode}
-              form={form}
-              optionsMap={optionsMap}
-              disabledFields={disabledFields}
-            />
-          ))}
         </TabsContent>
       ))}
 
@@ -1169,6 +1227,28 @@ function UnifiedSectionCard<T>({
 
   if (section.component) {
     const CustomComponent = section.component;
+
+    // Collapsible custom component sections (view mode only)
+    if (section.collapsible && !editing) {
+      return (
+        <Collapsible defaultOpen={!section.defaultCollapsed}>
+          <Card>
+            <CardHeader>
+              <CollapsibleTrigger className="flex items-center gap-2 group cursor-pointer w-full text-left">
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                <CardTitle>{section.title}</CardTitle>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent>
+                <CustomComponent data={data} editing={false} />
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      );
+    }
+
     return (
       <Card>
         {sectionHeader}
@@ -1215,6 +1295,221 @@ function UnifiedSectionCard<T>({
 }
 
 // =============================================================================
+// Grouped Field Section Components (view mode only)
+// =============================================================================
+
+/** Common props shared by section rendering helpers. */
+interface SectionRenderProps<T> {
+  data: T;
+  entity: EntityConfig<T>;
+  editing: boolean;
+  isCreateMode: boolean;
+  form?: UseFormReturn<Record<string, unknown>>;
+  optionsMap?: Record<string, { value: string; label: string }[]>;
+  disabledFields?: string[];
+}
+
+/**
+ * Renders grouped sections using `groupSectionsForDisplay`.
+ * Replaces the direct `sections.map(s => <UnifiedSectionCard .../>)` pattern.
+ */
+function SectionGroupRenderer<T>(
+  props: SectionRenderProps<T> & { sections: UnifiedSectionDef<T>[] }
+) {
+  const { sections, editing, ...rest } = props;
+  const groups = useMemo(
+    () => groupSectionsForDisplay(sections, editing),
+    [sections, editing]
+  );
+
+  return (
+    <>
+      {groups.map((group) => {
+        if (group.type === "field-group") {
+          const key = group.sections.map((s) => s.id).join("+");
+          return (
+            <FieldSectionGroup
+              key={key}
+              sections={group.sections}
+              editing={editing}
+              {...rest}
+            />
+          );
+        }
+        return (
+          <UnifiedSectionCard
+            key={group.section.id}
+            section={group.section}
+            editing={editing}
+            {...rest}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * Renders multiple field-based sections inside a single Card with dividers.
+ * Only used in view mode for groups of 2+ consecutive field sections.
+ */
+function FieldSectionGroup<T>({
+  sections,
+  data,
+  entity,
+  editing,
+  isCreateMode,
+  form,
+  optionsMap = {},
+  disabledFields,
+}: SectionRenderProps<T> & { sections: UnifiedSectionDef<T>[] }) {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="space-y-6">
+          {sections.map((section, idx) =>
+            section.collapsible ? (
+              <CollapsibleFieldSection
+                key={section.id}
+                section={section}
+                data={data}
+                entity={entity}
+                editing={editing}
+                isCreateMode={isCreateMode}
+                form={form}
+                optionsMap={optionsMap}
+                disabledFields={disabledFields}
+                showDivider={idx > 0}
+              />
+            ) : (
+              <CompactFieldSection
+                key={section.id}
+                section={section}
+                data={data}
+                entity={entity}
+                editing={editing}
+                isCreateMode={isCreateMode}
+                form={form}
+                optionsMap={optionsMap}
+                disabledFields={disabledFields}
+                showDivider={idx > 0}
+              />
+            )
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Renders a single field section with a compact header (no Card wrapper).
+ * Used inside FieldSectionGroup.
+ */
+function CompactFieldSection<T>({
+  section,
+  data,
+  entity,
+  editing,
+  isCreateMode,
+  form,
+  optionsMap = {},
+  disabledFields,
+  showDivider,
+}: SectionRenderProps<T> & {
+  section: UnifiedSectionDef<T>;
+  showDivider: boolean;
+}) {
+  const relationDisplayValues = useRelationDisplayValues(section.fields, data);
+
+  return (
+    <div>
+      {showDivider && <Separator className="mb-6" />}
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+        {section.title}
+      </h3>
+      <dl className="grid grid-cols-12 gap-4">
+        {section.fields?.map((field) => {
+          const effectiveField = disabledFields?.includes(field.name)
+            ? { ...field, disabled: true }
+            : field;
+          return (
+            <UnifiedField
+              key={field.name}
+              field={effectiveField as UnifiedFieldDef<Record<string, unknown>>}
+              editing={editing}
+              isCreateMode={isCreateMode}
+              form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
+              record={data as Record<string, unknown>}
+              entity={entity as EntityConfig<Record<string, unknown>>}
+              relationDisplayValues={relationDisplayValues}
+              dynamicOptions={optionsMap[field.name]}
+            />
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
+
+/**
+ * Collapsible variant of CompactFieldSection for sections with collapsible: true.
+ * Uses Radix Collapsible with a rotating chevron indicator.
+ */
+function CollapsibleFieldSection<T>({
+  section,
+  data,
+  entity,
+  editing,
+  isCreateMode,
+  form,
+  optionsMap = {},
+  disabledFields,
+  showDivider,
+}: SectionRenderProps<T> & {
+  section: UnifiedSectionDef<T>;
+  showDivider: boolean;
+}) {
+  const relationDisplayValues = useRelationDisplayValues(section.fields, data);
+
+  return (
+    <Collapsible defaultOpen={!section.defaultCollapsed}>
+      <div>
+        {showDivider && <Separator className="mb-6" />}
+        <CollapsibleTrigger className="flex items-center gap-1.5 group cursor-pointer w-full text-left mb-3">
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            {section.title}
+          </h3>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <dl className="grid grid-cols-12 gap-4">
+            {section.fields?.map((field) => {
+              const effectiveField = disabledFields?.includes(field.name)
+                ? { ...field, disabled: true }
+                : field;
+              return (
+                <UnifiedField
+                  key={field.name}
+                  field={effectiveField as UnifiedFieldDef<Record<string, unknown>>}
+                  editing={editing}
+                  isCreateMode={isCreateMode}
+                  form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
+                  record={data as Record<string, unknown>}
+                  entity={entity as EntityConfig<Record<string, unknown>>}
+                  relationDisplayValues={relationDisplayValues}
+                  dynamicOptions={optionsMap[field.name]}
+                />
+              );
+            })}
+          </dl>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
+// =============================================================================
 // Relation Table (identical to EntityDetail's RelationTable)
 // =============================================================================
 
@@ -1245,7 +1540,7 @@ function RelationTable({
       parentId
     ),
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
-    enabled: enabled && !!relatedEntity,
+    enabled: enabled && !!relatedEntity && !!parentId,
     queryFn: async () => {
       if (!relatedEntity) return [];
 
@@ -1283,7 +1578,8 @@ function RelationTable({
       } catch (err) {
         console.error(
           `Failed to load ${relatedEntity.displayNamePlural}:`,
-          err
+          err,
+          JSON.stringify(err),
         );
         throw err;
       }

@@ -14,7 +14,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { settingsKeys } from "@/lib/query-keys";
+import { entityKeys, settingsKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -255,7 +255,7 @@ function DefaultWaterProfileCard() {
 
   // Fetch water profiles for dropdown
   const { data: profiles = [], isLoading: profilesLoading } = useQuery({
-    queryKey: ["water_profiles", "options"],
+    queryKey: entityKeys.list("water_profiles", { is_active: true }),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("water_profiles")

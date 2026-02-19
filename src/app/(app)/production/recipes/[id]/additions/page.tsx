@@ -205,7 +205,7 @@ export default function RecipeAdditionsPage({
             <div className="text-sm text-muted-foreground">
               Water salts and acids are managed via the linked{" "}
               <Link
-                href={`/settings/water-addition-profiles/${recipe.water_addition_profile_id}`}
+                href={`/settings/water-profiles/additions/${recipe.water_addition_profile_id}`}
                 className="underline hover:text-foreground"
               >
                 water addition profile
@@ -264,7 +264,7 @@ export default function RecipeAdditionsPage({
               Water salts (Gypsum, CaCl₂, etc.) and acids (lactic, phosphoric) are managed
               via{" "}
               <Link
-                href="/settings/water-addition-profiles"
+                href="/settings/water-profiles/additions"
                 className="underline hover:text-foreground"
               >
                 addition profiles
