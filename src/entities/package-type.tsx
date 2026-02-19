@@ -48,19 +48,6 @@ export const packageTypeSchema = z.object({
 export type PackageTypeFormValues = z.infer<typeof packageTypeSchema>;
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-const CONTAINER_TYPE_OPTIONS = [
-  { value: "can", label: "Can" },
-  { value: "bottle", label: "Bottle" },
-  { value: "keg", label: "Keg" },
-  { value: "growler", label: "Growler" },
-  { value: "crowler", label: "Crowler" },
-  { value: "other", label: "Other" },
-];
-
-// =============================================================================
 // Entity Configuration
 // =============================================================================
 
@@ -89,8 +76,9 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       header: "Container",
       sortable: true,
       render: (value) => {
-        const option = CONTAINER_TYPE_OPTIONS.find((o) => o.value === value);
-        return option?.label || String(value);
+        if (!value) return "—";
+        const s = String(value);
+        return s.charAt(0).toUpperCase() + s.slice(1);
       },
     },
     {
@@ -125,7 +113,13 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       field: "container_type",
       type: "select",
       label: "Container Type",
-      options: CONTAINER_TYPE_OPTIONS,
+      dynamicOptions: {
+        table: "enum_values",
+        valueField: "value",
+        labelField: "label",
+        filter: { enum_type: "package_container_type" },
+        orderBy: "sort_order",
+      },
     },
     {
       field: "is_active",
@@ -183,7 +177,6 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
           name: "container_type",
           label: "Container Type",
           type: "select",
-          options: CONTAINER_TYPE_OPTIONS,
           dynamicOptions: {
             table: "enum_values",
             valueField: "value",
@@ -281,7 +274,6 @@ export const packageTypeEntity: EntityConfig<PackageType> = {
       name: "container_type",
       label: "Container Type",
       type: "select",
-      options: CONTAINER_TYPE_OPTIONS,
       dynamicOptions: {
         table: "enum_values",
         valueField: "value",
