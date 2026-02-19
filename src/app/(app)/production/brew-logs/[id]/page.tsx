@@ -16,8 +16,11 @@ import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { brewLogEntity } from "@/entities/brew-log";
 import { BrewLogCompletionDialog } from "@/components/domain/brew-log-completion-dialog";
+import { BrewLogRecipeSheet } from "@/components/domain/brew-log-recipe-sheet";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
 import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
+import { Button } from "@/components/ui/button";
+import { BookOpen } from "lucide-react";
 import { brewLogKeys, entityKeys } from "@/lib/query-keys";
 
 export default function BrewLogDetailPage({
@@ -31,6 +34,7 @@ export default function BrewLogDetailPage({
   const supabase = createClient();
 
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [showRecipeSheet, setShowRecipeSheet] = useState(false);
 
   // Fetch brew log data for banner logic and dialog props
   const { data: brewLog } = useQuery({
@@ -165,9 +169,28 @@ export default function BrewLogDetailPage({
     return null;
   }, [brewLog, linkedBatches, handleStartBrew]);
 
+  // Recipe info derived from linked batches
+  const recipeInfo = useMemo(() => {
+    const firstBatch = linkedBatches?.[0];
+    if (!firstBatch?.batch?.recipe_id || !firstBatch.batch.recipe) return null;
+    return { id: firstBatch.batch.recipe_id, name: firstBatch.batch.recipe.name };
+  }, [linkedBatches]);
+
   return (
     <div className="space-y-4">
-      <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+      <div className="flex items-center justify-between">
+        <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+        {recipeInfo && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRecipeSheet(true)}
+          >
+            <BookOpen className="mr-1.5 h-4 w-4" />
+            Recipe
+          </Button>
+        )}
+      </div>
 
       {bannerConfig && (
         <NextStepBanner
@@ -191,6 +214,15 @@ export default function BrewLogDetailPage({
           open={showCompletionDialog}
           onOpenChange={setShowCompletionDialog}
           onSuccess={handleDialogSuccess}
+        />
+      )}
+
+      {recipeInfo && (
+        <BrewLogRecipeSheet
+          recipeId={recipeInfo.id}
+          recipeName={recipeInfo.name}
+          open={showRecipeSheet}
+          onOpenChange={setShowRecipeSheet}
         />
       )}
     </div>
