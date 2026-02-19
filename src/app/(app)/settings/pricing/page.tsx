@@ -107,6 +107,29 @@ function formatColumnLabel(f: PackageFormat): { name: string; unit: string } {
   return { name: f.name, unit: "each" };
 }
 
+/**
+ * Fetches the list of format IDs enabled for a given sales channel
+ * from the pricing_channel_formats junction table.
+ */
+function useChannelFormatIds(channelId: string | null) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: settingsKeys.pricingChannelFormats(channelId ?? ""),
+    queryFn: async () => {
+      if (!channelId) return [];
+      // Table not yet in generated types -- cast until types are regenerated
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("pricing_channel_formats")
+        .select("format_id")
+        .eq("sales_channel_id", channelId);
+      if (error) throw error;
+      return (data as { format_id: string }[]).map((r) => r.format_id);
+    },
+    enabled: !!channelId,
+  });
+}
+
 // =============================================================================
 // Cell Editor Component
 // =============================================================================
@@ -270,22 +293,7 @@ function FormatManagement({
     },
   });
 
-  // Per-channel enabled formats
-  const { data: channelFormats, isLoading: channelFormatsLoading } = useQuery({
-    queryKey: settingsKeys.pricingChannelFormats(activeChannelId ?? ""),
-    queryFn: async () => {
-      if (!activeChannelId) return [];
-      // Table not yet in generated types — cast until types are regenerated
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from("pricing_channel_formats")
-        .select("format_id")
-        .eq("sales_channel_id", activeChannelId);
-      if (error) throw error;
-      return (data as { format_id: string }[]).map((r) => r.format_id);
-    },
-    enabled: !!activeChannelId,
-  });
+  const { data: channelFormats, isLoading: channelFormatsLoading } = useChannelFormatIds(activeChannelId);
 
   const enabledSet = new Set(channelFormats ?? []);
 
@@ -450,22 +458,7 @@ export default function PricingPage() {
     },
   });
 
-  // Fetch channel-specific format IDs from junction table
-  const { data: channelFormatIds, isLoading: channelFormatsLoading } = useQuery({
-    queryKey: settingsKeys.pricingChannelFormats(activeChannelId ?? ""),
-    queryFn: async () => {
-      if (!activeChannelId) return [];
-      // Table not yet in generated types — cast until types are regenerated
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from("pricing_channel_formats")
-        .select("format_id")
-        .eq("sales_channel_id", activeChannelId);
-      if (error) throw error;
-      return (data as { format_id: string }[]).map((r) => r.format_id);
-    },
-    enabled: !!activeChannelId,
-  });
+  const { data: channelFormatIds, isLoading: channelFormatsLoading } = useChannelFormatIds(activeChannelId);
 
   const { data: allPricingFormats, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormats(),
@@ -708,6 +701,8 @@ export default function PricingPage() {
 
   const isLoading = channelsLoading || tiersLoading || formatsLoading || channelFormatsLoading;
 
+  const activeChannelName = channels?.find((c) => c.id === activeChannelId)?.name;
+
   // Derived format groups: packaged first, then kegs
   const packagedFormats = formats?.filter(f => f.format_source === "package_type") ?? [];
   const kegFormats = formats?.filter(f => f.format_source === "keg_type") ?? [];
@@ -788,25 +783,31 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {view === "channels" ? (
+      {view === "channels" && (
         <EntityList
           key="channels"
           entity={salesChannelEntity}
           basePath="/settings/sales-channels"
         />
-      ) : view === "tiers" ? (
+      )}
+
+      {view === "tiers" && (
         <EntityList
           key="tiers"
           entity={pricingTierEntity}
           basePath="/settings/pricing/tiers"
         />
-      ) : view === "formats" ? (
+      )}
+
+      {view === "formats" && (
         <FormatManagement
-          channels={channels ?? []}
+          channels={channels}
           activeChannelId={activeChannelId}
           onChannelChange={setChannelOverride}
         />
-      ) : (
+      )}
+
+      {view === "matrix" && (
         <>
           {/* Channel Tabs */}
           <Tabs
@@ -835,8 +836,7 @@ export default function PricingPage() {
                   <PopoverContent className="w-72" align="end">
                     <div className="space-y-3">
                       <h4 className="font-medium text-sm">
-                        Adjust all prices in{" "}
-                        {channels.find((c) => c.id === activeChannelId)?.name}
+                        Adjust all prices in {activeChannelName}
                       </h4>
                       <div className="flex gap-2">
                         <Select
@@ -898,8 +898,7 @@ export default function PricingPage() {
                   <PopoverContent className="w-64" align="end">
                     <div className="space-y-3">
                       <h4 className="font-medium text-sm">
-                        Copy prices into{" "}
-                        {channels.find((c) => c.id === activeChannelId)?.name}
+                        Copy prices into {activeChannelName}
                       </h4>
                       <div>
                         <Label className="text-xs">Source channel</Label>
