@@ -3108,6 +3108,29 @@ export type Database = {
           },
         ]
       }
+      pricing_channel_formats: {
+        Row: {
+          format_id: string
+          sales_channel_id: string
+        }
+        Insert: {
+          format_id: string
+          sales_channel_id: string
+        }
+        Update: {
+          format_id?: string
+          sales_channel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_channel_formats_sales_channel_id_fkey"
+            columns: ["sales_channel_id"]
+            isOneToOne: false
+            referencedRelation: "sales_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_history: {
         Row: {
           changed_at: string
@@ -5772,10 +5795,106 @@ export type Database = {
         }
         Relationships: []
       }
+      yeast_pitch_events: {
+        Row: {
+          batch_id: string
+          cells_pitched_thousand: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          pitch_id: string
+          pitched_at: string
+          quantity_lbs: number
+          viability_at_pitch: number | null
+        }
+        Insert: {
+          batch_id: string
+          cells_pitched_thousand?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          pitch_id: string
+          pitched_at?: string
+          quantity_lbs: number
+          viability_at_pitch?: number | null
+        }
+        Update: {
+          batch_id?: string
+          cells_pitched_thousand?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          pitch_id?: string
+          pitched_at?: string
+          quantity_lbs?: number
+          viability_at_pitch?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_pitch_id_fkey"
+            columns: ["pitch_id"]
+            isOneToOne: false
+            referencedRelation: "yeast_pitches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_pitch_id_fkey"
+            columns: ["pitch_id"]
+            isOneToOne: false
+            referencedRelation: "yeast_pitches_with_remaining"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yeast_pitches: {
         Row: {
-          batch_id: string | null
-          cell_count_billion: number | null
+          cell_count_thousand: number | null
+          cell_density_thousand: number | null
           cost: number | null
           cost_per_batch: number | null
           created_at: string | null
@@ -5788,18 +5907,19 @@ export type Database = {
           location_id: string | null
           notes: string | null
           parent_pitch_id: string | null
-          pitched_at: string | null
+          quantity_lbs: number | null
           received_date: string | null
           source_type: string
           status: string
           strain_id: string
           updated_at: string | null
           use_by_date: string | null
+          vessel_id: string | null
           volume_ml: number | null
         }
         Insert: {
-          batch_id?: string | null
-          cell_count_billion?: number | null
+          cell_count_thousand?: number | null
+          cell_density_thousand?: number | null
           cost?: number | null
           cost_per_batch?: number | null
           created_at?: string | null
@@ -5812,18 +5932,19 @@ export type Database = {
           location_id?: string | null
           notes?: string | null
           parent_pitch_id?: string | null
-          pitched_at?: string | null
+          quantity_lbs?: number | null
           received_date?: string | null
           source_type: string
           status?: string
           strain_id: string
           updated_at?: string | null
           use_by_date?: string | null
+          vessel_id?: string | null
           volume_ml?: number | null
         }
         Update: {
-          batch_id?: string | null
-          cell_count_billion?: number | null
+          cell_count_thousand?: number | null
+          cell_density_thousand?: number | null
           cost?: number | null
           cost_per_batch?: number | null
           created_at?: string | null
@@ -5836,58 +5957,17 @@ export type Database = {
           location_id?: string | null
           notes?: string | null
           parent_pitch_id?: string | null
-          pitched_at?: string | null
+          quantity_lbs?: number | null
           received_date?: string | null
           source_type?: string
           status?: string
           strain_id?: string
           updated_at?: string | null
           use_by_date?: string | null
+          vessel_id?: string | null
           volume_ml?: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_brew_info"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_remaining_volume"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "ttb_in_process_beer"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "vessels_with_batch"
-            referencedColumns: ["batch_id"]
-          },
           {
             foreignKeyName: "yeast_pitches_location_id_fkey"
             columns: ["location_id"]
@@ -5913,7 +5993,7 @@ export type Database = {
             foreignKeyName: "yeast_pitches_parent_pitch_id_fkey"
             columns: ["parent_pitch_id"]
             isOneToOne: false
-            referencedRelation: "yeast_pitches_with_details"
+            referencedRelation: "yeast_pitches_with_remaining"
             referencedColumns: ["id"]
           },
           {
@@ -5921,6 +6001,41 @@ export type Database = {
             columns: ["strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "available_vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["current_vessel_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessel_batch_drift_check"
+            referencedColumns: ["vessel_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
             referencedColumns: ["id"]
           },
         ]
@@ -6244,6 +6359,91 @@ export type Database = {
           status: string | null
         }
         Relationships: []
+      }
+      batch_yeast_summary: {
+        Row: {
+          batch_id: string | null
+          cells_pitched_thousand: number | null
+          event_id: string | null
+          generation: number | null
+          notes: string | null
+          pitch_id: string | null
+          pitched_at: string | null
+          quantity_lbs: number | null
+          source_type: string | null
+          strain_code: string | null
+          strain_form: string | null
+          strain_id: string | null
+          strain_manufacturer: string | null
+          strain_name: string | null
+          strain_type: string | null
+          viability_at_pitch: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_pitch_id_fkey"
+            columns: ["pitch_id"]
+            isOneToOne: false
+            referencedRelation: "yeast_pitches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_pitch_id_fkey"
+            columns: ["pitch_id"]
+            isOneToOne: false
+            referencedRelation: "yeast_pitches_with_remaining"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_strain_id_fkey"
+            columns: ["strain_id"]
+            isOneToOne: false
+            referencedRelation: "yeasts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       batches_in_production_by_brand: {
         Row: {
@@ -8767,12 +8967,11 @@ export type Database = {
         }
         Relationships: []
       }
-      yeast_pitches_with_details: {
+      yeast_pitches_with_remaining: {
         Row: {
-          batch_id: string | null
-          batch_name: string | null
-          batch_number: string | null
-          cell_count_billion: number | null
+          batches_pitched: number | null
+          cell_count_thousand: number | null
+          cell_density_thousand: number | null
           cost: number | null
           cost_per_batch: number | null
           created_at: string | null
@@ -8788,8 +8987,8 @@ export type Database = {
           location_name: string | null
           notes: string | null
           parent_pitch_id: string | null
-          parent_strain_id: string | null
-          pitched_at: string | null
+          quantity_lbs: number | null
+          quantity_remaining_lbs: number | null
           received_date: string | null
           source_type: string | null
           status: string | null
@@ -8802,52 +9001,13 @@ export type Database = {
           strain_type: string | null
           updated_at: string | null
           use_by_date: string | null
+          vessel_id: string | null
+          vessel_name: string | null
+          vessel_vessel_type: Database["public"]["Enums"]["vessel_type"] | null
           viability_status: string | null
           volume_ml: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_brew_info"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_remaining_volume"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "ttb_in_process_beer"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "vessels_with_batch"
-            referencedColumns: ["batch_id"]
-          },
           {
             foreignKeyName: "yeast_pitches_location_id_fkey"
             columns: ["location_id"]
@@ -8873,14 +9033,7 @@ export type Database = {
             foreignKeyName: "yeast_pitches_parent_pitch_id_fkey"
             columns: ["parent_pitch_id"]
             isOneToOne: false
-            referencedRelation: "yeast_pitches_with_details"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_strain_id_fkey"
-            columns: ["parent_strain_id"]
-            isOneToOne: false
-            referencedRelation: "yeasts"
+            referencedRelation: "yeast_pitches_with_remaining"
             referencedColumns: ["id"]
           },
           {
@@ -8888,6 +9041,41 @@ export type Database = {
             columns: ["strain_id"]
             isOneToOne: false
             referencedRelation: "yeasts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "available_vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["current_vessel_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessel_batch_drift_check"
+            referencedColumns: ["vessel_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yeast_pitches_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
             referencedColumns: ["id"]
           },
         ]
@@ -9180,15 +9368,6 @@ export type Database = {
         }
         Returns: string
       }
-      start_batch_fermentation: {
-        Args: {
-          p_batch_id: string
-          p_vessel_id: string
-          p_vessel_name: string
-          p_volume_bbl: number
-        }
-        Returns: undefined
-      }
       suggest_recipe_improvements: {
         Args: { p_recipe_id: string }
         Returns: Json
@@ -9242,6 +9421,7 @@ export type Database = {
         | "unitank"
         | "foeder"
         | "barrel"
+        | "brink"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9405,6 +9585,7 @@ export const Constants = {
         "unitank",
         "foeder",
         "barrel",
+        "brink",
       ],
     },
   },

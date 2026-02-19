@@ -603,7 +603,7 @@ Brewing vessels (fermenters, brite tanks, kettles, etc.).
 |--------|------|-------------|
 | id | UUID | Primary key |
 | name | TEXT | Vessel name/identifier |
-| vessel_type | TEXT | Type: fermenter, brite, kettle, mash_tun, hlt, unitank, foeder, barrel |
+| vessel_type | TEXT | Type: fermenter, brite, kettle, mash_tun, hlt, unitank, foeder, barrel, brink |
 | capacity_bbl | DECIMAL(8,2) | Capacity in barrels |
 | location_id | UUID | FK to locations |
 | current_batch_id | UUID | FK to batches - automatically maintained by trigger |
@@ -860,186 +860,175 @@ Source batches for blends (many-to-many).
 
 ---
 
-## Yeast Management (Brinks Model)
+## Yeast Management (Pitch Events Model)
 
-Yeast tracking uses a brinks-based model where physical containers ("brinks") hold yeast that can be pitched to multiple batches. This enables:
-- Accurate tracking of yeast weight remaining in each container
-- Viability testing over time
+Yeast tracking uses a pitch events model where `yeast_pitches` represent yeast sources (purchases or harvests stored in brink vessels) and `yeast_pitch_events` record immutable deductions from those sources into batches. This enables:
+- Partial weight-based deductions from a single source to multiple batches
+- Quantity remaining calculated via views, never stored as mutable balances
+- Viability decay estimation with lab measurement overrides
 - Cost spreading across all batches in a lineage
 - Harvest and repitch tracking across generations
 
 ### Workflow
 
 ```
-Purchase Yeast (Gen 0)
+Purchase Yeast (Gen 0, source_type: purchase)
     ↓
-Brink B-001 (strain: WLP001, weight: 10 lbs)
+yeast_pitch (in Brink B-001, strain: WLP001, quantity: 10 lbs)
     ↓
-├── Viability reading: 95% (day before brew)
-├── Pitch 2 lbs → Batch #101
-├── Pitch 2 lbs → Batch #102
-├── Viability reading: 75%
-└── Remaining 6 lbs → viability too low → DUMP
+├── Record Cell Count: 95% viability
+├── Pitch Event: 2 lbs → Batch #101
+├── Pitch Event: 2 lbs → Batch #102
+├── Record Cell Count: 75% viability
+└── Remaining 6 lbs → viability too low → DISCARD
 
-Harvest from Batch #101 (Gen 1)
+Harvest from Batch #101 (Gen 1, source_type: harvest)
     ↓
-Brink B-002 (strain: WLP001, parent: B-001, weight: 8 lbs)
+yeast_pitch (in Brink B-002, strain: WLP001, parent: B-001, quantity: 8 lbs)
     ↓
 └── Continue pitching...
 ```
 
 ---
 
-## `yeast_brinks`
+## `yeast_pitches`
 
-Physical yeast containers with lineage tracking.
+Yeast sources — purchases or harvests stored in brink vessels. Tracks lineage, viability, and total quantity. Partial deductions tracked via `yeast_pitch_events`.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| brink_identifier | TEXT | Physical label (e.g., "B-001") - unique |
 | strain_id | UUID | FK to yeasts |
-| source_batch_id | UUID | FK to batches (NULL if purchased) |
-| harvested_at | TIMESTAMPTZ | Harvest timestamp (NULL if purchased) |
-| initial_weight_lbs | DECIMAL(8,2) | Initial weight in pounds |
-| initial_viability_percent | DECIMAL(5,2) | Viability at harvest/purchase (default: 95 harvested, 98 purchased) |
+| source_type | TEXT | Source: purchase, harvest |
+| parent_pitch_id | UUID | FK to yeast_pitches (lineage — NULL for purchases) |
 | generation | INTEGER | Generation (0 = purchased, 1+ = harvested) |
-| parent_brink_id | UUID | FK to yeast_brinks (lineage) |
-| status | TEXT | Status: active, depleted, dumped |
-| cost_cents | INTEGER | Purchase cost in cents (gen 0 only) |
+| status | TEXT | Status: in_stock, depleted, discarded |
+| quantity_lbs | DECIMAL(10,2) | Total weight in pounds |
+| cell_count_thousand | DECIMAL(14,2) | Total cell count in thousands |
+| cell_density_thousand | DECIMAL(14,2) | Thousand cells per pound |
+| initial_viability | DECIMAL(5,2) | Viability at harvest/purchase (0-100) |
+| current_viability | DECIMAL(5,2) | Last measured viability |
+| volume_ml | DECIMAL(10,2) | Volume in mL (for liquid purchases) |
+| vessel_id | UUID | FK to vessels (the brink this lives in) |
+| location_id | UUID | FK to locations |
+| cost | DECIMAL(10,2) | Purchase cost |
+| cost_per_batch | DECIMAL(10,2) | Calculated cost spread |
+| received_date | DATE | Date received (purchases) |
+| harvest_date | DATE | Date harvested |
+| use_by_date | DATE | Expiration date |
 | notes | TEXT | Notes |
+| created_by | UUID | FK to auth.users |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**Calculated fields** (via view or application):
-- `current_weight_lbs = initial_weight_lbs - SUM(yeast_pitches.weight_lbs)`
-- `current_viability` = see two-tier calculation below
+**Calculated fields** (via `yeast_pitches_with_remaining` view):
+- `quantity_remaining_lbs = quantity_lbs - SUM(events.quantity_lbs)`
+- `estimated_viability` = linear decay from initial_viability based on age and yeast form
+- `days_old` = days since harvest or received date
 
-**Viability decay formula** (Zainasheff, per DEC-GAP-004):
+**Viability decay formula:**
 ```
-viability = baseline_viability × (0.79 ^ months_elapsed)
+viability = initial_viability - (days_old × decay_rate)
+where decay_rate = 0.5 for dry yeast, 2.0 for liquid yeast
 ```
-
-**Two-tier calculation:**
-1. **If readings exist**: Use most recent `brink_viability_readings.viability_percent`, decay from `measured_at`
-2. **If no readings**: Use `initial_viability_percent`, decay from `harvested_at` (or `created_at` for purchased)
 
 ---
 
-## `brink_viability_readings`
+## `yeast_pitch_events`
 
-Viability measurements for yeast brinks over time.
+Immutable event log recording each yeast deduction from a source into a batch. Quantity remaining on the source is calculated as total minus sum of events.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| brink_id | UUID | FK to yeast_brinks |
-| measured_at | TIMESTAMPTZ | Measurement timestamp |
-| viability_percent | DECIMAL(5,2) | Viability percentage (0-100) |
-| cell_count_billion | DECIMAL(12,2) | Cell count in billions (optional) |
-| method | TEXT | Method: hemocytometer, cell_counter, estimated |
-| measured_by | UUID | FK to auth.users |
+| pitch_id | UUID | FK to yeast_pitches (source) |
+| batch_id | UUID | FK to batches (target) |
+| quantity_lbs | DECIMAL(10,2) | Weight pitched |
+| cells_pitched_thousand | DECIMAL(14,2) | Cells pitched in thousands |
+| viability_at_pitch | DECIMAL(5,2) | Measured/estimated viability at pitch time |
+| pitched_at | TIMESTAMPTZ | When pitched |
 | notes | TEXT | Notes |
+| created_by | UUID | FK to auth.users |
 | created_at | TIMESTAMPTZ | Created timestamp |
+
+**Indexes:** `pitch_id`, `batch_id`
 
 ---
 
-## `yeast_pitches`
+## `yeast_pitches_with_remaining` (View)
 
-Record of yeast pitched from brinks to batches.
+Enriched yeast pitch view with strain info, vessel details, calculated quantity remaining, viability decay, and age. Replaces the old `yeast_pitches_with_details` view.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| id | UUID | Primary key |
-| brink_id | UUID | FK to yeast_brinks |
-| batch_id | UUID | FK to batches |
-| pitched_at | TIMESTAMPTZ | Pitch timestamp |
-| weight_lbs | DECIMAL(8,4) | Weight removed from brink |
-| viability_at_pitch | DECIMAL(5,2) | Viability snapshot at pitch time |
-| pitch_rate | DECIMAL(5,3) | Actual pitch rate (M cells/mL/°P) |
-| pitched_by | UUID | FK to auth.users |
-| notes | TEXT | Notes |
-| created_at | TIMESTAMPTZ | Created timestamp |
+| *(all yeast_pitches columns)* | | Base pitch data |
+| strain_name | TEXT | Yeast strain name |
+| strain_manufacturer | TEXT | Manufacturer |
+| strain_code | TEXT | Product code |
+| strain_type | TEXT | Yeast type (ale, lager, etc.) |
+| strain_form | TEXT | Form (liquid, dry) |
+| strain_attenuation | DECIMAL | Typical attenuation |
+| vessel_name | TEXT | Brink vessel name |
+| vessel_vessel_type | TEXT | Vessel type |
+| location_name | TEXT | Location name |
+| quantity_remaining_lbs | DECIMAL | `quantity_lbs - SUM(events.quantity_lbs)` |
+| batches_pitched | INTEGER | Count of distinct batches from events |
+| days_old | INTEGER | Days since harvest or received date |
+| estimated_viability | DECIMAL(5,2) | Viability after decay |
+| viability_status | TEXT | excellent (≥90), good (≥75), marginal (≥50), low (≥25), inactive (<25) |
 
 ---
 
-## `yeast_brinks_with_status` (View)
+## `batch_yeast_summary` (View)
 
-Calculated view showing current brink status with two-tier viability calculation (per DEC-GAP-004).
+All yeast pitched into a batch with strain details, generation, quantity, and cell counts. Used on batch detail pages.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| *(all yeast_brinks columns)* | | Base brink data |
-| current_weight_lbs | DECIMAL | Remaining weight |
-| latest_viability | DECIMAL | Most recent viability reading (NULL if none) |
-| latest_reading_date | TIMESTAMPTZ | When last measured (NULL if none) |
-| estimated_viability | DECIMAL | **Two-tier calculation**: decay from reading if available, otherwise from initial |
-| viability_source | TEXT | 'reading' or 'initial' - indicates which tier was used |
-| pitch_count | INTEGER | Number of pitches from this brink |
+| batch_id | UUID | Batch ID |
+| event_id | UUID | Pitch event ID |
+| pitch_id | UUID | Source pitch ID |
+| quantity_lbs | DECIMAL | Weight pitched |
+| cells_pitched_thousand | DECIMAL | Cells pitched in thousands |
+| viability_at_pitch | DECIMAL | Viability at pitch |
+| pitched_at | TIMESTAMPTZ | When pitched |
+| notes | TEXT | Notes |
+| strain_id | UUID | Yeast strain ID |
+| generation | INTEGER | Generation number |
+| source_type | TEXT | Purchase or harvest |
+| strain_name | TEXT | Strain name |
+| strain_manufacturer | TEXT | Manufacturer |
+| strain_code | TEXT | Product code |
+| strain_type | TEXT | Yeast type |
+| strain_form | TEXT | Yeast form |
 
-```sql
-CREATE VIEW yeast_brinks_with_status AS
-SELECT
-  yb.*,
-  yb.initial_weight_lbs - COALESCE(SUM(yp.weight_lbs), 0) as current_weight_lbs,
-  latest.viability_percent as latest_viability,
-  latest.measured_at as latest_reading_date,
-  -- Two-tier viability: prefer reading decay, fallback to initial decay
-  COALESCE(
-    -- Tier 1: Decay from most recent reading
-    latest.viability_percent * POWER(0.79,
-      EXTRACT(EPOCH FROM (NOW() - latest.measured_at)) / (30.44 * 24 * 60 * 60)
-    ),
-    -- Tier 2: Decay from initial viability at harvest/purchase
-    yb.initial_viability_percent * POWER(0.79,
-      EXTRACT(EPOCH FROM (NOW() - COALESCE(yb.harvested_at, yb.created_at))) / (30.44 * 24 * 60 * 60)
-    )
-  ) as estimated_viability,
-  CASE WHEN latest.viability_percent IS NOT NULL THEN 'reading' ELSE 'initial' END as viability_source,
-  COUNT(yp.id) as pitch_count
-FROM yeast_brinks yb
-LEFT JOIN yeast_pitches yp ON yp.brink_id = yb.id
-LEFT JOIN LATERAL (
-  SELECT viability_percent, measured_at
-  FROM brink_viability_readings bvr
-  WHERE bvr.brink_id = yb.id
-  ORDER BY measured_at DESC
-  LIMIT 1
-) latest ON true
-GROUP BY yb.id, latest.viability_percent, latest.measured_at;
-```
+---
+
+## `yeast_lineage_summary` (View)
+
+Recursive lineage view for cost spreading and generation tracking.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| root_id | UUID | Root purchase pitch ID |
+| strain_name | TEXT | Yeast strain name |
+| original_cost | DECIMAL | Purchase cost |
+| total_pitches_in_lineage | INTEGER | Total pitches in lineage tree |
+| batches_used | INTEGER | Distinct batches pitched from this lineage |
+| cost_per_batch | DECIMAL | `original_cost / batches_used` |
+| max_generations | INTEGER | Maximum generation reached |
 
 ---
 
 ## Yeast Cost Spreading
 
-Per DEC-GAP-003, yeast costs are spread equally across all batches in a lineage:
+Yeast costs are spread equally across all batches in a lineage via the `yeast_lineage_summary` view:
 
 ```
 cost_per_batch = original_purchase_cost / COUNT(batches_in_lineage)
 ```
 
-This is recalculated when new batches are added to the lineage. Query:
-
-```sql
--- Get cost per batch for a lineage
-WITH RECURSIVE lineage AS (
-  SELECT id, parent_brink_id, cost_cents, generation
-  FROM yeast_brinks WHERE id = :root_brink_id
-  UNION ALL
-  SELECT yb.id, yb.parent_brink_id, yb.cost_cents, yb.generation
-  FROM yeast_brinks yb
-  JOIN lineage l ON yb.parent_brink_id = l.id
-),
-batches_in_lineage AS (
-  SELECT DISTINCT yp.batch_id
-  FROM yeast_pitches yp
-  WHERE yp.brink_id IN (SELECT id FROM lineage)
-)
-SELECT
-  (SELECT cost_cents FROM lineage WHERE generation = 0) / COUNT(*) as cost_per_batch_cents
-FROM batches_in_lineage;
-```
+This is recalculated dynamically by the view when queried. The `yeast_lineage_summary` uses a recursive CTE to walk the `parent_pitch_id` chain from each root purchase and counts distinct batches from `yeast_pitch_events`.
 
 ---
 
@@ -1056,10 +1045,12 @@ cancelled   cancelled     cancelled      (locked)
 
 | Transition | Trigger |
 |------------|---------|
-| planned -> fermenting | Wort transferred from brew to fermenter (link via brew_log_batches) |
-| fermenting -> conditioning | Transfer to brite/conditioning |
-| conditioning -> packaging | Packaging begins |
-| packaging -> completed | All packaging done |
+| planned -> fermenting | Suggested after Transfer (to fermenter) or Pitch Yeast action |
+| fermenting -> conditioning | Suggested after Transfer (to brite tank) action |
+| conditioning -> packaging | Packaging begins (direct action) |
+| packaging -> completed | All packaging done (direct action) |
+
+**Action-driven transitions:** State changes for planned→fermenting and fermenting→conditioning are suggested via toast notifications after Transfer or Pitch Yeast actions, rather than triggered by dedicated buttons. The user confirms or defers the state change.
 
 **See also:** [brew-logs.md](./brew-logs.md) for brew log state machine (draft → in_progress → completed).
 
@@ -1292,13 +1283,11 @@ CREATE INDEX idx_batch_readings_batch_date ON batch_readings(batch_id, recorded_
 CREATE INDEX idx_brew_log_batches_batch ON brew_log_batches(batch_id);
 CREATE INDEX idx_brew_log_batches_brew ON brew_log_batches(brew_log_id);
 
--- Yeast management (brinks model)
-CREATE INDEX idx_yeast_brinks_status ON yeast_brinks(status, yeast_id);
-CREATE INDEX idx_yeast_brinks_parent ON yeast_brinks(parent_brink_id);
-CREATE INDEX idx_brink_viability_brink_date ON brink_viability_readings(yeast_brink_id, reading_date DESC);
-CREATE INDEX idx_yeast_pitches_batch ON yeast_pitches(batch_id);
-CREATE INDEX idx_yeast_pitches_brink ON yeast_pitches(yeast_brink_id);
+-- Yeast management (pitch events model)
+CREATE INDEX idx_yeast_pitches_vessel ON yeast_pitches(vessel_id);
 CREATE INDEX idx_yeast_pitches_parent ON yeast_pitches(parent_pitch_id, generation);
+CREATE INDEX idx_yeast_pitch_events_pitch ON yeast_pitch_events(pitch_id);
+CREATE INDEX idx_yeast_pitch_events_batch ON yeast_pitch_events(batch_id);
 
 -- Vessel operations
 CREATE INDEX idx_vessels_status ON vessels(status, type);
