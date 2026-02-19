@@ -4,7 +4,7 @@
  * BrewLogSplitOverview - Visual split overview for brew log detail
  *
  * Shows how a single brew's wort was split across batches with:
- * - Recipe reference at top (linked to recipe detail)
+ * - Recipe name derived from linked batches
  * - Horizontal volume bar showing proportional splits
  * - Per-batch cards with status, volume, and vessel info
  */
@@ -12,13 +12,13 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { brewLogKeys, recipeKeys } from "@/lib/query-keys";
+import { brewLogKeys } from "@/lib/query-keys";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
-import { Beer, FlaskConical, ExternalLink } from "lucide-react";
+import { Beer, FlaskConical } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 // Segment colors for the volume bar
@@ -36,7 +36,6 @@ const SEGMENT_COLORS = [
 interface BrewLogSplitOverviewProps {
   data: {
     id: string;
-    recipe_id?: string | null;
     [key: string]: unknown;
   };
 }
@@ -51,26 +50,17 @@ interface LinkedBatch {
     name: string;
     status: string;
     volume_bbl: number | null;
-    current_vessel_name: string | null;
+    recipe: { name: string } | null;
   } | null;
-}
-
-interface RecipeSummary {
-  id: string;
-  name: string;
-  batch_size_bbl: number | null;
-  est_og: number | null;
-  style_name: string | null;
 }
 
 export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
   const brewLogId = data.id;
-  const recipeId = data.recipe_id;
   const supabase = createClient();
 
-  // Fetch linked batches with brew info (includes current_vessel_name)
+  // Fetch linked batches
   const { data: linkedBatches, isLoading: batchesLoading } = useQuery({
-    queryKey: brewLogKeys.batches(brewLogId),
+    queryKey: brewLogKeys.batchSplitOverview(brewLogId),
     queryFn: async () => {
       const { data: links, error } = await supabase
         .from("brew_log_batches")
@@ -79,13 +69,13 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
           id,
           volume_bbl,
           notes,
-          batch:batches_with_brew_info!brew_log_batches_batch_id_fkey (
+          batch:batches!brew_log_batches_batch_id_fkey (
             id,
             batch_number,
             name,
             status,
             volume_bbl,
-            current_vessel_name
+            recipe:recipes(name)
           )
         `
         )
@@ -93,22 +83,6 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
 
       if (error) throw error;
       return (links ?? []) as unknown as LinkedBatch[];
-    },
-  });
-
-  // Fetch recipe summary if recipe_id exists
-  const { data: recipe } = useQuery({
-    queryKey: recipeKeys.summary(recipeId!),
-    enabled: !!recipeId,
-    queryFn: async () => {
-      const { data: rec, error } = await supabase
-        .from("recipes_with_estimates")
-        .select("id, name, batch_size_bbl, est_og, style_name")
-        .eq("id", recipeId!)
-        .single();
-
-      if (error) throw error;
-      return rec as RecipeSummary;
     },
   });
 
@@ -125,8 +99,10 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
     );
   }
 
-  // Filter to only valid linked batches
-  const validBatches = (linkedBatches ?? []).filter((lb) => lb.batch);
+  // Filter to only linked batches with resolved batch data
+  const validBatches = (linkedBatches ?? []).filter(
+    (lb): lb is LinkedBatch & { batch: NonNullable<LinkedBatch["batch"]> } => lb.batch != null
+  );
 
   if (validBatches.length === 0) {
     return (
@@ -149,30 +125,11 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
 
   return (
     <div className="space-y-5">
-      {/* Recipe reference */}
-      {recipe && (
+      {/* Recipe (derived from linked batches) */}
+      {validBatches[0]?.batch?.recipe?.name && (
         <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-4 py-3">
           <Beer className="h-5 w-5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/production/recipes/${recipe.id}`}
-                className="truncate font-medium hover:underline"
-              >
-                {recipe.name}
-              </Link>
-              <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" />
-            </div>
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              {recipe.style_name && <span>{recipe.style_name}</span>}
-              {recipe.batch_size_bbl != null && (
-                <span><UnitDisplay value={recipe.batch_size_bbl} unitType="volume" /></span>
-              )}
-              {recipe.est_og != null && (
-                <span>Est. OG <UnitDisplay value={recipe.est_og} unitType="gravity" decimals={1} /></span>
-              )}
-            </div>
-          </div>
+          <span className="font-medium">{validBatches[0].batch.recipe.name}</span>
         </div>
       )}
 
@@ -195,10 +152,10 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
                 key={lb.id}
                 className={`${color} relative flex items-center justify-center text-[10px] font-medium text-white transition-all`}
                 style={{ width: `${pct}%` }}
-                title={`${lb.batch!.name}: ${volume.toFixed(2)} BBL (${pct.toFixed(0)}%)`}
+                title={`${lb.batch.name}: ${volume.toFixed(2)} BBL (${pct.toFixed(0)}%)`}
               >
                 {pct > 15 && (
-                  <span className="truncate px-1">{lb.batch!.name}</span>
+                  <span className="truncate px-1">{lb.batch.name}</span>
                 )}
               </div>
             );
@@ -209,7 +166,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
       {/* Per-batch cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {validBatches.map((lb, index) => {
-          const batch = lb.batch!;
+          const batch = lb.batch;
           const volume = Number(lb.volume_bbl) || 0;
           const pct = totalVolume > 0 ? (volume / totalVolume) * 100 : 0;
           const dotColor = SEGMENT_COLORS[index % SEGMENT_COLORS.length];
@@ -253,12 +210,6 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
                       </Badge>
                     </p>
                   </div>
-                  {batch.current_vessel_name && (
-                    <div>
-                      <span className="text-muted-foreground">Vessel</span>
-                      <p className="font-medium">{batch.current_vessel_name}</p>
-                    </div>
-                  )}
                 </div>
 
                 {lb.notes && (

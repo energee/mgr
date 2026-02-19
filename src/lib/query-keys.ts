@@ -432,6 +432,7 @@ export const brewLogKeys = {
   all: () => ["brew_logs"] as const,
   detail: (id: string) => ["brew_logs", id] as const,
   batches: (id: string) => ["brew_log_batches", id] as const,
+  batchSplitOverview: (id: string) => ["brew_log_batches", id, "split-overview"] as const,
   batchesForCompletion: (id: string) => ["brew_log_batches", id, "completion"] as const,
 };
 

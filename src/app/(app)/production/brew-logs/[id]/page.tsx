@@ -16,9 +16,12 @@ import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { brewLogEntity } from "@/entities/brew-log";
 import { BrewLogCompletionDialog } from "@/components/domain/brew-log-completion-dialog";
+import { BrewLogRecipeSheet } from "@/components/domain/brew-log-recipe-sheet";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
 import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
-import { brewLogKeys, entityKeys, recipeKeys } from "@/lib/query-keys";
+import { Button } from "@/components/ui/button";
+import { BookOpen } from "lucide-react";
+import { brewLogKeys, entityKeys } from "@/lib/query-keys";
 
 export default function BrewLogDetailPage({
   params,
@@ -31,6 +34,7 @@ export default function BrewLogDetailPage({
   const supabase = createClient();
 
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [showRecipeSheet, setShowRecipeSheet] = useState(false);
 
   // Fetch brew log data for banner logic and dialog props
   const { data: brewLog } = useQuery({
@@ -38,27 +42,12 @@ export default function BrewLogDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_logs")
-        .select("id, brew_number, status, events, recipe_id")
+        .select("id, brew_number, status, events")
         .eq("id", id)
         .single();
       if (error) throw error;
       return data;
     },
-  });
-
-  // Fetch recipe name for breadcrumb
-  const { data: recipe } = useQuery({
-    queryKey: recipeKeys.detail(brewLog?.recipe_id ?? ""),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipes")
-        .select("id, name")
-        .eq("id", brewLog!.recipe_id!)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!brewLog?.recipe_id,
   });
 
   // Fetch linked batches (needed for "View batch" link and breadcrumb)
@@ -67,15 +56,25 @@ export default function BrewLogDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_log_batches")
-        .select("batch_id, batch:batches(batch_number)")
+        .select("batch_id, batch:batches(batch_number, recipe_id, recipe:recipes(name))")
         .eq("brew_log_id", id);
       if (error) throw error;
       return (data ?? []) as Array<{
         batch_id: string;
-        batch: { batch_number: string } | null;
+        batch: {
+          batch_number: string;
+          recipe_id: string | null;
+          recipe: { name: string } | null;
+        } | null;
       }>;
     },
   });
+
+  // Invalidate both the domain-specific and generic entity caches for this brew log
+  const invalidateBrewLog = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
+    queryClient.invalidateQueries({ queryKey: entityKeys.detail("brew_logs", id) });
+  }, [queryClient, id]);
 
   // Direct state transition for "Start Brew" from the banner
   const handleStartBrew = useCallback(async () => {
@@ -87,49 +86,48 @@ export default function BrewLogDetailPage({
       toast.error("Failed to start brew");
       return;
     }
-    queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
-    queryClient.invalidateQueries({
-      queryKey: entityKeys.detail("brew_logs", id),
-    });
+    invalidateBrewLog();
     toast.success("Brew started");
-  }, [supabase, id, queryClient]);
+  }, [supabase, id, invalidateBrewLog]);
 
   // Intercept the complete_brew action to open the dialog
   const handleAction = useCallback((actionName: string) => {
     if (actionName === "complete_brew") {
       setShowCompletionDialog(true);
-      return true; // Indicates action was handled
+      return true;
     }
-    return false; // Let EntityDetailUnified handle normally
+    return false;
   }, []);
 
   const handleDialogSuccess = useCallback(
     (navigateToBatchId?: string) => {
-      queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
-      queryClient.invalidateQueries({
-        queryKey: entityKeys.detail("brew_logs", id),
-      });
+      invalidateBrewLog();
       if (navigateToBatchId) {
         router.push(`/production/batches/${navigateToBatchId}`);
       }
     },
-    [queryClient, id, router]
+    [invalidateBrewLog, router]
   );
 
-  // Breadcrumb: Recipe -> Brew Log -> Batch
+  // Breadcrumb: Recipe -> Brew Log -> Batch (recipe derived from linked batches)
   const breadcrumbSegments = useMemo(() => {
     const segments: { label: string; href?: string }[] = [];
-    if (recipe) {
-      segments.push({ label: recipe.name, href: `/production/recipes/${recipe.id}` });
+    // Recipe derived from first linked batch
+    const firstBatch = linkedBatches?.[0];
+    if (firstBatch?.batch?.recipe) {
+      segments.push({
+        label: firstBatch.batch.recipe.name,
+        href: `/production/recipes/${firstBatch.batch.recipe_id}`,
+      });
     }
-    segments.push({ label: brewLog?.brew_number ?? "Brew Log" }); // current page, no href
+    segments.push({ label: brewLog?.brew_number ?? "Brew Log" });
     if (linkedBatches?.length === 1) {
       const b = linkedBatches[0];
       const batchNumber = b.batch?.batch_number ?? "Batch";
       segments.push({ label: batchNumber, href: `/production/batches/${b.batch_id}` });
     }
     return segments;
-  }, [recipe, brewLog, linkedBatches]);
+  }, [brewLog, linkedBatches]);
 
   // Banner config based on brew log state
   const bannerConfig = useMemo(() => {
@@ -157,23 +155,46 @@ export default function BrewLogDetailPage({
       };
     }
     if (brewLog.status === "completed" && linkedBatches?.length) {
-      const message = linkedBatches.length === 1
-        ? "Brew complete. View your batch in the fermenter."
-        : `Brew complete. ${linkedBatches.length} batches are in fermentation.`;
-      const actions = linkedBatches.length === 1
-        ? [{ label: "View Batch", href: `/production/batches/${linkedBatches[0].batch_id}` }]
-        : linkedBatches.map((b, i) => ({
-            label: `Batch ${i + 1}`,
-            href: `/production/batches/${b.batch_id}`,
-          }));
-      return { message, variant: "success" as const, actions };
+      const isSingleBatch = linkedBatches.length === 1;
+      return {
+        message: isSingleBatch
+          ? "Brew complete. View your batch in the fermenter."
+          : `Brew complete. ${linkedBatches.length} batches are in fermentation.`,
+        variant: "success" as const,
+        actions: isSingleBatch
+          ? [{ label: "View Batch", href: `/production/batches/${linkedBatches[0].batch_id}` }]
+          : linkedBatches.map((b, i) => ({
+              label: `Batch ${i + 1}`,
+              href: `/production/batches/${b.batch_id}`,
+            })),
+      };
     }
     return null;
   }, [brewLog, linkedBatches, handleStartBrew]);
 
+  // Recipe info derived from first linked batch
+  const recipeInfo = useMemo(() => {
+    const recipe = linkedBatches?.[0]?.batch?.recipe;
+    const recipeId = linkedBatches?.[0]?.batch?.recipe_id;
+    if (!recipe || !recipeId) return null;
+    return { id: recipeId, name: recipe.name };
+  }, [linkedBatches]);
+
   return (
     <div className="space-y-4">
-      <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+      <div className="flex items-center justify-between">
+        <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+        {recipeInfo && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRecipeSheet(true)}
+          >
+            <BookOpen className="mr-1.5 h-4 w-4" />
+            Recipe
+          </Button>
+        )}
+      </div>
 
       {bannerConfig && (
         <NextStepBanner
@@ -197,6 +218,15 @@ export default function BrewLogDetailPage({
           open={showCompletionDialog}
           onOpenChange={setShowCompletionDialog}
           onSuccess={handleDialogSuccess}
+        />
+      )}
+
+      {recipeInfo && (
+        <BrewLogRecipeSheet
+          recipeId={recipeInfo.id}
+          recipeName={recipeInfo.name}
+          open={showRecipeSheet}
+          onOpenChange={setShowRecipeSheet}
         />
       )}
     </div>

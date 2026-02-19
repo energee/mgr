@@ -12,6 +12,8 @@
  * - Edit mode: inline form editing with react-hook-form, Zod validation,
  *   optimistic locking, dirty form guard, keyboard shortcuts
  * - Create mode: when id is undefined, starts in edit mode with INSERT on save
+ * - Section headerActions: optional component rendered next to section title
+ *   (e.g., "Add Event" button on brew day timeline)
  *
  * Keyboard shortcuts:
  * - Backspace: go back (view mode only)
@@ -679,9 +681,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   useEffect(() => {
     function isInputElement(el: Element | null): boolean {
       if (!el) return false;
-      const tag = el.tagName.toLowerCase();
-      return tag === "input" || tag === "textarea" || tag === "select"
-        || (el as HTMLElement).isContentEditable;
+      return el.matches("input, textarea, select, [contenteditable]");
     }
 
     function confirmDirtyNavigation(): boolean {
@@ -1132,16 +1132,36 @@ function UnifiedSectionCard<T>({
     data
   );
 
+  const HeaderActions = section.headerActions;
+  const headerClassName = HeaderActions
+    ? "flex flex-row items-center justify-between"
+    : undefined;
+
+  // Action trigger state for headerActions → component communication.
+  // Uses a counter to ensure repeated clicks of the same action always trigger.
+  const [actionTrigger, setActionTrigger] = useState<{ action: string; seq: number } | null>(null);
+  const actionSeqRef = useRef(0);
+  const fireAction = useCallback((action: string) => {
+    actionSeqRef.current += 1;
+    setActionTrigger({ action, seq: actionSeqRef.current });
+  }, []);
+
+  // Shared section header for all rendering paths
+  const sectionHeader = (
+    <CardHeader className={headerClassName}>
+      <CardTitle>{section.title}</CardTitle>
+      {HeaderActions && <HeaderActions data={data} onAction={fireAction} />}
+    </CardHeader>
+  );
+
   // Custom component handling
   if (editing && section.editComponent) {
     const EditComponent = section.editComponent;
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>{section.title}</CardTitle>
-        </CardHeader>
+        {sectionHeader}
         <CardContent>
-          <EditComponent data={data} editing={true} form={form} />
+          <EditComponent data={data} editing={true} form={form} actionTrigger={actionTrigger} />
         </CardContent>
       </Card>
     );
@@ -1151,14 +1171,13 @@ function UnifiedSectionCard<T>({
     const CustomComponent = section.component;
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>{section.title}</CardTitle>
-        </CardHeader>
+        {sectionHeader}
         <CardContent>
           <CustomComponent
             data={data}
             editing={editing}
             form={editing ? form : undefined}
+            actionTrigger={actionTrigger}
           />
         </CardContent>
       </Card>
@@ -1168,9 +1187,7 @@ function UnifiedSectionCard<T>({
   // Render fields using UnifiedField
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{section.title}</CardTitle>
-      </CardHeader>
+      {sectionHeader}
       <CardContent>
         <dl className="grid grid-cols-12 gap-4">
           {section.fields?.map((field) => {

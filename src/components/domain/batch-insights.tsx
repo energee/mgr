@@ -10,13 +10,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -109,22 +103,21 @@ function MetricComparison({
   const hasData = actualNum !== null && !isNaN(actualNum as number);
   const hasTarget = target !== null;
 
-  const getVarianceIcon = () => {
-    if (variance === null || variance === undefined) return null;
+  function renderVarianceIcon(): React.ReactNode {
+    if (variance == null) return null;
     if (Math.abs(variance) <= 0.002) {
       return <CheckCircle2 className="h-4 w-4 text-green-500" />;
     }
-    return variance > 0 ? (
-      <TrendingUp className="h-4 w-4 text-yellow-500" />
-    ) : (
-      <TrendingDown className="h-4 w-4 text-yellow-500" />
-    );
-  };
+    if (variance > 0) {
+      return <TrendingUp className="h-4 w-4 text-yellow-500" />;
+    }
+    return <TrendingDown className="h-4 w-4 text-yellow-500" />;
+  }
 
   return (
     <div className="flex items-center justify-between py-2 border-b last:border-b-0">
       <div className="flex items-center gap-2">
-        {hasData && getVarianceIcon()}
+        {hasData && renderVarianceIcon()}
         <span className="font-medium">{label}</span>
       </div>
       <div className="text-right">
@@ -235,140 +228,127 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
 
   const performance = performanceData as BatchPerformanceResult | undefined;
 
-  // Calculate how many metrics are on target
-  const getOnTargetCount = () => {
-    if (!performance) return 0;
-    let count = 0;
-    const { variances } = performance;
-
-    if (variances.fg_variance !== null && Math.abs(variances.fg_variance) <= 0.002) {
-      count++;
-    }
-    if (variances.abv_variance !== null && Math.abs(variances.abv_variance) <= 0.2) {
-      count++;
-    }
-    return count;
-  };
-
-  const onTargetCount = getOnTargetCount();
-  const totalMetrics = 2; // FG and ABV
+  // Count how many metrics (FG, ABV) are within tolerance of their targets
+  const totalMetrics = 2;
+  const onTargetCount = !performance
+    ? 0
+    : [
+        performance.variances.fg_variance !== null &&
+          Math.abs(performance.variances.fg_variance) <= 0.002,
+        performance.variances.abv_variance !== null &&
+          Math.abs(performance.variances.abv_variance) <= 0.2,
+      ].filter(Boolean).length;
 
   return (
-    <Card>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Batch Insights</CardTitle>
-            </div>
-            <div className="flex items-center gap-2">
-              {hasAnalyzed && !isLoading && performance && (
-                <Badge
-                  variant={onTargetCount === totalMetrics ? "default" : "secondary"}
-                  className="gap-1"
-                >
-                  <Target className="h-3 w-3" />
-                  {onTargetCount}/{totalMetrics} on target
-                </Badge>
-              )}
-              {!hasAnalyzed ? (
-                <Button size="sm" onClick={handleAnalyze}>
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Analyze Batch
-                </Button>
-              ) : (
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                    />
-                  </Button>
-                </CollapsibleTrigger>
-              )}
-            </div>
-          </div>
-          {hasAnalyzed && (
-            <CardDescription>
-              {batchNumber || performance?.batch_number || "Batch"} &bull;{" "}
-              {performance?.recipe?.name || "Recipe"}
-            </CardDescription>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="flex items-center justify-between pb-3">
+        <div className="flex items-center gap-2">
+          {hasAnalyzed && !isLoading && performance && (
+            <Badge
+              variant={onTargetCount === totalMetrics ? "default" : "secondary"}
+              className="gap-1"
+            >
+              <Target className="h-3 w-3" />
+              {onTargetCount}/{totalMetrics} on target
+            </Badge>
           )}
-        </CardHeader>
+        </div>
+        <div className="flex items-center gap-2">
+          {!hasAnalyzed ? (
+            <Button size="sm" onClick={handleAnalyze}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analyze Batch
+            </Button>
+          ) : (
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                />
+              </Button>
+            </CollapsibleTrigger>
+          )}
+        </div>
+      </div>
+      {hasAnalyzed && (
+        <CardDescription className="pb-3">
+          {batchNumber || performance?.batch_number || "Batch"} &bull;{" "}
+          {performance?.recipe?.name || "Recipe"}
+        </CardDescription>
+      )}
 
-        <CollapsibleContent>
-          <CardContent className="space-y-6">
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-            ) : error ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center">
-                <AlertTriangle className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">
-                  Unable to analyze batch. Make sure the batch has associated readings and brew log data.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => refetch()}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Try Again
-                </Button>
-              </div>
-            ) : performance ? (
-              <>
-                {/* Performance Metrics */}
-                <div>
-                  <h4 className="font-medium mb-3 flex items-center gap-2">
-                    <Target className="h-4 w-4" />
-                    Actuals vs Targets
-                  </h4>
-                  <div className="border rounded-lg p-3">
-                    <MetricComparison
-                      label="OG"
-                      target={performance.recipe.target_og}
-                      actual={performance.actuals.og}
-                      decimals={3}
-                    />
-                    <MetricComparison
-                      label="FG"
-                      target={performance.recipe.target_fg}
-                      actual={performance.actuals.fg}
-                      variance={performance.variances.fg_variance}
-                      decimals={3}
-                    />
-                    <MetricComparison
-                      label="ABV"
-                      target={performance.recipe.target_abv}
-                      actual={performance.actuals.abv}
-                      variance={performance.variances.abv_variance}
-                      decimals={1}
-                      unit="%"
-                    />
-                  </div>
-                </div>
-
-                {/* Fermentation Status */}
-                <FermentationStatus fermentation={performance.fermentation} />
-
-                {/* Status */}
-                <div className="flex items-center justify-between text-sm pt-2 border-t">
-                  <span className="text-muted-foreground">Batch Status</span>
-                  <StatusBadge
-                    status={performance.status}
-                    config={batchEntity.stateMachine?.stateDisplay}
+      <CollapsibleContent>
+        <div className="space-y-6">
+          {isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <AlertTriangle className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-muted-foreground">
+                Unable to analyze batch. Make sure the batch has associated readings and brew log data.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => refetch()}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          ) : performance ? (
+            <>
+              {/* Performance Metrics */}
+              <div>
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Actuals vs Targets
+                </h4>
+                <div className="border rounded-lg p-3">
+                  <MetricComparison
+                    label="OG"
+                    target={performance.recipe.target_og}
+                    actual={performance.actuals.og}
+                    decimals={3}
+                  />
+                  <MetricComparison
+                    label="FG"
+                    target={performance.recipe.target_fg}
+                    actual={performance.actuals.fg}
+                    variance={performance.variances.fg_variance}
+                    decimals={3}
+                  />
+                  <MetricComparison
+                    label="ABV"
+                    target={performance.recipe.target_abv}
+                    actual={performance.actuals.abv}
+                    variance={performance.variances.abv_variance}
+                    decimals={1}
+                    unit="%"
                   />
                 </div>
-              </>
-            ) : null}
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+              </div>
+
+              {/* Fermentation Status */}
+              <FermentationStatus fermentation={performance.fermentation} />
+
+              {/* Batch Status */}
+              <div className="flex items-center justify-between text-sm pt-2 border-t">
+                <span className="text-muted-foreground">Batch Status</span>
+                <StatusBadge
+                  status={performance.status}
+                  config={batchEntity.stateMachine?.stateDisplay}
+                />
+              </div>
+            </>
+          ) : null}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

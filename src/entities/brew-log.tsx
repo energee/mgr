@@ -2,10 +2,8 @@
  * Brew Log Entity Configuration
  *
  * Brew logs capture the hot-side brewing process (mash through knockout).
- * They are decoupled from batches to support:
- * - Split fermentation (1 brew → multiple batches)
- * - Parti-gyle brewing
- * - Blend at knockout
+ * They are linked to batches via brew_log_batches junction table.
+ * Recipe is derived from linked batches (not stored on brew_logs).
  *
  * Lifecycle: draft → in_progress → completed
  */
@@ -16,7 +14,9 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BrewLogTimeline } from "@/components/domain/brew-log-timeline";
+import { BrewEventTimelineActions } from "@/components/domain/brew-event-timeline";
 import { BrewLogSplitOverview } from "@/components/domain/brew-log-split-overview";
+import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 
 // Use generated type from Supabase (will need regeneration after migration)
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
@@ -26,52 +26,14 @@ type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
 // =============================================================================
 
 const measurementSchema = z.object({
-  metric: z.enum([
-    "temp_f",
-    "ph",
-    "volume_bbl",
-    "volume_l",
-    "gravity_plato",
-    "flow_rate",
-    "pump_speed",
-    "amount_lbs",
-    "amount_oz",
-    "amount_g",
-    "viability",
-    "pitch_rate",
-    "other",
-  ]),
+  metric: z.string().min(1, "Metric is required"),
   value: z.union([z.number(), z.string()]),
   custom_metric: z.string().nullable().optional(),
 });
 
 const brewEventSchema = z.object({
   id: z.string().uuid().optional(),
-  phase: z.enum([
-    "strike_water",
-    "mash_in",
-    "mash_rest",
-    "mash_step",
-    "vorlauf",
-    "runoff_start",
-    "runoff_end",
-    "sparge_start",
-    "sparge_end",
-    "kettle_full",
-    "boil_start",
-    "boil_end",
-    "hop_addition",
-    "adjunct_addition",
-    "whirlpool_start",
-    "whirlpool_rest",
-    "whirlpool_end",
-    "ko_start",
-    "ko_end",
-    "yeast_pitch",
-    "hourly_check",
-    "flow_rate_change",
-    "other",
-  ]),
+  phase: z.string().min(1, "Phase is required"),
   custom_phase: z.string().nullable().optional(),
   time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
   measurements: z.array(measurementSchema).default([]),
@@ -90,7 +52,6 @@ const brewEventSchema = z.object({
 export const brewLogSchema = z.object({
   brew_number: z.string().min(1, "Brew number is required"),
   brew_date: z.string().min(1, "Brew date is required"),
-  recipe_id: z.string().uuid().nullable().optional(),
   brewer_id: z.string().uuid().nullable().optional(),
   status: z.string().default("draft"),
   events: z.array(brewEventSchema).default([]),
@@ -100,56 +61,6 @@ export const brewLogSchema = z.object({
 export type BrewLogFormValues = z.infer<typeof brewLogSchema>;
 export type BrewEvent = z.infer<typeof brewEventSchema>;
 export type BrewMeasurement = z.infer<typeof measurementSchema>;
-
-// =============================================================================
-// Phase Display Config
-// =============================================================================
-
-export const phaseConfig = {
-  strike_water: { label: "Strike Water", icon: "droplet" },
-  mash_in: { label: "Mash In", icon: "grain" },
-  mash_rest: { label: "Mash Rest", icon: "clock" },
-  mash_step: { label: "Mash Step", icon: "thermometer" },
-  vorlauf: { label: "Vorlauf", icon: "refresh" },
-  runoff_start: { label: "Runoff Start", icon: "arrow-down" },
-  runoff_end: { label: "Runoff End", icon: "check" },
-  sparge_start: { label: "Sparge Start", icon: "droplet" },
-  sparge_end: { label: "Sparge End", icon: "check" },
-  kettle_full: { label: "Kettle Full", icon: "container" },
-  boil_start: { label: "Boil Start", icon: "flame" },
-  boil_end: { label: "Boil End", icon: "check" },
-  hop_addition: { label: "Hop Addition", icon: "leaf" },
-  adjunct_addition: { label: "Adjunct Addition", icon: "plus" },
-  whirlpool_start: { label: "Whirlpool Start", icon: "refresh" },
-  whirlpool_rest: { label: "Whirlpool Rest", icon: "clock" },
-  whirlpool_end: { label: "Whirlpool End", icon: "check" },
-  ko_start: { label: "Knock Out Start", icon: "arrow-right" },
-  ko_end: { label: "Knock Out End", icon: "check" },
-  yeast_pitch: { label: "Yeast Pitch", icon: "flask" },
-  hourly_check: { label: "Hourly Check", icon: "clock" },
-  flow_rate_change: { label: "Flow Rate Change", icon: "sliders" },
-  other: { label: "Other", icon: "more-horizontal" },
-} as const;
-
-// =============================================================================
-// Metric Display Config
-// =============================================================================
-
-export const metricConfig = {
-  temp_f: { label: "Temperature", unit: "°F", unitType: "temperature" as const, decimals: 1 },
-  ph: { label: "pH", unit: "" },
-  volume_bbl: { label: "Volume (BBL)", unit: "BBL", unitType: "volume" as const, decimals: 2 },
-  volume_l: { label: "Volume (L)", unit: "L", unitType: "volume" as const, decimals: 2 },
-  gravity_plato: { label: "Gravity", unit: "°P", unitType: "gravity" as const, decimals: 1 },
-  flow_rate: { label: "Flow Rate", unit: "" },
-  pump_speed: { label: "Pump Speed", unit: "" },
-  amount_lbs: { label: "Amount (lbs)", unit: "lbs", unitType: "weight" as const, decimals: 2 },
-  amount_oz: { label: "Amount (oz)", unit: "oz" },
-  amount_g: { label: "Amount (g)", unit: "g" },
-  viability: { label: "Viability", unit: "%" },
-  pitch_rate: { label: "Pitching Rate", unit: "M/mL/°P" },
-  other: { label: "Other", unit: "" },
-} as const;
 
 // =============================================================================
 // State Machine (defined separately to derive options)
@@ -186,6 +97,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
   // ---------------------------------------------------------------------------
   name: "brew_log",
   table: "brew_logs",
+  viewTable: "brew_logs_with_batches",
   displayName: "Brew Log",
   displayNamePlural: "Brew Logs",
   description: "Brew day records capturing the hot-side process from mash through knockout",
@@ -218,12 +130,8 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       ),
     },
     {
-      accessorKey: "recipe_id",
-      header: "Recipe",
-      relation: {
-        entity: "recipe",
-        displayField: "name",
-      },
+      accessorKey: "batch_numbers",
+      header: "Batches",
     },
   ],
 
@@ -232,12 +140,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       field: "status",
       type: "multiselect",
       label: "Status",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "in_progress", label: "In Progress" },
-        { value: "completed", label: "Completed" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: statusOptions,
     },
   ],
 
@@ -295,8 +198,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           name: "brew_number",
           label: "Brew Number",
           type: "text",
-          placeholder: "e.g., BRW-2024-001",
-          required: true,
+          editable: false,
           colSpan: 6,
         },
         {
@@ -304,21 +206,14 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           label: "Brew Date",
           type: "date",
           format: "date",
-          required: true,
-          colSpan: 6,
-        },
-        {
-          name: "recipe_id",
-          label: "Recipe",
-          type: "relation",
-          relation: { entity: "recipe", displayField: "name" },
+          editable: false,
           colSpan: 6,
         },
         {
           name: "brewer_id",
           label: "Brewer",
           type: "relation",
-          relation: { entity: "user", displayField: "full_name" },
+          relation: { entity: "user_profile", displayField: "display_name" },
           colSpan: 6,
         },
         {
@@ -334,6 +229,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       id: "timeline",
       title: "Brew Day Timeline",
       component: BrewLogTimeline,
+      headerActions: BrewEventTimelineActions,
     },
     {
       id: "batches",
@@ -354,6 +250,13 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
         },
       ],
     },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("brew_logs"),
+      collapsible: true,
+      defaultCollapsed: true,
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -366,25 +269,12 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       name: "brew_number",
       label: "Brew Number",
       type: "text",
-      placeholder: "e.g., BRW-2024-001",
-      required: true,
       colSpan: 6,
     },
     {
       name: "brew_date",
       label: "Brew Date",
       type: "date",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "recipe_id",
-      label: "Recipe",
-      type: "relation",
-      relation: {
-        entity: "recipe",
-        displayField: "name",
-      },
       colSpan: 6,
     },
     {
@@ -392,8 +282,8 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       label: "Brewer",
       type: "relation",
       relation: {
-        entity: "user",
-        displayField: "full_name",
+        entity: "user_profile",
+        displayField: "display_name",
       },
       colSpan: 6,
     },
@@ -454,13 +344,6 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
   // ---------------------------------------------------------------------------
   relations: [
     {
-      name: "recipe",
-      entity: "recipe",
-      type: "belongsTo",
-      foreignKey: "recipe_id",
-      showInDetail: true,
-    },
-    {
       name: "brewer",
       entity: "user_profile",
       type: "belongsTo",
@@ -475,9 +358,9 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
   queryExamples: [
     "Show me all brews from this week",
     "What brews are currently in progress?",
-    "Find brews for the Hazy IPA recipe",
+    "Find brews linked to batch B-20240115-01",
     "Which brewer did BRW-2024-015?",
   ],
 
-  keyFields: ["brew_number", "brew_date", "status", "recipe_id"],
+  keyFields: ["brew_number", "brew_date", "status"],
 };
