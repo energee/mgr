@@ -172,7 +172,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
           const dotColor = SEGMENT_COLORS[index % SEGMENT_COLORS.length];
 
           return (
-            <Card key={lb.id} className="overflow-hidden">
+            <Card key={lb.id ?? `batch-${index}`} className="overflow-hidden">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
