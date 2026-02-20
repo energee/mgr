@@ -1,16 +1,18 @@
 /**
  * Yeast Pitch Entity Configuration
  *
- * Track individual yeast pitches from purchase through repitching.
- * Supports lineage tracking for generation counting and cost spreading.
+ * Track individual yeast pitches with brink-based weight tracking.
+ * Supports lineage tracking, viability decay, and usage history via pitch events.
+ * Weight is tracked in lbs, cell counts in thousands of cells.
  */
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-// Use the view type since entity uses viewTable for queries
-type YeastPitch = Database["public"]["Views"]["yeast_pitches_with_details"]["Row"];
+// Use the view type for computed fields (quantity_remaining_lbs, viability, etc.)
+// NOTE: Supabase types must be regenerated after migration to include this view.
+type YeastPitch = Database["public"]["Views"]["yeast_pitches_with_remaining"]["Row"];
 
 // =============================================================================
 // Zod Schema
@@ -22,13 +24,15 @@ export const yeastPitchSchema = z.object({
   parent_pitch_id: z.string().uuid().nullable().optional(),
   status: z.enum(["in_stock", "in_use", "harvested", "depleted", "discarded"]).default("in_stock"),
   volume_ml: z.coerce.number().min(0).nullable().optional(),
-  cell_count_billion: z.coerce.number().min(0).nullable().optional(),
+  cell_count_thousand: z.coerce.number().min(0).nullable().optional(),
+  cell_density_thousand: z.coerce.number().min(0).nullable().optional(),
+  quantity_lbs: z.coerce.number().min(0).nullable().optional(),
+  vessel_id: z.string().uuid().nullable().optional(),
   initial_viability: z.coerce.number().min(0).max(100).default(95).nullable().optional(),
   cost: z.coerce.number().min(0).nullable().optional(),
   received_date: z.string().nullable().optional(),
   harvest_date: z.string().nullable().optional(),
   use_by_date: z.string().nullable().optional(),
-  batch_id: z.string().uuid().nullable().optional(),
   location_id: z.string().uuid().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
@@ -78,7 +82,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
   // ---------------------------------------------------------------------------
   name: "yeast_pitch",
   table: "yeast_pitches",
-  viewTable: "yeast_pitches_with_details",
+  viewTable: "yeast_pitches_with_remaining",
   displayName: "Yeast Pitch",
   displayNamePlural: "Yeast Pitches",
   description: "Individual yeast pitches tracking lineage, viability, and usage",
@@ -130,7 +134,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       sortable: true,
       render: (value, row) => {
         const pitch = row as YeastPitch;
-        if (value == null) return "—";
+        if (value == null) return "\u2014";
         const status = pitch.viability_status || "good";
         const color = VIABILITY_STATUS_DISPLAY[status]?.color || "default";
         return (
@@ -144,19 +148,13 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       accessorKey: "days_old",
       header: "Age",
       sortable: true,
-      render: (value) => (value != null ? `${value}d` : "—"),
+      render: (value) => (value != null ? `${value}d` : "\u2014"),
     },
     {
-      accessorKey: "batch_name",
-      header: "Batch",
+      accessorKey: "quantity_remaining_lbs",
+      header: "Remaining (lbs)",
       sortable: true,
-      render: (value, row) => {
-        const pitch = row as YeastPitch;
-        if (pitch.batch_id && value) {
-          return String(value);
-        }
-        return "—";
-      },
+      render: (value) => (value != null ? `${Number(value).toFixed(1)}` : "\u2014"),
     },
   ],
 
@@ -181,7 +179,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
   ],
 
   defaultSort: { column: "created_at", direction: "desc" },
-  searchableFields: ["strain_name", "strain_code", "notes", "batch_name"],
+  searchableFields: ["strain_name", "strain_code", "notes"],
 
   // ---------------------------------------------------------------------------
   // State Machine
@@ -205,35 +203,28 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
   // ---------------------------------------------------------------------------
   actions: [
     {
-      name: "use",
-      label: "Use for Batch",
+      name: "pitch_to_batch",
+      label: "Pitch to Batch",
       icon: "flask",
-      type: "button",
+      type: "button" as const,
       fromStates: ["in_stock"],
-      toState: "in_use",
+      // No toState - handled by custom dialog
     },
     {
-      name: "harvest",
-      label: "Harvest Yeast",
-      icon: "download",
-      type: "button",
-      fromStates: ["in_use"],
-      // No toState - handled by custom action handler
-    },
-    {
-      name: "mark_depleted",
-      label: "Mark Depleted",
-      icon: "x",
-      type: "button",
-      fromStates: ["in_use"],
-      toState: "depleted",
+      name: "record_cell_count",
+      label: "Record Cell Count",
+      icon: "microscope",
+      type: "button" as const,
+      fromStates: ["in_stock"],
+      // No toState - updates viability fields
     },
     {
       name: "discard",
       label: "Discard",
       icon: "trash",
-      type: "button",
-      fromStates: ["in_stock", "in_use"],
+      type: "dropdown" as const,
+      variant: "destructive" as const,
+      fromStates: ["in_stock"],
       toState: "discarded",
     },
   ],
@@ -261,14 +252,30 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       ],
     },
     {
+      id: "vessel",
+      title: "Vessel",
+      fields: [
+        { field: "vessel_name", label: "Brink" },
+      ],
+    },
+    {
+      id: "inventory",
+      title: "Inventory",
+      fields: [
+        { field: "quantity_lbs", label: "Quantity (lbs)", format: "number" },
+        { field: "quantity_remaining_lbs", label: "Remaining (lbs)", format: "number" },
+        { field: "cell_count_thousand", label: "Cell Count (Thousand)", format: "number" },
+        { field: "cell_density_thousand", label: "Cell Density (Thousand/mL)", format: "number" },
+        { field: "volume_ml", label: "Volume (mL)", format: "number" },
+      ],
+    },
+    {
       id: "viability",
-      title: "Viability & Quantity",
+      title: "Viability",
       fields: [
         { field: "initial_viability", label: "Initial Viability (%)", format: "percentage" },
         { field: "estimated_viability", label: "Current Viability (Est.)", format: "percentage" },
         { field: "viability_status", label: "Viability Status" },
-        { field: "volume_ml", label: "Volume (mL)", format: "number" },
-        { field: "cell_count_billion", label: "Cell Count (Billion)", format: "number" },
         { field: "days_old", label: "Days Old", format: "number" },
       ],
     },
@@ -279,7 +286,6 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
         { field: "received_date", label: "Received", format: "date" },
         { field: "harvest_date", label: "Harvested", format: "date" },
         { field: "use_by_date", label: "Use By", format: "date" },
-        { field: "pitched_at", label: "Pitched", format: "datetime" },
       ],
     },
     {
@@ -288,15 +294,6 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       fields: [
         { field: "cost", label: "Purchase Cost", format: "currency" },
         { field: "cost_per_batch", label: "Cost Per Batch", format: "currency" },
-      ],
-    },
-    {
-      id: "usage",
-      title: "Usage",
-      fields: [
-        { field: "batch_name", label: "Batch" },
-        { field: "batch_number", label: "Batch Number" },
-        { field: "location_name", label: "Storage Location" },
       ],
     },
     {
@@ -318,17 +315,11 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
         {
           name: "strain_id",
           label: "Yeast Strain",
-          type: "select",
+          type: "relation",
+          relation: { entity: "yeast", displayField: "name" },
           required: true,
           colSpan: 6,
-          dynamicOptions: {
-            table: "yeasts",
-            labelField: "name",
-            valueField: "id",
-            filter: { is_active: true },
-          },
         },
-        { name: "strain_name", label: "Strain", editable: false, colSpan: 6 },
         { name: "strain_manufacturer", label: "Manufacturer", editable: false, colSpan: 6 },
         { name: "strain_code", label: "Product Code", editable: false, colSpan: 6 },
         {
@@ -347,24 +338,68 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
           options: STATUS_OPTIONS,
           colSpan: 4,
         },
+      ],
+    },
+    {
+      id: "vessel",
+      title: "Vessel",
+      fields: [
         {
-          name: "parent_pitch_id",
-          label: "Parent Pitch (for harvest)",
-          type: "select",
+          name: "vessel_id",
+          label: "Brink",
+          type: "relation",
+          relation: { entity: "vessel", displayField: "name" },
           colSpan: 6,
-          dynamicOptions: {
-            table: "yeast_pitches_with_details",
-            labelField: "strain_name",
-            valueField: "id",
-            filter: { status: "in_use" },
-          },
-          description: "Select parent pitch when recording a harvest",
+        },
+        { name: "vessel_name", label: "Brink", editable: false, colSpan: 6 },
+      ],
+    },
+    {
+      id: "inventory",
+      title: "Inventory",
+      fields: [
+        {
+          name: "quantity_lbs",
+          label: "Quantity (lbs)",
+          type: "number",
+          format: "number",
+          placeholder: "e.g., 30",
+          description: "Weight of yeast slurry in pounds",
+          colSpan: 4,
+        },
+        { name: "quantity_remaining_lbs", label: "Remaining (lbs)", format: "number", editable: false, colSpan: 4 },
+        {
+          name: "cell_count_thousand",
+          label: "Cell Count (Thousand)",
+          type: "number",
+          format: "number",
+          placeholder: "e.g., 200000",
+          description: "Estimated cells in thousands",
+          colSpan: 4,
+        },
+        {
+          name: "cell_density_thousand",
+          label: "Cell Density (Thousand/mL)",
+          type: "number",
+          format: "number",
+          placeholder: "e.g., 1000",
+          description: "Cells per mL in thousands",
+          colSpan: 4,
+        },
+        {
+          name: "volume_ml",
+          label: "Volume (mL)",
+          type: "number",
+          format: "number",
+          placeholder: "e.g., 100",
+          description: "Volume for liquid purchases",
+          colSpan: 4,
         },
       ],
     },
     {
       id: "viability",
-      title: "Viability & Quantity",
+      title: "Viability",
       fields: [
         {
           name: "initial_viability",
@@ -377,23 +412,6 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
         },
         { name: "estimated_viability", label: "Current Viability (Est.)", format: "percentage", editable: false, colSpan: 4 },
         { name: "viability_status", label: "Viability Status", editable: false, colSpan: 4 },
-        {
-          name: "volume_ml",
-          label: "Volume (mL)",
-          type: "number",
-          format: "number",
-          placeholder: "e.g., 100",
-          colSpan: 4,
-        },
-        {
-          name: "cell_count_billion",
-          label: "Cell Count (Billion)",
-          type: "number",
-          format: "number",
-          placeholder: "e.g., 200",
-          description: "Estimated billion cells",
-          colSpan: 4,
-        },
         { name: "days_old", label: "Days Old", format: "number", editable: false, colSpan: 4 },
       ],
     },
@@ -407,7 +425,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
           type: "date",
           format: "date",
           description: "When purchased/received",
-          colSpan: 6,
+          colSpan: 4,
         },
         {
           name: "harvest_date",
@@ -415,16 +433,15 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
           type: "date",
           format: "date",
           description: "When harvested (for harvest source)",
-          colSpan: 6,
+          colSpan: 4,
         },
         {
           name: "use_by_date",
           label: "Use By",
           type: "date",
           format: "date",
-          colSpan: 6,
+          colSpan: 4,
         },
-        { name: "pitched_at", label: "Pitched", format: "datetime", editable: false, colSpan: 6 },
       ],
     },
     {
@@ -441,40 +458,6 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
           colSpan: 6,
         },
         { name: "cost_per_batch", label: "Cost Per Batch", format: "currency", editable: false, colSpan: 6 },
-      ],
-    },
-    {
-      id: "usage",
-      title: "Usage",
-      fields: [
-        {
-          name: "batch_id",
-          label: "Pitched Into Batch",
-          type: "select",
-          colSpan: 6,
-          dynamicOptions: {
-            table: "batches",
-            labelField: "name",
-            valueField: "id",
-            orderBy: "created_at",
-          },
-          description: "Batch this pitch was used for (if already pitched)",
-        },
-        { name: "batch_name", label: "Batch", editable: false, colSpan: 6 },
-        { name: "batch_number", label: "Batch Number", editable: false, colSpan: 6 },
-        {
-          name: "location_id",
-          label: "Storage Location",
-          type: "select",
-          colSpan: 6,
-          dynamicOptions: {
-            table: "locations",
-            labelField: "name",
-            valueField: "id",
-            filter: { is_active: true },
-          },
-        },
-        { name: "location_name", label: "Storage Location", editable: false, colSpan: 6 },
       ],
     },
     {
@@ -503,15 +486,10 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
     {
       name: "strain_id",
       label: "Yeast Strain",
-      type: "select",
+      type: "relation",
+      relation: { entity: "yeast", displayField: "name" },
       required: true,
       colSpan: 6,
-      dynamicOptions: {
-        table: "yeasts",
-        labelField: "name",
-        valueField: "id",
-        filter: { is_active: true },
-      },
     },
     {
       name: "source_type",
@@ -534,7 +512,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       type: "select",
       colSpan: 6,
       dynamicOptions: {
-        table: "yeast_pitches_with_details",
+        table: "yeast_pitches_with_remaining",
         labelField: "strain_name",
         valueField: "id",
         filter: { status: "in_use" },
@@ -542,31 +520,42 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       description: "Select parent pitch when recording a harvest",
     },
     {
-      name: "batch_id",
-      label: "Pitched Into Batch",
-      type: "select",
+      name: "vessel_id",
+      label: "Brink",
+      type: "relation",
+      relation: { entity: "vessel", displayField: "name" },
       colSpan: 6,
-      dynamicOptions: {
-        table: "batches",
-        labelField: "name",
-        valueField: "id",
-        orderBy: "created_at",
-      },
-      description: "Batch this pitch was used for (if already pitched)",
+    },
+    {
+      name: "quantity_lbs",
+      label: "Quantity (lbs)",
+      type: "number",
+      placeholder: "e.g., 30",
+      description: "Weight of yeast slurry in pounds",
+      colSpan: 4,
     },
     {
       name: "volume_ml",
       label: "Volume (mL)",
       type: "number",
       placeholder: "e.g., 100",
+      description: "Volume for liquid purchases",
       colSpan: 4,
     },
     {
-      name: "cell_count_billion",
-      label: "Cell Count (Billion)",
+      name: "cell_count_thousand",
+      label: "Cell Count (Thousand)",
       type: "number",
-      placeholder: "e.g., 200",
-      description: "Estimated billion cells",
+      placeholder: "e.g., 200000",
+      description: "Estimated cells in thousands",
+      colSpan: 4,
+    },
+    {
+      name: "cell_density_thousand",
+      label: "Cell Density (Thousand/mL)",
+      type: "number",
+      placeholder: "e.g., 1000",
+      description: "Cells per mL in thousands",
       colSpan: 4,
     },
     {
@@ -608,14 +597,9 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
     {
       name: "location_id",
       label: "Storage Location",
-      type: "select",
+      type: "relation",
+      relation: { entity: "location", displayField: "name" },
       colSpan: 6,
-      dynamicOptions: {
-        table: "locations",
-        labelField: "name",
-        valueField: "id",
-        filter: { is_active: true },
-      },
     },
     {
       name: "notes",
@@ -636,6 +620,14 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       type: "hasMany",
       foreignKey: "parent_pitch_id",
     },
+    {
+      name: "pitch_events",
+      entity: "yeast_pitch_event",
+      type: "hasMany",
+      foreignKey: "pitch_id",
+      showInDetail: true,
+      detailTab: "Usage History",
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -645,10 +637,11 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
     "Show available yeast pitches",
     "What's the viability of our lager yeast?",
     "List pitches from WLP001",
-    "Show yeast in use",
-    "Find pitches ready to harvest",
+    "Show yeast in stock",
     "What generation is our house yeast at?",
+    "How much yeast is remaining in the brink?",
+    "Show pitch usage history",
   ],
 
-  keyFields: ["strain_id", "source_type", "status", "generation", "estimated_viability", "batch_id"],
+  keyFields: ["strain_id", "source_type", "status", "generation", "estimated_viability", "vessel_id", "quantity_remaining_lbs"],
 };

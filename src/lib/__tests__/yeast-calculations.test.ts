@@ -6,6 +6,8 @@ import {
   estimateCellsFromPackage,
   estimateCellsFromSlurry,
   calculatePitchingRate,
+  calculatePitchWeightLbs,
+  formatCellCount,
   shouldReplaceYeast,
   estimateHarvestVolume,
   estimatePostHarvestViability,
@@ -105,26 +107,26 @@ describe("daysUntilViabilityThreshold", () => {
 // =============================================================================
 
 describe("estimateCellsFromPackage", () => {
-  it("estimates 100B cells for fresh liquid pack", () => {
+  it("estimates 100B (100,000,000 thousand) cells for fresh liquid pack", () => {
     const result = estimateCellsFromPackage("liquid", 1, 100);
-    expect(result.cellsBillion).toBe(100);
+    expect(result.cellsThousand).toBe(100_000_000);
   });
 
-  it("estimates 200B cells for fresh dry packet", () => {
+  it("estimates 200B (200,000,000 thousand) cells for fresh dry packet", () => {
     const result = estimateCellsFromPackage("dry", 1, 100);
-    expect(result.cellsBillion).toBe(200);
+    expect(result.cellsThousand).toBe(200_000_000);
   });
 
   it("scales with package count", () => {
     const one = estimateCellsFromPackage("liquid", 1, 95);
     const two = estimateCellsFromPackage("liquid", 2, 95);
-    expect(two.cellsBillion).toBeCloseTo(one.cellsBillion * 2, 1);
+    expect(two.cellsThousand).toBeCloseTo(one.cellsThousand * 2, 1);
   });
 
   it("reduces cells with lower viability", () => {
     const high = estimateCellsFromPackage("liquid", 1, 95);
     const low = estimateCellsFromPackage("liquid", 1, 50);
-    expect(low.cellsBillion).toBeLessThan(high.cellsBillion);
+    expect(low.cellsThousand).toBeLessThan(high.cellsThousand);
   });
 
   it("confidence is high for good viability", () => {
@@ -146,13 +148,13 @@ describe("estimateCellsFromSlurry", () => {
   it("dense slurry has more cells per mL", () => {
     const dense = estimateCellsFromSlurry(100, "dense", 85);
     const thin = estimateCellsFromSlurry(100, "thin", 85);
-    expect(dense.cellsBillion).toBeGreaterThan(thin.cellsBillion);
+    expect(dense.cellsThousand).toBeGreaterThan(thin.cellsThousand);
   });
 
   it("scales with volume", () => {
     const small = estimateCellsFromSlurry(100, "medium", 85);
     const large = estimateCellsFromSlurry(200, "medium", 85);
-    expect(large.cellsBillion).toBeCloseTo(small.cellsBillion * 2, 1);
+    expect(large.cellsThousand).toBeCloseTo(small.cellsThousand * 2, 1);
   });
 });
 
@@ -161,9 +163,11 @@ describe("estimateCellsFromSlurry", () => {
 // =============================================================================
 
 describe("calculatePitchingRate", () => {
-  it("calculates cells needed for ale", () => {
+  it("calculates cells needed for ale (in thousands)", () => {
     const result = calculatePitchingRate(7, 12, "ale");
     expect(result.cellsNeeded).toBeGreaterThan(0);
+    // 7 BBL ale at 12P should need hundreds of billions = hundreds of millions of thousands
+    expect(result.cellsNeeded).toBeGreaterThan(100_000_000);
   });
 
   it("lager needs more cells than ale", () => {
@@ -179,17 +183,91 @@ describe("calculatePitchingRate", () => {
   });
 
   it("recommends starter when cells are insufficient", () => {
-    const result = calculatePitchingRate(7, 12, "ale", 50);
+    // Pass available cells in thousands: 50B = 50,000,000 thousand
+    const result = calculatePitchingRate(7, 12, "ale", 50_000_000);
     // 7 BBL ale at 12P needs a lot of cells
-    if (result.cellsNeeded > 100) {
-      expect(result.starterRecommended).toBe(true);
-    }
+    expect(result.starterRecommended).toBe(true);
   });
 
   it("does not recommend starter when cells are sufficient", () => {
-    // Small batch with lots of cells available
-    const result = calculatePitchingRate(0.5, 10, "ale", 5000);
+    // Small batch with lots of cells available (5000B = 5,000,000,000 thousand)
+    const result = calculatePitchingRate(0.5, 10, "ale", 5_000_000_000_000);
     expect(result.starterRecommended).toBe(false);
+  });
+});
+
+// =============================================================================
+// Weight-Based Pitching
+// =============================================================================
+
+describe("calculatePitchWeightLbs", () => {
+  it("calculates correct lbs for normal case", () => {
+    // Need 500,000,000 thousand cells, density 100,000,000 thousand/lb, 90% viability
+    // Viable per lb = 100,000,000 * 0.9 = 90,000,000
+    // lbs = 500,000,000 / 90,000,000 = 5.555... -> ceil to 5.6
+    const lbs = calculatePitchWeightLbs(500_000_000, 100_000_000, 90);
+    expect(lbs).toBe(5.6);
+  });
+
+  it("returns 0 when density is zero", () => {
+    expect(calculatePitchWeightLbs(500_000_000, 0, 90)).toBe(0);
+  });
+
+  it("returns 0 when viability is zero", () => {
+    expect(calculatePitchWeightLbs(500_000_000, 100_000_000, 0)).toBe(0);
+  });
+
+  it("rounds up to nearest 0.1 lb", () => {
+    // Need 100,000,000 thousand cells, density 100,000,000 thousand/lb, 95% viability
+    // Viable per lb = 100,000,000 * 0.95 = 95,000,000
+    // lbs = 100,000,000 / 95,000,000 = 1.0526... -> ceil to 1.1
+    const lbs = calculatePitchWeightLbs(100_000_000, 100_000_000, 95);
+    expect(lbs).toBe(1.1);
+  });
+
+  it("returns exact value when division is clean", () => {
+    // Need 100,000,000 thousand cells, density 100,000,000 thousand/lb, 100% viability
+    // lbs = 100,000,000 / 100,000,000 = 1.0 exactly
+    const lbs = calculatePitchWeightLbs(100_000_000, 100_000_000, 100);
+    expect(lbs).toBe(1.0);
+  });
+});
+
+// =============================================================================
+// Cell Count Formatting
+// =============================================================================
+
+describe("formatCellCount", () => {
+  it("formats billions: 1,000,000 thousand -> '1B'", () => {
+    expect(formatCellCount(1_000_000)).toBe("1B");
+  });
+
+  it("formats billions with decimals: 1,500,000 thousand -> '1.5B'", () => {
+    expect(formatCellCount(1_500_000)).toBe("1.5B");
+  });
+
+  it("formats millions: 1,000 thousand -> '1M'", () => {
+    expect(formatCellCount(1_000)).toBe("1M");
+  });
+
+  it("formats millions with decimals: 450,500 thousand -> '450.5M'", () => {
+    expect(formatCellCount(450_500)).toBe("450.5M");
+  });
+
+  it("formats thousands: 500 -> '500K'", () => {
+    expect(formatCellCount(500)).toBe("500K");
+  });
+
+  it("formats small thousands: 1 -> '1K'", () => {
+    expect(formatCellCount(1)).toBe("1K");
+  });
+
+  it("strips trailing zeros in billions: 2,000,000 thousand -> '2B'", () => {
+    expect(formatCellCount(2_000_000)).toBe("2B");
+  });
+
+  it("strips trailing zeros in millions: 100,000 thousand -> '100M'", () => {
+    expect(formatCellCount(100_000)).toBe("100M");
   });
 });
 

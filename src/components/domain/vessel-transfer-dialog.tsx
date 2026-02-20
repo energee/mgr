@@ -3,8 +3,14 @@
 /**
  * VesselTransferDialog - Transfer a batch to a different vessel
  *
- * Used from batch detail when the "Move to Conditioning" action is triggered.
- * Creates a vessel_transfer record and updates batch status to conditioning.
+ * Creates a vessel_transfer record. Does NOT directly update batch status.
+ * Instead, suggests a state transition based on the destination vessel type
+ * via the `onSuggestTransition` callback, allowing the caller to handle
+ * state changes through proper state machine transitions.
+ *
+ * Suggestion logic:
+ * - planned batch -> fermenter/unitank => suggest "fermenting"
+ * - fermenting batch -> brite tank => suggest "conditioning"
  */
 
 import { useForm } from "react-hook-form";
@@ -51,12 +57,20 @@ type VesselTransferFormValues = z.infer<typeof vesselTransferSchema>;
 interface VesselTransferDialogProps {
   batchId: string;
   batchNumber: string;
+  /** Current batch status, used to determine smart state suggestions. */
+  batchStatus?: string;
   fromVesselId: string | null;
   fromVesselName: string | null;
   currentVolume?: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /**
+   * Called after a successful transfer when a state transition is suggested
+   * based on the destination vessel type. The caller is responsible for
+   * presenting the suggestion and executing the transition if confirmed.
+   */
+  onSuggestTransition?: (toState: string, vesselName: string) => void;
 }
 
 // =============================================================================
@@ -66,12 +80,14 @@ interface VesselTransferDialogProps {
 export function VesselTransferDialog({
   batchId,
   batchNumber,
+  batchStatus,
   fromVesselId,
   fromVesselName,
   currentVolume,
   open,
   onOpenChange,
   onSuccess,
+  onSuggestTransition,
 }: VesselTransferDialogProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
@@ -123,25 +139,37 @@ export function VesselTransferDialog({
 
       if (transferError) throw transferError;
 
-      // Update batch status to conditioning
-      const { error: statusError } = await supabase
-        .from("batches")
-        .update({ status: "conditioning" })
-        .eq("id", batchId);
-
-      if (statusError) throw statusError;
-
-      return availableVessels?.find((v) => v.id === values.to_vessel_id)?.name;
+      // Return destination vessel info for smart state suggestion in onSuccess
+      const destVessel = availableVessels?.find((v) => v.id === values.to_vessel_id);
+      return { vesselName: destVessel?.name, vesselType: destVessel?.vessel_type };
     },
-    onSuccess: (vesselName) => {
+    onSuccess: ({ vesselName, vesselType }) => {
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
       queryClient.invalidateQueries({ queryKey: vesselKeys.all() });
       queryClient.invalidateQueries({ queryKey: vesselKeys.transfers() });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("vessel_transfers") });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("vessel_transfers_with_details") });
-      toast.success(`Batch ${batchNumber} transferred to ${vesselName}`);
+      toast.success(`Transfer recorded: ${batchNumber} to ${vesselName || "vessel"}`);
       onOpenChange(false);
       form.reset();
+
+      // Suggest a state transition based on destination vessel type
+      if (batchStatus && onSuggestTransition) {
+        let suggestedState: string | undefined;
+        if (
+          batchStatus === "planned" &&
+          (vesselType === "fermenter" || vesselType === "unitank")
+        ) {
+          suggestedState = "fermenting";
+        } else if (batchStatus === "fermenting" && vesselType === "brite") {
+          suggestedState = "conditioning";
+        }
+
+        if (suggestedState) {
+          onSuggestTransition(suggestedState, vesselName || "vessel");
+        }
+      }
+
       onSuccess?.();
     },
     onError: (error) => {
@@ -165,11 +193,11 @@ export function VesselTransferDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowRight className="h-5 w-5" />
-            Move to Conditioning
+            Transfer Vessel
           </DialogTitle>
           <DialogDescription>
             Transfer batch {batchNumber} from{" "}
-            {fromVesselName || "kettle"} to a conditioning vessel.
+            {fromVesselName || "kettle"} to another vessel.
           </DialogDescription>
         </DialogHeader>
 
