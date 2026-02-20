@@ -3,17 +3,22 @@
 /**
  * Batch Detail Page
  *
- * Custom batch detail that wraps EntityDetail with batch-specific
- * action handling (e.g., start fermentation dialog, cancellation dialog).
+ * Custom batch detail that wraps EntityDetailUnified with batch-specific
+ * action handling: Transfer, Pitch Yeast, Harvest Yeast, Blend, and
+ * Cancel/Archive dialogs. State transitions (planned -> fermenting,
+ * fermenting -> conditioning) are suggested via toast after actions
+ * rather than being direct state-change buttons.
  */
 
 import { use, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { batchEntity } from "@/entities/batch";
-import { StartFermentationDialog } from "@/components/domain/start-fermentation-dialog";
+import { PitchYeastDialog } from "@/components/domain/pitch-yeast-dialog";
+import { YeastHarvestDialog } from "@/components/domain/yeast-harvest-dialog";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/vessel-transfer-dialog";
@@ -35,15 +40,18 @@ export default function BatchDetailPage({
     const { openDialog } = usePrefillStore.getState().consume();
     return openDialog;
   });
-  const [showStartFermentation, setShowStartFermentation] = useState(
-    prefillDialog === "start_fermentation"
+  const [showPitchYeast, setShowPitchYeast] = useState(
+    prefillDialog === "pitch_yeast"
+  );
+  const [showHarvestYeast, setShowHarvestYeast] = useState(
+    prefillDialog === "harvest_yeast"
   );
   const [showCancellation, setShowCancellation] = useState(
     prefillDialog === "cancel" || prefillDialog === "archive"
   );
   const [showBlend, setShowBlend] = useState(prefillDialog === "blend");
   const [showTransfer, setShowTransfer] = useState(
-    prefillDialog === "transfer_vessel"
+    prefillDialog === "transfer" || prefillDialog === "transfer_vessel"
   );
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
 
@@ -52,6 +60,18 @@ export default function BatchDetailPage({
   const router = useRouter();
 
   // Fetch batch data for the dialogs (use view to get vessel info)
+  // The view includes target_og via b.* but generated types are stale; use type extension
+  type BatchDetail = {
+    id: string;
+    batch_number: string;
+    name: string;
+    status: string;
+    volume_bbl: number | null;
+    target_og: number | null;
+    current_vessel_id: string | null;
+    current_vessel_name: string | null;
+    recipe_id: string | null;
+  };
   const { data: batch } = useQuery({
     queryKey: batchKeys.detail(id),
     queryFn: async () => {
@@ -61,7 +81,8 @@ export default function BatchDetailPage({
         .eq("id", id)
         .single();
       if (error) throw error;
-      return data;
+      // target_og is available in the view (via b.*) but not in generated types yet
+      return data as unknown as BatchDetail;
     },
   });
 
@@ -98,6 +119,18 @@ export default function BatchDetailPage({
     enabled: !!batch?.recipe_id,
   });
 
+  // Fetch batch yeast data for the harvest dialog (which strains were pitched)
+  const { data: batchYeastData = [] } = useQuery({
+    queryKey: batchKeys.yeastSummary(id),
+    queryFn: async () => {
+      const { data: result } = await (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (column: string, value: string) => PromiseLike<{ data: Array<{ pitch_id: string; strain_id: string; strain_name: string; generation: number }> | null; error: unknown }> } } })
+        .from("batch_yeast_summary")
+        .select("pitch_id, strain_id, strain_name, generation")
+        .eq("batch_id", id);
+      return result || [];
+    },
+  });
+
   // Breadcrumb: Recipe -> Brew Log -> Batch
   const breadcrumbSegments = useMemo(() => {
     const segments: { label: string; href?: string }[] = [];
@@ -128,11 +161,12 @@ export default function BatchDetailPage({
     }
     if (batch.status === "planned" && linkedBrewLogs?.length) {
       return {
-        message: "Brew is linked. Start fermentation when ready.",
+        message: "Brew is linked. Transfer to a fermenter or pitch yeast to begin.",
         variant: "info" as const,
         actions: [
           { label: "View Brew Log", href: `/production/brew-logs/${linkedBrewLogs[0].brew_log_id}` },
-          { label: "Start Fermentation", onClick: () => setShowStartFermentation(true) },
+          { label: "Transfer", onClick: () => setShowTransfer(true) },
+          { label: "Pitch Yeast", onClick: () => setShowPitchYeast(true) },
         ],
       };
     }
@@ -166,18 +200,29 @@ export default function BatchDetailPage({
   // Custom action handler for batch-specific actions.
   // Returns true when the action is handled by a dialog, false to let EntityDetail handle it.
   const handleAction = useCallback((actionName: string) => {
-    const dialogSetters: Record<string, (open: boolean) => void> = {
-      start_fermentation: setShowStartFermentation,
-      cancel: setShowCancellation,
-      archive: setShowCancellation, // Same dialog adapts based on batch status
-      blend: setShowBlend,
-      transfer_vessel: setShowTransfer,
-      start_brew_day: setShowStartBrewDay,
-    };
-
-    const setter = dialogSetters[actionName];
-    if (setter) {
-      setter(true);
+    if (actionName === "start_brew_day") {
+      setShowStartBrewDay(true);
+      return true;
+    }
+    if (actionName === "transfer") {
+      setShowTransfer(true);
+      return true;
+    }
+    if (actionName === "pitch_yeast") {
+      setShowPitchYeast(true);
+      return true;
+    }
+    if (actionName === "harvest_yeast") {
+      setShowHarvestYeast(true);
+      return true;
+    }
+    // Both cancel and archive use the same dialog (it adapts based on status)
+    if (actionName === "cancel" || actionName === "archive") {
+      setShowCancellation(true);
+      return true;
+    }
+    if (actionName === "blend") {
+      setShowBlend(true);
       return true;
     }
     return false;
@@ -185,6 +230,7 @@ export default function BatchDetailPage({
 
   const handleDialogSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+    queryClient.invalidateQueries({ queryKey: batchKeys.yeastSummary(id) });
   }, [queryClient, id]);
 
   const handleBrewDayCreated = useCallback(
@@ -196,6 +242,32 @@ export default function BatchDetailPage({
     },
     [queryClient, id, router]
   );
+
+  /** Suggest a batch state transition via a toast confirmation. */
+  const handleSuggestTransition = useCallback(async (toState: string) => {
+    const stateLabel = toState === "fermenting" ? "fermenting" : toState === "conditioning" ? "conditioning" : toState;
+
+    toast(`Mark batch as ${stateLabel}?`, {
+      action: {
+        label: "Yes, update",
+        onClick: async () => {
+          const client = createClient();
+          const { error } = await client
+            .from("batches")
+            .update({ status: toState })
+            .eq("id", id);
+          if (error) {
+            toast.error("Failed to update status");
+          } else {
+            queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+            toast.success(`Batch marked as ${stateLabel}`);
+          }
+        },
+      },
+      cancel: { label: "Not yet", onClick: () => {} },
+      duration: 10000,
+    });
+  }, [id, queryClient]);
 
   return (
     <div className="space-y-4">
@@ -218,12 +290,24 @@ export default function BatchDetailPage({
 
       {batch && batch.id && batch.batch_number && (
         <>
-          <StartFermentationDialog
+          <PitchYeastDialog
+            open={showPitchYeast}
+            onOpenChange={setShowPitchYeast}
             batchId={batch.id}
-            batchNumber={batch.batch_number}
-            plannedVolume={batch.volume_bbl}
-            open={showStartFermentation}
-            onOpenChange={setShowStartFermentation}
+            batchName={batch.name}
+            batchStatus={batch.status}
+            batchVolumeBbl={batch.volume_bbl}
+            recipeOg={batch.target_og}
+            onSuccess={handleDialogSuccess}
+            onSuggestTransition={(state) => handleSuggestTransition(state)}
+          />
+
+          <YeastHarvestDialog
+            open={showHarvestYeast}
+            onOpenChange={setShowHarvestYeast}
+            batchId={batch.id}
+            batchName={batch.name}
+            pitchedStrains={batchYeastData}
             onSuccess={handleDialogSuccess}
           />
 
@@ -251,12 +335,14 @@ export default function BatchDetailPage({
           <VesselTransferDialog
             batchId={batch.id}
             batchNumber={batch.batch_number}
+            batchStatus={batch.status}
             fromVesselId={batch.current_vessel_id}
             fromVesselName={batch.current_vessel_name}
             currentVolume={batch.volume_bbl}
             open={showTransfer}
             onOpenChange={setShowTransfer}
             onSuccess={handleDialogSuccess}
+            onSuggestTransition={(state) => handleSuggestTransition(state)}
           />
 
           <StartBrewDayDialog

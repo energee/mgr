@@ -2,7 +2,7 @@
  * Vessel Entity Configuration
  *
  * Vessels are the physical containers used in the brewing process:
- * fermenters, brites, kettles, mash tuns, HLTs, and unitanks.
+ * fermenters, brites, kettles, mash tuns, HLTs, unitanks, foeders, barrels, and brinks.
  *
  * State machine tracks the cleaning workflow:
  * dirty → caustic_cleaned → ready_for_use → in_use → dirty
@@ -40,6 +40,7 @@ const vesselTypeDisplayConfig: ValueDisplayConfig = {
     unitank: { label: "Unitank" },
     foeder: { label: "Foeder" },
     barrel: { label: "Barrel" },
+    brink: { label: "Brink" },
   },
 };
 
@@ -53,6 +54,7 @@ export const VESSEL_TYPES = [
   { value: "unitank", label: "Unitank" },
   { value: "foeder", label: "Foeder" },
   { value: "barrel", label: "Barrel" },
+  { value: "brink", label: "Brink" },
 ] as const;
 
 export type VesselType = (typeof VESSEL_TYPES)[number]["value"];
@@ -72,6 +74,7 @@ export const vesselSchema = z.object({
     "unitank",
     "foeder",
     "barrel",
+    "brink",
   ]),
   capacity_bbl: z.coerce.number().min(0, "Capacity must be positive"),
   location_id: z.string().uuid().nullable().optional(),

@@ -26,6 +26,7 @@ import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-in
 import { BatchInsights } from "@/components/domain/batch-insights";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { BatchBlendHistory } from "@/components/domain/batch-blend-history";
+import { BatchYeastSection } from "@/components/domain/batch-yeast-section";
 import { batchSchema, batchStates, batchTransitions } from "@/lib/schemas/batch";
 
 // Re-export schema so existing client-side imports keep working
@@ -210,6 +211,11 @@ export const batchEntity: EntityConfig<Batch> = {
       component: BatchBrewInfo,
     },
     {
+      id: "yeast",
+      title: "Yeast",
+      component: BatchYeastSection,
+    },
+    {
       id: "additions",
       title: "Cold-Side Additions",
       component: BatchAdditionsDisplay,
@@ -321,6 +327,11 @@ export const batchEntity: EntityConfig<Batch> = {
       id: "brew-info",
       title: "Brewing",
       component: BatchBrewInfo,
+    },
+    {
+      id: "yeast",
+      title: "Yeast",
+      component: BatchYeastSection,
     },
     {
       id: "ai-insights",
@@ -465,26 +476,34 @@ export const batchEntity: EntityConfig<Batch> = {
       fromStates: ["planned"],
     },
     {
-      name: "start_fermentation",
-      label: "Start Fermentation",
-      icon: "flask",
-      type: "button",
-      fromStates: ["planned"],
-      toState: "fermenting",
+      name: "transfer",
+      label: "Transfer",
+      icon: "arrow-right",
+      type: "button" as const,
+      fromStates: ["planned", "fermenting", "conditioning"],
+      // No toState — suggested by dialog based on vessel type
     },
     {
-      name: "transfer_vessel",
-      label: "Move to Conditioning",
-      icon: "arrow-right",
-      type: "button",
-      fromStates: ["fermenting"],
-      toState: "conditioning",
+      name: "pitch_yeast",
+      label: "Pitch Yeast",
+      icon: "flask",
+      type: "button" as const,
+      fromStates: ["planned", "fermenting"],
+      // No toState — suggested after pitch
+    },
+    {
+      name: "harvest_yeast",
+      label: "Harvest Yeast",
+      icon: "download",
+      type: "button" as const,
+      fromStates: ["fermenting", "conditioning"],
+      // No toState
     },
     {
       name: "start_packaging",
       label: "Start Packaging",
       icon: "package",
-      type: "button",
+      type: "button" as const,
       fromStates: ["conditioning"],
       toState: "packaging",
     },
@@ -492,7 +511,7 @@ export const batchEntity: EntityConfig<Batch> = {
       name: "complete",
       label: "Complete",
       icon: "check",
-      type: "button",
+      type: "button" as const,
       fromStates: ["packaging"],
       toState: "completed",
     },
@@ -500,29 +519,26 @@ export const batchEntity: EntityConfig<Batch> = {
       name: "blend",
       label: "Blend Batches",
       icon: "git-merge",
-      type: "dropdown",
+      type: "dropdown" as const,
       fromStates: ["fermenting", "conditioning"],
-      // Opens BatchBlendDialog - no state transition, just records blend sources
     },
     {
       name: "cancel",
       label: "Cancel Batch",
       icon: "x",
-      type: "dropdown",
-      variant: "destructive",
+      type: "dropdown" as const,
+      variant: "destructive" as const,
       fromStates: ["planned"],
       toState: "cancelled",
-      // Simple cancel for planned batches - no loss to record
     },
     {
       name: "archive",
       label: "Archive Batch",
       icon: "archive",
-      type: "dropdown",
-      variant: "destructive",
+      type: "dropdown" as const,
+      variant: "destructive" as const,
       fromStates: ["fermenting", "conditioning", "packaging"],
       toState: "archived",
-      // Uses BatchArchiveDialog for in-progress batches - records loss
     },
   ],
 
@@ -561,6 +577,13 @@ export const batchEntity: EntityConfig<Batch> = {
       showInDetail: true,
       detailTab: "Transfers",
       hideAdd: true,
+    },
+    {
+      name: "yeast_events",
+      entity: "yeast_pitch_event",
+      type: "hasMany",
+      foreignKey: "batch_id",
+      showInDetail: false, // shown via custom BatchYeastSection
     },
   ],
 

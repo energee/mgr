@@ -111,6 +111,8 @@ export const batchKeys = {
   brewSummary: (id: string) => ["batch-brew-summary", id] as const,
   brewLogLinks: (id: string) => ["batch-brew-log-links", id] as const,
   availableBrewLogs: (id: string) => ["available-brew-logs", id] as const,
+  yeast: (id: string) => ["batches", id, "yeast"] as const,
+  yeastSummary: (id: string) => ["batch-yeast-summary", id] as const,
 };
 
 // =============================================================================
@@ -309,9 +311,11 @@ export const purchaseOrderKeys = {
 export const yeastKeys = {
   all: () => ["yeast-pitches"] as const,
   detail: (id: string) => ["yeast-pitches", id] as const,
+  available: () => ["yeast-pitches", "available"] as const,
   lineageRoot: (pitchId: string) => ["yeast-lineage-root", pitchId] as const,
   lineage: (rootId: string | undefined) => ["yeast-lineage", rootId] as const,
   lineageSummary: (rootId: string | undefined) => ["yeast-lineage-summary", rootId] as const,
+  events: (pitchId: string) => ["yeast-pitch-events", pitchId] as const,
 };
 
 // =============================================================================
@@ -474,6 +478,7 @@ export const vesselKeys = {
   available: () => ["vessels", "available"] as const,
   availableForCompletion: () => ["vessels", "available", "completion"] as const,
   transfers: () => ["vessel_transfers"] as const,
+  brinks: () => ["vessels", "brinks"] as const,
 };
 
 // =============================================================================

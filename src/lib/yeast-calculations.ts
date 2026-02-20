@@ -18,14 +18,15 @@ export interface ViabilityResult {
 }
 
 export interface PitchingRateResult {
-  cellsNeeded: number; // billions of cells
+  cellsNeeded: number; // thousands of cells
   packagesNeeded: number;
   starterRecommended: boolean;
   starterVolumeMl: number | null;
+  lbsNeeded?: number;
 }
 
 export interface CellCountEstimate {
-  cellsBillion: number;
+  cellsThousand: number;
   confidence: "high" | "medium" | "low";
   notes: string;
 }
@@ -96,19 +97,24 @@ export function daysUntilViabilityThreshold(
 /**
  * Estimate cell count from liquid yeast package.
  *
- * Fresh liquid yeast pack: ~100 billion cells
- * Dry yeast packet (11g): ~200 billion cells
+ * Fresh liquid yeast pack: ~100 billion cells = 100,000,000 thousand cells
+ * Dry yeast packet (11g): ~200 billion cells = 200,000,000 thousand cells
+ *
+ * @returns Cell count in thousands
  */
 export function estimateCellsFromPackage(
   form: YeastForm,
   packageCount: number = 1,
   viability: number = 95
 ): CellCountEstimate {
-  const baseCells = form === "liquid" ? 100 : 200;
-  const viableCells = baseCells * (viability / 100) * packageCount;
+  // Base cells in billions, then convert to thousands (* 1,000,000)
+  const baseCellsBillion = form === "liquid" ? 100 : 200;
+  const viableCellsBillion =
+    baseCellsBillion * (viability / 100) * packageCount;
+  const viableCellsThousand = viableCellsBillion * 1_000_000;
 
   return {
-    cellsBillion: Math.round(viableCells * 10) / 10,
+    cellsThousand: Math.round(viableCellsThousand * 10) / 10,
     confidence: viability > 80 ? "high" : viability > 50 ? "medium" : "low",
     notes:
       form === "liquid"
@@ -120,20 +126,26 @@ export function estimateCellsFromPackage(
 /**
  * Estimate cell count from harvested slurry.
  *
- * Dense slurry: ~1 billion cells per mL
- * Medium slurry: ~0.5 billion cells per mL
- * Thin slurry: ~0.25 billion cells per mL
+ * Dense slurry: ~1 billion cells per mL = 1,000,000 thousand per mL
+ * Medium slurry: ~0.5 billion cells per mL = 500,000 thousand per mL
+ * Thin slurry: ~0.25 billion cells per mL = 250,000 thousand per mL
+ *
+ * @returns Cell count in thousands
  */
 export function estimateCellsFromSlurry(
   volumeMl: number,
   density: "dense" | "medium" | "thin" = "medium",
   viability: number = 85
 ): CellCountEstimate {
-  const cellsPerMl = density === "dense" ? 1.0 : density === "medium" ? 0.5 : 0.25;
-  const viableCells = volumeMl * cellsPerMl * (viability / 100);
+  // Cells per mL in billions, then convert result to thousands (* 1,000,000)
+  const cellsPerMlBillion =
+    density === "dense" ? 1.0 : density === "medium" ? 0.5 : 0.25;
+  const viableCellsBillion =
+    volumeMl * cellsPerMlBillion * (viability / 100);
+  const viableCellsThousand = viableCellsBillion * 1_000_000;
 
   return {
-    cellsBillion: Math.round(viableCells * 10) / 10,
+    cellsThousand: Math.round(viableCellsThousand * 10) / 10,
     confidence: "medium",
     notes: `Based on ${volumeMl}mL ${density} slurry at ${viability}% viability`,
   };
@@ -161,39 +173,51 @@ const PITCHING_RATES: Record<FermentationType, number> = {
 /**
  * Calculate required pitching rate and recommendations.
  *
+ * The formula uses million cells/mL/degP x volume x gravity, then converts
+ * the result to thousands. The intermediate result is in millions of cells:
+ *   cellsMillions = volumeMl * gravityPlato * pitchingRate
+ * Converting millions to thousands: multiply by 1,000.
+ *
  * @param volumeBbl - Batch volume in barrels
  * @param gravityPlato - Original gravity in Plato
  * @param fermentationType - Type of fermentation
- * @param availableCellsBillion - Available viable cells (optional)
+ * @param availableCellsThousand - Available viable cells in thousands (optional)
+ * @returns cellsNeeded in thousands
  */
 export function calculatePitchingRate(
   volumeBbl: number,
   gravityPlato: number,
   fermentationType: FermentationType = "ale",
-  availableCellsBillion?: number
+  availableCellsThousand?: number
 ): PitchingRateResult {
   // Convert BBL to mL (1 BBL = 117,348 mL)
   const volumeMl = volumeBbl * 117348;
 
-  // Calculate cells needed
+  // Calculate cells needed in millions (pitching rate is million cells/mL/degP)
   const pitchingRate = PITCHING_RATES[fermentationType];
-  const cellsNeeded = (volumeMl * gravityPlato * pitchingRate) / 1000; // billions
+  const cellsNeededMillions = volumeMl * gravityPlato * pitchingRate;
 
-  // Calculate packages needed (assuming 100B cells per liquid pack)
-  const packagesNeeded = Math.ceil(cellsNeeded / 100);
+  // Convert millions to thousands (* 1,000)
+  const cellsNeededThousand = cellsNeededMillions * 1_000;
+
+  // Calculate packages needed (assuming 100B = 100,000,000 thousand cells per liquid pack)
+  const cellsPerPackThousand = 100_000_000;
+  const packagesNeeded = Math.ceil(cellsNeededThousand / cellsPerPackThousand);
 
   // Determine if starter is recommended
   let starterRecommended = false;
   let starterVolumeMl: number | null = null;
 
-  if (availableCellsBillion !== undefined) {
-    const shortage = cellsNeeded - availableCellsBillion;
-    if (shortage > 50) {
-      // Need more than 50B additional cells
+  if (availableCellsThousand !== undefined) {
+    const shortageThousand = cellsNeededThousand - availableCellsThousand;
+    // 50B = 50,000,000 thousand
+    if (shortageThousand > 50_000_000) {
       starterRecommended = true;
-      // Starter can double cell count in ~24 hours with proper aeration
       // Rough estimate: 100mL starter per 10B cells needed
-      starterVolumeMl = Math.ceil((shortage * 100) / 10) * 100; // Round to nearest 100mL
+      // 10B = 10,000,000 thousand
+      const shortageBillion = shortageThousand / 1_000_000;
+      starterVolumeMl =
+        Math.ceil((shortageBillion * 100) / 10) * 100; // Round to nearest 100mL
     }
   } else if (packagesNeeded > 2) {
     // Without knowing available cells, recommend starter if >2 packs needed
@@ -202,7 +226,7 @@ export function calculatePitchingRate(
   }
 
   return {
-    cellsNeeded: Math.round(cellsNeeded * 10) / 10,
+    cellsNeeded: Math.round(cellsNeededThousand * 10) / 10,
     packagesNeeded,
     starterRecommended,
     starterVolumeMl,
@@ -301,6 +325,59 @@ export function estimateHarvestVolume(
     volumeMlMax: Math.round(batchVolumeBbl * baseRates.max * flocMultiplier),
   };
 }
+
+// =============================================================================
+// Weight-Based Pitching
+// =============================================================================
+
+/**
+ * Calculate how many lbs to pitch from a brink given batch requirements.
+ *
+ * @param cellsNeededThousand - Total cells needed (thousands)
+ * @param cellDensityThousandPerLb - Cell density of brink (thousands per lb)
+ * @param viability - Current viability percentage (0-100)
+ * @returns Weight in lbs to pitch, rounded up to nearest 0.1 lb
+ */
+export function calculatePitchWeightLbs(
+  cellsNeededThousand: number,
+  cellDensityThousandPerLb: number,
+  viability: number
+): number {
+  if (cellDensityThousandPerLb <= 0 || viability <= 0) return 0;
+  const viableCellsPerLb = cellDensityThousandPerLb * (viability / 100);
+  return Math.ceil((cellsNeededThousand / viableCellsPerLb) * 10) / 10;
+}
+
+// =============================================================================
+// Cell Count Formatting
+// =============================================================================
+
+/**
+ * Format cell count for display.
+ *
+ * Converts a cell count in thousands to a human-readable string:
+ * - >= 1,000,000 thousand -> billions (e.g. "1.5B")
+ * - >= 1,000 thousand -> millions (e.g. "450M")
+ * - < 1,000 thousand -> thousands (e.g. "500K")
+ *
+ * @param thousand - Cell count in thousands
+ * @returns Human-readable string like "450M" or "750K"
+ */
+export function formatCellCount(thousand: number): string {
+  if (thousand >= 1_000_000) {
+    const billions = thousand / 1_000_000;
+    return `${Number(billions.toFixed(1))}B`;
+  }
+  if (thousand >= 1_000) {
+    const millions = thousand / 1_000;
+    return `${Number(millions.toFixed(1))}M`;
+  }
+  return `${Number(thousand.toFixed(0))}K`;
+}
+
+// =============================================================================
+// Post-Harvest Viability
+// =============================================================================
 
 /**
  * Estimate post-harvest viability.
