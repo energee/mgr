@@ -28,8 +28,8 @@ export interface StyleComplianceResult {
 
 export interface ParameterAnalysis {
   value: number | null;
-  min: number;
-  max: number;
+  min: number | null;
+  max: number | null;
   status: "in_range" | "below_range" | "above_range" | "unknown";
 }
 

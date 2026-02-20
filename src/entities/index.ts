@@ -49,57 +49,36 @@ import { brandEntity } from "./brand";
 import { binEntity } from "./bin";
 import { deliveryEntity } from "./delivery";
 import { locationTransferEntity } from "./location-transfer";
+import { waterProfileEntity } from "./water-profile";
 
 // =============================================================================
 // Register All Entities
 // =============================================================================
 
-// Production domain
-registerEntity(batchEntity);
-registerEntity(brewLogEntity);
-registerEntity(recipeEntity);
-registerEntity(vesselEntity);
-registerEntity(vesselTransferEntity);
-registerEntity(packagingSessionEntity);
-registerEntity(sessionLineItemEntity);
-registerEntity(yeastStrainEntity);
-registerEntity(yeastPitchEntity);
-registerEntity(beerStyleEntity);
-registerEntity(brandEntity);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const allEntities: Array<import("@/types/entity").EntityConfig<any>> = [
+  // Production
+  batchEntity, brewLogEntity, recipeEntity, vesselEntity,
+  vesselTransferEntity, packagingSessionEntity, sessionLineItemEntity,
+  yeastStrainEntity, yeastPitchEntity, beerStyleEntity, brandEntity,
+  // Inventory
+  inventoryItemEntity, inventoryLotEntity, allocationEntity,
+  finishedGoodEntity, packageTypeEntity, kegTypeEntity, kegOwnerEntity,
+  kegInventoryEntity, kegTransactionEntity, binEntity, deliveryEntity,
+  locationTransferEntity,
+  // Sales
+  orderEntity, customerEntity, orderItemEntity, salesChannelEntity,
+  pricingTierEntity, pricingTierPriceEntity, pickListEntity,
+  // Purchasing
+  supplierEntity, purchaseOrderEntity, poLineItemEntity, poReceiveEntity,
+  // Settings
+  locationEntity, userProfileEntity, enumValueEntity,
+  waterProfileEntity,
+];
 
-// Inventory domain
-registerEntity(inventoryItemEntity);
-registerEntity(inventoryLotEntity);
-registerEntity(allocationEntity);
-registerEntity(finishedGoodEntity);
-registerEntity(packageTypeEntity);
-registerEntity(kegTypeEntity);
-registerEntity(kegOwnerEntity);
-registerEntity(kegInventoryEntity);
-registerEntity(kegTransactionEntity);
-registerEntity(binEntity);
-registerEntity(deliveryEntity);
-registerEntity(locationTransferEntity);
-
-// Sales domain
-registerEntity(orderEntity);
-registerEntity(customerEntity);
-registerEntity(orderItemEntity);
-registerEntity(salesChannelEntity);
-registerEntity(pricingTierEntity);
-registerEntity(pricingTierPriceEntity);
-registerEntity(pickListEntity);
-
-// Purchasing domain
-registerEntity(supplierEntity);
-registerEntity(purchaseOrderEntity);
-registerEntity(poLineItemEntity);
-registerEntity(poReceiveEntity);
-
-// Settings domain
-registerEntity(locationEntity);
-registerEntity(userProfileEntity);
-registerEntity(enumValueEntity);
+for (const entity of allEntities) {
+  registerEntity(entity);
+}
 
 // =============================================================================
 // Exports
@@ -175,3 +154,5 @@ export { deliveryEntity } from "./delivery";
 export type { DeliveryFormValues } from "./delivery";
 export { locationTransferEntity } from "./location-transfer";
 export type { LocationTransferFormValues } from "./location-transfer";
+export { waterProfileEntity } from "./water-profile";
+export type { WaterProfileFormValues } from "./water-profile";

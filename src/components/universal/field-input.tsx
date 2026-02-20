@@ -39,6 +39,7 @@ import {
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { UnitInput } from "@/components/ui/unit-input";
 import { X } from "lucide-react";
+import type { FC } from "react";
 import { getColSpanClass } from "./field-utils";
 
 // =============================================================================
@@ -62,6 +63,7 @@ interface FieldDef {
   };
   unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
   allowUnitSwitch?: boolean;
+  quickCreate?: FC<{ onCreated: (id: string) => void }>;
 }
 
 // =============================================================================
@@ -273,43 +275,50 @@ export function renderFieldInput(
       // controlled value="" causes the blur handler to clear the input before React
       // re-renders with the selected UUID.
       const comboboxValue = value != null && value !== "" ? String(value) : undefined;
+      const QuickCreate = field.quickCreate;
       return (
-        <Combobox
-          value={comboboxValue}
-          onValueChange={(v) => onChange(v || null)}
-          disabled={disabled}
-          onFilter={(values, search) => {
-            const term = search.toLowerCase();
-            return values.filter((v) => labelMap.get(v)?.includes(term));
-          }}
-        >
-          <ComboboxAnchor>
-            <ComboboxInput
-              id={field.name}
-              placeholder={field.placeholder || "Search..."}
-              {...ariaProps}
-            />
-            {!field.required && !!value && (
-              <button
-                type="button"
-                onClick={() => onChange(null)}
-                className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                aria-label="Clear selection"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-            <ComboboxTrigger />
-          </ComboboxAnchor>
-          <ComboboxContent>
-            <ComboboxEmpty>No results found</ComboboxEmpty>
-            {options.map((option) => (
-              <ComboboxItem key={option.value} value={option.value} label={option.label}>
-                {option.label}
-              </ComboboxItem>
-            ))}
-          </ComboboxContent>
-        </Combobox>
+        <div className="flex items-start gap-1.5">
+          <Combobox
+            className="flex-1"
+            value={comboboxValue}
+            onValueChange={(v) => onChange(v || null)}
+            disabled={disabled}
+            onFilter={(values, search) => {
+              const term = search.toLowerCase();
+              return values.filter((v) => labelMap.get(v)?.includes(term));
+            }}
+          >
+            <ComboboxAnchor>
+              <ComboboxInput
+                id={field.name}
+                placeholder={field.placeholder || "Search..."}
+                {...ariaProps}
+              />
+              {!field.required && !!value && (
+                <button
+                  type="button"
+                  onClick={() => onChange(null)}
+                  className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  aria-label="Clear selection"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+              <ComboboxTrigger />
+            </ComboboxAnchor>
+            <ComboboxContent>
+              <ComboboxEmpty>No results found</ComboboxEmpty>
+              {options.map((option) => (
+                <ComboboxItem key={option.value} value={option.value} label={option.label}>
+                  {option.label}
+                </ComboboxItem>
+              ))}
+            </ComboboxContent>
+          </Combobox>
+          {QuickCreate && !disabled && (
+            <QuickCreate onCreated={(id) => onChange(id)} />
+          )}
+        </div>
       );
     }
 

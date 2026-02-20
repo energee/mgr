@@ -3,13 +3,8 @@
 /**
  * GrainBillEditor - Recipe Grain Bill Management Component
  *
- * A specialized editor for managing recipe malts in junction table format.
- * Features:
- * - Searchable malt selector from catalog
- * - Inline weight editing
- * - Automatic percentage calculation
- * - Drag-to-reorder (position)
- * - Real-time totals
+ * Manages recipe malts in junction table format with searchable malt selector,
+ * inline weight editing, automatic percentage calculation, and drag-to-reorder.
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -23,6 +18,13 @@ import {
   TableRow,
   TableFooter,
 } from "@/components/ui/table";
+import {
+  Sortable,
+  SortableContent,
+  SortableItem,
+  SortableItemHandle,
+  SortableOverlay,
+} from "@/components/ui/sortable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,17 +41,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, GripVertical, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";
 
-// Types for grain bill entries
 export interface GrainBillItem {
   id?: string;
   malt_id: string;
   weight_lbs: number;
   position: number;
-  // Joined data (read-only)
+  /** Joined data (read-only) */
   malt?: {
     id: string;
     name: string;
@@ -57,6 +58,7 @@ export interface GrainBillItem {
     type: string;
     color_lovibond: number | null;
     potential_ppg: number | null;
+    bag_weight_lbs: number | null;
   };
 }
 
@@ -67,17 +69,22 @@ interface MaltCatalogItem {
   type: string;
   color_lovibond: number | null;
   potential_ppg: number | null;
+  bag_weight_lbs: number | null;
 }
 
+/** Malt type display labels for the selector grouping */
+const MALT_TYPE_LABELS: Record<string, string> = {
+  base: "Base Malts",
+  specialty: "Specialty Malts",
+  roasted: "Roasted Malts",
+  adjunct: "Adjuncts",
+  other: "Other",
+};
+
 interface GrainBillEditorProps {
-  /** Current grain bill items */
   items: GrainBillItem[];
-  /** Callback when items change */
   onChange: (items: GrainBillItem[]) => void;
-  /** Whether the editor is disabled */
   disabled?: boolean;
-  /** Recipe ID for context */
-  recipeId?: string;
 }
 
 export function GrainBillEditor({
@@ -88,38 +95,36 @@ export function GrainBillEditor({
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Fetch malt catalog
-  const { data: maltCatalog = [], isLoading: loadingMalts } = useCatalog<MaltCatalogItem>(catalogKeys.malts(), "malts", "id, name, maltster, type, color_lovibond, potential_ppg", ["type", "name"]);
-
-  // Calculate totals
-  const totals = useMemo(() => {
-    const totalWeight = items.reduce((sum, item) => sum + (item.weight_lbs || 0), 0);
-    return { totalWeight };
-  }, [items]);
-
-  // Get percentage for an item
-  const getPercentage = useCallback(
-    (weight: number) => {
-      if (totals.totalWeight === 0) return 0;
-      return (weight / totals.totalWeight) * 100;
-    },
-    [totals.totalWeight]
+  const { data: maltCatalog = [], isLoading: loadingMalts } = useCatalog<MaltCatalogItem>(
+    catalogKeys.malts(),
+    "malts",
+    "id, name, maltster, type, color_lovibond, potential_ppg, bag_weight_lbs",
+    ["type", "name"]
   );
 
-  // Add a new malt to the grain bill
+  const totalWeight = useMemo(
+    () => items.reduce((sum, item) => sum + (item.weight_lbs || 0), 0),
+    [items]
+  );
+
+  function getPercentage(weight: number): number {
+    if (totalWeight === 0) return 0;
+    return (weight / totalWeight) * 100;
+  }
+
   const handleAddMalt = useCallback(
     (malt: MaltCatalogItem) => {
-      // Check if already added
       if (items.some((item) => item.malt_id === malt.id)) {
         setAddOpen(false);
         return;
       }
 
       const newItem: GrainBillItem = {
+        id: crypto.randomUUID(),
         malt_id: malt.id,
         weight_lbs: 0,
         position: items.length,
-        malt: malt,
+        malt,
       };
 
       onChange([...items, newItem]);
@@ -129,7 +134,6 @@ export function GrainBillEditor({
     [items, onChange]
   );
 
-  // Update weight for an item
   const handleWeightChange = useCallback(
     (index: number, weight: number) => {
       const updated = [...items];
@@ -139,68 +143,43 @@ export function GrainBillEditor({
     [items, onChange]
   );
 
-  // Remove an item
   const handleRemove = useCallback(
     (index: number) => {
-      const updated = items.filter((_, i) => i !== index);
-      // Update positions
-      updated.forEach((item, i) => {
-        item.position = i;
-      });
+      const updated = items
+        .filter((_, i) => i !== index)
+        .map((item, i) => ({ ...item, position: i }));
       onChange(updated);
     },
     [items, onChange]
   );
 
-  // Move item up/down
-  const handleMove = useCallback(
-    (index: number, direction: "up" | "down") => {
-      if (direction === "up" && index === 0) return;
-      if (direction === "down" && index === items.length - 1) return;
-
-      const updated = [...items];
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
-
-      // Update positions
-      updated.forEach((item, i) => {
-        item.position = i;
-      });
+  const handleReorder = useCallback(
+    (reordered: GrainBillItem[]) => {
+      const updated = reordered.map((item, i) => ({
+        ...item,
+        position: i,
+      }));
       onChange(updated);
     },
-    [items, onChange]
+    [onChange]
   );
 
-  // Group malts by type for the selector
-  const maltsByType = useMemo(() => {
+  /** Available (not-yet-added) malts grouped by type for the selector */
+  const availableMaltsByType = useMemo(() => {
+    const addedIds = new Set(items.map((item) => item.malt_id));
     const groups: Record<string, MaltCatalogItem[]> = {};
-    maltCatalog.forEach((malt) => {
+    for (const malt of maltCatalog) {
+      if (addedIds.has(malt.id)) continue;
       const type = malt.type || "other";
       if (!groups[type]) groups[type] = [];
       groups[type].push(malt);
-    });
+    }
     return groups;
-  }, [maltCatalog]);
-
-  // Filter out already-added malts
-  const availableMalts = useMemo(() => {
-    const addedIds = new Set(items.map((item) => item.malt_id));
-    return maltCatalog.filter((malt) => !addedIds.has(malt.id));
   }, [maltCatalog, items]);
-
-  // Type labels for display
-  const typeLabels: Record<string, string> = {
-    base: "Base Malts",
-    specialty: "Specialty Malts",
-    roasted: "Roasted Malts",
-    adjunct: "Adjuncts",
-    other: "Other",
-  };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Grain Bill</h3>
+      <div className="flex items-center justify-end">
         <Popover open={addOpen} onOpenChange={setAddOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -223,15 +202,9 @@ export function GrainBillEditor({
               />
               <CommandList>
                 <CommandEmpty>No malts found.</CommandEmpty>
-                {Object.entries(maltsByType).map(([type, malts]) => {
-                  const available = malts.filter((m) =>
-                    availableMalts.some((am) => am.id === m.id)
-                  );
-                  if (available.length === 0) return null;
-
-                  return (
-                    <CommandGroup key={type} heading={typeLabels[type] || type}>
-                      {available.map((malt) => (
+                {Object.entries(availableMaltsByType).map(([type, malts]) => (
+                    <CommandGroup key={type} heading={MALT_TYPE_LABELS[type] || type}>
+                      {malts.map((malt) => (
                         <CommandItem
                           key={malt.id}
                           value={`${malt.name} ${malt.maltster || ""}`}
@@ -246,14 +219,10 @@ export function GrainBillEditor({
                               {malt.potential_ppg && ` • ${malt.potential_ppg} PPG`}
                             </span>
                           </div>
-                          {items.some((item) => item.malt_id === malt.id) && (
-                            <Check className="h-4 w-4 text-primary" />
-                          )}
                         </CommandItem>
                       ))}
                     </CommandGroup>
-                  );
-                })}
+                ))}
               </CommandList>
             </Command>
           </PopoverContent>
@@ -266,123 +235,140 @@ export function GrainBillEditor({
           <p className="text-sm mt-1">Click &quot;Add Malt&quot; to build your grain bill.</p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8"></TableHead>
-              <TableHead>Malt</TableHead>
-              <TableHead className="w-24 text-right">Weight (lbs)</TableHead>
-              <TableHead className="w-20 text-right">%</TableHead>
-              <TableHead className="w-20 text-right">°L</TableHead>
-              <TableHead className="w-16"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item, index) => {
-              const malt = item.malt || maltCatalog.find((m) => m.id === item.malt_id);
-              const percentage = getPercentage(item.weight_lbs);
+        <Sortable
+          value={items}
+          onValueChange={handleReorder}
+          getItemValue={(item) => item.id!}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8"></TableHead>
+                <TableHead>Malt</TableHead>
+                <TableHead className="w-24 text-right">Weight (lbs)</TableHead>
+                <TableHead className="w-16 text-right">Bags</TableHead>
+                <TableHead className="w-20 text-right">%</TableHead>
+                <TableHead className="w-20 text-right">°L</TableHead>
+                <TableHead className="w-16"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <SortableContent asChild>
+              <TableBody>
+                {items.map((item, index) => {
+                  const malt = item.malt || maltCatalog.find((m) => m.id === item.malt_id);
+                  const percentage = getPercentage(item.weight_lbs);
 
+                  return (
+                    <SortableItem key={item.id} value={item.id!} asChild disabled={disabled}>
+                      <TableRow>
+                        <TableCell>
+                          <SortableItemHandle className="p-1 hover:bg-muted rounded touch-none">
+                            <GripVertical className="h-4 w-4 text-muted-foreground" />
+                          </SortableItemHandle>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <div className="font-medium">{malt?.name || "Unknown"}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {malt?.maltster}
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {malt?.type}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            step="0.25"
+                            min="0"
+                            value={item.weight_lbs || ""}
+                            onChange={(e) =>
+                              handleWeightChange(index, parseFloat(e.target.value) || 0)
+                            }
+                            disabled={disabled}
+                            className="w-20 text-right ml-auto"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground tabular-nums">
+                          {malt?.bag_weight_lbs
+                            ? (item.weight_lbs / malt.bag_weight_lbs).toFixed(1)
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span
+                            className={cn(
+                              "tabular-nums",
+                              percentage >= 70 && "font-semibold text-primary"
+                            )}
+                          >
+                            {percentage.toFixed(1)}%
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {malt?.color_lovibond?.toFixed(1) || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemove(index)}
+                            disabled={disabled}
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    </SortableItem>
+                  );
+                })}
+              </TableBody>
+            </SortableContent>
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={2} className="font-medium">
+                  Total
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {totalWeight.toFixed(2)} lbs
+                </TableCell>
+                <TableCell></TableCell>
+                <TableCell className="text-right font-medium">100%</TableCell>
+                <TableCell colSpan={2}></TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+          <SortableOverlay>
+            {({ value }) => {
+              const item = items.find((i) => i.id === value);
+              const malt = item?.malt || maltCatalog.find((m) => m.id === item?.malt_id);
               return (
-                <TableRow key={item.malt_id}>
-                  <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => handleMove(index, "up")}
-                        disabled={disabled || index === 0}
-                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                      >
-                        <GripVertical className="h-3 w-3 rotate-180" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMove(index, "down")}
-                        disabled={disabled || index === items.length - 1}
-                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                      >
-                        <GripVertical className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div>
-                        <div className="font-medium">{malt?.name || "Unknown"}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {malt?.maltster}
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {malt?.type}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Input
-                      type="number"
-                      step="0.25"
-                      min="0"
-                      value={item.weight_lbs || ""}
-                      onChange={(e) =>
-                        handleWeightChange(index, parseFloat(e.target.value) || 0)
-                      }
-                      disabled={disabled}
-                      className="w-20 text-right ml-auto"
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span
-                      className={cn(
-                        "tabular-nums",
-                        percentage >= 70 && "font-semibold text-primary"
-                      )}
-                    >
-                      {percentage.toFixed(1)}%
+                <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 shadow-sm">
+                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{malt?.name || "Unknown"}</span>
+                  {item && (
+                    <span className="text-sm text-muted-foreground">
+                      {item.weight_lbs ? `${item.weight_lbs} lbs` : ""}
                     </span>
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {malt?.color_lovibond?.toFixed(1) || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemove(index)}
-                      disabled={disabled}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                  )}
+                </div>
               );
-            })}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={2} className="font-medium">
-                Total
-              </TableCell>
-              <TableCell className="text-right font-medium">
-                {totals.totalWeight.toFixed(2)} lbs
-              </TableCell>
-              <TableCell className="text-right font-medium">100%</TableCell>
-              <TableCell colSpan={2}></TableCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
+            }}
+          </SortableOverlay>
+        </Sortable>
       )}
 
-      {/* Warnings */}
       {items.length > 0 && (
-        <GrainBillWarnings items={items} totalWeight={totals.totalWeight} />
+        <GrainBillWarnings items={items} totalWeight={totalWeight} />
       )}
     </div>
   );
 }
 
-// Component for showing grain bill warnings/suggestions
 function GrainBillWarnings({
   items,
   totalWeight,
@@ -392,7 +378,6 @@ function GrainBillWarnings({
 }) {
   const warnings: string[] = [];
 
-  // Check for base malt percentage (should be 70-90% typically)
   const baseMalts = items.filter((item) => item.malt?.type === "base");
   const baseWeight = baseMalts.reduce((sum, item) => sum + (item.weight_lbs || 0), 0);
   const basePercent = totalWeight > 0 ? (baseWeight / totalWeight) * 100 : 0;
@@ -403,8 +388,7 @@ function GrainBillWarnings({
     );
   }
 
-  // Check for any items with 0 weight
-  const zeroWeightItems = items.filter((item) => !item.weight_lbs || item.weight_lbs === 0);
+  const zeroWeightItems = items.filter((item) => !item.weight_lbs);
   if (zeroWeightItems.length > 0) {
     warnings.push(
       `${zeroWeightItems.length} item(s) have no weight specified.`
@@ -416,7 +400,10 @@ function GrainBillWarnings({
   return (
     <div className="text-sm text-amber-600 dark:text-amber-400 space-y-1">
       {warnings.map((warning, i) => (
-        <p key={i}>⚠️ {warning}</p>
+        <p key={i} className="flex items-center gap-1">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {warning}
+        </p>
       ))}
     </div>
   );

@@ -99,8 +99,9 @@ Brewing recipes with all parameters. Ingredients are stored in junction tables f
 | tasting_notes | TEXT | Tasting notes |
 | development_notes | TEXT | Recipe development notes |
 | **Flags** | | |
-| use_default_additions | BOOLEAN | Use brewery default water/additive additions |
 | is_active | BOOLEAN | Active flag |
+| **Profiles** | | |
+| target_water_profile_id | UUID | FK to [water_profiles](#water_profiles), ON DELETE SET NULL |
 | **Meta** | | |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
@@ -429,24 +430,21 @@ Users who collaborated on a recipe.
 
 ## `recipe_additions`
 
-Water chemistry and other additive additions. Can be recipe-specific or brewery defaults.
+Recipe-specific additive additions: water salts, acids, clarifiers, nutrients, etc.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| recipe_id | UUID | FK to recipes (NULL for defaults) |
+| recipe_id | UUID | FK to recipes (NOT NULL) |
 | additive_id | UUID | FK to additives |
 | position | INTEGER | Sort order |
 | amount | DECIMAL(8,4) | Amount |
 | unit | TEXT | Unit: g, oz, tsp, tbsp, ml, tablets |
 | timing | TEXT | Timing: mash, sparge, boil, whirlpool, fermentation, packaging |
 | target | TEXT | Target (for water salts): mash, sparge, kettle |
-| is_default | BOOLEAN | Is this a brewery default addition? |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
-When `recipe_id` is NULL and `is_default` is TRUE, this is a brewery default addition.
-When `recipe_id` is set, this is a recipe-specific addition.
-Recipes with `use_default_additions = TRUE` use the defaults; otherwise use recipe-specific additions.
+Water salt additions can be auto-calculated from the recipe's source and target water profiles, then applied via the "Apply to Recipe" button on the recipe detail page.
 
 ---
 

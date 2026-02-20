@@ -8,6 +8,8 @@ import {
   estimateMashPH,
   getIonRecommendations,
   COMMON_PROFILES,
+  SALT_ADDITIVE_MAP,
+  mapSaltAdditionsToItems,
   type WaterProfile,
   type SaltAdditions,
 } from "../water-chemistry";
@@ -283,5 +285,68 @@ describe("COMMON_PROFILES", () => {
 
   it("Pilsen has very low mineral content", () => {
     expect(COMMON_PROFILES.pilsen.calcium_ppm).toBeLessThan(10);
+  });
+});
+
+// =============================================================================
+// SALT_ADDITIVE_MAP
+// =============================================================================
+
+describe("SALT_ADDITIVE_MAP", () => {
+  it("maps all SaltAdditions keys to additive names", () => {
+    const saltKeys: (keyof SaltAdditions)[] = [
+      "gypsum_g", "calcium_chloride_g", "epsom_salt_g",
+      "baking_soda_g", "chalk_g", "table_salt_g", "magnesium_chloride_g",
+    ];
+    for (const key of saltKeys) {
+      expect(SALT_ADDITIVE_MAP[key]).toBeDefined();
+      expect(typeof SALT_ADDITIVE_MAP[key]).toBe("string");
+    }
+  });
+});
+
+// =============================================================================
+// mapSaltAdditionsToItems
+// =============================================================================
+
+describe("mapSaltAdditionsToItems", () => {
+  const mockCatalog = [
+    { id: "gypsum-id", name: "Gypsum" },
+    { id: "cacl2-id", name: "Calcium Chloride" },
+    { id: "epsom-id", name: "Epsom Salt" },
+    { id: "bsoda-id", name: "Baking Soda" },
+    { id: "chalk-id", name: "Chalk" },
+    { id: "tsalt-id", name: "Table Salt" },
+    { id: "mgcl2-id", name: "Magnesium Chloride" },
+  ];
+
+  it("returns items for non-zero additions only", () => {
+    const additions: SaltAdditions = {
+      gypsum_g: 2.5, calcium_chloride_g: 1.0, epsom_salt_g: 0,
+      baking_soda_g: 0, chalk_g: 0, table_salt_g: 0, magnesium_chloride_g: 0,
+    };
+    const items = mapSaltAdditionsToItems(additions, mockCatalog);
+    expect(items).toHaveLength(2);
+    expect(items[0].additive_id).toBe("gypsum-id");
+    expect(items[0].amount).toBe(2.5);
+    expect(items[0].unit).toBe("g");
+    expect(items[1].additive_id).toBe("cacl2-id");
+  });
+
+  it("returns empty array when all additions are zero", () => {
+    const additions: SaltAdditions = {
+      gypsum_g: 0, calcium_chloride_g: 0, epsom_salt_g: 0,
+      baking_soda_g: 0, chalk_g: 0, table_salt_g: 0, magnesium_chloride_g: 0,
+    };
+    expect(mapSaltAdditionsToItems(additions, mockCatalog)).toHaveLength(0);
+  });
+
+  it("skips salts not found in catalog", () => {
+    const additions: SaltAdditions = {
+      gypsum_g: 1, calcium_chloride_g: 0, epsom_salt_g: 0,
+      baking_soda_g: 0, chalk_g: 0, table_salt_g: 0, magnesium_chloride_g: 0,
+    };
+    const items = mapSaltAdditionsToItems(additions, []);
+    expect(items).toHaveLength(0);
   });
 });
