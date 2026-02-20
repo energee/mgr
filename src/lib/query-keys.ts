@@ -67,6 +67,10 @@ export const recipeKeys = {
   hopSchedule: (id: string) => ["recipes", id, "hop-schedule"] as const,
   yeasts: (id: string) => ["recipes", id, "yeasts"] as const,
   additions: (id: string) => ["recipes", id, "additions"] as const,
+  adjuncts: (id: string) => ["recipes", id, "adjuncts"] as const,
+  sugars: (id: string) => ["recipes", id, "sugars"] as const,
+  spices: (id: string) => ["recipes", id, "spices"] as const,
+  fruits: (id: string) => ["recipes", id, "fruits"] as const,
   styleCompliance: (id: string) => ["recipe-style-compliance", id] as const,
   suggestions: (id: string) => ["recipe-suggestions", id] as const,
   cogs: (id: string) => ["recipe-cogs", id] as const,
@@ -194,6 +198,7 @@ export const settingsKeys = {
   enums: () => ["settings", "enums"] as const,
   enumValues: (enumType: string) => ["settings", "enums", enumType] as const,
   systemSettings: () => ["system-settings"] as const,
+  systemSetting: (key: string) => ["system-settings", key] as const,
   pricingChannels: () => ["pricing-channels"] as const,
   pricingMatrix: (channelId?: string) =>
     channelId
@@ -336,13 +341,12 @@ export const planningKeys = {
   batchesInProduction: () => ["planning", "batches-in-production"] as const,
   demandDetail: (brandId: string, packageTypeId: string, week: string) =>
     ["planning", "demand-detail", brandId, packageTypeId, week] as const,
-  // Backward planning from orders
   orderDemand: (horizonWeeks: number) =>
-    [...planningKeys.all(), "orderDemand", horizonWeeks] as const,
+    ["planning", "orderDemand", horizonWeeks] as const,
   productionRequirements: (horizonWeeks: number) =>
-    [...planningKeys.all(), "productionRequirements", horizonWeeks] as const,
+    ["planning", "productionRequirements", horizonWeeks] as const,
   materialRequirements: (horizonWeeks: number) =>
-    [...planningKeys.all(), "materialRequirements", horizonWeeks] as const,
+    ["planning", "materialRequirements", horizonWeeks] as const,
 };
 
 // =============================================================================

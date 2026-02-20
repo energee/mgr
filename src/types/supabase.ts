@@ -3386,8 +3386,7 @@ export type Database = {
           created_at: string | null
           id: string
           position: number | null
-          profile_id: string | null
-          recipe_id: string | null
+          recipe_id: string
           target: string | null
           timing: string
           unit: string
@@ -3398,8 +3397,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           position?: number | null
-          profile_id?: string | null
-          recipe_id?: string | null
+          recipe_id: string
           target?: string | null
           timing: string
           unit: string
@@ -3410,8 +3408,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           position?: number | null
-          profile_id?: string | null
-          recipe_id?: string | null
+          recipe_id?: string
           target?: string | null
           timing?: string
           unit?: string
@@ -3422,13 +3419,6 @@ export type Database = {
             columns: ["additive_id"]
             isOneToOne: false
             referencedRelation: "additives"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_additions_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "water_addition_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -4341,11 +4331,10 @@ export type Database = {
           target_og: number | null
           target_pitching_rate: number | null
           target_srm: number | null
+          target_water_profile_id: string | null
           tasting_notes: string | null
           updated_at: string | null
-          use_default_additions: boolean | null
           volume_bbl: number | null
-          water_addition_profile_id: string | null
           water_profile_id: string | null
           water_to_grain_ratio: number | null
           whirlpool_rest_min: number | null
@@ -4394,11 +4383,10 @@ export type Database = {
           target_og?: number | null
           target_pitching_rate?: number | null
           target_srm?: number | null
+          target_water_profile_id?: string | null
           tasting_notes?: string | null
           updated_at?: string | null
-          use_default_additions?: boolean | null
           volume_bbl?: number | null
-          water_addition_profile_id?: string | null
           water_profile_id?: string | null
           water_to_grain_ratio?: number | null
           whirlpool_rest_min?: number | null
@@ -4447,11 +4435,10 @@ export type Database = {
           target_og?: number | null
           target_pitching_rate?: number | null
           target_srm?: number | null
+          target_water_profile_id?: string | null
           tasting_notes?: string | null
           updated_at?: string | null
-          use_default_additions?: boolean | null
           volume_bbl?: number | null
-          water_addition_profile_id?: string | null
           water_profile_id?: string | null
           water_to_grain_ratio?: number | null
           whirlpool_rest_min?: number | null
@@ -4490,10 +4477,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "recipes_water_addition_profile_id_fkey"
-            columns: ["water_addition_profile_id"]
+            foreignKeyName: "recipes_target_water_profile_id_fkey"
+            columns: ["target_water_profile_id"]
             isOneToOne: false
-            referencedRelation: "water_addition_profiles"
+            referencedRelation: "water_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -5736,33 +5723,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      water_addition_profiles: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       water_profiles: {
         Row: {
@@ -8375,11 +8335,10 @@ export type Database = {
           target_og: number | null
           target_pitching_rate: number | null
           target_srm: number | null
+          target_water_profile_id: string | null
           tasting_notes: string | null
           updated_at: string | null
-          use_default_additions: boolean | null
           volume_bbl: number | null
-          water_addition_profile_id: string | null
           water_profile_id: string | null
           water_to_grain_ratio: number | null
           whirlpool_rest_min: number | null
@@ -8418,10 +8377,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "recipes_water_addition_profile_id_fkey"
-            columns: ["water_addition_profile_id"]
+            foreignKeyName: "recipes_target_water_profile_id_fkey"
+            columns: ["target_water_profile_id"]
             isOneToOne: false
-            referencedRelation: "water_addition_profiles"
+            referencedRelation: "water_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -9242,26 +9201,6 @@ export type Database = {
       user_has_permission: { Args: { p_permission: string }; Returns: boolean }
       user_has_role: { Args: { p_role: string }; Returns: boolean }
       validate_user_roles: { Args: { p_roles: string[] }; Returns: boolean }
-      save_qbo_tokens: {
-        Args: {
-          p_access_token: string
-          p_refresh_token: string
-          p_realm_id: string
-          p_expires_at: string
-        }
-        Returns: undefined
-      }
-      clear_qbo_tokens: {
-        Args: Record<string, never>
-        Returns: undefined
-      }
-      save_qbo_client_credentials: {
-        Args: {
-          p_client_id: string
-          p_client_secret: string
-        }
-        Returns: undefined
-      }
     }
     Enums: {
       cleaning_type:

@@ -10,22 +10,28 @@
  * - When the change occurred
  */
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { revisionKeys } from "@/lib/query-keys";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { ChevronDown, ChevronRight, History, Plus, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
+import {
+  Timeline,
+  TimelineItem,
+  TimelineDot,
+  TimelineConnector,
+  TimelineContent,
+} from "@/components/ui/timeline";
+
+/**
+ * Supabase client with dynamic table access.
+ * entity_revisions is not yet in the generated types, so we cast once here.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db: any = createClient();
 
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago").
@@ -77,8 +83,6 @@ interface RevisionHistoryProps {
   excludeFields?: string[];
   /** Maximum revisions to show initially */
   maxInitial?: number;
-  /** Title override */
-  title?: string;
 }
 
 // =============================================================================
@@ -134,30 +138,159 @@ function getChanges(
   return changes;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
 /**
  * Format a field name for display.
+ * Strips `_id` suffix from FK fields so "yeast_id" becomes "Yeast".
  */
 function formatFieldName(field: string): string {
   return field
+    .replace(/_id$/, "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
- * Format a value for display.
+ * Format a value for display. Handles UUIDs, dates, arrays, and objects
+ * to avoid showing raw technical data in the revision timeline.
+ * When a resolvedNames map is provided, UUIDs are replaced with display names.
  */
-function formatValue(value: unknown): string {
+function formatValue(value: unknown, resolvedNames?: Map<string, string>): string {
   if (value === null || value === undefined) {
     return "—";
   }
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
   }
+  if (typeof value === "string") {
+    if (UUID_RE.test(value)) {
+      return resolvedNames?.get(value) ?? "(reference)";
+    }
+    if (ISO_DATE_RE.test(value)) {
+      const d = new Date(value);
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      }
+    }
+    return value;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "Empty";
+    return `${value.length} item${value.length !== 1 ? "s" : ""}`;
+  }
   if (typeof value === "object") {
-    return JSON.stringify(value, null, 2);
+    const keys = Object.keys(value as Record<string, unknown>);
+    if (keys.length === 0) return "Empty";
+    return `${keys.length} field${keys.length !== 1 ? "s" : ""}`;
   }
   return String(value);
 }
+
+// =============================================================================
+// FK Name Resolution
+// =============================================================================
+
+/** Maps FK field names to their lookup table. Covers irregular plurals. */
+const FK_TABLE_MAP: Record<string, string> = {
+  style_id: "beer_styles",
+  yeast_id: "yeasts",
+  pricing_tier_id: "pricing_tiers",
+  keg_type_id: "keg_types",
+  keg_owner_id: "keg_owners",
+  package_type_id: "package_types",
+  sales_channel_id: "sales_channels",
+};
+
+/** Derive the lookup table for a `_id` field. Uses FK_TABLE_MAP for exceptions,
+ *  otherwise strips `_id` and appends `s` (e.g. `brand_id` → `brands`). */
+function fkTable(field: string): string {
+  if (FK_TABLE_MAP[field]) return FK_TABLE_MAP[field];
+  return field.replace(/_id$/, "s");
+}
+
+/**
+ * Collect all UUID values from `_id` fields across revisions, grouped by table.
+ * Returns { tableName: Set<uuid> }.
+ */
+function collectFkUuids(revisions: Revision[]): Map<string, Set<string>> {
+  const byTable = new Map<string, Set<string>>();
+  for (const rev of revisions) {
+    for (const data of [rev.old_data, rev.new_data]) {
+      if (!data) continue;
+      for (const [key, val] of Object.entries(data)) {
+        if (key.endsWith("_id") && typeof val === "string" && UUID_RE.test(val)) {
+          const table = fkTable(key);
+          let set = byTable.get(table);
+          if (!set) {
+            set = new Set();
+            byTable.set(table, set);
+          }
+          set.add(val);
+        }
+      }
+    }
+  }
+  return byTable;
+}
+
+/**
+ * Hook that resolves UUID foreign key values to display names.
+ * Returns a Map<uuid, displayName>.
+ */
+function useResolvedNames(revisions: Revision[]): Map<string, string> {
+
+  const fkGroups = useMemo(() => {
+    const grouped = collectFkUuids(revisions);
+    return Array.from(grouped.entries()).map(([table, ids]) => ({
+      table,
+      ids: Array.from(ids),
+    }));
+  }, [revisions]);
+
+  const queries = useQueries({
+    queries: fkGroups.map(({ table, ids }) => ({
+      queryKey: ["fk-resolve", table, ids.sort().join(",")],
+      queryFn: async () => {
+        const { data } = await db
+          .from(table)
+          .select("id, name")
+          .in("id", ids);
+        return (data ?? []) as Array<{ id: string; name: string }>;
+      },
+      staleTime: 5 * 60 * 1000,
+    })),
+  });
+
+  return useMemo(() => {
+    const map = new Map<string, string>();
+    for (const q of queries) {
+      if (q.data) {
+        for (const row of q.data) {
+          if (row.name) map.set(row.id, row.name);
+        }
+      }
+    }
+    return map;
+  }, [queries]);
+}
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const OPERATION_CONFIG = {
+  INSERT: { icon: Plus, label: "Created", color: "bg-green-500" },
+  UPDATE: { icon: Pencil, label: "Updated", color: "bg-blue-500" },
+  DELETE: { icon: Trash2, label: "Deleted", color: "bg-red-500" },
+} as const;
 
 // =============================================================================
 // Sub-components
@@ -166,33 +299,23 @@ function formatValue(value: unknown): string {
 function RevisionItem({
   revision,
   excludeFields,
+  resolvedNames,
 }: {
   revision: Revision;
   excludeFields: string[];
+  resolvedNames: Map<string, string>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const changes = getChanges(revision.old_data, revision.new_data, excludeFields);
 
-  const operationConfig = {
-    INSERT: { icon: Plus, label: "Created", color: "bg-green-500" },
-    UPDATE: { icon: Pencil, label: "Updated", color: "bg-blue-500" },
-    DELETE: { icon: Trash2, label: "Deleted", color: "bg-red-500" },
-  };
-
-  const config = operationConfig[revision.operation];
+  const config = OPERATION_CONFIG[revision.operation];
   const Icon = config.icon;
 
   return (
-    <div className="relative pl-6">
-      {/* Timeline line */}
-      <div className="absolute left-0 top-0 bottom-0 w-px bg-border" />
-
-      {/* Timeline dot */}
-      <div
-        className={`absolute left-0 top-2 w-2 h-2 rounded-full -translate-x-1/2 ${config.color}`}
-      />
-
-      <div>
+    <TimelineItem className="pb-4 last:pb-0">
+      <TimelineDot className={`border-0 ${config.color}`} />
+      <TimelineConnector />
+      <TimelineContent>
         <div className="flex items-start gap-2 py-2">
           <Button
             variant="ghost"
@@ -250,14 +373,14 @@ function RevisionItem({
                       <div className="flex gap-2">
                         <span className="text-red-600 dark:text-red-400">−</span>
                         <span className="text-muted-foreground line-through">
-                          {formatValue(oldValue)}
+                          {formatValue(oldValue, resolvedNames)}
                         </span>
                       </div>
                     )}
                     {newValue !== null && (
                       <div className="flex gap-2">
                         <span className="text-green-600 dark:text-green-400">+</span>
-                        <span>{formatValue(newValue)}</span>
+                        <span>{formatValue(newValue, resolvedNames)}</span>
                       </div>
                     )}
                   </div>
@@ -266,8 +389,8 @@ function RevisionItem({
             )}
           </div>
         )}
-      </div>
-    </div>
+      </TimelineContent>
+    </TimelineItem>
   );
 }
 
@@ -296,14 +419,8 @@ export function RevisionHistory({
   entityId,
   excludeFields = [],
   maxInitial = 5,
-  title = "Revision History",
 }: RevisionHistoryProps) {
   const [showAll, setShowAll] = useState(false);
-  const supabase = createClient();
-
-  // Cast supabase for dynamic table access (entity_revisions not in types yet)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntity(entityType, entityId),
@@ -320,55 +437,48 @@ export function RevisionHistory({
     },
   });
 
+  const resolvedNames = useResolvedNames(revisions);
   const displayedRevisions = showAll ? revisions : revisions.slice(0, maxInitial);
   const hasMore = revisions.length > maxInitial;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <History className="h-5 w-5" />
-          {title}
-        </CardTitle>
-        <CardDescription>
-          {revisions.length} revision{revisions.length !== 1 ? "s" : ""}
-        </CardDescription>
-      </CardHeader>
-      <Separator />
-      <CardContent className="pt-4">
-        {isLoading ? (
-          <RevisionHistorySkeleton />
-        ) : revisions.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No revision history available
-          </p>
-        ) : (
-          <>
-            <div className="space-y-1">
-              {displayedRevisions.map((revision) => (
-                <RevisionItem
-                  key={revision.id}
-                  revision={revision}
-                  excludeFields={excludeFields}
-                />
-              ))}
-            </div>
+    <div>
+      <p className="text-sm text-muted-foreground mb-4">
+        {revisions.length} revision{revisions.length !== 1 ? "s" : ""}
+      </p>
+      {isLoading ? (
+        <RevisionHistorySkeleton />
+      ) : revisions.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          No revision history available
+        </p>
+      ) : (
+        <>
+          <Timeline className="gap-0">
+            {displayedRevisions.map((revision) => (
+              <RevisionItem
+                key={revision.id}
+                revision={revision}
+                excludeFields={excludeFields}
+                resolvedNames={resolvedNames}
+              />
+            ))}
+          </Timeline>
 
-            {hasMore && !showAll && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAll(true)}
-                className="mt-4 w-full"
-              >
-                Show {revisions.length - maxInitial} more revision
-                {revisions.length - maxInitial !== 1 ? "s" : ""}
-              </Button>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+          {hasMore && !showAll && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAll(true)}
+              className="mt-4 w-full"
+            >
+              Show {revisions.length - maxInitial} more revision
+              {revisions.length - maxInitial !== 1 ? "s" : ""}
+            </Button>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -384,12 +494,6 @@ export function RevisionHistoryCompact({
   entityId: string;
   limit?: number;
 }) {
-  const supabase = createClient();
-
-  // Cast supabase for dynamic table access (entity_revisions not in types yet)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntityCompact(entityType, entityId),
     queryFn: async () => {
@@ -416,18 +520,12 @@ export function RevisionHistoryCompact({
     );
   }
 
-  const operationLabels = {
-    INSERT: "Created",
-    UPDATE: "Updated",
-    DELETE: "Deleted",
-  };
-
   return (
     <div className="space-y-1.5">
-      {revisions.map((rev: { id: string; operation: string; changed_at: string; revision_number: number }) => (
+      {revisions.map((rev: { id: string; operation: Revision["operation"]; changed_at: string; revision_number: number }) => (
         <div key={rev.id} className="flex items-center gap-2 text-sm">
           <Badge variant="outline" className="text-xs">
-            {operationLabels[rev.operation as keyof typeof operationLabels]}
+            {OPERATION_CONFIG[rev.operation].label}
           </Badge>
           <span className="text-muted-foreground">
             {formatTimeAgo(new Date(rev.changed_at))}

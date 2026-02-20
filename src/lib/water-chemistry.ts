@@ -7,9 +7,7 @@
  * - Residual alkalinity and mash pH estimation
  */
 
-// =============================================================================
-// Types
-// =============================================================================
+// --- Types ---
 
 export interface WaterProfile {
   calcium_ppm: number;
@@ -36,9 +34,24 @@ export interface GrainBillItem {
   weight_lb: number;
 }
 
-// =============================================================================
-// Salt Ion Contributions (ppm per gram per gallon)
-// =============================================================================
+// --- Helpers ---
+
+/** Round to one decimal place */
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/** The six ion fields on WaterProfile */
+const ION_FIELDS: (keyof WaterProfile)[] = [
+  "calcium_ppm",
+  "magnesium_ppm",
+  "sodium_ppm",
+  "sulfate_ppm",
+  "chloride_ppm",
+  "bicarbonate_ppm",
+];
+
+// --- Salt Ion Contributions (ppm per gram per gallon) ---
 
 export const SALT_CONTRIBUTIONS = {
   gypsum: {
@@ -78,9 +91,17 @@ export const SALT_CONTRIBUTIONS = {
   },
 } as const;
 
-// =============================================================================
-// Common Water Profiles
-// =============================================================================
+/** Mapping from salt contribution property names to WaterProfile field names */
+const ION_PROPERTY_TO_FIELD: Record<string, keyof WaterProfile> = {
+  calcium: "calcium_ppm",
+  magnesium: "magnesium_ppm",
+  sodium: "sodium_ppm",
+  sulfate: "sulfate_ppm",
+  chloride: "chloride_ppm",
+  bicarbonate: "bicarbonate_ppm",
+};
+
+// --- Common Water Profiles ---
 
 export const COMMON_PROFILES: Record<string, WaterProfile & { name: string; description: string }> = {
   distilled: {
@@ -165,7 +186,7 @@ export const COMMON_PROFILES: Record<string, WaterProfile & { name: string; desc
   },
 };
 
-// Target profiles for beer styles
+/** Target profiles for beer styles */
 export const STYLE_TARGETS: Record<string, WaterProfile & { name: string; ratio: string }> = {
   hoppy: {
     name: "Hoppy/IPA",
@@ -209,21 +230,21 @@ export const STYLE_TARGETS: Record<string, WaterProfile & { name: string; ratio:
   },
 };
 
-// =============================================================================
-// Calculation Functions
-// =============================================================================
+// --- Calculation Functions ---
 
-/**
- * Calculate sulfate to chloride ratio
- */
+/** Calculate sulfate to chloride ratio */
 export function calculateSulfateChlorideRatio(sulfate: number, chloride: number): number {
   if (chloride === 0) return Infinity;
-  return Math.round((sulfate / chloride) * 10) / 10;
+  return round1(sulfate / chloride);
 }
 
-/**
- * Get ratio description based on sulfate:chloride ratio
- */
+/** Format sulfate:chloride ratio as "N:1" */
+export function formatRatio(ratio: number): string {
+  if (ratio === Infinity) return "\u221E:1";
+  return `${ratio}:1`;
+}
+
+/** Get ratio description based on sulfate:chloride ratio */
 export function getRatioDescription(ratio: number): { label: string; character: string } {
   if (ratio >= 2.5) return { label: "Very Hoppy", character: "Accentuates hop bitterness and dryness" };
   if (ratio >= 1.5) return { label: "Hoppy", character: "Enhances hop character" };
@@ -232,9 +253,7 @@ export function getRatioDescription(ratio: number): { label: string; character: 
   return { label: "Very Malty", character: "Strong malt emphasis" };
 }
 
-/**
- * Calculate ion contribution from a salt addition
- */
+/** Calculate ion contribution from a salt addition */
 export function calculateIonContribution(
   salt: keyof typeof SALT_CONTRIBUTIONS,
   grams: number,
@@ -242,35 +261,23 @@ export function calculateIonContribution(
 ): Partial<WaterProfile> {
   const contributions = SALT_CONTRIBUTIONS[salt];
   const result: Partial<WaterProfile> = {};
+  const factor = grams / volumeGal;
 
-  if ("calcium" in contributions) {
-    result.calcium_ppm = (contributions.calcium * grams) / volumeGal;
+  for (const [prop, field] of Object.entries(ION_PROPERTY_TO_FIELD)) {
+    if (prop in contributions) {
+      result[field] = (contributions as unknown as Record<string, number>)[prop] * factor;
+    }
   }
-  if ("magnesium" in contributions) {
-    result.magnesium_ppm = (contributions.magnesium * grams) / volumeGal;
-  }
-  if ("sodium" in contributions) {
-    result.sodium_ppm = (contributions.sodium * grams) / volumeGal;
-  }
-  if ("sulfate" in contributions) {
-    result.sulfate_ppm = (contributions.sulfate * grams) / volumeGal;
-  }
-  if ("chloride" in contributions) {
-    result.chloride_ppm = (contributions.chloride * grams) / volumeGal;
-  }
-  if ("bicarbonate" in contributions) {
-    result.bicarbonate_ppm = (contributions.bicarbonate * grams) / volumeGal;
-  }
+
+  // Chalk contributes carbonate, which converts to bicarbonate at a 1.22 ratio
   if ("carbonate" in contributions) {
-    result.bicarbonate_ppm = ((contributions.carbonate * grams) / volumeGal) * 1.22; // Convert carbonate to bicarbonate
+    result.bicarbonate_ppm = contributions.carbonate * factor * 1.22;
   }
 
   return result;
 }
 
-/**
- * Calculate the resulting water profile after salt additions
- */
+/** Calculate the resulting water profile after salt additions */
 export function calculateResultingProfile(
   source: WaterProfile,
   additions: SaltAdditions,
@@ -278,7 +285,6 @@ export function calculateResultingProfile(
 ): WaterProfile {
   const result = { ...source };
 
-  // Add each salt's contribution
   const salts: [keyof typeof SALT_CONTRIBUTIONS, number][] = [
     ["gypsum", additions.gypsum_g],
     ["calcium_chloride", additions.calcium_chloride_g],
@@ -298,20 +304,18 @@ export function calculateResultingProfile(
     }
   }
 
-  // Round all values
-  return {
-    calcium_ppm: Math.round(result.calcium_ppm * 10) / 10,
-    magnesium_ppm: Math.round(result.magnesium_ppm * 10) / 10,
-    sodium_ppm: Math.round(result.sodium_ppm * 10) / 10,
-    sulfate_ppm: Math.round(result.sulfate_ppm * 10) / 10,
-    chloride_ppm: Math.round(result.chloride_ppm * 10) / 10,
-    bicarbonate_ppm: Math.round(result.bicarbonate_ppm * 10) / 10,
-  };
+  // Round all ion values to one decimal place
+  const rounded = {} as WaterProfile;
+  for (const field of ION_FIELDS) {
+    rounded[field] = round1(result[field]);
+  }
+  return rounded;
 }
 
 /**
- * Simple calculation of suggested additions to reach target profile
- * Uses a greedy algorithm to match sulfate and chloride first
+ * Simple calculation of suggested additions to reach target profile.
+ * Uses a greedy algorithm: match sulfate first (gypsum), then chloride (CaCl2),
+ * then remaining magnesium, bicarbonate, and sodium.
  */
 export function calculateAdditions(
   source: WaterProfile,
@@ -328,7 +332,6 @@ export function calculateAdditions(
     magnesium_chloride_g: 0,
   };
 
-  // Calculate deltas
   const delta = {
     calcium: Math.max(0, target.calcium_ppm - source.calcium_ppm),
     magnesium: Math.max(0, target.magnesium_ppm - source.magnesium_ppm),
@@ -338,98 +341,85 @@ export function calculateAdditions(
     bicarbonate: Math.max(0, target.bicarbonate_ppm - source.bicarbonate_ppm),
   };
 
-  // Priority: Match sulfate first (using gypsum), then chloride (using CaCl2)
-  // This is a simplified greedy approach
+  /** Calculate grams of salt needed to hit a target delta ppm */
+  function gramsForDelta(deltaPpm: number, contributionPerGramPerGal: number): number {
+    return round1((deltaPpm * volumeGal) / contributionPerGramPerGal);
+  }
 
-  // Add gypsum for sulfate (also adds calcium)
+  // Gypsum for sulfate (also contributes calcium)
   if (delta.sulfate > 0) {
-    const gramsNeeded = (delta.sulfate * volumeGal) / SALT_CONTRIBUTIONS.gypsum.sulfate;
-    additions.gypsum_g = Math.round(gramsNeeded * 10) / 10;
-    // Reduce remaining calcium need
-    delta.calcium = Math.max(0, delta.calcium - (gramsNeeded * SALT_CONTRIBUTIONS.gypsum.calcium) / volumeGal);
+    const grams = gramsForDelta(delta.sulfate, SALT_CONTRIBUTIONS.gypsum.sulfate);
+    additions.gypsum_g = grams;
+    delta.calcium = Math.max(0, delta.calcium - (grams * SALT_CONTRIBUTIONS.gypsum.calcium) / volumeGal);
   }
 
-  // Add calcium chloride for chloride (also adds calcium)
+  // Calcium chloride for chloride (also contributes calcium)
   if (delta.chloride > 0) {
-    const gramsNeeded = (delta.chloride * volumeGal) / SALT_CONTRIBUTIONS.calcium_chloride.chloride;
-    additions.calcium_chloride_g = Math.round(gramsNeeded * 10) / 10;
-    delta.calcium = Math.max(0, delta.calcium - (gramsNeeded * SALT_CONTRIBUTIONS.calcium_chloride.calcium) / volumeGal);
+    const grams = gramsForDelta(delta.chloride, SALT_CONTRIBUTIONS.calcium_chloride.chloride);
+    additions.calcium_chloride_g = grams;
+    delta.calcium = Math.max(0, delta.calcium - (grams * SALT_CONTRIBUTIONS.calcium_chloride.calcium) / volumeGal);
   }
 
-  // Add epsom salt for remaining magnesium
+  // Epsom salt for remaining magnesium
   if (delta.magnesium > 0) {
-    const gramsNeeded = (delta.magnesium * volumeGal) / SALT_CONTRIBUTIONS.epsom_salt.magnesium;
-    additions.epsom_salt_g = Math.round(gramsNeeded * 10) / 10;
+    additions.epsom_salt_g = gramsForDelta(delta.magnesium, SALT_CONTRIBUTIONS.epsom_salt.magnesium);
   }
 
-  // Add baking soda for bicarbonate
+  // Baking soda for bicarbonate
   if (delta.bicarbonate > 0) {
-    const gramsNeeded = (delta.bicarbonate * volumeGal) / SALT_CONTRIBUTIONS.baking_soda.bicarbonate;
-    additions.baking_soda_g = Math.round(gramsNeeded * 10) / 10;
+    additions.baking_soda_g = gramsForDelta(delta.bicarbonate, SALT_CONTRIBUTIONS.baking_soda.bicarbonate);
   }
 
-  // Add table salt for remaining sodium (if needed, uncommon)
+  // Table salt for sodium (only if significant sodium needed)
   if (delta.sodium > 50) {
-    // Only if significant sodium needed
-    const gramsNeeded = (delta.sodium * volumeGal) / SALT_CONTRIBUTIONS.table_salt.sodium;
-    additions.table_salt_g = Math.round(gramsNeeded * 10) / 10;
+    additions.table_salt_g = gramsForDelta(delta.sodium, SALT_CONTRIBUTIONS.table_salt.sodium);
   }
 
   return additions;
 }
 
-/**
- * Calculate residual alkalinity (RA)
- */
+/** Calculate residual alkalinity (RA) */
 export function calculateResidualAlkalinity(profile: WaterProfile): number {
   // RA = Alkalinity - (Calcium / 1.4) - (Magnesium / 1.7)
-  // Alkalinity ≈ Bicarbonate / 1.22 (as CaCO3)
+  // Alkalinity (as CaCO3) = Bicarbonate / 1.22
   const alkalinity = profile.bicarbonate_ppm / 1.22;
   return Math.round(alkalinity - profile.calcium_ppm / 1.4 - profile.magnesium_ppm / 1.7);
 }
 
 /**
- * Estimate mash pH based on water chemistry and grain bill
- * This is a simplified model based on residual alkalinity
+ * Estimate mash pH based on water chemistry and grain bill.
+ * Simplified model based on residual alkalinity.
  */
 export function estimateMashPH(
   waterProfile: WaterProfile,
   grainBill: GrainBillItem[],
   mashVolumeGal: number
 ): number {
-  // Base mash pH for distilled water with pale malt
   const basePH = 5.8;
 
-  // Calculate weighted average grain color
   const totalWeight = grainBill.reduce((sum, g) => sum + g.weight_lb, 0);
   if (totalWeight === 0) return basePH;
 
   const weightedColor = grainBill.reduce((sum, g) => sum + g.color_srm * g.weight_lb, 0) / totalWeight;
 
-  // Water-to-grain ratio affects buffering capacity
   // Thinner mashes (higher ratio) are less affected by grain acidity
   const waterToGrainRatio = mashVolumeGal / totalWeight;
   const ratioFactor = Math.min(1.5, Math.max(0.5, 1.25 / waterToGrainRatio));
 
-  // Grain acidity contribution (darker grains lower pH)
-  // Approximately -0.01 pH per SRM, modulated by water-to-grain ratio
+  // Darker grains lower pH: approximately -0.01 pH per SRM
   const grainContribution = -weightedColor * 0.01 * ratioFactor;
 
-  // Water residual alkalinity contribution
-  // Higher RA raises pH, approximately +0.03 pH per 10 ppm RA
+  // Higher RA raises pH: approximately +0.03 pH per 10 ppm RA
   const ra = calculateResidualAlkalinity(waterProfile);
   const waterContribution = (ra / 10) * 0.03;
 
-  // Calculate estimated pH
   const estimatedPH = basePH + grainContribution + waterContribution;
 
-  // Clamp to reasonable range
+  // Clamp to reasonable range and round to two decimal places
   return Math.round(Math.max(4.5, Math.min(6.5, estimatedPH)) * 100) / 100;
 }
 
-/**
- * Get recommended ion ranges for different beer styles
- */
+/** Get recommended ion ranges for different beer styles */
 export function getIonRecommendations(styleCategory: string): {
   calcium: [number, number];
   magnesium: [number, number];
@@ -440,7 +430,6 @@ export function getIonRecommendations(styleCategory: string): {
 } {
   const lower = styleCategory.toLowerCase();
 
-  // Hoppy styles (IPA, Pale Ale)
   if (lower.includes("ipa") || lower.includes("pale ale") || lower.includes("hoppy")) {
     return {
       calcium: [75, 150],
@@ -452,7 +441,6 @@ export function getIonRecommendations(styleCategory: string): {
     };
   }
 
-  // Malty styles (Stout, Porter, Brown)
   if (lower.includes("stout") || lower.includes("porter") || lower.includes("malty") || lower.includes("brown")) {
     return {
       calcium: [75, 150],
@@ -464,7 +452,6 @@ export function getIonRecommendations(styleCategory: string): {
     };
   }
 
-  // Lagers (Pilsner, Helles, Export)
   if (lower.includes("lager") || lower.includes("pilsner") || lower.includes("helles")) {
     return {
       calcium: [25, 75],
@@ -476,7 +463,6 @@ export function getIonRecommendations(styleCategory: string): {
     };
   }
 
-  // Default balanced
   return {
     calcium: [50, 150],
     magnesium: [5, 20],
@@ -485,4 +471,86 @@ export function getIonRecommendations(styleCategory: string): {
     chloride: [50, 150],
     bicarbonate: [50, 150],
   };
+}
+
+// --- Shared Ion Metadata ---
+
+/** Ion field keys and their display labels, used by chemistry summary tables */
+export const WATER_IONS = [
+  { key: "calcium_ppm", label: "Ca\u00B2\u207A" },
+  { key: "magnesium_ppm", label: "Mg\u00B2\u207A" },
+  { key: "sodium_ppm", label: "Na\u207A" },
+  { key: "sulfate_ppm", label: "SO\u2084\u00B2\u207B" },
+  { key: "chloride_ppm", label: "Cl\u207B" },
+  { key: "bicarbonate_ppm", label: "HCO\u2083\u207B" },
+] as const;
+
+// --- Nullable-to-WaterProfile Conversion ---
+
+/** Database rows return nullable ppm values; this normalizes them to a WaterProfile */
+export function toWaterProfile(row: {
+  calcium_ppm?: number | null;
+  magnesium_ppm?: number | null;
+  sodium_ppm?: number | null;
+  sulfate_ppm?: number | null;
+  chloride_ppm?: number | null;
+  bicarbonate_ppm?: number | null;
+}): WaterProfile {
+  return {
+    calcium_ppm: row.calcium_ppm ?? 0,
+    magnesium_ppm: row.magnesium_ppm ?? 0,
+    sodium_ppm: row.sodium_ppm ?? 0,
+    sulfate_ppm: row.sulfate_ppm ?? 0,
+    chloride_ppm: row.chloride_ppm ?? 0,
+    bicarbonate_ppm: row.bicarbonate_ppm ?? 0,
+  };
+}
+
+// --- Salt-to-Additive Mapping ---
+
+/** Maps SaltAdditions field names to additive catalog names */
+export const SALT_ADDITIVE_MAP: Record<keyof SaltAdditions, string> = {
+  gypsum_g: "Gypsum",
+  calcium_chloride_g: "Calcium Chloride",
+  epsom_salt_g: "Epsom Salt",
+  baking_soda_g: "Baking Soda",
+  chalk_g: "Chalk",
+  table_salt_g: "Table Salt",
+  magnesium_chloride_g: "Magnesium Chloride",
+};
+
+export interface SaltAdditionItem {
+  additive_id: string;
+  amount: number;
+  unit: string;
+  timing: string;
+  target: string;
+}
+
+/** Convert SaltAdditions to recipe_additions-compatible items */
+export function mapSaltAdditionsToItems(
+  additions: SaltAdditions,
+  catalog: { id: string; name: string }[]
+): SaltAdditionItem[] {
+  const items: SaltAdditionItem[] = [];
+
+  for (const [field, additiveName] of Object.entries(SALT_ADDITIVE_MAP)) {
+    const grams = additions[field as keyof SaltAdditions];
+    if (grams <= 0) continue;
+
+    const catalogEntry = catalog.find(
+      (a) => a.name.toLowerCase() === additiveName.toLowerCase()
+    );
+    if (!catalogEntry) continue;
+
+    items.push({
+      additive_id: catalogEntry.id,
+      amount: grams,
+      unit: "g",
+      timing: "mash",
+      target: "mash",
+    });
+  }
+
+  return items;
 }

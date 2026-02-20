@@ -3,11 +3,11 @@
 /**
  * Recipe Additions Page
  *
- * Manage water chemistry, clarifiers, and nutrient additions for a recipe.
- * Uses the AdditionsEditor component for inline editing of recipe_additions.
+ * Manage clarifiers, nutrients, and other non-water-chemistry additions for a recipe.
+ * Water salt additions are calculated from source/target water profiles on the recipe detail page.
  */
 
-import { use, useState } from "react";
+import { use, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { AdditionsEditor, type AdditionItem } from "@/components/domain/additions-editor";
@@ -19,6 +19,9 @@ import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { recipeKeys } from "@/lib/query-keys";
+
+/** Additive types managed via water chemistry calculations, excluded from this editor */
+const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
 
 export default function RecipeAdditionsPage({
   params,
@@ -37,7 +40,7 @@ export default function RecipeAdditionsPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recipes")
-        .select("id, name, use_default_additions")
+        .select("id, name, target_water_profile_id")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -75,13 +78,22 @@ export default function RecipeAdditionsPage({
     },
   });
 
+  // Filter to non-water-chemistry additions only
+  const nonWaterAdditions = useMemo(
+    () =>
+      (additions || []).filter(
+        (a) => !WATER_CHEMISTRY_TYPES.includes(a.additives?.type || "")
+      ),
+    [additions]
+  );
+
   // Sync fetched data to local editable state (React recommended pattern:
   // https://react.dev/reference/react/useState#storing-information-from-previous-renders)
-  const [prevAdditions, setPrevAdditions] = useState(additions);
-  if (additions && additions !== prevAdditions) {
-    setPrevAdditions(additions);
+  const [prevAdditions, setPrevAdditions] = useState(nonWaterAdditions);
+  if (nonWaterAdditions !== prevAdditions) {
+    setPrevAdditions(nonWaterAdditions);
     setItems(
-      additions.map((a) => ({
+      nonWaterAdditions.map((a) => ({
         id: a.id,
         additive_id: a.additive_id,
         amount: a.amount,
@@ -101,15 +113,23 @@ export default function RecipeAdditionsPage({
     setHasChanges(true);
   };
 
-  // Save mutation
+  // Save mutation — only touches non-water-chemistry items
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Delete all existing additions for this recipe
-      const { error: deleteError } = await supabase
-        .from("recipe_additions")
-        .delete()
-        .eq("recipe_id", id);
-      if (deleteError) throw deleteError;
+      // Get IDs of existing non-water-chemistry additions to delete
+      const existingNonWaterIds = (additions || [])
+        .filter((a) => !WATER_CHEMISTRY_TYPES.includes(a.additives?.type || ""))
+        .map((a) => a.id)
+        .filter(Boolean) as string[];
+
+      // Delete existing non-water additions for this recipe
+      if (existingNonWaterIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("recipe_additions")
+          .delete()
+          .in("id", existingNonWaterIds);
+        if (deleteError) throw deleteError;
+      }
 
       // Insert new additions
       if (items.length > 0) {
@@ -162,7 +182,7 @@ export default function RecipeAdditionsPage({
           <div className="flex-1">
             <h1 className="text-2xl font-bold">{recipe?.name}</h1>
             <p className="text-muted-foreground">
-              Water Chemistry & Additions
+              Clarifiers, Nutrients & Other Additions
             </p>
           </div>
           <Button
@@ -183,8 +203,8 @@ export default function RecipeAdditionsPage({
           <CardHeader>
             <CardTitle>Recipe Additions</CardTitle>
             <CardDescription>
-              Add water salts, acids, clarifiers, and nutrients. These additions
-              will be part of the recipe specification.
+              Add clarifiers, nutrients, and other additions to this recipe.
+              Water salt additions are calculated automatically from source and target water profiles.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -199,6 +219,7 @@ export default function RecipeAdditionsPage({
                 items={items}
                 onChange={handleChange}
                 disabled={saveMutation.isPending}
+                excludeTypes={WATER_CHEMISTRY_TYPES}
               />
             )}
           </CardContent>
@@ -211,17 +232,23 @@ export default function RecipeAdditionsPage({
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              <strong>Water Salts:</strong> Gypsum (CaSO₄), Calcium Chloride (CaCl₂),
-              Epsom Salt (MgSO₄), etc. for water chemistry adjustment.
-            </p>
-            <p>
-              <strong>Acids:</strong> Lactic acid, phosphoric acid for mash pH adjustment.
-            </p>
-            <p>
               <strong>Clarifiers:</strong> Whirlfloc, Irish Moss, gelatin for clarity.
             </p>
             <p>
               <strong>Nutrients:</strong> Yeast nutrients, Fermaid-O, etc. for healthy fermentation.
+            </p>
+            <p>
+              <strong>Other:</strong> Antifoam, enzymes, or other process additions.
+            </p>
+            <p className="text-xs border-t pt-2 mt-2">
+              Water salts (Gypsum, CaCl&#x2082;, etc.) and acids are calculated from source and target{" "}
+              <Link
+                href="/settings/water-profiles"
+                className="underline hover:text-foreground"
+              >
+                water profiles
+              </Link>
+              {" "}set on the recipe.
             </p>
           </CardContent>
         </Card>

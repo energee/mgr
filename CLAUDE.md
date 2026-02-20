@@ -86,13 +86,14 @@ All entity pages use universal components:
   [id]/page.tsx    -> <EntityDetailUnified entity={config} id={id} />  (view + inline edit)
 ```
 
-**Exceptions:** Brew logs have no `new/page.tsx` — they are created exclusively via
-"Start Brew Day" on a batch detail page. The list page passes `showCreate={false}`.
+**Exceptions:**
+- Brew logs have no `new/page.tsx` — they are created exclusively via "Start Brew Day" on a batch detail page. The list page passes `showCreate={false}`.
+- Recipes use a custom `RecipeEditorPage` instead of `EntityDetailUnified` — always-editable two-column layout with sticky sidebar showing live estimates. See `src/components/domain/recipe-editor/`.
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00096`
-Next available: `00097`
+Current highest: `00098`
+Next available: `00099`
 
 ### Reference Files by Pattern
 
@@ -103,6 +104,10 @@ Next available: `00097`
 | Domain component (editor) | `src/components/domain/grain-bill-editor.tsx` |
 | Entity pages | `src/app/(app)/production/batches/` |
 | Catalog selector | `src/components/domain/hop-schedule-editor.tsx` |
+| Custom editor page (two-column) | `src/components/domain/recipe-editor/recipe-editor-page.tsx` |
+| Section with independent save | `src/components/domain/recipe-editor/recipe-basics-section.tsx` |
+| Shared editor context | `src/components/domain/recipe-editor/recipe-editor-context.tsx` |
+| Client-side calculations | `src/components/domain/recipe-editor/recipe-estimate-calc.ts` |
 
 ### Form Field Types
 Entity forms support these field types:

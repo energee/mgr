@@ -14,26 +14,19 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
-import { RecipeVariantEditor } from "@/components/domain/recipe-variant-editor";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
-import { RecipeProductionHistory } from "@/components/domain/recipe-production-history";
 import { StatusBadge } from "@/components/universal/status-badge";
 
+import { WaterProfileQuickCreate } from "@/components/domain/water-profile-quick-create";
 import { recipeSchema } from "@/lib/schemas/recipe";
 
-// Re-export schema so existing client-side imports keep working
 export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
 
-// Use table type for base fields plus any-typed view fields
-// The view adds est_* fields but may not have the status field yet
+/** Base table type extended with computed view fields for list/detail display */
 type RecipeBase = Database["public"]["Tables"]["recipes"]["Row"];
 type RecipeView = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
 type Recipe = RecipeBase & Partial<Pick<RecipeView, "est_og" | "est_fg" | "est_abv" | "est_ibu" | "est_srm" | "style_name" | "est_cogs" | "batch_count">>;
-
-// =============================================================================
-// State Machine (defined separately to derive options)
-// =============================================================================
 
 const recipeStateMachine: StateMachineConfig<Recipe> = {
   stateField: "status",
@@ -51,12 +44,7 @@ const recipeStateMachine: StateMachineConfig<Recipe> = {
   },
 };
 
-// Derive status options from state machine (single source of truth)
 const statusOptions = statesAsOptions(recipeStateMachine);
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
 
 export const recipeEntity: EntityConfig<Recipe> = {
   name: "recipe",
@@ -66,13 +54,8 @@ export const recipeEntity: EntityConfig<Recipe> = {
   description: "Brewing recipes with ingredients and process parameters",
   domain: "production",
 
-  // Use the view for calculated estimates in list/detail views
-  // Forms write to base table, reads use this view
   viewTable: "recipes_with_estimates",
 
-  // ---------------------------------------------------------------------------
-  // List View
-  // ---------------------------------------------------------------------------
   listColumns: [
     {
       accessorKey: "name",
@@ -154,133 +137,8 @@ export const recipeEntity: EntityConfig<Recipe> = {
   defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name", "brew_day_notes", "development_notes"],
 
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "name",
-    // badge: "is_active",
-  },
+  detailHeader: { title: "name" },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "brand_id", label: "Brand" },
-        { field: "style_id", label: "Style" },
-        { field: "yeast_id", label: "Yeast" },
-        { field: "water_profile_id", label: "Water Profile" },
-        { field: "is_active", label: "Active" },
-      ],
-    },
-    {
-      id: "estimates",
-      title: "Calculated Estimates",
-      fields: [
-        // These come from recipes_with_estimates view
-        { field: "est_og", label: "Est. OG" },
-        { field: "est_fg", label: "Est. FG" },
-        { field: "est_abv", label: "Est. ABV %" },
-        { field: "est_ibu", label: "Est. IBU" },
-        { field: "est_srm", label: "Est. SRM" },
-      ],
-    },
-    {
-      id: "ai-analysis",
-      title: "AI Analysis",
-      component: RecipeAnalysis,
-    },
-    {
-      id: "volumes",
-      title: "Volumes",
-      fields: [
-        { field: "volume_bbl", label: "Recipe Volume (BBL)" },
-        { field: "batch_size_bbl", label: "Batch Size (BBL)" },
-        { field: "preboil_volume_bbl", label: "Pre-Boil Volume (BBL)" },
-        { field: "target_ko_volume_bbl", label: "Target KO Volume (BBL)" },
-        { field: "mash_water_volume_gal", label: "Mash Water (gal)" },
-        { field: "sparge_water_volume_gal", label: "Sparge Water (gal)" },
-      ],
-    },
-    {
-      id: "mash",
-      title: "Mash Parameters",
-      fields: [
-        { field: "mash_temp_f", label: "Mash Temp (°F)" },
-        { field: "target_mash_ph", label: "Target Mash pH" },
-        { field: "mash_efficiency", label: "Mash Efficiency %" },
-        { field: "water_to_grain_ratio", label: "Water:Grain Ratio" },
-      ],
-    },
-    {
-      id: "boil",
-      title: "Boil & Whirlpool",
-      fields: [
-        { field: "boil_time_min", label: "Boil Time (min)" },
-        { field: "whirlpool_time_min", label: "Whirlpool Time (min)" },
-        { field: "whirlpool_temp_f", label: "Whirlpool Temp (°F)" },
-        { field: "target_ko_temp_f", label: "Target KO Temp (°F)" },
-      ],
-    },
-    {
-      id: "fermentation",
-      title: "Fermentation",
-      fields: [
-        { field: "target_attenuation", label: "Target Attenuation %" },
-        { field: "target_pitching_rate", label: "Pitching Rate (M cells/mL/°P)" },
-        { field: "fermentation_days", label: "Fermentation Days" },
-        { field: "conditioning_days", label: "Conditioning Days" },
-      ],
-    },
-    {
-      id: "mash_schedule",
-      title: "Mash Schedule",
-      component: MashScheduleDisplay,
-    },
-    {
-      id: "fermentation_schedule",
-      title: "Fermentation Schedule",
-      component: FermentationScheduleDisplay,
-    },
-    {
-      id: "additions",
-      title: "Additions",
-      component: RecipeAdditionsDisplay,
-    },
-    {
-      id: "variants",
-      title: "Split Variants",
-      component: RecipeVariantEditor,
-    },
-    {
-      id: "production-history",
-      title: "Production History",
-      component: RecipeProductionHistory,
-      collapsible: true,
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "brew_day_notes", label: "Brew Day Notes", fullWidth: true },
-        { field: "tasting_notes", label: "Tasting Notes", fullWidth: true },
-        { field: "development_notes", label: "Development Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-    {
-      id: "revision-history",
-      title: "Revision History",
-      component: createRevisionHistoryDisplay("recipes"),
-      collapsible: true,
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // Unified Sections (detail + edit)
-  // ---------------------------------------------------------------------------
   sections: [
     {
       id: "overview",
@@ -330,21 +188,33 @@ export const recipeEntity: EntityConfig<Recipe> = {
             table: "yeasts",
             valueField: "id",
             labelField: "name",
-            orderBy: "lab,name",
+            orderBy: "manufacturer,name",
           },
         },
         {
           name: "water_profile_id",
-          label: "Water Profile",
-          type: "select",
-          placeholder: "Select water profile...",
-          colSpan: 6,
-          dynamicOptions: {
-            table: "water_profiles",
-            valueField: "id",
-            labelField: "name",
-            orderBy: "name",
+          label: "Source Water Profile",
+          type: "relation",
+          relation: {
+            entity: "water_profile",
+            displayField: "name",
           },
+          placeholder: "Select water profile...",
+          quickCreate: WaterProfileQuickCreate,
+          colSpan: 6,
+        },
+        {
+          name: "target_water_profile_id",
+          label: "Target Water Profile",
+          type: "relation",
+          relation: {
+            entity: "water_profile",
+            displayField: "name",
+          },
+          placeholder: "Select target profile...",
+          description: "Target water chemistry for salt addition calculations",
+          quickCreate: WaterProfileQuickCreate,
+          colSpan: 6,
         },
         {
           name: "pricing_tier_id",
@@ -500,13 +370,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
           placeholder: "e.g., 7",
           colSpan: 6,
         },
-        {
-          name: "use_default_additions",
-          label: "Use Default Water Additions",
-          type: "switch",
-          defaultValue: true,
-          colSpan: 6,
-        },
       ],
     },
     {
@@ -562,9 +425,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
   ],
 
-  // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
   formSchema: recipeSchema,
 
   formFields: [
@@ -613,7 +473,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
         table: "yeasts",
         valueField: "id",
         labelField: "name",
-        orderBy: "lab,name",
+        orderBy: "manufacturer,name",
       },
     },
     {
@@ -737,10 +597,14 @@ export const recipeEntity: EntityConfig<Recipe> = {
       colSpan: 3,
     },
     {
-      name: "use_default_additions",
-      label: "Use Default Water Additions",
-      type: "switch",
-      defaultValue: true,
+      name: "target_water_profile_id",
+      label: "Target Water Profile",
+      type: "relation",
+      relation: {
+        entity: "water_profile",
+        displayField: "name",
+      },
+      placeholder: "Select target profile...",
       colSpan: 3,
     },
     // Notes
@@ -760,14 +624,8 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
   ],
 
-  // ---------------------------------------------------------------------------
-  // State Machine
-  // ---------------------------------------------------------------------------
   stateMachine: recipeStateMachine,
 
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
   relations: [
     {
       name: "batches",
@@ -779,16 +637,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
   ],
 
-  // ---------------------------------------------------------------------------
-  // Actions
-  // ---------------------------------------------------------------------------
   actions: [
     {
       name: "clone",
       label: "Clone Recipe",
       icon: "copy",
       type: "button",
-      // Available for all recipes - custom handler needed
     },
     {
       name: "delete",
@@ -802,9 +656,6 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
   ],
 
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
   queryExamples: [
     "Show me all IPA recipes",
     "What recipes have estimated ABV over 7%?",

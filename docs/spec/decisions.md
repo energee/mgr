@@ -698,6 +698,28 @@ package_types:
 
 ---
 
+## Water Chemistry Decisions
+
+### DEC-WATER-001: Water Addition Profiles
+**Status**: Implemented
+
+Replace the non-functional `use_default_additions` toggle with named, reusable water addition profiles.
+
+- Water profiles = source water chemistry (existing `water_profiles` table)
+- Addition profiles = named salt/acid addition sets (new `water_addition_profiles` table)
+- Profile items stored in `recipe_additions` with `profile_id` FK (no schema duplication)
+- Recipes link to a profile via `water_addition_profile_id` FK
+- Non-water additions (clarifiers, nutrients) remain recipe-specific in `recipe_additions`
+- Default source water profile configurable in `system_settings`
+
+**Schema changes:**
+- New table: `water_addition_profiles` (id, name, description, is_active, created_at, updated_at)
+- `recipe_additions`: dropped `is_default`, added `profile_id` FK, added mutual exclusivity constraint (recipe_id XOR profile_id)
+- `recipes`: dropped `use_default_additions`, added `water_addition_profile_id` FK
+- New `system_settings` key: `default_water_profile_id`
+
+---
+
 ## Related Documents
 
 - [Architecture](./architecture.md) - Technical stack and patterns
