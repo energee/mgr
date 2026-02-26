@@ -1,7 +1,10 @@
 import { streamText, stepCountIs, type UIMessage, convertToModelMessages } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { withAuth } from "@/lib/api/auth";
+import { createAdminClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/supabase";
 import { createChatTools } from "./tools";
 import { entityService } from "@/services/entity-service";
 import { CHAT_ENTITY_MAP } from "./entity-map";
@@ -87,7 +90,7 @@ const ENTITY_TYPE_TO_REGISTRY: Record<string, string> = {
  * Uses the entity registry to look up any entity, then fetches via entityService.
  */
 async function fetchEntityContext(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient<Database>,
   entityType: string,
   entityId: string,
 ): Promise<string | null> {
@@ -137,7 +140,7 @@ async function fetchEntityContext(
 }
 
 async function buildSystemPrompt(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient<Database>,
   pageContext?: PageContext,
 ): Promise<string> {
   if (!pageContext?.section) return BASE_SYSTEM_PROMPT;
@@ -164,7 +167,7 @@ async function buildSystemPrompt(
  * Checks user preferences first, then falls back to the global system setting.
  */
 async function resolveApiKey(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient<Database>,
   userId: string,
 ): Promise<string | null> {
   // User's personal key (anthropic_api_key not yet in generated types)
@@ -184,10 +187,7 @@ async function resolveApiKey(
 
   // Fall back to global key from system_settings.
   // Uses service role client (no cookie auth) to bypass RLS.
-  const adminDb = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+  const adminDb = createAdminClient();
   const { data: setting, error: settingError } = await adminDb
     .from("system_settings")
     .select("value")
@@ -206,12 +206,12 @@ async function resolveApiKey(
   return null;
 }
 
-export async function POST(req: Request): Promise<Response> {
+export const POST = withAuth(async (request, { user, supabase }) => {
   // Rate limit: 10 requests per minute per IP
-  const ip = getClientIp(req);
+  const ip = getClientIp(request);
   const limiter = rateLimit(`chat:${ip}`, { windowMs: 60_000, maxRequests: 10 });
   if (!limiter.success) {
-    return Response.json(
+    return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
         status: 429,
@@ -220,28 +220,17 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const apiKey = await resolveApiKey(supabase, user.id);
 
   if (!apiKey) {
-    return Response.json(
+    return NextResponse.json(
       { error: "No API key configured. Add your Anthropic API key in Settings." },
       { status: 400 },
     );
   }
 
   const { messages, pageContext }: { messages: UIMessage[]; pageContext?: PageContext } =
-    await req.json();
+    await request.json();
 
   const anthropic = createAnthropic({ apiKey });
   const tools = createChatTools(supabase);
@@ -256,5 +245,10 @@ export async function POST(req: Request): Promise<Response> {
     stopWhen: stepCountIs(5),
   });
 
-  return result.toUIMessageStreamResponse();
-}
+  // Wrap the streaming Response as NextResponse to satisfy withAuth's return type
+  const streamingResponse = result.toUIMessageStreamResponse();
+  return new NextResponse(streamingResponse.body, {
+    status: streamingResponse.status,
+    headers: streamingResponse.headers,
+  });
+});

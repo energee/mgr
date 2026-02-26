@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/server";
 import { withPermission } from "@/lib/api/auth";
 import { testSlackWebhook } from "@/lib/slack";
-
-function createAdminDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 /**
  * POST /api/slack/test
@@ -21,7 +14,7 @@ export const POST = withPermission("integrations:manage", async (req) => {
   let webhookUrl: string | null = body.webhookUrl ?? null;
 
   if (!webhookUrl) {
-    const admin = createAdminDb();
+    const admin = createAdminClient();
     const { data: settings } = await admin
       .from("slack_settings")
       .select("webhook_url")

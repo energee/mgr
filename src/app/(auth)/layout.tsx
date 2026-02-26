@@ -5,8 +5,13 @@
  * Redirects logged-in users to the app.
  */
 
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "Sign In",
+};
 import { redirect } from "next/navigation";
 
 interface AuthLayoutProps {

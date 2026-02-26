@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { PortalShell } from "@/components/portal/portal-shell";
 import type { PortalCustomer } from "@/lib/portal-context";
+
+export const metadata: Metadata = {
+  title: "Customer Portal",
+};
 
 export default async function PortalLayout({
   children,

@@ -7,7 +7,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
+import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { userProfileEntity } from "@/entities/user-profile";
 
 interface UserDetailPageProps {
@@ -18,7 +18,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   const { id } = use(params);
 
   return (
-    <EntityDetailUnified
+    <EntityDetailUnifiedWithErrorBoundary
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       entity={userProfileEntity as any}
       id={id}

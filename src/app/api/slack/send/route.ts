@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/server";
 import { sendSlackNotification } from "@/lib/slack";
 import type { SlackSettings, SlackNotification } from "@/lib/slack";
 
@@ -10,13 +10,6 @@ function secureCompare(a: string, b: string): boolean {
   const bufB = Buffer.from(b);
   if (bufA.length !== bufB.length) return false;
   return crypto.timingSafeEqual(bufA, bufB);
-}
-
-function createAdminDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
 }
 
 /**
@@ -31,7 +24,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const admin = createAdminDb();
+  const admin = createAdminClient();
 
   // Validate secret against stored value
   const { data: settings, error: settingsErr } = await admin
