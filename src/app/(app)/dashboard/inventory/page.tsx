@@ -14,7 +14,8 @@ import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { InventoryAlerts } from "@/components/domain/inventory-alerts";
-import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
+import { Suspense } from "react";
+import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
@@ -172,6 +173,39 @@ export default function InventoryDashboardPage() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
+  const period = usePeriod();
+
+  const { data: inventoryTrends = [] } = useQuery({
+    queryKey: dashboardKeys.trends.inventory(period),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)("get_inventory_trends", {
+        p_days: period,
+      });
+      if (error) return [];
+      return (data || []) as Array<{
+        date: string;
+        lots_created: number;
+        lots_depleted: number;
+        total_lot_activity: number;
+      }>;
+    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+  });
+
+  // Split into current and previous periods
+  const currentPeriodData = inventoryTrends.slice(period);
+  const previousPeriodData = inventoryTrends.slice(0, period);
+
+  const currentLotsCreated = currentPeriodData.reduce((sum, d) => sum + d.lots_created, 0);
+  const previousLotsCreated = previousPeriodData.reduce((sum, d) => sum + d.lots_created, 0);
+
+  const currentLotsDepleted = currentPeriodData.reduce((sum, d) => sum + d.lots_depleted, 0);
+  const previousLotsDepleted = previousPeriodData.reduce((sum, d) => sum + d.lots_depleted, 0);
+
+  const deltaLabel = `vs prev ${period}d`;
+
   // Calculate totals
   const lowStockCount = lowStockItems.length;
   const expiringCount = expiringLots.filter((lot) => lot.days_until_expiry <= 30).length;
@@ -198,12 +232,17 @@ export default function InventoryDashboardPage() {
       <div className="space-y-1">
         <div className="flex items-baseline justify-between">
           <h1 className="text-2xl font-semibold">Inventory Dashboard</h1>
-          <Link
-            href="/inventory/items"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            View All Items
-          </Link>
+          <div className="flex items-center gap-4">
+            <Suspense fallback={null}>
+              <PeriodSelector />
+            </Suspense>
+            <Link
+              href="/inventory/items"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              View All Items
+            </Link>
+          </div>
         </div>
         <StatsStrip stats={primaryStats} />
       </div>
@@ -289,6 +328,34 @@ export default function InventoryDashboardPage() {
             </span>
           ))}
         </div>
+      </DashboardSection>
+
+      {/* Period Comparison Cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCardWithDelta
+          value={currentLotsCreated}
+          label="lots received"
+          delta={calculateDelta(currentLotsCreated, previousLotsCreated)}
+          deltaLabel={deltaLabel}
+        />
+        <StatCardWithDelta
+          value={currentLotsDepleted}
+          label="lots consumed"
+          delta={calculateDelta(currentLotsDepleted, previousLotsDepleted)}
+          deltaLabel={deltaLabel}
+        />
+      </div>
+
+      {/* Lot Activity Trend */}
+      <DashboardSection title="Lot Activity">
+        <TrendChart
+          data={currentPeriodData}
+          xKey="date"
+          series={[
+            { key: "lots_created", label: "Received", type: "bar", color: "hsl(var(--chart-1))" },
+            { key: "lots_depleted", label: "Consumed", type: "bar", color: "hsl(var(--chart-2))" },
+          ]}
+        />
       </DashboardSection>
 
       {/* AI-Powered Inventory Overview */}
