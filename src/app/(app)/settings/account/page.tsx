@@ -4,6 +4,7 @@
  * Account Settings Page
  *
  * Personal settings for the current user:
+ * - Avatar upload
  * - Display name
  * - Personal API key for Anthropic Claude
  */
@@ -18,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, Loader2 } from "lucide-react";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
+import { AvatarUpload } from "@/components/domain/avatar-upload";
 import { entityKeys, userKeys } from "@/lib/query-keys";
 
 // =============================================================================
@@ -36,12 +38,12 @@ function ProfileSection() {
 
       const { data, error } = await supabase
         .from("user_profiles")
-        .select("id, display_name, email")
+        .select("id, display_name, email, avatar_url")
         .eq("id", user.id)
         .single();
 
       if (error) throw error;
-      return data as { id: string; display_name: string | null; email: string | null };
+      return data as { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
     },
   });
 
@@ -88,7 +90,7 @@ function ProfileForm({
   onSave,
   isPending,
 }: {
-  profile: { display_name: string | null; email: string | null };
+  profile: { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
   onSave: (name: string) => void;
   isPending: boolean;
 }) {
@@ -104,6 +106,11 @@ function ProfileForm({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <AvatarUpload
+          userId={profile.id}
+          avatarUrl={profile.avatar_url}
+          displayName={profile.display_name}
+        />
         {profile.email && (
           <div className="grid gap-2">
             <Label>Email</Label>
