@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { sendSlackNotification } from "@/lib/slack";
 import type { SlackSettings, SlackNotification } from "@/lib/slack";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/slack/send" });
 
 /** Constant-time string comparison to prevent timing attacks. */
 function secureCompare(a: string, b: string): boolean {
@@ -21,6 +24,7 @@ function secureCompare(a: string, b: string): boolean {
 export async function POST(req: Request): Promise<Response> {
   const secret = req.headers.get("X-Slack-Secret");
   if (!secret) {
+    log.warn("Missing X-Slack-Secret header");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -34,15 +38,17 @@ export async function POST(req: Request): Promise<Response> {
     .single();
 
   if (settingsErr || !settings) {
-    console.error("[slack/send] Failed to read slack_settings:", settingsErr?.message);
+    log.error("Failed to read slack_settings", { error: settingsErr?.message });
     return NextResponse.json({ error: "Config error" }, { status: 500 });
   }
 
   if (!secureCompare(settings.internal_secret, secret)) {
+    log.warn("Invalid Slack secret provided");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   if (!settings.is_enabled || !settings.webhook_url) {
+    log.debug("Slack notifications disabled, skipping");
     return NextResponse.json({ skipped: true });
   }
 
@@ -78,7 +84,19 @@ export async function POST(req: Request): Promise<Response> {
     channel_overrides: (settings.channel_overrides as Record<string, string>) ?? {},
   };
 
+  log.info("Sending Slack notification", { type, priority, logId: log_id });
+
   const result = await sendSlackNotification(slackSettings, notification, appUrl);
+
+  if (result.ok) {
+    log.info("Slack notification sent successfully", { type, logId: log_id });
+  } else {
+    log.error("Slack notification failed", {
+      type,
+      logId: log_id,
+      error: result.error,
+    });
+  }
 
   // Update log entry
   if (log_id) {

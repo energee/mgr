@@ -9,6 +9,9 @@ import { createChatTools } from "./tools";
 import { entityService } from "@/services/entity-service";
 import { CHAT_ENTITY_MAP } from "./entity-map";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/chat" });
 
 const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant — concise, practical, brewery-focused.
 
@@ -178,7 +181,7 @@ async function resolveApiKey(
     .single<UserPrefsApiKeyRow>();
 
   if (prefsError) {
-    console.error("[chat] Failed to read user API key:", prefsError.message);
+    log.error("Failed to read user API key", { error: prefsError.message, userId });
   }
 
   if (prefs?.anthropic_api_key) {
@@ -195,7 +198,7 @@ async function resolveApiKey(
     .single();
 
   if (settingError) {
-    console.error("[chat] Failed to read global API key:", settingError.message);
+    log.error("Failed to read global API key", { error: settingError.message });
   }
 
   const globalKey = setting?.value;
@@ -207,10 +210,13 @@ async function resolveApiKey(
 }
 
 export const POST = withAuth(async (request, { user, supabase }) => {
+  const startTime = Date.now();
+
   // Rate limit: 10 requests per minute per IP
   const ip = getClientIp(request);
   const limiter = rateLimit(`chat:${ip}`, { windowMs: 60_000, maxRequests: 10 });
   if (!limiter.success) {
+    log.warn("Rate limit exceeded", { ip, userId: user.id });
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
@@ -223,6 +229,7 @@ export const POST = withAuth(async (request, { user, supabase }) => {
   const apiKey = await resolveApiKey(supabase, user.id);
 
   if (!apiKey) {
+    log.warn("No API key configured for chat request", { userId: user.id });
     return NextResponse.json(
       { error: "No API key configured. Add your Anthropic API key in Settings." },
       { status: 400 },
@@ -231,6 +238,13 @@ export const POST = withAuth(async (request, { user, supabase }) => {
 
   const { messages, pageContext }: { messages: UIMessage[]; pageContext?: PageContext } =
     await request.json();
+
+  log.info("Chat request started", {
+    userId: user.id,
+    messageCount: messages.length,
+    section: pageContext?.section,
+    entityType: pageContext?.entityType,
+  });
 
   const anthropic = createAnthropic({ apiKey });
   const tools = createChatTools(supabase);
@@ -243,6 +257,11 @@ export const POST = withAuth(async (request, { user, supabase }) => {
     tools,
     maxOutputTokens: 2048,
     stopWhen: stepCountIs(5),
+  });
+
+  log.info("Chat stream initiated", {
+    userId: user.id,
+    durationMs: Date.now() - startTime,
   });
 
   // Wrap the streaming Response as NextResponse to satisfy withAuth's return type

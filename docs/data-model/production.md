@@ -102,6 +102,7 @@ Brewing recipes with all parameters. Ingredients are stored in junction tables f
 | is_active | BOOLEAN | Active flag |
 | **Profiles** | | |
 | target_water_profile_id | UUID | FK to [water_profiles](#water_profiles), ON DELETE SET NULL |
+| water_addition_profile_id | UUID | FK to [water_addition_profiles](#water_addition_profiles), ON DELETE SET NULL |
 | **Meta** | | |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
@@ -430,12 +431,13 @@ Users who collaborated on a recipe.
 
 ## `recipe_additions`
 
-Recipe-specific additive additions: water salts, acids, clarifiers, nutrients, etc.
+Additive additions for recipes or water addition profiles: water salts, acids, clarifiers, nutrients, etc. Each row belongs to exactly one owner (recipe or profile), enforced by a mutual exclusivity constraint.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| recipe_id | UUID | FK to recipes (NOT NULL) |
+| recipe_id | UUID | FK to recipes (NULL if owned by profile) |
+| profile_id | UUID | FK to water_addition_profiles (NULL if owned by recipe) |
 | additive_id | UUID | FK to additives |
 | position | INTEGER | Sort order |
 | amount | DECIMAL(8,4) | Amount |
@@ -444,7 +446,40 @@ Recipe-specific additive additions: water salts, acids, clarifiers, nutrients, e
 | target | TEXT | Target (for water salts): mash, sparge, kettle |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
+**Ownership constraint:**
+```sql
+-- Exactly one owner: recipe or profile
+CONSTRAINT recipe_additions_owner_check CHECK (
+  (recipe_id IS NOT NULL AND profile_id IS NULL) OR
+  (recipe_id IS NULL AND profile_id IS NOT NULL)
+)
+```
+
+**Usage patterns:**
+- **Recipe-specific additions** (clarifiers, nutrients): `recipe_id` is set, `profile_id` is NULL
+- **Water addition profile items** (salts, acids): `profile_id` is set, `recipe_id` is NULL
+- Recipes link to a profile via `recipes.water_addition_profile_id` FK
+
 Water salt additions can be auto-calculated from the recipe's source and target water profiles, then applied via the "Apply to Recipe" button on the recipe detail page.
+
+---
+
+## `water_addition_profiles`
+
+Named, reusable sets of water salt/acid additions. A profile's items are stored in `recipe_additions` with `profile_id` set. Recipes link to a profile via `water_addition_profile_id` FK.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| name | TEXT | Profile name (e.g., "Hoppy IPA Salts", "Pilsner Minerals") |
+| description | TEXT | Description |
+| is_active | BOOLEAN | Inactive profiles hidden from dropdowns |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Relationships:**
+- Has many `recipe_additions` (via `profile_id` FK, CASCADE delete)
+- Has many `recipes` (via `recipes.water_addition_profile_id` FK, SET NULL on delete)
 
 ---
 

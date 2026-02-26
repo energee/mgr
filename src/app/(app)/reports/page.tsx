@@ -18,24 +18,24 @@ const reports = [
   },
   {
     title: "Production Summary",
-    description: "Monthly production volumes by brand and style",
-    href: "/reports/production",
+    description: "Monthly production volumes, brand breakdown, and style analysis",
+    href: "/reports/production-summary",
     icon: BarChart3,
-    available: false,
+    available: true,
   },
   {
     title: "Inventory Valuation",
     description: "Current inventory value by category",
     href: "/reports/inventory-valuation",
     icon: DollarSign,
-    available: false,
+    available: true,
   },
   {
     title: "Batch Cost Analysis",
-    description: "Cost breakdown per batch",
+    description: "Cost breakdown per batch with ingredient-level detail",
     href: "/reports/batch-cost",
     icon: ClipboardList,
-    available: false,
+    available: true,
   },
 ];
 
