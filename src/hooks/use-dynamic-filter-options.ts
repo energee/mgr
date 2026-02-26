@@ -4,10 +4,11 @@
  * Hook to fetch dynamic filter options from Supabase.
  *
  * Handles both legacy `fetchOptions` and new `dynamicOptions` patterns.
- * Returns a map of field name → options array.
+ * Returns a stable map of field name → options array. Only triggers
+ * re-renders when the actual option data changes (deep comparison).
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { EntityFilterDef } from "@/types/entity";
 
@@ -16,6 +17,32 @@ export type DynamicFilterOptions = Record<
   { value: string; label: string }[]
 >;
 
+/**
+ * Shallow-compare two DynamicFilterOptions maps.
+ * Returns true if they have the same keys with the same option arrays
+ * (compared by value+label of each entry).
+ */
+function optionsEqual(
+  a: DynamicFilterOptions,
+  b: DynamicFilterOptions
+): boolean {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    const arrA = a[key];
+    const arrB = b[key];
+    if (!arrB || arrA.length !== arrB.length) return false;
+    for (let i = 0; i < arrA.length; i++) {
+      if (arrA[i].value !== arrB[i].value || arrA[i].label !== arrB[i].label) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 export function useDynamicFilterOptions(
   listFilters: EntityFilterDef[] | undefined,
   entityName: string
@@ -23,9 +50,22 @@ export function useDynamicFilterOptions(
   const supabase = useMemo(() => createClient(), []);
   const [dynamicFilterOptions, setDynamicFilterOptions] =
     useState<DynamicFilterOptions>({});
+  const prevOptionsRef = useRef<DynamicFilterOptions>({});
+
+  // Stable setter that only updates state when data actually changes
+  const setOptionsIfChanged = useCallback(
+    (newOptions: DynamicFilterOptions) => {
+      if (!optionsEqual(prevOptionsRef.current, newOptions)) {
+        prevOptionsRef.current = newOptions;
+        setDynamicFilterOptions(newOptions);
+      }
+    },
+    []
+  );
 
   // Reset when navigating between entities
   useEffect(() => {
+    prevOptionsRef.current = {};
     setDynamicFilterOptions({});
   }, [entityName]);
 
@@ -61,20 +101,16 @@ export function useDynamicFilterOptions(
 
               // Apply filter if specified
               if (queryFilter) {
-                Object.entries(queryFilter).forEach(([key, value]) => {
-                  query = query.eq(
-                    key,
-                    value as string | number | boolean
-                  );
-                });
+                for (const [key, value] of Object.entries(queryFilter)) {
+                  query = query.eq(key, value as string | number | boolean);
+                }
               }
 
               // Apply ordering if specified
               if (orderBy) {
-                const orderFields = orderBy.split(",").map((f) => f.trim());
-                orderFields.forEach((field) => {
+                for (const field of orderBy.split(",").map((f) => f.trim())) {
                   query = query.order(field, { ascending: true });
-                });
+                }
               } else {
                 query = query.order(labelField, { ascending: true });
               }
@@ -101,16 +137,15 @@ export function useDynamicFilterOptions(
         })
       );
 
-      const optionsMap = results.reduce(
-        (acc, { field, options }) => ({ ...acc, [field]: options }),
-        {} as DynamicFilterOptions
+      const optionsMap: DynamicFilterOptions = Object.fromEntries(
+        results.map(({ field, options }) => [field, options])
       );
 
-      setDynamicFilterOptions(optionsMap);
+      setOptionsIfChanged(optionsMap);
     };
 
     fetchDynamicOptions();
-  }, [listFilters, entityName, supabase]);
+  }, [listFilters, entityName, supabase, setOptionsIfChanged]);
 
   return dynamicFilterOptions;
 }
