@@ -19,9 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/integration-badge";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Check, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { SecretKeyInput } from "@/components/domain/secret-key-input";
-import { Check, ExternalLink } from "lucide-react";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { SquareIcon } from "@/components/ui/square-icon";
 import { QuickBooksIcon } from "@/components/ui/quickbooks-icon";
@@ -467,30 +466,30 @@ function QuickBooksIntegrationCard() {
             keyPlaceholder="AB1cd2EFgh3..."
           />
         )}
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="text-sm font-medium mb-2">Features</h4>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              {[
-                "Auto-sync invoices from orders",
-                "Auto-sync bills from purchase orders",
-                "Customer & supplier mapping",
-                "Tax exemption support",
-              ].map((feature, i) => (
-                <li key={i} className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <Link href="/settings/integrations/quickbooks">
-            <Button variant="outline" size="sm">
-              Settings
-              <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
-            </Button>
-          </Link>
+        {/* Features */}
+        <div>
+          <h4 className="text-sm font-medium mb-2">Features</h4>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            {[
+              "Auto-sync invoices from orders",
+              "Auto-sync bills from purchase orders",
+              "Customer & supplier mapping",
+              "Tax exemption support",
+            ].map((feature, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                {feature}
+              </li>
+            ))}
+          </ul>
         </div>
+
+        <Link href="/settings/integrations/quickbooks">
+          <Button variant="outline" size="sm">
+            Settings
+            <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+          </Button>
+        </Link>
       </CardContent>
     </Card>
   );
