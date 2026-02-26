@@ -1,12 +1,29 @@
+import { NextResponse } from "next/server";
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
+import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
 
-const PORTAL_REDIRECT_URL = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback?redirect=/portal/orders`;
+/** Base URL for portal invite redirects. Prefers NEXT_PUBLIC_SITE_URL, falls back to NEXT_PUBLIC_APP_URL. */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const PORTAL_REDIRECT_URL = `${SITE_URL}/api/auth/callback?redirect=/portal/orders`;
 
 export const POST = withPermission(
   "customers:write",
-  async (_request, { supabase, params }) => {
+  async (request, { supabase, params }) => {
+    // Rate limit: 5 requests per minute per IP (stricter — sends emails)
+    const ip = getClientIp(request);
+    const limiter = rateLimit(`invite:${ip}`, { windowMs: 60_000, maxRequests: 5 });
+    if (!limiter.success) {
+      return NextResponse.json(
+        { error: { code: "RATE_LIMITED", message: "Too many requests. Please try again later." } },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil(limiter.resetMs / 1000)) },
+        },
+      );
+    }
+
     const customerId = params?.id;
     if (!customerId) {
       return errorResponse("BAD_REQUEST", "Missing customer ID", undefined, 400);

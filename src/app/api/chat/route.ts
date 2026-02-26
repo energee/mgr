@@ -5,6 +5,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createChatTools } from "./tools";
 import { entityService } from "@/services/entity-service";
 import { CHAT_ENTITY_MAP } from "./entity-map";
+import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 
 const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant — concise, practical, brewery-focused.
 
@@ -206,6 +207,19 @@ async function resolveApiKey(
 }
 
 export async function POST(req: Request): Promise<Response> {
+  // Rate limit: 10 requests per minute per IP
+  const ip = getClientIp(req);
+  const limiter = rateLimit(`chat:${ip}`, { windowMs: 60_000, maxRequests: 10 });
+  if (!limiter.success) {
+    return Response.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(limiter.resetMs / 1000)) },
+      },
+    );
+  }
+
   const supabase = await createClient();
 
   const {

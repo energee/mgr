@@ -1,7 +1,16 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendSlackNotification } from "@/lib/slack";
 import type { SlackSettings, SlackNotification } from "@/lib/slack";
+
+/** Constant-time string comparison to prevent timing attacks. */
+function secureCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 function createAdminDb() {
   return createClient(
@@ -36,7 +45,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Config error" }, { status: 500 });
   }
 
-  if (settings.internal_secret !== secret) {
+  if (!secureCompare(settings.internal_secret, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
