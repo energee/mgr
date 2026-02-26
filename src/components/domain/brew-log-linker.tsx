@@ -38,7 +38,7 @@ import { Link2, Plus, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { batchKeys } from "@/lib/query-keys";
-import { UnitDisplay } from "@/components/ui/unit-input";
+import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 
 interface BrewLog {
   id: string;
@@ -64,7 +64,7 @@ interface BrewLogLinkerProps {
 export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [selectedBrewLogId, setSelectedBrewLogId] = useState("");
-  const [volume, setVolume] = useState("");
+  const [volume, setVolume] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
 
   const supabase = createClient();
@@ -140,7 +140,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
       queryClient.invalidateQueries({ queryKey: batchKeys.detail(batchId) });
       setLinkDialogOpen(false);
       setSelectedBrewLogId("");
-      setVolume("");
+      setVolume(null);
       setNotes("");
       toast.success("Brew log linked");
     },
@@ -169,10 +169,10 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
   });
 
   const handleLink = () => {
-    if (!selectedBrewLogId || !volume) return;
+    if (!selectedBrewLogId || volume == null || volume <= 0) return;
     linkMutation.mutate({
       brewLogId: selectedBrewLogId,
-      volumeBbl: parseFloat(volume),
+      volumeBbl: volume,
       linkNotes: notes,
     });
   };
@@ -223,14 +223,13 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Volume (BBL)</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  placeholder="e.g., 10.5"
+                <Label>Volume</Label>
+                <UnitInput
                   value={volume}
-                  onChange={(e) => setVolume(e.target.value)}
+                  onChange={setVolume}
+                  unitType="volume"
+                  decimals={2}
+                  placeholder="e.g., 10.5"
                 />
               </div>
               <div className="space-y-2">
@@ -251,7 +250,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
               </Button>
               <Button
                 onClick={handleLink}
-                disabled={!selectedBrewLogId || !volume || linkMutation.isPending}
+                disabled={!selectedBrewLogId || volume == null || volume <= 0 || linkMutation.isPending}
               >
                 {linkMutation.isPending ? "Linking..." : "Link"}
               </Button>

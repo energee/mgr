@@ -27,7 +27,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -40,7 +39,7 @@ import {
 import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { batchKeys, vesselKeys, entityKeys } from "@/lib/query-keys";
-import { UnitDisplay } from "@/components/ui/unit-input";
+import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 
 // =============================================================================
 // Types
@@ -249,12 +248,12 @@ export function VesselTransferDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="volume_bbl">Volume (BBL)</Label>
-            <Input
-              id="volume_bbl"
-              type="number"
-              step="0.1"
-              {...form.register("volume_bbl")}
+            <Label htmlFor="volume_bbl">Volume</Label>
+            <UnitInput
+              value={form.watch("volume_bbl") || null}
+              onChange={(val) => form.setValue("volume_bbl", val ?? 0, { shouldValidate: true })}
+              unitType="volume"
+              decimals={2}
               placeholder="e.g., 7"
               className="min-h-[44px]"
             />

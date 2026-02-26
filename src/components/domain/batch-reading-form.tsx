@@ -18,6 +18,8 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { UnitInput } from "@/components/ui/unit-input";
+import type { UnitType } from "@/lib/units";
 import {
   Select,
   SelectContent,
@@ -62,6 +64,22 @@ const readingSchema = z.object({
 });
 
 type ReadingFormValues = z.infer<typeof readingSchema>;
+
+/**
+ * Map reading types to UnitInput-compatible unit types.
+ * Only gravity and temperature have meaningful unit conversions.
+ * Returns undefined for types that should use plain number inputs.
+ */
+const READING_UNIT_TYPE_MAP: Partial<Record<ReadingType, UnitType>> = {
+  gravity: "gravity",
+  temperature: "temperature",
+};
+
+/** Canonical unit for each UnitInput-backed reading type */
+const CANONICAL_UNIT_MAP: Partial<Record<ReadingType, string>> = {
+  gravity: "plato",
+  temperature: "f",
+};
 
 interface BatchReadingFormProps {
   batchId: string;
@@ -189,77 +207,107 @@ export function BatchReadingForm({
             />
 
             {/* Value Input - Large for touch */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
+            {READING_UNIT_TYPE_MAP[selectedType] ? (
+              /* UnitInput-backed types (gravity, temperature) - includes built-in unit switching */
+              <FormField
+                control={form.control}
+                name="value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base">Value</FormLabel>
+                    <FormControl>
+                      <UnitInput
+                        value={typeof field.value === "number" ? field.value : null}
+                        onChange={(val) => {
+                          field.onChange(val ?? "");
+                          // Keep the unit field in sync with the canonical unit
+                          form.setValue("unit", CANONICAL_UNIT_MAP[selectedType] ?? config.defaultUnit);
+                        }}
+                        unitType={READING_UNIT_TYPE_MAP[selectedType]!}
+                        allowSwitch
+                        decimals={selectedType === "gravity" ? 1 : 1}
+                        placeholder={`${config.min || 0} - ${config.max || 100}`}
+                        className="h-12 text-lg"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              /* Non-UnitInput types - plain number input with separate unit selector */
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <FormField
+                    control={form.control}
+                    name="value"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base">Value</FormLabel>
+                        <FormControl>
+                          {config.options ? (
+                            <Select
+                              value={String(field.value)}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger className="h-12 text-lg">
+                                <SelectValue placeholder="Select..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {config.options.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              type="number"
+                              step={config.step || "any"}
+                              min={config.min}
+                              max={config.max}
+                              placeholder={`${config.min || 0} - ${config.max || 100}`}
+                              className="h-12 text-lg"
+                              {...field}
+                            />
+                          )}
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Unit Selector */}
                 <FormField
                   control={form.control}
-                  name="value"
+                  name="unit"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base">Value</FormLabel>
-                      <FormControl>
-                        {config.options ? (
-                          <Select
-                            value={String(field.value)}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger className="h-12 text-lg">
-                              <SelectValue placeholder="Select..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {config.options.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option.charAt(0).toUpperCase() + option.slice(1)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            type="number"
-                            step={config.step || "any"}
-                            min={config.min}
-                            max={config.max}
-                            placeholder={`${config.min || 0} - ${config.max || 100}`}
-                            className="h-12 text-lg"
-                            {...field}
-                          />
-                        )}
-                      </FormControl>
+                      <FormLabel className="text-base">Unit</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={config.units.length <= 1}
+                      >
+                        <SelectTrigger className="h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {config.units.map((unit) => (
+                            <SelectItem key={unit} value={unit}>
+                              {getUnitLabel(selectedType, unit)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
-              {/* Unit Selector */}
-              <FormField
-                control={form.control}
-                name="unit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base">Unit</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={config.units.length <= 1}
-                    >
-                      <SelectTrigger className="h-12">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {config.units.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {getUnitLabel(selectedType, unit)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            )}
 
             {/* Validation Warning */}
             {validationWarning && (
