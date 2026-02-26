@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
 import Link from "next/link";
-import { CACHE_DURATIONS } from "@/lib/constants";
+import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { VESSEL_TYPES } from "@/entities/vessel";
 import { batchEntity } from "@/entities/batch";
 import { StatusBadge } from "@/components/universal/status-badge";
@@ -94,7 +94,7 @@ export default function DashboardPage() {
       }
       return counts;
     },
-    refetchInterval: 60000,
+    refetchInterval: POLLING_INTERVALS.FAST,
     refetchIntervalInBackground: false,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
@@ -125,7 +125,7 @@ export default function DashboardPage() {
         recipe_name: (batch.recipes as { name: string } | null)?.name,
       })) as ActiveBatch[];
     },
-    refetchInterval: 60000,
+    refetchInterval: POLLING_INTERVALS.FAST,
     refetchIntervalInBackground: false,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
@@ -149,7 +149,7 @@ export default function DashboardPage() {
 
       return data as VesselStatus[];
     },
-    refetchInterval: 120000,
+    refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
@@ -166,7 +166,7 @@ export default function DashboardPage() {
       if (error) return [];
       return (data || []) as ProductionShortfall[];
     },
-    refetchInterval: 120000,
+    refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });

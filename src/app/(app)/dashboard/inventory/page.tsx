@@ -17,7 +17,7 @@ import { InventoryAlerts } from "@/components/domain/inventory-alerts";
 import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { CACHE_DURATIONS } from "@/lib/constants";
+import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 
 // =============================================================================
 // Types
@@ -96,7 +96,7 @@ export default function InventoryDashboardPage() {
         unit: item.unit || "units",
       })) as LowStockItem[];
     },
-    refetchInterval: 120000,
+    refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
@@ -151,7 +151,7 @@ export default function InventoryDashboardPage() {
           };
         }) as ExpiringLot[];
     },
-    refetchInterval: 120000,
+    refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
@@ -167,7 +167,7 @@ export default function InventoryDashboardPage() {
       if (error) throw error;
       return (data || []) as InventorySummary[];
     },
-    refetchInterval: 120000,
+    refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });

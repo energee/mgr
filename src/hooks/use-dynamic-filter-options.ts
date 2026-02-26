@@ -101,20 +101,16 @@ export function useDynamicFilterOptions(
 
               // Apply filter if specified
               if (queryFilter) {
-                Object.entries(queryFilter).forEach(([key, value]) => {
-                  query = query.eq(
-                    key,
-                    value as string | number | boolean
-                  );
-                });
+                for (const [key, value] of Object.entries(queryFilter)) {
+                  query = query.eq(key, value as string | number | boolean);
+                }
               }
 
               // Apply ordering if specified
               if (orderBy) {
-                const orderFields = orderBy.split(",").map((f) => f.trim());
-                orderFields.forEach((field) => {
+                for (const field of orderBy.split(",").map((f) => f.trim())) {
                   query = query.order(field, { ascending: true });
-                });
+                }
               } else {
                 query = query.order(labelField, { ascending: true });
               }
@@ -141,9 +137,8 @@ export function useDynamicFilterOptions(
         })
       );
 
-      const optionsMap = results.reduce(
-        (acc, { field, options }) => ({ ...acc, [field]: options }),
-        {} as DynamicFilterOptions
+      const optionsMap: DynamicFilterOptions = Object.fromEntries(
+        results.map(({ field, options }) => [field, options])
       );
 
       setOptionsIfChanged(optionsMap);
