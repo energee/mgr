@@ -182,7 +182,10 @@ export default function InventoryDashboardPage() {
       const { data, error } = await (supabase.rpc as any)("get_inventory_trends", {
         p_days: period,
       });
-      if (error) return [];
+      if (error) {
+        console.error("Failed to fetch inventory trends:", error);
+        return [];
+      }
       return (data || []) as Array<{
         date: string;
         lots_created: number;

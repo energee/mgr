@@ -192,7 +192,10 @@ export default function DashboardPage() {
       const { data, error } = await (supabase.rpc as any)("get_production_trends", {
         p_days: period,
       });
-      if (error) return [];
+      if (error) {
+        console.error("Failed to fetch production trends:", error);
+        return [];
+      }
       return (data || []) as Array<{
         date: string;
         batches_started: number;

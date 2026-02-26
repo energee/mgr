@@ -250,7 +250,10 @@ export default function SalesDashboardPage() {
       const { data, error } = await (supabase.rpc as any)("get_sales_trends", {
         p_days: period,
       });
-      if (error) return [];
+      if (error) {
+        console.error("Failed to fetch sales trends:", error);
+        return [];
+      }
       return (data || []) as Array<{
         date: string;
         order_count: number;

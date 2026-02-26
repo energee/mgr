@@ -120,6 +120,20 @@ export function TrendChart({
 
   const yAxisFormatter = formatValue || ((v: number) => v.toLocaleString());
 
+  // Shared tooltip label formatter (used by both chart types)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tooltipLabelFormatter = (_: any, payload: readonly any[]) => {
+    const firstPayload = payload?.[0]?.payload;
+    if (firstPayload?.[xKey]) {
+      try {
+        return format(parseISO(String(firstPayload[xKey])), "EEE, MMM d");
+      } catch {
+        return String(firstPayload[xKey]);
+      }
+    }
+    return "";
+  };
+
   if (chartType === "bar") {
     return (
       <figure className={className} aria-label={series.map((s) => s.label).join(", ")}>
@@ -143,18 +157,7 @@ export function TrendChart({
             />
             <ChartTooltip
               content={
-                <ChartTooltipContent
-                  labelFormatter={(_, payload) => {
-                    if (payload?.[0]?.payload?.[xKey]) {
-                      try {
-                        return format(parseISO(String(payload[0].payload[xKey])), "EEE, MMM d");
-                      } catch {
-                        return String(payload[0].payload[xKey]);
-                      }
-                    }
-                    return "";
-                  }}
-                />
+                <ChartTooltipContent labelFormatter={tooltipLabelFormatter} />
               }
             />
             {series.map((s, i) => (
@@ -194,18 +197,7 @@ export function TrendChart({
           />
           <ChartTooltip
             content={
-              <ChartTooltipContent
-                labelFormatter={(_, payload) => {
-                  if (payload?.[0]?.payload?.[xKey]) {
-                    try {
-                      return format(parseISO(String(payload[0].payload[xKey])), "EEE, MMM d");
-                    } catch {
-                      return String(payload[0].payload[xKey]);
-                    }
-                  }
-                  return "";
-                }}
-              />
+              <ChartTooltipContent labelFormatter={tooltipLabelFormatter} />
             }
           />
           {series.map((s, i) => (

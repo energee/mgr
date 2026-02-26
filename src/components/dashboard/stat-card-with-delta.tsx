@@ -63,8 +63,8 @@ export function StatCardWithDelta({
         <div
           className={cn(
             "text-xs font-medium font-mono",
-            delta > 0 && "text-emerald-600",
-            delta < 0 && "text-amber-600",
+            delta > 0 && "text-emerald-600 dark:text-emerald-400",
+            delta < 0 && "text-amber-600 dark:text-amber-400",
             delta === 0 && "text-muted-foreground"
           )}
         >
