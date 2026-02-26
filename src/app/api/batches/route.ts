@@ -7,6 +7,7 @@ import {
 } from "@/lib/api";
 import { batchSchema } from "@/lib/schemas/batch";
 import { successResponse } from "@/lib/api/response";
+import { escapeLike } from "@/lib/utils";
 
 const listParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -41,8 +42,9 @@ export const GET = withPermission("batches:read", async (request, { supabase }) 
   }
   if (search) {
     // Strip PostgREST filter metacharacters (dots, commas, parens, backslashes)
-    // to prevent filter injection via the .or() string
-    const sanitized = search.replace(/[.,()\\]/g, "");
+    // to prevent filter injection via the .or() string, then escape LIKE
+    // wildcards so user input like "%" or "_" matches literally.
+    const sanitized = escapeLike(search.replace(/[.,()\\]/g, ""));
     query = query.or(`batch_number.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
   }
 

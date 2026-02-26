@@ -334,6 +334,9 @@ export const revisionKeys = {
     ["entity_revisions", entityType, entityId] as const,
   forEntityCompact: (entityType: string, entityId: string) =>
     ["entity_revisions", entityType, entityId, "compact"] as const,
+  /** Resolve foreign key UUIDs to display names for a given table */
+  fkResolve: (table: string, ids: string[]) =>
+    ["fk-resolve", table, ids.sort().join(",")] as const,
 };
 
 // =============================================================================

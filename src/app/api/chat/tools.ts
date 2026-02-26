@@ -22,11 +22,7 @@ import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 import { entityService } from "@/services/entity-service";
 import { formatServiceError } from "@/services/types";
 import { CHAT_ENTITY_MAP } from "./entity-map";
-
-/** Escape LIKE/ILIKE wildcard characters so they match literally. */
-function escapeLike(value: string): string {
-  return value.replace(/[%_\\]/g, "\\$&");
-}
+import { escapeLike } from "@/lib/utils";
 
 /** Execute an RPC call and throw on error. */
 async function rpc<T>(

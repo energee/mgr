@@ -18,9 +18,18 @@ import {
   WrenchIcon,
   XCircleIcon,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { isValidElement } from "react";
 
-import { CodeBlock } from "./code-block";
+/**
+ * Lazy-load CodeBlock to avoid pulling the shiki syntax-highlighting library
+ * into the initial bundle. The component is only rendered inside collapsible
+ * tool output panels, so deferring it has no visible impact.
+ */
+const CodeBlock = dynamic(
+  () => import("./code-block").then((mod) => mod.CodeBlock),
+  { ssr: false }
+);
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 

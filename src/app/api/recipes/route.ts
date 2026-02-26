@@ -7,6 +7,7 @@ import {
 } from "@/lib/api";
 import { recipeSchema } from "@/lib/schemas/recipe";
 import { successResponse } from "@/lib/api/response";
+import { escapeLike } from "@/lib/utils";
 
 const listParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -39,7 +40,9 @@ export const GET = withPermission("recipes:read", async (request, { supabase }) 
   if (style_id) query = query.eq("style_id", style_id);
   if (is_active !== undefined) query = query.eq("is_active", is_active === "true");
   if (search) {
-    const sanitized = search.replace(/[.,()\\]/g, "");
+    // Strip PostgREST filter metacharacters, then escape LIKE wildcards
+    // so user input like "%" or "_" matches literally.
+    const sanitized = escapeLike(search.replace(/[.,()\\]/g, ""));
     query = query.ilike("name", `%${sanitized}%`);
   }
 

@@ -1,5 +1,11 @@
+import withBundleAnalyzer from "@next/bundle-analyzer";
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+
+/** Wrap the final config with bundle analyzer when ANALYZE=true. */
+const analyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 /**
  * Security headers applied to all routes.
@@ -44,12 +50,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  // Suppress noisy build logs unless running in CI
-  silent: !process.env.CI,
+export default analyzer(
+  withSentryConfig(nextConfig, {
+    // Suppress noisy build logs unless running in CI
+    silent: !process.env.CI,
 
-  // Disable source map upload unless SENTRY_AUTH_TOKEN is configured
-  sourcemaps: {
-    disable: !process.env.SENTRY_AUTH_TOKEN,
-  },
-});
+    // Disable source map upload unless SENTRY_AUTH_TOKEN is configured
+    sourcemaps: {
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+    },
+  })
+);

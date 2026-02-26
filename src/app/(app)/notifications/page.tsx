@@ -124,7 +124,7 @@ export default function NotificationsPage() {
 
   // Fetch all notifications
   const { data, isLoading, error } = useQuery({
-    queryKey: [...notificationKeys.all(), "all", page, filterType, filterStatus, filterPriority, search],
+    queryKey: notificationKeys.list({ page, filterType, filterStatus, filterPriority, search }),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
@@ -421,7 +421,10 @@ export default function NotificationsPage() {
                       "w-2 h-2 rounded-full mt-2 flex-shrink-0",
                       PRIORITY_COLORS[notification.priority]
                     )}
-                  />
+                    title={`${notification.priority} priority`}
+                  >
+                    <span className="sr-only">{notification.priority} priority</span>
+                  </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">

@@ -257,7 +257,7 @@ function useResolvedNames(revisions: Revision[]): Map<string, string> {
 
   const queries = useQueries({
     queries: fkGroups.map(({ table, ids }) => ({
-      queryKey: ["fk-resolve", table, ids.sort().join(",")],
+      queryKey: revisionKeys.fkResolve(table, ids),
       queryFn: async () => {
         const { data } = await db
           .from(table)

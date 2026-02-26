@@ -7,9 +7,6 @@
 
 import { createClient } from "@/lib/supabase/client";
 
-// Create client once at module level (createClient returns singleton)
-const supabase = createClient();
-
 // Types
 export interface StyleComplianceResult {
   recipe_id: string;
@@ -53,6 +50,7 @@ export interface RecipeSuggestionsResult {
 export async function analyzeStyleCompliance(
   recipeId: string
 ): Promise<StyleComplianceResult> {
+  const supabase = createClient();
   const { data, error } = await supabase.rpc("analyze_recipe_style_compliance", {
     p_recipe_id: recipeId,
   });
@@ -70,6 +68,7 @@ export async function analyzeStyleCompliance(
 export async function getRecipeSuggestions(
   recipeId: string
 ): Promise<RecipeSuggestionsResult> {
+  const supabase = createClient();
   const { data, error } = await supabase.rpc("suggest_recipe_improvements", {
     p_recipe_id: recipeId,
   });
