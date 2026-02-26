@@ -248,6 +248,12 @@ export const dashboardKeys = {
     customerRevenue: () => ["dashboard", "sales", "customer-revenue"] as const,
     productMix: () => ["dashboard", "sales", "product-mix"] as const,
   },
+  /** Trend data for dashboard sparklines and charts, keyed by domain and time window */
+  trends: {
+    production: (days: number) => ["dashboard", "trends", "production", days] as const,
+    inventory: (days: number) => ["dashboard", "trends", "inventory", days] as const,
+    sales: (days: number) => ["dashboard", "trends", "sales", days] as const,
+  },
 };
 
 // =============================================================================

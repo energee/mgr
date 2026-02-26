@@ -199,6 +199,30 @@ describe("dashboardKeys", () => {
     expect(dashboardKeys.sales.orderCounts()[0]).toBe("dashboard");
     expect(dashboardKeys.sales.orderCounts()[1]).toBe("sales");
   });
+
+  it("trends.production returns key with days", () => {
+    expect(dashboardKeys.trends.production(7)).toEqual([
+      "dashboard", "trends", "production", 7,
+    ]);
+  });
+
+  it("trends.inventory returns key with days", () => {
+    expect(dashboardKeys.trends.inventory(30)).toEqual([
+      "dashboard", "trends", "inventory", 30,
+    ]);
+  });
+
+  it("trends.sales returns key with days", () => {
+    expect(dashboardKeys.trends.sales(90)).toEqual([
+      "dashboard", "trends", "sales", 90,
+    ]);
+  });
+
+  it("trends keys with different days are unique", () => {
+    expect(dashboardKeys.trends.production(7)).not.toEqual(
+      dashboardKeys.trends.production(30)
+    );
+  });
 });
 
 // =============================================================================
