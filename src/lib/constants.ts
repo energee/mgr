@@ -59,6 +59,18 @@ export const QUERY_LIMITS = {
 } as const;
 
 // =============================================================================
+// Polling Intervals (in milliseconds)
+// =============================================================================
+
+export const POLLING_INTERVALS = {
+  /** Frequently-changing data like active batches and order counts (1 minute) */
+  FAST: 60 * 1000,
+
+  /** Moderately-changing data like vessel utilization and summaries (2 minutes) */
+  NORMAL: 2 * 60 * 1000,
+} as const;
+
+// =============================================================================
 // UI Timeouts
 // =============================================================================
 

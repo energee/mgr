@@ -1,7 +1,19 @@
 "use client";
 
-import { ChatPanel } from "@/components/domain/chat-panel";
+/**
+ * Chat Layout
+ *
+ * Wraps authenticated pages with the collapsible AI chat panel and toggle.
+ * ChatPanel is dynamically imported to avoid loading it in the initial bundle.
+ */
+
+import dynamic from "next/dynamic";
 import { ChatToggle } from "@/components/domain/chat-toggle";
+
+const ChatPanel = dynamic(
+  () => import("@/components/domain/chat-panel").then((m) => m.ChatPanel),
+  { ssr: false }
+);
 
 interface ChatLayoutProps {
   children: React.ReactNode;

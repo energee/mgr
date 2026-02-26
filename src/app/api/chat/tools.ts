@@ -141,12 +141,15 @@ export function createChatTools(supabase: SupabaseClient) {
         "Get a summary of all batches grouped by status (planned, fermenting, conditioning, etc.). Useful for production overview.",
       inputSchema: z.object({}),
       execute: async () => {
-        const data = await query<{ status: string }[]>(
-          supabase.from("batches").select("status").neq("status", "cancelled"),
+        const data = await query<{ status: string; count: number }[]>(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (supabase as any).from("batch_status_counts").select("status, count"),
         );
         const summary: Record<string, number> = {};
-        for (const { status } of data) {
-          summary[status] = (summary[status] || 0) + 1;
+        for (const { status, count } of data) {
+          if (status !== "cancelled") {
+            summary[status] = count;
+          }
         }
         return summary;
       },
