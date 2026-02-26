@@ -13,7 +13,6 @@ MGR is a professional brewery management system following an **AI-first, minimal
 
 **Key Docs**:
 - `README.md` - Setup, commands, project structure
-- `.beads/` - Task tracking (source of truth for work items and status)
 - `docs/spec/` - Technical specification (see `docs/spec/README.md` for navigation)
   - `docs/spec/decisions.md` - Schema review decisions (DEC-*)
   - `docs/spec/architecture.md` - Tech stack and design patterns
