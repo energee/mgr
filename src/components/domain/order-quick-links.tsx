@@ -5,14 +5,15 @@
  *
  * Provides touch-friendly navigation to order sub-pages:
  * - Generate Pick List (creates formal pick list with FIFO)
- * - Pick List (for warehouse fulfillment)
+ * - Pick List (links to formal pick list if one exists, otherwise legacy page)
  * - Allocations (manage inventory allocations)
  */
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { pickListKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, Package, ArrowRight, ListPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,18 +28,33 @@ interface OrderQuickLinksProps {
 export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
   const router = useRouter();
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
-  // Show generate pick list for confirmed/allocated orders
-  const canGenerate = ["confirmed", "scheduled"].includes(data.status);
+  // Fetch any existing formal pick list for this order (non-cancelled)
+  const { data: formalPickList } = useQuery({
+    queryKey: pickListKeys.forOrder(data.id),
+    queryFn: async () => {
+      const { data: pickLists, error } = await supabase
+        .from("pick_lists")
+        .select("id, status")
+        .eq("order_id", data.id)
+        .neq("status", "cancelled")
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      return pickLists;
+    },
+  });
+
+  // Show generate pick list for confirmed/allocated orders (only if no active pick list exists)
+  const canGenerate = ["confirmed", "scheduled"].includes(data.status) && !formalPickList;
   // Show pick list for orders in picking states
   const showPickList = ["scheduled", "picking", "packed", "fulfilled"].includes(data.status);
 
   // Generate pick list mutation
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const { data: pickListId, error } = await db
+      const { data: pickListId, error } = await supabase
         .rpc("generate_pick_list", { p_order_id: data.id });
 
       if (error) throw error;
@@ -68,9 +84,13 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
     ...(showPickList
       ? [
           {
-            href: `/sales/orders/${data.id}/pick-list`,
+            href: formalPickList
+              ? `/sales/pick-lists/${formalPickList.id}`
+              : `/sales/orders/${data.id}/pick-list`,
             label: "Pick List",
-            description: "View and print pick list for warehouse",
+            description: formalPickList
+              ? "View formal pick list with FIFO allocation"
+              : "View and print pick list for warehouse",
             icon: ClipboardList,
           },
         ]
