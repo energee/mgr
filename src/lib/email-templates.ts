@@ -107,13 +107,16 @@ function ctaButton(label: string, url: string): string {
  * Renders a priority indicator badge for high/urgent notifications.
  */
 function priorityBadge(priority: string): string {
-  if (priority === "urgent") {
-    return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;background-color:#dc2626;color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;margin-left:8px;">Urgent</span>`;
+  const baseStyle = "display:inline-block;padding:2px 8px;border-radius:4px;color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;margin-left:8px;";
+
+  switch (priority) {
+    case "urgent":
+      return `<span style="${baseStyle}background-color:#dc2626;">Urgent</span>`;
+    case "high":
+      return `<span style="${baseStyle}background-color:#f59e0b;">High Priority</span>`;
+    default:
+      return "";
   }
-  if (priority === "high") {
-    return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;background-color:#f59e0b;color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;margin-left:8px;">High Priority</span>`;
-  }
-  return "";
 }
 
 // =============================================================================

@@ -225,7 +225,7 @@ export function BatchReadingForm({
                         }}
                         unitType={READING_UNIT_TYPE_MAP[selectedType]!}
                         allowSwitch
-                        decimals={selectedType === "gravity" ? 1 : 1}
+                        decimals={1}
                         placeholder={`${config.min || 0} - ${config.max || 100}`}
                         className="h-12 text-lg"
                       />

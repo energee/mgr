@@ -17,6 +17,7 @@ import { pickListKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, Package, ArrowRight, ListPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface OrderQuickLinksProps {
   data: {
@@ -106,7 +107,11 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
   if (links.length === 0) return null;
 
   return (
-    <div className={`grid gap-3 sm:grid-cols-${Math.min(links.length, 3)}`}>
+    <div className={cn("grid gap-3", {
+      "sm:grid-cols-1": links.length === 1,
+      "sm:grid-cols-2": links.length === 2,
+      "sm:grid-cols-3": links.length >= 3,
+    })}>
       {links.map((link) => {
         if ("action" in link && link.action) {
           return (

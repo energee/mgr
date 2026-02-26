@@ -266,12 +266,12 @@ function SquareIntegrationCard() {
 
   const isConnected = status?.isEnabled && status?.catalogItemCount > 0;
 
-  let squareStatus: IntegrationStatus = "not_connected";
-  if (isConnected) {
-    squareStatus = "connected";
-  } else if (status?.isEnabled) {
-    squareStatus = "enabled";
+  function getSquareStatus(): IntegrationStatus {
+    if (isConnected) return "connected";
+    if (status?.isEnabled) return "enabled";
+    return "not_connected";
   }
+  const squareStatus = getSquareStatus();
 
   return (
     <Card>

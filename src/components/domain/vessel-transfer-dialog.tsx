@@ -41,10 +41,6 @@ import { toast } from "sonner";
 import { batchKeys, vesselKeys, entityKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 
-// =============================================================================
-// Types
-// =============================================================================
-
 const vesselTransferSchema = z.object({
   to_vessel_id: z.string().uuid("Please select a destination vessel"),
   volume_bbl: z.coerce.number().positive("Volume must be positive"),
@@ -72,9 +68,25 @@ interface VesselTransferDialogProps {
   onSuggestTransition?: (toState: string, vesselName: string) => void;
 }
 
-// =============================================================================
-// Component
-// =============================================================================
+/**
+ * Derives a suggested batch state based on the current batch status
+ * and the destination vessel type after a transfer.
+ */
+function getSuggestedState(
+  batchStatus: string,
+  vesselType: string,
+): string | undefined {
+  if (
+    batchStatus === "planned" &&
+    (vesselType === "fermenter" || vesselType === "unitank")
+  ) {
+    return "fermenting";
+  }
+  if (batchStatus === "fermenting" && vesselType === "brite") {
+    return "conditioning";
+  }
+  return undefined;
+}
 
 export function VesselTransferDialog({
   batchId,
@@ -153,17 +165,8 @@ export function VesselTransferDialog({
       form.reset();
 
       // Suggest a state transition based on destination vessel type
-      if (batchStatus && onSuggestTransition) {
-        let suggestedState: string | undefined;
-        if (
-          batchStatus === "planned" &&
-          (vesselType === "fermenter" || vesselType === "unitank")
-        ) {
-          suggestedState = "fermenting";
-        } else if (batchStatus === "fermenting" && vesselType === "brite") {
-          suggestedState = "conditioning";
-        }
-
+      if (batchStatus && onSuggestTransition && vesselType) {
+        const suggestedState = getSuggestedState(batchStatus, vesselType);
         if (suggestedState) {
           onSuggestTransition(suggestedState, vesselName || "vessel");
         }
@@ -173,8 +176,7 @@ export function VesselTransferDialog({
     },
     onError: (error) => {
       console.error("Vessel transfer error:", error);
-      const message = error instanceof Error ? error.message : "Failed to transfer batch";
-      toast.error(message);
+      toast.error(error.message);
     },
   });
 

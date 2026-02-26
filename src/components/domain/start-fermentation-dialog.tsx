@@ -39,10 +39,6 @@ import { toast } from "sonner";
 import { batchKeys, vesselKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 
-// =============================================================================
-// Types
-// =============================================================================
-
 const startFermentationSchema = z.object({
   vessel_id: z.string().uuid("Please select a vessel"),
   volume_bbl: z.coerce.number().positive("Volume must be positive"),
@@ -58,10 +54,6 @@ interface StartFermentationDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
-
-// =============================================================================
-// Component
-// =============================================================================
 
 export function StartFermentationDialog({
   batchId,
@@ -131,8 +123,7 @@ export function StartFermentationDialog({
     },
     onError: (error) => {
       console.error("Start fermentation error:", error);
-      const message = error instanceof Error ? error.message : "Failed to start fermentation";
-      toast.error(message);
+      toast.error(error.message);
     },
   });
 

@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * SlackIntegrationCard - Slack Webhook Configuration
+ *
+ * Settings card for managing Slack notification integration:
+ * - Webhook URL management (secret key input)
+ * - Enable/disable toggle
+ * - Default channel and per-notification-type channel routing
+ * - Test message sending
+ */
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
