@@ -1,7 +1,12 @@
 "use client";
 
-import { ChatPanel } from "@/components/domain/chat-panel";
+import dynamic from "next/dynamic";
 import { ChatToggle } from "@/components/domain/chat-toggle";
+
+const ChatPanel = dynamic(
+  () => import("@/components/domain/chat-panel").then((m) => m.ChatPanel),
+  { ssr: false }
+);
 
 interface ChatLayoutProps {
   children: React.ReactNode;

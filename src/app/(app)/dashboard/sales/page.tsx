@@ -17,6 +17,7 @@ import { orderEntity } from "@/entities/order";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
+import { CACHE_DURATIONS } from "@/lib/constants";
 
 // =============================================================================
 // Types
@@ -153,8 +154,9 @@ export default function SalesDashboardPage() {
 
       return counts;
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
     refetchIntervalInBackground: false,
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
   // Fetch recent orders with totals (uses order_totals view via join)
@@ -197,8 +199,9 @@ export default function SalesDashboardPage() {
         total_value: totalMap.get(order.id) || 0,
       })) as RecentOrder[];
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
     refetchIntervalInBackground: false,
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
   // Fetch revenue by customer (pre-aggregated view, top 10)
@@ -214,8 +217,9 @@ export default function SalesDashboardPage() {
       if (error) throw error;
       return (data || []) as CustomerRevenue[];
     },
-    refetchInterval: 60000,
+    refetchInterval: 120000,
     refetchIntervalInBackground: false,
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
   // Fetch product mix (pre-aggregated view, revenue by brand)
@@ -231,8 +235,9 @@ export default function SalesDashboardPage() {
       if (error) throw error;
       return (data || []) as ProductMix[];
     },
-    refetchInterval: 60000,
+    refetchInterval: 120000,
     refetchIntervalInBackground: false,
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
   // Calculate summary stats

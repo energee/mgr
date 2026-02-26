@@ -27,6 +27,7 @@ import {
   AnimatedLinkActionMenuItem,
 } from "@/components/universal/animated-action-menu-item";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { memo } from "react";
 
 // =============================================================================
 // Filter Variant Mapping
@@ -48,6 +49,39 @@ function toFilterVariant(
   };
   return map[filterType];
 }
+
+// =============================================================================
+// CellRenderer (memoized)
+// =============================================================================
+
+/**
+ * Stable cell renderer component.
+ * Wrapped in React.memo to prevent re-renders when column defs regenerate
+ * but the actual cell data hasn't changed.
+ */
+const CellRenderer = memo(function CellRenderer<T>({
+  value,
+  original,
+  col,
+}: {
+  value: unknown;
+  original: T;
+  col: EntityColumnDef<T>;
+}) {
+  if (col.render) {
+    return col.render(value, original);
+  }
+
+  if (col.format === "unit" && col.unitType) {
+    return <UnitDisplay value={value as number | null} unitType={col.unitType} />;
+  }
+
+  return formatValue(value, col.format);
+}) as <T>(props: {
+  value: unknown;
+  original: T;
+  col: EntityColumnDef<T>;
+}) => React.ReactElement | string | null;
 
 // =============================================================================
 // buildDataTableColumns
@@ -95,16 +129,7 @@ export function buildDataTableColumns<T>(
       },
       cell: ({ row }: { row: { getValue: (id: string) => unknown; original: T } }) => {
         const value = accessorKey ? row.getValue(accessorKey) : null;
-
-        if (col.render) {
-          return col.render(value, row.original);
-        }
-
-        if (col.format === "unit" && col.unitType) {
-          return <UnitDisplay value={value as number | null} unitType={col.unitType} />;
-        }
-
-        return formatValue(value, col.format);
+        return <CellRenderer value={value} original={row.original} col={col} />;
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as ColumnDef<T, any>;
