@@ -29,8 +29,14 @@ interface RateLimitResult {
   resetMs: number;
 }
 
-/** Map of identifier -> array of request timestamps (epoch ms). */
-const requestMap = new Map<string, number[]>();
+/** A rate limit bucket stores timestamps and the window duration configured for it. */
+interface BucketEntry {
+  timestamps: number[];
+  windowMs: number;
+}
+
+/** Map of identifier -> bucket with request timestamps and associated window. */
+const requestMap = new Map<string, BucketEntry>();
 
 /** Timestamp of the last cleanup run. */
 let lastCleanup = Date.now();
@@ -41,18 +47,20 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 /**
  * Remove expired entries from the request map to prevent unbounded memory growth.
  * Called automatically on each `rateLimit` invocation if enough time has elapsed.
+ * Each bucket is cleaned using its own configured windowMs to avoid cross-bucket
+ * interference when different callers use different window durations.
  */
-function cleanup(windowMs: number): void {
+function cleanup(): void {
   const now = Date.now();
   if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
 
   lastCleanup = now;
-  for (const [key, timestamps] of requestMap) {
-    const valid = timestamps.filter((t) => now - t < windowMs);
+  for (const [key, entry] of requestMap) {
+    const valid = entry.timestamps.filter((t) => now - t < entry.windowMs);
     if (valid.length === 0) {
       requestMap.delete(key);
     } else {
-      requestMap.set(key, valid);
+      requestMap.set(key, { ...entry, timestamps: valid });
     }
   }
 }
@@ -73,10 +81,11 @@ export function rateLimit(
   const now = Date.now();
 
   // Opportunistic cleanup of stale entries
-  cleanup(windowMs);
+  cleanup();
 
   // Get existing timestamps and filter to the current window
-  const timestamps = (requestMap.get(identifier) ?? []).filter(
+  const existing = requestMap.get(identifier);
+  const timestamps = (existing?.timestamps ?? []).filter(
     (t) => now - t < windowMs,
   );
 
@@ -84,7 +93,7 @@ export function rateLimit(
     // Rate limited — compute when the earliest request expires
     const oldestInWindow = timestamps[0];
     const resetMs = oldestInWindow + windowMs - now;
-    requestMap.set(identifier, timestamps);
+    requestMap.set(identifier, { timestamps, windowMs });
     return {
       success: false,
       remaining: 0,
@@ -94,7 +103,7 @@ export function rateLimit(
 
   // Allow the request and record its timestamp
   timestamps.push(now);
-  requestMap.set(identifier, timestamps);
+  requestMap.set(identifier, { timestamps, windowMs });
 
   return {
     success: true,

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { withPermission } from "@/lib/api/auth";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/slack/settings" });
 
 /**
  * GET /api/slack/settings
@@ -16,7 +19,7 @@ export const GET = withPermission("integrations:manage", async () => {
     .single();
 
   if (error) {
-    console.error("[slack/settings] GET error:", error.message);
+    log.error("GET error", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -83,7 +86,7 @@ export const PUT = withPermission("integrations:manage", async (req) => {
     .not("id", "is", null); // Update the singleton row
 
   if (error) {
-    console.error("[slack/settings] PUT error:", error.message);
+    log.error("PUT error", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

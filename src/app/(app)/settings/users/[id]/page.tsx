@@ -19,8 +19,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
 
   return (
     <EntityDetailUnifiedWithErrorBoundary
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      entity={userProfileEntity as any}
+      entity={userProfileEntity}
       id={id}
       basePath="/settings/users"
     />

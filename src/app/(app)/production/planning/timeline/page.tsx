@@ -425,7 +425,7 @@ export default function ProductionTimelinePage() {
           {/* Legend — derive statuses from entity config (DEC-007) */}
           <div className="flex items-center gap-4 mt-3 text-xs">
             <span className="text-muted-foreground">Status:</span>
-            {(["planned", "fermenting", "conditioning", "packaging"] as const).map((status) => {
+            {Object.keys(batchEntity.stateMachine?.stateDisplay ?? {}).map((status) => {
               const colors = getTimelineColors(status);
               const label = batchEntity.stateMachine?.stateDisplay?.[status]?.label ?? status;
               return (

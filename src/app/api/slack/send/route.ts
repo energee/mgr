@@ -7,12 +7,15 @@ import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/slack/send" });
 
-/** Constant-time string comparison to prevent timing attacks. */
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ * HMAC-hashes both inputs to fixed-length digests before comparing,
+ * eliminating the length side-channel that a direct buffer comparison would leak.
+ */
 function secureCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  const hmacA = crypto.createHmac("sha256", "rate-compare").update(a).digest();
+  const hmacB = crypto.createHmac("sha256", "rate-compare").update(b).digest();
+  return crypto.timingSafeEqual(hmacA, hmacB);
 }
 
 /**

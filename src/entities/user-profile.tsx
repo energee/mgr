@@ -223,34 +223,72 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
     badge: "status",
   },
 
-  detailSections: [
+  // ---------------------------------------------------------------------------
+  // Unified Sections (for EntityDetailUnified)
+  // ---------------------------------------------------------------------------
+  sections: [
     {
       id: "profile",
       title: "Profile",
       fields: [
-        { field: "display_name", label: "Display Name" },
-        { field: "email", label: "Email" },
-        { field: "roles", label: "Roles", render: renderRoleBadges },
-        { field: "status_display", label: "Status" },
+        {
+          name: "display_name",
+          label: "Display Name",
+          type: "text",
+          required: true,
+          placeholder: "John Smith",
+          colSpan: 6,
+        },
+        {
+          name: "email",
+          label: "Email",
+          type: "text",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "roles",
+          label: "Roles",
+          type: "multiselect",
+          options: ROLE_OPTIONS,
+          required: true,
+          colSpan: 12,
+          description: "Select one or more roles. Permissions are additive across roles.",
+        },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: STATUS_OPTIONS,
+          colSpan: 6,
+        },
+        {
+          name: "avatar_url",
+          label: "Avatar URL",
+          type: "text",
+          placeholder: "https://...",
+          colSpan: 6,
+          description: "URL to user's profile picture",
+        },
       ],
     },
     {
       id: "activity",
       title: "Activity",
       fields: [
-        { field: "last_active_at", label: "Last Active", format: "datetime" },
-        { field: "days_since_active", label: "Days Since Active", format: "number" },
-        { field: "created_at", label: "Joined", format: "date" },
+        { name: "last_active_at", label: "Last Active", type: "text", editable: false, format: "datetime", colSpan: 4 },
+        { name: "days_since_active", label: "Days Since Active", type: "text", editable: false, format: "number", colSpan: 4 },
+        { name: "created_at", label: "Joined", type: "text", editable: false, format: "date", colSpan: 4 },
       ],
     },
     {
       id: "invitation",
       title: "Invitation",
-      fields: [
-        { field: "invited_by_name", label: "Invited By" },
-        { field: "invited_at", label: "Invited At", format: "datetime" },
-      ],
       collapsible: true,
+      fields: [
+        { name: "invited_by_name", label: "Invited By", type: "text", editable: false, colSpan: 6 },
+        { name: "invited_at", label: "Invited At", type: "text", editable: false, format: "datetime", colSpan: 6 },
+      ],
     },
   ],
 

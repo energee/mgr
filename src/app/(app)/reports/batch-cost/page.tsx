@@ -14,7 +14,7 @@
  * - Expandable ingredient-level detail per batch
  */
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
@@ -433,9 +433,8 @@ export default function BatchCostAnalysisPage() {
               </TableHeader>
               <TableBody>
                 {batchCostData.map((batch) => (
-                  <>
+                  <React.Fragment key={batch.id}>
                     <TableRow
-                      key={batch.id}
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => toggleExpand(batch.id)}
                     >
@@ -466,7 +465,7 @@ export default function BatchCostAnalysisPage() {
 
                     {/* Expanded ingredient detail */}
                     {expandedBatchId === batch.id && (
-                      <TableRow key={`${batch.id}-detail`}>
+                      <TableRow>
                         <TableCell colSpan={7} className="bg-muted/30 p-0">
                           <div className="px-8 py-4">
                             <h4 className="text-sm font-semibold mb-3">
@@ -538,7 +537,7 @@ export default function BatchCostAnalysisPage() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>

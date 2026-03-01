@@ -35,7 +35,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, escapeLike } from "@/lib/utils";
 
 // =============================================================================
 // Types
@@ -149,7 +149,8 @@ export default function NotificationsPage() {
         query = query.eq("priority", filterPriority);
       }
       if (search) {
-        query = query.or(`title.ilike.%${search}%,message.ilike.%${search}%`);
+        const escaped = escapeLike(search);
+        query = query.or(`title.ilike.%${escaped}%,message.ilike.%${escaped}%`);
       }
 
       const { data, error, count } = await query;
