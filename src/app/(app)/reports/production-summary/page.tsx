@@ -83,23 +83,6 @@ interface ProductionBatchRow {
   } | null;
 }
 
-/** Aggregated production data for a single brand. */
-interface BrandProduction {
-  brandId: string;
-  brandName: string;
-  batchCount: number;
-  totalBbl: number;
-  avgBblPerBatch: number;
-}
-
-/** Aggregated production data for a single style. */
-interface StyleProduction {
-  style: string;
-  batchCount: number;
-  totalBbl: number;
-  avgBblPerBatch: number;
-}
-
 // =============================================================================
 // Constants
 // =============================================================================
@@ -141,10 +124,49 @@ function getYearOptions(): number[] {
  */
 function daysInTank(
   plannedStart: string | null,
-  updatedAt: string | null
+  updatedAt: string | null,
 ): number | null {
   if (!plannedStart || !updatedAt) return null;
   return differenceInDays(parseISO(updatedAt), parseISO(plannedStart));
+}
+
+/** Shared aggregation shape used by both brand and style summaries. */
+interface ProductionAggregate {
+  key: string;
+  label: string;
+  batchCount: number;
+  totalBbl: number;
+  avgBblPerBatch: number;
+}
+
+/**
+ * Aggregate batches into production summaries by a key extractor.
+ * Returns rows sorted descending by totalBbl.
+ */
+function aggregateProduction(
+  batches: ProductionBatchRow[],
+  getKey: (b: ProductionBatchRow) => string,
+  getLabel: (b: ProductionBatchRow) => string,
+): ProductionAggregate[] {
+  const map = new Map<string, { label: string; batchCount: number; totalBbl: number }>();
+
+  for (const b of batches) {
+    const key = getKey(b);
+    const existing = map.get(key) ?? { label: getLabel(b), batchCount: 0, totalBbl: 0 };
+    existing.batchCount += 1;
+    existing.totalBbl += b.volume_bbl ?? 0;
+    map.set(key, existing);
+  }
+
+  return Array.from(map.entries())
+    .map(([key, v]) => ({
+      key,
+      label: v.label,
+      batchCount: v.batchCount,
+      totalBbl: v.totalBbl,
+      avgBblPerBatch: v.batchCount > 0 ? v.totalBbl / v.batchCount : 0,
+    }))
+    .sort((a, b) => b.totalBbl - a.totalBbl);
 }
 
 // =============================================================================
@@ -231,64 +253,30 @@ export default function ProductionSummaryPage() {
   }, [batches]);
 
   /** Production aggregated by brand. */
-  const brandProduction: BrandProduction[] = useMemo(() => {
-    if (!batches) return [];
-    const map = new Map<
-      string,
-      { brandName: string; batchCount: number; totalBbl: number }
-    >();
-
-    for (const b of batches) {
-      const brandId = b.recipes?.brand_id ?? "_unassigned";
-      const brandName = b.recipes?.brands?.name ?? "Unassigned";
-      const existing = map.get(brandId) ?? {
-        brandName,
-        batchCount: 0,
-        totalBbl: 0,
-      };
-      existing.batchCount += 1;
-      existing.totalBbl += b.volume_bbl ?? 0;
-      map.set(brandId, existing);
-    }
-
-    return Array.from(map.entries())
-      .map(([brandId, v]) => ({
-        brandId,
-        brandName: v.brandName,
-        batchCount: v.batchCount,
-        totalBbl: v.totalBbl,
-        avgBblPerBatch:
-          v.batchCount > 0 ? v.totalBbl / v.batchCount : 0,
-      }))
-      .sort((a, b) => b.totalBbl - a.totalBbl);
-  }, [batches]);
+  const brandProduction = useMemo(
+    () =>
+      batches
+        ? aggregateProduction(
+            batches,
+            (b) => b.recipes?.brand_id ?? "_unassigned",
+            (b) => b.recipes?.brands?.name ?? "Unassigned",
+          )
+        : [],
+    [batches],
+  );
 
   /** Production aggregated by beer style. */
-  const styleProduction: StyleProduction[] = useMemo(() => {
-    if (!batches) return [];
-    const map = new Map<
-      string,
-      { batchCount: number; totalBbl: number }
-    >();
-
-    for (const b of batches) {
-      const style = b.recipes?.style ?? "Unknown";
-      const existing = map.get(style) ?? { batchCount: 0, totalBbl: 0 };
-      existing.batchCount += 1;
-      existing.totalBbl += b.volume_bbl ?? 0;
-      map.set(style, existing);
-    }
-
-    return Array.from(map.entries())
-      .map(([style, v]) => ({
-        style,
-        batchCount: v.batchCount,
-        totalBbl: v.totalBbl,
-        avgBblPerBatch:
-          v.batchCount > 0 ? v.totalBbl / v.batchCount : 0,
-      }))
-      .sort((a, b) => b.totalBbl - a.totalBbl);
-  }, [batches]);
+  const styleProduction = useMemo(
+    () =>
+      batches
+        ? aggregateProduction(
+            batches,
+            (b) => b.recipes?.style ?? "Unknown",
+            (b) => b.recipes?.style ?? "Unknown",
+          )
+        : [],
+    [batches],
+  );
 
   const monthName = MONTHS[month - 1];
 
@@ -473,9 +461,9 @@ export default function ProductionSummaryPage() {
               </TableHeader>
               <TableBody>
                 {brandProduction.map((row) => (
-                  <TableRow key={row.brandId}>
+                  <TableRow key={row.key}>
                     <TableCell className="font-medium">
-                      {row.brandName}
+                      {row.label}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {row.batchCount}
@@ -543,9 +531,9 @@ export default function ProductionSummaryPage() {
               </TableHeader>
               <TableBody>
                 {styleProduction.map((row) => (
-                  <TableRow key={row.style}>
+                  <TableRow key={row.key}>
                     <TableCell className="font-medium">
-                      {row.style}
+                      {row.label}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {row.batchCount}

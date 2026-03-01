@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, ClipboardList, DollarSign, BarChart3 } from "lucide-react";
 
 const reports = [
@@ -14,28 +14,24 @@ const reports = [
     description: "Brewer's Report of Operations for federal tax compliance",
     href: "/reports/ttb",
     icon: FileText,
-    available: true,
   },
   {
     title: "Production Summary",
     description: "Monthly production volumes, brand breakdown, and style analysis",
     href: "/reports/production-summary",
     icon: BarChart3,
-    available: true,
   },
   {
     title: "Inventory Valuation",
     description: "Current inventory value by category",
     href: "/reports/inventory-valuation",
     icon: DollarSign,
-    available: true,
   },
   {
     title: "Batch Cost Analysis",
     description: "Cost breakdown per batch with ingredient-level detail",
     href: "/reports/batch-cost",
     icon: ClipboardList,
-    available: true,
   },
 ];
 
@@ -57,24 +53,6 @@ export default function ReportsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {reports.map((report) => {
           const Icon = report.icon;
-
-          if (!report.available) {
-            return (
-              <Card key={report.href} className="opacity-50 cursor-not-allowed">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Icon className="h-5 w-5" />
-                    {report.title}
-                  </CardTitle>
-                  <CardDescription>{report.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <span className="text-xs text-muted-foreground">Coming soon</span>
-                </CardContent>
-              </Card>
-            );
-          }
-
           return (
             <Link key={report.href} href={report.href}>
               <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">

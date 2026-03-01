@@ -81,8 +81,8 @@ export async function sendEmail(
       to: Array.isArray(options.to) ? options.to : [options.to],
       subject: options.subject,
       html: options.html,
-      ...(options.text ? { text: options.text } : {}),
-      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      text: options.text,
+      replyTo: options.replyTo,
     });
 
     if (error) {

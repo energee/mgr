@@ -52,6 +52,20 @@ function formatDev(entry: LogEntry): string {
   return `[${time}] ${level.toUpperCase().padEnd(5)} ${msg}${extras}`;
 }
 
+/** Resolve the appropriate console method for a given log level. */
+function consoleMethodForLevel(level: LogLevel): (...args: unknown[]) => void {
+  switch (level) {
+    case "error":
+      return console.error;
+    case "warn":
+      return console.warn;
+    case "debug":
+      return console.debug;
+    default:
+      return console.log;
+  }
+}
+
 function log(level: LogLevel, msg: string, data?: Record<string, unknown>): void {
   if (!shouldLog(level)) return;
 
@@ -62,53 +76,44 @@ function log(level: LogLevel, msg: string, data?: Record<string, unknown>): void
     ...data,
   };
 
+  const method = consoleMethodForLevel(level);
+
   if (isProduction) {
     // Structured JSON for log aggregators (Datadog, CloudWatch, etc.)
-    const consoleMethod = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
-    consoleMethod(JSON.stringify(entry));
+    method(JSON.stringify(entry));
   } else {
     // Human-readable in development
-    const formatted = formatDev(entry);
-    switch (level) {
-      case "error":
-        console.error(formatted);
-        break;
-      case "warn":
-        console.warn(formatted);
-        break;
-      case "debug":
-        console.debug(formatted);
-        break;
-      default:
-        console.log(formatted);
-    }
+    method(formatDev(entry));
   }
+}
+
+/** Public interface for the logger and child loggers. */
+export interface Logger {
+  debug: (msg: string, data?: Record<string, unknown>) => void;
+  info: (msg: string, data?: Record<string, unknown>) => void;
+  warn: (msg: string, data?: Record<string, unknown>) => void;
+  error: (msg: string, data?: Record<string, unknown>) => void;
+  child: (defaults: Record<string, unknown>) => Logger;
 }
 
 /**
  * Create a child logger with default fields merged into every log call.
  * Useful for tagging all logs from a specific module or request.
  */
-function child(defaults: Record<string, unknown>) {
+function child(defaults: Record<string, unknown>): Logger {
   return {
-    debug: (msg: string, data?: Record<string, unknown>) =>
-      log("debug", msg, { ...defaults, ...data }),
-    info: (msg: string, data?: Record<string, unknown>) =>
-      log("info", msg, { ...defaults, ...data }),
-    warn: (msg: string, data?: Record<string, unknown>) =>
-      log("warn", msg, { ...defaults, ...data }),
-    error: (msg: string, data?: Record<string, unknown>) =>
-      log("error", msg, { ...defaults, ...data }),
-    child: (extraDefaults: Record<string, unknown>) =>
-      child({ ...defaults, ...extraDefaults }),
+    debug: (msg, data) => log("debug", msg, { ...defaults, ...data }),
+    info: (msg, data) => log("info", msg, { ...defaults, ...data }),
+    warn: (msg, data) => log("warn", msg, { ...defaults, ...data }),
+    error: (msg, data) => log("error", msg, { ...defaults, ...data }),
+    child: (extraDefaults) => child({ ...defaults, ...extraDefaults }),
   };
 }
 
-export const logger = {
-  debug: (msg: string, data?: Record<string, unknown>) => log("debug", msg, data),
-  info: (msg: string, data?: Record<string, unknown>) => log("info", msg, data),
-  warn: (msg: string, data?: Record<string, unknown>) => log("warn", msg, data),
-  error: (msg: string, data?: Record<string, unknown>) => log("error", msg, data),
-  /** Create a child logger with default fields merged into every log call. */
+export const logger: Logger = {
+  debug: (msg, data) => log("debug", msg, data),
+  info: (msg, data) => log("info", msg, data),
+  warn: (msg, data) => log("warn", msg, data),
+  error: (msg, data) => log("error", msg, data),
   child,
 };
