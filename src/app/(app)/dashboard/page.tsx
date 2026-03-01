@@ -21,6 +21,7 @@ import { VESSEL_TYPES } from "@/entities/vessel";
 import { batchEntity } from "@/entities/batch";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense } from "react";
 import {
   StatsStrip,
@@ -183,45 +184,6 @@ export default function DashboardPage() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  const period = usePeriod();
-
-  const { data: productionTrends = [] } = useQuery({
-    queryKey: dashboardKeys.trends.production(period),
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_production_trends", {
-        p_days: period,
-      });
-      if (error) {
-        console.error("Failed to fetch production trends:", error);
-        return [];
-      }
-      return (data || []) as Array<{
-        date: string;
-        batches_started: number;
-        volume_bbl: number;
-        batches_completed: number;
-      }>;
-    },
-    refetchInterval: 60000,
-    refetchIntervalInBackground: false,
-  });
-
-  // Split trend data into current and previous periods for comparison
-  const currentPeriodData = productionTrends.slice(period);
-  const previousPeriodData = productionTrends.slice(0, period);
-
-  const currentBatchesStarted = currentPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
-  const previousBatchesStarted = previousPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
-
-  const currentVolume = currentPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
-  const previousVolume = previousPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
-
-  const currentCompleted = currentPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
-  const previousCompleted = previousPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
-
-  const deltaLabel = `vs prev ${period}d`;
-
   // Calculate per-type vessel utilization
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const vesselArray = vessels as any[];
@@ -367,6 +329,81 @@ export default function DashboardPage() {
         </DashboardSection>
       </div>
 
+      {/* Period Trends (wrapped in Suspense for useSearchParams) */}
+      <Suspense fallback={<ProductionTrendsSkeleton />}>
+        <ProductionTrends />
+      </Suspense>
+    </div>
+  );
+}
+
+// =============================================================================
+// Production Trends (Suspense child — uses useSearchParams via usePeriod)
+// =============================================================================
+
+function ProductionTrendsSkeleton() {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-[88px] rounded-lg" />
+        ))}
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-[248px] rounded-lg" />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function ProductionTrends() {
+  const supabase = createClient();
+  const period = usePeriod();
+
+  const { data: productionTrends = [], isLoading } = useQuery({
+    queryKey: dashboardKeys.trends.production(period),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)("get_production_trends", {
+        p_days: period,
+      });
+      if (error) {
+        console.error("Failed to fetch production trends:", error);
+        return [];
+      }
+      return (data || []) as Array<{
+        date: string;
+        batches_started: number;
+        volume_bbl: number;
+        batches_completed: number;
+      }>;
+    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+  });
+
+  if (isLoading) {
+    return <ProductionTrendsSkeleton />;
+  }
+
+  const currentPeriodData = productionTrends.slice(period);
+  const previousPeriodData = productionTrends.slice(0, period);
+
+  const currentBatchesStarted = currentPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
+  const previousBatchesStarted = previousPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
+
+  const currentVolume = currentPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+  const previousVolume = previousPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+
+  const currentCompleted = currentPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
+  const previousCompleted = previousPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
+
+  const deltaLabel = `vs prev ${period}d`;
+
+  return (
+    <>
       {/* Period Comparison Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCardWithDelta
@@ -395,18 +432,19 @@ export default function DashboardPage() {
           <TrendChart
             data={currentPeriodData}
             xKey="date"
-            series={[{ key: "batches_started", label: "Batches", type: "bar" }]}
+            type="bar"
+            series={[{ key: "batches_started", label: "Batches" }]}
           />
         </DashboardSection>
         <DashboardSection title="Volume Brewed">
           <TrendChart
             data={currentPeriodData}
             xKey="date"
-            series={[{ key: "volume_bbl", label: "BBL", type: "area" }]}
+            series={[{ key: "volume_bbl", label: "BBL" }]}
             formatValue={(v) => `${v} BBL`}
           />
         </DashboardSection>
       </div>
-    </div>
+    </>
   );
 }

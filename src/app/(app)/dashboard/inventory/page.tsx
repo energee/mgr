@@ -19,6 +19,7 @@ import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // =============================================================================
 // Types
@@ -173,42 +174,6 @@ export default function InventoryDashboardPage() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  const period = usePeriod();
-
-  const { data: inventoryTrends = [] } = useQuery({
-    queryKey: dashboardKeys.trends.inventory(period),
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_inventory_trends", {
-        p_days: period,
-      });
-      if (error) {
-        console.error("Failed to fetch inventory trends:", error);
-        return [];
-      }
-      return (data || []) as Array<{
-        date: string;
-        lots_created: number;
-        lots_depleted: number;
-        total_lot_activity: number;
-      }>;
-    },
-    refetchInterval: 60000,
-    refetchIntervalInBackground: false,
-  });
-
-  // Split into current and previous periods
-  const currentPeriodData = inventoryTrends.slice(period);
-  const previousPeriodData = inventoryTrends.slice(0, period);
-
-  const currentLotsCreated = currentPeriodData.reduce((sum, d) => sum + d.lots_created, 0);
-  const previousLotsCreated = previousPeriodData.reduce((sum, d) => sum + d.lots_created, 0);
-
-  const currentLotsDepleted = currentPeriodData.reduce((sum, d) => sum + d.lots_depleted, 0);
-  const previousLotsDepleted = previousPeriodData.reduce((sum, d) => sum + d.lots_depleted, 0);
-
-  const deltaLabel = `vs prev ${period}d`;
-
   // Calculate totals
   const lowStockCount = lowStockItems.length;
   const expiringCount = expiringLots.filter((lot) => lot.days_until_expiry <= 30).length;
@@ -333,6 +298,77 @@ export default function InventoryDashboardPage() {
         </div>
       </DashboardSection>
 
+      {/* Period Trends (wrapped in Suspense for useSearchParams) */}
+      <Suspense fallback={<InventoryTrendsSkeleton />}>
+        <InventoryTrends />
+      </Suspense>
+
+      {/* AI-Powered Inventory Overview */}
+      <InventoryAlerts autoExpandOnAlerts={false} />
+    </div>
+  );
+}
+
+// =============================================================================
+// Inventory Trends (Suspense child — uses useSearchParams via usePeriod)
+// =============================================================================
+
+function InventoryTrendsSkeleton() {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-[88px] rounded-lg" />
+        ))}
+      </div>
+      <Skeleton className="h-[248px] rounded-lg" />
+    </>
+  );
+}
+
+function InventoryTrends() {
+  const supabase = createClient();
+  const period = usePeriod();
+
+  const { data: inventoryTrends = [], isLoading } = useQuery({
+    queryKey: dashboardKeys.trends.inventory(period),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)("get_inventory_trends", {
+        p_days: period,
+      });
+      if (error) {
+        console.error("Failed to fetch inventory trends:", error);
+        return [];
+      }
+      return (data || []) as Array<{
+        date: string;
+        lots_created: number;
+        lots_depleted: number;
+        total_lot_activity: number;
+      }>;
+    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+  });
+
+  if (isLoading) {
+    return <InventoryTrendsSkeleton />;
+  }
+
+  const currentPeriodData = inventoryTrends.slice(period);
+  const previousPeriodData = inventoryTrends.slice(0, period);
+
+  const currentLotsCreated = currentPeriodData.reduce((sum, d) => sum + d.lots_created, 0);
+  const previousLotsCreated = previousPeriodData.reduce((sum, d) => sum + d.lots_created, 0);
+
+  const currentLotsDepleted = currentPeriodData.reduce((sum, d) => sum + d.lots_depleted, 0);
+  const previousLotsDepleted = previousPeriodData.reduce((sum, d) => sum + d.lots_depleted, 0);
+
+  const deltaLabel = `vs prev ${period}d`;
+
+  return (
+    <>
       {/* Period Comparison Cards */}
       <div className="grid gap-4 sm:grid-cols-2">
         <StatCardWithDelta
@@ -354,15 +390,13 @@ export default function InventoryDashboardPage() {
         <TrendChart
           data={currentPeriodData}
           xKey="date"
+          type="bar"
           series={[
-            { key: "lots_created", label: "Received", type: "bar", color: "hsl(var(--chart-1))" },
-            { key: "lots_depleted", label: "Consumed", type: "bar", color: "hsl(var(--chart-2))" },
+            { key: "lots_created", label: "Received", color: "hsl(var(--chart-1))" },
+            { key: "lots_depleted", label: "Consumed", color: "hsl(var(--chart-2))" },
           ]}
         />
       </DashboardSection>
-
-      {/* AI-Powered Inventory Overview */}
-      <InventoryAlerts autoExpandOnAlerts={false} />
-    </div>
+    </>
   );
 }

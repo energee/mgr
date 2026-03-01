@@ -40,8 +40,6 @@ interface TrendSeries {
   label: string;
   /** CSS color or chart variable (e.g., "hsl(var(--chart-1))") */
   color?: string;
-  /** Chart type: area (default) or bar */
-  type?: "area" | "bar";
 }
 
 interface TrendChartProps {
@@ -51,6 +49,8 @@ interface TrendChartProps {
   xKey: string;
   /** Series definitions */
   series: TrendSeries[];
+  /** Chart type: area (default) or bar. Applies to all series. */
+  type?: "area" | "bar";
   /** Chart height in pixels (default: 200) */
   height?: number;
   /** Custom value formatter for tooltip and y-axis */
@@ -78,6 +78,7 @@ export function TrendChart({
   data,
   xKey,
   series,
+  type: chartType = "area",
   height = 200,
   formatValue,
   className,
@@ -103,9 +104,6 @@ export function TrendChart({
       return value;
     }
   };
-
-  // Determine chart type from first series (all series in one chart should be same type)
-  const chartType = series[0]?.type || "area";
 
   if (data.length === 0) {
     return (
@@ -160,11 +158,11 @@ export function TrendChart({
                 <ChartTooltipContent labelFormatter={tooltipLabelFormatter} />
               }
             />
-            {series.map((s, i) => (
+            {series.map((s) => (
               <Bar
                 key={s.key}
                 dataKey={s.key}
-                fill={s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
+                fill={`var(--color-${s.key})`}
                 radius={[2, 2, 0, 0]}
               />
             ))}
@@ -200,13 +198,13 @@ export function TrendChart({
               <ChartTooltipContent labelFormatter={tooltipLabelFormatter} />
             }
           />
-          {series.map((s, i) => (
+          {series.map((s) => (
             <Area
               key={s.key}
               type="monotone"
               dataKey={s.key}
-              stroke={s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
-              fill={s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
+              stroke={`var(--color-${s.key})`}
+              fill={`var(--color-${s.key})`}
               fillOpacity={0.1}
               strokeWidth={2}
             />
