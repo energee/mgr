@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetail } from "@/components/universal/entity-detail";
+import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
 import { kegTransactionEntity } from "@/entities/keg-transaction";
 
 export default function KegTransactionDetailPage({
@@ -11,7 +11,7 @@ export default function KegTransactionDetailPage({
 }) {
   const { id } = use(params);
   return (
-    <EntityDetail
+    <EntityDetailUnified
       entity={kegTransactionEntity}
       id={id}
       basePath="/inventory/kegs/transactions"

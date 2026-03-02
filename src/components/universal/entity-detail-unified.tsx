@@ -24,7 +24,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePermissions } from "@/contexts/permissions";
-import type { Permission } from "@/lib/permissions";
+import { DOMAIN_WRITE_PERMISSIONS } from "@/lib/permissions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -72,6 +72,16 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
@@ -99,18 +109,6 @@ export interface EntityDetailUnifiedProps<T = Record<string, unknown>> {
     form: UseFormReturn<Record<string, unknown>>,
   ) => void;
 }
-
-// =============================================================================
-// Domain-to-write-permission mapping (cosmetic gating only)
-// =============================================================================
-
-const DOMAIN_WRITE_PERMISSIONS: Record<string, Permission> = {
-  production: "batches:write",
-  inventory: "inventory:write",
-  sales: "orders:write",
-  purchasing: "purchasing:write",
-  system: "settings:manage",
-};
 
 // =============================================================================
 // Config Resolution - Legacy to Unified conversion
@@ -360,6 +358,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const loadedVersionRef = useRef<number | null>(null);
   const conflictDialog = useConflictDialog();
   const [deleteAction, setDeleteAction] = useState<EntityActionDef<T> | null>(null);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const pendingDiscardRef = useRef<(() => void) | null>(null);
 
   const submitRef = useSubmitShortcut();
   const errorSummaryRef = useRef<HTMLDivElement>(null);
@@ -563,7 +563,16 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   const handleCancel = useCallback(() => {
     if (form.formState.isDirty) {
-      if (!window.confirm("You have unsaved changes. Discard?")) return;
+      pendingDiscardRef.current = () => {
+        if (isCreateMode) {
+          router.push(backUrl || path);
+        } else {
+          form.reset();
+          setEditing(false);
+        }
+      };
+      setShowUnsavedDialog(true);
+      return;
     }
     if (isCreateMode) {
       router.push(backUrl || path);
@@ -719,7 +728,18 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   useEffect(() => {
     function isInputElement(el: Element | null): boolean {
       if (!el) return false;
-      return el.matches("input, textarea, select, [contenteditable]");
+      const tag = el.tagName.toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select"
+        || (el as HTMLElement).isContentEditable;
+    }
+
+    function confirmDirtyNavigation(onConfirm: () => void): boolean {
+      if (editing && form.formState.isDirty) {
+        pendingDiscardRef.current = onConfirm;
+        setShowUnsavedDialog(true);
+        return false;
+      }
+      return true;
     }
 
     function handleKeyDown(e: KeyboardEvent) {
@@ -738,7 +758,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       switch (e.key) {
         case "Backspace":
           e.preventDefault();
-          if (!editing || !form.formState.isDirty || window.confirm("You have unsaved changes. Discard?")) {
+          if (confirmDirtyNavigation(() => router.push(backUrl || path))) {
             router.push(backUrl || path);
           }
           break;
@@ -989,6 +1009,36 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           aria-hidden="true"
         />
       )}
+
+      {/* Unsaved Changes Dialog */}
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes that will be lost. Are you sure you want to discard them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              pendingDiscardRef.current = null;
+            }}>
+              Keep editing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const action = pendingDiscardRef.current;
+                pendingDiscardRef.current = null;
+                setShowUnsavedDialog(false);
+                action?.();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Conflict Dialog */}
       <ConflictDialog

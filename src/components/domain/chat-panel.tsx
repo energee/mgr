@@ -56,14 +56,16 @@ function isNavigationIntent(result: unknown): result is NavigationIntent {
 }
 
 const TOOL_TITLES: Record<string, string> = {
-  // RPC tools
+  // Generic entity tools
+  searchEntity: "Search",
+  getEntityDetail: "Get Details",
+  // RPC / analysis tools
   analyzeRecipe: "Analyze Recipe",
   getRecipeSummary: "Recipe Summary",
   suggestImprovements: "Suggest Improvements",
   analyzeBatch: "Analyze Batch",
   getInventoryOverview: "Inventory Overview",
-  // Query tools
-  searchRecipes: "Search Recipes",
+  // Specialized query tools
   getBatchStatus: "Batch Status",
   getVesselAvailability: "Vessel Availability",
   getProductionSchedule: "Production Schedule",
@@ -73,25 +75,10 @@ const TOOL_TITLES: Record<string, string> = {
   getBatchTransfers: "Batch Transfers",
   getRecipeCost: "Recipe Cost",
   getLotExpiration: "Lot Expiration",
-  getBatchDetail: "Batch Detail",
-  searchBatches: "Search Batches",
-  getBrands: "Search Brands",
   getFinishedGoods: "Finished Goods",
-  lookupEntity: "Lookup Entity",
-  searchOrders: "Search Orders",
-  getOrderDetail: "Order Detail",
-  getCustomers: "Search Customers",
-  searchBrewLogs: "Search Brew Logs",
-  searchPurchaseOrders: "Search Purchase Orders",
-  searchSuppliers: "Search Suppliers",
-  searchPickLists: "Search Pick Lists",
-  searchYeastPitches: "Search Yeast Pitches",
   getKegInventory: "Keg Inventory",
-  searchDeliveries: "Search Deliveries",
-  searchLocationTransfers: "Search Transfers",
-  searchAllocations: "Search Allocations",
-  searchPackagingSessions: "Search Packaging Sessions",
-  // Help
+  // Utility tools
+  lookupEntity: "Lookup Entity",
   getAppGuide: "App Guide",
   // Navigation tools
   createBatch: "Create Batch",

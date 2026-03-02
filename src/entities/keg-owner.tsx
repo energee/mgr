@@ -239,65 +239,6 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
   // ---------------------------------------------------------------------------
   formSchema: kegOwnerSchema,
 
-  formFields: [
-    {
-      name: "name",
-      label: "Name",
-      type: "text",
-      placeholder: "e.g., Microstar",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "code",
-      label: "Code",
-      type: "text",
-      placeholder: "e.g., microstar",
-      required: true,
-      description: "Lowercase identifier (letters, numbers, hyphens, underscores)",
-      colSpan: 6,
-    },
-    {
-      name: "contact_name",
-      label: "Contact Name",
-      type: "text",
-      colSpan: 4,
-    },
-    {
-      name: "contact_email",
-      label: "Contact Email",
-      type: "text",
-      placeholder: "email@example.com",
-      colSpan: 4,
-    },
-    {
-      name: "contact_phone",
-      label: "Contact Phone",
-      type: "text",
-      colSpan: 4,
-    },
-    {
-      name: "is_active",
-      label: "Active",
-      type: "switch",
-      colSpan: 6,
-    },
-    {
-      name: "position",
-      label: "Display Order",
-      type: "number",
-      placeholder: "1",
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Optional notes about this fleet provider",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------

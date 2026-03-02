@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { inventoryKeys } from "@/lib/query-keys";
+import { CACHE_DURATIONS } from "@/lib/constants";
 import {
   Card,
   CardContent,
@@ -240,7 +241,7 @@ export function InventoryAlerts({
       if (error) throw error;
       return data as InventoryOverview;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: CACHE_DURATIONS.STATIC_DATA,
   });
 
   const overview = data as InventoryOverview | undefined;

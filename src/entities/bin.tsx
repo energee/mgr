@@ -272,63 +272,6 @@ export const binEntity: EntityConfig<Bin> = {
   // ---------------------------------------------------------------------------
   formSchema: binSchema,
 
-  formFields: [
-    {
-      name: "name",
-      label: "Name",
-      type: "text",
-      placeholder: "e.g., Shelf A-1, Cold Room 1",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "location_id",
-      label: "Location",
-      type: "select",
-      relation: { entity: "location", displayField: "name" },
-      dynamicOptions: {
-        table: "locations",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "name",
-        filter: { is_active: true },
-      },
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "bin_type",
-      label: "Type",
-      type: "select",
-      options: binTypeOptions,
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "capacity",
-      label: "Capacity",
-      type: "number",
-      placeholder: "e.g., 100",
-      description: "Maximum number of items this bin can hold",
-      colSpan: 6,
-    },
-    {
-      name: "is_active",
-      label: "Active",
-      type: "switch",
-      description: "Inactive bins won't appear in dropdown menus",
-      defaultValue: true,
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Any special notes about this bin...",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------

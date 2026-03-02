@@ -1,8 +1,27 @@
+/**
+ * AI Chat Tools
+ *
+ * Defines the tools available to the AI chat assistant. Tools fall into
+ * four categories:
+ *
+ * 1. **Generic entity tools** — `searchEntity` and `getEntityDetail` use the
+ *    entity registry + service layer to handle any entity type, replacing
+ *    ~16 hand-crafted search/detail tools.
+ * 2. **Specialized query tools** — Domain-specific queries that require
+ *    custom SQL joins, aggregations, or views not covered by generic search.
+ * 3. **RPC tools** — Wrappers around Supabase RPC calls to PostgreSQL functions.
+ * 4. **Navigation tools** — Return NavigationIntent objects that the client
+ *    renders as action cards for the user to review and submit.
+ */
+
 import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatStateLabel } from "@/types/entity";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
+import { entityService } from "@/services/entity-service";
+import { formatServiceError } from "@/services/types";
+import { CHAT_ENTITY_MAP } from "./entity-map";
 
 /** Escape LIKE/ILIKE wildcard characters so they match literally. */
 function escapeLike(value: string): string {
@@ -66,6 +85,86 @@ async function resolveBatch(
 export function createChatTools(supabase: SupabaseClient) {
   return {
     // =========================================================================
+    // Generic Entity Tools (config-driven via entity registry + service layer)
+    // =========================================================================
+
+    searchEntity: tool({
+      description:
+        "Search any entity type. Available entities: batch, recipe, brew_log, vessel, vessel_transfer, order, customer, supplier, purchase_order, packaging_session, session_line_item, allocation, delivery, location_transfer, finished_good, pick_list, yeast_pitch, yeast_strain, brand, keg_inventory, keg_transaction, inventory_item, inventory_lot, bin, location, beer_style, package_type, keg_type, keg_owner, order_item, po_line_item, po_receive, sales_channel, pricing_tier, pricing_tier_price, user_profile, enum_value. Use 'query' for text search across searchable fields. Use 'filters' for exact-match filtering (e.g. status, category).",
+      inputSchema: z.object({
+        entityName: z
+          .string()
+          .describe("Entity name (snake_case). See description for available names."),
+        query: z
+          .string()
+          .optional()
+          .describe("Free-text search across entity's searchable fields"),
+        filters: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe(
+            "Exact-match filters as key-value pairs (e.g. {status: 'active'})"
+          ),
+        limit: z
+          .number()
+          .optional()
+          .default(20)
+          .describe("Max results to return"),
+      }),
+      execute: async ({ entityName, query: searchQuery, filters, limit }) => {
+        const entity = CHAT_ENTITY_MAP.get(entityName);
+        if (!entity) {
+          throw new Error(
+            `Unknown entity "${entityName}". Available entities: ${Array.from(CHAT_ENTITY_MAP.keys()).join(", ")}`
+          );
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await entityService.list(supabase as any, entity, {
+          search: searchQuery,
+          filters,
+          limit,
+        });
+
+        if (!result.success) {
+          throw new Error(`Search failed: ${formatServiceError(result.error)}`);
+        }
+
+        return result.data;
+      },
+    }),
+
+    getEntityDetail: tool({
+      description:
+        "Get full details for a single entity record by ID. Works with any entity type registered in the system.",
+      inputSchema: z.object({
+        entityName: z
+          .string()
+          .describe("Entity name (snake_case)"),
+        id: z.string().uuid().describe("The record UUID"),
+      }),
+      execute: async ({ entityName, id }) => {
+        const entity = CHAT_ENTITY_MAP.get(entityName);
+        if (!entity) {
+          throw new Error(
+            `Unknown entity "${entityName}". Available entities: ${Array.from(CHAT_ENTITY_MAP.keys()).join(", ")}`
+          );
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await entityService.getById(supabase as any, entity, id);
+
+        if (!result.success) {
+          throw new Error(
+            `Failed to get ${entity.displayName}: ${formatServiceError(result.error)}`
+          );
+        }
+
+        return result.data;
+      },
+    }),
+
+    // =========================================================================
     // SQL Function Tools (via Supabase RPC)
     // =========================================================================
 
@@ -117,24 +216,8 @@ export function createChatTools(supabase: SupabaseClient) {
     }),
 
     // =========================================================================
-    // Query Tools (direct Supabase queries)
+    // Specialized Query Tools (custom joins, aggregations, or views)
     // =========================================================================
-
-    searchRecipes: tool({
-      description: "Search recipes by name. Returns recipe details with style info.",
-      inputSchema: z.object({
-        query: z.string().describe("Search term to match against recipe names"),
-        limit: z.number().optional().default(10).describe("Max results to return"),
-      }),
-      execute: async ({ query: searchQuery, limit }) =>
-        query(
-          supabase
-            .from("recipes_with_estimates")
-            .select("id, name, status, volume_bbl, est_og, est_fg, est_abv, est_ibu, est_srm, style:beer_styles(id, name, category)")
-            .ilike("name", `%${escapeLike(searchQuery)}%`)
-            .limit(limit),
-        ),
-    }),
 
     getBatchStatus: tool({
       description:
@@ -160,10 +243,22 @@ export function createChatTools(supabase: SupabaseClient) {
         "Get vessel utilization: which vessels are available, which are in use, and their current batch assignments.",
       inputSchema: z.object({}),
       execute: async () => {
-        const data = await query<{ id: string; name: string; vessel_type: string; capacity_bbl: number; status: string; current_batch_id: string | null; batch_number: string | null }[]>(
+        const data = await query<
+          {
+            id: string;
+            name: string;
+            vessel_type: string;
+            capacity_bbl: number;
+            status: string;
+            current_batch_id: string | null;
+            batch_number: string | null;
+          }[]
+        >(
           supabase
             .from("vessels_with_batch")
-            .select("id, name, vessel_type, capacity_bbl, status, current_batch_id, batch_number")
+            .select(
+              "id, name, vessel_type, capacity_bbl, status, current_batch_id, batch_number"
+            )
             .eq("is_active", true)
             .order("name"),
         );
@@ -177,8 +272,19 @@ export function createChatTools(supabase: SupabaseClient) {
             available: available.length,
             inUse: inUse.length,
           },
-          available: available.map((v) => ({ id: v.id, name: v.name, type: v.vessel_type, capacity_bbl: v.capacity_bbl })),
-          inUse: inUse.map((v) => ({ id: v.id, name: v.name, type: v.vessel_type, capacity_bbl: v.capacity_bbl, batch_number: v.batch_number })),
+          available: available.map((v) => ({
+            id: v.id,
+            name: v.name,
+            type: v.vessel_type,
+            capacity_bbl: v.capacity_bbl,
+          })),
+          inUse: inUse.map((v) => ({
+            id: v.id,
+            name: v.name,
+            type: v.vessel_type,
+            capacity_bbl: v.capacity_bbl,
+            batch_number: v.batch_number,
+          })),
         };
       },
     }),
@@ -194,7 +300,9 @@ export function createChatTools(supabase: SupabaseClient) {
         query(
           supabase
             .from("batches")
-            .select("id, batch_number, status, planned_start_date, recipe:recipes(name, volume_bbl, fermentation_days, conditioning_days)")
+            .select(
+              "id, batch_number, status, planned_start_date, recipe:recipes(name, volume_bbl, fermentation_days, conditioning_days)"
+            )
             .gte("planned_start_date", startDate)
             .lte("planned_start_date", endDate)
             .neq("status", "cancelled")
@@ -212,26 +320,37 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("Filter by category: malt, hop, yeast, adjunct, chemical"),
       }),
       execute: async ({ category }) => {
-        let q = supabase.from("inventory_items").select(
-          "id, name, category, unit, reorder_point, inventory_lots(quantity, expiration_date)"
+        // Fetch active items, then lots from the view that accounts for
+        // allocations (remaining_quantity = received - allocated).
+        let itemsQ = supabase
+          .from("inventory_items")
+          .select("id, name, category, unit, reorder_point")
+          .eq("is_active", true);
+        if (category) itemsQ = itemsQ.eq("category", category);
+
+        const items = await query<{ id: string; name: string; category: string; unit: string; reorder_point: number | null }[]>(itemsQ);
+        if (!items?.length) return [];
+
+        const lots = await query<{ inventory_item_id: string | null; remaining_quantity: number; expiration_date: string | null }[]>(
+          supabase
+            .from("inventory_lots_with_quantities")
+            .select("inventory_item_id, remaining_quantity, expiration_date")
+            .in("inventory_item_id", items.map((i) => i.id))
+            .gt("remaining_quantity", 0),
         );
-        if (category) q = q.eq("category", category);
 
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-
-        interface ItemRow {
-          id: string;
-          name: string;
-          category: string;
-          unit: string;
-          reorder_point: number | null;
-          inventory_lots: { quantity: number; expiration_date: string | null }[];
+        // Group lots by item
+        const lotsByItem = new Map<string, typeof lots>();
+        for (const lot of lots ?? []) {
+          if (!lot.inventory_item_id) continue;
+          const arr = lotsByItem.get(lot.inventory_item_id);
+          if (arr) arr.push(lot);
+          else lotsByItem.set(lot.inventory_item_id, [lot]);
         }
 
-        return (data as ItemRow[])?.map((item) => {
-          const lots = item.inventory_lots || [];
-          const expirationDates = lots
+        return items.map((item) => {
+          const itemLots = lotsByItem.get(item.id) ?? [];
+          const expirationDates = itemLots
             .map((lot) => lot.expiration_date)
             .filter((d): d is string => d !== null);
 
@@ -241,11 +360,10 @@ export function createChatTools(supabase: SupabaseClient) {
             category: item.category,
             unit: item.unit,
             reorder_point: item.reorder_point,
-            total_quantity: lots.reduce((sum, lot) => sum + lot.quantity, 0),
-            earliest_expiration: expirationDates.length > 0
-              ? expirationDates.sort()[0]
-              : null,
-            lot_count: lots.length,
+            total_quantity: itemLots.reduce((sum, lot) => sum + lot.remaining_quantity, 0),
+            earliest_expiration:
+              expirationDates.length > 0 ? expirationDates.sort()[0] : null,
+            lot_count: itemLots.length,
           };
         });
       },
@@ -277,7 +395,9 @@ export function createChatTools(supabase: SupabaseClient) {
         query(
           supabase
             .from("vessel_cleanings")
-            .select("id, cleaning_type, from_status, to_status, duration_min, chemicals_used, notes, created_at")
+            .select(
+              "id, cleaning_type, from_status, to_status, duration_min, chemicals_used, notes, created_at"
+            )
             .eq("vessel_id", vesselId)
             .order("created_at", { ascending: false })
             .limit(20),
@@ -294,7 +414,9 @@ export function createChatTools(supabase: SupabaseClient) {
         query(
           supabase
             .from("vessel_transfers")
-            .select("id, from_vessel:vessels!vessel_transfers_from_vessel_id_fkey(name), to_vessel:vessels!vessel_transfers_to_vessel_id_fkey(name), volume_bbl, transfer_type, notes, transferred_at")
+            .select(
+              "id, from_vessel:vessels!vessel_transfers_from_vessel_id_fkey(name), to_vessel:vessels!vessel_transfers_to_vessel_id_fkey(name), volume_bbl, transfer_type, notes, transferred_at"
+            )
             .eq("batch_id", batchId)
             .order("transferred_at", { ascending: true }),
         ),
@@ -310,7 +432,9 @@ export function createChatTools(supabase: SupabaseClient) {
         query(
           supabase
             .from("recipes_with_cogs")
-            .select("id, name, volume_bbl, malt_cost, hop_cost, yeast_cost, adjunct_cost, total_cogs, cogs_per_bbl")
+            .select(
+              "id, name, volume_bbl, malt_cost, hop_cost, yeast_cost, adjunct_cost, total_cogs, cogs_per_bbl"
+            )
             .eq("id", recipeId)
             .single(),
         ),
@@ -341,103 +465,6 @@ export function createChatTools(supabase: SupabaseClient) {
       },
     }),
 
-    getBatchDetail: tool({
-      description:
-        "Get full details for a specific batch by UUID or batch number. Returns batch info, recipe name, current vessel, brew dates, and status.",
-      inputSchema: z.object({
-        batchId: z.string().uuid().optional().describe("The batch UUID"),
-        batchNumber: z
-          .string()
-          .optional()
-          .describe("The batch number (e.g. '42' or 'B-042')"),
-      }),
-      execute: async ({ batchId, batchNumber }) => {
-        let q = supabase
-          .from("batches_with_brew_info")
-          .select(
-            "id, batch_number, name, status, volume_bbl, planned_start_date, actual_og, actual_fg, actual_abv, brew_date, current_vessel_name, notes, recipe:recipes(id, name)"
-          );
-        if (batchId) {
-          q = q.eq("id", batchId);
-        } else if (batchNumber) {
-          q = q.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
-        } else {
-          throw new Error("Either batchId or batchNumber is required");
-        }
-        const { data, error } = batchId
-          ? await q.single()
-          : await q.limit(5);
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchBatches: tool({
-      description:
-        "Search and filter batches by status, recipe name, date range, or batch number. Returns matching batches with recipe and vessel info.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by status: planned, fermenting, conditioning, packaging, completed, cancelled, archived"
-          ),
-        recipeName: z
-          .string()
-          .optional()
-          .describe("Filter by recipe name (partial match)"),
-        startDate: z.string().optional().describe("Start of date range (YYYY-MM-DD)"),
-        endDate: z.string().optional().describe("End of date range (YYYY-MM-DD)"),
-        batchNumber: z.string().optional().describe("Filter by batch number (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, recipeName, startDate, endDate, batchNumber, limit }) => {
-        const recipeJoin = recipeName
-          ? "recipe:recipes!inner(id, name)"
-          : "recipe:recipes(id, name)";
-        let q = supabase
-          .from("batches_with_brew_info")
-          .select(
-            `id, batch_number, name, status, volume_bbl, planned_start_date, brew_date, current_vessel_name, ${recipeJoin}`
-          )
-          .order("planned_start_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (batchNumber)
-          q = q.ilike("batch_number", `%${escapeLike(batchNumber)}%`);
-        if (startDate) q = q.gte("planned_start_date", startDate);
-        if (endDate) q = q.lte("planned_start_date", endDate);
-        if (recipeName)
-          q = q.ilike("recipes.name", `%${escapeLike(recipeName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    getBrands: tool({
-      description: "Search brands by name. Returns brand info with style.",
-      inputSchema: z.object({
-        query: z.string().optional().describe("Search by brand name"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ query: searchQuery, limit }) => {
-        let q = supabase
-          .from("brands")
-          .select("id, name, variant, abv, description, style:beer_styles(id, name)")
-          .order("name")
-          .limit(limit);
-
-        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
     getFinishedGoods: tool({
       description:
         "Get finished goods inventory with availability. Filter by brand or package type.",
@@ -457,408 +484,8 @@ export function createChatTools(supabase: SupabaseClient) {
           .limit(limit);
 
         if (brandId) q = q.eq("brand_id", brandId);
-        if (searchQuery) q = q.ilike("brand_name", `%${escapeLike(searchQuery)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    lookupEntity: tool({
-      description:
-        "Resolve a human-friendly name to a UUID. Searches batches (by number), recipes (by name), customers (by name), brands (by name), and orders (by number). Use this when you need a UUID for another tool.",
-      inputSchema: z.object({
-        query: z
-          .string()
-          .describe("The name or number to search for (e.g. 'batch 42', 'Hazy IPA')"),
-        entityType: z
-          .enum(["batch", "recipe", "customer", "brand", "order"])
-          .optional()
-          .describe("Narrow search to a specific entity type"),
-      }),
-      execute: async ({ query: searchQuery, entityType }) => {
-        type Result = { type: string; id: string; display: string };
-        const escaped = escapeLike(searchQuery);
-        const should = (t: string) => !entityType || entityType === t;
-
-        const queries: PromiseLike<Result[]>[] = [];
-
-        if (should("batch")) {
-          const batchSelect = "id, batch_number, name" as const;
-          const toResult = (b: { id: string; batch_number: string; name: string | null }) => ({
-            type: "batch" as const,
-            id: b.id,
-            display: `${b.batch_number}${b.name ? ` — ${b.name}` : ""}`,
-          });
-          queries.push(
-            Promise.all([
-              supabase
-                .from("batches")
-                .select(batchSelect)
-                .ilike("batch_number", `%${escaped}%`)
-                .limit(5),
-              supabase
-                .from("batches")
-                .select(batchSelect)
-                .ilike("name", `%${escaped}%`)
-                .limit(5),
-            ]).then(([byNumber, byName]) => {
-              const seen = new Set<string>();
-              const results: Result[] = [];
-              for (const row of [...(byNumber.data || []), ...(byName.data || [])]) {
-                if (!seen.has(row.id)) {
-                  seen.add(row.id);
-                  results.push(toResult(row));
-                }
-              }
-              return results.slice(0, 5);
-            })
-          );
-        }
-
-        if (should("recipe")) {
-          queries.push(
-            supabase
-              .from("recipes")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((r) => ({ type: "recipe", id: r.id, display: r.name }))
-              )
-          );
-        }
-
-        if (should("customer")) {
-          queries.push(
-            supabase
-              .from("customers")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .eq("is_active", true)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((c) => ({ type: "customer", id: c.id, display: c.name }))
-              )
-          );
-        }
-
-        if (should("brand")) {
-          queries.push(
-            supabase
-              .from("brands")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((b) => ({ type: "brand", id: b.id, display: b.name }))
-              )
-          );
-        }
-
-        if (should("order")) {
-          queries.push(
-            supabase
-              .from("orders")
-              .select("id, order_number")
-              .ilike("order_number", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((o) => ({ type: "order", id: o.id, display: o.order_number }))
-              )
-          );
-        }
-
-        const allResults = await Promise.all(queries);
-        return allResults.flat();
-      },
-    }),
-
-    searchOrders: tool({
-      description:
-        "Search orders by status, customer name, or date range. Returns order headers with customer info.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by status: draft, confirmed, scheduled, picking, packed, fulfilled, cancelled"
-          ),
-        customerName: z
-          .string()
-          .optional()
-          .describe("Filter by customer name (partial match)"),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Order date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Order date end (YYYY-MM-DD)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, customerName, startDate, endDate, limit }) => {
-        const customerJoin = customerName
-          ? "customer:customers!inner(id, name)"
-          : "customer:customers(id, name)";
-        let q = supabase
-          .from("orders")
-          .select(
-            `id, order_number, status, order_date, requested_date, scheduled_date, notes, ${customerJoin}`
-          )
-          .order("order_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("order_date", startDate);
-        if (endDate) q = q.lte("order_date", endDate);
-        if (customerName)
-          q = q.ilike("customers.name", `%${escapeLike(customerName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    getOrderDetail: tool({
-      description:
-        "Get full details for an order including line items with brand, package type, quantity, and price.",
-      inputSchema: z.object({
-        orderId: z.string().uuid().describe("The order UUID"),
-      }),
-      execute: async ({ orderId }) => {
-        const { data, error } = await supabase
-          .from("orders")
-          .select(
-            `id, order_number, status, order_date, requested_date, scheduled_date, fulfilled_date, shipping_address, notes,
-             customer:customers(id, name, customer_type, email, phone),
-             items:order_items(id, quantity, unit_price, notes, brand:brands(id, name), package_type:package_types(id, name, volume_oz), batch:batches(id, batch_number))`
-          )
-          .eq("id", orderId)
-          .single();
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    getCustomers: tool({
-      description:
-        "Search customers by name. Returns customer info with order statistics.",
-      inputSchema: z.object({
-        query: z.string().optional().describe("Search by customer name"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ query: searchQuery, limit }) => {
-        let q = supabase
-          .from("customers_with_order_summary")
-          .select(
-            "id, name, customer_type, contact_name, email, phone, total_orders, total_revenue, pending_orders, last_order_date"
-          )
-          .eq("is_active", true)
-          .order("name")
-          .limit(limit);
-
-        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchBrewLogs: tool({
-      description:
-        "Search brew logs (hot-side brew day records) by status, date range, or brew number. Returns brew log headers with recipe info.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe("Filter by status: draft, in_progress, completed, cancelled"),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Brew date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Brew date end (YYYY-MM-DD)"),
-        brewNumber: z
-          .string()
-          .optional()
-          .describe("Filter by brew number (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, brewNumber, limit }) => {
-        let q = supabase
-          .from("brew_logs")
-          .select(
-            "id, brew_number, brew_date, status, notes, recipe:recipes(id, name)"
-          )
-          .order("brew_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (brewNumber)
-          q = q.ilike("brew_number", `%${escapeLike(brewNumber)}%`);
-        if (startDate) q = q.gte("brew_date", startDate);
-        if (endDate) q = q.lte("brew_date", endDate);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchPurchaseOrders: tool({
-      description:
-        "Search purchase orders by status, date range, or supplier name. Returns PO headers with supplier info.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by status: draft, submitted, confirmed, partial, fulfilled, cancelled"
-          ),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Order date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Order date end (YYYY-MM-DD)"),
-        supplierName: z
-          .string()
-          .optional()
-          .describe("Filter by supplier name (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, supplierName, limit }) => {
-        const supplierJoin = supplierName
-          ? "supplier:suppliers!inner(id, name)"
-          : "supplier:suppliers(id, name)";
-        let q = supabase
-          .from("purchase_orders")
-          .select(
-            `id, po_number, status, order_date, expected_date, shipping_cost, tax, notes, ${supplierJoin}`
-          )
-          .order("order_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("order_date", startDate);
-        if (endDate) q = q.lte("order_date", endDate);
-        if (supplierName)
-          q = q.ilike("suppliers.name", `%${escapeLike(supplierName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchSuppliers: tool({
-      description:
-        "Search suppliers by name. Returns supplier contact info, payment terms, and lead times.",
-      inputSchema: z.object({
-        query: z.string().optional().describe("Search by supplier name"),
-        isActive: z
-          .boolean()
-          .optional()
-          .default(true)
-          .describe("Filter by active status (default true)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ query: searchQuery, isActive, limit }) => {
-        let q = supabase
-          .from("suppliers")
-          .select(
-            "id, name, contact_name, contact_email, contact_phone, payment_terms, default_lead_time_days, is_active"
-          )
-          .order("name")
-          .limit(limit);
-
-        if (isActive !== undefined) q = q.eq("is_active", isActive);
-        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchPickLists: tool({
-      description:
-        "Search pick lists by status, date range, or customer name. Returns pick list details with order info and progress.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe("Filter by status: pending, in_progress, completed, cancelled"),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Generated-at date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Generated-at date end (YYYY-MM-DD)"),
-        customerName: z
-          .string()
-          .optional()
-          .describe("Filter by customer name (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, customerName, limit }) => {
-        let q = supabase
-          .from("pick_list_details")
-          .select(
-            "id, status, generated_at, order_id, order_number, customer_name, total_items, items_picked, assigned_to_name"
-          )
-          .order("generated_at", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("generated_at", startDate);
-        if (endDate) q = q.lte("generated_at", endDate);
-        if (customerName)
-          q = q.ilike("customer_name", `%${escapeLike(customerName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchYeastPitches: tool({
-      description:
-        "Search yeast pitches with viability and strain details. Filter by status or strain name.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe("Filter by status: available, pitched, harvested, expired, discarded"),
-        strainName: z
-          .string()
-          .optional()
-          .describe("Filter by yeast strain name (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, strainName, limit }) => {
-        let q = supabase
-          .from("yeast_pitches_with_details")
-          .select(
-            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_number, location_name"
-          )
-          .order("created_at", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (strainName)
-          q = q.ilike("strain_name", `%${escapeLike(strainName)}%`);
+        if (searchQuery)
+          q = q.ilike("brand_name", `%${escapeLike(searchQuery)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -873,7 +500,9 @@ export function createChatTools(supabase: SupabaseClient) {
         state: z
           .string()
           .optional()
-          .describe("Filter by keg state: empty, filled, shipped, returned, lost, retired"),
+          .describe(
+            "Filter by keg state: empty, filled, shipped, returned, lost, retired"
+          ),
         kegTypeName: z
           .string()
           .optional()
@@ -905,178 +534,144 @@ export function createChatTools(supabase: SupabaseClient) {
       },
     }),
 
-    searchDeliveries: tool({
-      description:
-        "Search deliveries by status or date range. Returns delivery info with transfer and order counts.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe("Filter by status: planned, in_transit, delivered, cancelled"),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Scheduled date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Scheduled date end (YYYY-MM-DD)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, limit }) => {
-        let q = supabase
-          .from("deliveries_with_summary")
-          .select(
-            "id, delivery_number, status, scheduled_date, driver_name, vehicle, notes, transfer_count, order_count, total_stops"
-          )
-          .order("scheduled_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("scheduled_date", startDate);
-        if (endDate) q = q.lte("scheduled_date", endDate);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchLocationTransfers: tool({
-      description:
-        "Search location transfers (inventory movements between locations/bins). Filter by status or date range.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe("Filter by status: draft, shipped, received, cancelled"),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Ship date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Ship date end (YYYY-MM-DD)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, limit }) => {
-        let q = supabase
-          .from("location_transfers_with_details")
-          .select(
-            "id, status, ship_date, receive_date, from_bin_name, to_bin_name, from_location_name, to_location_name, delivery_number, lines_count"
-          )
-          .order("ship_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("ship_date", startDate);
-        if (endDate) q = q.lte("ship_date", endDate);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchAllocations: tool({
-      description:
-        "Search inventory allocations (movements between sources and destinations). Filter by status, source/destination type, or date range.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by status: planned, pending_approval, completed, rejected, cancelled"
-          ),
-        sourceType: z
-          .string()
-          .optional()
-          .describe("Filter by source type: inventory_lot, batch, finished_good, external"),
-        destinationType: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by destination type: batch, finished_good, order, taproom_sale, sample, adjustment, destruction, loss, transfer"
-          ),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Created-at date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Created-at date end (YYYY-MM-DD)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, sourceType, destinationType, startDate, endDate, limit }) => {
-        let q = supabase
-          .from("allocations")
-          .select(
-            "id, source_type, source_id, destination_type, destination_id, quantity, volume_bbl, unit_cost, status, reason_code, lot_number, created_at"
-          )
-          .order("created_at", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (sourceType) q = q.eq("source_type", sourceType);
-        if (destinationType) q = q.eq("destination_type", destinationType);
-        if (startDate) q = q.gte("created_at", startDate);
-        if (endDate) q = q.lte("created_at", endDate);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchPackagingSessions: tool({
-      description:
-        "Search packaging sessions by status, date range, or brand. Returns session details with line item summary (brands, planned/actual counts).",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by status: planned, in_progress, completed, revised, cancelled"
-          ),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Session date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Session date end (YYYY-MM-DD)"),
-        brandName: z
-          .string()
-          .optional()
-          .describe("Filter by brand name (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, brandName, limit }) => {
-        let q = supabase
-          .from("packaging_sessions_with_summary")
-          .select(
-            "id, session_date, status, notes, line_count, brands, total_planned, total_actual"
-          )
-          .order("session_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("session_date", startDate);
-        if (endDate) q = q.lte("session_date", endDate);
-        if (brandName) q = q.ilike("brands", `%${escapeLike(brandName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
     // =========================================================================
-    // Help / Guide Tool
+    // Utility Tools
     // =========================================================================
+
+    lookupEntity: tool({
+      description:
+        "Resolve a human-friendly name to a UUID. Searches batches (by number), recipes (by name), customers (by name), brands (by name), and orders (by number). Use this when you need a UUID for another tool.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .describe(
+            "The name or number to search for (e.g. 'batch 42', 'Hazy IPA')"
+          ),
+        entityType: z
+          .enum(["batch", "recipe", "customer", "brand", "order"])
+          .optional()
+          .describe("Narrow search to a specific entity type"),
+      }),
+      execute: async ({ query: searchQuery, entityType }) => {
+        type Result = { type: string; id: string; display: string };
+        const escaped = escapeLike(searchQuery);
+        const should = (t: string) => !entityType || entityType === t;
+
+        const queries: PromiseLike<Result[]>[] = [];
+
+        if (should("batch")) {
+          const batchSelect = "id, batch_number, name" as const;
+          const toResult = (b: {
+            id: string;
+            batch_number: string;
+            name: string | null;
+          }) => ({
+            type: "batch" as const,
+            id: b.id,
+            display: `${b.batch_number}${b.name ? ` — ${b.name}` : ""}`,
+          });
+          queries.push(
+            Promise.all([
+              supabase
+                .from("batches")
+                .select(batchSelect)
+                .ilike("batch_number", `%${escaped}%`)
+                .limit(5),
+              supabase
+                .from("batches")
+                .select(batchSelect)
+                .ilike("name", `%${escaped}%`)
+                .limit(5),
+            ]).then(([byNumber, byName]) => {
+              const seen = new Set<string>();
+              const results: Result[] = [];
+              for (const row of [
+                ...(byNumber.data || []),
+                ...(byName.data || []),
+              ]) {
+                if (!seen.has(row.id)) {
+                  seen.add(row.id);
+                  results.push(toResult(row));
+                }
+              }
+              return results.slice(0, 5);
+            })
+          );
+        }
+
+        if (should("recipe")) {
+          queries.push(
+            supabase
+              .from("recipes")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((r) => ({
+                  type: "recipe",
+                  id: r.id,
+                  display: r.name,
+                }))
+              )
+          );
+        }
+
+        if (should("customer")) {
+          queries.push(
+            supabase
+              .from("customers")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .eq("is_active", true)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((c) => ({
+                  type: "customer",
+                  id: c.id,
+                  display: c.name,
+                }))
+              )
+          );
+        }
+
+        if (should("brand")) {
+          queries.push(
+            supabase
+              .from("brands")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((b) => ({
+                  type: "brand",
+                  id: b.id,
+                  display: b.name,
+                }))
+              )
+          );
+        }
+
+        if (should("order")) {
+          queries.push(
+            supabase
+              .from("orders")
+              .select("id, order_number")
+              .ilike("order_number", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((o) => ({
+                  type: "order",
+                  id: o.id,
+                  display: o.order_number,
+                }))
+              )
+          );
+        }
+
+        const allResults = await Promise.all(queries);
+        return allResults.flat();
+      },
+    }),
 
     getAppGuide: tool({
       description:
@@ -1136,7 +731,7 @@ export function createChatTools(supabase: SupabaseClient) {
           if (error) throw new Error(error.message);
           if (!data || data.length === 0) {
             throw new Error(
-              `No recipe found matching "${recipeName}". Use searchRecipes to find the right name.`
+              `No recipe found matching "${recipeName}". Use searchEntity with entityName "recipe" to find the right name.`
             );
           }
           recipe = data[0];
@@ -1147,7 +742,8 @@ export function createChatTools(supabase: SupabaseClient) {
         const prefillData: Record<string, unknown> = {
           recipe_id: recipe.id,
         };
-        if (plannedStartDate) prefillData.planned_start_date = plannedStartDate;
+        if (plannedStartDate)
+          prefillData.planned_start_date = plannedStartDate;
         if (targetVolumeBbl) {
           prefillData.volume_bbl = targetVolumeBbl;
         } else if (recipe.volume_bbl) {
@@ -1168,7 +764,7 @@ export function createChatTools(supabase: SupabaseClient) {
 
     transitionBatch: tool({
       description:
-        "Navigate to a batch to perform a state transition. For transitions with dialogs (start fermentation, cancel, archive), the dialog opens automatically. For simple transitions (conditioning, packaging, complete), navigates to the batch detail page where the user clicks the action.",
+        "Navigate to a batch to perform a state transition. For start fermentation, the dialog opens automatically. For other transitions (conditioning, packaging, complete), navigates to the batch detail page where the user clicks the action.",
       inputSchema: z.object({
         batchId: z.string().uuid().optional().describe("The batch UUID"),
         batchNumber: z
@@ -1181,19 +777,21 @@ export function createChatTools(supabase: SupabaseClient) {
             "conditioning",
             "packaging",
             "completed",
-            "cancelled",
-            "archived",
           ])
           .describe("Target state"),
       }),
       execute: async ({ batchId, batchNumber, toState }) => {
         const batch = await resolveBatch(supabase, batchId, batchNumber);
 
+        // Mirrors batchTransitions from src/lib/schemas/batch.ts.
+        // Duplicated here because the batch entity config imports React
+        // client components, making it unavailable in this server route.
+        // Keep in sync with batchTransitions if batch states change.
         const validTransitions: Record<string, string[]> = {
-          planned: ["fermenting", "cancelled"],
-          fermenting: ["conditioning", "archived"],
-          conditioning: ["packaging", "archived"],
-          packaging: ["completed", "archived"],
+          planned: ["fermenting"],
+          fermenting: ["conditioning"],
+          conditioning: ["packaging"],
+          packaging: ["completed"],
         };
 
         const allowed = validTransitions[batch.status] || [];
@@ -1205,8 +803,6 @@ export function createChatTools(supabase: SupabaseClient) {
 
         const dialogMap: Record<string, string> = {
           fermenting: "start_fermentation",
-          cancelled: "cancel",
-          archived: "archive",
         };
 
         const openDialog = dialogMap[toState];
@@ -1258,9 +854,7 @@ export function createChatTools(supabase: SupabaseClient) {
       description:
         "Prepare a new packaging session. Returns a navigation action that opens the packaging session form with pre-filled data. The user will review and submit the form.",
       inputSchema: z.object({
-        sessionDate: z
-          .string()
-          .describe("Session date (YYYY-MM-DD)"),
+        sessionDate: z.string().describe("Session date (YYYY-MM-DD)"),
         notes: z
           .string()
           .optional()

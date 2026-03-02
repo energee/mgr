@@ -12,6 +12,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { userKeys } from "@/lib/query-keys";
+import { CACHE_DURATIONS } from "@/lib/constants";
 import type {
   VolumeUnit,
   WeightUnit,
@@ -93,7 +94,7 @@ export function useUnitPreferences() {
         retail_volume_unit: data.retail_volume_unit as RetailVolumeUnit,
       };
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: CACHE_DURATIONS.USER_PREFERENCES, // 5 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
   });
 }
@@ -123,7 +124,7 @@ export function useUserPreferences() {
 
       return data as UserPreferences;
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: CACHE_DURATIONS.USER_PREFERENCES,
   });
 }
 

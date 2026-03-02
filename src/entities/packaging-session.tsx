@@ -250,30 +250,6 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
   // ---------------------------------------------------------------------------
   formSchema: packagingSessionSchema,
 
-  formFields: [
-    {
-      name: "session_date",
-      label: "Session Date",
-      type: "date",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "status",
-      label: "Status",
-      type: "select",
-      options: statusOptions,
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Session notes, special instructions, etc.",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------

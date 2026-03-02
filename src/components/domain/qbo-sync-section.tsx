@@ -10,6 +10,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { qboKeys } from "@/lib/query-keys";
+import { CACHE_DURATIONS } from "@/lib/constants";
 import {
   RefreshCw,
   Check,
@@ -87,7 +88,7 @@ export function QBOSyncSection({ entityType, entityId }: QBOSyncSectionProps) {
       const json = await res.json();
       return json.data as { connected: boolean; companyName?: string };
     },
-    staleTime: 60_000,
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
   // Check sync status for this entity

@@ -10,6 +10,7 @@ import {
   extractBrewMeasurements,
   type BrewMeasurementHighlight,
 } from "@/lib/brew-events";
+import type { BrewEvent } from "@/types/domain";
 
 // =============================================================================
 // Helpers
@@ -351,10 +352,10 @@ describe("extractBrewMeasurements — edge cases with event structure", () => {
   });
 
   it("throws on null entries in events array (no null guard)", () => {
-    // The function casts unknown[] to TypedBrewEvent[] and accesses .phase
-    // directly via find(), so null entries cause a TypeError.
+    // The function accepts BrewEvent[] but null entries can arrive from
+    // unvalidated JSON. Null entries cause a TypeError in find().
     const events = [null, makeEvent("mash_in", "temp_f", 152)];
-    expect(() => extractBrewMeasurements(events as unknown[])).toThrow(TypeError);
+    expect(() => extractBrewMeasurements(events as unknown as BrewEvent[])).toThrow(TypeError);
   });
 });
 

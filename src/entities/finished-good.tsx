@@ -145,94 +145,126 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Product Information",
+      fields: [
+        {
+          name: "lot_number",
+          label: "Lot Code",
+          type: "text",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "quantity",
+          label: "Quantity",
+          type: "number",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "brand_id",
+          label: "Brand",
+          type: "select",
+          required: true,
+          colSpan: 6,
+          dynamicOptions: {
+            table: "brands",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "name",
+          },
+        },
+        {
+          name: "package_type_id",
+          label: "Package Type",
+          type: "select",
+          colSpan: 6,
+          dynamicOptions: {
+            table: "package_types",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "name",
+          },
+        },
+        {
+          name: "keg_type_id",
+          label: "Keg Type",
+          type: "relation",
+          colSpan: 6,
+          relation: { entity: "keg_type", displayField: "name" },
+        },
+        {
+          name: "batch_id",
+          label: "Source Batch",
+          type: "relation",
+          colSpan: 6,
+          relation: { entity: "batch", displayField: "batch_number" },
+        },
+      ],
+    },
+    {
+      id: "inventory",
+      title: "Inventory",
+      component: FGInventorySection,
+    },
+    {
+      id: "dates",
+      title: "Dates",
+      fields: [
+        {
+          name: "production_date",
+          label: "Production Date",
+          type: "date",
+          format: "date",
+          colSpan: 4,
+        },
+        {
+          name: "best_by_date",
+          label: "Best By",
+          type: "date",
+          format: "date",
+          colSpan: 4,
+        },
+        {
+          name: "expiration_date",
+          label: "Expiration",
+          type: "date",
+          format: "date",
+          colSpan: 4,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+    {
+      id: "revision-history",
+      title: "Revision History",
+      component: createRevisionHistoryDisplay("finished_goods"),
+      collapsible: true,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form (read-only entity, minimal form for future use)
   // ---------------------------------------------------------------------------
   formSchema: finishedGoodSchema,
-
-  formFields: [
-    {
-      name: "lot_number",
-      label: "Lot Code",
-      type: "text",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "quantity",
-      label: "Quantity",
-      type: "number",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "brand_id",
-      label: "Brand",
-      type: "select",
-      required: true,
-      colSpan: 6,
-      dynamicOptions: {
-        table: "brands",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "name",
-      },
-    },
-    {
-      name: "package_type_id",
-      label: "Package Type",
-      type: "select",
-      required: false,
-      colSpan: 6,
-      dynamicOptions: {
-        table: "package_types",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "name",
-      },
-    },
-    {
-      name: "keg_type_id",
-      label: "Keg Type",
-      type: "relation",
-      required: false,
-      colSpan: 6,
-      relation: { entity: "keg_type", displayField: "name" },
-    },
-    {
-      name: "batch_id",
-      label: "Source Batch",
-      type: "relation",
-      colSpan: 12,
-      relation: {
-        entity: "batch",
-        displayField: "batch_number",
-      },
-    },
-    {
-      name: "production_date",
-      label: "Production Date",
-      type: "date",
-      colSpan: 4,
-    },
-    {
-      name: "best_by_date",
-      label: "Best By Date",
-      type: "date",
-      colSpan: 4,
-    },
-    {
-      name: "expiration_date",
-      label: "Expiration Date",
-      type: "date",
-      colSpan: 4,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      colSpan: 12,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // Relations

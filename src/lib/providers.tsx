@@ -12,6 +12,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { CACHE_DURATIONS } from "@/lib/constants";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -24,8 +25,8 @@ export function Providers({ children }: ProvidersProps) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Stale time of 2 minutes - data is considered fresh for 2 min
-            staleTime: 2 * 60 * 1000,
+            // Stale time - data is considered fresh for this duration
+            staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
             // Keep unused data in cache for 5 minutes
             gcTime: 5 * 60 * 1000,
             // Retry failed requests once

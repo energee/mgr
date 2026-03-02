@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
+import { CACHE_DURATIONS } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 import { catalogKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
@@ -152,7 +153,7 @@ export function BatchAdditionForm({
       return queryCatalog(config.catalogTable);
     },
     enabled: !!config.catalogTable,
-    staleTime: 5 * 60 * 1000, // 5 minutes - catalog data rarely changes
+    staleTime: CACHE_DURATIONS.STATIC_DATA,
   });
 
   // Update defaults when type changes

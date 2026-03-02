@@ -205,55 +205,6 @@ export const brandEntity: EntityConfig<Brand> = {
   // ---------------------------------------------------------------------------
   formSchema: brandSchema,
 
-  formFields: [
-    {
-      name: "name",
-      label: "Brand Name",
-      type: "text",
-      placeholder: "e.g., Hop Highway",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "variant",
-      label: "Variant",
-      type: "text",
-      placeholder: "e.g., Session, Double, Nitro",
-      colSpan: 6,
-    },
-    {
-      name: "style_id",
-      label: "Style",
-      type: "relation",
-      colSpan: 6,
-      relation: {
-        entity: "beer_style",
-        displayField: "name",
-      },
-    },
-    {
-      name: "abv",
-      label: "ABV (%)",
-      type: "number",
-      placeholder: "e.g., 6.5",
-      colSpan: 6,
-    },
-    {
-      name: "description",
-      label: "Description",
-      type: "textarea",
-      placeholder: "Beer description, tasting notes, etc.",
-      colSpan: 12,
-    },
-    {
-      name: "untappd_url",
-      label: "Untappd URL",
-      type: "text",
-      placeholder: "https://untappd.com/b/...",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------

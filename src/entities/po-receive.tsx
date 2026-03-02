@@ -101,53 +101,72 @@ export const poReceiveEntity: EntityConfig<POReceive> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Receipt Information",
+      fields: [
+        {
+          name: "po_line_item_id",
+          label: "PO Line Item",
+          type: "relation",
+          relation: { entity: "po_line_item", displayField: "id" },
+          required: true,
+          colSpan: 12,
+        },
+        {
+          name: "quantity",
+          label: "Quantity Received",
+          type: "number",
+          required: true,
+          colSpan: 4,
+        },
+        {
+          name: "lot_number",
+          label: "Lot Number",
+          type: "text",
+          placeholder: "Supplier's lot number",
+          colSpan: 4,
+        },
+        {
+          name: "received_date",
+          label: "Received Date",
+          type: "date",
+          format: "date",
+          colSpan: 4,
+        },
+        {
+          name: "expiration_date",
+          label: "Expiration Date",
+          type: "date",
+          format: "date",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Quality notes, discrepancies...",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: poReceiveSchema,
-
-  formFields: [
-    {
-      name: "po_line_item_id",
-      label: "PO Line Item",
-      type: "relation",
-      relation: { entity: "po_line_item", displayField: "id" },
-      required: true,
-      colSpan: 12,
-    },
-    {
-      name: "quantity",
-      label: "Quantity Received",
-      type: "number",
-      required: true,
-      colSpan: 4,
-    },
-    {
-      name: "lot_number",
-      label: "Lot Number",
-      type: "text",
-      placeholder: "Supplier's lot number",
-      colSpan: 4,
-    },
-    {
-      name: "received_date",
-      label: "Received Date",
-      type: "date",
-      colSpan: 4,
-    },
-    {
-      name: "expiration_date",
-      label: "Expiration Date",
-      type: "date",
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Quality notes, discrepancies...",
-      colSpan: 12,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // Relations

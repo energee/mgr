@@ -3,12 +3,14 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createChatTools } from "./tools";
+import { entityService } from "@/services/entity-service";
+import { CHAT_ENTITY_MAP } from "./entity-map";
 
 const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant — concise, practical, brewery-focused.
 
 Knowledge: brewing science, BJCP styles, production planning, inventory, recipe optimization.
 
-You have tools to query live brewery data (recipes, batches, inventory, vessels, orders). Use them when the user asks about specific data.
+You have tools to query live brewery data. Use searchEntity and getEntityDetail for any entity type. Use specialized tools (analyzeRecipe, analyzeBatch, etc.) for domain-specific analysis.
 
 Navigation tools open pre-filled forms for the user to review and submit:
 - createBatch, transitionBatch, addBatchReading, createPackagingSession
@@ -31,56 +33,103 @@ interface PageContext {
   entityId?: string;
 }
 
-/** Fetch a lightweight summary for the entity the user is currently viewing. */
+/**
+ * Map from chat context entityType strings (from URL parsing) to entity
+ * registry names. The chat context uses display-friendly names like
+ * "brew log" while the registry uses snake_case like "brew_log".
+ */
+/**
+ * Maps display-friendly entity type names (from chat-context.tsx URL parser)
+ * to CHAT_ENTITY_MAP registry keys. Must stay in sync with ENTITY_MAP in
+ * src/contexts/chat-context.tsx.
+ */
+const ENTITY_TYPE_TO_REGISTRY: Record<string, string> = {
+  // Production
+  batch: "batch",
+  recipe: "recipe",
+  "brew log": "brew_log",
+  vessel: "vessel",
+  "vessel transfer": "vessel_transfer",
+  "yeast pitch": "yeast_pitch",
+  "packaging session": "packaging_session",
+  // Inventory
+  "finished good": "finished_good",
+  "inventory item": "inventory_item",
+  "inventory lot": "inventory_lot",
+  allocation: "allocation",
+  delivery: "delivery",
+  "location transfer": "location_transfer",
+  "keg inventory": "keg_inventory",
+  bin: "bin",
+  // Sales
+  order: "order",
+  customer: "customer",
+  "pick list": "pick_list",
+  // Purchasing
+  "purchase order": "purchase_order",
+  supplier: "supplier",
+  // Settings
+  "user profile": "user_profile",
+  location: "location",
+  brand: "brand",
+  "beer style": "beer_style",
+  "keg type": "keg_type",
+  "sales channel": "sales_channel",
+  "pricing tier": "pricing_tier",
+  "yeast strain": "yeast_strain",
+  "water profile": "water_profile",
+  "package type": "package_type",
+};
+
+/**
+ * Fetch a lightweight summary for the entity the user is currently viewing.
+ * Uses the entity registry to look up any entity, then fetches via entityService.
+ */
 async function fetchEntityContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   entityType: string,
   entityId: string,
 ): Promise<string | null> {
   try {
-    switch (entityType) {
-      case "batch": {
-        const { data } = await supabase
-          .from("batches_with_brew_info")
-          .select("batch_number, name, status, volume_bbl, planned_start_date, brew_date, current_vessel_name, recipe:recipes(name)")
-          .eq("id", entityId)
-          .single();
-        if (!data) return null;
-        const recipe = data.recipe as { name: string } | null;
-        return `Current batch: #${data.batch_number}${data.name ? ` "${data.name}"` : ""}, status=${data.status}, recipe="${recipe?.name}", volume=${data.volume_bbl} bbl, vessel=${data.current_vessel_name || "unassigned"}, planned=${data.planned_start_date || "n/a"}, brewed=${data.brew_date || "n/a"}`;
+    const registryName = ENTITY_TYPE_TO_REGISTRY[entityType];
+    if (!registryName) return null;
+
+    const entity = CHAT_ENTITY_MAP.get(registryName);
+    if (!entity) return null;
+
+    const result = await entityService.getById(supabase, entity, entityId);
+    if (!result.success) return null;
+
+    const record = result.data as Record<string, unknown>;
+
+    // Build a summary from the entity's key fields (title, subtitle, badge)
+    const parts: string[] = [`Current ${entity.displayName}:`];
+
+    if (entity.detailHeader) {
+      const titleVal = record[entity.detailHeader.title];
+      if (titleVal) parts.push(`"${titleVal}"`);
+
+      if (entity.detailHeader.subtitle) {
+        const subtitleVal = record[entity.detailHeader.subtitle];
+        if (subtitleVal) parts.push(`(${subtitleVal})`);
       }
-      case "recipe": {
-        const { data } = await supabase
-          .from("recipes_with_estimates")
-          .select("name, status, volume_bbl, est_og, est_fg, est_abv, est_ibu, est_srm, style:beer_styles(name)")
-          .eq("id", entityId)
-          .single();
-        if (!data) return null;
-        const style = data.style as { name: string } | null;
-        return `Current recipe: "${data.name}", status=${data.status}, style="${style?.name || "none"}", volume=${data.volume_bbl} bbl, OG=${data.est_og}, FG=${data.est_fg}, ABV=${data.est_abv}%, IBU=${data.est_ibu}, SRM=${data.est_srm}`;
+
+      if (entity.detailHeader.badge) {
+        const badgeVal = record[entity.detailHeader.badge];
+        if (badgeVal) parts.push(`status=${badgeVal}`);
       }
-      case "order": {
-        const { data } = await supabase
-          .from("orders")
-          .select("order_number, status, order_date, requested_date, customer:customers(name)")
-          .eq("id", entityId)
-          .single();
-        if (!data) return null;
-        const customer = data.customer as { name: string } | null;
-        return `Current order: #${data.order_number}, status=${data.status}, customer="${customer?.name}", ordered=${data.order_date}, requested=${data.requested_date || "n/a"}`;
-      }
-      case "vessel": {
-        const { data } = await supabase
-          .from("vessels_with_batch")
-          .select("name, vessel_type, capacity_bbl, status, batch_number")
-          .eq("id", entityId)
-          .single();
-        if (!data) return null;
-        return `Current vessel: "${data.name}", type=${data.vessel_type}, capacity=${data.capacity_bbl} bbl, status=${data.status}, batch=${data.batch_number || "empty"}`;
-      }
-      default:
-        return null;
     }
+
+    // Add key fields if defined in keyFields (AI context fields)
+    if (entity.keyFields?.length) {
+      for (const field of entity.keyFields) {
+        if (record[field] !== undefined && record[field] !== null) {
+          parts.push(`${field}=${record[field]}`);
+        }
+      }
+    }
+
+    return parts.join(", ");
   } catch {
     return null;
   }

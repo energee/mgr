@@ -188,58 +188,6 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
   // ---------------------------------------------------------------------------
   formSchema: vesselTransferSchema,
 
-  formFields: [
-    {
-      name: "batch_id",
-      label: "Batch",
-      type: "relation",
-      relation: { entity: "batch", displayField: "batch_number" },
-      description: "Batch being transferred",
-      required: true,
-      colSpan: 12,
-    },
-    {
-      name: "from_vessel_id",
-      label: "From Vessel",
-      type: "relation",
-      relation: { entity: "vessel", displayField: "name" },
-      description: "Source vessel (leave empty for knockout from kettle)",
-      required: false,
-    },
-    {
-      name: "to_vessel_id",
-      label: "To Vessel",
-      type: "relation",
-      relation: { entity: "vessel", displayField: "name" },
-      description: "Destination vessel",
-      required: true,
-    },
-    {
-      name: "volume_bbl",
-      label: "Volume",
-      type: "unit",
-      unitType: "volume",
-      description: "Volume transferred",
-      required: true,
-    },
-    {
-      name: "transferred_at",
-      label: "Date/Time",
-      type: "datetime",
-      description: "When the transfer occurred",
-      required: true,
-      defaultValue: () => new Date().toISOString(),
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      description: "Additional notes about the transfer",
-      required: false,
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------
