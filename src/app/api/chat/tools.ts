@@ -774,11 +774,15 @@ export function createChatTools(supabase: SupabaseClient) {
       execute: async ({ batchId, batchNumber, toState }) => {
         const batch = await resolveBatch(supabase, batchId, batchNumber);
 
+        // Mirrors batchTransitions from src/lib/schemas/batch.ts.
+        // Duplicated here because the batch entity config imports React
+        // client components, making it unavailable in this server route.
+        // Keep in sync with batchTransitions if batch states change.
         const validTransitions: Record<string, string[]> = {
-          planned: ["fermenting", "cancelled"],
-          fermenting: ["conditioning", "archived"],
-          conditioning: ["packaging", "archived"],
-          packaging: ["completed", "archived"],
+          planned: ["fermenting"],
+          fermenting: ["conditioning"],
+          conditioning: ["packaging"],
+          packaging: ["completed"],
         };
 
         const allowed = validTransitions[batch.status] || [];

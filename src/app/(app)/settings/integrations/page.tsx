@@ -429,7 +429,7 @@ function QuickBooksIntegrationCard() {
       if (!res.ok) return { connected: false };
       return (await res.json()).data;
     },
-    staleTime: CACHE_DURATIONS.REALTIME_DATA,
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
   const isConnected = status?.connected === true;

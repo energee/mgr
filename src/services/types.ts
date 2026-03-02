@@ -42,7 +42,7 @@ export type TableUpdate<T extends TableName> = Database["public"]["Tables"][T]["
  * On failure, includes a typed error describing what went wrong.
  */
 export type ServiceResult<T> =
-  | { success: true; data: T; invalidate: string[][] }
+  | { success: true; data: T; invalidate: readonly (readonly string[])[] }
   | { success: false; error: ServiceError };
 
 // =============================================================================
@@ -58,6 +58,7 @@ export type ServiceResult<T> =
 export type ServiceError =
   | { code: "VALIDATION"; issues: ZodIssue[] }
   | { code: "CONFLICT"; currentVersion: number; message: string }
+  | { code: "UNIQUE_VIOLATION"; message: string }
   | { code: "NOT_FOUND"; table: string; id: string }
   | { code: "FK_VIOLATION"; message: string }
   | { code: "RLS_DENIED"; message: string }
@@ -85,7 +86,7 @@ export interface ListOptions {
 // =============================================================================
 
 /** Create a successful result with data and invalidation hints. */
-export function ok<T>(data: T, invalidate: string[][] = []): ServiceResult<T> {
+export function ok<T>(data: T, invalidate: readonly (readonly string[])[] = []): ServiceResult<T> {
   return { success: true, data, invalidate };
 }
 
@@ -99,6 +100,7 @@ export function err<T>(error: ServiceError): ServiceResult<T> {
  *
  * Maps common PostgreSQL error codes to specific ServiceError variants:
  * - 23503 (FK violation) → FK_VIOLATION
+ * - 23505 (unique constraint) → UNIQUE_VIOLATION
  * - 42501 (insufficient privilege) → RLS_DENIED
  * - PGRST116 (no rows) → NOT_FOUND
  * - Everything else → UNKNOWN
@@ -128,9 +130,9 @@ export function parseSupabaseError(
     };
   }
 
-  // Unique constraint violation (could indicate optimistic lock conflict)
+  // Unique constraint violation (e.g., duplicate name, number, or key)
   if (error.code === "23505") {
-    return { code: "CONFLICT", currentVersion: -1, message };
+    return { code: "UNIQUE_VIOLATION", message };
   }
 
   return { code: "UNKNOWN", message, cause: error };
@@ -145,6 +147,8 @@ export function formatServiceError(error: ServiceError): string {
       return `Validation failed: ${error.issues.map((i) => i.message).join(", ")}`;
     case "CONFLICT":
       return error.message;
+    case "UNIQUE_VIOLATION":
+      return `A record with that value already exists`;
     case "NOT_FOUND":
       return `Record not found in ${error.table}`;
     case "FK_VIOLATION":

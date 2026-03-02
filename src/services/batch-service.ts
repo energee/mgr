@@ -1,7 +1,7 @@
 /**
  * Batch Domain Service
  *
- * Wraps batch-specific RPC functions (performance analysis, blend candidates)
+ * Batch-specific operations (RPC performance analysis, blend candidate queries)
  * in the ServiceResult pattern. Consolidates logic previously duplicated
  * between AI chat tools and the batch-insights component.
  */
@@ -102,7 +102,7 @@ export const batchService = {
         .select("id, batch_number, recipe_name, status, volume_bbl, current_vessel_name")
         .eq("recipe_id", sourceBatch.recipe_id)
         .neq("id", batchId)
-        .in("status", ["fermenting", "conditioning", "ready"]);
+        .in("status", ["fermenting", "conditioning", "packaging"]);
 
       if (listError) {
         return err(parseSupabaseError(listError, { table: "batches" }));

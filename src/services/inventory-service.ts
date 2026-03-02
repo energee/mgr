@@ -1,7 +1,7 @@
 /**
  * Inventory Domain Service
  *
- * Wraps inventory-specific RPC functions (overview, expiring lots)
+ * Wraps inventory-specific operations (RPC overview, expiring lot queries)
  * in the ServiceResult pattern. Consolidates logic previously duplicated
  * between AI chat tools and the inventory-alerts component.
  */
@@ -74,6 +74,9 @@ export const inventoryService = {
 
   /**
    * Get inventory lots expiring within the specified number of days.
+   * Uses the `inventory_lots_with_quantities` view for remaining_quantity
+   * (after allocations) and joins to inventory_items for the item name.
+   * Note: `location` is a plain TEXT column on inventory_lots, not a FK.
    */
   async getExpiringLots(
     supabase: SupabaseClient<Database>,
@@ -87,12 +90,14 @@ export const inventoryService = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
 
+      // Use view for remaining_quantity; join inventory_items for name.
+      // location is a plain text column (no FK to locations table).
       const { data, error } = await db
-        .from("inventory_lots")
-        .select("id, lot_number, quantity, unit, expiration_date, item:inventory_items(name), location:locations(name)")
+        .from("inventory_lots_with_quantities")
+        .select("id, lot_number, remaining_quantity, unit, expiration_date, location, item:inventory_items(name)")
         .not("expiration_date", "is", null)
         .lte("expiration_date", cutoffStr)
-        .gt("quantity", 0)
+        .gt("remaining_quantity", 0)
         .order("expiration_date", { ascending: true });
 
       if (error) {
@@ -105,17 +110,16 @@ export const inventoryService = {
         const diffTime = expDate.getTime() - now.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         const item = lot.item as { name: string } | null;
-        const location = lot.location as { name: string } | null;
 
         return {
           id: lot.id as string,
           item_name: item?.name ?? "Unknown",
           lot_number: lot.lot_number as string,
-          quantity: lot.quantity as number,
+          quantity: lot.remaining_quantity as number,
           unit: lot.unit as string,
           expiration_date: lot.expiration_date as string,
           days_until_expiry: diffDays,
-          location_name: location?.name ?? null,
+          location_name: (lot.location as string) ?? null,
         };
       });
 

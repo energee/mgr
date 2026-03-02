@@ -28,9 +28,15 @@ import {
 // Escape Helpers
 // =============================================================================
 
-/** Escape special characters for PostgREST .or() filter strings. */
-function escapePostgrestOr(value: string): string {
-  return value.replace(/[%_\\,().]/g, (c) => `\\${c}`);
+/**
+ * Escape a search value for use inside a PostgREST .or() filter string.
+ * PostgREST uses commas and parens as delimiters inside .or(); the correct
+ * way to embed these in a value is to double-quote the entire filter token.
+ * We also escape `%` and `_` which are LIKE/ILIKE wildcards.
+ */
+function escapePostgrestValue(value: string): string {
+  // Escape LIKE wildcards (these are interpreted inside ilike patterns)
+  return value.replace(/[%_\\]/g, (c) => `\\${c}`);
 }
 
 // =============================================================================
@@ -49,17 +55,17 @@ function readTable<T>(entity: EntityConfig<T>): string {
  * Build invalidation key arrays for an entity mutation.
  * Invalidates the base table, view table (if different), and the specific record.
  */
-function invalidationKeys<T>(entity: EntityConfig<T>, id?: string): string[][] {
-  const keys: string[][] = [entityKeys.all(entity.table) as unknown as string[]];
+function invalidationKeys<T>(entity: EntityConfig<T>, id?: string): readonly (readonly string[])[] {
+  const keys: (readonly string[])[] = [entityKeys.all(entity.table)];
 
   if (entity.viewTable) {
-    keys.push(entityKeys.all(entity.viewTable) as unknown as string[]);
+    keys.push(entityKeys.all(entity.viewTable));
   }
 
   if (id) {
-    keys.push(entityKeys.detail(entity.table, id) as unknown as string[]);
+    keys.push(entityKeys.detail(entity.table, id));
     if (entity.viewTable) {
-      keys.push(entityKeys.detail(entity.viewTable, id) as unknown as string[]);
+      keys.push(entityKeys.detail(entity.viewTable, id));
     }
   }
 
@@ -94,11 +100,14 @@ export const entityService = {
         }
       }
 
-      // Apply free-text search across searchableFields
+      // Apply free-text search across searchableFields.
+      // Values containing commas/parens must be double-quoted for PostgREST .or().
       if (options?.search && entity.searchableFields?.length) {
-        const escaped = escapePostgrestOr(options.search);
+        const escaped = escapePostgrestValue(options.search);
+        const needsQuoting = /[,().]/.test(escaped);
+        const pattern = needsQuoting ? `"%${escaped}%"` : `%${escaped}%`;
         const searchCondition = entity.searchableFields
-          .map((field) => `${field}.ilike.%${escaped}%`)
+          .map((field) => `${field}.ilike.${pattern}`)
           .join(",");
         query = query.or(searchCondition);
       }
@@ -337,15 +346,27 @@ export const entityService = {
         }
       }
 
-      // Perform the transition
+      // Perform the transition atomically — include current state in the WHERE
+      // clause to prevent race conditions where another process changes the
+      // state between our SELECT and UPDATE.
       const { data: updated, error: updateError } = await db
         .from(entity.table)
         .update({ [sm.stateField]: targetState })
         .eq("id", id)
+        .eq(sm.stateField, currentState)
         .select()
         .single();
 
       if (updateError) {
+        // PGRST116 = .single() matched no rows → state changed between read and write
+        if (updateError.code === "PGRST116") {
+          return err({
+            code: "INVALID_TRANSITION",
+            from: currentState,
+            to: targetState,
+            message: `State changed concurrently. Please refresh and try again.`,
+          });
+        }
         return err(parseSupabaseError(updateError, { table: entity.table, id }));
       }
 
