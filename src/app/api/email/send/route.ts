@@ -18,10 +18,13 @@ import {
 } from "@/lib/api";
 import { sendNotificationEmail } from "@/lib/email";
 import {
-  lowInventoryAlert,
-  orderStatusChange,
-  batchStateTransition,
+  lowInventoryAlertTemplate,
+  orderStatusChangeTemplate,
+  batchStatusChangeTemplate,
   type EmailTemplate,
+  type LowInventoryData,
+  type OrderStatusChangeData,
+  type BatchStatusChangeData,
 } from "@/lib/email-templates";
 
 // -- Validation schemas -------------------------------------------------------
@@ -42,6 +45,11 @@ type SendEmailBody = z.infer<typeof sendEmailSchema>;
 
 // -- Template rendering -------------------------------------------------------
 
+const APP_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  process.env.NEXT_PUBLIC_APP_URL ??
+  "http://localhost:3000";
+
 /**
  * Render a named template with the provided data payload.
  * Throws if required data fields are missing.
@@ -52,23 +60,35 @@ function renderTemplate(
 ): EmailTemplate {
   switch (template) {
     case "low_inventory_alert":
-      return lowInventoryAlert(
-        String(data.itemName ?? ""),
-        Number(data.currentQty ?? 0),
-        Number(data.reorderPoint ?? 0),
+      return lowInventoryAlertTemplate(
+        {
+          itemName: String(data.itemName ?? ""),
+          sku: data.sku ? String(data.sku) : null,
+          quantityOnHand: Number(data.currentQty ?? 0),
+          reorderPoint: Number(data.reorderPoint ?? 0),
+          category: data.category ? String(data.category) : null,
+        } satisfies LowInventoryData,
+        APP_URL,
       );
     case "order_status_change":
-      return orderStatusChange(
-        String(data.orderNumber ?? ""),
-        String(data.oldStatus ?? ""),
-        String(data.newStatus ?? ""),
-        String(data.customerName ?? ""),
+      return orderStatusChangeTemplate(
+        {
+          orderNumber: String(data.orderNumber ?? ""),
+          customerName: data.customerName ? String(data.customerName) : null,
+          oldStatus: String(data.oldStatus ?? ""),
+          newStatus: String(data.newStatus ?? ""),
+        } satisfies OrderStatusChangeData,
+        APP_URL,
       );
     case "batch_state_transition":
-      return batchStateTransition(
-        String(data.batchName ?? ""),
-        String(data.oldState ?? ""),
-        String(data.newState ?? ""),
+      return batchStatusChangeTemplate(
+        {
+          batchNumber: String(data.batchNumber ?? ""),
+          batchName: data.batchName ? String(data.batchName) : null,
+          oldStatus: String(data.oldState ?? ""),
+          newStatus: String(data.newState ?? ""),
+        } satisfies BatchStatusChangeData,
+        APP_URL,
       );
   }
 }
