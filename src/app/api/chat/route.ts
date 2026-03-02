@@ -38,26 +38,47 @@ interface PageContext {
  * registry names. The chat context uses display-friendly names like
  * "brew log" while the registry uses snake_case like "brew_log".
  */
+/**
+ * Maps display-friendly entity type names (from chat-context.tsx URL parser)
+ * to CHAT_ENTITY_MAP registry keys. Must stay in sync with ENTITY_MAP in
+ * src/contexts/chat-context.tsx.
+ */
 const ENTITY_TYPE_TO_REGISTRY: Record<string, string> = {
+  // Production
   batch: "batch",
   recipe: "recipe",
   "brew log": "brew_log",
   vessel: "vessel",
+  "vessel transfer": "vessel_transfer",
   "yeast pitch": "yeast_pitch",
   "packaging session": "packaging_session",
+  // Inventory
   "finished good": "finished_good",
-  order: "order",
-  customer: "customer",
   "inventory item": "inventory_item",
-  "purchase order": "purchase_order",
-  supplier: "supplier",
-  "pick list": "pick_list",
-  "keg inventory": "keg_inventory",
+  "inventory lot": "inventory_lot",
+  allocation: "allocation",
   delivery: "delivery",
   "location transfer": "location_transfer",
-  brand: "brand",
+  "keg inventory": "keg_inventory",
+  bin: "bin",
+  // Sales
+  order: "order",
+  customer: "customer",
+  "pick list": "pick_list",
+  // Purchasing
+  "purchase order": "purchase_order",
+  supplier: "supplier",
+  // Settings
+  "user profile": "user_profile",
   location: "location",
+  brand: "brand",
   "beer style": "beer_style",
+  "keg type": "keg_type",
+  "sales channel": "sales_channel",
+  "pricing tier": "pricing_tier",
+  "yeast strain": "yeast_strain",
+  "water profile": "water_profile",
+  "package type": "package_type",
 };
 
 /**

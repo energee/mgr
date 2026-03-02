@@ -24,24 +24,41 @@ interface PageContext {
 
 /** Map URL path segments to entity types (plural path → singular entity) */
 const ENTITY_MAP: Record<string, string> = {
+  // Production
   batches: "batch",
   recipes: "recipe",
   "brew-logs": "brew log",
   vessels: "vessel",
+  "vessel-transfers": "vessel transfer",
   "yeast-pitches": "yeast pitch",
-  "packaging-sessions": "packaging session",
+  packaging: "packaging session",
+  // Inventory
   "finished-goods": "finished good",
-  hops: "hop",
-  malts: "malt",
-  yeasts: "yeast",
-  "water-profiles": "water profile",
-  "inventory-items": "inventory item",
-  "purchase-orders": "purchase order",
+  items: "inventory item",
+  lots: "inventory lot",
+  allocations: "allocation",
+  deliveries: "delivery",
+  transfers: "location transfer",
+  kegs: "keg inventory",
+  bins: "bin",
+  // Sales
   orders: "order",
   customers: "customer",
-  "keg-inventory": "keg inventory",
+  "pick-lists": "pick list",
+  // Purchasing
+  pos: "purchase order",
   suppliers: "supplier",
+  // Settings
+  users: "user profile",
   locations: "location",
+  brands: "brand",
+  "beer-styles": "beer style",
+  "keg-types": "keg type",
+  "sales-channels": "sales channel",
+  pricing: "pricing tier",
+  yeasts: "yeast strain",
+  "water-profiles": "water profile",
+  formats: "package type",
 };
 
 const SECTIONS = new Set([
@@ -51,6 +68,7 @@ const SECTIONS = new Set([
   "purchasing",
   "sales",
   "reports",
+  "settings",
 ]);
 
 function parsePageContext(pathname: string): PageContext | undefined {

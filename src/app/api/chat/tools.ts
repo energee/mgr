@@ -320,10 +320,15 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("Filter by category: malt, hop, yeast, adjunct, chemical"),
       }),
       execute: async ({ category }) => {
+        // Join through inventory_lots (which has the FK to inventory_items),
+        // then use the with_quantities view columns via the lot query to get
+        // remaining_quantity after allocations. Since PostgREST can't join
+        // views through FKs, we query items with their lots and compute totals.
         let q = supabase.from("inventory_items").select(
           "id, name, category, unit, reorder_point, inventory_lots(quantity, expiration_date)"
         );
         if (category) q = q.eq("category", category);
+        q = q.eq("is_active", true);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -753,7 +758,7 @@ export function createChatTools(supabase: SupabaseClient) {
 
     transitionBatch: tool({
       description:
-        "Navigate to a batch to perform a state transition. For transitions with dialogs (start fermentation, cancel, archive), the dialog opens automatically. For simple transitions (conditioning, packaging, complete), navigates to the batch detail page where the user clicks the action.",
+        "Navigate to a batch to perform a state transition. For start fermentation, the dialog opens automatically. For other transitions (conditioning, packaging, complete), navigates to the batch detail page where the user clicks the action.",
       inputSchema: z.object({
         batchId: z.string().uuid().optional().describe("The batch UUID"),
         batchNumber: z
@@ -766,8 +771,6 @@ export function createChatTools(supabase: SupabaseClient) {
             "conditioning",
             "packaging",
             "completed",
-            "cancelled",
-            "archived",
           ])
           .describe("Target state"),
       }),
@@ -794,8 +797,6 @@ export function createChatTools(supabase: SupabaseClient) {
 
         const dialogMap: Record<string, string> = {
           fermenting: "start_fermentation",
-          cancelled: "cancel",
-          archived: "archive",
         };
 
         const openDialog = dialogMap[toState];
