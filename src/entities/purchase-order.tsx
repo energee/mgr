@@ -276,65 +276,6 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
   // ---------------------------------------------------------------------------
   formSchema: purchaseOrderSchema,
 
-  formFields: [
-    {
-      name: "po_number",
-      label: "PO Number",
-      type: "text",
-      placeholder: "e.g., PO-2025-001",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "status",
-      label: "Status",
-      type: "select",
-      options: statusOptions,
-      colSpan: 6,
-    },
-    {
-      name: "supplier_id",
-      label: "Supplier",
-      type: "relation",
-      relation: { entity: "supplier", displayField: "name" },
-      colSpan: 12,
-    },
-    {
-      name: "order_date",
-      label: "Order Date",
-      type: "date",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "expected_date",
-      label: "Expected Delivery Date",
-      type: "date",
-      colSpan: 6,
-    },
-    {
-      name: "shipping_cost",
-      label: "Shipping Cost",
-      type: "number",
-      placeholder: "0.00",
-      colSpan: 6,
-    },
-    {
-      name: "tax",
-      label: "Tax",
-      type: "number",
-      placeholder: "0.00",
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Special instructions, delivery notes...",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------

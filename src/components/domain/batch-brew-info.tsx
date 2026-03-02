@@ -15,6 +15,7 @@ import { BrewLogLinker } from "./brew-log-linker";
 import { Badge } from "@/components/ui/badge";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { extractBrewMeasurements } from "@/lib/brew-events";
+import type { BrewEvent } from "@/types/domain";
 import Link from "next/link";
 
 interface BatchBrewInfoProps {
@@ -118,7 +119,7 @@ export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
             const brew = link.brew_log;
             if (!brew) return null;
             const highlights = Array.isArray(brew.events)
-              ? extractBrewMeasurements(brew.events)
+              ? extractBrewMeasurements(brew.events as BrewEvent[])
               : [];
 
             return (

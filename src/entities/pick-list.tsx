@@ -276,44 +276,6 @@ export const pickListEntity: EntityConfig<PickListView> = {
   // ---------------------------------------------------------------------------
   formSchema: pickListSchema,
 
-  formFields: [
-    {
-      name: "order_id",
-      label: "Order",
-      type: "relation",
-      relation: {
-        entity: "order",
-        displayField: "order_number",
-      },
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "status",
-      label: "Status",
-      type: "select",
-      options: statusOptions,
-      colSpan: 6,
-    },
-    {
-      name: "assigned_to",
-      label: "Assigned To",
-      type: "relation",
-      relation: {
-        entity: "user_profile",
-        displayField: "display_name",
-      },
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Picking instructions, special handling...",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------

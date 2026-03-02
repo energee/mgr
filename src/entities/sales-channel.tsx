@@ -181,55 +181,6 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
   // ---------------------------------------------------------------------------
   formSchema: salesChannelSchema,
 
-  formFields: [
-    {
-      name: "name",
-      label: "Channel Name",
-      type: "text",
-      placeholder: "e.g., Distributor",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "code",
-      label: "Code",
-      type: "text",
-      placeholder: "e.g., dist",
-      description: "Short code for this channel",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "description",
-      label: "Description",
-      type: "textarea",
-      placeholder: "Describe this sales channel...",
-      colSpan: 12,
-    },
-    {
-      name: "position",
-      label: "Display Order",
-      type: "number",
-      placeholder: "e.g., 1",
-      colSpan: 6,
-    },
-    {
-      name: "is_active",
-      label: "Active",
-      type: "switch",
-      defaultValue: true,
-      colSpan: 6,
-    },
-    {
-      name: "change_request_cutoff_state",
-      label: "Change Request Cutoff",
-      type: "select",
-      description: "Customers can request order changes until this state",
-      options: cutoffStateOptions,
-      colSpan: 6,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------

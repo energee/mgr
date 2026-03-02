@@ -255,6 +255,104 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "profile",
+      title: "Profile",
+      fields: [
+        {
+          name: "display_name",
+          label: "Display Name",
+          type: "text",
+          required: true,
+          placeholder: "John Smith",
+          colSpan: 6,
+        },
+        {
+          name: "email",
+          label: "Email",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "roles",
+          label: "Roles",
+          type: "multiselect",
+          options: ROLE_OPTIONS,
+          required: true,
+          description: "Select one or more roles. Permissions are additive across roles.",
+          render: renderRoleBadges,
+          colSpan: 12,
+        },
+        {
+          name: "status",
+          label: "Status",
+          type: "select",
+          options: STATUS_OPTIONS,
+          colSpan: 6,
+        },
+        {
+          name: "avatar_url",
+          label: "Avatar URL",
+          type: "text",
+          placeholder: "https://...",
+          description: "URL to user's profile picture",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "activity",
+      title: "Activity",
+      fields: [
+        {
+          name: "last_active_at",
+          label: "Last Active",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "days_since_active",
+          label: "Days Since Active",
+          format: "number",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "created_at",
+          label: "Joined",
+          format: "date",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "invitation",
+      title: "Invitation",
+      collapsible: true,
+      fields: [
+        {
+          name: "invited_by_name",
+          label: "Invited By",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "invited_at",
+          label: "Invited At",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // State Machine (for status)
   // ---------------------------------------------------------------------------
   stateMachine: {
@@ -303,41 +401,6 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
   // Form
   // ---------------------------------------------------------------------------
   formSchema: userProfileSchema,
-
-  formFields: [
-    {
-      name: "display_name",
-      label: "Display Name",
-      type: "text",
-      required: true,
-      placeholder: "John Smith",
-      colSpan: 6,
-    },
-    {
-      name: "roles",
-      label: "Roles",
-      type: "multiselect",
-      options: ROLE_OPTIONS,
-      required: true,
-      colSpan: 12,
-      description: "Select one or more roles. Permissions are additive across roles.",
-    },
-    {
-      name: "status",
-      label: "Status",
-      type: "select",
-      options: STATUS_OPTIONS,
-      colSpan: 6,
-    },
-    {
-      name: "avatar_url",
-      label: "Avatar URL",
-      type: "text",
-      placeholder: "https://...",
-      colSpan: 6,
-      description: "URL to user's profile picture",
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // AI Context

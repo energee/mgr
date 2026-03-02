@@ -128,33 +128,6 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
   // ---------------------------------------------------------------------------
   formSchema: pricingTierSchema,
 
-  formFields: [
-    {
-      name: "name",
-      label: "Tier Name",
-      type: "text",
-      placeholder: 'e.g., "Tier 1" or "IPA"',
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "cogs_max",
-      label: "COGS Upper Bound",
-      type: "number",
-      placeholder: "e.g., 8.00",
-      description: "Recipes with COGS up to this value fall in this tier",
-      colSpan: 6,
-    },
-    {
-      name: "default_upc",
-      label: "Default UPC",
-      type: "text",
-      placeholder: "e.g., 123456789012",
-      description: "Overridden by brand UPC if set",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------

@@ -238,66 +238,6 @@ export const locationEntity: EntityConfig<LocationWithPos> = {
   // ---------------------------------------------------------------------------
   formSchema: locationSchema,
 
-  formFields: [
-    {
-      name: "name",
-      label: "Name",
-      type: "text",
-      placeholder: "e.g., Main Brewery, Downtown Taproom",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "location_type",
-      label: "Type",
-      type: "select",
-      options: valuesAsOptions(locationTypeDisplayConfig), // Fallback if dynamicOptions fails
-      dynamicOptions: {
-        table: "enum_values",
-        valueField: "value",
-        labelField: "label",
-        filter: { enum_type: "location_type" },
-        orderBy: "sort_order",
-      },
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "is_primary",
-      label: "Primary Location",
-      type: "switch",
-      description: "Default location for new vessels and inventory",
-      colSpan: 6,
-    },
-    {
-      name: "is_active",
-      label: "Active",
-      type: "switch",
-      description: "Inactive locations won't appear in dropdown menus",
-      defaultValue: true,
-      colSpan: 6,
-    },
-    {
-      name: "square_location_id",
-      label: "Square Location ID",
-      type: "text",
-      placeholder: "e.g., LXXXXXXXXXXXXXXXXX",
-      description: "The Square Location ID from your Square Dashboard",
-      colSpan: 6,
-    },
-    {
-      name: "pos_bin_id",
-      label: "POS Inventory Bin",
-      type: "relation",
-      relation: {
-        entity: "bin",
-        displayField: "name",
-      },
-      description: "Finished goods in this bin will sync to Square at this location",
-      colSpan: 6,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------

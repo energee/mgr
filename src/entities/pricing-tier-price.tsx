@@ -106,64 +106,74 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Overview",
+      fields: [
+        {
+          name: "pricing_tier_id",
+          label: "Pricing Tier",
+          type: "select",
+          placeholder: "Select tier...",
+          required: true,
+          colSpan: 4,
+          dynamicOptions: {
+            table: "pricing_tiers",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "cogs_max",
+          },
+        },
+        {
+          name: "format_id",
+          label: "Package Format",
+          type: "select",
+          placeholder: "Select format...",
+          required: true,
+          colSpan: 4,
+          dynamicOptions: {
+            table: "packaging_formats",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "name",
+            filter: { is_active: true, show_in_pricing: true },
+          },
+        },
+        {
+          name: "sales_channel_id",
+          label: "Sales Channel",
+          type: "select",
+          placeholder: "Select channel...",
+          required: true,
+          colSpan: 4,
+          dynamicOptions: {
+            table: "sales_channels",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "position",
+            filter: { is_active: true },
+          },
+        },
+        {
+          name: "price",
+          label: "Price",
+          type: "number",
+          format: "currency",
+          placeholder: "e.g., 42.00",
+          required: true,
+          colSpan: 4,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: pricingTierPriceSchema,
-
-  formFields: [
-    {
-      name: "pricing_tier_id",
-      label: "Pricing Tier",
-      type: "select",
-      placeholder: "Select tier...",
-      required: true,
-      colSpan: 4,
-      dynamicOptions: {
-        table: "pricing_tiers",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "cogs_max",
-      },
-    },
-    {
-      name: "format_id",
-      label: "Package Format",
-      type: "select",
-      placeholder: "Select format...",
-      required: true,
-      colSpan: 4,
-      dynamicOptions: {
-        table: "packaging_formats",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "name",
-        filter: { is_active: true, show_in_pricing: true },
-      },
-    },
-    {
-      name: "sales_channel_id",
-      label: "Sales Channel",
-      type: "select",
-      placeholder: "Select channel...",
-      required: true,
-      colSpan: 4,
-      dynamicOptions: {
-        table: "sales_channels",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "position",
-        filter: { is_active: true },
-      },
-    },
-    {
-      name: "price",
-      label: "Price",
-      type: "number",
-      placeholder: "e.g., 42.00",
-      required: true,
-      colSpan: 4,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // Relations

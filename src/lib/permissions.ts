@@ -110,6 +110,24 @@ export const PERMISSION_MAP: Record<Permission, readonly StaffRole[]> = {
 } as const;
 
 // =============================================================================
+// Domain-to-Write-Permission Mapping
+// =============================================================================
+
+/**
+ * Maps entity domains to the write permission required.
+ * Used for cosmetic gating (hiding edit buttons when the user lacks permission).
+ */
+export const DOMAIN_WRITE_PERMISSIONS: Record<string, Permission> = {
+  production: "batches:write",
+  inventory: "inventory:write",
+  sales: "orders:write",
+  purchasing: "purchasing:write",
+  system: "settings:manage",
+  packaging: "batches:write",
+  reporting: "batches:read",
+};
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 

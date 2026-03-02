@@ -326,44 +326,6 @@ export const locationTransferEntity: EntityConfig<LocationTransferView> = {
   // ---------------------------------------------------------------------------
   formSchema: locationTransferSchema,
 
-  formFields: [
-    {
-      name: "from_bin_id",
-      label: "From Bin",
-      type: "relation",
-      relation: { entity: "bin", displayField: "name" },
-      description: "Source bin to transfer from",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "to_bin_id",
-      label: "To Bin",
-      type: "relation",
-      relation: { entity: "bin", displayField: "name" },
-      description: "Destination bin to transfer to",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "delivery_id",
-      label: "Delivery",
-      type: "relation",
-      relation: { entity: "delivery", displayField: "delivery_number" },
-      description: "Optional delivery run this transfer belongs to",
-      required: false,
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Transfer instructions, special handling...",
-      required: false,
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------

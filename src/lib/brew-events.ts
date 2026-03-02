@@ -5,10 +5,7 @@
  * (review step) to display brew day highlights.
  */
 
-interface TypedBrewEvent {
-  phase?: string;
-  measurements?: Array<{ metric?: string; value?: number | string }>;
-}
+import type { BrewEvent } from "@/types/domain";
 
 export interface BrewMeasurementHighlight {
   label: string;
@@ -16,7 +13,7 @@ export interface BrewMeasurementHighlight {
 }
 
 function findMeasurement(
-  events: TypedBrewEvent[],
+  events: BrewEvent[],
   phases: string[],
   metric: string,
 ): { value: number | string } | undefined {
@@ -33,9 +30,9 @@ function findMeasurement(
  * volume, and knockout temp.
  */
 export function extractBrewMeasurements(
-  events: unknown[],
+  events: BrewEvent[],
 ): BrewMeasurementHighlight[] {
-  const typedEvents = events as TypedBrewEvent[];
+  const typedEvents = events;
   const highlights: BrewMeasurementHighlight[] = [];
 
   const mashTemp = findMeasurement(typedEvents, ["mash_in", "mash_rest"], "temp_f");

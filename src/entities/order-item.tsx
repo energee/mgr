@@ -137,102 +137,107 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Item Details",
+      fields: [
+        {
+          name: "order_id",
+          label: "Order",
+          type: "relation",
+          relation: { entity: "order", displayField: "order_number" },
+          required: true,
+          colSpan: 12,
+        },
+        {
+          name: "brand_id",
+          label: "Brand",
+          type: "relation",
+          relation: { entity: "brand", displayField: "name" },
+          colSpan: 6,
+        },
+        {
+          name: "style_id",
+          label: "Style (for TBD)",
+          type: "select",
+          colSpan: 6,
+          description: "Use when product is TBD - select the style category",
+          dynamicOptions: {
+            table: "beer_styles",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "category,name",
+          },
+        },
+        {
+          name: "tbd_notes",
+          label: "TBD Notes",
+          type: "textarea",
+          colSpan: 12,
+          placeholder: "Contract brew details, target specs, customer requirements...",
+          description: "Details about the TBD product for planning purposes",
+        },
+        {
+          name: "package_type_id",
+          label: "Package Type",
+          type: "relation",
+          relation: { entity: "package_type", displayField: "name" },
+          colSpan: 6,
+        },
+        {
+          name: "keg_type_id",
+          label: "Keg Type",
+          type: "relation",
+          relation: { entity: "keg_type", displayField: "name" },
+          colSpan: 6,
+        },
+        {
+          name: "quantity",
+          label: "Quantity",
+          type: "number",
+          required: true,
+          colSpan: 4,
+        },
+        {
+          name: "unit_price",
+          label: "Unit Price",
+          type: "number",
+          format: "currency",
+          placeholder: "0.00",
+          colSpan: 4,
+        },
+        {
+          name: "batch_id",
+          label: "Batch (optional)",
+          type: "relation",
+          relation: { entity: "batch", displayField: "batch_number" },
+          colSpan: 4,
+        },
+        {
+          name: "keg_owner_id",
+          label: "Keg Owner (optional)",
+          type: "relation",
+          relation: { entity: "keg_owner", displayField: "name" },
+          description: "Fleet owner for keg orders (picker uses this to select kegs)",
+          colSpan: 6,
+        },
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          colSpan: 12,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: orderItemSchema,
-
-  formFields: [
-    {
-      name: "order_id",
-      label: "Order",
-      type: "relation",
-      relation: { entity: "order", displayField: "order_number" },
-      required: true,
-      colSpan: 12,
-    },
-    {
-      name: "brand_id",
-      label: "Brand",
-      type: "relation",
-      relation: { entity: "brand", displayField: "name" },
-      required: false,
-      colSpan: 6,
-    },
-    {
-      name: "style_id",
-      label: "Style (for TBD)",
-      type: "select",
-      colSpan: 6,
-      description: "Use when product is TBD - select the style category",
-      dynamicOptions: {
-        table: "beer_styles",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "category,name",
-      },
-    },
-    {
-      name: "tbd_notes",
-      label: "TBD Notes",
-      type: "textarea",
-      colSpan: 12,
-      placeholder: "Contract brew details, target specs, customer requirements...",
-      description: "Details about the TBD product for planning purposes",
-    },
-    {
-      name: "package_type_id",
-      label: "Package Type",
-      type: "relation",
-      relation: { entity: "package_type", displayField: "name" },
-      required: false,
-      colSpan: 6,
-    },
-    {
-      name: "keg_type_id",
-      label: "Keg Type",
-      type: "relation",
-      relation: { entity: "keg_type", displayField: "name" },
-      required: false,
-      colSpan: 6,
-    },
-    {
-      name: "quantity",
-      label: "Quantity",
-      type: "number",
-      required: true,
-      colSpan: 4,
-    },
-    {
-      name: "unit_price",
-      label: "Unit Price",
-      type: "number",
-      placeholder: "0.00",
-      colSpan: 4,
-    },
-    {
-      name: "batch_id",
-      label: "Batch (optional)",
-      type: "relation",
-      relation: { entity: "batch", displayField: "batch_number" },
-      required: false,
-      colSpan: 4,
-    },
-    {
-      name: "keg_owner_id",
-      label: "Keg Owner (optional)",
-      type: "relation",
-      relation: { entity: "keg_owner", displayField: "name" },
-      required: false,
-      description: "Fleet owner for keg orders (picker uses this to select kegs)",
-      colSpan: 4,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      colSpan: 12,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // Relations

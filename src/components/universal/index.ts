@@ -6,6 +6,5 @@
  */
 
 export { EntityList } from "./entity-list";
-export { EntityDetail } from "./entity-detail";
-export { EntityForm } from "./entity-form";
+export { EntityDetailUnified } from "./entity-detail-unified";
 export { StatusBadge } from "./status-badge";
