@@ -7,6 +7,7 @@
  * Provides a user-friendly error page with retry action.
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
@@ -18,7 +19,8 @@ interface ErrorProps {
 
 export default function AppError({ error, reset }: ErrorProps) {
   useEffect(() => {
-    console.error("App error boundary caught:", error);
+    Sentry.captureException(error);
+    console.error("App error boundary:", error);
   }, [error]);
 
   return (

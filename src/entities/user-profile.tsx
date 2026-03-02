@@ -223,37 +223,6 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "profile",
-      title: "Profile",
-      fields: [
-        { field: "display_name", label: "Display Name" },
-        { field: "email", label: "Email" },
-        { field: "roles", label: "Roles", render: renderRoleBadges },
-        { field: "status_display", label: "Status" },
-      ],
-    },
-    {
-      id: "activity",
-      title: "Activity",
-      fields: [
-        { field: "last_active_at", label: "Last Active", format: "datetime" },
-        { field: "days_since_active", label: "Days Since Active", format: "number" },
-        { field: "created_at", label: "Joined", format: "date" },
-      ],
-    },
-    {
-      id: "invitation",
-      title: "Invitation",
-      fields: [
-        { field: "invited_by_name", label: "Invited By" },
-        { field: "invited_at", label: "Invited At", format: "datetime" },
-      ],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

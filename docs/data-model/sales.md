@@ -324,6 +324,10 @@ CREATE INDEX idx_tier_prices_temporal ON tier_prices(effective_from, effective_t
 -- Customer lookups
 CREATE INDEX idx_customers_type_active ON customers(customer_type, is_active);
 CREATE INDEX idx_customers_name ON customers(name) WHERE is_active = true;
+```
+
+---
+
 ## `order_change_requests`
 
 Customer-submitted change requests for orders. Requires admin approval.

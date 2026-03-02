@@ -19,7 +19,10 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MGR - Brewery Management",
+  title: {
+    default: "MGR - Brewery Management",
+    template: "%s | MGR",
+  },
   description: "Professional brewery management system",
 };
 

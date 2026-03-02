@@ -38,7 +38,7 @@ export type InventoryLotFormValues = z.infer<typeof inventoryLotSchema>;
 export const inventoryLotEntity: EntityConfig<InventoryLot> = {
   name: "inventory_lot",
   table: "inventory_lots",
-  // viewTable: "inventory_lots_with_quantities",  // TODO: create this view for calculated quantities
+  viewTable: "inventory_lots_with_quantities",
   displayName: "Inventory Lot",
   displayNamePlural: "Inventory Lots",
   description:
