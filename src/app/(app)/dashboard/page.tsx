@@ -408,7 +408,7 @@ function ProductionTrends() {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCardWithDelta
           value={currentBatchesStarted}
-          label="batches started"
+          label="batches scheduled"
           delta={calculateDelta(currentBatchesStarted, previousBatchesStarted)}
           deltaLabel={deltaLabel}
         />
@@ -428,7 +428,7 @@ function ProductionTrends() {
 
       {/* Trend Charts */}
       <div className="grid gap-6 md:grid-cols-2">
-        <DashboardSection title="Batches Started">
+        <DashboardSection title="Batches Scheduled">
           <TrendChart
             data={currentPeriodData}
             xKey="date"

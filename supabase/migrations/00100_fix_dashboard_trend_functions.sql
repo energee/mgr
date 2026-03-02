@@ -67,8 +67,12 @@ AS $$
 $$;
 
 -- =============================================================================
--- 2. Inventory Trends (re-create with p_days clamp + date cast fix)
+-- 2. Inventory Trends (re-create with p_days clamp + allocation-based depletion)
 -- =============================================================================
+-- NOTE: Depletion is derived from allocations, not from inventory_lots.quantity
+-- (which stores the immutable initial received quantity). A lot is "depleted"
+-- when its received quantity minus allocated quantity <= 0. The depletion date
+-- is approximated as the date of the most recent allocation against that lot.
 
 CREATE OR REPLACE FUNCTION get_inventory_trends(p_days integer DEFAULT 30)
 RETURNS TABLE (
@@ -99,13 +103,24 @@ AS $$
   ),
   depleted AS (
     SELECT
-      updated_at::date AS date,
+      lot_depleted_date AS date,
       COUNT(*)::integer AS cnt
-    FROM inventory_lots
-    WHERE quantity <= 0
-      AND updated_at >= CURRENT_DATE - (LEAST(p_days, 365) * 2 - 1)
-      AND updated_at::date != created_at::date
-    GROUP BY updated_at::date
+    FROM (
+      SELECT
+        il.id,
+        il.created_at::date AS lot_created_date,
+        MAX(a.updated_at)::date AS lot_depleted_date
+      FROM inventory_lots il
+      JOIN allocations a
+        ON a.source_type = 'inventory_lot'
+        AND a.source_id = il.id
+        AND a.status IN ('planned', 'completed')
+      GROUP BY il.id, il.quantity, il.created_at
+      HAVING il.quantity - SUM(a.quantity) <= 0
+    ) depleted_lots
+    WHERE lot_depleted_date >= CURRENT_DATE - (LEAST(p_days, 365) * 2 - 1)
+      AND lot_depleted_date != lot_created_date
+    GROUP BY lot_depleted_date
   )
   SELECT
     ds.date,

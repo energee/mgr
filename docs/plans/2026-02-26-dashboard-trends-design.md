@@ -29,39 +29,38 @@ Returns daily rows from `batches`:
 ```sql
 -- Output columns:
 date         DATE
-batches_started  INTEGER   -- batches with actual_start_date on this day
+batches_started  INTEGER   -- batches with planned_start_date on this day
 volume_bbl       NUMERIC   -- total volume_bbl for started batches
 batches_completed INTEGER  -- batches that reached 'completed' on this day
 ```
 
-Source: `batches` table, grouped by `actual_start_date` (for started) and status change timestamp (for completed). Lookback = `2 * p_days` to include comparison period.
+Source: `batches` table, grouped by `planned_start_date` (for scheduled — no `actual_start_date` column exists) and `updated_at` (for completed, as an approximation). Lookback = `2 * p_days` to include comparison period.
 
 #### `get_inventory_trends(p_days integer)`
 
-Returns daily rows:
+Returns daily lot activity rows:
 ```sql
 -- Output columns:
-date              DATE
-total_value       NUMERIC   -- sum of (quantity * cost_per_unit) from inventory_lots
-low_stock_count   INTEGER   -- items where current_qty < reorder_point
-lot_count         INTEGER   -- active lots with quantity > 0
+date                DATE
+lots_created        INTEGER   -- lots received (created_at) on this day
+lots_depleted       INTEGER   -- lots fully consumed (remaining_quantity <= 0) on this day
+total_lot_activity  INTEGER   -- lots_created + lots_depleted
 ```
 
-Source: `inventory_lots` joined with `inventory_items`. Since inventory doesn't have historical snapshots, this will compute current state and use `created_at` / `updated_at` to approximate daily changes. For the initial implementation, low_stock_count and total_value represent current state, with the trend chart showing lot activity (lots created/depleted per day).
+Source: `inventory_lots` for creation dates, `allocations` for depletion (a lot is depleted when its received quantity minus allocated quantity <= 0). Depletion date is approximated as the date of the most recent allocation against the lot. Since inventory doesn't have historical snapshots, lot activity serves as the trend metric.
 
 #### `get_sales_trends(p_days integer)`
 
-Returns daily rows from `orders` + `order_line_items`:
+Returns daily rows from `orders` + `order_items`:
 ```sql
 -- Output columns:
 date           DATE
 order_count    INTEGER   -- orders placed on this day
 revenue        NUMERIC   -- sum of line item totals for orders on this day
-avg_order_value NUMERIC  -- revenue / order_count
-fulfilled_count INTEGER  -- orders fulfilled on this day
+fulfilled_count INTEGER  -- orders fulfilled on this day (via updated_at approximation)
 ```
 
-Source: `orders` by `order_date`, with revenue from `order_line_items` (quantity * unit_price). Lookback = `2 * p_days`.
+Source: `orders` by `order_date`, with revenue from `order_items` (quantity * unit_price). `avg_order_value` is computed client-side from revenue / order_count. Lookback = `2 * p_days`.
 
 ### Component Layer
 
@@ -77,12 +76,11 @@ interface TrendChartProps {
   series: Array<{
     key: string;
     label: string;
-    color?: string;
-    type?: "area" | "bar";
+    color?: string;        // CSS color or chart variable
   }>;
-  height?: number;        // default 200
+  type?: "area" | "bar";  // chart type, applies to all series (default: "area")
+  height?: number;         // default 200
   formatValue?: (value: number) => string;
-  formatDate?: (date: string) => string;
 }
 ```
 
@@ -100,12 +98,12 @@ Enhanced stat display showing current value and change vs previous period.
 Props:
 ```typescript
 interface StatCardWithDeltaProps {
-  value: number | string;
+  value: number | string;   // pre-formatted if string (e.g., "$14,200")
   label: string;
-  delta?: number;           // percentage change
+  delta?: number | null;    // percentage change (null = no delta shown)
   deltaLabel?: string;      // e.g., "vs last 7d"
-  format?: "number" | "currency" | "percent";
   href?: string;
+  className?: string;
 }
 ```
 
@@ -123,14 +121,11 @@ Simple inline toggle for date range selection.
 Props:
 ```typescript
 interface PeriodSelectorProps {
-  value: number;            // days: 7, 30, or 90
-  onChange: (days: number) => void;
+  className?: string;
 }
 ```
 
-Renders as a segmented control: `7d | 30d | 90d`
-
-State management: stored in URL search params (`?period=7`) via `useSearchParams` so dashboards are linkable/shareable.
+Uncontrolled component — reads and writes period via URL search params (`?period=7`) using `useSearchParams` internally, so dashboards are linkable/shareable. Renders as a segmented control: `7d | 30d | 90d`. Companion `usePeriod()` hook reads the current period value (defaults to 30).
 
 ### Per-Dashboard Changes
 
@@ -175,7 +170,7 @@ Additions below existing content:
 
 | File | Type | Description |
 |------|------|-------------|
-| `supabase/migrations/00097_dashboard_trend_functions.sql` | New | 3 RPC functions |
+| `supabase/migrations/00099_dashboard_trend_functions.sql` | New | 3 RPC functions |
 | `src/components/dashboard/trend-chart.tsx` | New | Reusable Recharts time-series wrapper |
 | `src/components/dashboard/stat-card-with-delta.tsx` | New | Stat card with period delta |
 | `src/components/dashboard/period-selector.tsx` | New | 7d/30d/90d toggle |
@@ -185,7 +180,7 @@ Additions below existing content:
 | `src/app/(app)/dashboard/inventory/page.tsx` | Edit | Add inventory trends + deltas |
 | `src/app/(app)/dashboard/sales/page.tsx` | Edit | Add sales trends + deltas |
 
-## Migration: `00097_dashboard_trend_functions.sql`
+## Migration: `00099_dashboard_trend_functions.sql`
 
 Creates 3 functions with:
 - `SECURITY INVOKER` and `SET search_path = public`

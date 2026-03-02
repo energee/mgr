@@ -88,7 +88,8 @@ export function StatCardWithDelta({
 
 /**
  * Calculates the percentage change between two values.
- * Returns null if the previous value is 0 (avoid division by zero).
+ * Returns 100 if previous is 0 and current > 0 (new activity).
+ * Returns null if both values are 0 (no meaningful delta).
  */
 export function calculateDelta(
   current: number,
