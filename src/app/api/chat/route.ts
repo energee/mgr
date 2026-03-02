@@ -3,8 +3,8 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createChatTools } from "./tools";
-import { entityRegistry } from "@/entities";
 import { entityService } from "@/services/entity-service";
+import { CHAT_ENTITY_MAP } from "./entity-map";
 
 const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant — concise, practical, brewery-focused.
 
@@ -73,7 +73,7 @@ async function fetchEntityContext(
     const registryName = ENTITY_TYPE_TO_REGISTRY[entityType];
     if (!registryName) return null;
 
-    const entity = entityRegistry.get(registryName);
+    const entity = CHAT_ENTITY_MAP.get(registryName);
     if (!entity) return null;
 
     const result = await entityService.getById(supabase, entity, entityId);

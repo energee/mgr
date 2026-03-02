@@ -19,9 +19,9 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatStateLabel } from "@/types/entity";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
-import { entityRegistry } from "@/entities";
 import { entityService } from "@/services/entity-service";
 import { formatServiceError } from "@/services/types";
+import { CHAT_ENTITY_MAP } from "./entity-map";
 
 /** Escape LIKE/ILIKE wildcard characters so they match literally. */
 function escapeLike(value: string): string {
@@ -112,10 +112,10 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("Max results to return"),
       }),
       execute: async ({ entityName, query: searchQuery, filters, limit }) => {
-        const entity = entityRegistry.get(entityName);
+        const entity = CHAT_ENTITY_MAP.get(entityName);
         if (!entity) {
           throw new Error(
-            `Unknown entity "${entityName}". Available entities: ${Array.from(entityRegistry.keys()).join(", ")}`
+            `Unknown entity "${entityName}". Available entities: ${Array.from(CHAT_ENTITY_MAP.keys()).join(", ")}`
           );
         }
 
@@ -144,10 +144,10 @@ export function createChatTools(supabase: SupabaseClient) {
         id: z.string().uuid().describe("The record UUID"),
       }),
       execute: async ({ entityName, id }) => {
-        const entity = entityRegistry.get(entityName);
+        const entity = CHAT_ENTITY_MAP.get(entityName);
         if (!entity) {
           throw new Error(
-            `Unknown entity "${entityName}". Available entities: ${Array.from(entityRegistry.keys()).join(", ")}`
+            `Unknown entity "${entityName}". Available entities: ${Array.from(CHAT_ENTITY_MAP.keys()).join(", ")}`
           );
         }
 
