@@ -720,6 +720,54 @@ Replace the non-functional `use_default_additions` toggle with named, reusable w
 
 ---
 
+## Performance Decisions
+
+### DEC-PERF-001: Allocation & Query Performance Indexes
+**Status**: Implemented (migrations 00010, 00012, 00060, 00061, 00103)
+
+Add composite indexes for frequently-used query patterns across allocations, batches, inventory, orders, and kegs.
+
+**Indexes applied across multiple migrations:**
+```sql
+-- Allocation calculations (00010)
+CREATE INDEX idx_allocations_source ON allocations(source_type, source_id, status);
+CREATE INDEX idx_allocations_destination ON allocations(destination_type, destination_id, status);
+
+-- Batch operations (00012)
+CREATE INDEX idx_batches_status_recipe ON batches(status, recipe_id);
+CREATE INDEX idx_batch_readings_batch_date ON batch_readings(batch_id, recorded_at DESC);
+CREATE INDEX idx_brew_log_batches_batch ON brew_log_batches(batch_id);
+CREATE INDEX idx_brew_log_batches_brew ON brew_log_batches(brew_log_id);
+
+-- Inventory (00060, 00061)
+CREATE INDEX idx_inventory_lots_item_date ON inventory_lots(inventory_item_id, received_date, expiration_date);
+CREATE INDEX idx_bin_inventory_bin_fg ON bin_inventory(bin_id, finished_good_id);
+
+-- Orders & Sales (00061)
+CREATE INDEX idx_orders_customer_status_date ON orders(customer_id, status, order_date DESC);
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_fg ON order_items(finished_good_id);
+
+-- Finished goods FIFO (00103)
+CREATE INDEX idx_finished_goods_production_date ON finished_goods(production_date);
+```
+
+**Rationale**: Composite indexes aligned with actual query patterns (allocation lookups, batch filtering, order history, FIFO pick-list allocation, TTB reporting date ranges).
+
+### DEC-PERF-002: Calculated Quantity Views
+**Status**: Implemented (inventory_lot_quantities view in 00010, finished_goods views in 00010/00061)
+
+Use database views to calculate available quantities on read rather than maintaining mutable balance columns.
+
+**Key views:**
+- `inventory_lot_quantities` — calculates remaining quantity from `quantity - SUM(allocations)`
+- `finished_goods_with_availability` — derives available FG quantity from packaged minus allocated
+- `vessels_with_current_batch` — derives current batch from transfer log
+
+**Rationale**: Single source of truth for quantities. No stale balance bugs. Views perform well with the indexes from DEC-PERF-001.
+
+---
+
 ## Related Documents
 
 - [Architecture](./architecture.md) - Technical stack and patterns
