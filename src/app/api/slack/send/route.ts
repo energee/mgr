@@ -11,10 +11,11 @@ const log = logger.child({ route: "/api/slack/send" });
  * Constant-time string comparison to prevent timing attacks.
  * HMAC-hashes both inputs to fixed-length digests before comparing,
  * eliminating the length side-channel that a direct buffer comparison would leak.
+ * The key value is arbitrary — it only ensures both sides produce equal-length digests.
  */
 function secureCompare(a: string, b: string): boolean {
-  const hmacA = crypto.createHmac("sha256", "rate-compare").update(a).digest();
-  const hmacB = crypto.createHmac("sha256", "rate-compare").update(b).digest();
+  const hmacA = crypto.createHmac("sha256", "mgr-secure-compare").update(a).digest();
+  const hmacB = crypto.createHmac("sha256", "mgr-secure-compare").update(b).digest();
   return crypto.timingSafeEqual(hmacA, hmacB);
 }
 

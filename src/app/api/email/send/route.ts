@@ -1,16 +1,17 @@
 /**
  * POST /api/email/send
  *
- * Authenticated endpoint for sending templated notification emails.
+ * Admin-only endpoint for sending templated notification emails.
  * Accepts a template name and data payload, renders the appropriate
  * HTML template, and sends via Resend.
  *
- * Rate limited to 5 emails per minute per user to prevent abuse.
+ * Restricted to users with `integrations:manage` permission (admin role)
+ * to prevent abuse as an open relay. Rate limited to 5 emails per minute.
  */
 
 import { z } from "zod";
 import {
-  withAuth,
+  withPermission,
   validateBody,
   successResponse,
   errorResponse,
@@ -95,7 +96,7 @@ function renderTemplate(
 
 // -- Route handler ------------------------------------------------------------
 
-export const POST = withAuth(async (request, { user }) => {
+export const POST = withPermission("integrations:manage", async (request, { user }) => {
   // Rate limit: 5 emails per minute per user
   const rl = rateLimit(`email:${user.id}`, {
     windowMs: 60_000,

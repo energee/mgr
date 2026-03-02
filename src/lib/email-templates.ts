@@ -6,7 +6,12 @@
  *
  * Templates use inline CSS for maximum email client compatibility.
  * All templates include an unsubscribe link footer pointing to /settings/notifications.
+ *
+ * Status labels use formatStateLabel() from entity types (DEC-007 compliance)
+ * rather than hardcoded maps, so new states are automatically handled.
  */
+
+import { formatStateLabel } from "@/types/entity";
 
 // =============================================================================
 // Types
@@ -32,6 +37,19 @@ export interface NotificationContext {
 // =============================================================================
 // Shared layout helpers
 // =============================================================================
+
+/**
+ * Escape HTML special characters to prevent XSS in email templates.
+ * All user-supplied strings must be passed through this before interpolation.
+ */
+function esc(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 const BRAND_COLOR = "#2563eb";
 const MUTED_COLOR = "#6b7280";
@@ -150,7 +168,7 @@ export function lowInventoryAlertTemplate(
       Low Inventory Alert${priorityBadge("high")}
     </h2>
     <p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:1.6;">
-      <strong>${itemName}</strong>${skuDisplay}${categoryDisplay} has dropped below its reorder point.
+      <strong>${esc(itemName)}</strong>${esc(skuDisplay)}${esc(categoryDisplay)} has dropped below its reorder point.
     </p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;width:100%;">
       <tr>
@@ -197,19 +215,6 @@ export interface OrderStatusChangeData {
   newStatus: string;
 }
 
-/** Human-friendly status label mapping for orders */
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  confirmed: "Confirmed",
-  ready_to_ship: "Ready to Ship",
-  out_the_door: "Out the Door",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-};
-
-function orderStatusLabel(status: string): string {
-  return ORDER_STATUS_LABELS[status] ?? status;
-}
 
 /**
  * Email template for order status changes.
@@ -224,14 +229,14 @@ export function orderStatusChangeTemplate(
   const isCancelled = newStatus === "cancelled";
   const priority = isCancelled || newStatus === "ready_to_ship" ? "high" : "normal";
 
-  const subject = `Order ${orderNumber}: ${orderStatusLabel(newStatus)}`;
+  const subject = `Order ${orderNumber}: ${formatStateLabel(newStatus)}`;
 
   const bodyHtml = `
     <h2 style="margin:0 0 16px 0;font-size:20px;color:#111827;">
       Order Status Update${priorityBadge(priority)}
     </h2>
     <p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:1.6;">
-      Order <strong>${orderNumber}</strong>${customerDisplay} has been updated.
+      Order <strong>${esc(orderNumber)}</strong>${esc(customerDisplay)} has been updated.
     </p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;width:100%;">
       <tr>
@@ -239,11 +244,11 @@ export function orderStatusChangeTemplate(
           <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
             <tr>
               <td style="padding:4px 0;color:${MUTED_COLOR};font-size:13px;">Previous Status</td>
-              <td style="padding:4px 0;text-align:right;color:#374151;font-size:14px;">${orderStatusLabel(oldStatus)}</td>
+              <td style="padding:4px 0;text-align:right;color:#374151;font-size:14px;">${esc(formatStateLabel(oldStatus))}</td>
             </tr>
             <tr>
               <td style="padding:4px 0;color:${MUTED_COLOR};font-size:13px;">New Status</td>
-              <td style="padding:4px 0;text-align:right;font-weight:600;color:${isCancelled ? "#dc2626" : BRAND_COLOR};font-size:14px;">${orderStatusLabel(newStatus)}</td>
+              <td style="padding:4px 0;text-align:right;font-weight:600;color:${isCancelled ? "#dc2626" : BRAND_COLOR};font-size:14px;">${esc(formatStateLabel(newStatus))}</td>
             </tr>
           </table>
         </td>
@@ -256,8 +261,8 @@ export function orderStatusChangeTemplate(
 
 Order ${orderNumber}${customerDisplay} has been updated.
 
-Previous Status: ${orderStatusLabel(oldStatus)}
-New Status: ${orderStatusLabel(newStatus)}
+Previous Status: ${formatStateLabel(oldStatus)}
+New Status: ${formatStateLabel(newStatus)}
 
 View in MGR: ${appUrl}/sales/orders
 
@@ -278,22 +283,6 @@ export interface BatchStatusChangeData {
   newStatus: string;
 }
 
-/** Human-friendly status label mapping for batches */
-const BATCH_STATUS_LABELS: Record<string, string> = {
-  planning: "Planning",
-  ready_to_brew: "Ready to Brew",
-  brewing: "Brewing",
-  fermenting: "Fermenting",
-  conditioning: "Conditioning",
-  packaging: "Packaging",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  archived: "Archived",
-};
-
-function batchStatusLabel(status: string): string {
-  return BATCH_STATUS_LABELS[status] ?? status;
-}
 
 /**
  * Email template for batch status changes.
@@ -310,14 +299,14 @@ export function batchStatusChangeTemplate(
   const priority =
     isCancelled || newStatus === "packaging" ? "high" : "normal";
 
-  const subject = `Batch ${batchNumber}: ${batchStatusLabel(newStatus)}`;
+  const subject = `Batch ${batchNumber}: ${formatStateLabel(newStatus)}`;
 
   const bodyHtml = `
     <h2 style="margin:0 0 16px 0;font-size:20px;color:#111827;">
       Batch Status Update${priorityBadge(priority)}
     </h2>
     <p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:1.6;">
-      Batch <strong>${batchNumber}</strong>${nameDisplay} has been updated.
+      Batch <strong>${esc(batchNumber)}</strong>${esc(nameDisplay)} has been updated.
     </p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;width:100%;">
       <tr>
@@ -325,11 +314,11 @@ export function batchStatusChangeTemplate(
           <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
             <tr>
               <td style="padding:4px 0;color:${MUTED_COLOR};font-size:13px;">Previous Status</td>
-              <td style="padding:4px 0;text-align:right;color:#374151;font-size:14px;">${batchStatusLabel(oldStatus)}</td>
+              <td style="padding:4px 0;text-align:right;color:#374151;font-size:14px;">${esc(formatStateLabel(oldStatus))}</td>
             </tr>
             <tr>
               <td style="padding:4px 0;color:${MUTED_COLOR};font-size:13px;">New Status</td>
-              <td style="padding:4px 0;text-align:right;font-weight:600;color:${isCancelled ? "#dc2626" : BRAND_COLOR};font-size:14px;">${batchStatusLabel(newStatus)}</td>
+              <td style="padding:4px 0;text-align:right;font-weight:600;color:${isCancelled ? "#dc2626" : BRAND_COLOR};font-size:14px;">${esc(formatStateLabel(newStatus))}</td>
             </tr>
           </table>
         </td>
@@ -342,8 +331,8 @@ export function batchStatusChangeTemplate(
 
 Batch ${batchNumber}${nameDisplay} has been updated.
 
-Previous Status: ${batchStatusLabel(oldStatus)}
-New Status: ${batchStatusLabel(newStatus)}
+Previous Status: ${formatStateLabel(oldStatus)}
+New Status: ${formatStateLabel(newStatus)}
 
 View in MGR: ${appUrl}/production/batches
 
@@ -370,7 +359,7 @@ export function genericNotificationTemplate(
   const subject = title;
 
   const messageHtml = message
-    ? `<p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:1.6;">${message}</p>`
+    ? `<p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:1.6;">${esc(message)}</p>`
     : "";
 
   const actionButton = actionUrl
@@ -379,7 +368,7 @@ export function genericNotificationTemplate(
 
   const bodyHtml = `
     <h2 style="margin:0 0 16px 0;font-size:20px;color:#111827;">
-      ${title}${priorityBadge(priority)}
+      ${esc(title)}${priorityBadge(priority)}
     </h2>
     ${messageHtml}
     ${actionButton}

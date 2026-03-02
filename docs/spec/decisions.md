@@ -822,6 +822,19 @@ Use database views to calculate available quantities on read rather than maintai
 
 **Rationale**: Single source of truth for quantities. No stale balance bugs. Views perform well with the indexes from DEC-PERF-001.
 
+### DEC-SEC-001: Content-Security-Policy Header
+**Status**: Deferred
+
+Add a Content-Security-Policy (CSP) header to `next.config.ts`. CSP is the most impactful header against XSS and is intentionally omitted from the initial security headers deployment to avoid breaking inline scripts/styles used by Next.js, Sentry, and third-party integrations.
+
+**Requirements before implementation:**
+- Audit all inline scripts and styles (Next.js runtime, Sentry SDK, Vercel Analytics)
+- Determine nonce-based vs hash-based strategy for inline scripts
+- Test in report-only mode (`Content-Security-Policy-Report-Only`) before enforcement
+- Configure a CSP reporting endpoint to catch violations
+
+**Tracking:** Comment in `next.config.ts:12-13` references this decision.
+
 ---
 
 ## Related Documents

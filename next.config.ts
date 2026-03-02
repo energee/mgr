@@ -9,8 +9,8 @@ const analyzer = withBundleAnalyzer({
 
 /**
  * Security headers applied to all routes.
- * Content-Security-Policy is intentionally omitted — it will be added
- * separately after testing to avoid breaking inline scripts/styles.
+ * Content-Security-Policy is intentionally omitted — see DEC-SEC-001
+ * in docs/spec/decisions.md for tracking and requirements.
  */
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
