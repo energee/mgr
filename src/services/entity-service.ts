@@ -403,19 +403,4 @@ export const entityService = {
     }
   },
 
-  /**
-   * Search across an entity's searchable fields. Returns a lightweight list
-   * suitable for autocomplete/lookup results.
-   */
-  async search<T>(
-    supabase: SupabaseClient<Database>,
-    entity: EntityConfig<T>,
-    query: string,
-    limit: number = 20
-  ): Promise<ServiceResult<T[]>> {
-    return entityService.list(supabase, entity, {
-      search: query,
-      limit,
-    });
-  },
 };

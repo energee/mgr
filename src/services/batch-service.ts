@@ -40,7 +40,7 @@ export interface BlendCandidate {
   recipe_name: string;
   status: string;
   volume_bbl: number | null;
-  vessel_name: string | null;
+  current_vessel_name: string | null;
 }
 
 export const batchService = {
@@ -98,8 +98,8 @@ export const batchService = {
 
       // Find other batches of the same recipe in blendable states
       const { data: candidates, error: listError } = await db
-        .from("batches_with_vessel")
-        .select("id, batch_number, recipe_name, status, volume_bbl, vessel_name")
+        .from("batches_with_brew_info")
+        .select("id, batch_number, recipe_name, status, volume_bbl, current_vessel_name")
         .eq("recipe_id", sourceBatch.recipe_id)
         .neq("id", batchId)
         .in("status", ["fermenting", "conditioning", "ready"]);

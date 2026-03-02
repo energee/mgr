@@ -9,7 +9,7 @@
  */
 
 import { useMemo } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicOptionsKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
@@ -31,11 +31,13 @@ export function useDynamicFilterOptions(
     [listFilters]
   );
 
-  const queries = useQueries({
+  type FilterResult = { field: string; options: { value: string; label: string }[] };
+
+  return useQueries({
     queries: filtersWithDynamic.map((filter) => ({
       queryKey: dynamicOptionsKeys.field(entityName, filter.field),
       staleTime: CACHE_DURATIONS.STATIC_DATA,
-      queryFn: async (): Promise<{ field: string; options: { value: string; label: string }[] }> => {
+      queryFn: async (): Promise<FilterResult> => {
         // Handle legacy fetchOptions
         if (filter.fetchOptions) {
           const options = await filter.fetchOptions();
@@ -85,15 +87,14 @@ export function useDynamicFilterOptions(
         return { field: filter.field, options: [] };
       },
     })),
-  });
-
-  return useMemo(() => {
-    const optionsMap: DynamicFilterOptions = {};
-    for (const q of queries) {
-      if (q.data) {
-        optionsMap[q.data.field] = q.data.options;
+    combine: (results: UseQueryResult<FilterResult>[]) => {
+      const optionsMap: DynamicFilterOptions = {};
+      for (const q of results) {
+        if (q.data) {
+          optionsMap[q.data.field] = q.data.options;
+        }
       }
-    }
-    return optionsMap;
-  }, [queries]);
+      return optionsMap;
+    },
+  });
 }
