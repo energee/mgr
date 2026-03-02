@@ -469,3 +469,22 @@ SELECT * FROM square_sync_errors
 WHERE resolved_at IS NULL
 ORDER BY created_at DESC;
 ```
+
+## Dashboard RPC Functions
+
+### `get_sales_trends(p_days integer DEFAULT 30)`
+
+Returns daily sales metrics for dashboard trend charts. Returns `2 * p_days` rows (current + comparison period). `p_days` is clamped to max 365.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| date | DATE | Calendar date |
+| order_count | INTEGER | Orders placed (`order_date`) on this day |
+| revenue | NUMERIC | Sum of `order_items` (quantity * unit_price) for orders on this day |
+| fulfilled_count | INTEGER | Orders in `fulfilled` status (approximated via `updated_at`) |
+
+```sql
+SELECT * FROM get_sales_trends(30);  -- last 30 days + 30-day comparison
+```
+
+**Known limitations:** `fulfilled_count` uses `updated_at` as an approximation — editing a fulfilled order shifts its fulfillment date. `avg_order_value` is computed client-side as `revenue / order_count`.

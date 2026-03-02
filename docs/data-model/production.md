@@ -1315,3 +1315,22 @@ CREATE INDEX idx_recipe_variant_spices_variant ON recipe_variant_spices(recipe_v
 CREATE INDEX idx_batch_additions_batch ON batch_additions(batch_id);
 CREATE INDEX idx_batches_recipe_variant ON batches(recipe_variant_id);
 ```
+
+## Dashboard RPC Functions
+
+### `get_production_trends(p_days integer DEFAULT 30)`
+
+Returns daily-aggregated production metrics for dashboard trend charts. Returns `2 * p_days` rows (current + comparison period) so the frontend can compute period-over-period deltas from a single query. `p_days` is clamped to max 365.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| date | DATE | Calendar date |
+| batches_started | INTEGER | Batches with `planned_start_date` on this day |
+| volume_bbl | NUMERIC | Total volume for scheduled batches |
+| batches_completed | INTEGER | Batches in `completed` status (approximated via `updated_at`) |
+
+```sql
+SELECT * FROM get_production_trends(30);  -- last 30 days + 30-day comparison
+```
+
+**Known limitations:** `batches_started` uses `planned_start_date` (no `actual_start_date` column). `batches_completed` uses `updated_at` as an approximation — editing a completed batch shifts its completion date.

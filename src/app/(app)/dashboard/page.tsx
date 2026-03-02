@@ -7,6 +7,8 @@
  * - Batch status summary
  * - Active batches list
  * - Vessel utilization
+ * - Period-over-period trend comparison (delta cards)
+ * - Trend charts for batches started and volume brewed
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -19,7 +21,18 @@ import { VESSEL_TYPES } from "@/entities/vessel";
 import { batchEntity } from "@/entities/batch";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Progress } from "@/components/ui/progress";
-import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Suspense } from "react";
+import {
+  StatsStrip,
+  DashboardSection,
+  DashboardEmpty,
+  PeriodSelector,
+  usePeriod,
+  StatCardWithDelta,
+  calculateDelta,
+  TrendChart,
+} from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 
 // =============================================================================
@@ -220,12 +233,17 @@ export default function DashboardPage() {
       <div className="space-y-1">
         <div className="flex items-baseline justify-between">
           <h1 className="text-2xl font-semibold">Production Dashboard</h1>
-          <Link
-            href="/production/batches"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            View All Batches
-          </Link>
+          <div className="flex items-center gap-4">
+            <Suspense fallback={null}>
+              <PeriodSelector />
+            </Suspense>
+            <Link
+              href="/production/batches"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              View All Batches
+            </Link>
+          </div>
         </div>
         <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
       </div>
@@ -310,6 +328,123 @@ export default function DashboardPage() {
           </div>
         </DashboardSection>
       </div>
+
+      {/* Period Trends (wrapped in Suspense for useSearchParams) */}
+      <Suspense fallback={<ProductionTrendsSkeleton />}>
+        <ProductionTrends />
+      </Suspense>
     </div>
+  );
+}
+
+// =============================================================================
+// Production Trends (Suspense child — uses useSearchParams via usePeriod)
+// =============================================================================
+
+function ProductionTrendsSkeleton() {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-[88px] rounded-lg" />
+        ))}
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-[248px] rounded-lg" />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function ProductionTrends() {
+  const supabase = createClient();
+  const period = usePeriod();
+
+  const { data: productionTrends = [], isLoading } = useQuery({
+    queryKey: dashboardKeys.trends.production(period),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)("get_production_trends", {
+        p_days: period,
+      });
+      if (error) {
+        console.error("Failed to fetch production trends:", error);
+        return [];
+      }
+      return (data || []) as Array<{
+        date: string;
+        batches_started: number;
+        volume_bbl: number;
+        batches_completed: number;
+      }>;
+    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+  });
+
+  if (isLoading) {
+    return <ProductionTrendsSkeleton />;
+  }
+
+  const currentPeriodData = productionTrends.slice(period);
+  const previousPeriodData = productionTrends.slice(0, period);
+
+  const currentBatchesStarted = currentPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
+  const previousBatchesStarted = previousPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
+
+  const currentVolume = currentPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+  const previousVolume = previousPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+
+  const currentCompleted = currentPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
+  const previousCompleted = previousPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
+
+  const deltaLabel = `vs prev ${period}d`;
+
+  return (
+    <>
+      {/* Period Comparison Cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCardWithDelta
+          value={currentBatchesStarted}
+          label="batches scheduled"
+          delta={calculateDelta(currentBatchesStarted, previousBatchesStarted)}
+          deltaLabel={deltaLabel}
+        />
+        <StatCardWithDelta
+          value={`${Math.round(currentVolume * 10) / 10} BBL`}
+          label="volume brewed"
+          delta={calculateDelta(currentVolume, previousVolume)}
+          deltaLabel={deltaLabel}
+        />
+        <StatCardWithDelta
+          value={currentCompleted}
+          label="batches completed"
+          delta={calculateDelta(currentCompleted, previousCompleted)}
+          deltaLabel={deltaLabel}
+        />
+      </div>
+
+      {/* Trend Charts */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <DashboardSection title="Batches Scheduled">
+          <TrendChart
+            data={currentPeriodData}
+            xKey="date"
+            type="bar"
+            series={[{ key: "batches_started", label: "Batches" }]}
+          />
+        </DashboardSection>
+        <DashboardSection title="Volume Brewed">
+          <TrendChart
+            data={currentPeriodData}
+            xKey="date"
+            series={[{ key: "volume_bbl", label: "BBL" }]}
+            formatValue={(v) => `${v} BBL`}
+          />
+        </DashboardSection>
+      </div>
+    </>
   );
 }

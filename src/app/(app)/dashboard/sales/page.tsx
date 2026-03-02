@@ -15,9 +15,11 @@ import { dashboardKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { orderEntity } from "@/entities/order";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
+import { Suspense } from "react";
+import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // =============================================================================
 // Types
@@ -280,12 +282,17 @@ export default function SalesDashboardPage() {
       <div className="space-y-1">
         <div className="flex items-baseline justify-between">
           <h1 className="text-2xl font-semibold">Sales Dashboard</h1>
-          <Link
-            href="/sales/orders"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            View All Orders
-          </Link>
+          <div className="flex items-center gap-4">
+            <Suspense fallback={null}>
+              <PeriodSelector />
+            </Suspense>
+            <Link
+              href="/sales/orders"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              View All Orders
+            </Link>
+          </div>
         </div>
         <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
       </div>
@@ -395,6 +402,123 @@ export default function SalesDashboardPage() {
           <ProductMixBars products={productMix} />
         )}
       </DashboardSection>
+
+      {/* Period Trends (wrapped in Suspense for useSearchParams) */}
+      <Suspense fallback={<SalesTrendsSkeleton />}>
+        <SalesTrends />
+      </Suspense>
     </div>
+  );
+}
+
+// =============================================================================
+// Sales Trends (Suspense child — uses useSearchParams via usePeriod)
+// =============================================================================
+
+function SalesTrendsSkeleton() {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-[88px] rounded-lg" />
+        ))}
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-[248px] rounded-lg" />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function SalesTrends() {
+  const supabase = createClient();
+  const period = usePeriod();
+
+  const { data: salesTrends = [], isLoading } = useQuery({
+    queryKey: dashboardKeys.trends.sales(period),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)("get_sales_trends", {
+        p_days: period,
+      });
+      if (error) {
+        console.error("Failed to fetch sales trends:", error);
+        return [];
+      }
+      return (data || []) as Array<{
+        date: string;
+        order_count: number;
+        revenue: number;
+        fulfilled_count: number;
+      }>;
+    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+  });
+
+  if (isLoading) {
+    return <SalesTrendsSkeleton />;
+  }
+
+  const currentPeriodData = salesTrends.slice(period);
+  const previousPeriodData = salesTrends.slice(0, period);
+
+  const currentRevenue = currentPeriodData.reduce((sum, d) => sum + Number(d.revenue), 0);
+  const previousRevenue = previousPeriodData.reduce((sum, d) => sum + Number(d.revenue), 0);
+
+  const currentOrderCount = currentPeriodData.reduce((sum, d) => sum + d.order_count, 0);
+  const previousOrderCount = previousPeriodData.reduce((sum, d) => sum + d.order_count, 0);
+
+  const currentAvgOrder = currentOrderCount > 0 ? currentRevenue / currentOrderCount : 0;
+  const previousAvgOrder = previousOrderCount > 0 ? previousRevenue / previousOrderCount : 0;
+
+  const deltaLabel = `vs prev ${period}d`;
+
+  return (
+    <>
+      {/* Period Comparison Cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCardWithDelta
+          value={formatCurrency(currentRevenue)}
+          label="revenue"
+          delta={calculateDelta(currentRevenue, previousRevenue)}
+          deltaLabel={deltaLabel}
+        />
+        <StatCardWithDelta
+          value={currentOrderCount}
+          label="orders placed"
+          delta={calculateDelta(currentOrderCount, previousOrderCount)}
+          deltaLabel={deltaLabel}
+        />
+        <StatCardWithDelta
+          value={currentAvgOrder > 0 ? formatCurrency(currentAvgOrder) : "—"}
+          label="avg order value"
+          delta={calculateDelta(currentAvgOrder, previousAvgOrder)}
+          deltaLabel={deltaLabel}
+        />
+      </div>
+
+      {/* Trend Charts */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <DashboardSection title="Revenue">
+          <TrendChart
+            data={currentPeriodData}
+            xKey="date"
+            type="bar"
+            series={[{ key: "revenue", label: "Revenue" }]}
+            formatValue={(v) => formatCurrency(v)}
+          />
+        </DashboardSection>
+        <DashboardSection title="Orders">
+          <TrendChart
+            data={currentPeriodData}
+            xKey="date"
+            series={[{ key: "order_count", label: "Orders" }]}
+          />
+        </DashboardSection>
+      </div>
+    </>
   );
 }
