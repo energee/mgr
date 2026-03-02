@@ -106,10 +106,10 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
     table: "orders",
     displayName: "Order",
     displayNamePlural: "Orders",
-    searchableFields: ["order_number", "customer_name"],
+    searchableFields: ["order_number"],
     defaultSort: { column: "order_date", direction: "desc" },
     detailHeader: { title: "order_number", badge: "status" },
-    keyFields: ["order_date", "requested_date", "customer_name"],
+    keyFields: ["order_date", "requested_date"],
   })],
   ["customer", entry({
     name: "customer",

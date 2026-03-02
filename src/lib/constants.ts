@@ -12,8 +12,8 @@ export const CACHE_DURATIONS = {
   /** Static data that rarely changes - catalogs, options, settings (5 minutes) */
   STATIC_DATA: 5 * 60 * 1000,
 
-  /** Dynamic data that changes moderately - lists, counts (1 minute) */
-  DYNAMIC_DATA: 60 * 1000,
+  /** Dynamic data that changes moderately - lists, counts (2 minutes) */
+  DYNAMIC_DATA: 2 * 60 * 1000,
 
   /** User preferences - personal settings (5 minutes) */
   USER_PREFERENCES: 5 * 60 * 1000,
