@@ -212,6 +212,9 @@ const FK_TABLE_MAP: Record<string, string> = {
   sales_channel_id: "sales_channels",
   delivery_id: "deliveries",
   category_id: "categories",
+  batch_id: "batches",
+  address_id: "addresses",
+  inventory_id: "inventories",
 };
 
 /** Derive the lookup table for a `_id` field. Uses FK_TABLE_MAP for exceptions,

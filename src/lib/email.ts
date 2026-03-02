@@ -116,10 +116,12 @@ export async function sendNotificationEmail(
   to: string | string[],
   subject: string,
   html: string,
+  text?: string,
 ): Promise<SendEmailResult> {
   return sendEmail({
     to,
     subject: `[MGR] ${subject}`,
     html,
+    text,
   });
 }

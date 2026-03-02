@@ -119,6 +119,7 @@ export const POST = withPermission("integrations:manage", async (request, { user
     body.to,
     rendered.subject,
     rendered.html,
+    rendered.text,
   );
 
   if (!result.ok && !result.skipped) {
