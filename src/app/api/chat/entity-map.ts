@@ -382,6 +382,16 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
     displayNamePlural: "Pricing Tier Prices",
     defaultSort: { column: "created_at", direction: "desc" },
   })],
+  ["water_profile", entry({
+    name: "water_profile",
+    table: "water_profiles",
+    displayName: "Water Profile",
+    displayNamePlural: "Water Profiles",
+    searchableFields: ["name", "description"],
+    defaultSort: { column: "name", direction: "asc" },
+    detailHeader: { title: "name" },
+    keyFields: ["calcium_ppm", "sulfate_ppm", "chloride_ppm", "ph"],
+  })],
   ["user_profile", entry({
     name: "user_profile",
     table: "user_profiles",

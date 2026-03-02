@@ -320,31 +320,37 @@ export function createChatTools(supabase: SupabaseClient) {
           .describe("Filter by category: malt, hop, yeast, adjunct, chemical"),
       }),
       execute: async ({ category }) => {
-        // Join through inventory_lots (which has the FK to inventory_items),
-        // then use the with_quantities view columns via the lot query to get
-        // remaining_quantity after allocations. Since PostgREST can't join
-        // views through FKs, we query items with their lots and compute totals.
-        let q = supabase.from("inventory_items").select(
-          "id, name, category, unit, reorder_point, inventory_lots(quantity, expiration_date)"
+        // Fetch active items, then lots from the view that accounts for
+        // allocations (remaining_quantity = received - allocated).
+        let itemsQ = supabase
+          .from("inventory_items")
+          .select("id, name, category, unit, reorder_point")
+          .eq("is_active", true);
+        if (category) itemsQ = itemsQ.eq("category", category);
+
+        const items = await query<{ id: string; name: string; category: string; unit: string; reorder_point: number | null }[]>(itemsQ);
+        if (!items?.length) return [];
+
+        const lots = await query<{ inventory_item_id: string | null; remaining_quantity: number; expiration_date: string | null }[]>(
+          supabase
+            .from("inventory_lots_with_quantities")
+            .select("inventory_item_id, remaining_quantity, expiration_date")
+            .in("inventory_item_id", items.map((i) => i.id))
+            .gt("remaining_quantity", 0),
         );
-        if (category) q = q.eq("category", category);
-        q = q.eq("is_active", true);
 
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-
-        interface ItemRow {
-          id: string;
-          name: string;
-          category: string;
-          unit: string;
-          reorder_point: number | null;
-          inventory_lots: { quantity: number; expiration_date: string | null }[];
+        // Group lots by item
+        const lotsByItem = new Map<string, typeof lots>();
+        for (const lot of lots ?? []) {
+          if (!lot.inventory_item_id) continue;
+          const arr = lotsByItem.get(lot.inventory_item_id);
+          if (arr) arr.push(lot);
+          else lotsByItem.set(lot.inventory_item_id, [lot]);
         }
 
-        return (data as ItemRow[])?.map((item) => {
-          const lots = item.inventory_lots || [];
-          const expirationDates = lots
+        return items.map((item) => {
+          const itemLots = lotsByItem.get(item.id) ?? [];
+          const expirationDates = itemLots
             .map((lot) => lot.expiration_date)
             .filter((d): d is string => d !== null);
 
@@ -354,10 +360,10 @@ export function createChatTools(supabase: SupabaseClient) {
             category: item.category,
             unit: item.unit,
             reorder_point: item.reorder_point,
-            total_quantity: lots.reduce((sum, lot) => sum + lot.quantity, 0),
+            total_quantity: itemLots.reduce((sum, lot) => sum + lot.remaining_quantity, 0),
             earliest_expiration:
               expirationDates.length > 0 ? expirationDates.sort()[0] : null,
-            lot_count: lots.length,
+            lot_count: itemLots.length,
           };
         });
       },

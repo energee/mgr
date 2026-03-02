@@ -269,7 +269,7 @@ export const entityService = {
       // Standard update (no version check)
       const { data: updated, error } = await db
         .from(entity.table)
-        .update(parsed.data)
+        .update({ ...parsed.data, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
         .single();
