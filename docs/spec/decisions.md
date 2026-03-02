@@ -835,6 +835,17 @@ Add a Content-Security-Policy (CSP) header to `next.config.ts`. CSP is the most 
 
 **Tracking:** Comment in `next.config.ts:12-13` references this decision.
 
+### DEC-SEC-002: In-Memory Rate Limiter (Known Limitation)
+**Status**: RESOLVED/DOCUMENTED
+
+The rate limiter in `src/lib/api/rate-limit.ts` uses a module-level `Map` that is per-instance and resets on every cold start. Under concurrent load on Vercel, the same IP can hit different serverless instances with independent buckets, effectively multiplying the per-window request allowance.
+
+**Affected endpoints:** `/api/chat` (paid Anthropic API calls), `/api/customers/[id]/invite` (sends emails), `/api/email/send` (sends emails).
+
+**Current mitigation:** The in-memory limiter still provides best-effort protection against burst abuse from a single client within a single instance. Combined with admin-only restrictions on `/api/email/send` and auth requirements on all endpoints, the risk is bounded.
+
+**Production-grade solution:** Replace with Redis or [Upstash Rate Limit](https://github.com/upstash/ratelimit) for cross-instance, durable rate limiting. This is the recommended upgrade path when the app moves to production traffic levels.
+
 ---
 
 ## Related Documents

@@ -58,7 +58,7 @@ export const POST = withPermission(
       .limit(1)
       .maybeSingle();
 
-    const adminDb = await createAdminClient();
+    const adminDb = createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const adminAny = adminDb as any;
 

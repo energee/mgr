@@ -5,6 +5,10 @@
  * window duration and request limits. Expired entries are automatically
  * cleaned up every 5 minutes to prevent memory leaks.
  *
+ * **Known limitation (DEC-SEC-002):** State is per-instance and resets on cold
+ * start. Under concurrent serverless load, different instances maintain
+ * independent buckets. See docs/spec/decisions.md for upgrade path.
+ *
  * Usage:
  *   const ip = getClientIp(request);
  *   const result = rateLimit(`chat:${ip}`, { windowMs: 60_000, maxRequests: 10 });
