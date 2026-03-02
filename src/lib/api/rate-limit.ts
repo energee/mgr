@@ -115,21 +115,26 @@ export function rateLimit(
 /**
  * Extract the client IP address from request headers.
  *
- * Checks common proxy headers in order of precedence:
- * 1. `x-forwarded-for` (first entry, set by most reverse proxies)
- * 2. `x-real-ip` (set by Nginx and some CDNs)
+ * Checks proxy headers in order of trust:
+ * 1. `x-real-ip` — set by the infrastructure (Vercel, Nginx) from the actual
+ *    TCP connection and cannot be spoofed by clients.
+ * 2. `x-forwarded-for` — can be spoofed by clients (they control the first
+ *    entry), so only used as a fallback when `x-real-ip` is unavailable.
  * 3. Falls back to "unknown" if no IP can be determined.
  */
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    // x-forwarded-for may contain a comma-separated list; use the first (client) IP
-    return forwarded.split(",")[0].trim();
-  }
-
+  // Prefer x-real-ip: set by the platform from the actual connection, not spoofable
   const realIp = request.headers.get("x-real-ip");
   if (realIp) {
     return realIp.trim();
+  }
+
+  // Fallback to x-forwarded-for (last entry is most trustworthy, added by the
+  // nearest proxy; earlier entries may be client-supplied)
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const parts = forwarded.split(",");
+    return parts[parts.length - 1].trim();
   }
 
   return "unknown";
