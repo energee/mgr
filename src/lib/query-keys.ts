@@ -227,6 +227,12 @@ export const reportKeys = {
   inventory: () => ["reports", "inventory"] as const,
   inventoryValuation: (asOfDate: string) =>
     ["reports", "inventory-valuation", asOfDate] as const,
+  /** Raw material inventory valuation (lots with remaining quantities) */
+  inventoryValuationRaw: (asOfDate: string) =>
+    ["reports", "inventory-valuation", asOfDate, "raw-materials"] as const,
+  /** Finished goods inventory valuation (packaging allocations) */
+  inventoryValuationFinishedGoods: (asOfDate: string) =>
+    ["reports", "inventory-valuation", asOfDate, "finished-goods"] as const,
   production: () => ["reports", "production"] as const,
   ttbBatches: (year: number, month: number) =>
     ["ttb-batches", year, month] as const,

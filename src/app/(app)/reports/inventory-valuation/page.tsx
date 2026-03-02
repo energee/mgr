@@ -142,7 +142,7 @@ export default function InventoryValuationPage() {
     isLoading: rawLoading,
     error: rawError,
   } = useQuery({
-    queryKey: [...reportKeys.inventoryValuation(asOfDate), "raw-materials"],
+    queryKey: reportKeys.inventoryValuationRaw(asOfDate),
     queryFn: async () => {
       // Fetch lots with remaining quantities, joined to item details.
       // The view already calculates remaining_quantity from allocations.
@@ -167,10 +167,7 @@ export default function InventoryValuationPage() {
     isLoading: fgLoading,
     error: fgError,
   } = useQuery({
-    queryKey: [
-      ...reportKeys.inventoryValuation(asOfDate),
-      "finished-goods",
-    ],
+    queryKey: reportKeys.inventoryValuationFinishedGoods(asOfDate),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("finished_goods_with_availability")
