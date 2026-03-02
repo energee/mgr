@@ -674,3 +674,22 @@ CREATE INDEX idx_deliveries_scheduled ON deliveries(scheduled_date);
 -- Transfer lines (raw material support)
 CREATE INDEX idx_transfer_lines_lot ON transfer_lines(inventory_lot_id);
 ```
+
+## Dashboard RPC Functions
+
+### `get_inventory_trends(p_days integer DEFAULT 30)`
+
+Returns daily lot activity metrics for dashboard trend charts. Returns `2 * p_days` rows (current + comparison period). `p_days` is clamped to max 365.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| date | DATE | Calendar date |
+| lots_created | INTEGER | Lots received (`created_at`) on this day |
+| lots_depleted | INTEGER | Lots fully consumed on this day |
+| total_lot_activity | INTEGER | `lots_created + lots_depleted` |
+
+```sql
+SELECT * FROM get_inventory_trends(30);  -- last 30 days + 30-day comparison
+```
+
+**Depletion logic:** A lot is "depleted" when `received_quantity - SUM(allocated_quantity) <= 0`, derived from the `allocations` table (not from `inventory_lots.quantity`, which is immutable). The depletion date is approximated as the date of the most recent allocation against the lot.

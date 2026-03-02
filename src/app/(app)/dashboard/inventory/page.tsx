@@ -14,10 +14,12 @@ import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { InventoryAlerts } from "@/components/domain/inventory-alerts";
-import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
+import { Suspense } from "react";
+import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // =============================================================================
 // Types
@@ -198,12 +200,17 @@ export default function InventoryDashboardPage() {
       <div className="space-y-1">
         <div className="flex items-baseline justify-between">
           <h1 className="text-2xl font-semibold">Inventory Dashboard</h1>
-          <Link
-            href="/inventory/items"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            View All Items
-          </Link>
+          <div className="flex items-center gap-4">
+            <Suspense fallback={null}>
+              <PeriodSelector />
+            </Suspense>
+            <Link
+              href="/inventory/items"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              View All Items
+            </Link>
+          </div>
         </div>
         <StatsStrip stats={primaryStats} />
       </div>
@@ -291,8 +298,105 @@ export default function InventoryDashboardPage() {
         </div>
       </DashboardSection>
 
+      {/* Period Trends (wrapped in Suspense for useSearchParams) */}
+      <Suspense fallback={<InventoryTrendsSkeleton />}>
+        <InventoryTrends />
+      </Suspense>
+
       {/* AI-Powered Inventory Overview */}
       <InventoryAlerts autoExpandOnAlerts={false} />
     </div>
+  );
+}
+
+// =============================================================================
+// Inventory Trends (Suspense child — uses useSearchParams via usePeriod)
+// =============================================================================
+
+function InventoryTrendsSkeleton() {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-[88px] rounded-lg" />
+        ))}
+      </div>
+      <Skeleton className="h-[248px] rounded-lg" />
+    </>
+  );
+}
+
+function InventoryTrends() {
+  const supabase = createClient();
+  const period = usePeriod();
+
+  const { data: inventoryTrends = [], isLoading } = useQuery({
+    queryKey: dashboardKeys.trends.inventory(period),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)("get_inventory_trends", {
+        p_days: period,
+      });
+      if (error) {
+        console.error("Failed to fetch inventory trends:", error);
+        return [];
+      }
+      return (data || []) as Array<{
+        date: string;
+        lots_created: number;
+        lots_depleted: number;
+        total_lot_activity: number;
+      }>;
+    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+  });
+
+  if (isLoading) {
+    return <InventoryTrendsSkeleton />;
+  }
+
+  const currentPeriodData = inventoryTrends.slice(period);
+  const previousPeriodData = inventoryTrends.slice(0, period);
+
+  const currentLotsCreated = currentPeriodData.reduce((sum, d) => sum + d.lots_created, 0);
+  const previousLotsCreated = previousPeriodData.reduce((sum, d) => sum + d.lots_created, 0);
+
+  const currentLotsDepleted = currentPeriodData.reduce((sum, d) => sum + d.lots_depleted, 0);
+  const previousLotsDepleted = previousPeriodData.reduce((sum, d) => sum + d.lots_depleted, 0);
+
+  const deltaLabel = `vs prev ${period}d`;
+
+  return (
+    <>
+      {/* Period Comparison Cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCardWithDelta
+          value={currentLotsCreated}
+          label="lots received"
+          delta={calculateDelta(currentLotsCreated, previousLotsCreated)}
+          deltaLabel={deltaLabel}
+        />
+        <StatCardWithDelta
+          value={currentLotsDepleted}
+          label="lots consumed"
+          delta={calculateDelta(currentLotsDepleted, previousLotsDepleted)}
+          deltaLabel={deltaLabel}
+        />
+      </div>
+
+      {/* Lot Activity Trend */}
+      <DashboardSection title="Lot Activity">
+        <TrendChart
+          data={currentPeriodData}
+          xKey="date"
+          type="bar"
+          series={[
+            { key: "lots_created", label: "Received", color: "hsl(var(--chart-1))" },
+            { key: "lots_depleted", label: "Consumed", color: "hsl(var(--chart-2))" },
+          ]}
+        />
+      </DashboardSection>
+    </>
   );
 }
