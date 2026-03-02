@@ -193,36 +193,110 @@ export const deliveryEntity: EntityConfig<DeliveryView> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Delivery Details",
+      fields: [
+        {
+          name: "delivery_number",
+          label: "Delivery #",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "status",
+          label: "Status",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "scheduled_date",
+          label: "Scheduled Date",
+          type: "date",
+          format: "date",
+          colSpan: 6,
+        },
+        {
+          name: "driver_name",
+          label: "Driver",
+          type: "text",
+          colSpan: 6,
+        },
+        {
+          name: "vehicle",
+          label: "Vehicle",
+          type: "text",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "shipping",
+      title: "Shipping",
+      fields: [
+        {
+          name: "ship_date",
+          label: "Shipped",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "receive_date",
+          label: "Received",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "summary",
+      title: "Stops Summary",
+      fields: [
+        {
+          name: "transfer_count",
+          label: "Transfers",
+          editable: false,
+          colSpan: 4,
+        },
+        {
+          name: "order_count",
+          label: "Orders",
+          editable: false,
+          colSpan: 4,
+        },
+        {
+          name: "total_stops",
+          label: "Total Stops",
+          editable: false,
+          colSpan: 4,
+        },
+      ],
+    },
+    {
+      id: "notes",
+      title: "Notes",
+      collapsible: true,
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          fullWidth: true,
+          colSpan: 12,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: deliverySchema,
-
-  formFields: [
-    {
-      name: "scheduled_date",
-      label: "Scheduled Date",
-      type: "date",
-      colSpan: 6,
-    },
-    {
-      name: "driver_name",
-      label: "Driver",
-      type: "text",
-      colSpan: 6,
-    },
-    {
-      name: "vehicle",
-      label: "Vehicle",
-      type: "text",
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      colSpan: 12,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // State Machine

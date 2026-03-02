@@ -95,7 +95,7 @@ export interface EntityConfig<T = Record<string, unknown>> {
   formSchema: ZodSchema<Partial<T>>;
 
   /** @deprecated Use `sections` instead. Kept for backward compatibility. */
-  formFields: EntityFieldDef<T>[];
+  formFields?: EntityFieldDef<T>[];
 
   /** @deprecated Use `sections` with `editable: "create-only"` instead. */
   createFields?: (keyof T & string)[];

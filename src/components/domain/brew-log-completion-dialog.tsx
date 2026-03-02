@@ -47,6 +47,7 @@ import {
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { extractBrewMeasurements } from "@/lib/brew-events";
+import type { BrewEvent } from "@/types/domain";
 
 // =============================================================================
 // Types
@@ -357,7 +358,7 @@ export function BrewLogCompletionDialog({
   // ---------------------------------------------------------------------------
 
   const renderStep1 = () => {
-    const events = (brewLogFull?.events as unknown[]) || [];
+    const events = (brewLogFull?.events as BrewEvent[]) || [];
     const keyMeasurements = extractBrewMeasurements(events);
 
     return (

@@ -300,50 +300,6 @@ export const orderEntity: EntityConfig<Order> = {
   // ---------------------------------------------------------------------------
   formSchema: orderSchema,
 
-  formFields: [
-    {
-      name: "order_number",
-      label: "Order Number",
-      type: "text",
-      placeholder: "e.g., ORD-2025-001",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "status",
-      label: "Status",
-      type: "select",
-      options: statusOptions,
-      colSpan: 6,
-    },
-    {
-      name: "order_date",
-      label: "Order Date",
-      type: "date",
-      required: true,
-      colSpan: 4,
-    },
-    {
-      name: "requested_date",
-      label: "Requested Delivery Date",
-      type: "date",
-      colSpan: 4,
-    },
-    {
-      name: "scheduled_date",
-      label: "Scheduled Delivery Date",
-      type: "date",
-      colSpan: 4,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Special instructions, delivery notes...",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------

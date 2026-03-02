@@ -307,123 +307,155 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Transaction Details",
+      fields: [
+        {
+          name: "transaction_type",
+          label: "Transaction Type",
+          type: "select",
+          options: TRANSACTION_TYPES.map((t) => ({
+            value: t.value,
+            label: `${t.label} - ${t.description}`,
+          })),
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "keg_type_id",
+          label: "Keg Type",
+          type: "relation",
+          relation: { entity: "keg_type", displayField: "name" },
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "keg_owner_id",
+          label: "Keg Owner",
+          type: "relation",
+          relation: { entity: "keg_owner", displayField: "name" },
+          description: "Fleet provider (e.g., Owned, Microstar, KegFleet)",
+          colSpan: 6,
+        },
+        {
+          name: "quantity",
+          label: "Quantity",
+          type: "number",
+          placeholder: "1",
+          required: true,
+          colSpan: 6,
+        },
+        {
+          name: "from_state",
+          label: "From State",
+          type: "select",
+          options: [
+            { value: "_none", label: "None (New Kegs)" },
+            ...KEG_STATES.map((s) => ({ value: s.value, label: s.label })),
+          ],
+          colSpan: 6,
+          showWhen: (values: Partial<KegTransaction>) =>
+            ["maintain", "retire", "adjust"].includes(values.transaction_type || ""),
+        },
+        {
+          name: "to_state",
+          label: "To State",
+          type: "select",
+          options: KEG_STATES.map((s) => ({ value: s.value, label: s.label })),
+          colSpan: 6,
+          showWhen: (values: Partial<KegTransaction>) =>
+            values.transaction_type === "adjust",
+        },
+        {
+          name: "from_location_id",
+          label: "From Location",
+          type: "relation",
+          relation: { entity: "location", displayField: "name" },
+          colSpan: 6,
+        },
+        {
+          name: "to_location_id",
+          label: "To Location",
+          type: "relation",
+          relation: { entity: "location", displayField: "name" },
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "related",
+      title: "Related Records",
+      fields: [
+        {
+          name: "customer_id",
+          label: "Customer",
+          type: "relation",
+          relation: { entity: "customer", displayField: "name" },
+          description: "Required for ship/return transactions",
+          colSpan: 6,
+        },
+        {
+          name: "order_id",
+          label: "Order",
+          type: "relation",
+          relation: { entity: "order", displayField: "order_number" },
+          description: "Optional: Link to sales order",
+          colSpan: 6,
+        },
+        {
+          name: "batch_id",
+          label: "Batch",
+          type: "relation",
+          relation: { entity: "batch", displayField: "batch_number" },
+          description: "Required for fill transactions",
+          colSpan: 6,
+        },
+        {
+          name: "finished_good_id",
+          label: "Finished Good",
+          type: "relation",
+          relation: { entity: "finished_good", displayField: "lot_number" },
+          description: "Required for fill transactions",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
+      id: "audit",
+      title: "Audit Information",
+      fields: [
+        {
+          name: "notes",
+          label: "Notes",
+          type: "textarea",
+          placeholder: "Optional notes about this transaction",
+          colSpan: 12,
+        },
+        {
+          name: "created_by_name",
+          label: "Created By",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "created_at",
+          label: "Created At",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: kegTransactionSchema,
-
-  formFields: [
-    {
-      name: "transaction_type",
-      label: "Transaction Type",
-      type: "select",
-      options: TRANSACTION_TYPES.map((t) => ({
-        value: t.value,
-        label: `${t.label} - ${t.description}`,
-      })),
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "keg_type_id",
-      label: "Keg Type",
-      type: "relation",
-      relation: { entity: "keg_type", displayField: "name" },
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "keg_owner_id",
-      label: "Keg Owner",
-      type: "relation",
-      relation: { entity: "keg_owner", displayField: "name" },
-      description: "Fleet provider (e.g., Owned, Microstar, KegFleet)",
-      colSpan: 6,
-    },
-    {
-      name: "quantity",
-      label: "Quantity",
-      type: "number",
-      placeholder: "1",
-      required: true,
-      colSpan: 4,
-    },
-    {
-      name: "from_state",
-      label: "From State",
-      type: "select",
-      options: [
-        { value: "_none", label: "None (New Kegs)" },
-        ...KEG_STATES.map((s) => ({ value: s.value, label: s.label })),
-      ],
-      colSpan: 4,
-      // Only show for types where the user needs to choose (maintain, retire, adjust)
-      showWhen: (values: Partial<KegTransaction>) =>
-        ["maintain", "retire", "adjust"].includes(values.transaction_type || ""),
-    },
-    {
-      name: "to_state",
-      label: "To State",
-      type: "select",
-      options: KEG_STATES.map((s) => ({ value: s.value, label: s.label })),
-      colSpan: 4,
-      // Only show for adjust (all other types have a fixed to_state)
-      showWhen: (values: Partial<KegTransaction>) =>
-        values.transaction_type === "adjust",
-    },
-    {
-      name: "from_location_id",
-      label: "From Location",
-      type: "relation",
-      relation: { entity: "location", displayField: "name" },
-      colSpan: 6,
-    },
-    {
-      name: "to_location_id",
-      label: "To Location",
-      type: "relation",
-      relation: { entity: "location", displayField: "name" },
-      colSpan: 6,
-    },
-    {
-      name: "customer_id",
-      label: "Customer",
-      type: "relation",
-      relation: { entity: "customer", displayField: "name" },
-      description: "Required for ship/return transactions",
-      colSpan: 6,
-    },
-    {
-      name: "order_id",
-      label: "Order",
-      type: "relation",
-      relation: { entity: "order", displayField: "order_number" },
-      description: "Optional: Link to sales order",
-      colSpan: 6,
-    },
-    {
-      name: "batch_id",
-      label: "Batch",
-      type: "relation",
-      relation: { entity: "batch", displayField: "batch_number" },
-      description: "Required for fill transactions",
-      colSpan: 6,
-    },
-    {
-      name: "finished_good_id",
-      label: "Finished Good",
-      type: "relation",
-      relation: { entity: "finished_good", displayField: "lot_number" },
-      description: "Required for fill transactions",
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Optional notes about this transaction",
-      colSpan: 12,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // AI Context

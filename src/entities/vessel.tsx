@@ -351,65 +351,6 @@ export const vesselEntity: EntityConfig<Vessel> = {
   // ---------------------------------------------------------------------------
   formSchema: vesselSchema,
 
-  formFields: [
-    {
-      name: "name",
-      label: "Name",
-      type: "text",
-      placeholder: "e.g., FV-1, Brite-A",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "vessel_type",
-      label: "Type",
-      type: "select",
-      options: vesselTypeOptions,
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "capacity_bbl",
-      label: "Capacity",
-      type: "unit",
-      unitType: "volume",
-      placeholder: "e.g., 7",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "status",
-      label: "Status",
-      type: "select",
-      options: statusOptions,
-      colSpan: 6,
-    },
-    {
-      name: "location_id",
-      label: "Location",
-      type: "relation",
-      relation: {
-        entity: "location",
-        displayField: "name",
-      },
-      colSpan: 6,
-    },
-    {
-      name: "is_active",
-      label: "Active",
-      type: "switch",
-      defaultValue: true,
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      placeholder: "Any special notes about this vessel...",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------

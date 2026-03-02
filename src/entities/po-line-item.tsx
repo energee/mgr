@@ -145,58 +145,68 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Line Item Details",
+      fields: [
+        {
+          name: "po_id",
+          label: "Purchase Order",
+          type: "relation",
+          relation: { entity: "purchase_order", displayField: "po_number" },
+          required: true,
+          colSpan: 12,
+        },
+        {
+          name: "catalog_type",
+          label: "Item Type",
+          type: "select",
+          options: CATALOG_TYPES.map((t) => ({ value: t.value, label: t.label })),
+          required: true,
+          colSpan: 4,
+        },
+        {
+          name: "catalog_id",
+          label: "Item",
+          type: "text",
+          placeholder: "Select item type first",
+          required: true,
+          colSpan: 8,
+        },
+        {
+          name: "quantity",
+          label: "Quantity",
+          type: "number",
+          required: true,
+          colSpan: 4,
+        },
+        {
+          name: "unit",
+          label: "Unit",
+          type: "text",
+          placeholder: "e.g., lb, oz, kg",
+          required: true,
+          colSpan: 4,
+        },
+        {
+          name: "unit_price",
+          label: "Unit Price",
+          type: "number",
+          format: "currency",
+          placeholder: "0.00",
+          colSpan: 4,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: poLineItemSchema,
-
-  formFields: [
-    {
-      name: "po_id",
-      label: "Purchase Order",
-      type: "relation",
-      relation: { entity: "purchase_order", displayField: "po_number" },
-      required: true,
-      colSpan: 12,
-    },
-    {
-      name: "catalog_type",
-      label: "Item Type",
-      type: "select",
-      options: CATALOG_TYPES.map((t) => ({ value: t.value, label: t.label })),
-      required: true,
-      colSpan: 4,
-    },
-    {
-      name: "catalog_id",
-      label: "Item",
-      type: "text", // Would need dynamic lookup based on catalog_type
-      placeholder: "Select item type first",
-      required: true,
-      colSpan: 8,
-    },
-    {
-      name: "quantity",
-      label: "Quantity",
-      type: "number",
-      required: true,
-      colSpan: 4,
-    },
-    {
-      name: "unit",
-      label: "Unit",
-      type: "text",
-      placeholder: "e.g., lb, oz, kg",
-      required: true,
-      colSpan: 4,
-    },
-    {
-      name: "unit_price",
-      label: "Unit Price",
-      type: "number",
-      placeholder: "0.00",
-      colSpan: 4,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // Relations

@@ -198,7 +198,7 @@ export default function IngredientDemandPage() {
           {
             action: {
               label: "View PO",
-              onClick: () => router.push(`/purchasing/purchase-orders/${poId}`),
+              onClick: () => router.push(`/purchasing/pos/${poId}`),
             },
           }
         );

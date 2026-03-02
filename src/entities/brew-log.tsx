@@ -264,44 +264,6 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
   // ---------------------------------------------------------------------------
   formSchema: brewLogSchema,
 
-  formFields: [
-    {
-      name: "brew_number",
-      label: "Brew Number",
-      type: "text",
-      colSpan: 6,
-    },
-    {
-      name: "brew_date",
-      label: "Brew Date",
-      type: "date",
-      colSpan: 6,
-    },
-    {
-      name: "brewer_id",
-      label: "Brewer",
-      type: "relation",
-      relation: {
-        entity: "user_profile",
-        displayField: "display_name",
-      },
-      colSpan: 6,
-    },
-    {
-      name: "status",
-      label: "Status",
-      type: "select",
-      options: statusOptions,
-      colSpan: 6,
-    },
-    {
-      name: "notes",
-      label: "Notes",
-      type: "textarea",
-      colSpan: 12,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // State Machine
   // ---------------------------------------------------------------------------

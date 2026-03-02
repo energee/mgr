@@ -124,69 +124,82 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
   ],
 
   // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
+  sections: [
+    {
+      id: "overview",
+      title: "Line Item Details",
+      fields: [
+        {
+          name: "brand_id",
+          label: "Brand",
+          type: "select",
+          required: true,
+          colSpan: 6,
+          dynamicOptions: {
+            table: "brands",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "name",
+          },
+        },
+        {
+          name: "package_type_id",
+          label: "Package Type",
+          type: "select",
+          colSpan: 6,
+          dynamicOptions: {
+            table: "package_types",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "name",
+          },
+        },
+        {
+          name: "keg_type_id",
+          label: "Keg Type",
+          type: "relation",
+          colSpan: 6,
+          relation: { entity: "keg_type", displayField: "name" },
+        },
+        {
+          name: "keg_owner_id",
+          label: "Keg Owner",
+          type: "relation",
+          colSpan: 6,
+          relation: { entity: "keg_owner", displayField: "name" },
+          description: "Fleet owner for keg packaging",
+        },
+        {
+          name: "planned_quantity",
+          label: "Planned Quantity",
+          type: "number",
+          placeholder: "Units to package",
+          colSpan: 6,
+        },
+        {
+          name: "actual_quantity",
+          label: "Actual Quantity",
+          type: "number",
+          placeholder: "Actual units packaged",
+          colSpan: 6,
+        },
+        {
+          name: "created_at",
+          label: "Created",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+      ],
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
   formSchema: sessionLineItemSchema,
-
-  formFields: [
-    {
-      name: "brand_id",
-      label: "Brand",
-      type: "select",
-      required: true,
-      colSpan: 6,
-      dynamicOptions: {
-        table: "brands",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "name",
-      },
-    },
-    {
-      name: "package_type_id",
-      label: "Package Type",
-      type: "select",
-      required: false,
-      colSpan: 6,
-      dynamicOptions: {
-        table: "package_types",
-        valueField: "id",
-        labelField: "name",
-        orderBy: "name",
-      },
-    },
-    {
-      name: "keg_type_id",
-      label: "Keg Type",
-      type: "relation",
-      required: false,
-      colSpan: 6,
-      relation: { entity: "keg_type", displayField: "name" },
-    },
-    {
-      name: "keg_owner_id",
-      label: "Keg Owner",
-      type: "relation",
-      required: false,
-      colSpan: 6,
-      relation: { entity: "keg_owner", displayField: "name" },
-      description: "Fleet owner for keg packaging",
-    },
-    {
-      name: "planned_quantity",
-      label: "Planned Quantity",
-      type: "number",
-      placeholder: "Units to package",
-      colSpan: 6,
-    },
-    {
-      name: "actual_quantity",
-      label: "Actual Quantity",
-      type: "number",
-      placeholder: "Actual units packaged",
-      colSpan: 6,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // Relations

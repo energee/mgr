@@ -194,7 +194,6 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
   // ---------------------------------------------------------------------------
   // Note: This is a calculated view. To modify inventory, record a keg transaction.
   formSchema: kegInventorySchema,
-  formFields: [], // Empty - no direct editing of calculated view
 
   // ---------------------------------------------------------------------------
   // AI Context

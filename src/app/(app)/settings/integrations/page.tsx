@@ -26,6 +26,7 @@ import { SquareIcon } from "@/components/ui/square-icon";
 import { QuickBooksIcon } from "@/components/ui/quickbooks-icon";
 import { SlackIntegrationCard } from "@/components/domain/slack-integration-card";
 import { qboKeys, squareKeys } from "@/lib/query-keys";
+import { CACHE_DURATIONS } from "@/lib/constants";
 
 // =============================================================================
 // Global API Key Section (write-only — key is never read back to the client)
@@ -428,7 +429,7 @@ function QuickBooksIntegrationCard() {
       if (!res.ok) return { connected: false };
       return (await res.json()).data;
     },
-    staleTime: 30_000,
+    staleTime: CACHE_DURATIONS.REALTIME_DATA,
   });
 
   const isConnected = status?.connected === true;

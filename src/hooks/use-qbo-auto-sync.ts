@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { qboKeys } from "@/lib/query-keys";
+import { CACHE_DURATIONS } from "@/lib/constants";
 
 // Map of entity names to their sync entity types and trigger states.
 // Entities with empty triggerStates arrays are manual-sync only.
@@ -26,7 +27,7 @@ export function useQBOAutoSync(entityName: string) {
       if (!res.ok) return { connected: false, autoSyncEnabled: false };
       return (await res.json()).data;
     },
-    staleTime: 60_000,
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     enabled: isConfigured,
   });
 
