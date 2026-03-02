@@ -114,7 +114,7 @@ function ctaButton(label: string, url: string): string {
   <tr>
     <td style="background-color:${BRAND_COLOR};border-radius:6px;padding:12px 24px;">
       <a href="${url}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;">
-        ${label}
+        ${esc(label)}
       </a>
     </td>
   </tr>

@@ -86,8 +86,8 @@ function renderTemplate(
         {
           batchNumber: String(data.batchNumber ?? ""),
           batchName: data.batchName ? String(data.batchName) : null,
-          oldStatus: String(data.oldState ?? ""),
-          newStatus: String(data.newState ?? ""),
+          oldStatus: String(data.oldStatus ?? ""),
+          newStatus: String(data.newStatus ?? ""),
         } satisfies BatchStatusChangeData,
         APP_URL,
       );

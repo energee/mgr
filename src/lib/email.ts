@@ -12,8 +12,16 @@ import { Resend } from "resend";
 // -- Configuration ------------------------------------------------------------
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL =
-  process.env.RESEND_FROM_EMAIL ?? "MGR Brewery <noreply@yourdomain.com>";
+const FROM_EMAIL_DEFAULT = "MGR Brewery <noreply@yourdomain.com>";
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? FROM_EMAIL_DEFAULT;
+
+if (RESEND_API_KEY && FROM_EMAIL === FROM_EMAIL_DEFAULT) {
+  console.warn(
+    "[email] RESEND_API_KEY is set but RESEND_FROM_EMAIL is not configured. " +
+      "Emails will fail because the default domain is not verified with Resend. " +
+      "Set RESEND_FROM_EMAIL in your environment variables.",
+  );
+}
 
 /** Lazily initialized Resend client; null when API key is missing. */
 let resendClient: Resend | null = null;
