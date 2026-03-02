@@ -49,6 +49,7 @@ import {
 } from "@/lib/data-table-adapter";
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
+import { useKeyboardShortcuts, type KeyboardShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { generateId } from "@/lib/id";
 
 import { DataTable } from "@/components/data-table/data-table";
@@ -169,33 +170,26 @@ export function EntityDataTable<T = Record<string, unknown>>({
   );
 
   // ---------------------------------------------------------------------------
-  // "n" hotkey for New entity
+  // "n" hotkey for New entity (uses useKeyboardShortcuts to skip in inputs)
   // ---------------------------------------------------------------------------
-  useEffect(() => {
-    if (!showCreate) return;
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key !== "n" || e.metaKey || e.ctrlKey || e.altKey) return;
-
-      // Don't trigger when typing in an input
-      const el = document.activeElement;
-      if (el) {
-        const tag = el.tagName.toLowerCase();
-        if (tag === "input" || tag === "textarea" || tag === "select") return;
-        if ((el as HTMLElement).isContentEditable) return;
-      }
-
-      e.preventDefault();
-      if (onCreateClick) {
-        onCreateClick();
-      } else {
-        router.push(`${path}/new`);
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showCreate, onCreateClick, router, path]);
+  const listShortcuts = useMemo<KeyboardShortcut[]>(() => {
+    if (!showCreate) return [];
+    return [
+      {
+        key: "n",
+        label: "N",
+        description: `Create new ${entity.displayName.toLowerCase()}`,
+        handler: () => {
+          if (onCreateClick) {
+            onCreateClick();
+          } else {
+            router.push(`${path}/new`);
+          }
+        },
+      },
+    ];
+  }, [showCreate, onCreateClick, router, path, entity.displayName]);
+  useKeyboardShortcuts(listShortcuts);
 
   // ---------------------------------------------------------------------------
   // Dynamic filter options

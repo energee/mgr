@@ -1,0 +1,43 @@
+/**
+ * E2E tests for the core production workflow.
+ *
+ * These tests verify basic navigation to production-domain list pages
+ * and include a skipped scaffold for the full recipe-to-package flow.
+ */
+import { test, expect } from "@playwright/test";
+
+test.describe("Production Workflow", () => {
+  test("navigate to recipes list", async ({ page }) => {
+    await page.goto("/production/recipes");
+    await expect(
+      page.getByRole("heading", { name: /recipes/i }),
+    ).toBeVisible();
+  });
+
+  test("navigate to batches list", async ({ page }) => {
+    await page.goto("/production/batches");
+    await expect(
+      page.getByRole("heading", { name: /batches/i }),
+    ).toBeVisible();
+  });
+
+  test("navigate to vessels list", async ({ page }) => {
+    await page.goto("/production/vessels");
+    await expect(
+      page.getByRole("heading", { name: /vessels/i }),
+    ).toBeVisible();
+  });
+
+  test.skip("full production workflow: recipe -> batch -> brew log -> package", async ({
+    page,
+  }) => {
+    // TODO: Full E2E flow - skipped until test data seeding is set up
+    // Step 1: Navigate to recipes, find or create a recipe
+    // Step 2: Navigate to batches, create batch from recipe
+    // Step 3: Start brew day from batch detail
+    // Step 4: Add brew readings
+    // Step 5: Transition through states
+    // Step 6: Create packaging session
+    // Step 7: Verify finished goods
+  });
+});

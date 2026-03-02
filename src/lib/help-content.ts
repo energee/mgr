@@ -147,6 +147,28 @@ Catalog pages: Package Formats, Keg Types, Yeast Strains, Sales Channels, Pricin
 To use it, configure an Anthropic API key in Settings > System Settings. Each user can also set a personal key in their preferences.`,
   },
   {
+    id: "keyboard-shortcuts",
+    title: "Keyboard Shortcuts",
+    content: `MGR supports keyboard shortcuts for quick navigation and actions. Press ? anywhere to open the shortcuts dialog.
+
+Global shortcuts (available on all pages):
+- ? — Show keyboard shortcuts dialog
+- / — Focus the search input
+- Esc — Close dialog or clear focus
+- Cmd+. (Mac) / Ctrl+. (Windows) — Toggle the AI assistant
+
+List pages (e.g., Batches, Recipes, Orders):
+- N — Create a new entity (when create is available)
+
+Detail pages (e.g., viewing a single batch or recipe):
+- E — Toggle into edit mode
+- Backspace — Go back to list (prompts if unsaved changes)
+- Esc — Cancel editing (prompts if unsaved changes)
+- Cmd+Enter (Mac) / Ctrl+Enter (Windows) — Save changes
+
+Shortcuts are automatically disabled when typing in input fields, textareas, or dropdown selects to avoid interference with data entry.`,
+  },
+  {
     id: "common-workflows",
     title: "Common Workflows",
     content: `Brew a batch:

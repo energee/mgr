@@ -43,9 +43,7 @@ export async function calculateLandedCost(
 ): Promise<LandedCostBreakdown[]> {
   const supabase = createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-  const { data, error } = await db.rpc("calculate_landed_cost", {
+  const { data, error } = await supabase.rpc("calculate_landed_cost", {
     p_po_id: poId,
   });
 
@@ -118,6 +116,6 @@ export function landedCostMarkup(
   landedCost: number,
   unitPrice: number
 ): number | null {
-  if (!unitPrice || unitPrice === 0) return null;
+  if (!unitPrice) return null;
   return ((landedCost - unitPrice) / unitPrice) * 100;
 }

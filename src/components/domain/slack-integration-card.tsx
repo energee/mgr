@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * SlackIntegrationCard - Slack Webhook Configuration
+ *
+ * Settings card for managing Slack notification integration:
+ * - Webhook URL management (secret key input)
+ * - Enable/disable toggle
+ * - Default channel and per-notification-type channel routing
+ * - Test message sending
+ */
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -169,16 +179,14 @@ export function SlackIntegrationCard() {
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
+          <div>
+            <CardTitle className="flex items-center gap-2">
               <SlackIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Slack</CardTitle>
-              <CardDescription>
-                Send notifications to Slack channels for batch status changes, orders, inventory alerts, and more.
-              </CardDescription>
-            </div>
+              Slack
+            </CardTitle>
+            <CardDescription>
+              Send notifications to Slack channels for batch status changes, orders, inventory alerts, and more.
+            </CardDescription>
           </div>
           <ConnectionBadge isConnected={isConnected} isEnabled={isEnabled} />
         </div>
