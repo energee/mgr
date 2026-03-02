@@ -228,7 +228,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     },
   });
 
-  // Function to look up tier price (only works for package_type formats)
+  // Function to look up tier price (works for both package_type and keg_type formats)
   const lookupTierPrice = useCallback(async (
     brandId: string | null,
     formatId: string | null
