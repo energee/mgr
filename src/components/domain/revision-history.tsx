@@ -210,6 +210,8 @@ const FK_TABLE_MAP: Record<string, string> = {
   keg_owner_id: "keg_owners",
   package_type_id: "package_types",
   sales_channel_id: "sales_channels",
+  delivery_id: "deliveries",
+  category_id: "categories",
 };
 
 /** Derive the lookup table for a `_id` field. Uses FK_TABLE_MAP for exceptions,

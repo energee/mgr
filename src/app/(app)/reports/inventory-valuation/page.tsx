@@ -424,6 +424,11 @@ export default function InventoryValuationPage() {
                 {formatCurrency(grandTotal)}
               </div>
             )}
+            {!isLoading && finishedGoodRows.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Excludes finished goods (unit costs not yet tracked)
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
