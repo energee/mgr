@@ -4,7 +4,7 @@ Catalog tables store reference data for ingredients. These are templates with pr
 
 ## Catalog Architecture
 
-The catalog uses **separate tables per ingredient type** (malts, hops, yeasts, etc.) for strong typing and type-specific fields. Cross-domain references use a polymorphic pattern.
+The catalog uses **separate tables per ingredient type** (malts, hops, yeasts, etc.) for strong typing and type-specific fields. Cross-domain references use a polymorphic pattern. A unified `catalog_items` table was considered (see DEC-SIMP-001 in `docs/spec/decisions.md`) but deferred in favor of the current approach, which provides better type safety and query performance for type-specific operations.
 
 ### Polymorphic References
 
@@ -20,6 +20,8 @@ catalog_id    UUID  -- FK to the appropriate table
 - `po_line_items` - What's being ordered
 - `inventory_items` - Stock tracking items
 - `batch_additions` - Post-brew additions
+
+**Note**: The polymorphic `catalog_type + catalog_id` pattern does not enforce referential integrity at the database level (no FK constraint to a specific table). Application-layer validation ensures `catalog_id` references a valid record in the table corresponding to `catalog_type`.
 
 ### Recipe Ingredient Pattern
 

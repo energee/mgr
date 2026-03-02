@@ -522,6 +522,9 @@ Used by: `user_role`
 - `brewer`: `["recipes", "batches", "brewing"]`
 - `sales`: `["orders", "customers"]`
 - `viewer`: `["read"]`
+- `customer`: `["portal"]` (external portal access)
+
+**Note:** RLS policies use `user_has_permission()` to map granular permissions to roles. See `docs/spec/workflows.md` for the full permission table.
 
 #### Mash Step Temperature Ranges
 Used by: `mash_step_type`
@@ -584,7 +587,7 @@ WHERE enum_type = 'batch_status' AND value = 'brewing';
 
 ## `user_profiles`
 
-User profiles with cached auth info and role assignment. Caches user information from `auth.users` to avoid direct joins per security guidelines.
+User profiles with cached auth info and multi-role assignment. Caches user information from `auth.users` to avoid direct joins per security guidelines. Permission-based access control via `user_has_permission()` function.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -592,7 +595,7 @@ User profiles with cached auth info and role assignment. Caches user information
 | email | TEXT | Cached email from auth.users |
 | display_name | TEXT | User's display name |
 | avatar_url | TEXT | Profile avatar URL |
-| role | TEXT | User role: admin, production_manager, brewer, sales, viewer |
+| roles | TEXT[] | User roles array (replaces single `role` column) |
 | status | TEXT | Account status: active, inactive, pending |
 | last_active_at | TIMESTAMPTZ | Last activity timestamp |
 | invited_at | TIMESTAMPTZ | When user was invited |
@@ -603,11 +606,14 @@ User profiles with cached auth info and role assignment. Caches user information
 ### Constraints
 
 ```sql
-CONSTRAINT chk_user_role CHECK (role IN ('admin', 'production_manager', 'brewer', 'sales', 'viewer'))
+-- Validated via function: each role must be one of the valid values
+CONSTRAINT chk_user_roles CHECK (validate_user_roles(roles))
 CONSTRAINT chk_user_status CHECK (status IN ('active', 'inactive', 'pending'))
 ```
 
 ### User Roles
+
+A user can hold multiple roles simultaneously. The `roles` column is a `TEXT[]` array indexed with GIN.
 
 | Role | Description | Access Level |
 |------|-------------|--------------|
@@ -616,10 +622,11 @@ CONSTRAINT chk_user_status CHECK (status IN ('active', 'inactive', 'pending'))
 | brewer | Recipes/batches/brewing | Brewing operations |
 | sales | Orders/customers | Sales domain |
 | viewer | Read-only access | View only |
+| customer | Portal access | External customer portal |
 
 ### Auto-Creation Trigger
 
-User profiles are automatically created when users sign up via `auth.users` trigger:
+User profiles are automatically created when users sign up via `auth.users` trigger. The first user is assigned `admin` role; subsequent users default to `viewer`.
 
 ```sql
 CREATE TRIGGER on_auth_user_created_profile
@@ -627,25 +634,40 @@ CREATE TRIGGER on_auth_user_created_profile
   FOR EACH ROW EXECUTE FUNCTION create_user_profile();
 ```
 
-### Helper Functions
+### Permission Helper Functions
+
+All RLS policies use `user_has_permission()` to check access. This function maps permission strings to role arrays and checks if the user's roles overlap.
 
 ```sql
--- Get current user's role
-SELECT get_user_role();  -- Uses auth.uid() by default
+-- Check a granular permission (used in RLS policies)
+SELECT user_has_permission('recipes:write');  -- Returns boolean
+
+-- Check a specific role
+SELECT user_has_role('admin');  -- Returns boolean
+
+-- Get current user's primary role
+SELECT get_user_role();  -- Returns roles[1]
 
 -- Check if current user is admin
 SELECT is_admin();  -- Returns boolean
-
--- Update last active timestamp
-SELECT update_last_active();
 ```
+
+**Permission mapping** (see `docs/spec/workflows.md` for full table):
+- `recipes:read` -> admin, production_manager, brewer, sales, viewer
+- `recipes:write` -> admin, brewer
+- `batches:write` -> admin, production_manager, brewer
+- `orders:write` -> admin, sales
+- `inventory:write` -> admin, production_manager
+- `settings:manage` -> admin
+- etc.
 
 ### RLS Policies
 
 - All authenticated users can view profiles (needed for displaying names)
 - Users can update their own profile (name, avatar only)
-- Admins can update any profile (role, status changes)
+- Admins can update any profile (roles, status changes)
 - Admins can insert profiles (for invitations)
+- All domain tables use `user_has_permission()` in their RLS policies
 
 ---
 

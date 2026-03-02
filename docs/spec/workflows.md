@@ -310,6 +310,142 @@ interface Revision {
 
 ---
 
+## Permission-Based Access Control
+
+User access is controlled via a multi-role system with granular permission checks (migration `00092_permission_based_roles.sql`).
+
+### Role Model
+
+Users have a `roles TEXT[]` array on `user_profiles` (replacing the old single `role TEXT` column). A user can hold multiple roles simultaneously.
+
+**Available roles:**
+| Role | Description |
+|------|-------------|
+| admin | Full system access |
+| production_manager | Production, inventory, purchasing |
+| brewer | Recipes, batches, brewing |
+| sales | Orders, customers |
+| viewer | Read-only access |
+| customer | Portal access (external) |
+
+### Permission Checks
+
+All RLS policies use `user_has_permission(p_permission TEXT)` which maps permissions to roles:
+
+| Permission | Roles |
+|------------|-------|
+| recipes:read | admin, production_manager, brewer, sales, viewer |
+| recipes:write | admin, brewer |
+| batches:read | admin, production_manager, brewer, sales, viewer |
+| batches:write | admin, production_manager, brewer |
+| orders:read | admin, production_manager, sales, viewer |
+| orders:write | admin, sales |
+| customers:read | admin, production_manager, sales, viewer |
+| customers:write | admin, sales |
+| inventory:read | admin, production_manager, brewer, sales, viewer |
+| inventory:write | admin, production_manager |
+| purchasing:read | admin, production_manager, viewer |
+| purchasing:write | admin, production_manager |
+| vessels:read | admin, production_manager, brewer, sales, viewer |
+| vessels:write | admin, production_manager, brewer |
+| integrations:manage | admin |
+| settings:manage | admin |
+| users:manage | admin |
+
+### Helper Functions
+
+```sql
+-- Check permission (used in RLS policies)
+user_has_permission('recipes:write')  -- Returns boolean
+
+-- Check specific role
+user_has_role('admin')  -- Returns boolean
+
+-- First user auto-assigned admin role
+-- Subsequent users default to 'viewer'
+```
+
+### Catalog/Shared Tables
+
+Ingredient catalogs (malts, hops, yeasts, etc.), enum_values, brands, package_types, sales_channels, and pricing tables are readable by all authenticated users and writable only by users with `settings:manage` permission (admin).
+
+---
+
+## Yeast Pitch Events Workflow
+
+Yeast tracking uses an event-driven model (migration `00095_yeast_workflow_unification.sql`) where pitch sources and batch deductions are separated.
+
+### Model
+
+- **`yeast_pitches`** = Sources (purchased or harvested yeast stored in brink vessels)
+- **`yeast_pitch_events`** = Immutable deductions from sources into batches
+- **Quantity remaining** = Calculated via view, never stored as mutable balance
+
+### Lifecycle
+
+```
+Purchase / Harvest
+    ↓
+yeast_pitch created (status: in_stock, quantity_lbs: N)
+    ↓
+├── Pitch Event → Batch A (deducts X lbs)
+├── Pitch Event → Batch B (deducts Y lbs)
+├── ...
+└── Remaining = 0 or viability too low → status: depleted/discarded
+```
+
+### Viability Decay
+
+Estimated automatically by `yeast_pitches_with_remaining` view:
+```
+estimated_viability = initial_viability - (days_old x decay_rate)
+  dry yeast:    0.5%/day
+  liquid yeast: 2.0%/day
+```
+
+### Lineage Tracking
+
+Lineage chains via `parent_pitch_id` on `yeast_pitches`. Cost is spread across all batches in a lineage via the `yeast_lineage_summary` view:
+```
+cost_per_batch = original_purchase_cost / COUNT(distinct batches in lineage)
+```
+
+### Brink Storage
+
+Brinks are vessels of type `brink` (added to `vessel_type` enum). Yeast pitches link to brink vessels via `vessel_id` FK.
+
+---
+
+## Water Addition Profiles
+
+Named, reusable sets of water salt/acid additions (migration `00096_water_addition_profiles.sql`).
+
+### Model
+
+- **`water_profiles`** = Source water chemistry (Ca, Mg, SO4, etc.) -- existing table
+- **`water_addition_profiles`** = Named sets of salt/acid additions (e.g., "Hoppy IPA Salts") -- new table
+- **`recipe_additions`** = Individual addition items, owned by either a recipe or a profile (mutual exclusivity constraint)
+
+### Recipe Linkage
+
+Recipes link to a water addition profile via `water_addition_profile_id` FK. Non-water additions (clarifiers, nutrients) remain recipe-specific in `recipe_additions` with `recipe_id` set.
+
+### Ownership Constraint
+
+Each `recipe_additions` row belongs to exactly one owner:
+```sql
+CHECK (
+  (recipe_id IS NOT NULL AND profile_id IS NULL) OR
+  (recipe_id IS NULL AND profile_id IS NOT NULL)
+)
+```
+
+### Default Source Water
+
+The brewery's default source water profile is configured via `system_settings` key `default_water_profile_id`. Recipes without a specific `water_profile_id` use this default.
+
+---
+
 ## Error Handling
 
 ### Error Categories

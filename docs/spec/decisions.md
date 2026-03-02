@@ -9,6 +9,9 @@ This document captures architectural decisions from a comprehensive schema revie
 | **Documented** | Data model docs updated, migration pending |
 | **Implemented** | Migration created and applied |
 | **Rejected** | Decision was considered but not adopted |
+| **RESOLVED/DEFERRED** | Evaluated and intentionally deferred; current approach documented |
+| **RESOLVED/MODIFIED** | Implemented with a different approach than originally proposed |
+| **RESOLVED/DOCUMENTED** | Rules documented; enforcement is application-layer |
 | *(no status)* | Proposed, not yet reviewed |
 
 ---
@@ -299,6 +302,7 @@ Available = Packaged - Allocated - Adjustments(negative) + Adjustments(positive)
 ```
 
 ### DEC-GAP-002: Packaging Session Rollback Rules
+**Status**: RESOLVED/DOCUMENTED
 
 **Block rollback if**:
 - `allocations` exist with `status = 'completed'` for session's finished goods
@@ -311,6 +315,15 @@ Available = Packaged - Allocated - Adjustments(negative) + Adjustments(positive)
 - Cancel all planned allocations
 - Reverse bin_inventory quantities
 - Set FG status to `voided` (preserve for audit)
+
+#### Resolution
+
+**Status**: RESOLVED/DOCUMENTED
+**Date**: 2026-02-26
+
+**Implementation notes**: Rollback rules are documented in `docs/spec/workflows.md` (Packaging Session Rules table) and `docs/data-model/packaging.md` (State Machine section). Application-layer validation enforces the blocking conditions. No database-level constraints were added for rollback rules since they require multi-table checks that are better suited to application logic.
+
+**Caveats**: Rollback enforcement is application-side only. Direct database operations could bypass these rules. RLS policies do not cover rollback-specific constraints.
 
 ### DEC-GAP-003: Yeast Cost Spreading
 
@@ -363,6 +376,7 @@ Resolution order:
 3. No match → Flag line item for manual price entry; block order confirmation until resolved
 
 ### DEC-GAP-007: Partial Transfer Handling
+**Status**: RESOLVED/DOCUMENTED
 
 **Flow**:
 1. Original transfer ships partial items
@@ -372,9 +386,21 @@ Resolution order:
 
 **Cancellation**: New transfer can be cancelled; releases reservation, items remain in source bin.
 
-### DEC-GAP-008: Adjustment Approval Workflow
+#### Resolution
 
-**Schema**:
+**Status**: RESOLVED/DOCUMENTED
+**Date**: 2026-02-26
+
+**Implementation notes**: The schema supports partial transfers via the `location_transfers` and `transfer_lines` tables (see `docs/data-model/inventory.md`). `transfer_lines` tracks per-item quantities, enabling partial receives. Application-layer logic handles auto-creation of remainder transfers when a transfer is completed with fewer items than planned.
+
+**Caveats**: Auto-creation of remainder transfers is application-side logic, not a database trigger. The `transfer_lines` table supports both finished goods and raw materials via an XOR constraint (`finished_good_id` or `inventory_lot_id`, exactly one must be set).
+
+### DEC-GAP-008: Adjustment Approval Workflow
+**Status**: RESOLVED/MODIFIED
+
+**Original proposal**: Separate `inventory_adjustments` table with approval workflow.
+
+**Original schema** (proposed):
 ```sql
 inventory_adjustments:
   id                  UUID PRIMARY KEY
@@ -393,7 +419,7 @@ inventory_adjustments:
   reviewed_at         TIMESTAMPTZ
 ```
 
-**Configuration** (in account_settings JSONB):
+**Original configuration** (in account_settings JSONB):
 ```json
 {
   "adjustments": {
@@ -403,6 +429,24 @@ inventory_adjustments:
   }
 }
 ```
+
+#### Resolution
+
+**Status**: RESOLVED/MODIFIED
+**Date**: 2026-02-26
+
+**Implementation notes**: Instead of a separate `inventory_adjustments` table, the approval workflow was integrated directly into the unified `allocations` table. The following fields on `allocations` support the approval flow:
+- `requires_approval BOOLEAN` - Set by business rules when creating the allocation
+- `status` - Extended to include `pending_approval` and `rejected` states
+- `approved_by UUID` - FK to auth.users (who approved)
+- `approved_at TIMESTAMPTZ` - When approved
+- `rejection_reason TEXT` - Reason for rejection (if rejected)
+
+The status flow for approved allocations is: `planned -> pending_approval -> completed` (or `-> rejected`).
+
+This is a simpler approach that avoids a separate table and keeps all inventory movements in the single `allocations` audit trail. See `docs/data-model/inventory.md` for the full allocations schema.
+
+**Caveats**: Less granular than the original proposal -- there is no `recipient_type`/`recipient_id` tracking for who received samples. The `reason_code` and `notes` fields on `allocations` capture this context instead. Approval configuration is not yet implemented in `system_settings`; approval rules are currently hardcoded in application logic.
 
 ### DEC-GAP-009: TTB Reporting
 
@@ -559,6 +603,9 @@ account_settings:
 ## Simplification Decisions
 
 ### DEC-SIMP-001: Unified Catalog Items Table
+**Status**: RESOLVED/DEFERRED
+
+**Original proposal**: Merge all ingredient tables into a single `catalog_items` table with a `type` discriminator and JSONB `metadata` for type-specific fields.
 
 ```sql
 catalog_items:
@@ -576,24 +623,18 @@ catalog_items:
   metadata        JSONB  -- type-specific fields (alpha_acid for hops, color_lovibond for malts, etc.)
 ```
 
-**Usage**:
-```sql
--- supplier_catalog now uses simple FK
-supplier_catalog:
-  supplier_id     UUID REFERENCES suppliers(id)
-  catalog_item_id UUID REFERENCES catalog_items(id)  -- replaces catalog_type + catalog_id
-  supplier_sku    TEXT
-  price           DECIMAL
+**Rationale for original**: Proper FK constraints, simpler queries, single table to query for all ingredients.
 
--- batch_additions uses simple FK
-batch_additions:
-  batch_id        UUID REFERENCES batches(id)
-  catalog_item_id UUID REFERENCES catalog_items(id)  -- replaces catalog_type + catalog_id
-  quantity        DECIMAL
-  unit            TEXT
-```
+#### Resolution
 
-**Rationale**: Proper FK constraints, simpler queries, single table to query for all ingredients.
+**Status**: RESOLVED/DEFERRED
+**Date**: 2026-02-26
+
+**Implementation notes**: Separate type-safe tables (malts, hops, yeasts, adjuncts, sugars, spices, fruits, additives) were retained. The unified `catalog_items` table was not created. Cross-domain references use a polymorphic pattern (`catalog_type` + `catalog_id`) in tables that need to reference any ingredient type: `supplier_catalog`, `po_line_items`, `inventory_items`, and `batch_additions`.
+
+Recipe ingredients continue to use concrete junction tables (`recipe_malts`, `recipe_hops`, etc.) with direct foreign keys for stronger typing, database-level constraints, and proper indexing.
+
+**Caveats**: The polymorphic `catalog_type + catalog_id` pattern does not enforce referential integrity at the database level. Application-layer validation is required. The current approach provides better type safety and query performance for the common case (type-specific queries), at the cost of a union query when querying across all ingredient types. See `docs/data-model/catalog.md` for the full architecture.
 
 ### DEC-SIMP-002: Keep Brew Log Events as JSONB
 Retain `brew_logs.events` as JSONB array.
@@ -601,10 +642,11 @@ Retain `brew_logs.events` as JSONB array.
 **Rationale**: Events are always fetched with the brew log, rarely queried independently. JSONB provides flexibility for varying event structures without schema changes.
 
 ### DEC-SIMP-003: Revised Yeast Management (Brinks Model)
+**Status**: RESOLVED/MODIFIED
 
-Replace simple yeast_pitches with comprehensive brink-based tracking.
+**Original proposal**: Replace simple `yeast_pitches` with a full three-table brinks model (`yeast_brinks`, `brink_viability_readings`, `yeast_pitches`).
 
-**Schema**:
+**Original schema** (proposed):
 ```sql
 yeast_brinks:
   id                    UUID PRIMARY KEY
@@ -642,21 +684,35 @@ yeast_pitches:
   notes                 TEXT
 ```
 
-**Workflow**:
-```
-Purchase Yeast (Gen 0)
-    ↓
-Brink B-001 (strain: WLP001, weight: 10 lbs)
-    ↓
-├── Viability reading: 95% (day before brew)
-├── Pitch 2 lbs → Batch #101
-├── Pitch 2 lbs → Batch #102
-├── Viability reading: 75%
-└── Remaining 6 lbs → viability too low → DUMP
+#### Resolution
 
-Harvest from Batch #101 (Gen 1)
+**Status**: RESOLVED/MODIFIED
+**Date**: 2026-02-26
+**Migration**: `00095_yeast_workflow_unification.sql`
+
+**Implementation notes**: An event-based yeast tracking model was implemented instead of the full three-table brinks model. The approach uses two tables:
+- `yeast_pitches` - Represents yeast sources (purchases or harvests stored in brink vessels). Tracks lineage via `parent_pitch_id`, weight-based quantity (`quantity_lbs`), cell counts in thousands, and links to brink vessels via `vessel_id` FK to the `vessels` table (brink is a vessel type).
+- `yeast_pitch_events` - Immutable event log recording each deduction from a source into a batch. Quantity remaining is calculated as `quantity_lbs - SUM(events.quantity_lbs)`.
+
+The full brinks model (`brink_identifier`, `brink_viability_readings` table) was deferred as unnecessary complexity. Viability is tracked via `initial_viability` and `current_viability` on `yeast_pitches`, with decay estimated by the `yeast_pitches_with_remaining` view using a linear model (0.5%/day dry, 2.0%/day liquid). Manual viability overrides are supported via `current_viability`.
+
+**Key views**: `yeast_pitches_with_remaining` (replaces old `yeast_pitches_with_details`), `batch_yeast_summary`, `yeast_lineage_summary`.
+
+**Caveats**: If detailed viability reading history becomes needed (method, cell count per reading, measured_by), a dedicated readings table could be added later. The current model tracks only the latest measurement.
+
+**Workflow** (as implemented):
+```
+Purchase Yeast (Gen 0, source_type: purchase)
     ↓
-Brink B-002 (strain: WLP001, parent: B-001, weight: 8 lbs)
+yeast_pitch (in Brink vessel, strain: WLP001, quantity: 10 lbs)
+    ↓
+├── Pitch Event: 2 lbs → Batch #101
+├── Pitch Event: 2 lbs → Batch #102
+└── Remaining 6 lbs → viability too low → DISCARD
+
+Harvest from Batch #101 (Gen 1, source_type: harvest)
+    ↓
+yeast_pitch (parent: prev pitch, strain: WLP001, quantity: 8 lbs)
     ↓
 └── Continue pitching...
 ```
@@ -765,6 +821,30 @@ Use database views to calculate available quantities on read rather than maintai
 - `vessels_with_current_batch` — derives current batch from transfer log
 
 **Rationale**: Single source of truth for quantities. No stale balance bugs. Views perform well with the indexes from DEC-PERF-001.
+
+### DEC-SEC-001: Content-Security-Policy Header
+**Status**: Deferred
+
+Add a Content-Security-Policy (CSP) header to `next.config.ts`. CSP is the most impactful header against XSS and is intentionally omitted from the initial security headers deployment to avoid breaking inline scripts/styles used by Next.js, Sentry, and third-party integrations.
+
+**Requirements before implementation:**
+- Audit all inline scripts and styles (Next.js runtime, Sentry SDK, Vercel Analytics)
+- Determine nonce-based vs hash-based strategy for inline scripts
+- Test in report-only mode (`Content-Security-Policy-Report-Only`) before enforcement
+- Configure a CSP reporting endpoint to catch violations
+
+**Tracking:** Comment in `next.config.ts:12-13` references this decision.
+
+### DEC-SEC-002: In-Memory Rate Limiter (Known Limitation)
+**Status**: RESOLVED/DOCUMENTED
+
+The rate limiter in `src/lib/api/rate-limit.ts` uses a module-level `Map` that is per-instance and resets on every cold start. Under concurrent load on Vercel, the same IP can hit different serverless instances with independent buckets, effectively multiplying the per-window request allowance.
+
+**Affected endpoints:** `/api/chat` (paid Anthropic API calls), `/api/customers/[id]/invite` (sends emails), `/api/email/send` (sends emails).
+
+**Current mitigation:** The in-memory limiter still provides best-effort protection against burst abuse from a single client within a single instance. Combined with admin-only restrictions on `/api/email/send` and auth requirements on all endpoints, the risk is bounded.
+
+**Production-grade solution:** Replace with Redis or [Upstash Rate Limit](https://github.com/upstash/ratelimit) for cross-instance, durable rate limiting. This is the recommended upgrade path when the app moves to production traffic levels.
 
 ---
 

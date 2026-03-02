@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/server";
 import { withPermission } from "@/lib/api/auth";
+import { logger } from "@/lib/logger";
 
-function createAdminDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+const log = logger.child({ route: "/api/slack/settings" });
 
 /**
  * GET /api/slack/settings
@@ -15,7 +11,7 @@ function createAdminDb() {
  * Returns Slack configuration with the webhook URL masked for security.
  */
 export const GET = withPermission("integrations:manage", async () => {
-  const admin = createAdminDb();
+  const admin = createAdminClient();
   const { data, error } = await admin
     .from("slack_settings")
     .select("webhook_url, default_channel, is_enabled, channel_overrides, updated_at")
@@ -23,7 +19,7 @@ export const GET = withPermission("integrations:manage", async () => {
     .single();
 
   if (error) {
-    console.error("[slack/settings] GET error:", error.message);
+    log.error("GET error", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -71,7 +67,7 @@ export const PUT = withPermission("integrations:manage", async (req) => {
     channel_overrides?: Record<string, string>;
   };
 
-  const admin = createAdminDb();
+  const admin = createAdminClient();
 
   // Build update payload with only provided fields
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -90,7 +86,7 @@ export const PUT = withPermission("integrations:manage", async (req) => {
     .not("id", "is", null); // Update the singleton row
 
   if (error) {
-    console.error("[slack/settings] PUT error:", error.message);
+    log.error("PUT error", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

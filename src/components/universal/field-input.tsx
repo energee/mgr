@@ -147,7 +147,7 @@ export function FieldInput({
       )}
 
       {error && (
-        <p id={`${field.name}-error`} role="alert" className="text-sm text-destructive mt-1">
+        <p id={`${field.name}-error`} role="alert" aria-live="polite" className="text-sm text-destructive mt-1">
           {error}
         </p>
       )}

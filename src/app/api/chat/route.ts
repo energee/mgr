@@ -1,10 +1,17 @@
 import { streamText, stepCountIs, type UIMessage, convertToModelMessages } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { withAuth } from "@/lib/api/auth";
+import { createAdminClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/supabase";
 import { createChatTools } from "./tools";
 import { entityService } from "@/services/entity-service";
 import { CHAT_ENTITY_MAP } from "./entity-map";
+import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/chat" });
 
 const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant — concise, practical, brewery-focused.
 
@@ -20,12 +27,6 @@ Use lookupEntity to resolve names/numbers to UUIDs (e.g., "batch 42" → UUID).
 When users ask "how do I..." in MGR, use the getAppGuide tool to look up navigation instructions.
 
 Summarize tool results clearly. Use tables for multi-row data.`;
-
-// Pending type generation — anthropic_api_key is added by migration 00064
-// but not yet in generated Supabase types. Remove after next `supabase gen types`.
-interface UserPrefsApiKeyRow {
-  anthropic_api_key: string | null;
-}
 
 interface PageContext {
   section?: string;
@@ -86,7 +87,7 @@ const ENTITY_TYPE_TO_REGISTRY: Record<string, string> = {
  * Uses the entity registry to look up any entity, then fetches via entityService.
  */
 async function fetchEntityContext(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient<Database>,
   entityType: string,
   entityId: string,
 ): Promise<string | null> {
@@ -136,7 +137,7 @@ async function fetchEntityContext(
 }
 
 async function buildSystemPrompt(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient<Database>,
   pageContext?: PageContext,
 ): Promise<string> {
   if (!pageContext?.section) return BASE_SYSTEM_PROMPT;
@@ -163,18 +164,17 @@ async function buildSystemPrompt(
  * Checks user preferences first, then falls back to the global system setting.
  */
 async function resolveApiKey(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient<Database>,
   userId: string,
 ): Promise<string | null> {
-  // User's personal key (anthropic_api_key not yet in generated types)
   const { data: prefs, error: prefsError } = await supabase
     .from("user_preferences")
-    .select("anthropic_api_key" as string)
+    .select("anthropic_api_key")
     .eq("user_id", userId)
-    .single<UserPrefsApiKeyRow>();
+    .single();
 
   if (prefsError) {
-    console.error("[chat] Failed to read user API key:", prefsError.message);
+    log.error("Failed to read user API key", { error: prefsError.message, userId });
   }
 
   if (prefs?.anthropic_api_key) {
@@ -183,10 +183,7 @@ async function resolveApiKey(
 
   // Fall back to global key from system_settings.
   // Uses service role client (no cookie auth) to bypass RLS.
-  const adminDb = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+  const adminDb = createAdminClient();
   const { data: setting, error: settingError } = await adminDb
     .from("system_settings")
     .select("value")
@@ -194,7 +191,7 @@ async function resolveApiKey(
     .single();
 
   if (settingError) {
-    console.error("[chat] Failed to read global API key:", settingError.message);
+    log.error("Failed to read global API key", { error: settingError.message });
   }
 
   const globalKey = setting?.value;
@@ -205,29 +202,42 @@ async function resolveApiKey(
   return null;
 }
 
-export async function POST(req: Request): Promise<Response> {
-  const supabase = await createClient();
+export const POST = withAuth(async (request, { user, supabase }) => {
+  const startTime = Date.now();
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // Rate limit: 10 requests per minute per IP
+  const ip = getClientIp(request);
+  const limiter = rateLimit(`chat:${ip}`, { windowMs: 60_000, maxRequests: 10 });
+  if (!limiter.success) {
+    log.warn("Rate limit exceeded", { ip, userId: user.id });
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(limiter.resetMs / 1000)) },
+      },
+    );
   }
 
   const apiKey = await resolveApiKey(supabase, user.id);
 
   if (!apiKey) {
-    return Response.json(
+    log.warn("No API key configured for chat request", { userId: user.id });
+    return NextResponse.json(
       { error: "No API key configured. Add your Anthropic API key in Settings." },
       { status: 400 },
     );
   }
 
   const { messages, pageContext }: { messages: UIMessage[]; pageContext?: PageContext } =
-    await req.json();
+    await request.json();
+
+  log.info("Chat request started", {
+    userId: user.id,
+    messageCount: messages.length,
+    section: pageContext?.section,
+    entityType: pageContext?.entityType,
+  });
 
   const anthropic = createAnthropic({ apiKey });
   const tools = createChatTools(supabase);
@@ -242,5 +252,15 @@ export async function POST(req: Request): Promise<Response> {
     stopWhen: stepCountIs(5),
   });
 
-  return result.toUIMessageStreamResponse();
-}
+  log.info("Chat stream initiated", {
+    userId: user.id,
+    durationMs: Date.now() - startTime,
+  });
+
+  // Wrap the streaming Response as NextResponse to satisfy withAuth's return type
+  const streamingResponse = result.toUIMessageStreamResponse();
+  return new NextResponse(streamingResponse.body, {
+    status: streamingResponse.status,
+    headers: streamingResponse.headers,
+  });
+});

@@ -13,7 +13,7 @@ import type {
   EntityFilterDef,
 } from "@/types/entity";
 import type { FilterVariant, Option, ExtendedColumnFilter } from "@/types/data-table";
-import { formatValue } from "@/lib/utils";
+import { formatValue, escapeLike } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -258,9 +258,9 @@ export function buildActionsColumn<T>(
 // Input Escaping
 // =============================================================================
 
-/** Escape SQL LIKE wildcards for use in ilike queries */
+/** @deprecated Use `escapeLike` from `@/lib/utils` instead. */
 export function escapeLikeValue(value: string): string {
-  return value.replace(/[%_\\]/g, (c) => `\\${c}`);
+  return escapeLike(value);
 }
 
 /** Escape special characters for PostgREST .or() filter strings */

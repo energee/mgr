@@ -26,6 +26,7 @@ import {
   parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { batchEntity } from "@/entities/batch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -90,14 +91,34 @@ interface VesselInfo {
 // Constants
 // =============================================================================
 
-const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  planned: { bg: "bg-slate-100", border: "border-slate-300", text: "text-slate-700" },
-  fermenting: { bg: "bg-amber-50", border: "border-amber-400", text: "text-amber-800" },
-  conditioning: { bg: "bg-sky-50", border: "border-sky-400", text: "text-sky-800" },
-  packaging: { bg: "bg-violet-50", border: "border-violet-400", text: "text-violet-800" },
-  completed: { bg: "bg-emerald-50", border: "border-emerald-400", text: "text-emerald-800" },
+/**
+ * Map from stateDisplay semantic color names to Tailwind timeline bar classes.
+ * DEC-007: derive status styling from entity config rather than hardcoding
+ * per-status values. The stateDisplay colors ("default", "info", etc.) are
+ * mapped to Tailwind bg/border/text classes appropriate for the timeline bars.
+ */
+const TIMELINE_COLOR_MAP: Record<string, { bg: string; border: string; text: string }> = {
+  default: { bg: "bg-secondary", border: "border-secondary-foreground/30", text: "text-secondary-foreground" },
+  info: { bg: "bg-orange-50", border: "border-orange-400", text: "text-orange-800" },
+  warning: { bg: "bg-amber-50", border: "border-amber-400", text: "text-amber-800" },
+  success: { bg: "bg-emerald-50", border: "border-emerald-400", text: "text-emerald-800" },
+  error: { bg: "bg-red-50", border: "border-red-400", text: "text-red-800" },
 };
 
+const FALLBACK_TIMELINE_COLORS = TIMELINE_COLOR_MAP.default;
+
+/** Resolve timeline bar colors for a batch status from entity stateDisplay config. */
+function getTimelineColors(status: string): { bg: string; border: string; text: string } {
+  const stateDisplay = batchEntity.stateMachine?.stateDisplay;
+  const semanticColor = stateDisplay?.[status]?.color ?? "default";
+  return TIMELINE_COLOR_MAP[semanticColor] ?? FALLBACK_TIMELINE_COLORS;
+}
+
+/**
+ * Icons for batch statuses on the timeline. These are not available from the
+ * entity stateDisplay config (which only provides label and semantic color),
+ * so they are defined here as a timeline-specific visual enhancement.
+ */
 const STATUS_ICONS: Record<string, React.ReactNode> = {
   planned: <Clock className="h-3 w-3" />,
   fermenting: <Zap className="h-3 w-3" />,
@@ -388,28 +409,32 @@ export default function ProductionTimelinePage() {
 
               {/* Navigation */}
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={goToPrevious}>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={goToPrevious} aria-label="Previous period">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Button variant="outline" size="sm" className="h-8" onClick={goToToday}>
                   Today
                 </Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={goToNext}>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={goToNext} aria-label="Next period">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Legend */}
+          {/* Legend — derive statuses from entity config (DEC-007) */}
           <div className="flex items-center gap-4 mt-3 text-xs">
             <span className="text-muted-foreground">Status:</span>
-            {Object.entries(STATUS_COLORS).slice(0, 4).map(([status, colors]) => (
-              <div key={status} className="flex items-center gap-1.5">
-                <div className={cn("w-3 h-3 rounded-sm border", colors.bg, colors.border)} />
-                <span className="text-muted-foreground capitalize">{status}</span>
-              </div>
-            ))}
+            {Object.keys(batchEntity.stateMachine?.stateDisplay ?? {}).map((status) => {
+              const colors = getTimelineColors(status);
+              const label = batchEntity.stateMachine?.stateDisplay?.[status]?.label ?? status;
+              return (
+                <div key={status} className="flex items-center gap-1.5">
+                  <div className={cn("w-3 h-3 rounded-sm border", colors.bg, colors.border)} />
+                  <span className="text-muted-foreground">{label}</span>
+                </div>
+              );
+            })}
             <div className="flex items-center gap-1.5 ml-4">
               <AlertTriangle className="h-3 w-3 text-destructive" />
               <span className="text-muted-foreground">Shortfall</span>
@@ -528,7 +553,7 @@ export default function ProductionTimelinePage() {
                     const style = getBatchStyle(batch);
                     if (!style) return null;
 
-                    const colors = STATUS_COLORS[batch.status] || STATUS_COLORS.planned;
+                    const colors = getTimelineColors(batch.status);
 
                     return (
                       <Tooltip key={batch.id}>

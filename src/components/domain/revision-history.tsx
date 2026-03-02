@@ -27,11 +27,14 @@ import {
 } from "@/components/ui/timeline";
 
 /**
- * Supabase client with dynamic table access.
- * entity_revisions is not yet in the generated types, so we cast once here.
+ * Create a Supabase client with dynamic table access.
+ * entity_revisions is not yet in the generated types, so we cast here.
+ * Called per-query (not module-level) to capture the correct session context.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db: any = createClient();
+function getDb(): any {
+  return createClient();
+}
 
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago").
@@ -207,6 +210,11 @@ const FK_TABLE_MAP: Record<string, string> = {
   keg_owner_id: "keg_owners",
   package_type_id: "package_types",
   sales_channel_id: "sales_channels",
+  delivery_id: "deliveries",
+  category_id: "categories",
+  batch_id: "batches",
+  address_id: "addresses",
+  inventory_id: "inventories",
 };
 
 /** Derive the lookup table for a `_id` field. Uses FK_TABLE_MAP for exceptions,
@@ -257,9 +265,9 @@ function useResolvedNames(revisions: Revision[]): Map<string, string> {
 
   const queries = useQueries({
     queries: fkGroups.map(({ table, ids }) => ({
-      queryKey: ["fk-resolve", table, ids.sort().join(",")],
+      queryKey: revisionKeys.fkResolve(table, ids),
       queryFn: async () => {
-        const { data } = await db
+        const { data } = await getDb()
           .from(table)
           .select("id, name")
           .in("id", ids);
@@ -425,7 +433,7 @@ export function RevisionHistory({
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntity(entityType, entityId),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await getDb()
         .from("entity_revisions")
         .select("*")
         .eq("entity_type", entityType)
@@ -497,7 +505,7 @@ export function RevisionHistoryCompact({
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntityCompact(entityType, entityId),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await getDb()
         .from("entity_revisions")
         .select("id, operation, changed_at, revision_number")
         .eq("entity_type", entityType)

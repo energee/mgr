@@ -21,3 +21,5 @@ export {
 
 export { ApiError, handleApiError } from "./errors";
 export type { ApiErrorCode } from "./errors";
+
+export { rateLimit, getClientIp } from "./rate-limit";

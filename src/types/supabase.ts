@@ -9243,6 +9243,15 @@ export type Database = {
         }[]
       }
       get_inventory_overview: { Args: never; Returns: Json }
+      get_inventory_trends: {
+        Args: { p_days?: number }
+        Returns: {
+          date: string
+          lots_created: number
+          lots_depleted: number
+          total_lot_activity: number
+        }[]
+      }
       get_price_for_customer: {
         Args: {
           p_brand_id?: string
@@ -9258,10 +9267,28 @@ export type Database = {
           tier_name: string
         }[]
       }
+      get_production_trends: {
+        Args: { p_days?: number }
+        Returns: {
+          batches_completed: number
+          batches_started: number
+          date: string
+          volume_bbl: number
+        }[]
+      }
       get_recipe_summary: { Args: { p_recipe_id: string }; Returns: Json }
       get_roles_for_permission: {
         Args: { p_permission: string }
         Returns: string[]
+      }
+      get_sales_trends: {
+        Args: { p_days?: number }
+        Returns: {
+          date: string
+          fulfilled_count: number
+          order_count: number
+          revenue: number
+        }[]
       }
       get_system_setting: { Args: { setting_key: string }; Returns: Json }
       get_system_setting_text: {

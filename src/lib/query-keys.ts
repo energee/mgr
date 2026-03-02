@@ -225,9 +225,28 @@ export const reportKeys = {
   ttb: (period?: { year: number; month: number }) =>
     period ? (["reports", "ttb", period] as const) : (["reports", "ttb"] as const),
   inventory: () => ["reports", "inventory"] as const,
+  inventoryValuation: (asOfDate: string) =>
+    ["reports", "inventory-valuation", asOfDate] as const,
+  /** Raw material inventory valuation (lots with remaining quantities) */
+  inventoryValuationRaw: (asOfDate: string) =>
+    ["reports", "inventory-valuation", asOfDate, "raw-materials"] as const,
+  /** Finished goods inventory valuation (packaging allocations) */
+  inventoryValuationFinishedGoods: (asOfDate: string) =>
+    ["reports", "inventory-valuation", asOfDate, "finished-goods"] as const,
   production: () => ["reports", "production"] as const,
   ttbBatches: (year: number, month: number) =>
     ["ttb-batches", year, month] as const,
+  /** Production summary report filtered by date range */
+  productionSummary: (startDate: string, endDate: string) =>
+    ["reports", "production-summary", startDate, endDate] as const,
+  /** Batch cost analysis — batches with their allocation costs for a date range */
+  batchCost: (dateRange?: { from: string; to: string }) =>
+    dateRange
+      ? (["reports", "batch-cost", dateRange] as const)
+      : (["reports", "batch-cost"] as const),
+  /** Ingredient-level cost detail for a single batch */
+  batchCostDetail: (batchId: string) =>
+    ["reports", "batch-cost", "detail", batchId] as const,
 };
 
 // =============================================================================
@@ -334,6 +353,9 @@ export const revisionKeys = {
     ["entity_revisions", entityType, entityId] as const,
   forEntityCompact: (entityType: string, entityId: string) =>
     ["entity_revisions", entityType, entityId, "compact"] as const,
+  /** Resolve foreign key UUIDs to display names for a given table */
+  fkResolve: (table: string, ids: string[]) =>
+    ["fk-resolve", table, ids.sort().join(",")] as const,
 };
 
 // =============================================================================
@@ -595,4 +617,16 @@ export const squareKeys = {
     locationId
       ? (["square", "draft-sales", locationId] as const)
       : (["square", "draft-sales"] as const),
+};
+
+// =============================================================================
+// Email Keys
+// =============================================================================
+
+export const emailKeys = {
+  all: () => ["email"] as const,
+  sendHistory: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["email", "send-history", filters] as const)
+      : (["email", "send-history"] as const),
 };

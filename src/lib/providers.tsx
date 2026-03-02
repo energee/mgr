@@ -35,8 +35,8 @@ export function Providers({ children }: ProvidersProps) {
             refetchOnWindowFocus: process.env.NODE_ENV === "production",
           },
           mutations: {
-            // Retry failed mutations once
-            retry: 1,
+            // Disable mutation retry to prevent duplicate record creation on transient failures
+            retry: false,
           },
         },
       })
