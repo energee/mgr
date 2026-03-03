@@ -109,7 +109,7 @@ export function PickListItems({ data }: PickListItemsProps) {
       const [fgResult, locationResult] = await Promise.all([
         supabase
           .from("finished_goods")
-          .select("id, lot_number, brand_id, package_type_id, production_date")
+          .select("id, lot_number, brand_id, selling_format_id, production_date")
           .in("id", fgIds),
         locationIds.length > 0
           ? supabase.from("locations").select("id, name").in("id", locationIds)
@@ -121,19 +121,19 @@ export function PickListItems({ data }: PickListItemsProps) {
 
       // Get brand and package type names
       const brandIds = [...new Set((fgResult.data || []).map((fg) => fg.brand_id).filter((id): id is string => !!id))];
-      const packageIds = [...new Set((fgResult.data || []).map((fg) => fg.package_type_id).filter((id): id is string => !!id))];
+      const formatIds = [...new Set((fgResult.data || []).map((fg) => fg.selling_format_id).filter((id): id is string => !!id))];
 
-      const [brandsResult, packagesResult] = await Promise.all([
+      const [brandsResult, formatsResult] = await Promise.all([
         brandIds.length > 0
           ? supabase.from("brands").select("id, name").in("id", brandIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-        packageIds.length > 0
-          ? supabase.from("package_types").select("id, name").in("id", packageIds)
+        formatIds.length > 0
+          ? supabase.from("selling_formats").select("id, name").in("id", formatIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
 
       const brandMap = new Map((brandsResult.data || []).map((b) => [b.id, b.name]));
-      const packageMap = new Map((packagesResult.data || []).map((p) => [p.id, p.name]));
+      const formatMap = new Map((formatsResult.data || []).map((f) => [f.id, f.name]));
 
       return pickItems.map((item: PickListItemRow) => {
         const fg = fgMap.get(item.finished_good_id);
@@ -141,7 +141,7 @@ export function PickListItems({ data }: PickListItemsProps) {
           ...item,
           lot_number: fg?.lot_number || "N/A",
           brand_name: fg?.brand_id ? brandMap.get(fg.brand_id) || "Unknown" : "Unknown",
-          package_name: fg?.package_type_id ? packageMap.get(fg.package_type_id) || "Unknown" : "Unknown",
+          package_name: fg?.selling_format_id ? formatMap.get(fg.selling_format_id) || "Unknown" : "Unknown",
           location_name: item.location_id ? locationMap.get(item.location_id) || null : null,
           production_date: fg?.production_date || null,
         } as PickListItemRow;

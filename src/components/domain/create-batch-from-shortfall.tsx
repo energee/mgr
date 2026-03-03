@@ -203,7 +203,7 @@ export function CreateBatchFromShortfall({
           </DialogTitle>
           <DialogDescription>
             Create a batch to address the shortfall for{" "}
-            <span className="font-medium">{shortfall.brand_name}</span> ({shortfall.package_type_name}).
+            <span className="font-medium">{shortfall.brand_name}</span> ({shortfall.selling_format_name}).
           </DialogDescription>
         </DialogHeader>
 

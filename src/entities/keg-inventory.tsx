@@ -26,16 +26,15 @@ export type KegState =
 
 interface KegInventory {
   id: string;
-  keg_type_id: string;
+  selling_format_id: string;
   keg_owner_id: string | null;
   state: KegState;
   location_id: string | null;
   quantity: number;
   batch_id: string | null;
   finished_good_id: string | null;
-  // Joined fields from view
+  // Convenience display fields populated by the view from selling_formats/containers
   keg_type_name?: string;
-  keg_type_code?: string;
   keg_owner_name?: string;
   volume_bbl?: number;
   location_name?: string;
@@ -62,7 +61,7 @@ export const KEG_STATES: { value: KegState; label: string; description: string }
 // =============================================================================
 
 export const kegInventorySchema = z.object({
-  keg_type_id: z.string().uuid(),
+  selling_format_id: z.string().uuid(),
   keg_owner_id: z.string().uuid().nullable().optional(),
   state: z.enum(["empty", "filled", "shipped", "returned_dirty", "cleaning", "maintenance", "retired"]),
   location_id: z.string().uuid().nullable().optional(),
@@ -158,7 +157,6 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
       title: "Keg Inventory Details",
       fields: [
         { field: "keg_type_name", label: "Keg Type" },
-        { field: "keg_type_code", label: "Code" },
         { field: "keg_owner_name", label: "Owner" },
         { field: "state", label: "State" },
         { field: "quantity", label: "Quantity" },
@@ -178,7 +176,6 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
       title: "Keg Inventory Details",
       fields: [
         { name: "keg_type_name", label: "Keg Type", editable: false },
-        { name: "keg_type_code", label: "Code", editable: false },
         { name: "keg_owner_name", label: "Owner", editable: false },
         { name: "state", label: "State", editable: false },
         { name: "quantity", label: "Quantity", editable: false },
@@ -205,5 +202,5 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
     "What's the total keg count by state?",
   ],
 
-  keyFields: ["keg_type_id", "keg_owner_id", "state", "quantity", "location_id"],
+  keyFields: ["selling_format_id", "keg_owner_id", "state", "quantity", "location_id"],
 };

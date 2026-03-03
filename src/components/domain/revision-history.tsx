@@ -201,20 +201,24 @@ function formatValue(value: unknown, resolvedNames?: Map<string, string>): strin
 // FK Name Resolution
 // =============================================================================
 
-/** Maps FK field names to their lookup table. Covers irregular plurals. */
+/** Maps FK field names to their lookup table. Covers irregular plurals
+ *  and legacy columns whose tables were dropped during the containers migration. */
 const FK_TABLE_MAP: Record<string, string> = {
   style_id: "beer_styles",
   yeast_id: "yeasts",
   pricing_tier_id: "pricing_tiers",
-  keg_type_id: "keg_types",
+  selling_format_id: "selling_formats",
+  container_id: "containers",
   keg_owner_id: "keg_owners",
-  package_type_id: "package_types",
   sales_channel_id: "sales_channels",
   delivery_id: "deliveries",
   category_id: "categories",
   batch_id: "batches",
   address_id: "addresses",
   inventory_id: "inventories",
+  // Legacy columns -- old UUIDs were reused as selling_formats.id
+  package_type_id: "selling_formats",
+  keg_type_id: "selling_formats",
 };
 
 /** Derive the lookup table for a `_id` field. Uses FK_TABLE_MAP for exceptions,

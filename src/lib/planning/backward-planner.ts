@@ -33,8 +33,8 @@ export interface OrderItemDemand {
   item_id: string;
   brand_id: string | null;
   brand_name: string | null;
-  package_type_id: string | null;
-  package_type_name: string | null;
+  selling_format_id: string | null;
+  selling_format_name: string | null;
   quantity: number;
   // TBD fields
   is_tbd: boolean;
@@ -49,8 +49,8 @@ export interface OrderItemDemand {
 export interface ProductionRequirement {
   brand_id: string | null;
   brand_name: string | null;
-  package_type_id: string | null;
-  package_type_name: string | null;
+  selling_format_id: string | null;
+  selling_format_name: string | null;
   // TBD fields
   is_tbd: boolean;
   style_id: string | null;
@@ -131,12 +131,12 @@ export async function getOrderDemand(horizonWeeks = 8): Promise<OrderDemand[]> {
       id,
       order_id,
       brand_id,
-      package_type_id,
+      selling_format_id,
       quantity,
       style_id,
       tbd_notes,
       brands:brand_id (name),
-      package_types:package_type_id (name),
+      selling_formats:selling_format_id (name),
       beer_styles:style_id (name)
     `)
     .in("order_id", orderIds);
@@ -154,15 +154,15 @@ export async function getOrderDemand(horizonWeeks = 8): Promise<OrderDemand[]> {
     }
 
     const brand = item.brands as { name: string } | null;
-    const packageType = item.package_types as { name: string } | null;
+    const sellingFormat = item.selling_formats as { name: string } | null;
     const style = item.beer_styles as { name: string } | null;
 
     itemsByOrder.get(item.order_id)!.push({
       item_id: item.id,
       brand_id: item.brand_id,
       brand_name: brand?.name ?? null,
-      package_type_id: item.package_type_id,
-      package_type_name: packageType?.name ?? null,
+      selling_format_id: item.selling_format_id,
+      selling_format_name: sellingFormat?.name ?? null,
       quantity: item.quantity,
       is_tbd: !item.brand_id && !!item.style_id,
       style_id: item.style_id,
@@ -205,15 +205,15 @@ export async function getProductionRequirements(
     for (const item of order.items) {
       // Create key: either brand/package or style/package for TBD
       const key = item.is_tbd
-        ? `tbd:${item.style_id}:${item.package_type_id}`
-        : `brand:${item.brand_id}:${item.package_type_id}`;
+        ? `tbd:${item.style_id}:${item.selling_format_id}`
+        : `brand:${item.brand_id}:${item.selling_format_id}`;
 
       if (!requirementMap.has(key)) {
         requirementMap.set(key, {
           brand_id: item.brand_id,
           brand_name: item.brand_name,
-          package_type_id: item.package_type_id,
-          package_type_name: item.package_type_name,
+          selling_format_id: item.selling_format_id,
+          selling_format_name: item.selling_format_name,
           is_tbd: item.is_tbd,
           style_id: item.style_id,
           style_name: item.style_name,
@@ -252,19 +252,19 @@ export async function getProductionRequirements(
 
   // Fetch available inventory for non-TBD items
   const brandPackageKeys = Array.from(requirementMap.values())
-    .filter((r) => !r.is_tbd && r.brand_id && r.package_type_id);
+    .filter((r) => !r.is_tbd && r.brand_id && r.selling_format_id);
 
   if (brandPackageKeys.length > 0) {
     // Get finished goods availability
     const { data: inventory, error: invError } = await supabase
       .from("finished_goods_with_availability")
-      .select("brand_id, package_type_id, available_quantity");
+      .select("brand_id, selling_format_id, available_quantity");
 
     if (invError) {
       console.error("Error fetching inventory:", invError);
     } else if (inventory) {
       for (const inv of inventory) {
-        const key = `brand:${inv.brand_id}:${inv.package_type_id}`;
+        const key = `brand:${inv.brand_id}:${inv.selling_format_id}`;
         const req = requirementMap.get(key);
         if (req) {
           req.available_quantity = inv.available_quantity || 0;

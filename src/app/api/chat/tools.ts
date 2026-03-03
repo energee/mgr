@@ -463,7 +463,7 @@ export function createChatTools(supabase: SupabaseClient) {
 
     getFinishedGoods: tool({
       description:
-        "Get finished goods inventory with availability. Filter by brand or package type.",
+        "Get finished goods inventory with availability. Filter by brand or selling format.",
       inputSchema: z.object({
         brandId: z.string().uuid().optional().describe("Filter by brand UUID"),
         query: z.string().optional().describe("Search by brand name"),
@@ -473,15 +473,415 @@ export function createChatTools(supabase: SupabaseClient) {
         let q = supabase
           .from("finished_goods_with_availability")
           .select(
-            "id, lot_number, brand_name, package_type_name, total_quantity, allocated_quantity, reserved_quantity, available_quantity, production_date, best_by_date"
+            "id, lot_number, brand_name, selling_format_name, total_quantity, allocated_quantity, reserved_quantity, available_quantity, production_date, best_by_date"
           )
           .gt("available_quantity", 0)
           .order("brand_name")
           .limit(limit);
 
         if (brandId) q = q.eq("brand_id", brandId);
-        if (searchQuery)
-          q = q.ilike("brand_name", `%${escapeLike(searchQuery)}%`);
+        if (searchQuery) q = q.ilike("brand_name", `%${escapeLike(searchQuery)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    lookupEntity: tool({
+      description:
+        "Resolve a human-friendly name to a UUID. Searches batches (by number), recipes (by name), customers (by name), brands (by name), and orders (by number). Use this when you need a UUID for another tool.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .describe("The name or number to search for (e.g. 'batch 42', 'Hazy IPA')"),
+        entityType: z
+          .enum(["batch", "recipe", "customer", "brand", "order"])
+          .optional()
+          .describe("Narrow search to a specific entity type"),
+      }),
+      execute: async ({ query: searchQuery, entityType }) => {
+        type Result = { type: string; id: string; display: string };
+        const escaped = escapeLike(searchQuery);
+        const should = (t: string) => !entityType || entityType === t;
+
+        const queries: PromiseLike<Result[]>[] = [];
+
+        if (should("batch")) {
+          const batchSelect = "id, batch_number, name" as const;
+          const toResult = (b: { id: string; batch_number: string; name: string | null }) => ({
+            type: "batch" as const,
+            id: b.id,
+            display: `${b.batch_number}${b.name ? ` — ${b.name}` : ""}`,
+          });
+          queries.push(
+            Promise.all([
+              supabase
+                .from("batches")
+                .select(batchSelect)
+                .ilike("batch_number", `%${escaped}%`)
+                .limit(5),
+              supabase
+                .from("batches")
+                .select(batchSelect)
+                .ilike("name", `%${escaped}%`)
+                .limit(5),
+            ]).then(([byNumber, byName]) => {
+              const seen = new Set<string>();
+              const results: Result[] = [];
+              for (const row of [...(byNumber.data || []), ...(byName.data || [])]) {
+                if (!seen.has(row.id)) {
+                  seen.add(row.id);
+                  results.push(toResult(row));
+                }
+              }
+              return results.slice(0, 5);
+            })
+          );
+        }
+
+        if (should("recipe")) {
+          queries.push(
+            supabase
+              .from("recipes")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((r) => ({ type: "recipe", id: r.id, display: r.name }))
+              )
+          );
+        }
+
+        if (should("customer")) {
+          queries.push(
+            supabase
+              .from("customers")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .eq("is_active", true)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((c) => ({ type: "customer", id: c.id, display: c.name }))
+              )
+          );
+        }
+
+        if (should("brand")) {
+          queries.push(
+            supabase
+              .from("brands")
+              .select("id, name")
+              .ilike("name", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((b) => ({ type: "brand", id: b.id, display: b.name }))
+              )
+          );
+        }
+
+        if (should("order")) {
+          queries.push(
+            supabase
+              .from("orders")
+              .select("id, order_number")
+              .ilike("order_number", `%${escaped}%`)
+              .limit(5)
+              .then(({ data }) =>
+                (data || []).map((o) => ({ type: "order", id: o.id, display: o.order_number }))
+              )
+          );
+        }
+
+        const allResults = await Promise.all(queries);
+        return allResults.flat();
+      },
+    }),
+
+    searchOrders: tool({
+      description:
+        "Search orders by status, customer name, or date range. Returns order headers with customer info.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by status: draft, confirmed, scheduled, picking, packed, fulfilled, cancelled"
+          ),
+        customerName: z
+          .string()
+          .optional()
+          .describe("Filter by customer name (partial match)"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Order date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Order date end (YYYY-MM-DD)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, customerName, startDate, endDate, limit }) => {
+        const customerJoin = customerName
+          ? "customer:customers!inner(id, name)"
+          : "customer:customers(id, name)";
+        let q = supabase
+          .from("orders")
+          .select(
+            `id, order_number, status, order_date, requested_date, scheduled_date, notes, ${customerJoin}`
+          )
+          .order("order_date", { ascending: false })
+          .limit(limit);
+
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("order_date", startDate);
+        if (endDate) q = q.lte("order_date", endDate);
+        if (customerName)
+          q = q.ilike("customers.name", `%${escapeLike(customerName)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    getOrderDetail: tool({
+      description:
+        "Get full details for an order including line items with brand, selling format, quantity, and price.",
+      inputSchema: z.object({
+        orderId: z.string().uuid().describe("The order UUID"),
+      }),
+      execute: async ({ orderId }) => {
+        const { data, error } = await supabase
+          .from("orders")
+          .select(
+            `id, order_number, status, order_date, requested_date, scheduled_date, fulfilled_date, shipping_address, notes,
+             customer:customers(id, name, customer_type, email, phone),
+             items:order_items(id, quantity, unit_price, notes, brand:brands(id, name), selling_format:selling_formats(id, name), batch:batches(id, batch_number))`
+          )
+          .eq("id", orderId)
+          .single();
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    getCustomers: tool({
+      description:
+        "Search customers by name. Returns customer info with order statistics.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Search by customer name"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ query: searchQuery, limit }) => {
+        let q = supabase
+          .from("customers_with_order_summary")
+          .select(
+            "id, name, customer_type, contact_name, email, phone, total_orders, total_revenue, pending_orders, last_order_date"
+          )
+          .eq("is_active", true)
+          .order("name")
+          .limit(limit);
+
+        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchBrewLogs: tool({
+      description:
+        "Search brew logs (hot-side brew day records) by status, date range, or brew number. Returns brew log headers with recipe info.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe("Filter by status: draft, in_progress, completed, cancelled"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Brew date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Brew date end (YYYY-MM-DD)"),
+        brewNumber: z
+          .string()
+          .optional()
+          .describe("Filter by brew number (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, brewNumber, limit }) => {
+        let q = supabase
+          .from("brew_logs")
+          .select(
+            "id, brew_number, brew_date, status, notes, recipe:recipes(id, name)"
+          )
+          .order("brew_date", { ascending: false })
+          .limit(limit);
+
+        if (status) q = q.eq("status", status);
+        if (brewNumber)
+          q = q.ilike("brew_number", `%${escapeLike(brewNumber)}%`);
+        if (startDate) q = q.gte("brew_date", startDate);
+        if (endDate) q = q.lte("brew_date", endDate);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchPurchaseOrders: tool({
+      description:
+        "Search purchase orders by status, date range, or supplier name. Returns PO headers with supplier info.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by status: draft, submitted, confirmed, partial, fulfilled, cancelled"
+          ),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Order date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Order date end (YYYY-MM-DD)"),
+        supplierName: z
+          .string()
+          .optional()
+          .describe("Filter by supplier name (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, supplierName, limit }) => {
+        const supplierJoin = supplierName
+          ? "supplier:suppliers!inner(id, name)"
+          : "supplier:suppliers(id, name)";
+        let q = supabase
+          .from("purchase_orders")
+          .select(
+            `id, po_number, status, order_date, expected_date, shipping_cost, tax, notes, ${supplierJoin}`
+          )
+          .order("order_date", { ascending: false })
+          .limit(limit);
+
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("order_date", startDate);
+        if (endDate) q = q.lte("order_date", endDate);
+        if (supplierName)
+          q = q.ilike("suppliers.name", `%${escapeLike(supplierName)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchSuppliers: tool({
+      description:
+        "Search suppliers by name. Returns supplier contact info, payment terms, and lead times.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Search by supplier name"),
+        isActive: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Filter by active status (default true)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ query: searchQuery, isActive, limit }) => {
+        let q = supabase
+          .from("suppliers")
+          .select(
+            "id, name, contact_name, contact_email, contact_phone, payment_terms, default_lead_time_days, is_active"
+          )
+          .order("name")
+          .limit(limit);
+
+        if (isActive !== undefined) q = q.eq("is_active", isActive);
+        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchPickLists: tool({
+      description:
+        "Search pick lists by status, date range, or customer name. Returns pick list details with order info and progress.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe("Filter by status: pending, in_progress, completed, cancelled"),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Generated-at date start (YYYY-MM-DD)"),
+        endDate: z
+          .string()
+          .optional()
+          .describe("Generated-at date end (YYYY-MM-DD)"),
+        customerName: z
+          .string()
+          .optional()
+          .describe("Filter by customer name (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, startDate, endDate, customerName, limit }) => {
+        let q = supabase
+          .from("pick_list_details")
+          .select(
+            "id, status, generated_at, order_id, order_number, customer_name, total_items, items_picked, assigned_to_name"
+          )
+          .order("generated_at", { ascending: false })
+          .limit(limit);
+
+        if (status) q = q.eq("status", status);
+        if (startDate) q = q.gte("generated_at", startDate);
+        if (endDate) q = q.lte("generated_at", endDate);
+        if (customerName)
+          q = q.ilike("customer_name", `%${escapeLike(customerName)}%`);
+
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    }),
+
+    searchYeastPitches: tool({
+      description:
+        "Search yeast pitches with viability and strain details. Filter by status or strain name.",
+      inputSchema: z.object({
+        status: z
+          .string()
+          .optional()
+          .describe("Filter by status: available, pitched, harvested, expired, discarded"),
+        strainName: z
+          .string()
+          .optional()
+          .describe("Filter by yeast strain name (partial match)"),
+        limit: z.number().optional().default(20).describe("Max results"),
+      }),
+      execute: async ({ status, strainName, limit }) => {
+        let q = supabase
+          .from("yeast_pitches_with_details")
+          .select(
+            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_number, location_name"
+          )
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (status) q = q.eq("status", status);
+        if (strainName)
+          q = q.ilike("strain_name", `%${escapeLike(strainName)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -513,7 +913,7 @@ export function createChatTools(supabase: SupabaseClient) {
         let q = supabase
           .from("keg_inventory_with_details")
           .select(
-            "id, keg_type_name, keg_type_code, volume_bbl, keg_owner_name, state, location_name, quantity, batch_number, finished_good_name"
+            "id, keg_type_name, volume_bbl, keg_owner_name, state, location_name, quantity, batch_number, finished_good_name"
           )
           .order("keg_type_name")
           .limit(limit);
@@ -527,145 +927,6 @@ export function createChatTools(supabase: SupabaseClient) {
         const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
-      },
-    }),
-
-    // =========================================================================
-    // Utility Tools
-    // =========================================================================
-
-    lookupEntity: tool({
-      description:
-        "Resolve a human-friendly name to a UUID. Searches batches (by number), recipes (by name), customers (by name), brands (by name), and orders (by number). Use this when you need a UUID for another tool.",
-      inputSchema: z.object({
-        query: z
-          .string()
-          .describe(
-            "The name or number to search for (e.g. 'batch 42', 'Hazy IPA')"
-          ),
-        entityType: z
-          .enum(["batch", "recipe", "customer", "brand", "order"])
-          .optional()
-          .describe("Narrow search to a specific entity type"),
-      }),
-      execute: async ({ query: searchQuery, entityType }) => {
-        type Result = { type: string; id: string; display: string };
-        const escaped = escapeLike(searchQuery);
-        const should = (t: string) => !entityType || entityType === t;
-
-        const queries: PromiseLike<Result[]>[] = [];
-
-        if (should("batch")) {
-          const batchSelect = "id, batch_number, name" as const;
-          const toResult = (b: {
-            id: string;
-            batch_number: string;
-            name: string | null;
-          }) => ({
-            type: "batch" as const,
-            id: b.id,
-            display: `${b.batch_number}${b.name ? ` — ${b.name}` : ""}`,
-          });
-          queries.push(
-            Promise.all([
-              supabase
-                .from("batches")
-                .select(batchSelect)
-                .ilike("batch_number", `%${escaped}%`)
-                .limit(5),
-              supabase
-                .from("batches")
-                .select(batchSelect)
-                .ilike("name", `%${escaped}%`)
-                .limit(5),
-            ]).then(([byNumber, byName]) => {
-              const seen = new Set<string>();
-              const results: Result[] = [];
-              for (const row of [
-                ...(byNumber.data || []),
-                ...(byName.data || []),
-              ]) {
-                if (!seen.has(row.id)) {
-                  seen.add(row.id);
-                  results.push(toResult(row));
-                }
-              }
-              return results.slice(0, 5);
-            })
-          );
-        }
-
-        if (should("recipe")) {
-          queries.push(
-            supabase
-              .from("recipes")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((r) => ({
-                  type: "recipe",
-                  id: r.id,
-                  display: r.name,
-                }))
-              )
-          );
-        }
-
-        if (should("customer")) {
-          queries.push(
-            supabase
-              .from("customers")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .eq("is_active", true)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((c) => ({
-                  type: "customer",
-                  id: c.id,
-                  display: c.name,
-                }))
-              )
-          );
-        }
-
-        if (should("brand")) {
-          queries.push(
-            supabase
-              .from("brands")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((b) => ({
-                  type: "brand",
-                  id: b.id,
-                  display: b.name,
-                }))
-              )
-          );
-        }
-
-        if (should("order")) {
-          queries.push(
-            supabase
-              .from("orders")
-              .select("id, order_number")
-              .ilike("order_number", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((o) => ({
-                  type: "order",
-                  id: o.id,
-                  display: o.order_number,
-                }))
-              )
-          );
-        }
-
-        const allResults = await Promise.all(queries);
-        return allResults.flat();
       },
     }),
 

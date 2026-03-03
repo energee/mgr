@@ -112,8 +112,8 @@ Square catalog items must be mapped to MGR finished goods before sync works. Unm
 
 ```typescript
 // Mapping resolution order:
-// 1. Exact finished_good_id match (specific FG/lot)
-// 2. brand_id + package_type_id match (any available FG)
+// 1. brand_id + selling_format_id match → find available FG
+// 2. If no inventory available → log error, skip item
 ```
 
 ### Implementation
@@ -159,8 +159,8 @@ export async function handleSquareWebhook(req: Request) {
 
     // Look up mapping
     const { data: mapping } = await supabase
-      .from('square_item_mappings')
-      .select('finished_good_id, brand_id, package_type_id')
+      .from('square_catalog_map')
+      .select('brand_id, selling_format_id')
       .eq('square_catalog_id', item.catalog_object_id)
       .single();
 
@@ -176,8 +176,7 @@ export async function handleSquareWebhook(req: Request) {
     }
 
     // Resolve finished good (specific or find available)
-    const finishedGoodId = mapping.finished_good_id
-      ?? await findAvailableFG(mapping.brand_id, mapping.package_type_id);
+    const finishedGoodId = await findAvailableFG(mapping.brand_id, mapping.selling_format_id);
 
     if (!finishedGoodId) {
       await supabase.from('square_sync_errors').insert({
