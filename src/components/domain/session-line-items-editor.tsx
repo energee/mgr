@@ -9,7 +9,7 @@
  * Uses unified selling_format_id (containers + selling_formats model).
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ import {
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sessionLineItemKeys, packagingKeys } from "@/lib/query-keys";
-import { useBrands, usePackagingFormats, useKegOwners, isKegFormat } from "@/hooks/use-catalog";
+import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
@@ -266,6 +266,12 @@ export function SessionLineItemsEditor({
   const { data: packagingFormats } = usePackagingFormats();
   const { data: kegOwners } = useKegOwners();
 
+  // O(1) keg format lookup — avoids O(n) isKegFormat() calls in render
+  const kegFormatIds = useMemo(
+    () => new Set(packagingFormats?.filter((f) => f.container_type === "keg").map((f) => f.id)),
+    [packagingFormats]
+  );
+
   // Batch options for new item row
   const { data: newItemBatches, isLoading: newItemBatchesLoading } =
     useBatchesForBrand(newItem.brand_id || null);
@@ -273,7 +279,7 @@ export function SessionLineItemsEditor({
   // Add item mutation
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
-      const isKeg = isKegFormat(item.format_id || null, packagingFormats);
+      const isKeg = kegFormatIds.has(item.format_id);
       const sourceBatches = item.batch_id
         ? [
             {
@@ -466,7 +472,7 @@ export function SessionLineItemsEditor({
                 {readOnly ? (
                   <span className="flex items-center gap-1.5">
                     {getFormatName(item)}
-                    {isKegFormat(item.selling_format_id, packagingFormats) && item.keg_owner_name && (
+                    {item.selling_format_id && kegFormatIds.has(item.selling_format_id) && item.keg_owner_name && (
                       <Badge variant="outline" className="text-xs">{item.keg_owner_name}</Badge>
                     )}
                   </span>
@@ -498,7 +504,7 @@ export function SessionLineItemsEditor({
                         ))}
                       </ComboboxContent>
                     </Combobox>
-                    {isKegFormat(item.selling_format_id, packagingFormats) && (
+                    {item.selling_format_id && kegFormatIds.has(item.selling_format_id) && (
                       <Combobox
                         value={item.keg_owner_id || ""}
                         onValueChange={(v) =>
@@ -686,7 +692,7 @@ export function SessionLineItemsEditor({
                       ))}
                     </ComboboxContent>
                   </Combobox>
-                  {isKegFormat(newItem.format_id || null, packagingFormats) && (
+                  {kegFormatIds.has(newItem.format_id) && (
                     <Combobox
                       value={newItem.keg_owner_id}
                       onValueChange={(v) => setNewItem({ ...newItem, keg_owner_id: v })}

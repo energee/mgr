@@ -1124,13 +1124,6 @@ export type Database = {
             foreignKeyName: "channel_formats_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "channel_formats_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -1596,13 +1589,6 @@ export type Database = {
             foreignKeyName: "finished_goods_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "finished_goods_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -1919,13 +1905,6 @@ export type Database = {
             foreignKeyName: "keg_owner_deposits_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "keg_owner_deposits_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -2212,13 +2191,6 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "keg_transactions_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -2721,13 +2693,6 @@ export type Database = {
             foreignKeyName: "order_items_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "order_items_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -2879,7 +2844,7 @@ export type Database = {
           notes: string | null
           packaged_date: string
           quantity: number
-          selling_format_id: string | null
+          selling_format_id: string
         }
         Insert: {
           batch_id: string
@@ -2890,7 +2855,7 @@ export type Database = {
           notes?: string | null
           packaged_date: string
           quantity: number
-          selling_format_id?: string | null
+          selling_format_id: string
         }
         Update: {
           batch_id?: string
@@ -2901,7 +2866,7 @@ export type Database = {
           notes?: string | null
           packaged_date?: string
           quantity?: number
-          selling_format_id?: string | null
+          selling_format_id?: string
         }
         Relationships: [
           {
@@ -2951,13 +2916,6 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "packages_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -3377,13 +3335,6 @@ export type Database = {
             columns: ["format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "pricing_tier_prices_format_id_fkey"
-            columns: ["format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -4880,13 +4831,6 @@ export type Database = {
             foreignKeyName: "session_line_items_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "session_line_items_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -5117,13 +5061,6 @@ export type Database = {
             foreignKeyName: "square_catalog_map_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "square_catalog_map_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -5231,13 +5168,6 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "square_draft_sales_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -7088,13 +7018,6 @@ export type Database = {
             foreignKeyName: "keg_transactions_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "keg_transactions_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -7238,13 +7161,6 @@ export type Database = {
             foreignKeyName: "finished_goods_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "finished_goods_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -7366,13 +7282,6 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "finished_goods_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -7506,13 +7415,6 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "finished_goods_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -7690,13 +7592,6 @@ export type Database = {
             foreignKeyName: "keg_transactions_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "keg_transactions_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -7730,28 +7625,6 @@ export type Database = {
           },
         ]
       }
-      keg_fleet_summary: {
-        Row: {
-          active_kegs: number | null
-          cleaning_count: number | null
-          deposit_amount: number | null
-          deposits_outstanding: number | null
-          dirty_count: number | null
-          empty_count: number | null
-          filled_count: number | null
-          keg_owner_id: string | null
-          keg_owner_name: string | null
-          keg_type_name: string | null
-          maintenance_count: number | null
-          retired_count: number | null
-          selling_format_id: string | null
-          shipped_count: number | null
-          total_kegs: number | null
-          utilization_pct: number | null
-          volume_bbl: number | null
-        }
-        Relationships: []
-      }
       keg_inventory: {
         Row: {
           batch_id: string | null
@@ -7767,13 +7640,16 @@ export type Database = {
       }
       keg_inventory_summary: {
         Row: {
-          keg_owner_id: string | null
-          keg_owner_name: string | null
+          cleaning_count: number | null
+          dirty_count: number | null
+          empty_count: number | null
+          filled_count: number | null
           keg_type_name: string | null
-          location_count: number | null
+          maintenance_count: number | null
+          retired_count: number | null
           selling_format_id: string | null
-          state: Database["public"]["Enums"]["keg_state"] | null
-          total_quantity: number | null
+          shipped_count: number | null
+          total_count: number | null
           volume_bbl: number | null
         }
         Relationships: []
@@ -7986,13 +7862,6 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "keg_transactions_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -8286,13 +8155,6 @@ export type Database = {
             foreignKeyName: "order_items_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "order_items_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -8430,13 +8292,6 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "order_items_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {

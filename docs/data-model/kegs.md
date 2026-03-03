@@ -166,7 +166,6 @@ Keg inventory with joined display names for UI. Joins through `selling_formats` 
 |--------|------|-------------|
 | (all keg_inventory columns) | | Base inventory data |
 | keg_type_name | TEXT | Container name (backward-compat alias from `containers.name`) |
-| keg_type_code | TEXT | Keg type code |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_name | TEXT | Fleet owner name |
 | keg_owner_code | TEXT | Fleet owner code |
@@ -184,7 +183,6 @@ Keg transactions with joined display names for UI. Joins through `selling_format
 |--------|------|-------------|
 | (all keg_transactions columns) | | Base transaction data |
 | keg_type_name | TEXT | Container name (backward-compat alias from `containers.name`) |
-| keg_type_code | TEXT | Keg type code |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_name | TEXT | Fleet owner name |
 | keg_owner_code | TEXT | Fleet owner code |
@@ -223,7 +221,6 @@ Aggregated view of keg inventory by type, owner, and state.
 | customer_name | TEXT | Customer name |
 | selling_format_id | UUID | FK to selling_formats |
 | keg_type_name | TEXT | Container name (backward-compat alias) |
-| keg_type_code | TEXT | Keg type code |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_id | UUID | Fleet owner ID |
 | keg_owner_name | TEXT | Fleet owner name |
@@ -317,7 +314,6 @@ Fleet-wide summary of keg counts by type, owner, and state.
 |--------|------|-------------|
 | selling_format_id | UUID | FK to selling_formats |
 | keg_type_name | TEXT | Container name (backward-compat alias) |
-| keg_type_code | TEXT | Keg type code |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_id | UUID | Fleet owner ID |
 | keg_owner_name | TEXT | Fleet owner name |
