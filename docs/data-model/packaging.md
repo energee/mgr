@@ -152,7 +152,9 @@ Finished goods inventory (packaged products ready for sale).
 Use this view for order fulfillment and inventory queries. Available quantity is calculated from allocations.
 
 ```sql
-CREATE VIEW finished_goods_with_availability AS
+CREATE VIEW finished_goods_with_availability
+WITH (security_invoker = true)
+AS
 SELECT
   fg.*,
   fg.quantity as total_quantity,

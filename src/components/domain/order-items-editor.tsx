@@ -850,7 +850,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
             </TableRow>
           )}
 
-          {showAddRow && newItem.brand_id && newItem.format_id && (
+          {showAddRow && newItem.brand_id && newItem.format_id && !kegFormatIds.has(newItem.format_id) && (
             <TableRow>
               <TableCell colSpan={readOnly ? 5 : 6}>
                 <AvailabilityPanel brandId={newItem.brand_id} sellingFormatId={newItem.format_id} />
