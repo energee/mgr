@@ -3,8 +3,9 @@
 /**
  * Login Form
  *
- * Handles email/password login and magic link authentication.
- * Uses basic form handling for simplicity.
+ * Handles email/password login and passwordless authentication.
+ * Passwordless flow sends a magic link and OTP code via email.
+ * Users can either click the link or enter the code manually.
  */
 
 import { useState, type FormEvent } from "react";
@@ -81,7 +82,7 @@ export function LoginForm() {
     }
   };
 
-  const handleMagicLink = async () => {
+  const handlePasswordless = async () => {
     if (!email || !z.string().email().safeParse(email).success) {
       toast.error("Please enter a valid email first");
       return;
@@ -104,7 +105,7 @@ export function LoginForm() {
       localStorage.setItem("mgr:login-email", email);
       setOtpSent(true);
       setOtpCode("");
-      toast.success("Check your email for the login code");
+      toast.success("Check your email for a login link or code");
     } catch {
       toast.error("An unexpected error occurred");
     } finally {
@@ -143,7 +144,8 @@ export function LoginForm() {
     return (
       <form onSubmit={handleVerifyOtp} className="space-y-4">
         <p className="text-sm text-muted-foreground text-center">
-          Enter the code we sent to <span className="font-medium text-foreground">{email}</span>
+          We sent a login link and code to <span className="font-medium text-foreground">{email}</span>.
+          Click the link or enter the code below.
         </p>
         <div className="space-y-2">
           <Label htmlFor="otp">Code</Label>
@@ -166,7 +168,7 @@ export function LoginForm() {
           <Button type="button" variant="outline" className="flex-1" onClick={() => setOtpSent(false)} disabled={isLoading}>
             Back
           </Button>
-          <Button type="button" variant="outline" className="flex-1" onClick={handleMagicLink} disabled={isLoading}>
+          <Button type="button" variant="outline" className="flex-1" onClick={handlePasswordless} disabled={isLoading}>
             Resend code
           </Button>
         </div>
@@ -211,7 +213,7 @@ export function LoginForm() {
           <Separator className="w-full" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">Or</span>
+          <span className="bg-background px-2 text-muted-foreground">Or</span>
         </div>
       </div>
 
@@ -219,10 +221,10 @@ export function LoginForm() {
         type="button"
         variant="outline"
         className="w-full"
-        onClick={handleMagicLink}
+        onClick={handlePasswordless}
         disabled={isLoading}
       >
-        Sign in with email code
+        Sign in with magic link
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
