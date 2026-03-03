@@ -222,7 +222,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     },
   });
 
-  // Function to look up tier price for a selling format
+  // Function to look up tier price for a selling format (works for all format types including kegs)
   const lookupTierPrice = useCallback(async (
     brandId: string | null,
     formatId: string | null
@@ -266,10 +266,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     return set;
   }, [packagingFormats]);
 
-  // Auto-lookup price when brand or format changes in new item
+  // Auto-lookup price when brand or format changes in new item (all formats including kegs)
   useEffect(() => {
     const lookupPrice = async () => {
-      if (newItem.brand_id && newItem.format_id && !kegFormatIds.has(newItem.format_id)) {
+      if (newItem.brand_id && newItem.format_id) {
         const result = await lookupTierPrice(newItem.brand_id, newItem.format_id);
         if (result) {
           setNewItem((prev) => ({
@@ -285,12 +285,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
             tierName: null,
           }));
         }
-      } else if (newItem.format_id && kegFormatIds.has(newItem.format_id)) {
-        setNewItem((prev) => ({ ...prev, suggestedPrice: null, tierName: null }));
       }
     };
     lookupPrice();
-  }, [newItem.brand_id, newItem.format_id, lookupTierPrice, kegFormatIds]);
+  }, [newItem.brand_id, newItem.format_id, lookupTierPrice]);
 
   // Inventory availability
   const { data: availability } = useBrandAvailability();
@@ -633,7 +631,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       className="h-8 w-full"
                       placeholder="0.00"
                     />
-                    {effectiveCustomerId && item.brand_id && item.selling_format_id && !kegFormatIds.has(item.selling_format_id ?? "") && (
+                    {effectiveCustomerId && item.brand_id && item.selling_format_id && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>

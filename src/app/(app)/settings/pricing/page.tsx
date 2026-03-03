@@ -52,9 +52,11 @@ import {
   Settings2,
   Grid3X3,
   Package,
+  Store,
 } from "lucide-react";
 import { EntityList } from "@/components/universal/entity-list";
 import { pricingTierEntity } from "@/entities/pricing-tier";
+import { salesChannelEntity } from "@/entities/sales-channel";
 
 // =============================================================================
 // Types
@@ -98,6 +100,29 @@ interface ChannelFormat {
   sales_channel_id: string;
 }
 
+/**
+ * Fetches the list of format IDs enabled for a given sales channel
+ * from the pricing_channel_formats junction table.
+ */
+function useChannelFormatIds(channelId: string | null) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: settingsKeys.pricingChannelFormats(channelId ?? ""),
+    queryFn: async () => {
+      if (!channelId) return [];
+      // Table not yet in generated types -- cast until types are regenerated
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("pricing_channel_formats")
+        .select("format_id")
+        .eq("sales_channel_id", channelId);
+      if (error) throw error;
+      return (data as { format_id: string }[]).map((r) => r.format_id);
+    },
+    enabled: !!channelId,
+  });
+}
+
 // =============================================================================
 // Cell Editor Component
 // =============================================================================
@@ -125,11 +150,13 @@ function PriceCell({
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
+  const dirtyRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const startEditing = useCallback(() => {
     setValue(price != null ? price.toFixed(2) : "");
+    dirtyRef.current = false;
     setEditing(true);
   }, [price]);
 
@@ -150,6 +177,9 @@ function PriceCell({
 
   const commit = useCallback(() => {
     setEditing(false);
+    // If the user never typed anything, treat as cancel — prevents accidental
+    // deletes when a cell is opened before price data has loaded.
+    if (!dirtyRef.current) return;
     const trimmed = value.trim();
     const parsed = trimmed === "" ? null : parseFloat(trimmed);
     if (trimmed !== "" && (isNaN(parsed!) || parsed! < 0)) {
@@ -201,7 +231,7 @@ function PriceCell({
         type="text"
         inputMode="decimal"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => { dirtyRef.current = true; setValue(e.target.value); }}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         className="h-8 w-full text-right text-sm px-2 py-0 tabular-nums"
@@ -229,7 +259,15 @@ function PriceCell({
 // Format Management Component (channel_formats toggles)
 // =============================================================================
 
-function FormatManagement() {
+function FormatManagement({
+  channels,
+  activeChannelId,
+  onChannelChange,
+}: {
+  channels: SalesChannel[];
+  activeChannelId: string | null;
+  onChannelChange: (id: string) => void;
+}) {
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -245,20 +283,6 @@ function FormatManagement() {
         .order("name");
       if (error) throw error;
       return data as SellingFormatWithContainer[];
-    },
-  });
-
-  // All sales channels
-  const { data: channels } = useQuery({
-    queryKey: settingsKeys.pricingChannels(),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales_channels")
-        .select("id, name, code, position, is_active")
-        .eq("is_active", true)
-        .order("position");
-      if (error) throw error;
-      return data as SalesChannel[];
     },
   });
 
@@ -328,7 +352,21 @@ function FormatManagement() {
   if (formatsLoading) return <Skeleton className="h-64 w-full" />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Channel tabs */}
+      <Tabs
+        value={activeChannelId ?? undefined}
+        onValueChange={onChannelChange}
+      >
+        <TabsList>
+          {channels.map((ch) => (
+            <TabsTrigger key={ch.id} value={ch.id}>
+              {ch.name}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
       <p className="text-sm text-muted-foreground">
         Toggle which selling formats appear in the pricing matrix for each sales channel.
       </p>
@@ -391,7 +429,7 @@ export default function PricingPage() {
   const queryClient = useQueryClient();
 
   const [channelOverride, setChannelOverride] = useState<string | null>(null);
-  const [view, setView] = useState<"matrix" | "tiers" | "formats">("matrix");
+  const [view, setView] = useState<"matrix" | "tiers" | "formats" | "channels">("matrix");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkType, setBulkType] = useState<"percent" | "flat">("percent");
   const [bulkValue, setBulkValue] = useState("");
@@ -709,6 +747,8 @@ export default function PricingPage() {
 
   const isLoading = channelsLoading || tiersLoading || formatsLoading;
 
+  const activeChannelName = channels?.find((c) => c.id === activeChannelId)?.name;
+
   if (isLoading) {
     return (
       <div className="space-y-6 max-w-6xl">
@@ -773,17 +813,42 @@ export default function PricingPage() {
             <Package className="h-4 w-4 mr-1" />
             Formats
           </Button>
+          <Button
+            variant={view === "channels" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("channels")}
+          >
+            <Store className="h-4 w-4 mr-1" />
+            Channels
+          </Button>
         </div>
       </div>
 
-      {view === "tiers" ? (
+      {view === "channels" && (
         <EntityList
+          key="channels"
+          entity={salesChannelEntity}
+          basePath="/settings/sales-channels"
+        />
+      )}
+
+      {view === "tiers" && (
+        <EntityList
+          key="tiers"
           entity={pricingTierEntity}
           basePath="/settings/pricing/tiers"
         />
-      ) : view === "formats" ? (
-        <FormatManagement />
-      ) : (
+      )}
+
+      {view === "formats" && (
+        <FormatManagement
+          channels={channels}
+          activeChannelId={activeChannelId}
+          onChannelChange={setChannelOverride}
+        />
+      )}
+
+      {view === "matrix" && (
         <>
           {/* Channel Tabs */}
           <Tabs
@@ -812,8 +877,7 @@ export default function PricingPage() {
                   <PopoverContent className="w-72" align="end">
                     <div className="space-y-3">
                       <h4 className="font-medium text-sm">
-                        Adjust all prices in{" "}
-                        {channels.find((c) => c.id === activeChannelId)?.name}
+                        Adjust all prices in {activeChannelName}
                       </h4>
                       <div className="flex gap-2">
                         <Select
@@ -875,8 +939,7 @@ export default function PricingPage() {
                   <PopoverContent className="w-64" align="end">
                     <div className="space-y-3">
                       <h4 className="font-medium text-sm">
-                        Copy prices into{" "}
-                        {channels.find((c) => c.id === activeChannelId)?.name}
+                        Copy prices into {activeChannelName}
                       </h4>
                       <div>
                         <Label className="text-xs">Source channel</Label>
