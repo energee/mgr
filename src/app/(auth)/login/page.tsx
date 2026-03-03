@@ -1,7 +1,7 @@
 /**
  * Login Page
  *
- * Email/password authentication with magic link option.
+ * Email/password authentication with passwordless (magic link + OTP code) option.
  * Renders heading + subtitle + form inside the split-screen auth layout.
  */
 
