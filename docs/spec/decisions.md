@@ -146,7 +146,7 @@ CREATE INDEX idx_order_items_order ON order_items(order_id);
 CREATE INDEX idx_order_items_fg ON order_items(finished_good_id);
 
 -- Kegs
-CREATE INDEX idx_keg_transactions_customer ON keg_transactions(customer_id, keg_type_id, keg_size_id);
+CREATE INDEX idx_keg_transactions_customer ON keg_transactions(customer_id, selling_format_id);
 
 -- Yeast lineage
 CREATE INDEX idx_yeast_pitches_batch ON yeast_pitches(batch_id);
@@ -231,7 +231,7 @@ tier_prices:
   tier_id     UUID REFERENCES price_tiers(id)
   style_id    UUID REFERENCES beer_styles(id)  -- NEW: for style-level pricing
   brand_id    UUID REFERENCES brands(id)       -- nullable if style-level
-  format_id   UUID REFERENCES package_types(id)
+  format_id   UUID REFERENCES selling_formats(id)
   price       DECIMAL NOT NULL
   valid_from  DATE NOT NULL DEFAULT CURRENT_DATE
   valid_to    DATE           -- null = current
@@ -731,16 +731,16 @@ Retain `location_transfers` + `transfer_lines` normalized structure.
 **Rationale**: Proper normalization enables partial receives (per DEC-GAP-007) and supports multi-FG transfers with line-level tracking.
 
 ### DEC-SIMP-006: Inner Pack Columns for Package Composition
-**Status**: Approved
+**Status**: Superseded (replaced by `containers` + `selling_formats` model)
 
-Add `inner_pack_size` and `inner_packs_per_case` columns to `package_types`.
+~~Add `inner_pack_size` and `inner_packs_per_case` columns to `package_types`.~~ Package composition is now modeled via `selling_formats.unit_count` linked to `containers`. See [packaging.md](../data-model/packaging.md).
 
-**Schema:**
+**Original Schema (superseded):**
 ```sql
-package_types:
-  inner_pack_size       INTEGER   -- Units per inner pack (NULL = loose)
-  inner_packs_per_case  INTEGER   -- Inner packs per case (NULL if loose)
-  units_per_case        INTEGER   -- Total units (must equal inner_pack_size × inner_packs_per_case when both set)
+-- Now modeled via selling_formats.unit_count
+selling_formats:
+  container_id          UUID      -- FK to containers
+  unit_count            INTEGER   -- Units per selling format
 ```
 
 **Examples:**

@@ -379,8 +379,9 @@ SELECT
 FROM bin_inventory bi
 JOIN finished_goods fg ON fg.id = bi.finished_good_id
 JOIN brands br ON br.id = fg.brand_id
-JOIN package_types pt ON pt.id = fg.package_type_id
-GROUP BY br.id, pt.id, fg.id;
+JOIN selling_formats sf ON sf.id = fg.selling_format_id
+JOIN containers c ON c.id = sf.container_id
+GROUP BY br.id, sf.id, c.id, fg.id;
 ```
 
 ### 4. Production Planning

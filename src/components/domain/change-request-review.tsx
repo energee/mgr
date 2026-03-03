@@ -52,13 +52,11 @@ interface ChangeRequestItem {
   change_type: "add" | "modify" | "remove";
   order_item_id: string | null;
   brand_id: string | null;
-  package_type_id: string | null;
-  keg_type_id: string | null;
+  selling_format_id: string | null;
   quantity: number | null;
   original_quantity: number | null;
   brands: { name: string } | null;
-  package_types: { name: string } | null;
-  keg_types: { name: string } | null;
+  selling_formats: { name: string } | null;
 }
 
 interface PendingRequest {
@@ -73,12 +71,10 @@ interface PendingRequest {
 interface OrderItem {
   id: string;
   brand_id: string | null;
-  package_type_id: string | null;
-  keg_type_id: string | null;
+  selling_format_id: string | null;
   quantity: number;
   brands: { name: string } | null;
-  package_types: { name: string } | null;
-  keg_types: { name: string } | null;
+  selling_formats: { name: string } | null;
 }
 
 // =============================================================================
@@ -109,11 +105,10 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
         .select(`
           id, status, notes, created_at, requested_by,
           order_change_request_items (
-            id, change_type, order_item_id, brand_id, package_type_id, keg_type_id,
+            id, change_type, order_item_id, brand_id, selling_format_id,
             quantity, original_quantity,
             brands (name),
-            package_types (name),
-            keg_types (name)
+            selling_formats (name)
           )
         `)
         .eq("order_id", orderId)
@@ -134,7 +129,7 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
       const db = supabase as any;
       const { data: result, error } = await db
         .from("order_items")
-        .select("id, brand_id, package_type_id, keg_type_id, quantity, brands(name), package_types(name), keg_types(name)")
+        .select("id, brand_id, selling_format_id, quantity, brands(name), selling_formats(name)")
         .eq("order_id", orderId);
       if (error) throw error;
       return result as OrderItem[];
@@ -199,9 +194,7 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
   // ---------------------------------------------------------------------------
 
   function getFormatLabel(item: ChangeRequestItem | OrderItem): string {
-    if (item.keg_types?.name) return item.keg_types.name;
-    if (item.package_types?.name) return item.package_types.name;
-    return "-";
+    return item.selling_formats?.name || "-";
   }
 
   function getProductName(item: ChangeRequestItem | OrderItem): string {

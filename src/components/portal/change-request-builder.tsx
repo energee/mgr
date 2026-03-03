@@ -47,23 +47,19 @@ import Link from "next/link";
 interface OrderItem {
   id: string;
   brand_id: string;
-  package_type_id: string | null;
-  keg_type_id: string | null;
+  selling_format_id: string | null;
   quantity: number;
   unit_price: number;
   brands: { id: string; name: string } | null;
-  package_types: { id: string; name: string } | null;
-  keg_types: { id: string; name: string } | null;
+  selling_formats: { id: string; name: string } | null;
 }
 
 interface FinishedGoodAvailability {
   brand_id: string;
-  package_type_id: string | null;
-  keg_type_id: string | null;
+  selling_format_id: string | null;
   available_quantity: number;
   brands: { id: string; name: string } | null;
-  package_types: { id: string; name: string } | null;
-  keg_types: { id: string; name: string } | null;
+  selling_formats: { id: string; name: string } | null;
 }
 
 interface ItemChange {
@@ -71,10 +67,8 @@ interface ItemChange {
   orderItemId?: string;
   brandId: string;
   brandName: string;
-  packageTypeId?: string;
-  packageTypeName?: string;
-  kegTypeId?: string;
-  kegTypeName?: string;
+  sellingFormatId?: string;
+  sellingFormatName?: string;
   originalQuantity?: number;
   proposedQuantity: number;
 }
@@ -88,15 +82,14 @@ function formatName(item: ItemChange): string {
 }
 
 function formatType(item: ItemChange): string {
-  return item.packageTypeName || item.kegTypeName || "-";
+  return item.sellingFormatName || "-";
 }
 
 function availabilityKey(
   brandId: string,
-  packageTypeId?: string,
-  kegTypeId?: string
+  sellingFormatId?: string
 ): string {
-  return `${brandId}|${packageTypeId ?? ""}|${kegTypeId ?? ""}`;
+  return `${brandId}|${sellingFormatId ?? ""}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +118,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
       const { data, error } = await db
         .from("order_items")
         .select(
-          "id, brand_id, package_type_id, keg_type_id, quantity, unit_price, brands(id, name), package_types(id, name), keg_types(id, name)"
+          "id, brand_id, selling_format_id, quantity, unit_price, brands(id, name), selling_formats(id, name)"
         )
         .eq("order_id", orderId);
       if (error) throw error;
@@ -143,7 +136,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
       const { data, error } = await db
         .from("finished_goods_with_availability")
         .select(
-          "brand_id, package_type_id, keg_type_id, available_quantity, brands(id, name), package_types(id, name), keg_types(id, name)"
+          "brand_id, selling_format_id, available_quantity, brands(id, name), selling_formats(id, name)"
         )
         .gt("available_quantity", 0);
       if (error) throw error;
@@ -159,10 +152,8 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
         orderItemId: item.id,
         brandId: item.brand_id,
         brandName: item.brands?.name ?? "Unknown",
-        packageTypeId: item.package_type_id ?? undefined,
-        packageTypeName: item.package_types?.name ?? undefined,
-        kegTypeId: item.keg_type_id ?? undefined,
-        kegTypeName: item.keg_types?.name ?? undefined,
+        sellingFormatId: item.selling_format_id ?? undefined,
+        sellingFormatName: item.selling_formats?.name ?? undefined,
         originalQuantity: item.quantity,
         proposedQuantity: item.quantity,
       }))
@@ -177,8 +168,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
       for (const fg of availableGoods) {
         const key = availabilityKey(
           fg.brand_id,
-          fg.package_type_id ?? undefined,
-          fg.keg_type_id ?? undefined
+          fg.selling_format_id ?? undefined
         );
         map.set(key, fg.available_quantity);
       }
@@ -190,8 +180,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
   function getMaxQuantity(item: ItemChange): number {
     const key = availabilityKey(
       item.brandId,
-      item.packageTypeId,
-      item.kegTypeId
+      item.sellingFormatId
     );
     const available = availabilityMap.get(key) ?? 0;
     if (item.orderItemId && item.originalQuantity != null) {
@@ -253,14 +242,13 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
     if (!availableGoods) return [];
     const existingKeys = new Set(
       changes.map((c) =>
-        availabilityKey(c.brandId, c.packageTypeId, c.kegTypeId)
+        availabilityKey(c.brandId, c.sellingFormatId)
       )
     );
     return availableGoods.filter((fg) => {
       const key = availabilityKey(
         fg.brand_id,
-        fg.package_type_id ?? undefined,
-        fg.keg_type_id ?? undefined
+        fg.selling_format_id ?? undefined
       );
       return !existingKeys.has(key);
     });
@@ -271,8 +259,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
     const fg = addableItems.find((item) => {
       const key = availabilityKey(
         item.brand_id,
-        item.package_type_id ?? undefined,
-        item.keg_type_id ?? undefined
+        item.selling_format_id ?? undefined
       );
       return key === newItemKey;
     });
@@ -287,10 +274,8 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
         changeType: "add",
         brandId: fg.brand_id,
         brandName: fg.brands?.name ?? "Unknown",
-        packageTypeId: fg.package_type_id ?? undefined,
-        packageTypeName: fg.package_types?.name ?? undefined,
-        kegTypeId: fg.keg_type_id ?? undefined,
-        kegTypeName: fg.keg_types?.name ?? undefined,
+        sellingFormatId: fg.selling_format_id ?? undefined,
+        sellingFormatName: fg.selling_formats?.name ?? undefined,
         proposedQuantity: qty,
       },
     ]);
@@ -346,8 +331,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
         change_type: c.changeType,
         order_item_id: c.orderItemId || null,
         brand_id: c.brandId,
-        package_type_id: c.packageTypeId || null,
-        keg_type_id: c.kegTypeId || null,
+        selling_format_id: c.sellingFormatId || null,
         quantity: c.proposedQuantity,
         original_quantity: c.originalQuantity ?? null,
       }));
@@ -525,14 +509,11 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
                       {addableItems.map((fg) => {
                         const key = availabilityKey(
                           fg.brand_id,
-                          fg.package_type_id ?? undefined,
-                          fg.keg_type_id ?? undefined
+                          fg.selling_format_id ?? undefined
                         );
                         const name = fg.brands?.name ?? "Unknown";
                         const format =
-                          fg.package_types?.name ||
-                          fg.keg_types?.name ||
-                          "Unknown";
+                          fg.selling_formats?.name || "Unknown";
                         return (
                           <SelectItem key={key} value={key}>
                             {name} - {format} (
@@ -553,8 +534,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
                       addableItems.find((fg) => {
                         const key = availabilityKey(
                           fg.brand_id,
-                          fg.package_type_id ?? undefined,
-                          fg.keg_type_id ?? undefined
+                          fg.selling_format_id ?? undefined
                         );
                         return key === newItemKey;
                       })?.available_quantity ?? 999

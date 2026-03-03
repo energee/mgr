@@ -249,7 +249,7 @@ function RequirementRow({ requirement }: { requirement: ProductionRequirement })
         )}
       </TableCell>
       <TableCell className="text-sm">
-        {requirement.package_type_name || "—"}
+        {requirement.selling_format_name || "—"}
       </TableCell>
       <TableCell className="text-right font-mono">
         {requirement.total_demand.toLocaleString()}
@@ -331,7 +331,7 @@ function OrderCard({ order }: { order: OrderDemand }) {
                   )}
                 </TableCell>
                 <TableCell className="text-sm">
-                  {item.package_type_name || "—"}
+                  {item.selling_format_name || "—"}
                 </TableCell>
                 <TableCell className="text-right font-mono">
                   {item.quantity.toLocaleString()}
@@ -353,7 +353,7 @@ function OrderCard({ order }: { order: OrderDemand }) {
 
 function getRequirementKey(req: ProductionRequirement, index: number): string {
   if (req.is_tbd) {
-    return `tbd-${req.style_id}-${req.package_type_id}-${index}`;
+    return `tbd-${req.style_id}-${req.selling_format_id}-${index}`;
   }
-  return `brand-${req.brand_id}-${req.package_type_id}-${index}`;
+  return `brand-${req.brand_id}-${req.selling_format_id}-${index}`;
 }

@@ -133,7 +133,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
           id,
           lot_number,
           brand_id,
-          package_type_id,
+          selling_format_id,
           production_date
         `)
         .in("id", fgIds);
@@ -142,14 +142,14 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
 
       // Get brands and package types
       const brandIds = [...new Set(finishedGoods?.map((fg) => fg.brand_id).filter((id): id is string => !!id))];
-      const packageIds = [...new Set(finishedGoods?.map((fg) => fg.package_type_id).filter((id): id is string => !!id))];
+      const formatIds = [...new Set(finishedGoods?.map((fg) => fg.selling_format_id).filter((id): id is string => !!id))];
 
-      const [brandsResult, packagesResult, binInventoryResult] = await Promise.all([
+      const [brandsResult, formatsResult, binInventoryResult] = await Promise.all([
         brandIds.length > 0
           ? supabase.from("brands").select("id, name").in("id", brandIds)
           : { data: [] },
-        packageIds.length > 0
-          ? supabase.from("package_types").select("id, name").in("id", packageIds)
+        formatIds.length > 0
+          ? supabase.from("selling_formats").select("id, name").in("id", formatIds)
           : { data: [] },
         db
           .from("bin_inventory")
@@ -163,7 +163,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
       ]);
 
       const brandMap = new Map((brandsResult.data || []).map((b) => [b.id, b.name]));
-      const packageMap = new Map((packagesResult.data || []).map((p) => [p.id, p.name]));
+      const formatMap = new Map((formatsResult.data || []).map((f) => [f.id, f.name]));
 
       const binInventory = binInventoryResult.data;
 
@@ -192,7 +192,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
             finished_good_id: fg.id,
             lot_number: fg.lot_number || "N/A",
             brand_name: (fg.brand_id && brandMap.get(fg.brand_id)) || "Unknown",
-            package_name: (fg.package_type_id && packageMap.get(fg.package_type_id)) || "Unknown",
+            package_name: (fg.selling_format_id && formatMap.get(fg.selling_format_id)) || "Unknown",
             quantity: a.quantity,
             bin_name: binInfo?.bin_name || null,
             location_name: binInfo?.location_name || null,

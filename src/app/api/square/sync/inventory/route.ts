@@ -19,17 +19,16 @@ import { pushInventoryCounts } from "@/lib/square/inventory";
 import type { SquareSyncInventory, SquareSyncResult } from "@/lib/square/types";
 
 // Supabase nested join shapes (not reflected in generated types)
-interface PackageTypeJoin {
+interface SellingFormatJoin {
   id: string;
-  inner_packs_per_case: number | null;
-  units_per_case: number | null;
+  unit_count: number | null;
 }
 
-interface FGWithPackageType {
+interface FGWithSellingFormat {
   id: string;
   brand_id: string;
-  package_type_id: string;
-  package_types: PackageTypeJoin | null;
+  selling_format_id: string;
+  selling_formats: SellingFormatJoin | null;
 }
 
 interface FGBrandOnly {
@@ -72,28 +71,22 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     }
 
     // 2. Load catalog mappings for ITEM_VARIATION entries
-    //    We need: brand_id + package_type_id -> square_catalog_id
+    //    We need: brand_id + selling_format_id -> square_catalog_id
     const { data: catalogMaps, error: mapError } = await admin
       .from("square_catalog_map")
-      .select("brand_id, package_type_id, keg_type_id, square_catalog_id")
+      .select("brand_id, selling_format_id, square_catalog_id")
       .eq("object_type", "ITEM_VARIATION");
 
     if (mapError) {
       throw new Error(`Failed to query catalog mappings: ${mapError.message}`);
     }
 
-    // Build lookup: "brand-{brandId}-pkg-{pkgId}" or "brand-{brandId}-keg-{kegId}" -> squareVariationId
+    // Build lookup: "brand-{brandId}-fmt-{formatId}" -> squareVariationId
     const variationLookup = new Map<string, string>();
     for (const m of catalogMaps ?? []) {
-      if (m.package_type_id) {
+      if (m.selling_format_id) {
         variationLookup.set(
-          `brand-${m.brand_id}-pkg-${m.package_type_id}`,
-          m.square_catalog_id
-        );
-      }
-      if (m.keg_type_id) {
-        variationLookup.set(
-          `brand-${m.brand_id}-keg-${m.keg_type_id}`,
+          `brand-${m.brand_id}-fmt-${m.selling_format_id}`,
           m.square_catalog_id
         );
       }
@@ -114,7 +107,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       const squareLocationId = location.square_location_id!;
       const posBinId = location.pos_bin_id!;
 
-      // 3a. Query bin inventory for this POS bin with package type details
+      // 3a. Query bin inventory for this POS bin with selling format details
       const { data: binItems, error: binError } = await admin
         .from("bin_inventory")
         .select(
@@ -125,11 +118,10 @@ export const POST = withPermission("integrations:manage", async (_request, { use
           finished_goods!inner(
             id,
             brand_id,
-            package_type_id,
-            package_types(
+            selling_format_id,
+            selling_formats(
               id,
-              inner_packs_per_case,
-              units_per_case
+              unit_count
             )
           )
         `
@@ -148,39 +140,33 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       // 3b. Convert to SquareSyncInventory
       const counts: SquareSyncInventory[] = [];
 
-      // Aggregate by brand + package type (multiple FGs may share the same brand+package)
+      // Aggregate by brand + selling format (multiple FGs may share the same brand+format)
       // Use nested Map to avoid string-parsing UUIDs
       const aggregated = new Map<string, Map<string, number>>();
 
       for (const item of binItems ?? []) {
-        const fg = item.finished_goods as unknown as FGWithPackageType | null;
-        if (!fg?.brand_id || !fg?.package_type_id) continue;
+        const fg = item.finished_goods as unknown as FGWithSellingFormat | null;
+        if (!fg?.brand_id || !fg?.selling_format_id) continue;
 
-        const { brand_id: brandId, package_type_id: packageTypeId, package_types: packageType } = fg;
+        const { brand_id: brandId, selling_format_id: formatId, selling_formats: sellingFormat } = fg;
 
-        // Convert cases to selling units
-        // The selling unit is the inner pack (e.g., 4-pack).
-        // If no inner packs, the selling unit is individual unit.
-        const sellingUnits =
-          item.quantity *
-          (packageType?.inner_packs_per_case ??
-            packageType?.units_per_case ??
-            1);
+        // Convert cases to selling units using unit_count from the selling format
+        const sellingUnits = item.quantity * (sellingFormat?.unit_count ?? 1);
 
         if (!aggregated.has(brandId)) aggregated.set(brandId, new Map());
-        const brandMap = aggregated.get(brandId)!;
-        brandMap.set(packageTypeId, (brandMap.get(packageTypeId) ?? 0) + sellingUnits);
+        const brandAgg = aggregated.get(brandId)!;
+        brandAgg.set(formatId, (brandAgg.get(formatId) ?? 0) + sellingUnits);
       }
 
-      for (const [brandId, packageMap] of aggregated) {
-        for (const [packageTypeId, quantity] of packageMap) {
-          const lookupKey = `brand-${brandId}-pkg-${packageTypeId}`;
+      for (const [brandId, formatMap] of aggregated) {
+        for (const [formatId, quantity] of formatMap) {
+          const lookupKey = `brand-${brandId}-fmt-${formatId}`;
           const squareVariationId = variationLookup.get(lookupKey);
 
           if (!squareVariationId) {
             allErrors.push({
-              itemId: `${brandId}/${packageTypeId}`,
-              error: `No Square catalog mapping for brand ${brandId} / package ${packageTypeId} at ${location.name}`,
+              itemId: `${brandId}/${formatId}`,
+              error: `No Square catalog mapping for brand ${brandId} / format ${formatId} at ${location.name}`,
             });
             continue;
           }
@@ -198,7 +184,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         .from("keg_inventory")
         .select(
           `
-          keg_type_id,
+          selling_format_id,
           quantity,
           finished_good_id,
           finished_goods(brand_id)
@@ -214,27 +200,27 @@ export const POST = withPermission("integrations:manage", async (_request, { use
           error: `Failed to query keg inventory for ${location.name}: ${kegError.message}`,
         });
       } else {
-        // Aggregate kegs by brand + keg_type using nested Map
+        // Aggregate kegs by brand + selling_format using nested Map
         const kegAggregated = new Map<string, Map<string, number>>();
         for (const keg of kegItems ?? []) {
           const fg = keg.finished_goods as unknown as FGBrandOnly | null;
           const brandId = fg?.brand_id;
-          if (!brandId || !keg.keg_type_id || !keg.quantity) continue;
+          if (!brandId || !keg.selling_format_id || !keg.quantity) continue;
 
           if (!kegAggregated.has(brandId)) kegAggregated.set(brandId, new Map());
-          const brandMap = kegAggregated.get(brandId)!;
-          brandMap.set(keg.keg_type_id, (brandMap.get(keg.keg_type_id) ?? 0) + keg.quantity);
+          const brandAgg = kegAggregated.get(brandId)!;
+          brandAgg.set(keg.selling_format_id, (brandAgg.get(keg.selling_format_id) ?? 0) + keg.quantity);
         }
 
         for (const [brandId, kegMap] of kegAggregated) {
-          for (const [kegTypeId, quantity] of kegMap) {
-            const lookupKey = `brand-${brandId}-keg-${kegTypeId}`;
+          for (const [formatId, quantity] of kegMap) {
+            const lookupKey = `brand-${brandId}-fmt-${formatId}`;
             const squareVariationId = variationLookup.get(lookupKey);
 
             if (!squareVariationId) {
               allErrors.push({
-                itemId: `${brandId}/${kegTypeId}`,
-                error: `No Square catalog mapping for brand ${brandId} / keg ${kegTypeId} at ${location.name}`,
+                itemId: `${brandId}/${formatId}`,
+                error: `No Square catalog mapping for brand ${brandId} / format ${formatId} at ${location.name}`,
               });
               continue;
             }

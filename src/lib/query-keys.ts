@@ -371,8 +371,8 @@ export const planningKeys = {
   demandByProduct: () => ["planning", "demand-by-product"] as const,
   supplyByProduct: () => ["planning", "supply-by-product"] as const,
   batchesInProduction: () => ["planning", "batches-in-production"] as const,
-  demandDetail: (brandId: string, packageTypeId: string, week: string) =>
-    ["planning", "demand-detail", brandId, packageTypeId, week] as const,
+  demandDetail: (brandId: string, sellingFormatId: string, week: string) =>
+    ["planning", "demand-detail", brandId, sellingFormatId, week] as const,
   orderDemand: (horizonWeeks: number) =>
     ["planning", "orderDemand", horizonWeeks] as const,
   productionRequirements: (horizonWeeks: number) =>
@@ -433,15 +433,15 @@ export const brandKeys = {
 };
 
 // =============================================================================
-// Package Type Keys
+// Channel Format Keys
 // =============================================================================
 
-export const packageTypeKeys = {
-  all: () => ["package-types"] as const,
-  list: (filters?: Record<string, unknown>) =>
-    filters
-      ? (["package-types", "list", filters] as const)
-      : (["package-types", "list"] as const),
+export const channelFormatKeys = {
+  all: () => ["channel-formats"] as const,
+  byChannel: (channelId: string) =>
+    ["channel-formats", "by-channel", channelId] as const,
+  byFormat: (formatId: string) =>
+    ["channel-formats", "by-format", formatId] as const,
 };
 
 // =============================================================================
@@ -490,11 +490,12 @@ export const packagingKeys = {
 };
 
 // =============================================================================
-// Packaging Format Keys (union of package_types + keg_types)
+// Packaging Format Keys (view over selling_formats + containers)
 // =============================================================================
 
 export const packagingFormatKeys = {
   all: () => ["packaging-formats"] as const,
+  kegFormats: () => ["packaging-formats", "keg"] as const,
 };
 
 // =============================================================================
@@ -567,8 +568,8 @@ export const portalKeys = {
 export const finishedGoodKeys = {
   all: () => ["finished-goods"] as const,
   brandAvailability: () => ["finished-goods", "brand-availability"] as const,
-  availability: (brandId: string, packageTypeId: string) =>
-    ["finished-goods", "availability", brandId, packageTypeId] as const,
+  availability: (brandId: string, sellingFormatId: string) =>
+    ["finished-goods", "availability", brandId, sellingFormatId] as const,
   binInventory: (fgId: string) => ["finished-goods", fgId, "bins"] as const,
   commitments: (fgId: string) =>
     ["finished-goods", fgId, "commitments"] as const,

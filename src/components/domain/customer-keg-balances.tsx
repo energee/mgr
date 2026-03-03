@@ -4,7 +4,7 @@
  * CustomerKegBalances Component
  *
  * Displays detailed keg balance breakdown by keg type for a customer.
- * Data is calculated from keg_transactions (ship - return = kegs out).
+ * Data from customer_keg_balances view (selling_formats + containers model).
  */
 
 import Link from "next/link";
@@ -28,9 +28,8 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 interface CustomerKegBalance {
   customer_id: string;
   customer_name: string;
-  keg_type_id: string;
+  selling_format_id: string;
   keg_type_name: string;
-  keg_type_code: string;
   volume_bbl: number;
   deposit_amount: number;
   kegs_out: number;
@@ -135,12 +134,9 @@ export function CustomerKegBalances({
               </TableHeader>
               <TableBody>
                 {balances.map((balance) => (
-                  <TableRow key={balance.keg_type_id}>
+                  <TableRow key={balance.selling_format_id}>
                     <TableCell className="font-medium">
                       {balance.keg_type_name}
-                      <span className="text-muted-foreground ml-2 text-sm">
-                        ({balance.keg_type_code})
-                      </span>
                     </TableCell>
                     <TableCell className="text-right">
                       <UnitDisplay value={balance.volume_bbl} unitType="volume" />

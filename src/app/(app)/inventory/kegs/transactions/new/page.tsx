@@ -6,7 +6,7 @@
  * Supports URL parameters for pre-populating form fields:
  * - customer_id: Pre-select customer (for returns)
  * - transaction_type: Pre-select transaction type
- * - keg_type_id: Pre-select keg type
+ * - selling_format_id: Pre-select selling format
  * - order_id: Pre-select order (for ship transactions)
  */
 
@@ -39,9 +39,9 @@ export default function NewKegTransactionPage() {
     }
   }
 
-  const kegTypeId = searchParams.get("keg_type_id");
-  if (kegTypeId) {
-    defaultValues.keg_type_id = kegTypeId;
+  const sellingFormatId = searchParams.get("selling_format_id");
+  if (sellingFormatId) {
+    defaultValues.selling_format_id = sellingFormatId;
   }
 
   const orderId = searchParams.get("order_id");

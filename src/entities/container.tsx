@@ -1,45 +1,60 @@
 /**
- * Keg Type Entity Configuration
+ * Container Entity Configuration
  *
- * Keg types define the physical keg sizes used for packaging and tracking.
- * Each type has a volume (in BBL for TTB reporting) and an optional deposit amount.
+ * Containers represent physical vessels — cans, bottles, kegs.
+ * Parent of selling_formats which define how containers are grouped for sale.
  */
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-type KegType = Database["public"]["Tables"]["keg_types"]["Row"];
+type Container = Database["public"]["Tables"]["containers"]["Row"];
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const CONTAINER_TYPE_OPTIONS = [
+  { value: "package", label: "Package" },
+  { value: "keg", label: "Keg" },
+];
 
 // =============================================================================
 // Zod Schema
 // =============================================================================
 
-export const kegTypeSchema = z.object({
+export const containerSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  code: z.string().min(1, "Code is required"),
-  volume_bbl: z.coerce.number().positive("Volume must be positive"),
+  type: z.string().min(1, "Type is required"),
+  volume_oz: z.coerce.number().positive("Volume must be positive").nullable().optional(),
+  volume_bbl: z.coerce.number().positive("Volume must be positive").nullable().optional(),
   deposit_amount: z.coerce.number().min(0, "Deposit cannot be negative").default(0),
-  description: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
-  position: z.coerce.number().int().nullable().optional(),
-});
+  position: z.coerce.number().int().min(0).default(0),
+}).refine(
+  (data) => data.type !== "package" || (data.volume_oz != null && data.volume_oz > 0),
+  { message: "Package containers require volume in oz", path: ["volume_oz"] }
+).refine(
+  (data) => data.type !== "keg" || (data.volume_bbl != null && data.volume_bbl > 0),
+  { message: "Keg containers require volume in BBL", path: ["volume_bbl"] }
+);
 
-export type KegTypeFormValues = z.infer<typeof kegTypeSchema>;
+export type ContainerFormValues = z.infer<typeof containerSchema>;
 
 // =============================================================================
 // Entity Configuration
 // =============================================================================
 
-export const kegTypeEntity: EntityConfig<KegType> = {
+export const containerEntity: EntityConfig<Container> = {
   // ---------------------------------------------------------------------------
   // Identity
   // ---------------------------------------------------------------------------
-  name: "keg_type",
-  table: "keg_types",
-  displayName: "Keg Type",
-  displayNamePlural: "Keg Types",
-  description: "Keg size definitions for inventory tracking and deposit management",
+  name: "container",
+  table: "containers",
+  displayName: "Container",
+  displayNamePlural: "Containers",
+  description: "Physical vessels — cans, bottles, kegs. Parent of selling formats.",
   domain: "inventory",
 
   // ---------------------------------------------------------------------------
@@ -52,16 +67,25 @@ export const kegTypeEntity: EntityConfig<KegType> = {
       sortable: true,
     },
     {
-      accessorKey: "code",
-      header: "Code",
+      accessorKey: "type",
+      header: "Type",
       sortable: true,
+      render: (value) => {
+        const option = CONTAINER_TYPE_OPTIONS.find((o) => o.value === value);
+        return option?.label || String(value);
+      },
+    },
+    {
+      accessorKey: "volume_oz",
+      header: "Volume (oz)",
+      sortable: true,
+      render: (value) => (value != null ? String(value) : "—"),
     },
     {
       accessorKey: "volume_bbl",
       header: "Volume (BBL)",
       sortable: true,
-      format: "unit",
-      unitType: "volume",
+      render: (value) => (value != null ? String(value) : "—"),
     },
     {
       accessorKey: "deposit_amount",
@@ -79,33 +103,38 @@ export const kegTypeEntity: EntityConfig<KegType> = {
 
   listFilters: [
     {
+      field: "type",
+      type: "select",
+      label: "Type",
+      options: CONTAINER_TYPE_OPTIONS,
+    },
+    {
       field: "is_active",
       type: "boolean",
       label: "Active",
     },
   ],
 
-  defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name", "code"],
+  defaultSort: { column: "position", direction: "asc" },
+  searchableFields: ["name"],
 
   // ---------------------------------------------------------------------------
   // Detail View
   // ---------------------------------------------------------------------------
   detailHeader: {
     title: "name",
-    subtitle: "code",
   },
 
   detailSections: [
     {
       id: "overview",
-      title: "Keg Type Details",
+      title: "Container Details",
       fields: [
         { field: "name", label: "Name" },
-        { field: "code", label: "Code" },
-        { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
+        { field: "type", label: "Type" },
+        { field: "volume_oz", label: "Volume (oz)" },
+        { field: "volume_bbl", label: "Volume (BBL)" },
         { field: "deposit_amount", label: "Deposit", format: "currency" },
-        { field: "description", label: "Description" },
         { field: "is_active", label: "Active" },
         { field: "position", label: "Display Order" },
         { field: "created_at", label: "Created", format: "datetime" },
@@ -120,35 +149,39 @@ export const kegTypeEntity: EntityConfig<KegType> = {
   sections: [
     {
       id: "overview",
-      title: "Keg Type Details",
+      title: "Container Details",
       fields: [
         {
           name: "name",
           label: "Name",
           type: "text",
-          placeholder: "e.g., 1/2 Barrel, 1/6 Barrel, 50 Liter",
+          placeholder: "e.g., 12oz Can, 1/2 Barrel",
           required: true,
           colSpan: 6,
         },
         {
-          name: "code",
-          label: "Code",
-          type: "text",
-          placeholder: "e.g., half, sixth, 50L",
+          name: "type",
+          label: "Type",
+          type: "select",
+          options: CONTAINER_TYPE_OPTIONS,
           required: true,
-          description: "Short code for identification",
           colSpan: 6,
+        },
+        {
+          name: "volume_oz",
+          label: "Volume (oz)",
+          type: "number",
+          placeholder: "e.g., 12, 16, 128",
+          description: "Volume in fluid ounces (for package containers)",
+          colSpan: 4,
         },
         {
           name: "volume_bbl",
-          label: "Volume",
-          type: "unit",
-          unitType: "volume",
-          format: "unit",
+          label: "Volume (BBL)",
+          type: "number",
           placeholder: "e.g., 0.5, 0.1667",
-          required: true,
-          description: "Volume in barrels for TTB reporting",
-          colSpan: 6,
+          description: "Volume in barrels for TTB reporting (for keg containers)",
+          colSpan: 4,
         },
         {
           name: "deposit_amount",
@@ -156,21 +189,14 @@ export const kegTypeEntity: EntityConfig<KegType> = {
           type: "number",
           format: "currency",
           placeholder: "e.g., 30.00",
-          description: "Keg deposit charged to customers",
-          colSpan: 6,
-        },
-        {
-          name: "description",
-          label: "Description",
-          type: "textarea",
-          placeholder: "Optional notes about this keg type",
-          colSpan: 12,
+          description: "Deposit charged to customers (kegs)",
+          colSpan: 4,
         },
         {
           name: "position",
           label: "Display Order",
           type: "number",
-          placeholder: "e.g., 1, 2, 3",
+          placeholder: "e.g., 10, 20, 30",
           description: "Order in dropdown menus (lower numbers appear first)",
           colSpan: 6,
         },
@@ -178,7 +204,7 @@ export const kegTypeEntity: EntityConfig<KegType> = {
           name: "is_active",
           label: "Active",
           type: "switch",
-          description: "Inactive types won't appear in dropdown menus",
+          description: "Inactive containers won't appear in dropdown menus",
           defaultValue: true,
           colSpan: 6,
         },
@@ -203,7 +229,19 @@ export const kegTypeEntity: EntityConfig<KegType> = {
   // ---------------------------------------------------------------------------
   // Form
   // ---------------------------------------------------------------------------
-  formSchema: kegTypeSchema,
+  formSchema: containerSchema,
+
+  // ---------------------------------------------------------------------------
+  // Relations
+  // ---------------------------------------------------------------------------
+  relations: [
+    {
+      name: "selling_formats",
+      entity: "selling_format",
+      foreignKey: "container_id",
+      type: "hasMany",
+    },
+  ],
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -211,7 +249,7 @@ export const kegTypeEntity: EntityConfig<KegType> = {
   actions: [
     {
       name: "delete",
-      label: "Delete Keg Type",
+      label: "Delete Container",
       icon: "trash",
       type: "dropdown",
       variant: "destructive",
@@ -223,10 +261,10 @@ export const kegTypeEntity: EntityConfig<KegType> = {
   // AI Context
   // ---------------------------------------------------------------------------
   queryExamples: [
-    "List all keg types",
-    "What is the deposit for a 1/2 barrel?",
-    "Show keg sizes by volume",
+    "Show all containers",
+    "What keg sizes do we have?",
+    "List active can and bottle containers",
   ],
 
-  keyFields: ["name", "code", "volume_bbl", "deposit_amount", "is_active"],
+  keyFields: ["name", "type", "volume_oz", "volume_bbl", "deposit_amount", "is_active"],
 };

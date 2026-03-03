@@ -588,7 +588,7 @@ Unified view of all items (FG and raw materials) stored in bins.
 | item_type | TEXT | `finished_good` or `raw_material` |
 | item_id | UUID | ID of the FG or inventory lot |
 | item_name | TEXT | Brand name (FG) or item name (raw material) |
-| package_name | TEXT | Package type name (FG only, NULL for raw materials) |
+| package_name | TEXT | Selling format name (FG only, NULL for raw materials) |
 | lot_number | TEXT | Lot number |
 | quantity | NUMERIC | Quantity in bin |
 | item_date | DATE | Production date (FG) or received date (raw material) |

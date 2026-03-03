@@ -6,8 +6,7 @@
  * Inline editor for packaging session line items. Each line item represents
  * a product (brand + format) being packaged with planned/actual quantities.
  *
- * Supports both package types (cans, bottles) and keg types via
- * the packaging_formats union view with dual FK pattern.
+ * Uses unified selling_format_id (containers + selling_formats model).
  */
 
 import { useState } from "react";
@@ -46,7 +45,7 @@ import {
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sessionLineItemKeys, packagingKeys } from "@/lib/query-keys";
-import { useBrands, usePackagingFormats, useKegOwners, type PackagingFormat } from "@/hooks/use-catalog";
+import { useBrands, usePackagingFormats, useKegOwners, isKegFormat } from "@/hooks/use-catalog";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
@@ -57,10 +56,8 @@ interface SessionLineItemRow {
   id: string;
   brand_id: string;
   brand_name: string;
-  package_type_id: string | null;
-  package_type_name: string | null;
-  keg_type_id: string | null;
-  keg_type_name: string | null;
+  selling_format_id: string | null;
+  selling_format_name: string | null;
   keg_owner_id: string | null;
   keg_owner_name: string | null;
   planned_quantity: number | null;
@@ -80,7 +77,6 @@ interface SessionLineItemsEditorProps {
 interface NewItemState {
   brand_id: string;
   format_id: string;
-  format_source: PackagingFormat["format_source"] | "";
   keg_owner_id: string;
   planned_quantity: number | null;
   actual_quantity: number | null;
@@ -90,7 +86,6 @@ interface NewItemState {
 const EMPTY_NEW_ITEM: NewItemState = {
   brand_id: "",
   format_id: "",
-  format_source: "",
   keg_owner_id: "",
   planned_quantity: null,
   actual_quantity: null,
@@ -239,7 +234,7 @@ export function SessionLineItemsEditor({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("session_line_items")
-        .select("*, brands(name), package_types(name), keg_types(name), keg_owners(name)")
+        .select("*, brands(name), selling_formats(name), keg_owners(name)")
         .eq("session_id", sessionId)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -248,12 +243,9 @@ export function SessionLineItemsEditor({
         id: item.id,
         brand_id: item.brand_id,
         brand_name: (item.brands as { name: string } | null)?.name || "Unknown",
-        package_type_id: item.package_type_id,
-        package_type_name:
-          (item.package_types as { name: string } | null)?.name || null,
-        keg_type_id: item.keg_type_id,
-        keg_type_name:
-          (item.keg_types as { name: string } | null)?.name || null,
+        selling_format_id: item.selling_format_id,
+        selling_format_name:
+          (item.selling_formats as { name: string } | null)?.name || null,
         keg_owner_id: item.keg_owner_id,
         keg_owner_name:
           (item.keg_owners as { name: string } | null)?.name || null,
@@ -281,7 +273,7 @@ export function SessionLineItemsEditor({
   // Add item mutation
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
-      const isKeg = item.format_source === "keg_type";
+      const isKeg = isKegFormat(item.format_id || null, packagingFormats);
       const sourceBatches = item.batch_id
         ? [
             {
@@ -294,8 +286,7 @@ export function SessionLineItemsEditor({
       const { error } = await supabase.from("session_line_items").insert({
         session_id: sessionId,
         brand_id: item.brand_id,
-        package_type_id: isKeg ? null : item.format_id || null,
-        keg_type_id: isKeg ? item.format_id || null : null,
+        selling_format_id: item.format_id || null,
         keg_owner_id: isKeg ? item.keg_owner_id || null : null,
         planned_quantity: item.planned_quantity,
         actual_quantity: item.actual_quantity,
@@ -343,15 +334,15 @@ export function SessionLineItemsEditor({
     },
   });
 
-  // Handle format change for existing items (needs multi-field update)
+  // Handle format change for existing items
   const handleFormatChange = async (itemId: string, formatId: string) => {
     const format = packagingFormats?.find((f) => f.id === formatId);
     if (!format) return;
 
-    const updates =
-      format.format_source === "keg_type"
-        ? { keg_type_id: formatId, package_type_id: null }
-        : { package_type_id: formatId, keg_type_id: null, keg_owner_id: null };
+    const updates: Record<string, unknown> = { selling_format_id: formatId };
+    if (format.container_type !== "keg") {
+      updates.keg_owner_id = null;
+    }
 
     const { error } = await supabase
       .from("session_line_items")
@@ -394,10 +385,10 @@ export function SessionLineItemsEditor({
 
   // Helper: get display format name
   const getFormatName = (item: SessionLineItemRow) =>
-    item.keg_type_name ?? item.package_type_name ?? "—";
+    item.selling_format_name ?? "—";
 
   const getFormatId = (item: SessionLineItemRow) =>
-    item.keg_type_id ?? item.package_type_id ?? "";
+    item.selling_format_id ?? "";
 
   // Handle add item
   const handleAdd = () => {
@@ -475,7 +466,7 @@ export function SessionLineItemsEditor({
                 {readOnly ? (
                   <span className="flex items-center gap-1.5">
                     {getFormatName(item)}
-                    {item.keg_type_id && item.keg_owner_name && (
+                    {isKegFormat(item.selling_format_id, packagingFormats) && item.keg_owner_name && (
                       <Badge variant="outline" className="text-xs">{item.keg_owner_name}</Badge>
                     )}
                   </span>
@@ -499,7 +490,7 @@ export function SessionLineItemsEditor({
                           <ComboboxItem key={f.id} value={f.id} label={f.name}>
                             <span className="flex items-center gap-2">
                               {f.name}
-                              {f.format_source === "keg_type" && (
+                              {f.container_type === "keg" && (
                                 <Badge variant="outline" className="text-xs">keg</Badge>
                               )}
                             </span>
@@ -507,7 +498,7 @@ export function SessionLineItemsEditor({
                         ))}
                       </ComboboxContent>
                     </Combobox>
-                    {item.keg_type_id && (
+                    {isKegFormat(item.selling_format_id, packagingFormats) && (
                       <Combobox
                         value={item.keg_owner_id || ""}
                         onValueChange={(v) =>
@@ -669,8 +660,7 @@ export function SessionLineItemsEditor({
                       setNewItem({
                         ...newItem,
                         format_id: v,
-                        format_source: format?.format_source || "",
-                        keg_owner_id: format?.format_source === "keg_type" ? newItem.keg_owner_id : "",
+                        keg_owner_id: format?.container_type === "keg" ? newItem.keg_owner_id : "",
                       });
                     }}
                     onFilter={(values, search) => {
@@ -688,7 +678,7 @@ export function SessionLineItemsEditor({
                         <ComboboxItem key={f.id} value={f.id} label={f.name}>
                           <span className="flex items-center gap-2">
                             {f.name}
-                            {f.format_source === "keg_type" && (
+                            {f.container_type === "keg" && (
                               <Badge variant="outline" className="text-xs">keg</Badge>
                             )}
                           </span>
@@ -696,7 +686,7 @@ export function SessionLineItemsEditor({
                       ))}
                     </ComboboxContent>
                   </Combobox>
-                  {newItem.format_source === "keg_type" && (
+                  {isKegFormat(newItem.format_id || null, packagingFormats) && (
                     <Combobox
                       value={newItem.keg_owner_id}
                       onValueChange={(v) => setNewItem({ ...newItem, keg_owner_id: v })}

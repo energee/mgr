@@ -65,15 +65,10 @@ Order line items.
 | id | UUID | Primary key |
 | order_id | UUID | FK to orders |
 | brand_id | UUID | FK to brands |
-| package_type_id | UUID | FK to package_types |
-| keg_type_id | UUID | FK to keg_types (for keg formats) |
+| selling_format_id | UUID | FK to selling_formats |
+| keg_owner_id | UUID | FK to keg_owners (for keg formats, nullable) |
 | quantity | INTEGER | Quantity |
 | unit_price | DECIMAL(10,2) | Unit price (resolved or manually set) |
-| price_source | TEXT | How price was determined: tier, style_tier, manual, promotional |
-| line_total | DECIMAL(10,2) | Line total (calculated: quantity × unit_price) |
-| allocation_id | UUID | FK to allocations (where source_type='finished_good') |
-| allocation_warning | TEXT | Warning: unallocated, over_committed |
-| bin_assignments | JSONB | Bin assignments at picking |
 | notes | TEXT | Notes |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
@@ -150,10 +145,10 @@ Prices by tier, product, and package type. Supports temporal pricing with valid 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| tier_id | UUID | FK to price_tiers |
+| pricing_tier_id | UUID | FK to pricing_tiers |
 | style_id | UUID | FK to beer_styles (fallback pricing) |
 | brand_id | UUID | FK to brands (overrides style) |
-| package_type_id | UUID | FK to package_types |
+| format_id | UUID | FK to selling_formats |
 | price | DECIMAL(10,2) | Price |
 | effective_from | DATE | Price effective from (defaults to creation date) |
 | effective_to | DATE | Price effective until (NULL = current/no end) |
@@ -163,18 +158,16 @@ Prices by tier, product, and package type. Supports temporal pricing with valid 
 **Constraint:** Either style_id or brand_id must be set.
 
 **Price resolution order** (for a given order date):
-1. Brand + Package Type + Tier (most specific, where date in valid range)
-2. Style + Package Type + Tier (fallback, where date in valid range)
+1. Brand + Selling Format + Tier (most specific)
+2. Style + Selling Format + Tier (fallback)
 3. Flag for manual entry (no match found)
 
-**Temporal query:**
+**Query:**
 ```sql
-SELECT * FROM tier_prices
-WHERE tier_id = :tier
-  AND package_type_id = :package
+SELECT * FROM pricing_tier_prices
+WHERE pricing_tier_id = :tier
+  AND format_id = :format
   AND (brand_id = :brand OR (brand_id IS NULL AND style_id = :style))
-  AND effective_from <= :order_date
-  AND (effective_to IS NULL OR effective_to >= :order_date)
 ORDER BY brand_id NULLS LAST  -- prefer brand over style
 LIMIT 1;
 ```
@@ -210,7 +203,7 @@ Complete algorithm for resolving unit price when creating order items.
 async function resolvePrice(
   customerId: string,
   brandId: string,
-  packageTypeId: string,
+  sellingFormatId: string,
   orderDate: Date
 ): Promise<{ price: number; source: 'tier' | 'style_tier' | 'manual' } | null> {
 
@@ -223,18 +216,15 @@ async function resolvePrice(
     return { price: 0, source: 'manual' }; // No tier configured
   }
 
-  const tierId = tierMapping.tier_id;
+  const tierId = tierMapping.pricing_tier_id;
 
   // Step 2: Try brand-specific price (most specific)
   const brandPrice = await supabase
-    .from('tier_prices')
+    .from('pricing_tier_prices')
     .select('price')
-    .eq('tier_id', tierId)
+    .eq('pricing_tier_id', tierId)
     .eq('brand_id', brandId)
-    .eq('package_type_id', packageTypeId)
-    .lte('effective_from', orderDate)
-    .or(`effective_to.is.null,effective_to.gte.${orderDate}`)
-    .order('effective_from', { ascending: false })
+    .eq('format_id', sellingFormatId)
     .limit(1)
     .single();
 
@@ -245,15 +235,12 @@ async function resolvePrice(
   // Step 3: Try style-level fallback
   const brand = await getBrand(brandId);
   const stylePrice = await supabase
-    .from('tier_prices')
+    .from('pricing_tier_prices')
     .select('price')
-    .eq('tier_id', tierId)
+    .eq('pricing_tier_id', tierId)
     .eq('style_id', brand.style_id)
     .is('brand_id', null)
-    .eq('package_type_id', packageTypeId)
-    .lte('effective_from', orderDate)
-    .or(`effective_to.is.null,effective_to.gte.${orderDate}`)
-    .order('effective_from', { ascending: false })
+    .eq('format_id', sellingFormatId)
     .limit(1)
     .single();
 
@@ -270,8 +257,8 @@ async function resolvePrice(
 
 | Scenario | Result | price_source |
 |----------|--------|--------------|
-| Brand + Package + Tier found | Use that price | `tier` |
-| Brand not found, Style + Package + Tier found | Use style price | `style_tier` |
+| Brand + Format + Tier found | Use that price | `tier` |
+| Brand not found, Style + Format + Tier found | Use style price | `style_tier` |
 | Neither found | Flag for manual entry, price = 0 | `manual` |
 | Temporal gap (price expired, no current) | Flag for manual entry | `manual` |
 
@@ -312,13 +299,13 @@ CREATE INDEX idx_orders_order_number ON orders(order_number);
 
 -- Order items (line item lookups and FG allocation)
 CREATE INDEX idx_order_items_order ON order_items(order_id);
-CREATE INDEX idx_order_items_brand_package ON order_items(brand_id, package_type_id);
+CREATE INDEX idx_order_items_brand_format ON order_items(brand_id, selling_format_id);
 CREATE INDEX idx_order_items_allocation ON order_items(allocation_id) WHERE allocation_id IS NOT NULL;
 
 -- Price tier lookups (pricing resolution)
 CREATE INDEX idx_tier_prices_tier ON tier_prices(price_tier_id, effective_from, effective_to);
-CREATE INDEX idx_tier_prices_brand_package ON tier_prices(brand_id, package_type_id, effective_from, effective_to);
-CREATE INDEX idx_tier_prices_style_package ON tier_prices(style_id, package_type_id, effective_from, effective_to) WHERE style_id IS NOT NULL;
+CREATE INDEX idx_tier_prices_brand_format ON pricing_tier_prices(brand_id, format_id);
+CREATE INDEX idx_tier_prices_style_format ON pricing_tier_prices(style_id, format_id) WHERE style_id IS NOT NULL;
 CREATE INDEX idx_tier_prices_temporal ON tier_prices(effective_from, effective_to);
 
 -- Customer lookups
@@ -358,8 +345,7 @@ Individual line-item changes within a change request.
 | change_type | TEXT | Type: add, modify, remove |
 | order_item_id | UUID | FK to order_items (null for 'add') |
 | brand_id | UUID | FK to brands |
-| package_type_id | UUID | FK to package_types |
-| keg_type_id | UUID | FK to keg_types |
+| selling_format_id | UUID | FK to selling_formats |
 | quantity | INTEGER | Proposed quantity |
 | original_quantity | INTEGER | Original quantity (snapshot) |
 
@@ -403,23 +389,20 @@ Map Square catalog items to MGR products.
 | id | UUID | Primary key |
 | square_catalog_id | TEXT | Square catalog object ID |
 | square_item_name | TEXT | Item name from Square (for display) |
-| finished_good_id | UUID | FK to finished_goods (specific lot, nullable) |
-| brand_id | UUID | FK to brands (fallback if no specific FG) |
-| package_type_id | UUID | FK to package_types (required if brand_id set) |
+| brand_id | UUID | FK to brands |
+| selling_format_id | UUID | FK to selling_formats |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
 **Unique constraint:** `square_catalog_id`
 
-**Validation:** Either `finished_good_id` is set, OR both `brand_id` and `package_type_id` are set.
-
 ### Mapping Resolution
 
 ```typescript
 // When processing a Square sale:
-// 1. If finished_good_id is set → use that specific FG
-// 2. If brand_id + package_type_id set → find any available FG matching those
+// 1. Match square_catalog_id to brand_id + selling_format_id
+// 2. Find available FG matching brand + selling format
 // 3. If no inventory available → log error, skip item
 ```
 

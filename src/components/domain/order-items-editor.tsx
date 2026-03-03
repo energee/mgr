@@ -10,8 +10,7 @@
  * - Auto-pricing from customer's price tier when brand/format selected
  * - Shows price source (tier name or "manual")
  * - Manual price override with indication
- * - Supports both package types (cans, bottles) and keg types via
- *   the packaging_formats union view with dual FK pattern
+ * - Uses unified selling_format_id (containers + selling_formats model)
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -47,7 +46,7 @@ import {
 import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { orderKeys, finishedGoodKeys } from "@/lib/query-keys";
-import { useBrands, usePackagingFormats, useKegOwners, type PackagingFormat } from "@/hooks/use-catalog";
+import { useBrands, usePackagingFormats, useKegOwners, isKegFormat } from "@/hooks/use-catalog";
 
 // =============================================================================
 // Types
@@ -56,8 +55,7 @@ import { useBrands, usePackagingFormats, useKegOwners, type PackagingFormat } fr
 interface OrderItemRow {
   id: string;
   brand_id: string | null;
-  package_type_id: string | null;
-  keg_type_id: string | null;
+  selling_format_id: string | null;
   keg_owner_id: string | null;
   quantity: number;
   unit_price: number | null;
@@ -73,7 +71,6 @@ interface OrderItemsEditorProps {
 interface NewItemState {
   brand_id: string;
   format_id: string;
-  format_source: PackagingFormat["format_source"] | "";
   keg_owner_id: string;
   quantity: number;
   unit_price: number;
@@ -91,7 +88,6 @@ interface TierPriceResult {
 const EMPTY_NEW_ITEM: NewItemState = {
   brand_id: "",
   format_id: "",
-  format_source: "",
   keg_owner_id: "",
   quantity: 1,
   unit_price: 0,
@@ -110,7 +106,7 @@ function useBrandAvailability() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("finished_goods_with_availability")
-        .select("brand_id, package_type_id, keg_type_id, available_quantity")
+        .select("brand_id, selling_format_id, available_quantity")
         .gt("available_quantity", 0);
       if (error) throw error;
       const byBrand: Record<string, number> = {};
@@ -119,10 +115,8 @@ function useBrandAvailability() {
         if (row.brand_id) {
           byBrand[row.brand_id] = (byBrand[row.brand_id] ?? 0) + (row.available_quantity ?? 0);
         }
-        // Key by whichever format ID is set
-        const formatId = row.keg_type_id ?? row.package_type_id;
-        if (row.brand_id && formatId) {
-          const key = `${row.brand_id}:${formatId}`;
+        if (row.brand_id && row.selling_format_id) {
+          const key = `${row.brand_id}:${row.selling_format_id}`;
           byBrandFormat[key] = (byBrandFormat[key] ?? 0) + (row.available_quantity ?? 0);
         }
       }
@@ -131,23 +125,23 @@ function useBrandAvailability() {
   });
 }
 
-function useAvailability(brandId: string | null, packageTypeId: string | null) {
+function useAvailability(brandId: string | null, sellingFormatId: string | null) {
   const supabase = createClient();
   return useQuery({
-    queryKey: finishedGoodKeys.availability(brandId ?? "", packageTypeId ?? ""),
+    queryKey: finishedGoodKeys.availability(brandId ?? "", sellingFormatId ?? ""),
     queryFn: async () => {
-      if (!brandId || !packageTypeId) return [];
+      if (!brandId || !sellingFormatId) return [];
       const { data, error } = await supabase
         .from("finished_goods_with_availability")
         .select("id, lot_number, production_date, quantity, available_quantity")
         .eq("brand_id", brandId)
-        .eq("package_type_id", packageTypeId)
+        .eq("selling_format_id", sellingFormatId)
         .gt("available_quantity", 0)
         .order("production_date", { ascending: true });
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!brandId && !!packageTypeId,
+    enabled: !!brandId && !!sellingFormatId,
   });
 }
 
@@ -155,10 +149,10 @@ function useAvailability(brandId: string | null, packageTypeId: string | null) {
 // Availability Panel
 // =============================================================================
 
-function AvailabilityPanel({ brandId, packageTypeId }: { brandId: string | null; packageTypeId: string | null }) {
-  const { data: fgItems, isLoading } = useAvailability(brandId, packageTypeId);
+function AvailabilityPanel({ brandId, sellingFormatId }: { brandId: string | null; sellingFormatId: string | null }) {
+  const { data: fgItems, isLoading } = useAvailability(brandId, sellingFormatId);
 
-  if (!brandId || !packageTypeId) return null;
+  if (!brandId || !sellingFormatId) return null;
   if (isLoading) return <div className="text-sm text-muted-foreground p-2"><Loader2 className="h-3 w-3 animate-spin inline mr-1" />Checking inventory...</div>;
   if (!fgItems || fgItems.length === 0) {
     return (
@@ -228,7 +222,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     },
   });
 
-  // Function to look up tier price (only works for package_type formats)
+  // Function to look up tier price for a selling format
   const lookupTierPrice = useCallback(async (
     brandId: string | null,
     formatId: string | null
@@ -258,10 +252,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     }
   }, [effectiveCustomerId, db]);
 
-  // Auto-lookup price when brand or format changes in new item (package_type only)
+  // Auto-lookup price when brand or format changes in new item
   useEffect(() => {
     const lookupPrice = async () => {
-      if (newItem.brand_id && newItem.format_id && newItem.format_source === "package_type") {
+      if (newItem.brand_id && newItem.format_id) {
         const result = await lookupTierPrice(newItem.brand_id, newItem.format_id);
         if (result) {
           setNewItem((prev) => ({
@@ -277,17 +271,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
             tierName: null,
           }));
         }
-      } else if (newItem.format_source === "keg_type") {
-        // No auto-pricing for keg types
-        setNewItem((prev) => ({
-          ...prev,
-          suggestedPrice: null,
-          tierName: null,
-        }));
       }
     };
     lookupPrice();
-  }, [newItem.brand_id, newItem.format_id, newItem.format_source, lookupTierPrice]);
+  }, [newItem.brand_id, newItem.format_id, lookupTierPrice]);
 
   // Fetch catalog data
   const { data: brands } = useBrands();
@@ -308,23 +295,21 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     });
   }, [brands, availability]);
 
-  // Availability for new item row (package_type formats only)
-  const newItemPackageTypeId = newItem.format_source === "package_type" ? newItem.format_id : null;
+  // Availability for new item row
   const { data: newItemFGs } = useAvailability(
     newItem.brand_id || null,
-    newItemPackageTypeId || null,
+    newItem.format_id || null,
   );
   const newItemTotalAvailable = newItemFGs?.reduce((sum, fg) => sum + (fg.available_quantity ?? 0), 0);
 
   // Add item mutation
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
-      const isKeg = item.format_source === "keg_type";
+      const isKeg = isKegFormat(item.format_id || null, packagingFormats);
       const { error } = await supabase.from("order_items").insert({
         order_id: orderId,
         brand_id: item.brand_id || null,
-        package_type_id: isKeg ? null : item.format_id || null,
-        keg_type_id: isKeg ? item.format_id || null : null,
+        selling_format_id: item.format_id || null,
         keg_owner_id: isKeg ? item.keg_owner_id || null : null,
         quantity: item.quantity,
         unit_price: item.unit_price || null,
@@ -374,15 +359,16 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     },
   });
 
-  // Handle format change for existing items (needs multi-field update)
+  // Handle format change for existing items
   const handleFormatChange = async (itemId: string, formatId: string) => {
     const format = packagingFormats?.find((f) => f.id === formatId);
     if (!format) return;
 
-    const updates =
-      format.format_source === "keg_type"
-        ? { keg_type_id: formatId, package_type_id: null }
-        : { package_type_id: formatId, keg_type_id: null, keg_owner_id: null };
+    const updates: Record<string, unknown> = { selling_format_id: formatId };
+    // Clear keg_owner_id when switching to non-keg format
+    if (format.container_type !== "keg") {
+      updates.keg_owner_id = null;
+    }
 
     const { error } = await supabase
       .from("order_items")
@@ -415,20 +401,31 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     return sum + (item.quantity * (item.unit_price || 0));
   }, 0) || 0;
 
+  // Pre-compute lookup maps to avoid O(n) find per row per render
+  const formatNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const f of packagingFormats ?? []) map.set(f.id, f.name);
+    return map;
+  }, [packagingFormats]);
+
+  const kegOwnerNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of kegOwners ?? []) map.set(o.id, o.name);
+    return map;
+  }, [kegOwners]);
+
   // Helper functions
   const getBrandName = (id: string | null) =>
     brands?.find((b) => b.id === id)?.name || "—";
 
-  const getFormatName = (item: OrderItemRow) => {
-    const formatId = item.keg_type_id ?? item.package_type_id;
-    return packagingFormats?.find((f) => f.id === formatId)?.name || "—";
-  };
+  const getFormatName = (item: OrderItemRow) =>
+    formatNameMap.get(item.selling_format_id ?? "") ?? "—";
 
   const getFormatId = (item: OrderItemRow) =>
-    item.keg_type_id ?? item.package_type_id ?? "";
+    item.selling_format_id ?? "";
 
   const getKegOwnerName = (id: string | null) =>
-    kegOwners?.find((o) => o.id === id)?.name || null;
+    (id ? kegOwnerNameMap.get(id) : null) ?? null;
 
   // Handle add item
   const handleAdd = () => {
@@ -516,7 +513,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 {readOnly ? (
                   <span className="flex items-center gap-1.5">
                     {getFormatName(item)}
-                    {item.keg_type_id && getKegOwnerName(item.keg_owner_id) && (
+                    {isKegFormat(item.selling_format_id, packagingFormats) && getKegOwnerName(item.keg_owner_id) && (
                       <Badge variant="outline" className="text-xs">{getKegOwnerName(item.keg_owner_id)}</Badge>
                     )}
                   </span>
@@ -540,7 +537,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                           <ComboboxItem key={f.id} value={f.id} label={f.name}>
                             <span className="flex items-center gap-2">
                               {f.name}
-                              {f.format_source === "keg_type" && (
+                              {f.container_type === "keg" && (
                                 <Badge variant="outline" className="text-xs">keg</Badge>
                               )}
                               {item.brand_id && availability?.byBrandFormat[`${item.brand_id}:${f.id}`]
@@ -552,7 +549,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                         ))}
                       </ComboboxContent>
                     </Combobox>
-                    {item.keg_type_id && (
+                    {isKegFormat(item.selling_format_id, packagingFormats) && (
                       <Combobox
                         value={item.keg_owner_id || ""}
                         onValueChange={(v) =>
@@ -619,7 +616,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       className="h-8 w-full"
                       placeholder="0.00"
                     />
-                    {effectiveCustomerId && item.brand_id && item.package_type_id && (
+                    {effectiveCustomerId && item.brand_id && item.selling_format_id && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -627,7 +624,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 shrink-0"
-                              onClick={() => applyTierPrice(item.id, item.brand_id, item.package_type_id)}
+                              onClick={() => applyTierPrice(item.id, item.brand_id, item.selling_format_id)}
                             >
                               <RefreshCw className="h-3 w-3" />
                             </Button>
@@ -701,9 +698,8 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       setNewItem({
                         ...newItem,
                         format_id: v,
-                        format_source: format?.format_source || "",
                         // Clear keg_owner when switching to non-keg
-                        keg_owner_id: format?.format_source === "keg_type" ? newItem.keg_owner_id : "",
+                        keg_owner_id: format?.container_type === "keg" ? newItem.keg_owner_id : "",
                       });
                     }}
                     onFilter={(values, search) => {
@@ -721,7 +717,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                         <ComboboxItem key={f.id} value={f.id} label={f.name}>
                           <span className="flex items-center gap-2">
                             {f.name}
-                            {f.format_source === "keg_type" && (
+                            {f.container_type === "keg" && (
                               <Badge variant="outline" className="text-xs">keg</Badge>
                             )}
                             {newItem.brand_id && availability?.byBrandFormat[`${newItem.brand_id}:${f.id}`]
@@ -733,7 +729,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       ))}
                     </ComboboxContent>
                   </Combobox>
-                  {newItem.format_source === "keg_type" && (
+                  {isKegFormat(newItem.format_id || null, packagingFormats) && (
                     <Combobox
                       value={newItem.keg_owner_id}
                       onValueChange={(v) => setNewItem({ ...newItem, keg_owner_id: v })}
@@ -768,7 +764,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   }
                   className="h-8 w-full"
                 />
-                {newItem.format_source === "package_type" && newItemTotalAvailable !== undefined && newItem.quantity > newItemTotalAvailable && (
+                {newItemTotalAvailable !== undefined && newItem.quantity > newItemTotalAvailable && (
                   <div className="text-xs text-orange-500 mt-1">
                     Exceeds available ({newItemTotalAvailable}). Will need production.
                   </div>
@@ -837,10 +833,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
             </TableRow>
           )}
 
-          {showAddRow && newItem.brand_id && newItem.format_id && newItem.format_source === "package_type" && (
+          {showAddRow && newItem.brand_id && newItem.format_id && (
             <TableRow>
               <TableCell colSpan={readOnly ? 5 : 6}>
-                <AvailabilityPanel brandId={newItem.brand_id} packageTypeId={newItem.format_id} />
+                <AvailabilityPanel brandId={newItem.brand_id} sellingFormatId={newItem.format_id} />
               </TableCell>
             </TableRow>
           )}

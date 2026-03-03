@@ -38,9 +38,8 @@ import {
 
 // Types for report data
 interface FleetSummary {
-  keg_type_id: string;
+  selling_format_id: string;
   keg_type_name: string;
-  keg_type_code: string;
   volume_bbl: number;
   deposit_amount: number;
   empty_count: number;
@@ -57,9 +56,8 @@ interface FleetSummary {
 }
 
 interface TurnoverMetric {
-  keg_type_id: string;
+  selling_format_id: string;
   keg_type_name: string;
-  keg_type_code: string;
   completed_cycles: number;
   avg_cycle_days: number;
   min_cycle_days: number;
@@ -70,9 +68,8 @@ interface TurnoverMetric {
 interface AgingKeg {
   customer_id: string;
   customer_name: string;
-  keg_type_id: string;
+  selling_format_id: string;
   keg_type_name: string;
-  keg_type_code: string;
   kegs_out: number;
   days_out: number;
   aging_status: "normal" | "attention" | "warning" | "critical";
@@ -82,7 +79,7 @@ interface AgingKeg {
 interface CustomerBalance {
   customer_id: string;
   customer_name: string;
-  keg_type_id: string;
+  selling_format_id: string;
   keg_type_name: string;
   kegs_out: number;
   deposit_value: number;
@@ -301,7 +298,7 @@ export default function KegReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {fleetSummary.map((row) => (
-                    <TableRow key={row.keg_type_id}>
+                    <TableRow key={row.selling_format_id}>
                       <TableCell className="font-medium">{row.keg_type_name}</TableCell>
                       <TableCell className="text-right">{row.empty_count}</TableCell>
                       <TableCell className="text-right">{row.filled_count}</TableCell>
@@ -346,7 +343,7 @@ export default function KegReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {turnoverMetrics.map((row) => (
-                    <TableRow key={row.keg_type_id}>
+                    <TableRow key={row.selling_format_id}>
                       <TableCell className="font-medium">{row.keg_type_name}</TableCell>
                       <TableCell className="text-right">{row.completed_cycles}</TableCell>
                       <TableCell className="text-right">
@@ -393,7 +390,7 @@ export default function KegReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {customerBalances.map((row, i) => (
-                    <TableRow key={`${row.customer_id}-${row.keg_type_id}-${i}`}>
+                    <TableRow key={`${row.customer_id}-${row.selling_format_id}-${i}`}>
                       <TableCell className="font-medium">
                         <Link
                           href={`/sales/customers/${row.customer_id}`}
@@ -443,7 +440,7 @@ export default function KegReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {agingKegs.map((row, i) => (
-                    <TableRow key={`${row.customer_id}-${row.keg_type_id}-${i}`}>
+                    <TableRow key={`${row.customer_id}-${row.selling_format_id}-${i}`}>
                       <TableCell className="font-medium">
                         <Link
                           href={`/sales/customers/${row.customer_id}`}

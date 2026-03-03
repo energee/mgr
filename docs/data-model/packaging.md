@@ -1,72 +1,72 @@
 # Packaging Domain
 
-## `package_types`
+## `containers`
 
-Package type definitions with support for inner pack configurations.
+Physical vessels — cans, bottles, kegs. Parent of selling_formats.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| name | TEXT | Package name (e.g., "16oz Can 6x4-pack") |
-| container_type | TEXT | Type: can, bottle, keg, growler |
-| volume_oz | DECIMAL(6,2) | Volume per unit in ounces |
-| inner_pack_size | INTEGER | Units per inner pack (NULL = loose) |
-| inner_packs_per_case | INTEGER | Inner packs per case (NULL if loose) |
-| units_per_case | INTEGER | Total units per case (calculated or direct) |
+| name | TEXT | Container name (e.g., "16oz Can", "1/2 Barrel") |
+| type | TEXT | Type: package, keg |
+| volume_oz | DECIMAL(6,2) | Volume per unit in ounces (required for packages) |
+| volume_bbl | DECIMAL(10,4) | Volume in barrels (required for kegs) |
+| deposit_amount | DECIMAL(10,2) | Default deposit amount (kegs) |
 | is_active | BOOLEAN | Active flag |
+| position | INTEGER | Display order |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-### Inner Pack Configuration
-
-| Configuration | inner_pack_size | inner_packs_per_case | units_per_case |
-|---------------|-----------------|----------------------|----------------|
-| 24 loose cans | NULL | NULL | 24 |
-| 6 × 4-packs | 4 | 6 | 24 |
-| 4 × 6-packs | 6 | 4 | 24 |
-| 2 × 12-packs | 12 | 2 | 24 |
-| 1/6 BBL keg | NULL | NULL | 1 |
-
-**Constraint:**
+**Constraints:**
 ```sql
--- Ensure units_per_case matches inner pack math when both are set
-ALTER TABLE package_types ADD CONSTRAINT chk_package_units_consistency CHECK (
-  (inner_pack_size IS NULL AND inner_packs_per_case IS NULL) OR
-  (inner_pack_size IS NOT NULL AND inner_packs_per_case IS NOT NULL
-   AND units_per_case = inner_pack_size * inner_packs_per_case)
-);
-```
-
-**Display name generation:**
-```typescript
-function formatPackageName(pkg: PackageType): string {
-  if (!pkg.inner_pack_size) {
-    return `${pkg.volume_oz}oz ${pkg.container_type} (${pkg.units_per_case}/case)`;
-  }
-  return `${pkg.volume_oz}oz ${pkg.container_type} ${pkg.inner_packs_per_case}×${pkg.inner_pack_size}-pack`;
-}
-// Examples:
-// "16oz can (24/case)" - loose
-// "16oz can 6×4-pack" - inner packs
+CHECK (type IN ('package', 'keg'))
+CHECK (type != 'package' OR volume_oz IS NOT NULL)
+CHECK (type != 'keg' OR volume_bbl IS NOT NULL)
 ```
 
 ---
 
-## `packages`
+## `selling_formats`
 
-Packaged beer records (simple tracking, see `finished_goods` for full inventory).
+How a container is grouped for sale — single, 4-pack, case of 24, per keg.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| batch_id | UUID | FK to [batches](./production.md#batches) |
-| package_type_id | UUID | FK to [package_types](#package_types) |
-| quantity | INTEGER | Number of units |
-| packaged_date | DATE | Packaging date |
-| best_by_date | DATE | Best by date |
-| lot_code | TEXT | Lot code |
-| notes | TEXT | Notes |
+| container_id | UUID | FK to [containers](#containers) |
+| name | TEXT | Format name (e.g., "Case of 24", "4-Pack", "Per Keg") |
+| unit_count | INTEGER | Units per selling format (e.g., 24 for a case, 1 for single/keg) |
+| is_active | BOOLEAN | Active flag |
+| position | INTEGER | Display order |
 | created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Unique constraint:** `(container_id, name)`
+
+**Examples:**
+
+| Container | Selling Format | unit_count |
+|-----------|---------------|------------|
+| 16oz Can | Case of 24 | 24 |
+| 16oz Can | 4-Pack | 4 |
+| 16oz Can | Single | 1 |
+| 12oz Bottle | Case of 24 | 24 |
+| 1/2 Barrel | Per Keg | 1 |
+| 1/6 Barrel | Per Keg | 1 |
+
+---
+
+## `channel_formats`
+
+Junction table: which selling formats appear in which sales channel. Replaces the old `show_in_pricing` boolean with per-channel visibility.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| selling_format_id | UUID | FK to [selling_formats](#selling_formats) |
+| sales_channel_id | UUID | FK to [sales_channels](./sales.md#sales_channels) |
+
+**Unique constraint:** `(selling_format_id, sales_channel_id)`
 
 ---
 
@@ -97,7 +97,7 @@ Line items within a packaging session.
 | id | UUID | Primary key |
 | session_id | UUID | FK to [packaging_sessions](#packaging_sessions) |
 | brand_id | UUID | FK to [brands](./production.md#brands) |
-| package_type_id | UUID | FK to [package_types](#package_types) |
+| selling_format_id | UUID | FK to [selling_formats](#selling_formats) |
 | source_batches | JSONB | Source batch allocations |
 | planned_quantity | INTEGER | Planned quantity |
 | actual_quantity | INTEGER | Actual quantity |
@@ -121,7 +121,7 @@ Finished goods inventory (packaged products ready for sale).
 | id | UUID | Primary key |
 | batch_id | UUID? | FK to batches (nullable for contract/purchased FG) |
 | brand_id | UUID | FK to brands |
-| package_type_id | UUID | FK to package_types |
+| selling_format_id | UUID | FK to selling_formats |
 | session_line_item_id | UUID? | FK to session_line_items (nullable for external FG) |
 | quantity | INTEGER | Total quantity produced |
 | lot_number | TEXT | Lot number (auto-generated or external) |
@@ -142,23 +142,10 @@ Finished goods inventory (packaged products ready for sale).
 | `julian` | `26304-001` | YYDDD-NNN (day of year) |
 | `coded` | `6JV-001` | YMD-NNN (obscured) |
 
-**Coded format encoding:**
-- Y = last digit of year (2026 → 6)
-- M = month letter (A=Jan, B=Feb, ... J=Oct, K=Nov, L=Dec)
-- D = day (1-9 = 1-9, A=10, B=11, ... U=30, V=31)
-
 **Entry point rules:** See `docs/data-model/inventory.md` "FG Entry Points" for complete documentation.
 
 - **Internal FG:** `batch_id` AND `session_line_item_id` are both required
 - **External FG:** Both are NULL, and `notes` is required to document source
-
-```sql
--- Constraint to enforce valid entry point combinations
-ALTER TABLE finished_goods ADD CONSTRAINT chk_fg_entry_point CHECK (
-  (batch_id IS NOT NULL AND session_line_item_id IS NOT NULL) OR
-  (batch_id IS NULL AND session_line_item_id IS NULL)
-);
-```
 
 ### `finished_goods_with_availability` (View)
 
@@ -169,6 +156,9 @@ CREATE VIEW finished_goods_with_availability AS
 SELECT
   fg.*,
   fg.quantity as total_quantity,
+  sf.name as selling_format_name,
+  c.name as container_name,
+  c.type as container_type,
   COALESCE(SUM(CASE WHEN a.status = 'completed'
     THEN a.quantity ELSE 0 END), 0) as allocated_quantity,
   COALESCE(SUM(CASE WHEN a.status = 'planned'
@@ -176,24 +166,11 @@ SELECT
   fg.quantity - COALESCE(SUM(CASE WHEN a.status IN ('planned', 'completed')
     THEN a.quantity ELSE 0 END), 0) as available_quantity
 FROM finished_goods fg
+LEFT JOIN selling_formats sf ON sf.id = fg.selling_format_id
+LEFT JOIN containers c ON c.id = sf.container_id
 LEFT JOIN allocations a
   ON a.source_type = 'finished_good' AND a.source_id = fg.id
-GROUP BY fg.id;
-```
-
-**Optimistic Locking:** The `version` column enables optimistic locking for concurrent updates:
-
-```typescript
-// Application pattern
-const result = await supabase
-  .from('finished_goods')
-  .update({ quantity: newQty, version: currentVersion + 1 })
-  .eq('id', fgId)
-  .eq('version', currentVersion);
-
-if (result.count === 0) {
-  throw new Error('Concurrent modification detected');
-}
+GROUP BY fg.id, sf.name, c.name, c.type;
 ```
 
 ---
@@ -222,11 +199,6 @@ INSERT INTO allocations (
 );
 ```
 
-This creates an audit trail of batch → FG movement and enables:
-- Volume reconciliation (wort volume vs. packaged volume = packaging loss)
-- COGS calculation (batch cost spread across FG units)
-- TTB reporting (Line 2: production removals)
-
 See [inventory.md](./inventory.md#allocations) for complete allocation documentation.
 
 ---
@@ -246,93 +218,3 @@ cancelled   cancelled    (adjust only if no downstream orders packed)
 | in_progress -> completed | Finish, create finished goods + allocations |
 | completed -> revised | Adjust quantities |
 | completed -> (rollback) | Only if no downstream orders packed |
-
----
-
-## Example Queries
-
-### Packaging Loss Calculation
-
-Calculate packaging loss (wort volume vs. packaged volume):
-
-```sql
-SELECT
-  ps.id as session_id,
-  ps.session_date,
-  sli.brand_id,
-  b.brand_name,
-  -- Input: total batch volume allocated
-  SUM(
-    (SELECT a.volume_bbl
-     FROM allocations a
-     WHERE a.source_type = 'batch'
-       AND a.destination_type = 'finished_good'
-       AND a.destination_id IN (
-         SELECT id FROM finished_goods WHERE session_line_item_id = sli.id
-       ))
-  ) as input_volume_bbl,
-  -- Output: packaged volume
-  SUM(sli.actual_quantity * pt.volume_oz / 128.0 / 31.0) as packaged_volume_bbl,
-  -- Loss
-  SUM(
-    (SELECT a.volume_bbl FROM allocations a
-     WHERE a.source_type = 'batch'
-       AND a.destination_type = 'finished_good'
-       AND a.destination_id IN (SELECT id FROM finished_goods WHERE session_line_item_id = sli.id))
-  ) - SUM(sli.actual_quantity * pt.volume_oz / 128.0 / 31.0) as loss_bbl
-FROM packaging_sessions ps
-JOIN session_line_items sli ON sli.session_id = ps.id
-JOIN brands b ON sli.brand_id = b.id
-JOIN package_types pt ON sli.package_type_id = pt.id
-WHERE ps.status = 'completed'
-GROUP BY ps.id, ps.session_date, sli.brand_id, b.brand_name
-ORDER BY ps.session_date DESC;
-```
-
-### Recent Packaging Sessions with FG Output
-
-```sql
-SELECT
-  ps.session_date,
-  ps.status,
-  b.name as brand,
-  pt.name as package,
-  sli.planned_quantity,
-  sli.actual_quantity,
-  sli.actual_quantity - sli.planned_quantity as variance,
-  fg.lot_number,
-  fg.best_by_date
-FROM packaging_sessions ps
-JOIN session_line_items sli ON sli.session_id = ps.id
-JOIN brands b ON sli.brand_id = b.id
-JOIN package_types pt ON sli.package_type_id = pt.id
-LEFT JOIN finished_goods fg ON fg.session_line_item_id = sli.id
-WHERE ps.session_date >= CURRENT_DATE - INTERVAL '30 days'
-ORDER BY ps.session_date DESC, b.name;
-```
-
-### Session Completion Checklist
-
-Before completing a packaging session, verify all line items are ready:
-
-```sql
-SELECT
-  sli.id,
-  b.name as brand,
-  pt.name as package,
-  sli.planned_quantity,
-  sli.actual_quantity,
-  CASE
-    WHEN sli.actual_quantity IS NULL THEN 'Missing actual quantity'
-    WHEN sli.actual_quantity <= 0 THEN 'Invalid quantity'
-    WHEN jsonb_array_length(sli.source_batches) = 0 THEN 'No source batches'
-    ELSE 'OK'
-  END as validation_status
-FROM session_line_items sli
-JOIN brands b ON sli.brand_id = b.id
-JOIN package_types pt ON sli.package_type_id = pt.id
-WHERE sli.session_id = 'session-uuid-here'
-  AND (sli.actual_quantity IS NULL
-    OR sli.actual_quantity <= 0
-    OR jsonb_array_length(sli.source_batches) = 0);
-```

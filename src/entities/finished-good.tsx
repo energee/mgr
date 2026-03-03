@@ -3,6 +3,7 @@
  *
  * Finished goods represent packaged products ready for sale.
  * They are created through packaging sessions and tracked with lot numbers.
+ * Each finished good references a selling_format (unified container packaging).
  *
  * This is a read-only entity view - finished goods are created by packaging sessions.
  */
@@ -23,8 +24,7 @@ type FinishedGoodView = Database["public"]["Views"]["finished_goods_with_availab
 export const finishedGoodSchema = z.object({
   lot_number: z.string().min(1, "Lot number is required"),
   brand_id: z.string().uuid(),
-  package_type_id: z.string().uuid().nullable().optional(),
-  keg_type_id: z.string().uuid().nullable().optional(),
+  selling_format_id: z.string().uuid().nullable().optional(),
   batch_id: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().int().min(0),
   production_date: z.string().nullable().optional(),
@@ -66,8 +66,8 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       sortable: true,
     },
     {
-      accessorKey: "package_type_name",
-      header: "Package",
+      accessorKey: "selling_format_name",
+      header: "Format",
       sortable: true,
     },
     {
@@ -109,8 +109,7 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       fields: [
         { field: "lot_number", label: "Lot Code" },
         { field: "brand_id", label: "Brand" },
-        { field: "package_type_id", label: "Package Type" },
-        { field: "keg_type_id", label: "Keg Type" },
+        { field: "selling_format_id", label: "Selling Format" },
         { field: "batch_id", label: "Source Batch" },
       ],
     },
@@ -180,23 +179,11 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
           },
         },
         {
-          name: "package_type_id",
-          label: "Package Type",
-          type: "select",
-          colSpan: 6,
-          dynamicOptions: {
-            table: "package_types",
-            valueField: "id",
-            labelField: "name",
-            orderBy: "name",
-          },
-        },
-        {
-          name: "keg_type_id",
-          label: "Keg Type",
+          name: "selling_format_id",
+          label: "Selling Format",
           type: "relation",
           colSpan: 6,
-          relation: { entity: "keg_type", displayField: "name" },
+          relation: { entity: "selling_format", displayField: "name" },
         },
         {
           name: "batch_id",
@@ -288,5 +275,5 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
     "Show allocation history for lot Y",
   ],
 
-  keyFields: ["lot_number", "brand_id", "package_type_id", "keg_type_id", "quantity", "available_quantity"],
+  keyFields: ["lot_number", "brand_id", "selling_format_id", "quantity", "available_quantity"],
 };

@@ -44,7 +44,7 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
   // Fetch order items
   const { data: items } = await admin
     .from("order_items")
-    .select("*, brand:brands(name), package_type:package_types(name)")
+    .select("*, brand:brands(name), selling_format:selling_formats(name)")
     .eq("order_id", orderId);
 
   if (!items?.length) {
@@ -54,8 +54,8 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
   // Build invoice lines (description-only, no QBO Item refs)
   const lines: QBOInvoiceLine[] = (items || []).map((item) => {
     const brandName = (item.brand as Record<string, unknown> | null)?.name || "Unknown";
-    const pkgName = (item.package_type as Record<string, unknown> | null)?.name || "";
-    const description = pkgName ? `${brandName} - ${pkgName}` : String(brandName);
+    const formatName = (item.selling_format as Record<string, unknown> | null)?.name || "";
+    const description = formatName ? `${brandName} - ${formatName}` : String(brandName);
     return {
       Amount: (item.quantity || 1) * Number(item.unit_price || 0),
       Description: description,
