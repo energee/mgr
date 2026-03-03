@@ -33,7 +33,7 @@ interface KegInventory {
   quantity: number;
   batch_id: string | null;
   finished_good_id: string | null;
-  // Joined fields from view (backward-compatible aliases from selling_formats/containers)
+  // Convenience display fields populated by the view from selling_formats/containers
   keg_type_name?: string;
   keg_owner_name?: string;
   volume_bbl?: number;

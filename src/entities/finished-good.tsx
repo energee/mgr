@@ -89,7 +89,7 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
 
   listFilters: [
     // Note: dynamicOptions not yet supported in EntityFilterDef type
-    // For now using basic filters, will add brand/package type when type supports it
+    // For now using basic filters, will add brand/selling format when type supports it
   ],
 
   defaultSort: { column: "production_date", direction: "desc" },

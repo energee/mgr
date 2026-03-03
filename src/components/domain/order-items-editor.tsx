@@ -8,8 +8,8 @@
  *
  * Features:
  * - Auto-pricing from customer's price tier when brand/format selected
- * - Shows price source (tier name or "manual")
- * - Manual price override with indication
+ * - Shows price source (tier name badge when auto-priced)
+ * - Manual price override support
  * - Uses unified selling_format_id (containers + selling_formats model)
  */
 
@@ -252,10 +252,15 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     }
   }, [effectiveCustomerId, db]);
 
+  // Fetch catalog data (must be above useEffect that references packagingFormats)
+  const { data: brands } = useBrands();
+  const { data: packagingFormats } = usePackagingFormats();
+  const { data: kegOwners } = useKegOwners();
+
   // Auto-lookup price when brand or format changes in new item
   useEffect(() => {
     const lookupPrice = async () => {
-      if (newItem.brand_id && newItem.format_id) {
+      if (newItem.brand_id && newItem.format_id && !isKegFormat(newItem.format_id, packagingFormats)) {
         const result = await lookupTierPrice(newItem.brand_id, newItem.format_id);
         if (result) {
           setNewItem((prev) => ({
@@ -271,15 +276,12 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
             tierName: null,
           }));
         }
+      } else if (newItem.format_id && isKegFormat(newItem.format_id, packagingFormats)) {
+        setNewItem((prev) => ({ ...prev, suggestedPrice: null, tierName: null }));
       }
     };
     lookupPrice();
-  }, [newItem.brand_id, newItem.format_id, lookupTierPrice]);
-
-  // Fetch catalog data
-  const { data: brands } = useBrands();
-  const { data: packagingFormats } = usePackagingFormats();
-  const { data: kegOwners } = useKegOwners();
+  }, [newItem.brand_id, newItem.format_id, lookupTierPrice, packagingFormats]);
 
   // Inventory availability
   const { data: availability } = useBrandAvailability();
@@ -616,7 +618,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       className="h-8 w-full"
                       placeholder="0.00"
                     />
-                    {effectiveCustomerId && item.brand_id && item.selling_format_id && (
+                    {effectiveCustomerId && item.brand_id && item.selling_format_id && !isKegFormat(item.selling_format_id, packagingFormats) && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -764,7 +766,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   }
                   className="h-8 w-full"
                 />
-                {newItemTotalAvailable !== undefined && newItem.quantity > newItemTotalAvailable && (
+                {!isKegFormat(newItem.format_id || null, packagingFormats) && newItemTotalAvailable !== undefined && newItem.quantity > newItemTotalAvailable && (
                   <div className="text-xs text-orange-500 mt-1">
                     Exceeds available ({newItemTotalAvailable}). Will need production.
                   </div>

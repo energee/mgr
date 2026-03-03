@@ -45,7 +45,7 @@ interface KegTransaction {
   notes: string | null;
   created_by_name: string | null;
   created_at: string | null;
-  // Joined fields from view (backward-compatible aliases from selling_formats/containers)
+  // Convenience display fields populated by the view from selling_formats/containers
   keg_type_name?: string;
   volume_bbl?: number;
   keg_owner_name?: string;

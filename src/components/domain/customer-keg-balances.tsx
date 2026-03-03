@@ -47,14 +47,10 @@ export function CustomerKegBalances({
 }: CustomerKegBalancesProps) {
   const supabase = createClient();
 
-  // Cast supabase to any since customer_keg_balances view isn't in generated types yet
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-
   const { data: balances, isLoading, error } = useQuery({
     queryKey: kegKeys.customerBalances(customerId),
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("customer_keg_balances")
         .select("*")
         .eq("customer_id", customerId)

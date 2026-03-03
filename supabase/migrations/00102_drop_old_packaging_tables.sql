@@ -131,7 +131,7 @@ AS $$
   fg_summary AS (
     SELECT
       get_ttb_tax_class(c.type) AS tax_class,
-      SUM((fg.quantity * c.volume_oz / 3968.0)::DECIMAL(10,4)) AS packaged_bbl,
+      SUM((fg.quantity * COALESCE(c.volume_oz, c.volume_bbl * 3968.0) / 3968.0)::DECIMAL(10,4)) AS packaged_bbl,
       COUNT(*) AS fg_count
     FROM finished_goods fg
     JOIN selling_formats sf ON sf.id = fg.selling_format_id
@@ -191,7 +191,7 @@ AS $$
     SELECT
       fg.id,
       get_ttb_tax_class(c.type) AS tax_class,
-      (fg.quantity * c.volume_oz / 3968.0)::DECIMAL(10,4) AS produced_bbl
+      (fg.quantity * COALESCE(c.volume_oz, c.volume_bbl * 3968.0) / 3968.0)::DECIMAL(10,4) AS produced_bbl
     FROM finished_goods fg
     JOIN selling_formats sf ON sf.id = fg.selling_format_id
     JOIN containers c ON c.id = sf.container_id
@@ -225,7 +225,7 @@ AS $$
     SELECT
       fg.id,
       get_ttb_tax_class(c.type) AS tax_class,
-      (fg.quantity * c.volume_oz / 3968.0)::DECIMAL(10,4) AS produced_bbl
+      (fg.quantity * COALESCE(c.volume_oz, c.volume_bbl * 3968.0) / 3968.0)::DECIMAL(10,4) AS produced_bbl
     FROM finished_goods fg
     JOIN selling_formats sf ON sf.id = fg.selling_format_id
     JOIN containers c ON c.id = sf.container_id
@@ -467,8 +467,9 @@ $$;
 -- Part 2: Drop old columns and tables
 -- -----------------------------------------------------------------------------
 
--- Handle packages table (add new FK, drop old)
+-- Handle packages table (add new FK, backfill from old UUID-reused IDs, drop old)
 ALTER TABLE packages ADD COLUMN selling_format_id UUID REFERENCES selling_formats(id) ON DELETE RESTRICT;
+UPDATE packages SET selling_format_id = package_type_id;
 ALTER TABLE packages DROP COLUMN package_type_id;
 
 -- Fix keg_owner_deposits unique constraint
@@ -481,6 +482,7 @@ ALTER TABLE session_line_items DROP COLUMN package_type_id, DROP COLUMN keg_type
 ALTER TABLE finished_goods DROP COLUMN package_type_id, DROP COLUMN keg_type_id;
 ALTER TABLE keg_transactions DROP COLUMN keg_type_id;
 ALTER TABLE keg_owner_deposits DROP COLUMN keg_type_id;
+ALTER TABLE order_change_request_items DROP COLUMN IF EXISTS package_type_id, DROP COLUMN IF EXISTS keg_type_id;
 ALTER TABLE square_catalog_map DROP COLUMN package_type_id, DROP COLUMN keg_type_id;
 ALTER TABLE square_draft_sales DROP COLUMN keg_type_id;
 

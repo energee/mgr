@@ -27,9 +27,9 @@ import {
 } from "@/components/ui/timeline";
 
 /**
- * Create a Supabase client with dynamic table access.
- * entity_revisions is not yet in the generated types, so we cast here.
- * Called per-query (not module-level) to capture the correct session context.
+ * Supabase client with dynamic table access.
+ * Uses `as any` because entity_revisions and dynamic FK-resolution
+ * tables aren't in the generated types.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getDb(): any {

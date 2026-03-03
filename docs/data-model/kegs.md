@@ -203,9 +203,7 @@ Aggregated view of keg inventory by type, owner, and state.
 | Column | Type | Description |
 |--------|------|-------------|
 | selling_format_id | UUID | FK to selling_formats |
-| selling_format_id | UUID | FK to selling_formats |
 | keg_type_name | TEXT | Container name (backward-compat alias) |
-| keg_type_code | TEXT | Keg type code |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_id | UUID | Fleet owner ID |
 | keg_owner_name | TEXT | Fleet owner name |

@@ -105,10 +105,12 @@ UPDATE finished_goods SET selling_format_id = COALESCE(keg_type_id, package_type
 -- keg_transactions (keg_type_id only)
 ALTER TABLE keg_transactions ADD COLUMN selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
 UPDATE keg_transactions SET selling_format_id = keg_type_id;
+ALTER TABLE keg_transactions ALTER COLUMN selling_format_id SET NOT NULL;
 
 -- keg_owner_deposits (keg_type_id only)
 ALTER TABLE keg_owner_deposits ADD COLUMN selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
 UPDATE keg_owner_deposits SET selling_format_id = keg_type_id;
+ALTER TABLE keg_owner_deposits ALTER COLUMN selling_format_id SET NOT NULL;
 
 -- order_change_request_items
 ALTER TABLE order_change_request_items ADD COLUMN selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
