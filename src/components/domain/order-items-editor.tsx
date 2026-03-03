@@ -46,7 +46,7 @@ import {
 import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { orderKeys, finishedGoodKeys } from "@/lib/query-keys";
-import { useBrands, usePackagingFormats, useKegOwners, isKegFormat } from "@/hooks/use-catalog";
+import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
 
 // =============================================================================
 // Types
@@ -252,15 +252,24 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     }
   }, [effectiveCustomerId, db]);
 
-  // Fetch catalog data (must be above useEffect that references packagingFormats)
+  // Fetch catalog data (must be above useEffect that references them)
   const { data: brands } = useBrands();
   const { data: packagingFormats } = usePackagingFormats();
   const { data: kegOwners } = useKegOwners();
 
+  // O(1) keg format check — must be above useEffect that references it
+  const kegFormatIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of packagingFormats ?? []) {
+      if (f.container_type === "keg") set.add(f.id);
+    }
+    return set;
+  }, [packagingFormats]);
+
   // Auto-lookup price when brand or format changes in new item
   useEffect(() => {
     const lookupPrice = async () => {
-      if (newItem.brand_id && newItem.format_id && !isKegFormat(newItem.format_id, packagingFormats)) {
+      if (newItem.brand_id && newItem.format_id && !kegFormatIds.has(newItem.format_id)) {
         const result = await lookupTierPrice(newItem.brand_id, newItem.format_id);
         if (result) {
           setNewItem((prev) => ({
@@ -276,12 +285,12 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
             tierName: null,
           }));
         }
-      } else if (newItem.format_id && isKegFormat(newItem.format_id, packagingFormats)) {
+      } else if (newItem.format_id && kegFormatIds.has(newItem.format_id)) {
         setNewItem((prev) => ({ ...prev, suggestedPrice: null, tierName: null }));
       }
     };
     lookupPrice();
-  }, [newItem.brand_id, newItem.format_id, lookupTierPrice, packagingFormats]);
+  }, [newItem.brand_id, newItem.format_id, lookupTierPrice, kegFormatIds]);
 
   // Inventory availability
   const { data: availability } = useBrandAvailability();
@@ -307,7 +316,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   // Add item mutation
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
-      const isKeg = isKegFormat(item.format_id || null, packagingFormats);
+      const isKeg = kegFormatIds.has(item.format_id ?? "");
       const { error } = await supabase.from("order_items").insert({
         order_id: orderId,
         brand_id: item.brand_id || null,
@@ -416,9 +425,15 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     return map;
   }, [kegOwners]);
 
+  const brandNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of brands ?? []) map.set(b.id, b.name);
+    return map;
+  }, [brands]);
+
   // Helper functions
   const getBrandName = (id: string | null) =>
-    brands?.find((b) => b.id === id)?.name || "—";
+    (id ? brandNameMap.get(id) : null) ?? "—";
 
   const getFormatName = (item: OrderItemRow) =>
     formatNameMap.get(item.selling_format_id ?? "") ?? "—";
@@ -515,7 +530,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 {readOnly ? (
                   <span className="flex items-center gap-1.5">
                     {getFormatName(item)}
-                    {isKegFormat(item.selling_format_id, packagingFormats) && getKegOwnerName(item.keg_owner_id) && (
+                    {kegFormatIds.has(item.selling_format_id ?? "") && getKegOwnerName(item.keg_owner_id) && (
                       <Badge variant="outline" className="text-xs">{getKegOwnerName(item.keg_owner_id)}</Badge>
                     )}
                   </span>
@@ -551,7 +566,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                         ))}
                       </ComboboxContent>
                     </Combobox>
-                    {isKegFormat(item.selling_format_id, packagingFormats) && (
+                    {kegFormatIds.has(item.selling_format_id ?? "") && (
                       <Combobox
                         value={item.keg_owner_id || ""}
                         onValueChange={(v) =>
@@ -618,7 +633,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       className="h-8 w-full"
                       placeholder="0.00"
                     />
-                    {effectiveCustomerId && item.brand_id && item.selling_format_id && !isKegFormat(item.selling_format_id, packagingFormats) && (
+                    {effectiveCustomerId && item.brand_id && item.selling_format_id && !kegFormatIds.has(item.selling_format_id ?? "") && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -731,7 +746,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       ))}
                     </ComboboxContent>
                   </Combobox>
-                  {isKegFormat(newItem.format_id || null, packagingFormats) && (
+                  {kegFormatIds.has(newItem.format_id) && (
                     <Combobox
                       value={newItem.keg_owner_id}
                       onValueChange={(v) => setNewItem({ ...newItem, keg_owner_id: v })}
@@ -766,7 +781,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   }
                   className="h-8 w-full"
                 />
-                {!isKegFormat(newItem.format_id || null, packagingFormats) && newItemTotalAvailable !== undefined && newItem.quantity > newItemTotalAvailable && (
+                {!kegFormatIds.has(newItem.format_id) && newItemTotalAvailable !== undefined && newItem.quantity > newItemTotalAvailable && (
                   <div className="text-xs text-orange-500 mt-1">
                     Exceeds available ({newItemTotalAvailable}). Will need production.
                   </div>

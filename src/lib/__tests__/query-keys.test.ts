@@ -302,6 +302,11 @@ describe("Key factory consistency", () => {
       "batch",
       "b1",
     ]);
+    expect(revisionKeys.fkResolve("customers", ["c1", "c2"])).toEqual([
+      "fk-resolve",
+      "customers",
+      "c1,c2",
+    ]);
   });
 
   it("planningKeys with and without options", () => {
