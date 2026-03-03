@@ -2,21 +2,23 @@
  * Signup Page
  *
  * New user registration.
+ * Renders heading + subtitle + form inside the split-screen auth layout.
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignupForm } from "./signup-form";
 
 export default function SignupPage() {
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">MGR</CardTitle>
-        <CardDescription>Create your brewery account</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <SignupForm />
-      </CardContent>
-    </Card>
+    <>
+      <div className="flex flex-col gap-2 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Create an account
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Enter your details to get started
+        </p>
+      </div>
+      <SignupForm />
+    </>
   );
 }

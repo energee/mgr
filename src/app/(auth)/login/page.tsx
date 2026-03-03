@@ -2,28 +2,24 @@
  * Login Page
  *
  * Email/password authentication with magic link option.
+ * Renders heading + subtitle + form inside the split-screen auth layout.
  */
 
 import { Suspense } from "react";
 import { LoginForm } from "./login-form";
-import { MGRIcon } from "@/components/icons/mgr-logo";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage() {
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <div className="flex items-center justify-center gap-2">
-          <MGRIcon size={28} />
-          <CardTitle className="text-2xl">MGR</CardTitle>
-        </div>
-        <CardDescription>Sign in to your brewery account</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Suspense fallback={<div className="h-64 animate-pulse" />}>
-          <LoginForm />
-        </Suspense>
-      </CardContent>
-    </Card>
+    <>
+      <div className="flex flex-col gap-2 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+        <p className="text-sm text-muted-foreground">
+          Enter your credentials to access your brewery
+        </p>
+      </div>
+      <Suspense fallback={<div className="h-64 animate-pulse" />}>
+        <LoginForm />
+      </Suspense>
+    </>
   );
 }
