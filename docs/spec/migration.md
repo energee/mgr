@@ -42,7 +42,7 @@ async function migrateRecipes(payload: PayloadData, supabase: SupabaseClient) {
 ## Migration Order
 
 1. System settings
-2. Reference data (styles, formats, keg_types, sales_channels)
+2. Reference data (styles, containers, selling_formats, sales_channels)
 3. Users
 4. Suppliers and ingredients
 5. Yeast strains

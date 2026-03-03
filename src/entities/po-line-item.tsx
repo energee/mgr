@@ -35,7 +35,7 @@ export const CATALOG_TABLES: Record<string, string> = {
   yeast: "yeasts",
   adjunct: "adjuncts",
   additive: "additives",
-  packaging: "package_types",
+  packaging: "selling_formats",
 };
 
 /**

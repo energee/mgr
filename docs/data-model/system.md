@@ -231,7 +231,8 @@ Entities with `is_active` flag use soft delete. This section documents when soft
 | allocations | No delete | Use status=cancelled instead |
 | finished_goods | No delete | Use allocations to remove quantity |
 | **Packaging** | | |
-| package_types | Soft only | None |
+| containers | Soft only | None (check for selling_formats first) |
+| selling_formats | Soft only | None (check for finished_goods, order_items) |
 | packaging_sessions | No delete | Use status=cancelled instead |
 | **Sales** | | |
 | customers | Soft only | No unpaid orders |
@@ -449,7 +450,7 @@ CONSTRAINT uq_enum_type_value UNIQUE (enum_type, value)
 | notification_status | Notification read state | No |
 | notification_severity | Alert level | No |
 | location_type | Location categories | No |
-| package_container_type | Package formats | No |
+| container_type | Container types (package, keg) | No |
 | keg_state | Keg lifecycle states | Yes |
 | keg_transaction_type | Keg movement types | No |
 | catalog_type | Inventory item categories | No |

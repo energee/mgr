@@ -2,7 +2,7 @@
  * Order Item Entity Configuration
  *
  * Order line items represent products on a sales order.
- * References brand, package type, and quantity with optional batch link.
+ * References brand, selling format, and quantity with optional batch link.
  */
 
 import { z } from "zod";
@@ -18,8 +18,7 @@ type OrderItem = Database["public"]["Tables"]["order_items"]["Row"];
 export const orderItemSchema = z.object({
   order_id: z.string().uuid("Order is required"),
   brand_id: z.string().uuid().nullable().optional(),
-  package_type_id: z.string().uuid().nullable().optional(),
-  keg_type_id: z.string().uuid().nullable().optional(),
+  selling_format_id: z.string().uuid().nullable().optional(),
   batch_id: z.string().uuid().nullable().optional(),
   keg_owner_id: z.string().uuid().nullable().optional(),
   style_id: z.string().uuid().nullable().optional(),
@@ -76,18 +75,10 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       },
     },
     {
-      accessorKey: "package_type_id",
-      header: "Package",
+      accessorKey: "selling_format_id",
+      header: "Format",
       relation: {
-        entity: "package_type",
-        displayField: "name",
-      },
-    },
-    {
-      accessorKey: "keg_type_id",
-      header: "Keg Type",
-      relation: {
-        entity: "keg_type",
+        entity: "selling_format",
         displayField: "name",
       },
     },
@@ -125,8 +116,7 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
         { field: "brand_id", label: "Brand" },
         { field: "style_id", label: "Style (TBD)" },
         { field: "tbd_notes", label: "TBD Notes" },
-        { field: "package_type_id", label: "Package Type" },
-        { field: "keg_type_id", label: "Keg Type" },
+        { field: "selling_format_id", label: "Selling Format" },
         { field: "quantity", label: "Quantity" },
         { field: "unit_price", label: "Unit Price", format: "currency" },
         { field: "batch_id", label: "Batch" },
@@ -181,17 +171,10 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
           description: "Details about the TBD product for planning purposes",
         },
         {
-          name: "package_type_id",
-          label: "Package Type",
+          name: "selling_format_id",
+          label: "Selling Format",
           type: "relation",
-          relation: { entity: "package_type", displayField: "name" },
-          colSpan: 6,
-        },
-        {
-          name: "keg_type_id",
-          label: "Keg Type",
-          type: "relation",
-          relation: { entity: "keg_type", displayField: "name" },
+          relation: { entity: "selling_format", displayField: "name" },
           colSpan: 6,
         },
         {
@@ -268,5 +251,5 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
     "Find items for IPA brand",
   ],
 
-  keyFields: ["order_id", "brand_id", "style_id", "package_type_id", "keg_type_id", "quantity", "unit_price", "keg_owner_id"],
+  keyFields: ["order_id", "brand_id", "style_id", "selling_format_id", "quantity", "unit_price", "keg_owner_id"],
 };

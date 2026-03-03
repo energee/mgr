@@ -200,10 +200,11 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
     }
 
     try {
-      // Look up the catalog mapping
-      const { data: mapping } = await admin
+      // Look up the catalog mapping with selling format container type
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: mapping } = await (admin as any)
         .from("square_catalog_map")
-        .select("id, brand_id, package_type_id, keg_type_id")
+        .select("id, brand_id, selling_format_id, selling_formats(containers(type))")
         .eq("square_catalog_id", catalogObjectId)
         .eq("object_type", "ITEM_VARIATION")
         .maybeSingle();
@@ -216,18 +217,33 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       const quantity = parseInt(lineItem.quantity, 10) || 0;
       if (quantity <= 0) continue;
 
-      if (mapping.package_type_id) {
+      // Determine if this is a keg (draft) or packaged good based on container type.
+      // The join may be null if the selling format or container was deleted.
+      const containerType = mapping.selling_formats?.containers?.type ?? null;
+      const isDraft = containerType === "keg";
+
+      if (!containerType) {
+        itemsFailed++;
+        errors.push({
+          lineItemUid: lineItem.uid ?? "unknown",
+          error: `Catalog mapping ${mapping.id} has no linked container type (selling_format or container may have been deleted)`,
+        });
+        continue;
+      }
+
+      if (!isDraft) {
         // ---------------------------------------------------------------
         // Packaged good sale: create a completed allocation
         // ---------------------------------------------------------------
 
-        // Find the most relevant finished good for this brand + package type
+        // Find the most relevant finished good for this brand + selling format
         // (pick the one with the most available stock via FIFO by production date)
-        const { data: fg } = await admin
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: fg } = await (admin as any)
           .from("finished_goods_with_availability")
           .select("id")
           .eq("brand_id", mapping.brand_id)
-          .eq("package_type_id", mapping.package_type_id)
+          .eq("selling_format_id", mapping.selling_format_id)
           .gt("available_quantity", 0)
           .order("production_date", { ascending: true })
           .limit(1)
@@ -245,7 +261,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
         });
 
         itemsSynced++;
-      } else if (mapping.keg_type_id) {
+      } else {
         // ---------------------------------------------------------------
         // Draft sale: insert into square_draft_sales
         // ---------------------------------------------------------------
@@ -265,7 +281,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
           square_order_id: orderId,
           square_payment_id: paymentId ?? null,
           brand_id: mapping.brand_id,
-          keg_type_id: mapping.keg_type_id,
+          selling_format_id: mapping.selling_format_id,
           quantity,
           volume_oz: volumeOz,
           unit_price_cents: lineItem.basePriceMoney?.amount

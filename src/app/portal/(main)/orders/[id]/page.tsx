@@ -70,13 +70,11 @@ function changeTypeLabel(changeType: string): string {
 interface OrderItem {
   id: string;
   brand_id: string;
-  package_type_id: string | null;
-  keg_type_id: string | null;
+  selling_format_id: string | null;
   quantity: number;
   unit_price: number;
   brands: { id: string; name: string } | null;
-  package_types: { id: string; name: string } | null;
-  keg_types: { id: string; name: string } | null;
+  selling_formats: { id: string; name: string } | null;
 }
 
 interface Order {
@@ -96,8 +94,7 @@ interface ChangeRequestItem {
   change_type: string;
   order_item_id: string | null;
   brand_id: string | null;
-  package_type_id: string | null;
-  keg_type_id: string | null;
+  selling_format_id: string | null;
   quantity: number | null;
   original_quantity: number | null;
 }
@@ -138,10 +135,9 @@ export default function PortalOrderDetailPage({
           id, order_number, status, order_date, requested_date, scheduled_date, notes,
           customer_id,
           order_items (
-            id, brand_id, package_type_id, keg_type_id, quantity, unit_price,
+            id, brand_id, selling_format_id, quantity, unit_price,
             brands (id, name),
-            package_types (id, name),
-            keg_types (id, name)
+            selling_formats (id, name)
           )
         `
         )
@@ -165,7 +161,7 @@ export default function PortalOrderDetailPage({
           `
           id, status, notes, rejection_reason, created_at,
           order_change_request_items (
-            id, change_type, order_item_id, brand_id, package_type_id, keg_type_id,
+            id, change_type, order_item_id, brand_id, selling_format_id,
             quantity, original_quantity
           )
         `
@@ -333,9 +329,7 @@ export default function PortalOrderDetailPage({
                 <TableBody>
                   {order.order_items.map((item) => {
                     const format =
-                      item.package_types?.name ||
-                      item.keg_types?.name ||
-                      "-";
+                      item.selling_formats?.name || "-";
                     const lineTotal = item.quantity * item.unit_price;
                     return (
                       <TableRow key={item.id}>

@@ -60,6 +60,10 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       accessorKey: "format_id",
       header: "Format",
       sortable: true,
+      relation: {
+        entity: "selling_format",
+        displayField: "name",
+      },
     },
     {
       accessorKey: "sales_channel_id",
@@ -94,7 +98,7 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       title: "Overview",
       fields: [
         { field: "pricing_tier_id", label: "Pricing Tier" },
-        { field: "format_id", label: "Package Format" },
+        { field: "format_id", label: "Selling Format" },
         { field: "sales_channel_id", label: "Sales Channel" },
         { field: "price", label: "Price", format: "currency" },
       ],
@@ -125,18 +129,12 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
         },
         {
           name: "format_id",
-          label: "Package Format",
-          type: "select",
+          label: "Selling Format",
+          type: "relation",
           placeholder: "Select format...",
           required: true,
           colSpan: 4,
-          dynamicOptions: {
-            table: "packaging_formats",
-            valueField: "id",
-            labelField: "name",
-            orderBy: "name",
-            filter: { is_active: true, show_in_pricing: true },
-          },
+          relation: { entity: "selling_format", displayField: "name" },
         },
         {
           name: "sales_channel_id",
@@ -180,6 +178,12 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       entity: "pricing_tier",
       type: "belongsTo",
       foreignKey: "pricing_tier_id",
+    },
+    {
+      name: "selling_format",
+      entity: "selling_format",
+      type: "belongsTo",
+      foreignKey: "format_id",
     },
     {
       name: "sales_channel",

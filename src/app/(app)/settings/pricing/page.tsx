@@ -5,17 +5,17 @@
  *
  * Spreadsheet-like grid for managing tier-based pricing.
  * - Tabs: sales channels across the top
- * - Rows: pricing tiers (sorted by sort_order)
- * - Columns: priceable package formats (show_in_pricing = true)
+ * - Rows: pricing tiers (sorted by cogs_max)
+ * - Columns: selling formats visible in the active channel (via channel_formats)
  *
  * Supports inline editing, bulk adjustments, and copy-channel.
- * Tier settings toggled via a secondary view.
+ * Format visibility per channel managed via the Formats tab.
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { settingsKeys } from "@/lib/query-keys";
+import { settingsKeys, channelFormatKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -76,13 +76,14 @@ interface PricingTier {
   cogs_max: number | null;
 }
 
-interface PackageFormat {
+/** A selling format with container info, from the packaging_formats view */
+interface SellingFormatWithContainer {
   id: string;
   name: string;
-  format_source: "package_type" | "keg_type";
-  container_type: string | null;
-  volume_oz: number | null;
-  units_per_case: number | null;
+  container_id: string;
+  container_name: string;
+  container_type: string;
+  unit_count: number;
 }
 
 interface PricingTierPrice {
@@ -93,18 +94,10 @@ interface PricingTierPrice {
   price: number;
 }
 
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function formatColumnLabel(f: PackageFormat): { name: string; unit: string } {
-  if (f.format_source === "keg_type") {
-    return { name: f.name, unit: "per keg" };
-  }
-  if (f.units_per_case) {
-    return { name: f.name, unit: `case/${f.units_per_case}` };
-  }
-  return { name: f.name, unit: "each" };
+interface ChannelFormat {
+  id: string;
+  selling_format_id: string;
+  sales_channel_id: string;
 }
 
 /**
@@ -167,7 +160,6 @@ function PriceCell({
     setEditing(true);
   }, [price]);
 
-  // Expose focus method via data attribute for external navigation
   useEffect(() => {
     const el = buttonRef.current;
     if (el) {
@@ -258,13 +250,13 @@ function PriceCell({
           : "text-muted-foreground/30 hover:bg-muted/30"
       )}
     >
-      {price != null ? `$${price.toFixed(2)}` : "·"}
+      {price != null ? `$${price.toFixed(2)}` : "\u00b7"}
     </button>
   );
 }
 
 // =============================================================================
-// Format Management Component
+// Format Management Component (channel_formats toggles)
 // =============================================================================
 
 function FormatManagement({
@@ -279,106 +271,85 @@ function FormatManagement({
   const supabase = createClient();
   const queryClient = useQueryClient();
 
-  // All active formats (master list gated by show_in_pricing)
+  // All active selling formats with container info
   const { data: formats, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormatsAll(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("packaging_formats")
-        .select("id, name, format_source, container_type, volume_oz, units_per_case, show_in_pricing")
+        .select("id, name, container_name, container_type, container_id, unit_count")
         .eq("is_active", true)
+        .order("container_type")
         .order("name");
       if (error) throw error;
-      return data as (PackageFormat & { show_in_pricing: boolean })[];
+      return data as SellingFormatWithContainer[];
     },
   });
 
-  const { data: channelFormats, isLoading: channelFormatsLoading } = useChannelFormatIds(activeChannelId);
+  // All channel_formats entries
+  const { data: channelFormats } = useQuery({
+    queryKey: channelFormatKeys.all(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("channel_formats")
+        .select("id, selling_format_id, sales_channel_id");
+      if (error) throw error;
+      return data as ChannelFormat[];
+    },
+  });
 
-  const enabledSet = new Set(channelFormats ?? []);
+  // Build lookup: `${formatId}:${channelId}` -> channel_format row
+  const cfMap = useMemo(() => {
+    const map = new Map<string, ChannelFormat>();
+    channelFormats?.forEach((cf) => {
+      map.set(`${cf.selling_format_id}:${cf.sales_channel_id}`, cf);
+    });
+    return map;
+  }, [channelFormats]);
 
-  // Toggle per-channel visibility (insert/delete from junction table)
-  const toggleChannelFormatMutation = useMutation({
-    mutationFn: async ({ formatId, enabled }: { formatId: string; enabled: boolean }) => {
-      if (!activeChannelId) return;
-      // Table not yet in generated types — cast until types are regenerated
+  const toggleMutation = useMutation({
+    mutationFn: async ({
+      sellingFormatId,
+      salesChannelId,
+      enabled,
+    }: {
+      sellingFormatId: string;
+      salesChannelId: string;
+      enabled: boolean;
+    }) => {
       if (enabled) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any)
-          .from("pricing_channel_formats")
-          .insert({ sales_channel_id: activeChannelId, format_id: formatId });
+        const { error } = await supabase.from("channel_formats").insert({
+          selling_format_id: sellingFormatId,
+          sales_channel_id: salesChannelId,
+        });
         if (error) throw error;
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any)
-          .from("pricing_channel_formats")
+        const { error } = await supabase
+          .from("channel_formats")
           .delete()
-          .eq("sales_channel_id", activeChannelId)
-          .eq("format_id", formatId);
+          .eq("selling_format_id", sellingFormatId)
+          .eq("sales_channel_id", salesChannelId);
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: settingsKeys.pricingChannelFormats(activeChannelId ?? ""),
-      });
-      // Also refresh matrix formats when toggling
+      queryClient.invalidateQueries({ queryKey: channelFormatKeys.all() });
       queryClient.invalidateQueries({ queryKey: settingsKeys.pricingFormats() });
     },
   });
 
-  const isLoading = formatsLoading || channelFormatsLoading;
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  // Group formats by container
+  const byContainer = useMemo(() => {
+    const map = new Map<string, SellingFormatWithContainer[]>();
+    formats?.forEach((f) => {
+      const key = f.container_id;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(f);
+    });
+    return map;
+  }, [formats]);
 
-  // Only show formats where show_in_pricing = true
-  const priceable = formats?.filter(f => f.show_in_pricing) ?? [];
-  const packaged = priceable.filter(f => f.format_source === "package_type");
-  const kegs = priceable.filter(f => f.format_source === "keg_type");
-
-  const renderSection = (title: string, items: typeof packaged) => (
-    <div className="space-y-2">
-      <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-      {items.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-2">
-          No {title.toLowerCase()} have &quot;Show in Pricing&quot; enabled.
-        </p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Format</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead className="w-[100px] text-right">Enabled</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map(f => (
-              <TableRow key={f.id}>
-                <TableCell className="font-medium">{f.name}</TableCell>
-                <TableCell className="text-muted-foreground capitalize">{f.container_type}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatColumnLabel(f).unit}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Switch
-                    checked={enabledSet.has(f.id)}
-                    onCheckedChange={(checked) =>
-                      toggleChannelFormatMutation.mutate({
-                        formatId: f.id,
-                        enabled: checked,
-                      })
-                    }
-                    disabled={toggleChannelFormatMutation.isPending}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </div>
-  );
+  if (formatsLoading) return <Skeleton className="h-64 w-full" />;
 
   return (
     <div className="space-y-4">
@@ -397,15 +368,54 @@ function FormatManagement({
       </Tabs>
 
       <p className="text-sm text-muted-foreground">
-        Toggle which formats appear in the pricing matrix for{" "}
-        <span className="font-medium text-foreground">
-          {channels.find(c => c.id === activeChannelId)?.name ?? "this channel"}
-        </span>.
-        Only formats with &quot;Show in Pricing&quot; enabled in their catalog settings appear here.
+        Toggle which selling formats appear in the pricing matrix for each sales channel.
       </p>
-
-      {renderSection("Packaged Formats", packaged)}
-      {renderSection("Keg Formats", kegs)}
+      {Array.from(byContainer.entries()).map(([containerId, containerFormats]) => (
+        <div key={containerId} className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            {containerFormats[0].container_name} ({containerFormats[0].container_type})
+          </h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Format</TableHead>
+                <TableHead>Units</TableHead>
+                {channels?.map((ch) => (
+                  <TableHead key={ch.id} className="w-[80px] text-center">
+                    {ch.name}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {containerFormats.map((f) => (
+                <TableRow key={f.id}>
+                  <TableCell className="font-medium">{f.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{f.unit_count}</TableCell>
+                  {channels?.map((ch) => {
+                    const isEnabled = cfMap.has(`${f.id}:${ch.id}`);
+                    return (
+                      <TableCell key={ch.id} className="text-center">
+                        <Switch
+                          checked={isEnabled}
+                          onCheckedChange={(checked) =>
+                            toggleMutation.mutate({
+                              sellingFormatId: f.id,
+                              salesChannelId: ch.id,
+                              enabled: checked,
+                            })
+                          }
+                          disabled={toggleMutation.isPending}
+                        />
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ))}
     </div>
   );
 }
@@ -443,7 +453,6 @@ export default function PricingPage() {
     },
   });
 
-  // Derive active channel: user override or first available
   const activeChannelId = channelOverride ?? channels?.[0]?.id ?? null;
 
   const { data: tiers, isLoading: tiersLoading } = useQuery({
@@ -458,25 +467,72 @@ export default function PricingPage() {
     },
   });
 
-  const { data: channelFormatIds, isLoading: channelFormatsLoading } = useChannelFormatIds(activeChannelId);
+  // Fetch channel_formats for the active channel to determine visible formats
+  const { data: activeChannelFormats } = useQuery({
+    queryKey: channelFormatKeys.byChannel(activeChannelId ?? ""),
+    queryFn: async () => {
+      if (!activeChannelId) return [];
+      const { data, error } = await supabase
+        .from("channel_formats")
+        .select("selling_format_id")
+        .eq("sales_channel_id", activeChannelId);
+      if (error) throw error;
+      return data.map((d) => d.selling_format_id);
+    },
+    enabled: !!activeChannelId,
+  });
 
-  const { data: allPricingFormats, isLoading: formatsLoading } = useQuery({
+  // Fetch all active selling formats with container info
+  const { data: allFormatsRaw, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormats(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("packaging_formats")
-        .select("id, name, format_source, container_type, volume_oz, units_per_case")
+        .select("id, name, container_name, container_type, container_id, unit_count")
         .eq("is_active", true)
-        .eq("show_in_pricing", true)
+        .order("container_type")
+        .order("container_id")
+        .order("position")
         .order("name");
       if (error) throw error;
-      return data as PackageFormat[];
+      return data as SellingFormatWithContainer[];
     },
   });
 
-  // Filter formats to only those enabled for the active channel
-  const channelFormatSet = new Set(channelFormatIds ?? []);
-  const formats = allPricingFormats?.filter(f => channelFormatSet.has(f.id)) ?? undefined;
+  // Filter to only formats visible in the active channel
+  const visibleFormatIds = useMemo(
+    () => new Set(activeChannelFormats ?? []),
+    [activeChannelFormats]
+  );
+
+  const formats = useMemo(
+    () => allFormatsRaw?.filter((f) => visibleFormatIds.has(f.id)) ?? [],
+    [allFormatsRaw, visibleFormatIds]
+  );
+
+  // Group formats by container type for column headers
+  const formatGroups = useMemo(() => {
+    const groups: { containerName: string; containerType: string; formats: SellingFormatWithContainer[] }[] = [];
+    let currentContainerId = "";
+    for (const f of formats) {
+      if (f.container_id !== currentContainerId) {
+        groups.push({ containerName: f.container_name, containerType: f.container_type, formats: [] });
+        currentContainerId = f.container_id;
+      }
+      groups[groups.length - 1].formats.push(f);
+    }
+    return groups;
+  }, [formats]);
+
+  // Pre-compute which format IDs start a new container group (for border rendering)
+  const groupBorderSet = useMemo(() => {
+    const set = new Set<string>();
+    for (let i = 1; i < formatGroups.length; i++) {
+      const firstFmt = formatGroups[i].formats[0];
+      if (firstFmt) set.add(firstFmt.id);
+    }
+    return set;
+  }, [formatGroups]);
 
   const { data: prices } = useQuery({
     queryKey: settingsKeys.pricingMatrix(activeChannelId ?? undefined),
@@ -520,21 +576,18 @@ export default function PricingPage() {
       const existing = priceMap.get(tierId)?.get(formatId);
 
       if (value === null && existing) {
-        // Delete
         const { error } = await supabase
           .from("pricing_tier_prices")
           .delete()
           .eq("id", existing.id);
         if (error) throw error;
       } else if (value !== null && existing) {
-        // Update
         const { error } = await supabase
           .from("pricing_tier_prices")
           .update({ price: value, updated_at: new Date().toISOString() })
           .eq("id", existing.id);
         if (error) throw error;
       } else if (value !== null && !existing) {
-        // Insert
         const { error } = await supabase.from("pricing_tier_prices").insert({
           pricing_tier_id: tierId,
           format_id: formatId,
@@ -562,7 +615,6 @@ export default function PricingPage() {
     [saveMutation]
   );
 
-  // Bulk adjust
   const bulkAdjustMutation = useMutation({
     mutationFn: async ({
       type,
@@ -573,14 +625,12 @@ export default function PricingPage() {
       amount: number;
       channelId: string;
     }) => {
-      // Fetch all prices for this channel
       const { data: channelPrices, error: fetchError } = await supabase
         .from("pricing_tier_prices")
         .select("id, price")
         .eq("sales_channel_id", channelId);
       if (fetchError) throw fetchError;
 
-      // Apply adjustment to each
       for (const p of channelPrices || []) {
         const newPrice =
           type === "percent"
@@ -608,7 +658,6 @@ export default function PricingPage() {
     },
   });
 
-  // Copy channel
   const copyChannelMutation = useMutation({
     mutationFn: async ({
       fromChannelId,
@@ -617,7 +666,6 @@ export default function PricingPage() {
       fromChannelId: string;
       toChannelId: string;
     }) => {
-      // Fetch source prices
       const { data: sourcePrices, error: fetchError } = await supabase
         .from("pricing_tier_prices")
         .select("pricing_tier_id, format_id, price")
@@ -629,7 +677,6 @@ export default function PricingPage() {
         return;
       }
 
-      // Upsert each price into the target channel
       for (const sp of sourcePrices) {
         const { error } = await supabase.from("pricing_tier_prices").upsert(
           {
@@ -666,7 +713,7 @@ export default function PricingPage() {
 
   const handleCellNavigate = useCallback(
     (rowIndex: number, colIndex: number, direction: NavigateDirection) => {
-      if (!tiers || !formats) return;
+      if (!tiers || !formats.length) return;
 
       let newRow = rowIndex;
       let newCol = colIndex;
@@ -686,7 +733,6 @@ export default function PricingPage() {
           break;
       }
 
-      // Find and click the target cell button
       const targetButton = tableRef.current?.querySelector(
         `button[data-cell-row="${newRow}"][data-cell-col="${newCol}"]`
       ) as HTMLButtonElement | null;
@@ -699,14 +745,9 @@ export default function PricingPage() {
   // Render
   // ---------------------------------------------------------------------------
 
-  const isLoading = channelsLoading || tiersLoading || formatsLoading || channelFormatsLoading;
+  const isLoading = channelsLoading || tiersLoading || formatsLoading;
 
   const activeChannelName = channels?.find((c) => c.id === activeChannelId)?.name;
-
-  // Derived format groups: packaged first, then kegs
-  const packagedFormats = formats?.filter(f => f.format_source === "package_type") ?? [];
-  const kegFormats = formats?.filter(f => f.format_source === "keg_type") ?? [];
-  const allFormats = [...packagedFormats, ...kegFormats];
 
   if (isLoading) {
     return (
@@ -953,9 +994,9 @@ export default function PricingPage() {
             </p>
           )}
 
-          {!!tiers?.length && !formats?.length && (
+          {!!tiers?.length && !formats.length && (
             <p className="text-muted-foreground py-8 text-center">
-              No formats enabled for pricing. Switch to the{" "}
+              No formats enabled for this channel. Switch to the{" "}
               <button onClick={() => setView("formats")} className="underline">
                 Formats
               </button>{" "}
@@ -963,46 +1004,48 @@ export default function PricingPage() {
             </p>
           )}
 
-          {!!tiers?.length && !!formats?.length && (
+          {!!tiers?.length && !!formats.length && (
             <div ref={tableRef} className="border rounded-lg">
               <Table className="table-fixed">
                 <TableHeader className="sticky top-0 z-20">
-                  {(packagedFormats.length > 0 && kegFormats.length > 0) && (
+                  {/* Container group header row */}
+                  {formatGroups.length > 1 && (
                     <TableRow className="bg-muted/50 hover:bg-muted/50 border-b-0">
                       <TableHead className="sticky left-0 z-10 bg-muted/50" />
-                      <TableHead
-                        colSpan={packagedFormats.length}
-                        className="text-center text-xs font-medium text-muted-foreground border-b-0"
-                      >
-                        Packaged
-                      </TableHead>
-                      <TableHead
-                        colSpan={kegFormats.length}
-                        className="text-center text-xs font-medium text-muted-foreground border-l border-b-0"
-                      >
-                        Draft / Kegs
-                      </TableHead>
+                      {formatGroups.map((group, gi) => (
+                        <TableHead
+                          key={group.containerName}
+                          colSpan={group.formats.length}
+                          className={cn(
+                            "text-center text-xs font-medium text-muted-foreground border-b-0",
+                            gi > 0 && "border-l"
+                          )}
+                        >
+                          {group.containerName}
+                        </TableHead>
+                      ))}
                     </TableRow>
                   )}
+                  {/* Format sub-header row */}
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead className="sticky left-0 z-10 bg-muted/50 min-w-[120px]">
                       Tier
                     </TableHead>
-                    {allFormats.map((f) => {
-                      const label = formatColumnLabel(f);
-                      const isFirstKeg = kegFormats.length > 0 && f.id === kegFormats[0].id;
-                      return (
+                    {formatGroups.map((group, gi) =>
+                      group.formats.map((f, fi) => (
                         <TableHead
                           key={f.id}
-                          className={cn("text-right w-[120px]", isFirstKeg && "border-l")}
+                          className={cn(
+                            "text-right w-[120px]",
+                            gi > 0 && fi === 0 && "border-l"
+                          )}
                         >
                           <div className="leading-tight">
-                            <div className="text-xs font-medium">{label.name}</div>
-                            <div className="text-[10px] text-muted-foreground font-normal">{label.unit}</div>
+                            <div className="text-xs font-medium">{f.name}</div>
                           </div>
                         </TableHead>
-                      );
-                    })}
+                      ))
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1025,11 +1068,11 @@ export default function PricingPage() {
                           )}
                         </div>
                       </TableCell>
-                      {allFormats.map((fmt, fmtIdx) => {
+                      {formats.map((fmt, fmtIdx) => {
                         const priceObj = priceMap.get(tier.id)?.get(fmt.id);
-                        const isFirstKeg = kegFormats.length > 0 && fmt.id === kegFormats[0].id;
+                        const isFirstInGroup = groupBorderSet.has(fmt.id);
                         return (
-                          <TableCell key={fmt.id} className={cn("px-1 py-0.5", isFirstKeg && "border-l")}>
+                          <TableCell key={fmt.id} className={cn("px-1 py-0.5", isFirstInGroup && "border-l")}>
                             <PriceCell
                               price={priceObj?.price ?? null}
                               tierId={tier.id}

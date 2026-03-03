@@ -9,7 +9,7 @@ All quantities stored in consistent base units in the database:
 | Measurement | Canonical Unit | Column Suffix | Example |
 |-------------|----------------|---------------|---------|
 | Production volume | BBL (barrels) | `_bbl` | `batches.volume_bbl` |
-| Retail container | oz (fluid ounces) | `_oz` | `package_types.volume_oz` |
+| Retail container | oz (fluid ounces) | `_oz` | `containers.volume_oz` |
 | Weight | lbs (pounds) | `_lbs` | `recipe_malts.weight_lbs` |
 | Gravity | Plato | (no suffix) | `brew_logs.og` |
 | Temperature | °F (Fahrenheit) | `_f` | `fermentation_temp_f` |

@@ -21,7 +21,7 @@ import {
   purchasingKeys,
   pickListKeys,
   brandKeys,
-  packageTypeKeys,
+  channelFormatKeys,
   kegKeys,
   brewLogKeys,
   sessionLineItemKeys,
@@ -302,6 +302,11 @@ describe("Key factory consistency", () => {
       "batch",
       "b1",
     ]);
+    expect(revisionKeys.fkResolve("customers", ["c1", "c2"])).toEqual([
+      "fk-resolve",
+      "customers",
+      "c1,c2",
+    ]);
   });
 
   it("planningKeys with and without options", () => {
@@ -434,23 +439,27 @@ describe("brandKeys", () => {
 });
 
 // =============================================================================
-// packageTypeKeys
+// channelFormatKeys
 // =============================================================================
 
-describe("packageTypeKeys", () => {
-  it("all() returns ['package-types']", () => {
-    expect(packageTypeKeys.all()).toEqual(["package-types"]);
+describe("channelFormatKeys", () => {
+  it("all() returns ['channel-formats']", () => {
+    expect(channelFormatKeys.all()).toEqual(["channel-formats"]);
   });
 
-  it("list() without filters returns ['package-types', 'list']", () => {
-    expect(packageTypeKeys.list()).toEqual(["package-types", "list"]);
+  it("byChannel() returns key with channelId", () => {
+    expect(channelFormatKeys.byChannel("ch1")).toEqual([
+      "channel-formats",
+      "by-channel",
+      "ch1",
+    ]);
   });
 
-  it("list() with filters includes them", () => {
-    expect(packageTypeKeys.list({ category: "keg" })).toEqual([
-      "package-types",
-      "list",
-      { category: "keg" },
+  it("byFormat() returns key with formatId", () => {
+    expect(channelFormatKeys.byFormat("sf1")).toEqual([
+      "channel-formats",
+      "by-format",
+      "sf1",
     ]);
   });
 });
@@ -544,5 +553,12 @@ describe("vesselKeys", () => {
 describe("packagingFormatKeys", () => {
   it("all() returns ['packaging-formats']", () => {
     expect(packagingFormatKeys.all()).toEqual(["packaging-formats"]);
+  });
+
+  it("kegFormats() returns ['packaging-formats', 'keg']", () => {
+    expect(packagingFormatKeys.kegFormats()).toEqual([
+      "packaging-formats",
+      "keg",
+    ]);
   });
 });

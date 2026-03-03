@@ -10,10 +10,8 @@ export interface SquareSyncProduct {
 }
 
 export interface SquareSyncVariation {
-  /** Package type for packaged goods, null for draft */
-  packageTypeId?: string;
-  /** Keg type for draft goods, null for packaged */
-  kegTypeId?: string;
+  /** Selling format ID (unified identifier for all format types) */
+  sellingFormatId: string;
   name: string; // e.g., "16oz 4-Pack", "1/2 BBL Draft"
   priceCents: number;
   /** Existing Square catalog ID */

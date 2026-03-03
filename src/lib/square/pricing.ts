@@ -2,8 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 
 interface TaproomPrice {
   brandId: string;
-  packageTypeId?: string;
-  kegTypeId?: string;
+  sellingFormatId: string;
   priceCents: number;
 }
 
@@ -16,8 +15,8 @@ interface TaproomPrice {
  *   -> pricing_tier_prices WHERE pricing_tier_id AND sales_channel = taproom
  *   -> price (in dollars) -> convert to cents (* 100)
  *
- * Package formats come from package_types and keg_types referenced
- * via pricing_tier_prices.format_id (which references packaging_formats).
+ * Selling formats are referenced via pricing_tier_prices.format_id
+ * (which references selling_formats).
  */
 export async function resolveTaproomPrices(
   brandIds: string[]
@@ -80,16 +79,11 @@ export async function resolveTaproomPrices(
   }
 
   // 4. Get pricing_tier_prices for those tiers and the taproom channel
-  // Cast needed: auto-generated types still reference old column name (package_format_id)
-  // until supabase types are regenerated after migration 00092.
   const { data: tierPrices, error: pricesError } = await admin
     .from("pricing_tier_prices")
     .select("pricing_tier_id, format_id, price")
     .in("pricing_tier_id", tierIds)
-    .eq("sales_channel_id", taproomChannelId) as unknown as {
-      data: { pricing_tier_id: string; format_id: string; price: number }[] | null;
-      error: Error | null;
-    };
+    .eq("sales_channel_id", taproomChannelId);
 
   if (pricesError || !tierPrices || tierPrices.length === 0) {
     return [];
@@ -107,9 +101,7 @@ export async function resolveTaproomPrices(
   }
 
   // 6. Map results back to brands
-  // format_id references the packaging_formats view which includes both
-  // package_types and keg_types. We treat all as packageTypeId for now.
-  // TODO: Use format_source from packaging_formats to distinguish package vs keg.
+  // format_id references selling_formats directly
   const results: TaproomPrice[] = [];
 
   for (const [brandId, tierId] of Object.entries(brandTierMap)) {
@@ -119,7 +111,7 @@ export async function resolveTaproomPrices(
     for (const [formatId, priceDollars] of Object.entries(pricesForTier)) {
       results.push({
         brandId,
-        packageTypeId: formatId,
+        sellingFormatId: formatId,
         priceCents: Math.round(priceDollars * 100),
       });
     }

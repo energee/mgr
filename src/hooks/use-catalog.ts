@@ -2,7 +2,7 @@
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { brandKeys, packageTypeKeys, packagingFormatKeys, entityKeys } from "@/lib/query-keys";
+import { brandKeys, packagingFormatKeys, entityKeys } from "@/lib/query-keys";
 
 /**
  * Generic hook for fetching active catalog items from a Supabase table.
@@ -57,28 +57,24 @@ export function useBrands(): UseQueryResult<IdNamePair[]> {
   });
 }
 
-/** Fetch active package types (id, name) */
-export function usePackageTypes(): UseQueryResult<IdNamePair[]> {
-  return useCatalog<IdNamePair>(packageTypeKeys.all(), "package_types", "id, name");
-}
-
-/**
- * A packaging format from the union view (package_types + keg_types).
- * `format_source` discriminates which table the ID came from.
- */
-export interface PackagingFormat {
-  id: string;
-  name: string;
-  format_source: "package_type" | "keg_type";
-  container_type: string;
-}
-
 /** Fetch active keg owners (id, name) */
 export function useKegOwners(): UseQueryResult<IdNamePair[]> {
   return useCatalog<IdNamePair>(entityKeys.all("keg_owners"), "keg_owners", "id, name", ["position", "name"]);
 }
 
-/** Fetch packaging formats (union of non-keg package_types + keg_types) */
+/**
+ * A packaging format from the packaging_formats view (selling_formats + containers).
+ * Used by the pricing matrix and format selectors.
+ */
+export interface PackagingFormat {
+  id: string;
+  name: string;
+  container_type: string;
+  container_name: string;
+  unit_count: number;
+}
+
+/** Fetch packaging formats (view over selling_formats + containers) */
 export function usePackagingFormats(): UseQueryResult<PackagingFormat[]> {
   const supabase = createClient();
 
@@ -87,12 +83,21 @@ export function usePackagingFormats(): UseQueryResult<PackagingFormat[]> {
     queryFn: async (): Promise<PackagingFormat[]> => {
       const { data, error } = await supabase
         .from("packaging_formats")
-        .select("id, name, format_source, container_type")
+        .select("id, name, container_type, container_name, unit_count")
         .eq("is_active", true)
-        .order("format_source")
+        .order("container_type")
         .order("name");
       if (error) throw error;
       return data as PackagingFormat[];
     },
   });
+}
+
+/** Check if a selling format ID refers to a keg container type */
+export function isKegFormat(
+  formatId: string | null,
+  formats: PackagingFormat[] | undefined
+): boolean {
+  if (!formatId || !formats) return false;
+  return formats.some((f) => f.id === formatId && f.container_type === "keg");
 }

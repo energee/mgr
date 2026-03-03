@@ -1,7 +1,7 @@
 /**
  * Square Catalog Sync
  *
- * POST: Push catalog (brands + package/keg variations) to Square.
+ * POST: Push catalog (brands + selling format variations) to Square.
  *
  * 1. Queries POS-configured locations (those with both square_location_id and pos_bin_id)
  * 2. Gathers packaged FG from bin_inventory at POS bins
@@ -30,7 +30,7 @@ interface BrandJoin {
 interface FGWithBrand {
   id: string;
   brand_id: string;
-  package_type_id: string | null;
+  selling_format_id: string | null;
   brands: BrandJoin;
 }
 
@@ -82,7 +82,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         finished_goods!inner(
           id,
           brand_id,
-          package_type_id,
+          selling_format_id,
           brands(id, name, description)
         )
       `
@@ -100,7 +100,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       .from("keg_inventory")
       .select(
         `
-        keg_type_id,
+        selling_format_id,
         location_id,
         quantity,
         finished_good_id,
@@ -121,14 +121,14 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     }
 
     // 4. Build unique brand + variation combinations
-    //    Map: brandId -> { brand info, variations: Map<packageTypeId|kegTypeId, variation> }
+    //    Map: brandId -> { brand info, variations: Map<sellingFormatId, variation> }
     const brandMap = new Map<
       string,
       {
         brandId: string;
         brandName: string;
         description?: string;
-        variations: Map<string, { packageTypeId?: string; kegTypeId?: string; name: string }>;
+        variations: Map<string, { sellingFormatId: string; name: string }>;
       }
     >();
 
@@ -148,12 +148,12 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         });
       }
 
-      if (fg.package_type_id) {
-        const varKey = `pkg-${fg.package_type_id}`;
+      if (fg.selling_format_id) {
+        const varKey = `fmt-${fg.selling_format_id}`;
         if (!brandMap.get(fg.brand_id)!.variations.has(varKey)) {
           brandMap.get(fg.brand_id)!.variations.set(varKey, {
-            packageTypeId: fg.package_type_id,
-            name: fg.package_type_id, // placeholder, will be enriched with price
+            sellingFormatId: fg.selling_format_id,
+            name: fg.selling_format_id, // placeholder, will be enriched with price
           });
         }
       }
@@ -175,13 +175,13 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         });
       }
 
-      const kegTypeId = keg.keg_type_id as string;
-      if (kegTypeId) {
-        const varKey = `keg-${kegTypeId}`;
+      const sellingFormatId = keg.selling_format_id as string;
+      if (sellingFormatId) {
+        const varKey = `fmt-${sellingFormatId}`;
         if (!brandMap.get(fg.brand_id)!.variations.has(varKey)) {
           brandMap.get(fg.brand_id)!.variations.set(varKey, {
-            kegTypeId,
-            name: kegTypeId, // placeholder
+            sellingFormatId,
+            name: sellingFormatId, // placeholder
           });
         }
       }
@@ -192,49 +192,31 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     // 5. Resolve taproom prices
     const prices = await resolveTaproomPrices(activeBrandIds);
 
-    // Build price lookup: brandId -> formatId -> priceCents
+    // Build price lookup: brandId -> varKey -> priceCents
     const priceLookup = new Map<string, Map<string, number>>();
     for (const p of prices) {
       if (!priceLookup.has(p.brandId)) {
         priceLookup.set(p.brandId, new Map());
       }
-      if (p.packageTypeId) {
-        priceLookup.get(p.brandId)!.set(`pkg-${p.packageTypeId}`, p.priceCents);
-      }
-      if (p.kegTypeId) {
-        priceLookup.get(p.brandId)!.set(`keg-${p.kegTypeId}`, p.priceCents);
-      }
+      priceLookup.get(p.brandId)!.set(`fmt-${p.sellingFormatId}`, p.priceCents);
     }
 
-    // 6. Fetch package_types and keg_types names for variation display names
-    const packageTypeIds = new Set<string>();
-    const kegTypeIds = new Set<string>();
+    // 6. Fetch selling_formats names for variation display names
+    const sellingFormatIds = new Set<string>();
     for (const brand of brandMap.values()) {
       for (const [, variation] of brand.variations) {
-        if (variation.packageTypeId) packageTypeIds.add(variation.packageTypeId);
-        if (variation.kegTypeId) kegTypeIds.add(variation.kegTypeId);
+        sellingFormatIds.add(variation.sellingFormatId);
       }
     }
 
-    let packageTypeNames: Record<string, string> = {};
-    if (packageTypeIds.size > 0) {
-      const { data: ptData } = await admin
-        .from("package_types")
+    let formatNames: Record<string, string> = {};
+    if (sellingFormatIds.size > 0) {
+      const { data: sfData } = await admin
+        .from("selling_formats")
         .select("id, name")
-        .in("id", [...packageTypeIds]);
-      if (ptData) {
-        packageTypeNames = Object.fromEntries(ptData.map((pt) => [pt.id, pt.name]));
-      }
-    }
-
-    let kegTypeNames: Record<string, string> = {};
-    if (kegTypeIds.size > 0) {
-      const { data: ktData } = await admin
-        .from("keg_types")
-        .select("id, name")
-        .in("id", [...kegTypeIds]);
-      if (ktData) {
-        kegTypeNames = Object.fromEntries(ktData.map((kt) => [kt.id, kt.name]));
+        .in("id", [...sellingFormatIds]);
+      if (sfData) {
+        formatNames = Object.fromEntries(sfData.map((sf) => [sf.id, sf.name]));
       }
     }
 
@@ -243,7 +225,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       .from("square_catalog_map")
       .select("*");
 
-    // Build lookup: "brand-{brandId}" -> mapping, "var-{brandId}-{pkg|keg}-{id}" -> mapping
+    // Build lookup: "brand-{brandId}" -> mapping, "var-{brandId}-fmt-{id}" -> mapping
     const mapLookup = new Map<string, { squareCatalogId: string; squareVersion: bigint | undefined }>();
     for (const m of existingMaps ?? []) {
       if (m.object_type === "ITEM") {
@@ -251,18 +233,12 @@ export const POST = withPermission("integrations:manage", async (_request, { use
           squareCatalogId: m.square_catalog_id,
           squareVersion: m.square_version != null ? BigInt(m.square_version) : undefined,
         });
-      } else if (m.object_type === "ITEM_VARIATION") {
-        const varKey = m.package_type_id
-          ? `pkg-${m.package_type_id}`
-          : m.keg_type_id
-            ? `keg-${m.keg_type_id}`
-            : null;
-        if (varKey) {
-          mapLookup.set(`var-${m.brand_id}-${varKey}`, {
-            squareCatalogId: m.square_catalog_id,
-            squareVersion: m.square_version != null ? BigInt(m.square_version) : undefined,
-          });
-        }
+      } else if (m.object_type === "ITEM_VARIATION" && m.selling_format_id) {
+        const varKey = `fmt-${m.selling_format_id}`;
+        mapLookup.set(`var-${m.brand_id}-${varKey}`, {
+          squareCatalogId: m.square_catalog_id,
+          squareVersion: m.square_version != null ? BigInt(m.square_version) : undefined,
+        });
       }
     }
 
@@ -278,19 +254,11 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         const brandPrices = priceLookup.get(brand.brandId);
         const priceCents = brandPrices?.get(varKey) ?? 0;
 
-        // Resolve display name
-        let displayName: string;
-        if (variation.packageTypeId) {
-          displayName = packageTypeNames[variation.packageTypeId] ?? "Unknown Package";
-        } else if (variation.kegTypeId) {
-          displayName = `${kegTypeNames[variation.kegTypeId] ?? "Unknown Keg"} Draft`;
-        } else {
-          displayName = "Unknown";
-        }
+        // Resolve display name from selling_formats
+        const displayName = formatNames[variation.sellingFormatId] ?? "Unknown Format";
 
         variations.push({
-          packageTypeId: variation.packageTypeId,
-          kegTypeId: variation.kegTypeId,
+          sellingFormatId: variation.sellingFormatId,
           name: displayName,
           priceCents,
           squareCatalogId: varMapping?.squareCatalogId,

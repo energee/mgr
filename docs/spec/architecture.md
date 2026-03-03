@@ -244,10 +244,10 @@ All tables include:
 | Catalog | beer_styles, yeasts, malts, hops, adjuncts, sugars, spices, fruits, additives | [catalog.md](../data-model/catalog.md) |
 | Production | recipes, batches, vessels, batch_readings, batch_additions, yeast_pitches | [production.md](../data-model/production.md) |
 | Inventory | inventory_items, allocations, bins, bin_inventory, location_transfers | [inventory.md](../data-model/inventory.md) |
-| Packaging | package_types, packaging_sessions, finished_goods | [packaging.md](../data-model/packaging.md) |
+| Packaging | containers, selling_formats, channel_formats, packaging_sessions, finished_goods | [packaging.md](../data-model/packaging.md) |
 | Sales | customers, orders, sales_channels, price_tiers, tier_prices | [sales.md](../data-model/sales.md) |
 | Purchasing | suppliers, purchase_orders, po_line_items, inventory_lots | [purchasing.md](../data-model/purchasing.md) |
-| Kegs | keg_types, keg_inventory, customer_keg_balances, keg_transactions | [kegs.md](../data-model/kegs.md) |
+| Kegs | keg_owners, keg_inventory, customer_keg_balances, keg_transactions | [kegs.md](../data-model/kegs.md) |
 | Notifications | notifications, notification_preferences, slack_settings, slack_notification_log | [notifications.md](../data-model/notifications.md) |
 | System | settings, locations | [system.md](../data-model/system.md) |
 

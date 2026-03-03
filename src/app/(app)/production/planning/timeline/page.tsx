@@ -629,7 +629,7 @@ export default function ProductionTimelinePage() {
                   const left = offset * 48;
 
                   return (
-                    <Tooltip key={`${shortfall.brand_id}-${shortfall.package_type_id}-${idx}`}>
+                    <Tooltip key={`${shortfall.brand_id}-${shortfall.selling_format_id}-${idx}`}>
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setSelectedShortfall(shortfall)}
@@ -657,7 +657,7 @@ export default function ProductionTimelinePage() {
                             {shortfall.is_urgent && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                             {shortfall.brand_name}
                           </div>
-                          <div>{shortfall.package_type_name}</div>
+                          <div>{shortfall.selling_format_name}</div>
                           <div className="text-xs text-muted-foreground">
                             Need {shortfall.shortfall_quantity.toLocaleString()} by {format(demandDate, "MMM d")}
                           </div>
