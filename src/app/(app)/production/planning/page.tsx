@@ -82,7 +82,7 @@ export default function ProductionPlanningPage() {
   const summary: PlanningSummary = {
     totalDemand: shortfalls.reduce((sum, s) => sum + s.demand_quantity, 0),
     availableSupply: shortfalls.reduce((sum, s) => sum + s.available_quantity, 0),
-    inProduction: shortfalls.reduce((sum, s) => sum + s.in_production_cases, 0),
+    inProduction: shortfalls.reduce((sum, s) => sum + s.in_production_units, 0),
     shortfallCount: shortfalls.length,
     urgentCount: shortfalls.filter((s) => s.is_urgent).length,
   };
@@ -213,11 +213,11 @@ export default function ProductionPlanningPage() {
             </TableHeader>
             <TableBody>
               {shortfalls.map((shortfall, index) => (
-                <TableRow key={`${shortfall.brand_id}-${shortfall.package_type_id}-${shortfall.demand_week}-${index}`}>
+                <TableRow key={`${shortfall.brand_id}-${shortfall.selling_format_id}-${shortfall.demand_week}-${index}`}>
                   <TableCell>
                     <div className="font-medium">{shortfall.brand_name}</div>
                     <div className="text-sm text-muted-foreground">
-                      {shortfall.package_type_name}
+                      {shortfall.selling_format_name}
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">{formatWeek(shortfall.demand_week)}</TableCell>
@@ -226,9 +226,9 @@ export default function ProductionPlanningPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <span className="font-mono">{shortfall.available_quantity.toLocaleString()}</span>
-                    {shortfall.in_production_cases > 0 && (
+                    {shortfall.in_production_units > 0 && (
                       <span className="text-muted-foreground text-xs block">
-                        +{shortfall.in_production_cases} in prod
+                        +{shortfall.in_production_units} in prod
                       </span>
                     )}
                   </TableCell>

@@ -30,7 +30,7 @@ export type KegTransactionType =
 interface KegTransaction {
   id: string;
   transaction_type: KegTransactionType;
-  keg_type_id: string;
+  selling_format_id: string;
   quantity: number;
   from_state: KegState | null;
   to_state: KegState | null;
@@ -45,9 +45,8 @@ interface KegTransaction {
   notes: string | null;
   created_by_name: string | null;
   created_at: string | null;
-  // Joined fields from view
+  // Convenience display fields populated by the view from selling_formats/containers
   keg_type_name?: string;
-  keg_type_code?: string;
   volume_bbl?: number;
   keg_owner_name?: string;
   customer_name?: string;
@@ -142,7 +141,7 @@ export const kegTransactionSchema = z.object({
     "retire",
     "maintain",
   ]),
-  keg_type_id: z.string().uuid("Select a keg type"),
+  selling_format_id: z.string().uuid("Select a selling format"),
   keg_owner_id: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().int().positive("Quantity must be at least 1"),
   from_state: z.enum(KEG_STATE_VALUES).nullable().optional(),
@@ -326,10 +325,10 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
           colSpan: 6,
         },
         {
-          name: "keg_type_id",
+          name: "selling_format_id",
           label: "Keg Type",
           type: "relation",
-          relation: { entity: "keg_type", displayField: "name" },
+          relation: { entity: "selling_format", displayField: "name" },
           required: true,
           colSpan: 6,
         },
@@ -467,5 +466,5 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
     "Show fill transactions for batch Y",
   ],
 
-  keyFields: ["transaction_type", "keg_type_id", "keg_owner_id", "quantity", "from_state", "to_state", "created_at"],
+  keyFields: ["transaction_type", "selling_format_id", "keg_owner_id", "quantity", "from_state", "to_state", "created_at"],
 };

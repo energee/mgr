@@ -29,13 +29,13 @@ import { orderItemEntity } from "./order-item";
 import { poLineItemEntity } from "./po-line-item";
 import { poReceiveEntity } from "./po-receive";
 import { sessionLineItemEntity } from "./session-line-item";
-import { packageTypeEntity } from "./package-type";
+import { containerEntity } from "./container";
+import { sellingFormatEntity } from "./selling-format";
 import { yeastStrainEntity } from "./yeast-strain";
 import { yeastPitchEntity } from "./yeast-pitch";
 import { salesChannelEntity } from "./sales-channel";
 import { pricingTierEntity } from "./pricing-tier";
 import { pricingTierPriceEntity } from "./pricing-tier-price";
-import { kegTypeEntity } from "./keg-type";
 import { kegOwnerEntity } from "./keg-owner";
 import { kegInventoryEntity } from "./keg-inventory";
 import { kegTransactionEntity } from "./keg-transaction";
@@ -63,7 +63,7 @@ const allEntities: Array<import("@/types/entity").EntityConfig<any>> = [
   yeastStrainEntity, yeastPitchEntity, beerStyleEntity, brandEntity,
   // Inventory
   inventoryItemEntity, inventoryLotEntity, allocationEntity,
-  finishedGoodEntity, packageTypeEntity, kegTypeEntity, kegOwnerEntity,
+  finishedGoodEntity, containerEntity, sellingFormatEntity, kegOwnerEntity,
   kegInventoryEntity, kegTransactionEntity, binEntity, deliveryEntity,
   locationTransferEntity,
   // Sales
@@ -116,10 +116,10 @@ export { poLineItemEntity, CATALOG_TYPES } from "./po-line-item";
 export type { POLineItemFormValues } from "./po-line-item";
 export { poReceiveEntity } from "./po-receive";
 export type { POReceiveFormValues } from "./po-receive";
-export { packageTypeEntity } from "./package-type";
-export type { PackageTypeFormValues } from "./package-type";
-export { kegTypeEntity } from "./keg-type";
-export type { KegTypeFormValues } from "./keg-type";
+export { containerEntity } from "./container";
+export type { ContainerFormValues } from "./container";
+export { sellingFormatEntity } from "./selling-format";
+export type { SellingFormatFormValues } from "./selling-format";
 export { kegOwnerEntity } from "./keg-owner";
 export type { KegOwnerFormValues } from "./keg-owner";
 export { kegInventoryEntity, KEG_STATES } from "./keg-inventory";

@@ -12,13 +12,13 @@
 export interface ProductionShortfall {
   brand_id: string;
   brand_name: string;
-  package_type_id: string;
-  package_type_name: string;
+  selling_format_id: string;
+  selling_format_name: string;
   demand_week: string;
   demand_quantity: number;
   available_quantity: number;
   in_production_bbl: number;
-  in_production_cases: number;
+  in_production_units: number;
   shortfall_quantity: number;
   recommended_brew_start: string;
   lead_time_days: number;
@@ -33,7 +33,7 @@ export interface ProductionShortfall {
 
 export interface DemandByProduct {
   brand_id: string;
-  package_type_id: string;
+  selling_format_id: string;
   demand_week: string;
   total_quantity: number;
   order_count: number;
@@ -49,7 +49,7 @@ export interface DemandByProduct {
 
 export interface SupplyByProduct {
   brand_id: string;
-  package_type_id: string;
+  selling_format_id: string;
   total_quantity: number;
   available_quantity: number;
   allocated_quantity: number;

@@ -74,10 +74,12 @@ Production Domain
 │   └── pitch_usage (pitch_id)
 
 Packaging Domain
-├── package_types
-│   └── packages (package_type_id)
-│   └── finished_goods (package_type_id)
-│   └── order_items (package_type_id)
+├── containers (physical vessels: cans, bottles, kegs)
+│   └── selling_formats (container_id) — how containers are sold
+│       └── channel_formats (selling_format_id) — per-channel visibility
+│       └── finished_goods (selling_format_id)
+│       └── order_items (selling_format_id)
+│       └── session_line_items (selling_format_id)
 ├── packaging_sessions
 │   └── session_line_items (session_id)
 │   └── finished_goods (session_line_item_id)
@@ -120,14 +122,12 @@ Sales Domain
 │   └── price_tier_channels (tier_id)
 │   └── tier_prices (tier_id)
 
-Kegs Domain
-├── keg_types
-│   └── keg_inventory (keg_type_id)
-│   └── customer_keg_balances (keg_type_id)
-│   └── keg_transactions (keg_type_id)
-├── keg_sizes
-│   └── keg_inventory (keg_size_id)
-│   └── keg_transactions (keg_size_id)
+Kegs Domain (uses containers where type='keg')
+├── keg_owners
+│   └── keg_owner_deposits (keg_owner_id, selling_format_id)
+├── keg_transactions (selling_format_id, keg_owner_id)
+│   └── keg_inventory (calculated view)
+│   └── customer_keg_balances (calculated view)
 
 System Domain
 ├── settings (singleton)
@@ -360,7 +360,7 @@ Hot-path queries have dedicated indexes. See `docs/MGR-SPECIFICATION.md` section
 - `allocations(status, created_at)` - Dashboard queries
 - `allocations(source_id, destination_type)` - Availability calculations
 - `vessel_transfers(to_vessel_id, transferred_at)` - Current batch derivation
-- `finished_goods(brand_id, package_type_id)` - Inventory lookups
+- `finished_goods(brand_id, selling_format_id)` - Inventory lookups
 
 ### When to Consider Partitioning
 

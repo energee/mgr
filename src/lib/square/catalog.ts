@@ -3,9 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import type { SquareSyncProduct, SquareSyncResult, SquareSyncVariation } from "./types";
 
 function variationKey(variation: SquareSyncVariation): string {
-  return variation.packageTypeId
-    ? `pkg-${variation.packageTypeId}`
-    : `keg-${variation.kegTypeId}`;
+  return `fmt-${variation.sellingFormatId}`;
 }
 
 function optionalVersion(version: bigint | undefined): { version: bigint } | undefined {
@@ -59,7 +57,7 @@ export function buildCatalogObjects(products: SquareSyncProduct[]) {
  * Flow:
  *  1. Build CatalogObject array from products
  *  2. Call Square batchUpsertCatalogObjects
- *  3. Map returned IDs back to brands/packages/kegs
+ *  3. Map returned IDs back to brands/selling formats
  *  4. Upsert into square_catalog_map
  */
 export async function pushCatalog(
@@ -130,8 +128,7 @@ export async function pushCatalog(
         .from("square_catalog_map")
         .insert({
           brand_id: product.brandId,
-          package_type_id: null,
-          keg_type_id: null,
+          selling_format_id: null,
           square_catalog_id: realItemId,
           square_version: itemVersion ? Number(itemVersion) : null,
           object_type: "ITEM",
@@ -173,8 +170,7 @@ export async function pushCatalog(
           .from("square_catalog_map")
           .insert({
             brand_id: product.brandId,
-            package_type_id: variation.packageTypeId ?? null,
-            keg_type_id: variation.kegTypeId ?? null,
+            selling_format_id: variation.sellingFormatId,
             square_catalog_id: realVarId,
             square_version: varVersion ? Number(varVersion) : null,
             object_type: "ITEM_VARIATION",
@@ -183,7 +179,7 @@ export async function pushCatalog(
           });
 
         if (varInsertError) {
-          let updateQuery = admin
+          await admin
             .from("square_catalog_map")
             .update({
               square_catalog_id: realVarId,
@@ -192,17 +188,8 @@ export async function pushCatalog(
               updated_at: now,
             })
             .eq("brand_id", product.brandId)
-            .eq("object_type", "ITEM_VARIATION");
-
-          if (variation.packageTypeId) {
-            updateQuery = updateQuery.eq(
-              "package_type_id",
-              variation.packageTypeId
-            );
-          } else {
-            updateQuery = updateQuery.eq("keg_type_id", variation.kegTypeId!);
-          }
-          await updateQuery;
+            .eq("object_type", "ITEM_VARIATION")
+            .eq("selling_format_id", variation.sellingFormatId);
         }
         itemsSynced++;
       }

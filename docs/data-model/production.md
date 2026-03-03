@@ -1153,26 +1153,20 @@ calculate_units_per_bbl(p_volume_oz DECIMAL, p_units_per_case INTEGER) RETURNS D
 
 ---
 
-### `package_types.units_per_bbl_override` (Column)
+### Yield Override
 
-Optional manual override for yield calculation.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| units_per_bbl_override | DECIMAL(6,2) | If set, used instead of calculated value |
-
-Useful for accounting for packaging losses or non-standard yields.
+Selling formats can have yield overrides configured to account for packaging losses or non-standard yields. See [packaging.md](./packaging.md) for container and selling format schema details.
 
 ---
 
 ### `order_demand_by_product` (View)
 
-Aggregates order demand by brand, package type, and week.
+Aggregates order demand by brand, selling format, and week.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | brand_id | UUID | FK to brands |
-| package_type_id | UUID | FK to package_types |
+| selling_format_id | UUID | FK to selling_formats |
 | demand_week | DATE | Week start date (Monday) |
 | total_quantity | INTEGER | Sum of order item quantities |
 | order_count | INTEGER | Number of orders |
@@ -1183,18 +1177,18 @@ Aggregates order demand by brand, package type, and week.
 
 **Filters:**
 - Excludes `fulfilled` and `cancelled` orders
-- Requires `brand_id`, `package_type_id`, and due date to be set
+- Requires `brand_id`, `selling_format_id`, and due date to be set
 
 ---
 
 ### `finished_goods_supply_by_product` (View)
 
-Aggregates available finished goods inventory by brand and package type.
+Aggregates available finished goods inventory by brand and selling format.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | brand_id | UUID | FK to brands |
-| package_type_id | UUID | FK to package_types |
+| selling_format_id | UUID | FK to selling_formats |
 | total_quantity | INTEGER | Total inventory quantity |
 | available_quantity | INTEGER | Available (unallocated) quantity |
 | allocated_quantity | INTEGER | Already allocated to orders |
@@ -1256,13 +1250,13 @@ calculate_production_shortfalls(
 |--------|------|-------------|
 | brand_id | UUID | FK to brands |
 | brand_name | TEXT | Brand name |
-| package_type_id | UUID | FK to package_types |
-| package_type_name | TEXT | Package type name |
+| selling_format_id | UUID | FK to selling_formats |
+| selling_format_name | TEXT | Selling format name |
 | demand_week | DATE | Week start date |
 | demand_quantity | INTEGER | Total demand |
 | available_quantity | INTEGER | Available inventory |
 | in_production_bbl | NUMERIC | BBL in production |
-| in_production_cases | INTEGER | Estimated units from production |
+| in_production_units | INTEGER | Estimated units from production |
 | shortfall_quantity | INTEGER | Demand - available - in_production |
 | recommended_brew_start | DATE | When to start brewing |
 | lead_time_days | INTEGER | Total lead time |
@@ -1330,8 +1324,8 @@ CREATE INDEX idx_vessel_transfers_source ON vessel_transfers(source_vessel_id, t
 CREATE INDEX idx_vessel_transfers_dest ON vessel_transfers(destination_vessel_id, transfer_date);
 
 -- Production planning
-CREATE INDEX idx_order_items_brand_package ON order_items(brand_id, package_type_id)
-  WHERE brand_id IS NOT NULL AND package_type_id IS NOT NULL;
+CREATE INDEX idx_order_items_brand_format ON order_items(brand_id, selling_format_id)
+  WHERE brand_id IS NOT NULL AND selling_format_id IS NOT NULL;
 CREATE INDEX idx_orders_planning ON orders(status, scheduled_date, requested_date)
   WHERE status NOT IN ('fulfilled', 'cancelled');
 CREATE INDEX idx_batches_planning ON batches(status, recipe_id)

@@ -4,24 +4,17 @@ Keg inventory tracking with support for different keg types, fleet owners, and c
 
 **Design Pattern**: Following the unified allocations pattern, keg inventory is a **calculated view** derived from immutable transaction records. Quantities are never stored as mutable balances.
 
-## `keg_types`
+## Keg Types (via `containers` + `selling_formats`)
 
-Keg type definitions with size and deposit information.
+Keg types are now stored as rows in the unified `containers` table where `type = 'keg'`. Each keg container has a corresponding `selling_formats` entry (typically "Per Keg" with `unit_count = 1`). See [packaging.md](./packaging.md) for the full `containers` and `selling_formats` schema.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| name | TEXT | Display name (e.g., "1/2 Barrel", "1/6 Barrel") |
-| code | TEXT | Short code (e.g., "half", "sixth") |
-| volume_bbl | DECIMAL(10,4) | Volume in barrels |
-| deposit_amount | DECIMAL(10,2) | Default deposit amount per keg |
-| description | TEXT | Optional description |
-| is_active | BOOLEAN | Active flag |
-| position | INTEGER | Display order |
-| created_at | TIMESTAMPTZ | Created timestamp |
-| updated_at | TIMESTAMPTZ | Updated timestamp |
+**Key columns on `containers` for kegs:**
+- `name` — Display name (e.g., "1/2 Barrel", "1/6 Barrel")
+- `type` — Always `'keg'`
+- `volume_bbl` — Volume in barrels
+- `deposit_amount` — Default deposit amount per keg
 
-**Migration:** `00029_keg_types.sql`
+**Backward compatibility:** Keg views (e.g., `keg_inventory_with_details`) expose `keg_type_name` as an alias for `containers.name` to maintain UI compatibility.
 
 ---
 
@@ -51,34 +44,34 @@ Fleet provider definitions. Tracks who owns each keg for logistics, deposits, an
 
 ## `keg_owner_deposits`
 
-Per-owner per-keg-type deposit amounts. Overrides `keg_types.deposit_amount` when a fleet owner is specified.
+Per-owner per-format deposit amounts. Overrides `containers.deposit_amount` when a fleet owner is specified.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
 | keg_owner_id | UUID | FK to keg_owners |
-| keg_type_id | UUID | FK to keg_types |
-| deposit_amount | DECIMAL(10,2) | Deposit amount for this owner + type combination |
+| selling_format_id | UUID | FK to selling_formats (keg format) |
+| deposit_amount | DECIMAL(10,2) | Deposit amount for this owner + format combination |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**Unique Constraint:** `(keg_owner_id, keg_type_id)`
+**Unique Constraint:** `(keg_owner_id, selling_format_id)`
 
 **Migration:** `00079_keg_owners.sql`
 
 ---
 
-## Owner × Type Matrix
+## Owner × Format Matrix
 
 ```
-keg_types (sizes)           keg_owners (fleet providers)
-──────────────────          ────────────────────────────
+containers (type='keg')     keg_owners (fleet providers)
+──────────────────────      ────────────────────────────
 1/2 Barrel (0.5 BBL)   ×   Owned (house kegs)
 1/6 Barrel (0.167 BBL)     Microstar
 1/4 Barrel (0.25 BBL)      KegFleet
 ```
 
-Deposit resolution: `COALESCE(keg_owner_deposits.deposit_amount, keg_types.deposit_amount)`
+Deposit resolution: `COALESCE(keg_owner_deposits.deposit_amount, containers.deposit_amount)`
 
 ---
 
@@ -90,7 +83,7 @@ Immutable audit log for all keg state transitions. Keg inventory is calculated f
 |--------|------|-------------|
 | id | UUID | Primary key |
 | transaction_type | keg_transaction_type | Transaction type (enum) |
-| keg_type_id | UUID | FK to keg_types |
+| selling_format_id | UUID | FK to selling_formats (keg format) |
 | keg_owner_id | UUID | FK to keg_owners (nullable) |
 | quantity | INTEGER | Quantity (always positive) |
 | from_state | keg_state | State before transaction (NULL for receive) |
@@ -147,7 +140,7 @@ Immutable audit log for all keg state transitions. Keg inventory is calculated f
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Deterministic ID for the combination |
-| keg_type_id | UUID | FK to keg_types |
+| selling_format_id | UUID | FK to selling_formats (keg format) |
 | keg_owner_id | UUID | FK to keg_owners (nullable) |
 | state | keg_state | Current state (enum) |
 | location_id | UUID | FK to locations (optional) |
@@ -158,7 +151,7 @@ Immutable audit log for all keg state transitions. Keg inventory is calculated f
 **Calculation Logic:**
 - Kegs entering a state (to_state) add to quantity
 - Kegs leaving a state (from_state) subtract from quantity
-- Groups by keg_type × keg_owner × state × location × batch × finished_good
+- Groups by selling_format × keg_owner × state × location × batch × finished_good
 - Only rows with positive quantity are shown
 
 **Migration:** `00032_keg_transactions.sql` (original), `00079_keg_owners.sql` (adds owner dimension)
@@ -167,13 +160,12 @@ Immutable audit log for all keg state transitions. Keg inventory is calculated f
 
 ## `keg_inventory_with_details` View
 
-Keg inventory with joined display names for UI.
+Keg inventory with joined display names for UI. Joins through `selling_formats` → `containers` to resolve display names.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | (all keg_inventory columns) | | Base inventory data |
-| keg_type_name | TEXT | Keg type display name |
-| keg_type_code | TEXT | Keg type code |
+| keg_type_name | TEXT | Container name (backward-compat alias from `containers.name`) |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_name | TEXT | Fleet owner name |
 | keg_owner_code | TEXT | Fleet owner code |
@@ -185,13 +177,12 @@ Keg inventory with joined display names for UI.
 
 ## `keg_transactions_with_details` View
 
-Keg transactions with joined display names for UI.
+Keg transactions with joined display names for UI. Joins through `selling_formats` → `containers` to resolve display names.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | (all keg_transactions columns) | | Base transaction data |
-| keg_type_name | TEXT | Keg type display name |
-| keg_type_code | TEXT | Keg type code |
+| keg_type_name | TEXT | Container name (backward-compat alias from `containers.name`) |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_name | TEXT | Fleet owner name |
 | keg_owner_code | TEXT | Fleet owner code |
@@ -209,9 +200,8 @@ Aggregated view of keg inventory by type, owner, and state.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| keg_type_id | UUID | Keg type ID |
-| keg_type_name | TEXT | Keg type display name |
-| keg_type_code | TEXT | Keg type code |
+| selling_format_id | UUID | FK to selling_formats |
+| keg_type_name | TEXT | Container name (backward-compat alias) |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_id | UUID | Fleet owner ID |
 | keg_owner_name | TEXT | Fleet owner name |
@@ -229,9 +219,8 @@ Aggregated view of keg inventory by type, owner, and state.
 |--------|------|-------------|
 | customer_id | UUID | FK to customers |
 | customer_name | TEXT | Customer name |
-| keg_type_id | UUID | FK to keg_types |
-| keg_type_name | TEXT | Keg type name |
-| keg_type_code | TEXT | Keg type code |
+| selling_format_id | UUID | FK to selling_formats |
+| keg_type_name | TEXT | Container name (backward-compat alias) |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_id | UUID | Fleet owner ID |
 | keg_owner_name | TEXT | Fleet owner name |
@@ -239,7 +228,7 @@ Aggregated view of keg inventory by type, owner, and state.
 | kegs_out | INTEGER | Kegs currently out (shipped - returned) |
 | deposit_value | DECIMAL | Total deposit value (kegs_out × deposit_amount) |
 
-**Deposit Resolution:** Uses `COALESCE(keg_owner_deposits.deposit_amount, keg_types.deposit_amount)` to prefer owner-specific deposits when available.
+**Deposit Resolution:** Uses `COALESCE(keg_owner_deposits.deposit_amount, containers.deposit_amount)` to prefer owner-specific deposits when available.
 
 **Calculation Logic:**
 - Kegs shipped to customer (ship transactions) add to kegs_out
@@ -287,8 +276,8 @@ Shows kegs that are currently out with customers, with age calculations.
 |--------|------|-------------|
 | customer_id | UUID | FK to customers |
 | customer_name | TEXT | Customer name |
-| keg_type_id | UUID | FK to keg_types |
-| keg_type_name | TEXT | Keg type name |
+| selling_format_id | UUID | FK to selling_formats |
+| keg_type_name | TEXT | Container name (backward-compat alias) |
 | keg_owner_id | UUID | Fleet owner ID |
 | keg_owner_name | TEXT | Fleet owner name |
 | quantity | INTEGER | Quantity shipped |
@@ -306,8 +295,8 @@ Turnover statistics by keg type and owner.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| keg_type_id | UUID | FK to keg_types |
-| keg_type_name | TEXT | Keg type name |
+| selling_format_id | UUID | FK to selling_formats |
+| keg_type_name | TEXT | Container name (backward-compat alias) |
 | keg_owner_id | UUID | Fleet owner ID |
 | keg_owner_name | TEXT | Fleet owner name |
 | total_shipments | INTEGER | Total ship transactions |
@@ -323,9 +312,8 @@ Fleet-wide summary of keg counts by type, owner, and state.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| keg_type_id | UUID | FK to keg_types |
-| keg_type_name | TEXT | Keg type name |
-| keg_type_code | TEXT | Keg type code |
+| selling_format_id | UUID | FK to selling_formats |
+| keg_type_name | TEXT | Container name (backward-compat alias) |
 | volume_bbl | DECIMAL | Volume in barrels |
 | keg_owner_id | UUID | Fleet owner ID |
 | keg_owner_name | TEXT | Fleet owner name |
@@ -367,30 +355,24 @@ Benefits:
 
 The `keg_owners` table adds a second dimension to keg tracking without changing pricing:
 
-- **`keg_types`** define sizes (1/2 BBL, 1/6 BBL, etc.)
+- **`containers`** (where `type='keg'`) define sizes (1/2 BBL, 1/6 BBL, etc.)
+- **`selling_formats`** link containers to the sales model (typically "Per Keg" with `unit_count=1`)
 - **`keg_owners`** define fleet providers (Owned, Microstar, KegFleet, etc.)
-- **`keg_owner_deposits`** allow per-owner per-type deposit overrides
-- Pricing stays at `package_type_id` level — fleet owner is an operational detail
+- **`keg_owner_deposits`** allow per-owner per-format deposit overrides
+- Pricing uses `selling_format_id` — fleet owner is an operational detail
 
-### Unified Packaging Formats
+### Unified Containers Model
 
-The `packaging_formats` view combines non-keg `package_types` with `keg_types` into a single dropdown source:
+All packaging (cans, bottles, kegs) shares a single `containers` + `selling_formats` model. See [packaging.md](./packaging.md) for details.
 
-```sql
--- Union view: packaging_formats
-SELECT id, name, 'package_type' AS format_source, container_type, is_active FROM package_types WHERE container_type != 'keg'
-UNION ALL
-SELECT id, name, 'keg_type' AS format_source, 'keg' AS container_type, is_active FROM keg_types
-```
-
-**Dual FK pattern**: `order_items`, `session_line_items`, and `finished_goods` have mutually exclusive `package_type_id` OR `keg_type_id` (enforced by CHECK constraints). The `format_source` discriminator tells the UI which FK to set.
+- `containers` holds physical vessels with `type` = `'package'` or `'keg'`
+- `selling_formats` defines how containers are grouped for sale
+- All FKs use a single `selling_format_id` (no more dual-FK pattern)
 
 ### Automatic Keg Transactions
 
-- **Order fulfillment**: When `orders.status` transitions to `'fulfilled'`, a trigger auto-creates `ship` keg_transactions for all order items with `keg_type_id`.
-- **Packaging completion**: When `create_finished_goods_from_packaging()` runs, it also creates `fill` keg_transactions for session line items with `keg_type_id`.
-
-**Migration:** `00080_unify_packaging_formats.sql`
+- **Order fulfillment**: When `orders.status` transitions to `'fulfilled'`, a trigger auto-creates `ship` keg_transactions for all keg order items (where the selling format's container has `type='keg'`).
+- **Packaging completion**: When `create_finished_goods_from_packaging()` runs, it also creates `fill` keg_transactions for keg session line items.
 
 ### Recording Transactions
 
@@ -399,17 +381,17 @@ To modify keg inventory, insert a record into `keg_transactions`:
 ```sql
 -- Receive 20 new half-barrel kegs from Microstar
 INSERT INTO keg_transactions (
-  transaction_type, keg_type_id, keg_owner_id, quantity, to_state
+  transaction_type, selling_format_id, keg_owner_id, quantity, to_state
 ) VALUES (
-  'receive', 'uuid-of-half-barrel', 'uuid-of-microstar', 20, 'empty'
+  'receive', 'uuid-of-half-barrel-format', 'uuid-of-microstar', 20, 'empty'
 );
 
 -- Ship 5 filled kegs to a customer
 INSERT INTO keg_transactions (
-  transaction_type, keg_type_id, keg_owner_id, quantity,
+  transaction_type, selling_format_id, keg_owner_id, quantity,
   from_state, to_state, customer_id
 ) VALUES (
-  'ship', 'uuid-of-half-barrel', 'uuid-of-microstar', 5,
+  'ship', 'uuid-of-half-barrel-format', 'uuid-of-microstar', 5,
   'filled', 'shipped', 'uuid-of-customer'
 );
 ```

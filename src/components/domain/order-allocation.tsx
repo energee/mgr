@@ -4,7 +4,7 @@
  * OrderAllocation - Allocate finished goods to an order
  *
  * Features:
- * - Shows available finished goods by brand/package type
+ * - Shows available finished goods by brand/selling format
  * - FIFO suggestion (oldest lots first)
  * - Quantity input validated against available
  * - Creates allocation records on save
@@ -36,7 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Package, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { orderKeys, inventoryKeys } from "@/lib/query-keys";
-import { useBrands, usePackageTypes } from "@/hooks/use-catalog";
+import { useBrands, usePackagingFormats } from "@/hooks/use-catalog";
 
 // =============================================================================
 // Types
@@ -46,7 +46,7 @@ interface FinishedGoodAvailable {
   id: string;
   lot_number: string;
   brand_id: string;
-  package_type_id: string;
+  selling_format_id: string;
   quantity: number;
   available_quantity: number;
   production_date: string | null;
@@ -100,7 +100,7 @@ export function OrderAllocation({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("finished_goods_with_availability")
-        .select("id, lot_number, brand_id, package_type_id, quantity, available_quantity, production_date")
+        .select("id, lot_number, brand_id, selling_format_id, quantity, available_quantity, production_date")
         .gt("available_quantity", 0)
         .order("production_date", { ascending: true });
 
@@ -110,9 +110,9 @@ export function OrderAllocation({
     enabled: open,
   });
 
-  // Fetch brands and package types for display
+  // Fetch brands and packaging formats for display
   const { data: brands } = useBrands();
-  const { data: packageTypes } = usePackageTypes();
+  const { data: packagingFormats } = usePackagingFormats();
 
   // Create allocations mutation
   const allocateMutation = useMutation({
@@ -191,14 +191,14 @@ export function OrderAllocation({
     return map;
   }, [brands]);
 
-  const packageMap = useMemo(() => {
+  const formatMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const p of packageTypes ?? []) map.set(p.id, p.name);
+    for (const f of packagingFormats ?? []) map.set(f.id, f.name);
     return map;
-  }, [packageTypes]);
+  }, [packagingFormats]);
 
   const getBrandName = (id: string) => brandMap.get(id) || "—";
-  const getPackageName = (id: string) => packageMap.get(id) || "—";
+  const getFormatName = (id: string) => formatMap.get(id) || "—";
 
   const isLoading = orderLoading || fgLoading;
 
@@ -228,7 +228,7 @@ export function OrderAllocation({
                 <TableRow>
                   <TableHead>Lot</TableHead>
                   <TableHead>Brand</TableHead>
-                  <TableHead>Package</TableHead>
+                  <TableHead>Format</TableHead>
                   <TableHead className="text-right">Available</TableHead>
                   <TableHead className="w-[120px]">Allocate</TableHead>
                 </TableRow>
@@ -247,7 +247,7 @@ export function OrderAllocation({
                       </div>
                     </TableCell>
                     <TableCell>{getBrandName(fg.brand_id)}</TableCell>
-                    <TableCell>{getPackageName(fg.package_type_id)}</TableCell>
+                    <TableCell>{getFormatName(fg.selling_format_id)}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant="outline">{fg.available_quantity}</Badge>
                     </TableCell>

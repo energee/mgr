@@ -67,7 +67,6 @@ export const ENUM_TYPES = {
   YEAST_FORM: "yeast_form",
   YEAST_SOURCE_TYPE: "yeast_source_type",
   LOCATION_TYPE: "location_type",
-  PACKAGE_CONTAINER_TYPE: "package_container_type",
   CATALOG_TYPE: "catalog_type",
   KEG_TRANSACTION_TYPE: "keg_transaction_type",
   MASH_STEP_TYPE: "mash_step_type",
