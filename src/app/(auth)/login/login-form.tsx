@@ -9,6 +9,7 @@
  */
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
@@ -224,14 +225,14 @@ export function LoginForm() {
         onClick={handlePasswordless}
         disabled={isLoading}
       >
-        Sign in with magic link
+        Sign in without password
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
-        <a href="/signup" className="underline hover:text-foreground">
+        <Link href="/signup" className="underline hover:text-foreground">
           Sign up
-        </a>
+        </Link>
       </p>
     </form>
   );
