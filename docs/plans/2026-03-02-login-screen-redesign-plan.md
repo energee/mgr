@@ -53,16 +53,16 @@ export default async function AuthLayout({ children }: AuthLayoutProps) {
 
   return (
     <div className="relative min-h-screen items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-      <div className="relative hidden h-full flex-col p-10 text-primary lg:flex dark:border-r">
+      <div className="relative hidden h-full flex-col p-10 text-primary lg:flex dark:border-r" aria-hidden="true">
         <div className="absolute inset-0 bg-primary/5" />
         <div className="relative z-20 flex items-center text-lg font-medium">
           <MGRIcon size={24} className="mr-2" />
           MGR
         </div>
         <div className="relative z-20 mt-auto">
-          <blockquote className="text-balance leading-normal">
+          <p className="text-balance leading-normal">
             Brewery management, simplified.
-          </blockquote>
+          </p>
         </div>
       </div>
       <div className="flex min-h-screen items-center justify-center p-4 lg:p-8">
@@ -100,7 +100,7 @@ git commit -m "feat: split-screen auth layout with MGR branding panel"
 /**
  * Login Page
  *
- * Email/password authentication with magic link option.
+ * Email/password authentication with passwordless (magic link + OTP code) option.
  * Renders heading + subtitle + form inside the split-screen auth layout.
  */
 
@@ -208,6 +208,6 @@ Check:
 **Step 2: Final commit (if any tweaks needed)**
 
 ```bash
-git add -A
+git add src/app/(auth)/layout.tsx src/app/(auth)/login/login-form.tsx
 git commit -m "fix: auth layout visual adjustments"
 ```
