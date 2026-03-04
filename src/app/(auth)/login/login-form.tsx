@@ -225,7 +225,7 @@ export function LoginForm() {
         onClick={handlePasswordless}
         disabled={isLoading}
       >
-        Sign in without password
+        Sign in with magic link
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
