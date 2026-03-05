@@ -11,6 +11,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { pickListKeys } from "@/lib/query-keys";
+import { dynamicFrom } from "@/services/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,8 +71,6 @@ interface PickListItemsProps {
 
 export function PickListItems({ data }: PickListItemsProps) {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const queryClient = useQueryClient();
   const pickListId = data.id;
   const isEditable = ["draft", "assigned", "in_progress"].includes(data.status);
@@ -82,8 +81,7 @@ export function PickListItems({ data }: PickListItemsProps) {
   const { data: items = [], isLoading } = useQuery<PickListItemRow[]>({
     queryKey: pickListKeys.items(pickListId),
     queryFn: async () => {
-      const { data: pickItems, error } = await db
-        .from("pick_list_items")
+      const { data: pickItems, error } = await dynamicFrom(supabase, "pick_list_items")
         .select(`
           id,
           pick_list_id,
@@ -152,8 +150,7 @@ export function PickListItems({ data }: PickListItemsProps) {
   // Mutation to update picked quantity
   const updatePickedMutation = useMutation({
     mutationFn: async ({ itemId, quantity }: { itemId: string; quantity: number }) => {
-      const { error } = await db
-        .from("pick_list_items")
+      const { error } = await dynamicFrom(supabase, "pick_list_items")
         .update({
           quantity_picked: quantity,
           picked_at: quantity > 0 ? new Date().toISOString() : null,
@@ -206,8 +203,7 @@ export function PickListItems({ data }: PickListItemsProps) {
 
       const now = new Date().toISOString();
       const updates = Array.from(byQuantity.entries()).map(([qty, ids]) =>
-        db
-          .from("pick_list_items")
+        dynamicFrom(supabase, "pick_list_items")
           .update({
             quantity_picked: qty,
             picked_at: now,

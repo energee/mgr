@@ -273,8 +273,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
         .eq("recipe_id", recipeId)
         .order("position", { ascending: true });
       if (error) throw error;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return rows as any[];
+      return rows;
     },
   });
 

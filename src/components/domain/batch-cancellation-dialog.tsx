@@ -19,6 +19,7 @@ import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys, dashboardKeys, entityKeys, inventoryKeys } from "@/lib/query-keys";
+import { dynamicRpc } from "@/services/types";
 import {
   Dialog,
   DialogContent,
@@ -143,8 +144,7 @@ export function BatchCancellationDialog({
   const terminateMutation = useMutation({
     mutationFn: async (values: TerminationFormValues) => {
       const rpcName = isArchive ? "archive_batch" : "cancel_batch";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(rpcName, {
+      const { data, error } = await dynamicRpc(supabase, rpcName, {
         p_batch_id: batchId,
         p_reason: values.reason,
         p_loss_volume_bbl: isArchive ? (values.loss_volume_bbl || null) : null,
@@ -189,7 +189,6 @@ export function BatchCancellationDialog({
     terminateMutation.mutate(values);
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const selectedReason = form.watch("reason");
   const selectedReasonInfo = reasons.find((r) => r.value === selectedReason);
 

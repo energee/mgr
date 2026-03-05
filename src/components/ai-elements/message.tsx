@@ -225,10 +225,8 @@ export type MessageBranchSelectorProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 export const MessageBranchSelector = ({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured to exclude from ...props spread
-  className,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured to exclude from ...props spread
-  from,
+  className: _className,
+  from: _from,
   ...props
 }: MessageBranchSelectorProps) => {
   const { totalBranches } = useMessageBranch();

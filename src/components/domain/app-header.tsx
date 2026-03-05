@@ -24,6 +24,7 @@ import type { AnimatedIconHandle } from "@/components/icons/animated";
 import { useRef } from "react";
 import { toast } from "sonner";
 import { NotificationBell } from "@/components/domain/notification-bell";
+import { SafeImage } from "@/components/ui/safe-image";
 
 interface AppHeaderProps {
   user: User;
@@ -55,8 +56,7 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
         {breweryLogoSvg && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
+          <SafeImage
             src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(breweryLogoSvg)))}`}
             alt={breweryName || "Brewery logo"}
             className="h-8 w-8 object-contain"

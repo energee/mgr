@@ -3,6 +3,7 @@
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { entityKeys, changeRequestKeys, portalKeys } from "@/lib/query-keys";
 import { formatCurrency } from "@/lib/format";
 import { usePortalCustomer } from "@/lib/portal-context";
@@ -120,10 +121,7 @@ export default function PortalOrderDetailPage({
   const { data: order, isLoading: orderLoading } = useQuery<Order>({
     queryKey: entityKeys.detail("orders", id),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data, error } = await db
-        .from("orders")
+      const { data, error } = await dynamicFrom(supabase, "orders")
         .select(
           `
           id, order_number, status, order_date, requested_date, scheduled_date, notes,
@@ -147,10 +145,7 @@ export default function PortalOrderDetailPage({
   const { data: changeRequests } = useQuery<ChangeRequest[]>({
     queryKey: changeRequestKeys.forOrder(id),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data, error } = await db
-        .from("order_change_requests")
+      const { data, error } = await dynamicFrom(supabase, "order_change_requests")
         .select(
           `
           id, status, notes, rejection_reason, created_at,
@@ -172,10 +167,7 @@ export default function PortalOrderDetailPage({
   const { data: cutoffState } = useQuery<string>({
     queryKey: portalKeys.cutoff(id),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data: orderRow } = await db
-        .from("orders")
+      const { data: orderRow } = await dynamicFrom(supabase, "orders")
         .select("customer_id, customers(sales_channel_id, sales_channels(change_request_cutoff_state))")
         .eq("id", id)
         .single();

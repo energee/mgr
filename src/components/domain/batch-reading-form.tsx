@@ -118,7 +118,6 @@ export function BatchReadingForm({
   }, [selectedType, form]);
 
   // Validate value on change
-  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const watchValue = form.watch("value");
   useEffect(() => {
     if (watchValue === "" || watchValue === undefined) {

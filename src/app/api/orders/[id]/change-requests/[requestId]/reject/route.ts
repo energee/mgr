@@ -1,5 +1,6 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
+import { dynamicFrom } from "@/services/types";
 
 export const POST = withPermission(
   "orders:write",
@@ -20,10 +21,7 @@ export const POST = withPermission(
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabase as any;
-    const { error } = await db
-      .from("order_change_requests")
+    const { error } = await dynamicFrom(supabase, "order_change_requests")
       .update({
         status: "rejected",
         reviewed_by: user.id,

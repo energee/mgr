@@ -18,6 +18,7 @@ import { useQueries } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicOptionsKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
+import { dynamicFrom } from "@/services/types";
 
 // Minimal field shape accepted by the hook - covers both EntityFieldDef and UnifiedFieldDef
 interface DynamicOptionsField {
@@ -57,8 +58,7 @@ export function useDynamicOptions(fields: DynamicOptionsField[]): DynamicOptions
       queryFn: async () => {
         const { table, valueField, labelField, filter, orderBy } = field.dynamicOptions!;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let query = supabase.from(table as any).select(`${valueField}, ${labelField}`);
+        let query = dynamicFrom(supabase, table).select(`${valueField}, ${labelField}`);
 
         // Apply filters
         if (filter) {
@@ -102,9 +102,7 @@ export function useDynamicOptions(fields: DynamicOptionsField[]): DynamicOptions
           const relatedEntity = entityRegistry.get(relation.entity);
           const tableName = relatedEntity?.table || `${relation.entity}s`;
 
-          const { data, error } = await supabase
-            // @ts-expect-error -- dynamic table name from entity registry
-            .from(tableName)
+          const { data, error } = await dynamicFrom(supabase, tableName)
             .select(`id, ${relation.displayField}`)
             .order(relation.displayField);
 

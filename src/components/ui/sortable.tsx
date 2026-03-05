@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/preserve-manual-memoization, react-hooks/exhaustive-deps */
 "use client";
 
 import {

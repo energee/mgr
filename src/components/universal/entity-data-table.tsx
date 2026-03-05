@@ -30,6 +30,7 @@ import { useQueryState } from "nuqs";
 import { parseAsStringEnum } from "nuqs";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
@@ -104,8 +105,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
 }: EntityDataTableProps<T>) {
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const path = basePath || `/${entity.domain}/${entity.table}`;
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<{ record: T; action: EntityActionDef<T> } | null>(null);
@@ -124,8 +123,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       const transitions = entity.stateMachine.transitions;
 
       // Validate transition is allowed before hitting the database
-      const { data: current } = await db
-        .from(entity.table)
+      const { data: current } = await dynamicFrom(supabase, entity.table)
         .select(stateField)
         .eq("id", id)
         .single();
@@ -137,8 +135,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         return;
       }
 
-      const { error } = await db
-        .from(entity.table)
+      const { error } = await dynamicFrom(supabase, entity.table)
         .update({ [stateField]: toState })
         .eq("id", id);
 
@@ -158,7 +155,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
       toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
     },
-    [entity, db, queryClient, fetchTable],
+    [entity, supabase, queryClient, fetchTable],
   );
 
   // ---------------------------------------------------------------------------
@@ -237,8 +234,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Build columns (memoized, updates when dynamicFilterOptions change)
   // ---------------------------------------------------------------------------
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const columns = useMemo((): ColumnDef<T, any>[] => {
+  const columns = useMemo((): ColumnDef<T>[] => {
     const dataColumns = buildDataTableColumns(entity, dynamicFilterOptions);
     const actionsColumn = buildActionsColumn(
       entity,
@@ -330,7 +326,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         setSorting([{ id: defaultFilter.sort.column, desc: defaultFilter.sort.direction === "desc" }]);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits urlFilters to avoid re-running after default is applied; hasAppliedDefault guard ensures single execution
   }, [quickFilters]);
 
   const handleQuickFilterChange = useCallback(
@@ -404,7 +400,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
     }),
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     queryFn: async () => {
-      let query = db.from(fetchTable).select("*");
+      let query = dynamicFrom(supabase, fetchTable).select("*");
 
       // Apply prop-level filters
       if (filters) {
@@ -525,8 +521,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       );
 
       // Fetch current states to validate transitions server-side
-      const { data: currentData, error: fetchError } = await db
-        .from(entity.table)
+      const { data: currentData, error: fetchError } = await dynamicFrom(supabase, entity.table)
         .select(`id, ${stateField}`)
         .in("id", ids);
 
@@ -546,8 +541,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         return 0;
       }
 
-      const { error } = await db
-        .from(entity.table)
+      const { error } = await dynamicFrom(supabase, entity.table)
         .update({ [stateField]: targetStatus })
         .in("id", validIds);
 
@@ -568,7 +562,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
       return validIds.length;
     },
-    [entity, selectedRows, db, queryClient, fetchTable]
+    [entity, selectedRows, supabase, queryClient, fetchTable]
   );
 
   // ---------------------------------------------------------------------------

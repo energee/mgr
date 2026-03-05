@@ -46,6 +46,7 @@ import {
   type TTBReportData,
 } from "@/lib/report-export";
 import { batchEntity } from "@/entities/batch";
+import { dynamicRpc } from "@/services/types";
 import { getStateLabel } from "@/types/entity";
 
 // =============================================================================
@@ -144,8 +145,7 @@ export default function TTBReportPage() {
   const { data: reportData, isLoading: reportLoading, error: reportError } = useQuery({
     queryKey: reportKeys.ttb({ year, month }),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_ttb_report", {
+      const { data, error } = await dynamicRpc(supabase, "get_ttb_report", {
         p_year: year,
         p_month: month,
       });

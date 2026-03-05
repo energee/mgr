@@ -77,8 +77,8 @@ describe("validateReading", () => {
     });
 
     it("handles unknown reading type", () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect(validateReading("unknown" as any, 5).valid).toBe(false);
+      // Force an invalid type to verify runtime guard
+      expect(validateReading("unknown" as Parameters<typeof validateReading>[0], 5).valid).toBe(false);
     });
   });
 });

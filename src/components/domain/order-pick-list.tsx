@@ -10,6 +10,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { orderKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,8 +71,6 @@ interface OrderPickListProps {
 
 export function OrderPickList({ orderId }: OrderPickListProps) {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
   const [pickedItems, setPickedItems] = useState<Set<string>>(new Set());
 
@@ -151,8 +150,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
         formatIds.length > 0
           ? supabase.from("selling_formats").select("id, name").in("id", formatIds)
           : { data: [] },
-        db
-          .from("bin_inventory")
+        dynamicFrom(supabase, "bin_inventory")
           .select(`
             finished_good_id,
             quantity,

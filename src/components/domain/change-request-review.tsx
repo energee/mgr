@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { entityKeys, changeRequestKeys } from "@/lib/query-keys";
+import { dynamicFrom } from "@/services/types";
 import {
   Table,
   TableBody,
@@ -43,8 +44,7 @@ import { AlertTriangle, Check, X, ArrowUp, ArrowDown } from "lucide-react";
 
 interface ChangeRequestReviewProps {
   parentId?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data?: { id: string | null } & Record<string, any>;
+  data?: { id: string | null } & Record<string, unknown>;
 }
 
 interface ChangeRequestItem {
@@ -98,10 +98,7 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
     queryKey: changeRequestKeys.pendingForOrder(orderId || ""),
     enabled: !!orderId,
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data: result, error } = await db
-        .from("order_change_requests")
+      const { data: result, error } = await dynamicFrom(supabase, "order_change_requests")
         .select(`
           id, status, notes, created_at, requested_by,
           order_change_request_items (
@@ -125,10 +122,7 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
     queryKey: entityKeys.detail("order_items_for_review", orderId || ""),
     enabled: !!orderId,
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data: result, error } = await db
-        .from("order_items")
+      const { data: result, error } = await dynamicFrom(supabase, "order_items")
         .select("id, brand_id, selling_format_id, quantity, brands(name), selling_formats(name)")
         .eq("order_id", orderId);
       if (error) throw error;

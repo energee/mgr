@@ -19,6 +19,7 @@ import { Suspense } from "react";
 import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // =============================================================================
@@ -134,14 +135,11 @@ function ProductMixBars({ products }: { products: ProductMix[] }) {
 
 export default function SalesDashboardPage() {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
   const { data: orderCounts = DEFAULT_ORDER_COUNTS } = useQuery({
     queryKey: dashboardKeys.sales.orderCounts(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("order_status_counts")
+      const { data, error } = await dynamicFrom(supabase, "order_status_counts")
         .select("status, count");
 
       if (error) throw error;
@@ -182,8 +180,7 @@ export default function SalesDashboardPage() {
 
       // Fetch pre-aggregated totals only for displayed orders
       const orderIds = (orders || []).map((o) => o.id);
-      const { data: totals } = await db
-        .from("order_totals")
+      const { data: totals } = await dynamicFrom(supabase, "order_totals")
         .select("order_id, total_value")
         .in("order_id", orderIds);
 
@@ -210,8 +207,7 @@ export default function SalesDashboardPage() {
   const { data: customerRevenue = [] } = useQuery({
     queryKey: dashboardKeys.sales.customerRevenue(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("customer_revenue_summary")
+      const { data, error } = await dynamicFrom(supabase, "customer_revenue_summary")
         .select("customer_id, customer_name, sales_channel, order_count, total_revenue")
         .order("total_revenue", { ascending: false })
         .limit(MAX_QUERY_RESULTS);
@@ -228,8 +224,7 @@ export default function SalesDashboardPage() {
   const { data: productMix = [] } = useQuery({
     queryKey: dashboardKeys.sales.productMix(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("product_mix_by_brand")
+      const { data, error } = await dynamicFrom(supabase, "product_mix_by_brand")
         .select("brand_id, brand_name, total_quantity, total_revenue")
         .order("total_revenue", { ascending: false })
         .limit(MAX_QUERY_RESULTS);
@@ -439,8 +434,7 @@ function SalesTrends() {
   const { data: salesTrends = [], isLoading } = useQuery({
     queryKey: dashboardKeys.trends.sales(period),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_sales_trends", {
+      const { data, error } = await dynamicRpc(supabase, "get_sales_trends", {
         p_days: period,
       });
       if (error) {

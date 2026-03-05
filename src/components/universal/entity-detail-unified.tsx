@@ -31,6 +31,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { formatValue } from "@/lib/utils";
 import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
@@ -125,8 +126,9 @@ function getUnifiedSections<T>(
     collapsible: section.collapsible,
     defaultCollapsed: section.defaultCollapsed,
     tab: section.tab,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    component: section.component as any,
+    // Legacy sections use a narrower component type (just { data: T }) or string.
+    // Cast to unified type — extra props (editing, form) will be passed but unused.
+    component: section.component as UnifiedSectionDef<T>["component"],
     fields: section.fields?.map((f) => ({
       name: f.field,
       label: f.label,
@@ -269,8 +271,6 @@ function useRelationDisplayValues<T>(
   data: T | null
 ): Record<string, string> {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
   const relationQueries = useMemo(() => {
     if (!fields || !data) return [];
@@ -297,8 +297,7 @@ function useRelationDisplayValues<T>(
       await Promise.all(
         relationQueries.map(async (q) => {
           try {
-            const { data: row } = await db
-              .from(q.table)
+            const { data: row } = await dynamicFrom(supabase, q.table)
               .select(q.displayField)
               .eq("id", q.id)
               .single();
@@ -345,8 +344,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const hasWritePermission = writePermission ? can(writePermission) : true;
   const canEdit = showEdit && !!entity.formSchema && hasWritePermission;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const fetchTable = entity.viewTable || entity.table;
   const sections = useMemo(() => getUnifiedSections(entity), [entity]);
 
@@ -382,8 +379,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     enabled: !!id,
     queryFn: async () => {
-      const { data, error } = await db
-        .from(fetchTable)
+      const { data, error } = await dynamicFrom(supabase, fetchTable)
         .select("*")
         .eq("id", id)
         .single();
@@ -467,8 +463,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       if (!entity.stateMachine)
         throw new Error("No state machine configured");
       const stateField = entity.stateMachine.stateField;
-      const { error } = await db
-        .from(entity.table)
+      const { error } = await dynamicFrom(supabase, entity.table)
         .update({ [stateField]: toState })
         .eq("id", id);
       if (error) throw error;
@@ -621,8 +616,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     setIsSubmitting(true);
     try {
       if (isCreateMode) {
-        const { data: newRow, error } = await db
-          .from(entity.table)
+        const { data: newRow, error } = await dynamicFrom(supabase, entity.table)
           .insert(result.data)
           .select()
           .single();
@@ -651,8 +645,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             throw new Error(lockResult.error);
           }
         } else {
-          const { error } = await db
-            .from(entity.table)
+          const { error } = await dynamicFrom(supabase, entity.table)
             .update(result.data)
             .eq("id", id)
             .select()
@@ -678,7 +671,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     entity,
     isCreateMode,
     id,
-    db,
     supabase,
     invalidateEntityCaches,
     path,
@@ -696,8 +688,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       await queryClient.invalidateQueries({
         queryKey: entityKeys.detail(entity.table, id || ""),
       });
-      const { data: freshData } = await db
-        .from(entity.table)
+      const { data: freshData } = await dynamicFrom(supabase, entity.table)
         .select("*")
         .eq("id", id)
         .single();
@@ -715,7 +706,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     } finally {
       conflictDialog.hideConflict();
     }
-  }, [conflictDialog, queryClient, entity.table, id, db, form, formDefaults]);
+  }, [conflictDialog, queryClient, entity.table, id, supabase, form, formDefaults]);
 
   const handleConflictDiscard = useCallback(() => {
     conflictDialog.hideConflict();
@@ -1516,9 +1507,6 @@ function RelationTable({
   const supabase = createClient();
   const relatedEntity = entityRegistry.get(relation.entity);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-
   const {
     data: items,
     isLoading,
@@ -1552,8 +1540,7 @@ function RelationTable({
         const sortAsc = relatedEntity.defaultSort?.direction === "asc";
         const limit = relation.relationLimit || 50;
 
-        const { data, error } = await db
-          .from(relatedEntity.viewTable || relatedEntity.table)
+        const { data, error } = await dynamicFrom(supabase, relatedEntity.viewTable || relatedEntity.table)
           .select(selectClause)
           .eq(relation.foreignKey, parentId)
           .order(sortField, { ascending: sortAsc })

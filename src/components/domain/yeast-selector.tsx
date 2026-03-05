@@ -172,8 +172,8 @@ export function YeastSelector({
         if (i !== index) item.is_primary = false;
       });
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (newItems[index] as any)[field] = value;
+    // Dynamic field assignment using Object.assign for type safety
+    Object.assign(newItems[index], { [field]: value });
     onChange(newItems);
   };
 

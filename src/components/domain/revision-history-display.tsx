@@ -25,8 +25,7 @@ export function createRevisionHistoryDisplay(entityType: string) {
   return function RevisionHistoryDisplayComponent({
     data,
   }: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data: { id: string | null } & Record<string, any>;
+    data: { id: string | null } & Record<string, unknown>;
   }) {
     if (!data.id) {
       return (

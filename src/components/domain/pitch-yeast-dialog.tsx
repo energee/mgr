@@ -15,6 +15,7 @@ import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import {
   Dialog,
   DialogContent,
@@ -112,9 +113,7 @@ export function PitchYeastDialog({
   const { data: pitches, isLoading: pitchesLoading } = useQuery({
     queryKey: yeastKeys.available(),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from("yeast_pitches_with_remaining")
+      const { data, error } = await dynamicFrom(supabase, "yeast_pitches_with_remaining")
         .select(
           "id, strain_id, strain_name, generation, quantity_remaining_lbs, estimated_viability, cell_density_thousand, status"
         )
@@ -154,7 +153,6 @@ export function PitchYeastDialog({
     },
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const selectedPitchId = form.watch("pitch_id");
   const watchedViability = form.watch("viability");
   const watchedQuantity = form.watch("quantity_lbs");
@@ -230,9 +228,7 @@ export function PitchYeastDialog({
           : null;
 
       // Insert yeast_pitch_event
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: insertError } = await (supabase as any)
-        .from("yeast_pitch_events")
+      const { error: insertError } = await dynamicFrom(supabase, "yeast_pitch_events")
         .insert({
           pitch_id: values.pitch_id,
           batch_id: batchId,
@@ -251,9 +247,7 @@ export function PitchYeastDialog({
       const newRemaining =
         pitch.quantity_remaining_lbs - values.quantity_lbs;
       if (newRemaining <= 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: statusError } = await (supabase as any)
-          .from("yeast_pitches")
+        const { error: statusError } = await dynamicFrom(supabase, "yeast_pitches")
           .update({ status: "depleted" })
           .eq("id", values.pitch_id);
 

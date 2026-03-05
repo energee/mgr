@@ -312,7 +312,6 @@ function DataTableSortItem({
 
   return (
     <SortableItem value={sort.id} asChild>
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- listitem keyboard nav for sortable items */}
       <div
         role="listitem"
         id={sortItemId}

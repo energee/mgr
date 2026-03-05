@@ -4,6 +4,7 @@ import { successResponse, errorResponse } from "@/lib/api/response";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
 import { SITE_URL } from "@/lib/env";
+import { dynamicFrom } from "@/services/types";
 const PORTAL_REDIRECT_URL = `${SITE_URL}/api/auth/callback?redirect=/portal/orders`;
 
 export const POST = withPermission(
@@ -47,18 +48,13 @@ export const POST = withPermission(
     }
 
     // Check if customer already has a linked portal user
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabase as any;
-    const { data: existingLink } = await db
-      .from("customer_portal_users")
+    const { data: existingLink } = await dynamicFrom(supabase, "customer_portal_users")
       .select("user_id")
       .eq("customer_id", customerId)
       .limit(1)
       .maybeSingle();
 
     const adminDb = createAdminClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const adminAny = adminDb as any;
 
     // Already linked -- resend magic link
     if (existingLink?.user_id) {
@@ -100,14 +96,12 @@ export const POST = withPermission(
       }
 
       if (linkData?.user) {
-        await adminAny
-          .from("customer_portal_users")
+        await dynamicFrom(adminDb, "customer_portal_users")
           .upsert({ customer_id: customerId, user_id: linkData.user.id });
       }
     } else if (inviteData?.user) {
       // Successful invite -- create the junction link
-      await adminAny
-        .from("customer_portal_users")
+      await dynamicFrom(adminDb, "customer_portal_users")
         .upsert({ customer_id: customerId, user_id: inviteData.user.id });
     }
 

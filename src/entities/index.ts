@@ -55,6 +55,8 @@ import { waterProfileEntity } from "./water-profile";
 // Register All Entities
 // =============================================================================
 
+// EntityConfig<T> uses T in invariant positions (ZodSchema<Partial<T>>, keyof T), so heterogeneous
+// configs can't unify under a common T. `any` is required to collect them into one array.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const allEntities: Array<import("@/types/entity").EntityConfig<any>> = [
   // Production

@@ -14,6 +14,7 @@ import {
   hasPermission,
   getPermissions,
 } from "@/lib/permissions";
+import { dynamicFrom } from "@/services/types";
 import { errorResponse } from "./response";
 import { ApiError, handleApiError } from "./errors";
 
@@ -82,10 +83,8 @@ export function withPermission(
   return withAuth(async (request, context) => {
     const { user, supabase } = context;
 
-    // Cast needed: generated types don't include the `roles` column yet
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profile, error } = await (supabase as any)
-      .from("user_profiles")
+    // Dynamic access: generated types may not include the `roles` column yet
+    const { data: profile, error } = await dynamicFrom(supabase, "user_profiles")
       .select("roles")
       .eq("id", user.id)
       .single();

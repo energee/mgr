@@ -6,6 +6,8 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/supabase";
+import { dynamicFrom } from "@/services/types";
 import { ConcurrentModificationError } from "./errors";
 
 // =============================================================================
@@ -54,18 +56,13 @@ export interface VersionedRecord {
  * ```
  */
 export async function updateWithOptimisticLock<T extends VersionedRecord>(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   table: string,
   id: string,
   data: Partial<Omit<T, "id" | "version">>,
   currentVersion: number
 ): Promise<OptimisticLockResult<T>> {
-  // Cast supabase for dynamic table access
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-
-  const { data: updated, error } = await db
-    .from(table)
+  const { data: updated, error } = await dynamicFrom(supabase, table)
     .update({
       ...data,
       version: currentVersion + 1,
@@ -105,7 +102,7 @@ export async function updateWithOptimisticLock<T extends VersionedRecord>(
  * @throws ConcurrentModificationError if the record was modified
  */
 export async function updateWithOptimisticLockOrThrow<T extends VersionedRecord>(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   table: string,
   id: string,
   data: Partial<Omit<T, "id" | "version">>,

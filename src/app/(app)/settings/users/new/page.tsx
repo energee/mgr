@@ -88,7 +88,6 @@ export default function InviteUserPage() {
     },
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const selectedRoles = watch("roles");
 
   const inviteMutation = useMutation({

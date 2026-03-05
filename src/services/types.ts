@@ -6,6 +6,7 @@
  * consistent error handling, validation, and cache invalidation.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import type { ZodIssue } from "zod";
 
@@ -136,6 +137,36 @@ export function parseSupabaseError(
   }
 
   return { code: "UNKNOWN", message, cause: error };
+}
+
+// =============================================================================
+// Dynamic Query Helpers
+// =============================================================================
+
+/**
+ * Untyped Supabase query builder for tables/views accessed by dynamic name.
+ * Used when the table name comes from entity config at runtime.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DynamicQueryBuilder = any;
+
+/**
+ * Access a Supabase table by dynamic name. Centralizes the type assertion
+ * needed when table names come from entity config at runtime.
+ */
+export function dynamicFrom(supabase: SupabaseClient<Database>, table: string): DynamicQueryBuilder {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return supabase.from(table as any);
+}
+
+/**
+ * Call a Supabase RPC function by dynamic name. Centralizes the type assertion
+ * needed when function names are determined at runtime.
+ * Returns an untyped promise since the function name is not known at compile time.
+ */
+export function dynamicRpc(supabase: SupabaseClient<Database>, fn: string, args?: Record<string, unknown>): DynamicQueryBuilder {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return supabase.rpc(fn as any, args as any);
 }
 
 /**

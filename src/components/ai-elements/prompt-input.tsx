@@ -710,8 +710,7 @@ export const PromptInput = ({
 
     // Convert blob URLs to data URLs asynchronously
     Promise.all(
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- id is intentionally excluded from the FileUIPart spread
-      files.map(async ({ id, ...item }) => {
+      files.map(async ({ id: _id, ...item }) => {
         if (item.url?.startsWith("blob:")) {
           const dataUrl = await convertBlobUrlToDataUrl(item.url);
           // If conversion failed, keep the original blob URL
@@ -1170,7 +1169,6 @@ export const PromptInputTabLabel = ({
   className,
   ...props
 }: PromptInputTabLabelProps) => (
-  // eslint-disable-next-line jsx-a11y/heading-has-content -- content provided via {...props} spread
   <h3
     className={cn(
       "mb-2 px-3 font-medium text-muted-foreground text-xs",
