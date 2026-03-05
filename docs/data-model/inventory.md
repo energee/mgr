@@ -17,7 +17,7 @@ The inventory system uses multiple tables that work together. This section clari
 
 ```
 RAW MATERIALS FLOW:
-PO receive → inventory_lots (creates lot record)
+PO receive → "Accept into Inventory" → inventory_lots (creates lot record via po_receive_id)
                 ↓
 batch_additions → allocations (source_type=inventory_lot, destination_type=batch)
                 ↓

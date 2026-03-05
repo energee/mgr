@@ -336,6 +336,14 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       confirm: true,
     },
     {
+      name: "accept_into_inventory",
+      label: "Accept into Inventory",
+      icon: "package-check",
+      type: "button",
+      variant: "default",
+      fromStates: ["partial", "fulfilled"],
+    },
+    {
       name: "calculate_landed_cost",
       label: "Calculate Landed Cost",
       icon: "calculator",

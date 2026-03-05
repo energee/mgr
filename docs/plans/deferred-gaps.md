@@ -55,20 +55,17 @@
 
 ## Landed Cost System
 
-### PO Receiving Does Not Create Inventory Lots (Critical Pipeline Break)
+### ~~PO Receiving Does Not Create Inventory Lots (Critical Pipeline Break)~~ RESOLVED
 - **Severity:** Critical
-- **Location:** `src/components/domain/po-receiving.tsx:215-221`
-- **Problem:** PO receiving explicitly does NOT create `inventory_lots` (comment says "A separate inventory receiving workflow should create inventory_lots..."). The `calculate_landed_cost` function joins `inventory_lots` via `po_receive_id` to find lots to update. Without this link, the calculation runs but updates zero rows.
-- **Options:**
-  1. Add an "Accept into Inventory" step that creates `inventory_lots` from `po_receives` with `po_receive_id` FK set (aligns with QA/inspection step)
-  2. Auto-create `inventory_lots` when recording a PO receive (simpler, skips QA)
+- **Status:** Resolved (migration 00107, `POAcceptInventoryDialog`)
+- **Resolution:** Added "Accept into Inventory" dialog that creates `inventory_lots` from `po_receives` with `po_receive_id` FK set. Uses `get_unaccepted_po_receives()` SQL function to find receives needing acceptance. Action button appears on PO detail page for `partial`/`fulfilled` states.
 
 ### No Landed Cost Breakdown Display
 - **Severity:** Medium
 - **Location:** PO detail page (`src/app/(app)/purchasing/pos/[id]/page.tsx`)
 - **Problem:** After clicking "Calculate Landed Cost", user sees only a toast. There is no UI showing per-line-item breakdown (allocated shipping, landed cost per unit, markup). `getLandedCostSummary`, `formatLandedCost`, `landedCostMarkup` are never called from UI.
 - **Fix:** Create `LandedCostBreakdown` component using `getLandedCostSummary` with `useQuery` keyed on `purchaseOrderKeys.landedCost(poId)`.
-- **Blocked by:** PO receiving → inventory lots pipeline must work first.
+- **Blocked by:** ~~PO receiving → inventory lots pipeline must work first.~~ Unblocked (resolved by migration 00107).
 
 ### Landed Cost Not Visible in Inventory Lots List View
 - **Severity:** Low

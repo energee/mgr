@@ -623,6 +623,15 @@ export const squareKeys = {
 };
 
 // =============================================================================
+// PO Receive Keys (for accept-into-inventory workflow)
+// =============================================================================
+
+export const poReceiveKeys = {
+  all: () => ["po-receives"] as const,
+  unaccepted: (poId: string) => ["po-receives", "unaccepted", poId] as const,
+};
+
+// =============================================================================
 // Email Keys
 // =============================================================================
 
