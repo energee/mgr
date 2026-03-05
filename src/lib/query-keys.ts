@@ -339,9 +339,12 @@ export const yeastKeys = {
   all: () => ["yeast-pitches"] as const,
   detail: (id: string) => ["yeast-pitches", id] as const,
   available: () => ["yeast-pitches", "available"] as const,
+  brinks: () => ["yeast", "brinks"] as const,
+  brinksDetail: (vesselId: string) => ["yeast", "brinks", vesselId] as const,
   lineageRoot: (pitchId: string) => ["yeast-lineage-root", pitchId] as const,
   lineage: (rootId: string | undefined) => ["yeast-lineage", rootId] as const,
   lineageSummary: (rootId: string | undefined) => ["yeast-lineage-summary", rootId] as const,
+  costSpread: (pitchId: string) => ["yeast", "cost-spread", pitchId] as const,
   events: (pitchId: string) => ["yeast-pitch-events", pitchId] as const,
 };
 
