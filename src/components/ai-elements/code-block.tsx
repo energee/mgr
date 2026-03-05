@@ -34,8 +34,11 @@ import {
  * highlighting is actually requested (i.e. when the AI chat panel is open
  * and a code block is rendered).
  */
-const loadHighlighter = () =>
-  import("shiki").then((mod) => mod.createHighlighter);
+let shikiPromise: Promise<typeof import("shiki")> | null = null;
+const loadHighlighter = () => {
+  if (!shikiPromise) shikiPromise = import("shiki");
+  return shikiPromise.then((mod) => mod.createHighlighter);
+};
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 const isItalic = (fontStyle: number | undefined) => fontStyle && fontStyle & 1;

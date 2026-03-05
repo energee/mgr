@@ -21,14 +21,9 @@ import {
 import { createAdminClient } from "@/lib/supabase/server";
 import { ALL_ROLES } from "@/lib/permissions";
 import { logger } from "@/lib/logger";
+import { SITE_URL } from "@/lib/env";
 
 const log = logger.child({ route: "/api/users/invite" });
-
-/** Base URL for invite redirects. Prefers NEXT_PUBLIC_SITE_URL, falls back to NEXT_PUBLIC_APP_URL. */
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  "http://localhost:3000";
 
 const inviteSchema = z.object({
   email: z.string().email("A valid email address is required"),

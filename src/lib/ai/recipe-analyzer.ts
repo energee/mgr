@@ -42,15 +42,21 @@ export interface RecipeSuggestionsResult {
   suggestions: RecipeSuggestion[];
 }
 
+// Cached lazy import to avoid pulling in browser-only createBrowserClient
+// when this module is imported server-side (e.g. for type re-exports).
+let clientImport: Promise<typeof import("@/lib/supabase/client")> | null = null;
+function getClientModule() {
+  if (!clientImport) clientImport = import("@/lib/supabase/client");
+  return clientImport;
+}
+
 /**
  * Analyze a recipe's compliance with its target style guidelines
  */
 export async function analyzeStyleCompliance(
   recipeId: string
 ): Promise<StyleComplianceResult> {
-  // Lazy import to avoid pulling in browser-only createBrowserClient when
-  // this module is imported server-side (e.g. for type re-exports).
-  const { createClient } = await import("@/lib/supabase/client");
+  const { createClient } = await getClientModule();
   const supabase = createClient();
   const { data, error } = await supabase.rpc("analyze_recipe_style_compliance", {
     p_recipe_id: recipeId,
@@ -69,9 +75,7 @@ export async function analyzeStyleCompliance(
 export async function getRecipeSuggestions(
   recipeId: string
 ): Promise<RecipeSuggestionsResult> {
-  // Lazy import to avoid pulling in browser-only createBrowserClient when
-  // this module is imported server-side (e.g. for type re-exports).
-  const { createClient } = await import("@/lib/supabase/client");
+  const { createClient } = await getClientModule();
   const supabase = createClient();
   const { data, error } = await supabase.rpc("suggest_recipe_improvements", {
     p_recipe_id: recipeId,

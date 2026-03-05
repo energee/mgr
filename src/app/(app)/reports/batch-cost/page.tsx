@@ -69,7 +69,6 @@ interface BatchCostRow {
   brand_name: string | null;
   volume_bbl: number | null;
   ingredient_cost: number;
-  total_cost: number;
   cost_per_bbl: number | null;
   status: string;
   /** Whether cost data came from allocations (true) or recipe estimates (false) */
@@ -149,17 +148,7 @@ export default function BatchCostAnalysisPage() {
 
       const batchIds = batches.map((b) => b.id);
 
-      // Step 2: Get all allocations destined for these batches
-      const { data: allocations, error: allocErr } = await supabase
-        .from("allocations")
-        .select("id, destination_id, quantity, unit_cost, source_id, source_type")
-        .eq("destination_type", "batch")
-        .in("destination_id", batchIds)
-        .in("status", ["completed", "planned"]);
-
-      if (allocErr) throw allocErr;
-
-      // Step 3: Get recipe-level COGS for fallback estimates
+      // Steps 2 & 3: Fetch allocations and recipe COGS in parallel
       const recipeIds = [
         ...new Set(
           batches
@@ -171,19 +160,31 @@ export default function BatchCostAnalysisPage() {
         ),
       ];
 
+      const [allocResult, cogsResult] = await Promise.all([
+        supabase
+          .from("allocations")
+          .select("id, destination_id, quantity, unit_cost, source_id, source_type")
+          .eq("destination_type", "batch")
+          .in("destination_id", batchIds)
+          .in("status", ["completed", "planned"]),
+        recipeIds.length > 0
+          ? supabase
+              .from("recipes_with_cogs" as "recipes")
+              .select("id, total_cogs, cogs_per_bbl")
+              .in("id", recipeIds)
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+
+      if (allocResult.error) throw allocResult.error;
+      if (cogsResult.error) throw cogsResult.error;
+
+      const allocations = allocResult.data;
+
       type RecipeCOGSRow = { id: string; total_cogs: number | null; cogs_per_bbl: number | null };
       const recipeCOGSMap = new Map<string, RecipeCOGSRow>();
-
-      if (recipeIds.length > 0) {
-        const { data: cogsData } = await supabase
-          .from("recipes_with_cogs" as "recipes")
-          .select("id, total_cogs, cogs_per_bbl")
-          .in("id", recipeIds);
-
-        if (cogsData) {
-          for (const row of cogsData as unknown as RecipeCOGSRow[]) {
-            recipeCOGSMap.set(row.id, row);
-          }
+      if (cogsResult.data) {
+        for (const row of cogsResult.data as unknown as RecipeCOGSRow[]) {
+          recipeCOGSMap.set(row.id, row);
         }
       }
 
@@ -222,8 +223,6 @@ export default function BatchCostAnalysisPage() {
           ingredientCost = 0;
         }
 
-        const totalCost = ingredientCost;
-
         return {
           id: b.id,
           batch_number: b.batch_number,
@@ -232,9 +231,8 @@ export default function BatchCostAnalysisPage() {
           brand_name: recipe?.brand?.name ?? null,
           volume_bbl: volumeBbl,
           ingredient_cost: ingredientCost,
-          total_cost: totalCost,
           cost_per_bbl:
-            volumeBbl && volumeBbl > 0 ? totalCost / volumeBbl : null,
+            volumeBbl && volumeBbl > 0 ? ingredientCost / volumeBbl : null,
           status: b.status,
           has_allocation_costs: hasAllocationCosts,
         };
@@ -319,7 +317,7 @@ export default function BatchCostAnalysisPage() {
     }
 
     const totalProductionCost = batchCostData.reduce(
-      (sum, b) => sum + b.total_cost,
+      (sum, b) => sum + b.ingredient_cost,
       0
     );
 
@@ -565,7 +563,7 @@ export default function BatchCostAnalysisPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
-                        {formatCurrency(batch.total_cost)}
+                        {formatCurrency(batch.ingredient_cost)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(batch.cost_per_bbl)}
