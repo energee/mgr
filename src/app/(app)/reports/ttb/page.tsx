@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
+import { formatBbl } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -84,10 +85,6 @@ interface BatchSummary {
 // =============================================================================
 // Helper Functions
 // =============================================================================
-
-function formatBbl(value: number | null | undefined): string {
-  return (value ?? 0).toFixed(2);
-}
 
 function getTaxClassLabel(taxClass: string): string {
   switch (taxClass) {

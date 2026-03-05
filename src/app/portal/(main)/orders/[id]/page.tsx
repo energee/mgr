@@ -4,6 +4,7 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { entityKeys, changeRequestKeys, portalKeys } from "@/lib/query-keys";
+import { formatCurrency } from "@/lib/format";
 import { usePortalCustomer } from "@/lib/portal-context";
 import {
   Card,
@@ -41,13 +42,6 @@ function isBelowCutoff(orderStatus: string, cutoffState: string): boolean {
   const cutoffRank = ORDER_STATES.indexOf(cutoffState);
   if (orderRank === -1 || cutoffRank === -1) return false;
   return orderRank < cutoffRank;
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
 }
 
 function formatDate(dateStr: string | null | undefined): string {

@@ -16,6 +16,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
+import { formatBbl } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -107,11 +108,6 @@ const MONTHS = [
 // =============================================================================
 // Helper Functions
 // =============================================================================
-
-/** Format a barrel value to two decimal places with a fallback of zero. */
-function formatBbl(value: number | null | undefined): string {
-  return (value ?? 0).toFixed(2);
-}
 
 /** Generate year options: current year and 3 years back. */
 function getYearOptions(): number[] {

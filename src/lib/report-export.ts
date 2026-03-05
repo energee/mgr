@@ -5,6 +5,8 @@
  * Used for TTB compliance reports and other data exports.
  */
 
+import { formatBbl } from "@/lib/format";
+
 // =============================================================================
 // CSV Export
 // =============================================================================
@@ -205,10 +207,6 @@ function getTaxClassLabel(taxClass: string): string {
     default:
       return taxClass;
   }
-}
-
-function formatBbl(value: number): string {
-  return value.toFixed(2);
 }
 
 /**

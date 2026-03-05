@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { DollarSign, TrendingUp } from "lucide-react";
 import { recipeKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { formatCurrency } from "@/lib/format";
 
 // =============================================================================
 // Types
@@ -47,19 +48,6 @@ interface RecipeCOGSDisplayProps {
   recipeId: string;
 }
 
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-function formatCurrency(value: number | null): string {
-  if (value === null || value === 0) return "$0.00";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
 function CostRow({
   label,

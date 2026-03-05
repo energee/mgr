@@ -24,6 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
+import { formatCurrency, formatBbl } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -86,25 +87,6 @@ interface IngredientCostRow {
   unit_cost: number | null;
   total_cost: number;
   lot_number: string | null;
-}
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function formatCurrency(value: number | null | undefined): string {
-  if (value == null) return "--";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatBbl(value: number | null | undefined): string {
-  if (value == null) return "--";
-  return value.toFixed(2);
 }
 
 // =============================================================================
