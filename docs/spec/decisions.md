@@ -823,17 +823,17 @@ Use database views to calculate available quantities on read rather than maintai
 **Rationale**: Single source of truth for quantities. No stale balance bugs. Views perform well with the indexes from DEC-PERF-001.
 
 ### DEC-SEC-001: Content-Security-Policy Header
-**Status**: Deferred
+**Status**: Implemented
 
-Add a Content-Security-Policy (CSP) header to `next.config.ts`. CSP is the most impactful header against XSS and is intentionally omitted from the initial security headers deployment to avoid breaking inline scripts/styles used by Next.js, Sentry, and third-party integrations.
+CSP header added to `next.config.ts` with the following directives:
+- `default-src 'self'`
+- `script-src 'self' 'unsafe-inline'` (required by Next.js inline scripts; `'unsafe-eval'` added in dev only)
+- `style-src 'self' 'unsafe-inline'`
+- `connect-src 'self'` + Supabase URLs + `*.ingest.sentry.io`
+- `img-src 'self' data: blob:`
+- `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`
 
-**Requirements before implementation:**
-- Audit all inline scripts and styles (Next.js runtime, Sentry SDK, Vercel Analytics)
-- Determine nonce-based vs hash-based strategy for inline scripts
-- Test in report-only mode (`Content-Security-Policy-Report-Only`) before enforcement
-- Configure a CSP reporting endpoint to catch violations
-
-**Tracking:** Comment in `next.config.ts:12-13` references this decision.
+**Note:** `'unsafe-inline'` is required for Next.js compatibility. A future improvement would be nonce-based CSP via Next.js middleware, which would provide stronger XSS protection.
 
 ### DEC-SEC-002: In-Memory Rate Limiter (Known Limitation)
 **Status**: RESOLVED/DOCUMENTED

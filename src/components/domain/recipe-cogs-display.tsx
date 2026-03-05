@@ -88,11 +88,8 @@ export function RecipeCOGSDisplay({ recipeId }: RecipeCOGSDisplayProps) {
   const { data: cogs, isLoading, error } = useQuery({
     queryKey: recipeKeys.cogs(recipeId),
     queryFn: async () => {
-      // NOTE: After migration runs, regenerate types with:
-      // npx supabase gen types typescript --local > src/types/supabase.ts
-      // Then replace RecipeCOGS interface with:
-      // type RecipeCOGS = Database["public"]["Views"]["recipes_with_cogs"]["Row"]
-      // And remove the type casting below
+      // Generated types exist (Database["public"]["Views"]["recipes_with_cogs"]["Row"])
+      // but mark `id` as nullable (view column). Manual interface used for stricter typing.
       const { data, error } = await supabase
         .from("recipes_with_cogs" as "recipes")
         .select("*")
