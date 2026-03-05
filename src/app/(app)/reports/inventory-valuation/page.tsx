@@ -17,8 +17,8 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency } from "@/lib/format";
 import { reportKeys } from "@/lib/query-keys";
+import { formatCurrency } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -98,7 +98,6 @@ interface FinishedGoodDisplayRow {
 // =============================================================================
 // Helper Functions
 // =============================================================================
-
 
 /** Format a number with commas and optional decimal places */
 function formatQuantity(value: number, decimals = 2): string {
@@ -301,7 +300,7 @@ export default function InventoryValuationPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/reports">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Back to reports">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>

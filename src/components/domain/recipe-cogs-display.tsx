@@ -16,13 +16,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, TrendingUp } from "lucide-react";
 import { recipeKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { formatCurrency } from "@/lib/format";
 
 // =============================================================================
 // Types
@@ -47,11 +47,6 @@ interface RecipeCOGS {
 interface RecipeCOGSDisplayProps {
   recipeId: string;
 }
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
 
 function CostRow({
   label,
@@ -92,11 +87,8 @@ export function RecipeCOGSDisplay({ recipeId }: RecipeCOGSDisplayProps) {
   const { data: cogs, isLoading, error } = useQuery({
     queryKey: recipeKeys.cogs(recipeId),
     queryFn: async () => {
-      // NOTE: After migration runs, regenerate types with:
-      // npx supabase gen types typescript --local > src/types/supabase.ts
-      // Then replace RecipeCOGS interface with:
-      // type RecipeCOGS = Database["public"]["Views"]["recipes_with_cogs"]["Row"]
-      // And remove the type casting below
+      // Generated types exist (Database["public"]["Views"]["recipes_with_cogs"]["Row"])
+      // but mark `id` as nullable (view column). Manual interface used for stricter typing.
       const { data, error } = await supabase
         .from("recipes_with_cogs" as "recipes")
         .select("*")

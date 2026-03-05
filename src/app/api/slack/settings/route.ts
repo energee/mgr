@@ -19,7 +19,7 @@ export const GET = withPermission("integrations:manage", async () => {
     .single();
 
   if (error) {
-    log.error("GET error", { error: error.message });
+    log.error({ error: error.message }, "GET error");
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -86,7 +86,7 @@ export const PUT = withPermission("integrations:manage", async (req) => {
     .not("id", "is", null); // Update the singleton row
 
   if (error) {
-    log.error("PUT error", { error: error.message });
+    log.error({ error: error.message }, "PUT error");
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
+import { formatBbl } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -85,8 +86,9 @@ interface BatchSummary {
 // Helper Functions
 // =============================================================================
 
-function formatBbl(value: number | null | undefined): string {
-  return (value ?? 0).toFixed(2);
+/** TTB compliance wrapper: null volumes display as "0.00" (not "--") on regulatory forms. */
+function formatTtbBbl(value: number | null | undefined): string {
+  return formatBbl(value ?? 0);
 }
 
 function getTaxClassLabel(taxClass: string): string {
@@ -255,7 +257,7 @@ export default function TTBReportPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/reports">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Back to reports">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
@@ -402,7 +404,7 @@ export default function TTBReportPage() {
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-bold font-mono">
-                {formatBbl(totals.beginningInventory)} <span className="text-sm font-normal text-muted-foreground">BBL</span>
+                {formatTtbBbl(totals.beginningInventory)} <span className="text-sm font-normal text-muted-foreground">BBL</span>
               </div>
             )}
           </CardContent>
@@ -418,7 +420,7 @@ export default function TTBReportPage() {
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-bold font-mono">
-                {formatBbl(totals.beerProduced)} <span className="text-sm font-normal text-muted-foreground">BBL</span>
+                {formatTtbBbl(totals.beerProduced)} <span className="text-sm font-normal text-muted-foreground">BBL</span>
               </div>
             )}
           </CardContent>
@@ -434,7 +436,7 @@ export default function TTBReportPage() {
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-bold font-mono">
-                {formatBbl(totals.totalRemovals)} <span className="text-sm font-normal text-muted-foreground">BBL</span>
+                {formatTtbBbl(totals.totalRemovals)} <span className="text-sm font-normal text-muted-foreground">BBL</span>
               </div>
             )}
           </CardContent>
@@ -450,7 +452,7 @@ export default function TTBReportPage() {
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-bold font-mono">
-                {formatBbl(totals.endingInventory)} <span className="text-sm font-normal text-muted-foreground">BBL</span>
+                {formatTtbBbl(totals.endingInventory)} <span className="text-sm font-normal text-muted-foreground">BBL</span>
               </div>
             )}
           </CardContent>
@@ -467,6 +469,7 @@ export default function TTBReportPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -493,33 +496,33 @@ export default function TTBReportPage() {
                   <TableCell>Beginning Inventory</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.beginning_inventory_bbl)}
+                      {formatTtbBbl(row.beginning_inventory_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.beginningInventory)}
+                    {formatTtbBbl(totals.beginningInventory)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Beer Produced/Packaged</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.beer_produced_bbl)}
+                      {formatTtbBbl(row.beer_produced_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.beerProduced)}
+                    {formatTtbBbl(totals.beerProduced)}
                   </TableCell>
                 </TableRow>
                 <TableRow className="border-t-2">
                   <TableCell className="font-medium">Total Available</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono font-medium">
-                      {formatBbl(row.total_available_bbl)}
+                      {formatTtbBbl(row.total_available_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.totalAvailable)}
+                    {formatTtbBbl(totals.totalAvailable)}
                   </TableCell>
                 </TableRow>
 
@@ -533,66 +536,66 @@ export default function TTBReportPage() {
                   <TableCell className="pl-6">Taxpaid (Domestic)</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.taxpaid_domestic_bbl)}
+                      {formatTtbBbl(row.taxpaid_domestic_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.taxpaidDomestic)}
+                    {formatTtbBbl(totals.taxpaidDomestic)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="pl-6">Taxpaid (Export)</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.taxpaid_export_bbl)}
+                      {formatTtbBbl(row.taxpaid_export_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.taxpaidExport)}
+                    {formatTtbBbl(totals.taxpaidExport)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="pl-6">Tax-Free Samples</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.tax_free_samples_bbl)}
+                      {formatTtbBbl(row.tax_free_samples_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.taxFreeSamples)}
+                    {formatTtbBbl(totals.taxFreeSamples)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="pl-6">Losses</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.losses_bbl)}
+                      {formatTtbBbl(row.losses_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.losses)}
+                    {formatTtbBbl(totals.losses)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell className="pl-6">Destroyed</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.destroyed_bbl)}
+                      {formatTtbBbl(row.destroyed_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.destroyed)}
+                    {formatTtbBbl(totals.destroyed)}
                   </TableCell>
                 </TableRow>
                 <TableRow className="border-t-2">
                   <TableCell className="font-medium">Total Removals</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono font-medium">
-                      {formatBbl(row.total_removals_bbl)}
+                      {formatTtbBbl(row.total_removals_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.totalRemovals)}
+                    {formatTtbBbl(totals.totalRemovals)}
                   </TableCell>
                 </TableRow>
 
@@ -606,11 +609,11 @@ export default function TTBReportPage() {
                   <TableCell>Ending Inventory</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.ending_inventory_bbl)}
+                      {formatTtbBbl(row.ending_inventory_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono">
-                    {formatBbl(totals.endingInventory)}
+                    {formatTtbBbl(totals.endingInventory)}
                   </TableCell>
                 </TableRow>
 
@@ -624,15 +627,16 @@ export default function TTBReportPage() {
                   <TableCell>End of Month (In Process)</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
-                      {formatBbl(row.in_process_ending_bbl)}
+                      {formatTtbBbl(row.in_process_ending_bbl)}
                     </TableCell>
                   ))}
                   <TableCell className="text-right font-mono font-bold">
-                    {formatBbl(totals.inProcessEnding)}
+                    {formatTtbBbl(totals.inProcessEnding)}
                   </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -671,7 +675,7 @@ export default function TTBReportPage() {
                   <TableRow>
                     <TableCell className="pl-6">Beer Produced</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatBbl(batchData?.completedVolume)}
+                      {formatTtbBbl(batchData?.completedVolume)}
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -683,7 +687,7 @@ export default function TTBReportPage() {
                   <TableRow>
                     <TableCell className="pl-6">End of Month</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatBbl(batchData?.inProgressVolume)}
+                      {formatTtbBbl(batchData?.inProgressVolume)}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -727,14 +731,14 @@ export default function TTBReportPage() {
                     <TableCell className="font-mono">{batch.batch_number}</TableCell>
                     <TableCell>{batch.name}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatBbl(batch.volume_bbl)}
+                      {formatTtbBbl(batch.volume_bbl)}
                     </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="font-bold">
                   <TableCell colSpan={2}>Total</TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatBbl(batchData?.completedVolume)}
+                    {formatTtbBbl(batchData?.completedVolume)}
                   </TableCell>
                 </TableRow>
               </TableBody>
@@ -769,14 +773,14 @@ export default function TTBReportPage() {
                     <TableCell>{batch.name}</TableCell>
                     <TableCell>{getStateLabel(batchEntity, batch.status)}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatBbl(batch.volume_bbl)}
+                      {formatTtbBbl(batch.volume_bbl)}
                     </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="font-bold">
                   <TableCell colSpan={3}>Total In Process</TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatBbl(batchData.inProgressVolume)}
+                    {formatTtbBbl(batchData.inProgressVolume)}
                   </TableCell>
                 </TableRow>
               </TableBody>

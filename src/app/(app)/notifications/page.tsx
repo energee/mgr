@@ -483,6 +483,7 @@ export default function NotificationsPage() {
                         className="h-8 w-8"
                         onClick={() => markAsReadMutation.mutate([notification.id])}
                         title="Mark as read"
+                        aria-label="Mark as read"
                       >
                         <Check className="h-4 w-4" />
                       </Button>
@@ -493,6 +494,7 @@ export default function NotificationsPage() {
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       onClick={() => dismissMutation.mutate([notification.id])}
                       title="Dismiss"
+                      aria-label="Dismiss notification"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

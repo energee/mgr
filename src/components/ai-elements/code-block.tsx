@@ -28,7 +28,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { createHighlighter } from "shiki";
+/**
+ * Dynamic import for shiki's createHighlighter.
+ * Shiki includes 1-3MB of WASM/grammars that should only load when syntax
+ * highlighting is actually requested (i.e. when the AI chat panel is open
+ * and a code block is rendered).
+ */
+let shikiPromise: Promise<typeof import("shiki")> | null = null;
+const loadHighlighter = () => {
+  if (!shikiPromise) shikiPromise = import("shiki");
+  return shikiPromise.then((mod) => mod.createHighlighter);
+};
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 const isItalic = (fontStyle: number | undefined) => fontStyle && fontStyle & 1;
@@ -138,10 +148,12 @@ const getHighlighter = (
     return cached;
   }
 
-  const highlighterPromise = createHighlighter({
-    langs: [language],
-    themes: ["github-light", "github-dark"],
-  });
+  const highlighterPromise = loadHighlighter().then((createHighlighter) =>
+    createHighlighter({
+      langs: [language],
+      themes: ["github-light", "github-dark"],
+    })
+  );
 
   highlighterCache.set(language, highlighterPromise);
   return highlighterPromise;

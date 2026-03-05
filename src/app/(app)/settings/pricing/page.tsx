@@ -982,7 +982,7 @@ export default function PricingPage() {
           )}
 
           {!!tiers?.length && !!formats.length && (
-            <div ref={tableRef} className="border rounded-lg">
+            <div ref={tableRef} className="border rounded-lg overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
               <Table className="table-fixed">
                 <TableHeader className="sticky top-0 z-20">
                   {/* Container group header row */}

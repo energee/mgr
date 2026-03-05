@@ -10,9 +10,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency } from "@/lib/format";
 import { recipeKeys, recipeVariantKeys, batchAdditionKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { formatCurrency } from "@/lib/format";
 
 // =============================================================================
 // Types
@@ -47,11 +47,6 @@ interface BatchCostBreakdownProps {
     [key: string]: unknown;
   };
 }
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
 
 function CostRow({
   label,

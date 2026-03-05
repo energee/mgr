@@ -1,3 +1,7 @@
+/**
+ * Shared formatting utilities used across reports, dashboards, and domain components.
+ */
+
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -9,6 +13,12 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 export function formatCurrency(value: number | null | undefined): string {
   if (value == null) return "\u2014";
   return currencyFormatter.format(value);
+}
+
+/** Format a barrel volume to two decimal places. Returns "--" for null/undefined values. */
+export function formatBbl(value: number | null | undefined): string {
+  if (value == null) return "--";
+  return value.toFixed(2);
 }
 
 export function formatDate(
