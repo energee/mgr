@@ -48,7 +48,6 @@ interface RecipeCOGSDisplayProps {
   recipeId: string;
 }
 
-
 function CostRow({
   label,
   cost,

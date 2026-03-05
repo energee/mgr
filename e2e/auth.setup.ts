@@ -7,7 +7,7 @@
  *
  * Credentials are read from environment variables (see playwright.config.ts).
  */
-import { test as setup, expect } from "@playwright/test";
+import { test as setup } from "@playwright/test";
 
 const authFile = "e2e/.auth/user.json";
 

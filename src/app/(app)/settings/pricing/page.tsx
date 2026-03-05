@@ -100,29 +100,6 @@ interface ChannelFormat {
   sales_channel_id: string;
 }
 
-/**
- * Fetches the list of format IDs enabled for a given sales channel
- * from the pricing_channel_formats junction table.
- */
-function useChannelFormatIds(channelId: string | null) {
-  const supabase = createClient();
-  return useQuery({
-    queryKey: settingsKeys.pricingChannelFormats(channelId ?? ""),
-    queryFn: async () => {
-      if (!channelId) return [];
-      // Table not yet in generated types -- cast until types are regenerated
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from("pricing_channel_formats")
-        .select("format_id")
-        .eq("sales_channel_id", channelId);
-      if (error) throw error;
-      return (data as { format_id: string }[]).map((r) => r.format_id);
-    },
-    enabled: !!channelId,
-  });
-}
-
 // =============================================================================
 // Cell Editor Component
 // =============================================================================

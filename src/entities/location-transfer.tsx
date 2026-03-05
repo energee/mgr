@@ -6,6 +6,7 @@
  * and raw materials between storage bins across locations.
  *
  * Lifecycle: planned -> in_transit -> completed (cancelled from planned/in_transit)
+ * Partial shipments: planned -> partial (auto-creates remainder transfer for unshipped lines)
  */
 
 import { z } from "zod";
@@ -63,17 +64,19 @@ export type LocationTransferFormValues = z.infer<typeof locationTransferSchema>;
 
 const locationTransferStateMachine: StateMachineConfig<LocationTransferView> = {
   stateField: "status",
-  states: ["planned", "in_transit", "completed", "cancelled"],
+  states: ["planned", "in_transit", "partial", "completed", "cancelled"],
   initialState: "planned",
   transitions: {
-    planned: ["in_transit", "cancelled"],
+    planned: ["in_transit", "partial", "cancelled"],
     in_transit: ["completed", "cancelled"],
+    partial: [],
     completed: [],
     cancelled: [],
   },
   stateDisplay: {
     planned: { label: "Planned", color: "default" },
     in_transit: { label: "In Transit", color: "info" },
+    partial: { label: "Partially Shipped", color: "warning" },
     completed: { label: "Completed", color: "success" },
     cancelled: { label: "Cancelled", color: "error" },
   },
@@ -341,7 +344,7 @@ export const locationTransferEntity: EntityConfig<LocationTransferView> = {
       icon: "truck",
       type: "button",
       fromStates: ["planned"],
-      toState: "in_transit",
+      // No toState — handled by ShipTransferDialog via onAction
     },
     {
       name: "receive",

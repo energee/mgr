@@ -24,6 +24,7 @@ export interface POLineItemDraft {
   min_order_qty: number | null;
   total_required: number;
   available_qty: number;
+  on_order_qty: number;
   is_urgent: boolean;
 }
 
@@ -86,6 +87,7 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
       min_order_qty: shortfall.min_order_qty,
       total_required: shortfall.total_required,
       available_qty: shortfall.available_qty,
+      on_order_qty: shortfall.on_order_qty,
       is_urgent: shortfall.is_urgent,
     });
   }

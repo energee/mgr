@@ -48,7 +48,6 @@ interface BatchCostBreakdownProps {
   };
 }
 
-
 function CostRow({
   label,
   planned,
