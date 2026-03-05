@@ -328,6 +328,7 @@ export const purchaseOrderKeys = {
   lineItems: (poId: string) => ["po-line-items", poId] as const,
   lineItemsForReceive: (poId: string) => ["po-line-items-for-receive", poId] as const,
   nextNumber: () => ["purchase-orders", "next-number"] as const,
+  status: (poId: string) => ["purchase-order", poId, "status"] as const,
   landedCost: (poId: string) => ["purchase-order", poId, "landed-cost"] as const,
 };
 

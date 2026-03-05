@@ -19,6 +19,8 @@ import { POAcceptInventoryDialog } from "@/components/domain/po-accept-inventory
 import { PoLandedCostBreakdown } from "@/components/domain/po-landed-cost-breakdown";
 import { purchaseOrderKeys, entityKeys, landedCostKeys } from "@/lib/query-keys";
 
+const LANDED_COST_STATUSES = ["partial", "fulfilled", "closed"];
+
 export default function PurchaseOrderDetailPage({
   params,
 }: {
@@ -29,9 +31,8 @@ export default function PurchaseOrderDetailPage({
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
 
   /** Fetch PO status to conditionally show the landed cost breakdown */
-  const LANDED_COST_STATUSES = ["partial", "fulfilled", "closed"];
   const { data: poStatus } = useQuery({
-    queryKey: purchaseOrderKeys.detail(id),
+    queryKey: purchaseOrderKeys.status(id),
     queryFn: async () => {
       const supabase = createClient();
       const { data } = await supabase

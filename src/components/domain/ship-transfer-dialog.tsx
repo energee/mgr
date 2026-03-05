@@ -67,8 +67,9 @@ export function ShipTransferDialog({
   const supabase = createClient();
   const queryClient = useQueryClient();
 
-  // Per-line shipped quantities keyed by line ID
-  const [shippedQuantities, setShippedQuantities] = useState<
+  // Per-line shipped quantity overrides keyed by line ID.
+  // When empty, defaults to full quantity from query data.
+  const [quantityOverrides, setQuantityOverrides] = useState<
     Record<string, number>
   >({});
 
@@ -143,11 +144,7 @@ export function ShipTransferDialog({
         }
       }
 
-      // Initialize shipped quantities to full quantity
-      const initialQuantities: Record<string, number> = {};
-      const result: TransferLine[] = rawLines.map((line) => {
-        initialQuantities[line.id] = line.quantity;
-
+      return rawLines.map((line) => {
         let itemName = "Unknown Item";
         if (line.finished_good_id) {
           itemName =
@@ -162,15 +159,22 @@ export function ShipTransferDialog({
           item_name: itemName,
         };
       });
-
-      setShippedQuantities(initialQuantities);
-      return result;
     },
     enabled: open,
   });
 
+  // Derive shipped quantities: use overrides if present, else default to full quantity
+  const shippedQuantities = useMemo(() => {
+    if (!lines) return {} as Record<string, number>;
+    const result: Record<string, number> = {};
+    for (const line of lines) {
+      result[line.id] = quantityOverrides[line.id] ?? line.quantity;
+    }
+    return result;
+  }, [lines, quantityOverrides]);
+
   const updateQuantity = useCallback((lineId: string, value: number) => {
-    setShippedQuantities((prev) => ({
+    setQuantityOverrides((prev) => ({
       ...prev,
       [lineId]: value,
     }));
@@ -253,7 +257,7 @@ export function ShipTransferDialog({
         queryKey: transferKeys.lines(transferId),
       });
 
-      setShippedQuantities({});
+      setQuantityOverrides({});
       onClose();
     },
     onError: (error) => {

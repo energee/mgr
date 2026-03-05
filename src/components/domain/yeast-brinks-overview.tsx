@@ -42,8 +42,6 @@ interface ActivePitch {
   generation: number | null;
   vessel_id: string | null;
   days_old: number | null;
-  estimated_viability: number | null;
-  viability_status: string | null;
 }
 
 // =============================================================================
@@ -99,7 +97,7 @@ export function YeastBrinksOverview() {
       const { data, error } = await supabase
         .from("yeast_pitches_with_remaining")
         .select(
-          "id, strain_name, strain_form, quantity_remaining_lbs, initial_viability, received_date, harvest_date, generation, vessel_id, days_old, estimated_viability, viability_status"
+          "id, strain_name, strain_form, quantity_remaining_lbs, initial_viability, received_date, harvest_date, generation, vessel_id, days_old"
         )
         .in("status", ["in_stock", "in_use"])
         .not("vessel_id", "is", null);
