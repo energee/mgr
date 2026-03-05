@@ -169,6 +169,26 @@ ORDER BY received_date ASC, expiration_date ASC NULLS LAST;
 
 ---
 
+## Accept into Inventory Workflow
+
+After PO items are physically received (`po_receives`), an "Accept into Inventory" step creates `inventory_lots` records, linking them via `po_receive_id`.
+
+**Flow:**
+```
+po_receives (physical receipt) → Accept into Inventory → inventory_lots (tracked inventory)
+```
+
+**Database function:** `get_unaccepted_po_receives(p_po_id UUID)` returns all `po_receives` for a PO that don't yet have a linked `inventory_lot`. The dialog uses this to show which received items still need inventory acceptance.
+
+**Why two steps?** Separating receiving from inventory acceptance enables:
+- QA/inspection steps between receipt and inventory acceptance
+- Proper mapping to `inventory_items` (which may not match catalog items 1:1)
+- User control over which items enter inventory tracking
+
+**UI:** The "Accept into Inventory" action button appears on PO detail pages when status is `partial` or `fulfilled`.
+
+---
+
 ## State Machine: Purchase Order
 
 ```

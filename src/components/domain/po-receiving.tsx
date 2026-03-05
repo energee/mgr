@@ -36,9 +36,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Package, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
-  CATALOG_TABLES,
   getCatalogTypeLabel,
-  isFreeTextCatalogType,
+  resolveCatalogNames,
 } from "@/entities/po-line-item";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { purchaseOrderKeys } from "@/lib/query-keys";
@@ -141,42 +140,8 @@ export function POReceiving({
         receivedByItem.set(r.po_line_item_id, current + r.quantity);
       }
 
-      // Resolve catalog item names -- group items by catalog_type to batch queries
-      const itemsByType = new Map<string, typeof items>();
-      for (const item of items) {
-        const existing = itemsByType.get(item.catalog_type);
-        if (existing) {
-          existing.push(item);
-        } else {
-          itemsByType.set(item.catalog_type, [item]);
-        }
-      }
-
-      // Fetch names from each catalog table
-      const nameMap = new Map<string, string>();
-      for (const [catalogType, typeItems] of itemsByType) {
-        // For "other" type, use catalog_id directly as name (it's free text)
-        if (isFreeTextCatalogType(catalogType)) {
-          for (const item of typeItems) {
-            nameMap.set(`${catalogType}:${item.catalog_id}`, item.catalog_id);
-          }
-          continue;
-        }
-
-        const table = CATALOG_TABLES[catalogType];
-        if (!table) continue;
-
-        const catalogIds = typeItems.map((i) => i.catalog_id);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: catalogItems } = await (supabase as any)
-          .from(table)
-          .select("id, name")
-          .in("id", catalogIds);
-
-        for (const ci of catalogItems ?? []) {
-          nameMap.set(`${catalogType}:${ci.id}`, ci.name);
-        }
-      }
+      // Resolve catalog item names using shared utility
+      const nameMap = await resolveCatalogNames(supabase, items);
 
       // Merge with resolved names
       return items.map((item) => ({

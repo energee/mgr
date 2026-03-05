@@ -1,12 +1,25 @@
 "use client";
 
-import { use, useCallback } from "react";
+/**
+ * Purchase Order Detail Page
+ *
+ * Renders the PO detail view with custom action handlers for:
+ * - "Accept into Inventory" — opens dialog to create inventory lots from po_receives
+ * - "Calculate Landed Cost" — distributes shipping/tax across inventory lots
+ */
+
+import { use, useCallback, useState } from "react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { calculateLandedCost } from "@/lib/purchasing/landed-cost";
-import { purchaseOrderKeys, entityKeys } from "@/lib/query-keys";
+import { POAcceptInventoryDialog } from "@/components/domain/po-accept-inventory-dialog";
+import { PoLandedCostBreakdown } from "@/components/domain/po-landed-cost-breakdown";
+import { purchaseOrderKeys, entityKeys, landedCostKeys } from "@/lib/query-keys";
+
+const LANDED_COST_STATUSES = ["partial", "fulfilled", "closed"];
 
 export default function PurchaseOrderDetailPage({
   params,
@@ -15,9 +28,30 @@ export default function PurchaseOrderDetailPage({
 }) {
   const { id } = use(params);
   const queryClient = useQueryClient();
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+
+  /** Fetch PO status to conditionally show the landed cost breakdown */
+  const { data: poStatus } = useQuery({
+    queryKey: purchaseOrderKeys.status(id),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("purchase_orders")
+        .select("status")
+        .eq("id", id)
+        .single();
+      return data?.status as string | undefined;
+    },
+  });
+  const showLandedCost = !!poStatus && LANDED_COST_STATUSES.includes(poStatus);
 
   const handleAction = useCallback(
     (actionName: string): boolean => {
+      if (actionName === "accept_into_inventory") {
+        setAcceptDialogOpen(true);
+        return true;
+      }
+
       if (actionName === "calculate_landed_cost") {
         const run = async () => {
           try {
@@ -31,6 +65,9 @@ export default function PurchaseOrderDetailPage({
               queryKey: purchaseOrderKeys.landedCost(id),
             });
             queryClient.invalidateQueries({
+              queryKey: landedCostKeys.summary(id),
+            });
+            queryClient.invalidateQueries({
               queryKey: entityKeys.all("inventory_lots"),
             });
             queryClient.invalidateQueries({
@@ -42,19 +79,28 @@ export default function PurchaseOrderDetailPage({
           }
         };
         run();
-        return true; // Mark action as handled
+        return true;
       }
-      return false; // Not handled, let default behavior run
+
+      return false;
     },
     [id, queryClient]
   );
 
   return (
-    <EntityDetailUnifiedWithErrorBoundary
-      entity={purchaseOrderEntity}
-      id={id}
-      basePath="/purchasing/pos"
-      onAction={handleAction}
-    />
+    <>
+      <EntityDetailUnifiedWithErrorBoundary
+        entity={purchaseOrderEntity}
+        id={id}
+        basePath="/purchasing/pos"
+        onAction={handleAction}
+      />
+      {showLandedCost && <PoLandedCostBreakdown poId={id} />}
+      <POAcceptInventoryDialog
+        poId={id}
+        open={acceptDialogOpen}
+        onClose={() => setAcceptDialogOpen(false)}
+      />
+    </>
   );
 }

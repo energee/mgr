@@ -79,6 +79,7 @@ export function WaterChemistrySection() {
   const { isDirty } = form.formState;
 
   // Sync to context
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedSourceProfile = form.watch("water_profile_id");
   const watchedTargetProfile = form.watch("target_water_profile_id");
   const watchedMashWater = form.watch("mash_water_volume_gal");

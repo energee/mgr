@@ -44,6 +44,7 @@ export function MashSection() {
   });
 
   const { isDirty } = form.formState;
+  // eslint-disable-next-line react-hooks/incompatible-library
   const mashSchedule = form.watch("mash_schedule");
   const watchedEfficiency = form.watch("mash_efficiency");
 

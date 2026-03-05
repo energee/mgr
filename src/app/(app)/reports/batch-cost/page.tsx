@@ -18,6 +18,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
+import { formatCurrency } from "@/lib/format";
 import { reportKeys } from "@/lib/query-keys";
 import {
   Card,
@@ -81,15 +82,6 @@ interface IngredientCostRow {
 // Helpers
 // =============================================================================
 
-function formatCurrency(value: number | null | undefined): string {
-  if (value == null) return "--";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
 function formatBbl(value: number | null | undefined): string {
   if (value == null) return "--";

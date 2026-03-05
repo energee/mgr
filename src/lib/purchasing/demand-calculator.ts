@@ -27,6 +27,7 @@ export interface IngredientShortfall {
   catalog_name: string;
   total_required: number;
   available_qty: number;
+  on_order_qty: number;
   shortfall_qty: number;
   unit: string;
   required_by_date: string;
