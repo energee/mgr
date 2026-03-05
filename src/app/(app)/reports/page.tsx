@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, ClipboardList, DollarSign, BarChart3 } from "lucide-react";
+import { FileText, ClipboardList, DollarSign, BarChart3, TrendingUp } from "lucide-react";
 
 const reports = [
   {
@@ -32,6 +32,12 @@ const reports = [
     description: "Cost breakdown per batch with ingredient-level detail",
     href: "/reports/batch-cost",
     icon: ClipboardList,
+  },
+  {
+    title: "Projections & COGS",
+    description: "Cost analysis, margin tracking, and production forecasting",
+    href: "/reports/projections",
+    icon: TrendingUp,
   },
 ];
 
