@@ -16,6 +16,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicRpc } from "@/services/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -183,8 +184,6 @@ function AvailabilityPanel({ brandId, sellingFormatId }: { brandId: string | nul
 
 export function OrderItemsEditor({ orderId, customerId, readOnly = false }: OrderItemsEditorProps) {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const queryClient = useQueryClient();
 
   // New item form state
@@ -230,7 +229,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     if (!effectiveCustomerId || !formatId) return null;
 
     try {
-      const { data, error } = await db.rpc("get_price_for_customer", {
+      const { data, error } = await dynamicRpc(supabase, "get_price_for_customer", {
         p_customer_id: effectiveCustomerId,
         p_format_id: formatId,
         p_brand_id: brandId || null,
@@ -250,7 +249,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       console.error("Price lookup failed:", e);
       return null;
     }
-  }, [effectiveCustomerId, db]);
+  }, [effectiveCustomerId, supabase]);
 
   // Fetch catalog data (must be above useEffect that references them)
   const { data: brands } = useBrands();

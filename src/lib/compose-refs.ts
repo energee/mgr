@@ -55,8 +55,8 @@ function composeRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
  * Accepts callback refs and RefObject(s)
  */
 function useComposedRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
-  // biome-ignore lint/correctness/useExhaustiveDependencies: we want to memoize by all values
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refs array is spread as deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refs spread as deps; ESLint can't statically verify spread elements
   return React.useCallback(composeRefs(...refs), refs);
 }
 

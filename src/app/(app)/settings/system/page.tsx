@@ -35,6 +35,7 @@ import { Loader2, Trash2, Upload } from "lucide-react";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useIsMac } from "@/hooks/use-is-mac";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { SafeImage } from "@/components/ui/safe-image";
 
 // =============================================================================
 // Schema
@@ -321,8 +322,7 @@ export default function SystemSettingsPage() {
                       {logoSvg && (
                         <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
                           <div className="h-[120px] w-[120px] rounded-md border bg-white flex items-center justify-center p-3">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <SafeImage
                               src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(logoSvg)))}`}
                               alt="Brewery logo"
                               className="max-h-full max-w-full object-contain"
@@ -468,7 +468,6 @@ export default function SystemSettingsPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="timezone">Timezone</Label>
                     <Select
-                      // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
                       value={form.watch("timezone")}
                       onValueChange={(value) => form.setValue("timezone", value)}
                     >

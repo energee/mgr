@@ -391,7 +391,6 @@ function DataTableFilterItem<TData>({
 
   return (
     <SortableItem value={filter.filterId} asChild>
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- listitem keyboard nav for sortable filter items */}
       <div
         role="listitem"
         id={filterItemId}
@@ -785,7 +784,6 @@ function onFilterInputRender<TData>({
             {filter.operator === "isBetween" ? (
               <Calendar
                 aria-label={`Select ${columnMeta?.label} date range`}
-                // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus management when popover opens
                 autoFocus
                 captionLayout="dropdown"
                 mode="range"
@@ -814,7 +812,6 @@ function onFilterInputRender<TData>({
             ) : (
               <Calendar
                 aria-label={`Select ${columnMeta?.label} date`}
-                // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus management when popover opens
                 autoFocus
                 captionLayout="dropdown"
                 mode="single"

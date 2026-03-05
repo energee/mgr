@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { entityKeys, batchKeys } from "@/lib/query-keys";
+import { dynamicFrom } from "@/services/types";
 import {
   Table,
   TableBody,
@@ -33,21 +34,33 @@ interface BatchBlendHistoryProps {
   data: { id: string; [key: string]: unknown };
 }
 
+/** Row shape returned by the batch_blend_details view. */
+interface BlendDetailRow {
+  id: string;
+  blend_batch_id: string;
+  blend_batch_number: string | null;
+  blend_batch_name: string | null;
+  source_batch_id: string;
+  source_batch_number: string | null;
+  source_batch_name: string | null;
+  source_batch_status: string | null;
+  source_recipe_name: string | null;
+  volume_bbl: number;
+  blended_at: string;
+}
+
 // =============================================================================
 // Component
 // =============================================================================
 
 export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const batchId = data.id;
 
   const { data: blends, isLoading } = useQuery({
     queryKey: entityKeys.related("batch_blends", "blend_batch_id", batchId),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("batch_blend_details")
+      const { data, error } = await dynamicFrom(supabase, "batch_blend_details")
         .select("*")
         .eq("blend_batch_id", batchId)
         .order("blended_at", { ascending: false });
@@ -60,8 +73,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const { data: usedInBlends } = useQuery({
     queryKey: entityKeys.related("batch_blends", "source_batch_id", batchId),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("batch_blend_details")
+      const { data, error } = await dynamicFrom(supabase, "batch_blend_details")
         .select("*")
         .eq("source_batch_id", batchId)
         .order("blended_at", { ascending: false });
@@ -74,8 +86,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const { data: blendInfo } = useQuery({
     queryKey: batchKeys.blendInfo(batchId),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("batches_with_blend_info")
+      const { data, error } = await dynamicFrom(supabase, "batches_with_blend_info")
         .select("*")
         .eq("id", batchId)
         .single();
@@ -104,8 +115,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const totalVolume = blends?.reduce((sum: number, b: any) => sum + Number(b.volume_bbl), 0) ?? 0;
+  const totalVolume = blends?.reduce((sum: number, b: BlendDetailRow) => sum + Number(b.volume_bbl), 0) ?? 0;
 
   return (
     <div className="space-y-4">
@@ -128,8 +138,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {blends?.map((blend: any) => (
+                {blends?.map((blend: BlendDetailRow) => (
                   <TableRow key={blend.id}>
                     <TableCell>
                       <Link
@@ -239,8 +248,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {usedInBlends?.map((blend: any) => (
+                {usedInBlends?.map((blend: BlendDetailRow) => (
                   <TableRow key={blend.id}>
                     <TableCell>
                       <Link

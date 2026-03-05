@@ -13,6 +13,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 import {
   brewLogKeys,
   entityKeys,
@@ -104,8 +105,6 @@ export function BrewLogCompletionDialog({
   onSuccess,
 }: BrewLogCompletionDialogProps) {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
@@ -130,8 +129,7 @@ export function BrewLogCompletionDialog({
   const { data: brewLogFull } = useQuery({
     queryKey: brewLogKeys.detail(brewLogId),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("brew_logs")
+      const { data, error } = await dynamicFrom(supabase, "brew_logs")
         .select("id, brew_number, status, events")
         .eq("id", brewLogId)
         .single();
@@ -148,8 +146,7 @@ export function BrewLogCompletionDialog({
     queryKey: brewLogKeys.batchesForCompletion(brewLogId),
     queryFn: async () => {
       // Get brew_log_batches joined with batch info
-      const { data: links, error } = await db
-        .from("brew_log_batches")
+      const { data: links, error } = await dynamicFrom(supabase, "brew_log_batches")
         .select(
           `
           id,
@@ -167,8 +164,7 @@ export function BrewLogCompletionDialog({
         (l: { batch_id: string }) => l.batch_id
       );
 
-      const { data: batches, error: batchError } = await db
-        .from("batches_with_brew_info")
+      const { data: batches, error: batchError } = await dynamicFrom(supabase, "batches_with_brew_info")
         .select(
           "id, batch_number, name, status, volume_bbl, current_vessel_id, current_vessel_name"
         )
@@ -202,8 +198,7 @@ export function BrewLogCompletionDialog({
   >({
     queryKey: vesselKeys.availableForCompletion(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("vessels")
+      const { data, error } = await dynamicFrom(supabase, "vessels")
         .select("id, name, vessel_type, capacity_bbl")
         .eq("is_active", true)
         .is("current_batch_id", null)
@@ -299,7 +294,7 @@ export function BrewLogCompletionDialog({
           const volume = batch.link_volume_bbl ?? batch.volume_bbl ?? 0;
 
           // Use the atomic RPC function that creates transfer + updates batch
-          const { error } = await db.rpc("start_batch_fermentation", {
+          const { error } = await dynamicRpc(supabase, "start_batch_fermentation", {
             p_batch_id: batch.id,
             p_vessel_id: assignedVesselId,
             p_volume_bbl: volume,
@@ -309,8 +304,7 @@ export function BrewLogCompletionDialog({
           if (error) throw error;
         } else if (batch.current_vessel_id) {
           // Vessel already assigned; just update batch status to fermenting
-          const { error } = await db
-            .from("batches")
+          const { error } = await dynamicFrom(supabase, "batches")
             .update({ status: "fermenting" })
             .eq("id", batch.id);
 
@@ -319,8 +313,7 @@ export function BrewLogCompletionDialog({
       }
 
       // Mark brew log as completed
-      const { error: brewLogError } = await db
-        .from("brew_logs")
+      const { error: brewLogError } = await dynamicFrom(supabase, "brew_logs")
         .update({ status: "completed" })
         .eq("id", brewLogId);
 

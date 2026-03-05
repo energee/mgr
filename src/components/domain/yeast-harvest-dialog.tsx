@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { yeastKeys, vesselKeys, batchKeys } from "@/lib/query-keys";
 
 // =============================================================================
@@ -114,10 +115,7 @@ export function YeastHarvestDialog({
   const { data: brinks, isLoading: brinksLoading } = useQuery({
     queryKey: vesselKeys.brinks(),
     queryFn: async () => {
-      // Type assertion needed: "brink" vessel_type not yet in generated Supabase types
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from("vessels")
+      const { data, error } = await dynamicFrom(supabase, "vessels")
         .select("id, name, capacity_bbl")
         .eq("vessel_type", "brink")
         .in("status", ["ready_for_use", "in_use"])
@@ -144,9 +142,7 @@ export function YeastHarvestDialog({
       );
       if (!strain) throw new Error("Source strain not found");
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: newPitch, error: insertError } = await (supabase as any)
-        .from("yeast_pitches")
+      const { data: newPitch, error: insertError } = await dynamicFrom(supabase, "yeast_pitches")
         .insert({
           strain_id: strain.strain_id,
           source_type: "harvest",

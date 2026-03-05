@@ -13,6 +13,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { revisionKeys } from "@/lib/query-keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,15 +27,6 @@ import {
   TimelineContent,
 } from "@/components/ui/timeline";
 
-/**
- * Create a Supabase client with dynamic table access.
- * entity_revisions is not yet in the generated types, so we cast here.
- * Called per-query (not module-level) to capture the correct session context.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getDb(): any {
-  return createClient();
-}
 
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago").
@@ -271,8 +263,7 @@ function useResolvedNames(revisions: Revision[]): Map<string, string> {
     queries: fkGroups.map(({ table, ids }) => ({
       queryKey: revisionKeys.fkResolve(table, ids),
       queryFn: async () => {
-        const { data } = await getDb()
-          .from(table)
+        const { data } = await dynamicFrom(createClient(), table)
           .select("id, name")
           .in("id", ids);
         return (data ?? []) as Array<{ id: string; name: string }>;
@@ -437,8 +428,7 @@ export function RevisionHistory({
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntity(entityType, entityId),
     queryFn: async () => {
-      const { data, error } = await getDb()
-        .from("entity_revisions")
+      const { data, error } = await dynamicFrom(createClient(), "entity_revisions")
         .select("*")
         .eq("entity_type", entityType)
         .eq("entity_id", entityId)
@@ -509,8 +499,7 @@ export function RevisionHistoryCompact({
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntityCompact(entityType, entityId),
     queryFn: async () => {
-      const { data, error } = await getDb()
-        .from("entity_revisions")
+      const { data, error } = await dynamicFrom(createClient(), "entity_revisions")
         .select("id, operation, changed_at, revision_number")
         .eq("entity_type", entityType)
         .eq("entity_id", entityId)

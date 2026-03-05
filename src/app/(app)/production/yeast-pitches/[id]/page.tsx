@@ -18,6 +18,7 @@ import { use, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
+import type { EntityConfig } from "@/types/entity";
 import { YeastLineageDisplay } from "@/components/domain/yeast-lineage-display";
 import { YeastViabilityChart } from "@/components/domain/yeast-viability-chart";
 import { RecordCellCountDialog } from "@/components/domain/record-cell-count-dialog";
@@ -178,13 +179,12 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
 
   // Handle custom actions from the entity detail action bar.
   const handleAction = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (actionName: string, data: any): boolean => {
+    (actionName: string, data: Record<string, unknown>): boolean => {
       if (actionName === "record_cell_count") {
         setCurrentPitchData({
-          id: data.id,
-          strain_name: data.strain_name,
-          source_type: data.source_type,
+          id: data.id as string,
+          strain_name: data.strain_name as string | undefined,
+          source_type: data.source_type as string | undefined,
         });
         setShowCellCountDialog(true);
         return true;
@@ -202,8 +202,7 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
   return (
     <>
       <EntityDetailUnifiedWithErrorBoundary
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        entity={yeastPitchEntity as any}
+        entity={yeastPitchEntity as unknown as EntityConfig<Record<string, unknown>>}
         id={id}
         basePath="/production/yeast-pitches"
         onAction={handleAction}

@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -131,9 +132,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
         if (!table) continue;
 
         const catalogIds = typeItems.map((i) => i.catalog_id);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: catalogData } = await (supabase as any)
-          .from(table)
+        const { data: catalogData } = await dynamicFrom(supabase, table)
           .select("id, name")
           .in("id", catalogIds);
 
@@ -158,9 +157,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
         return [];
       }
       const table = CATALOG_TABLES[newItem.catalog_type];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from(table)
+      const { data, error } = await dynamicFrom(supabase, table)
         .select("id, name")
         .order("name");
       if (error) throw error;

@@ -259,8 +259,7 @@ function AdjunctsTab({
         .eq("recipe_id", recipeId)
         .order("position", { ascending: true });
       if (error) throw error;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data as any[];
+      return data;
     },
   });
 
@@ -481,8 +480,7 @@ function SugarsTab({
         .eq("recipe_id", recipeId)
         .order("position", { ascending: true });
       if (error) throw error;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data as any[];
+      return data;
     },
   });
 
@@ -703,8 +701,7 @@ function SpicesTab({
         .eq("recipe_id", recipeId)
         .order("position", { ascending: true });
       if (error) throw error;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data as any[];
+      return data;
     },
   });
 
@@ -962,8 +959,7 @@ function FruitsTab({
         .eq("recipe_id", recipeId)
         .order("position", { ascending: true });
       if (error) throw error;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data as any[];
+      return data;
     },
   });
 

@@ -16,6 +16,7 @@ import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import {
   Dialog,
   DialogContent,
@@ -83,8 +84,7 @@ export function RecordCellCountDialog({
     mutationFn: async (values: CellCountFormValues) => {
       // Build the update payload: cell count, viability, and reset the
       // decay baseline date based on source type
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const updatePayload: Record<string, any> = {
+      const updatePayload: Record<string, unknown> = {
         cell_count_thousand: values.cell_count_thousand,
         initial_viability: values.viability,
       };
@@ -98,9 +98,7 @@ export function RecordCellCountDialog({
         updatePayload.received_date = values.measured_date;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from("yeast_pitches")
+      const { error } = await dynamicFrom(supabase, "yeast_pitches")
         .update(updatePayload)
         .eq("id", pitchId);
 

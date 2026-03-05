@@ -13,6 +13,7 @@ import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicOptionsKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
+import { dynamicFrom } from "@/services/types";
 import type { EntityFilterDef } from "@/types/entity";
 
 export type DynamicFilterOptions = Record<
@@ -54,9 +55,7 @@ export function useDynamicFilterOptions(
             orderBy,
           } = filter.dynamicOptions;
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let query = (supabase as any)
-            .from(table)
+          let query = dynamicFrom(supabase, table)
             .select(`${valueField}, ${labelField}`);
 
           if (queryFilter) {
@@ -76,8 +75,7 @@ export function useDynamicFilterOptions(
           const { data, error } = await query;
           if (error) throw error;
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const options = (data || []).map((row: any) => ({
+          const options = (data || []).map((row: Record<string, unknown>) => ({
             value: String(row[valueField]),
             label: String(row[labelField]),
           }));

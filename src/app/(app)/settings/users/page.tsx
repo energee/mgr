@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { EntityList } from "@/components/universal/entity-list";
 import { userProfileEntity } from "@/entities/user-profile";
 import { entityKeys } from "@/lib/query-keys";
+import type { EntityConfig } from "@/types/entity";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,8 +54,7 @@ export default function UsersSettingsPage() {
   return (
     <>
       <EntityList
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        entity={userProfileEntity as any}
+        entity={userProfileEntity as unknown as EntityConfig<Record<string, unknown>>}
         basePath="/settings/users"
         onAction={(actionName, record) => {
           if (actionName === "delete") {

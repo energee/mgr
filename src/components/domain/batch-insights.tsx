@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
+import { dynamicRpc } from "@/services/types";
 import {
   Collapsible,
   CollapsibleContent,
@@ -202,9 +203,7 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
     queryKey: batchKeys.performance(batchId!),
     queryFn: async () => {
       if (!batchId) return null;
-      // Note: Type assertion needed until supabase types are regenerated
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("analyze_batch_performance", {
+      const { data, error } = await dynamicRpc(supabase, "analyze_batch_performance", {
         p_batch_id: batchId,
       });
 

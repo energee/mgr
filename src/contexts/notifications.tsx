@@ -19,6 +19,7 @@ import {
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { notificationKeys } from "@/lib/query-keys";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -86,12 +87,8 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
   } = useQuery({
     queryKey: notificationKeys.unread(),
     queryFn: async () => {
-      // Use type assertion for view not in types yet
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
-      const { data, error } = await db
-        .from("my_unread_notifications")
+      // View not yet in generated types — use dynamicFrom for runtime table access
+      const { data, error } = await dynamicFrom(supabase, "my_unread_notifications")
         .select("*")
         .limit(50);
 
@@ -168,15 +165,13 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         supabase.removeChannel(channel);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once realtime subscription; supabase/queryClient are stable singletons, channel is set inside the effect
   }, []);
 
   // Mark as read mutation
   const markAsReadMutation = useMutation({
     mutationFn: async (id: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { error } = await db.rpc("mark_notification_read", {
+      const { error } = await dynamicRpc(supabase, "mark_notification_read", {
         p_notification_id: id,
       });
       if (error) throw error;
@@ -189,9 +184,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
   // Mark all as read mutation
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { error } = await db.rpc("mark_all_notifications_read");
+      const { error } = await dynamicRpc(supabase, "mark_all_notifications_read");
       if (error) throw error;
     },
     onSuccess: () => {
@@ -202,9 +195,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
   // Dismiss mutation
   const dismissMutation = useMutation({
     mutationFn: async (id: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { error } = await db.rpc("dismiss_notification", {
+      const { error } = await dynamicRpc(supabase, "dismiss_notification", {
         p_notification_id: id,
       });
       if (error) throw error;

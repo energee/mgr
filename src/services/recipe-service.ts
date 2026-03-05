@@ -13,7 +13,7 @@ import type {
   StyleComplianceResult,
   RecipeSuggestionsResult,
 } from "@/lib/ai/recipe-analyzer";
-import { type ServiceResult, ok, err, parseSupabaseError } from "./types";
+import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc } from "./types";
 
 /** Summary returned by the get_recipe_summary RPC function. */
 export interface RecipeSummary {
@@ -42,8 +42,7 @@ export const recipeService = {
     recipeId: string
   ): Promise<ServiceResult<StyleComplianceResult>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
+      const { data, error } = await dynamicRpc(supabase,
         "analyze_recipe_style_compliance",
         { p_recipe_id: recipeId }
       );
@@ -71,8 +70,7 @@ export const recipeService = {
     recipeId: string
   ): Promise<ServiceResult<RecipeSummary>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
+      const { data, error } = await dynamicRpc(supabase,
         "get_recipe_summary",
         { p_recipe_id: recipeId }
       );
@@ -100,8 +98,7 @@ export const recipeService = {
     recipeId: string
   ): Promise<ServiceResult<RecipeSuggestionsResult>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
+      const { data, error } = await dynamicRpc(supabase,
         "suggest_recipe_improvements",
         { p_recipe_id: recipeId }
       );

@@ -17,20 +17,21 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/supabase";
 import { formatStateLabel } from "@/types/entity";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 import { entityService } from "@/services/entity-service";
-import { formatServiceError } from "@/services/types";
+import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
 import { CHAT_ENTITY_MAP } from "./entity-map";
 import { escapeLike } from "@/lib/utils";
 
 /** Execute an RPC call and throw on error. */
 async function rpc<T>(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   fn: string,
   params: Record<string, unknown>,
 ): Promise<T> {
-  const { data, error } = await supabase.rpc(fn, params);
+  const { data, error } = await dynamicRpc(supabase, fn, params);
   if (error) throw new Error(error.message);
   return data as T;
 }
@@ -78,7 +79,7 @@ async function resolveBatch(
  * Read tools query data directly. Navigation tools return a NavigationIntent
  * that the client renders as an action card — the user reviews and submits.
  */
-export function createChatTools(supabase: SupabaseClient) {
+export function createChatTools(supabase: SupabaseClient<Database>) {
   return {
     // =========================================================================
     // Generic Entity Tools (config-driven via entity registry + service layer)
@@ -115,8 +116,7 @@ export function createChatTools(supabase: SupabaseClient) {
           );
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await entityService.list(supabase as any, entity, {
+        const result = await entityService.list(supabase, entity, {
           search: searchQuery,
           filters,
           limit,
@@ -147,8 +147,7 @@ export function createChatTools(supabase: SupabaseClient) {
           );
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await entityService.getById(supabase as any, entity, id);
+        const result = await entityService.getById(supabase, entity, id);
 
         if (!result.success) {
           throw new Error(
@@ -221,8 +220,7 @@ export function createChatTools(supabase: SupabaseClient) {
       inputSchema: z.object({}),
       execute: async () => {
         const data = await query<{ status: string; count: number }[]>(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).from("batch_status_counts").select("status, count"),
+          dynamicFrom(supabase, "batch_status_counts").select("status, count"),
         );
         const summary: Record<string, number> = {};
         for (const { status, count } of data) {
@@ -250,8 +248,7 @@ export function createChatTools(supabase: SupabaseClient) {
             batch_number: string | null;
           }[]
         >(
-          supabase
-            .from("vessels_with_batch")
+          dynamicFrom(supabase, "vessels_with_batch")
             .select(
               "id, name, vessel_type, capacity_bbl, status, current_batch_id, batch_number"
             )
@@ -318,8 +315,7 @@ export function createChatTools(supabase: SupabaseClient) {
       execute: async ({ category }) => {
         // Fetch active items, then lots from the view that accounts for
         // allocations (remaining_quantity = received - allocated).
-        let itemsQ = supabase
-          .from("inventory_items")
+        let itemsQ = dynamicFrom(supabase, "inventory_items")
           .select("id, name, category, unit, reorder_point")
           .eq("is_active", true);
         if (category) itemsQ = itemsQ.eq("category", category);
@@ -328,8 +324,7 @@ export function createChatTools(supabase: SupabaseClient) {
         if (!items?.length) return [];
 
         const lots = await query<{ inventory_item_id: string | null; remaining_quantity: number; expiration_date: string | null }[]>(
-          supabase
-            .from("inventory_lots_with_quantities")
+          dynamicFrom(supabase, "inventory_lots_with_quantities")
             .select("inventory_item_id, remaining_quantity, expiration_date")
             .in("inventory_item_id", items.map((i) => i.id))
             .gt("remaining_quantity", 0),
@@ -871,8 +866,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, strainName, limit }) => {
-        let q = supabase
-          .from("yeast_pitches_with_details")
+        let q = dynamicFrom(supabase, "yeast_pitches_with_details")
           .select(
             "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_number, location_name"
           )
@@ -910,8 +904,7 @@ export function createChatTools(supabase: SupabaseClient) {
         limit: z.number().optional().default(50).describe("Max results"),
       }),
       execute: async ({ state, kegTypeName, locationName, limit }) => {
-        let q = supabase
-          .from("keg_inventory_with_details")
+        let q = dynamicFrom(supabase, "keg_inventory_with_details")
           .select(
             "id, keg_type_name, volume_bbl, keg_owner_name, state, location_name, quantity, batch_number, finished_good_name"
           )

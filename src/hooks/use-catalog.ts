@@ -3,10 +3,12 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { brandKeys, packagingFormatKeys, entityKeys } from "@/lib/query-keys";
+import { dynamicFrom } from "@/services/types";
 
 /**
  * Generic hook for fetching active catalog items from a Supabase table.
- * Note: Uses `as any` cast because table name is dynamic, not a literal type.
+ * Uses dynamic table name, so Supabase client requires `as any` cast
+ * (table name is a runtime string, not a known literal from the generated types).
  */
 const DEFAULT_ORDER_BY = ["name"];
 
@@ -21,9 +23,7 @@ export function useCatalog<T>(
   return useQuery({
     queryKey,
     queryFn: async (): Promise<T[]> => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = (supabase as any)
-        .from(table)
+      let query = dynamicFrom(supabase, table)
         .select(select)
         .eq("is_active", true);
 

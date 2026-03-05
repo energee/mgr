@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,9 +38,6 @@ export function EntityDeleteDialog({
   onSuccess,
 }: EntityDeleteDialogProps) {
   const supabase = createClient();
-  // Cast to any for dynamic table access - universal components work with any entity
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isSoft = deleteMode === "soft";
   const verb = isSoft ? "Deactivate" : "Delete";
@@ -48,12 +46,10 @@ export function EntityDeleteDialog({
   const mutation = useMutation({
     mutationFn: async () => {
       const result = isSoft
-        ? await db
-            .from(entityTable)
+        ? await dynamicFrom(supabase, entityTable)
             .update({ is_active: false } as Record<string, unknown>)
             .eq("id", recordId)
-        : await db
-            .from(entityTable)
+        : await dynamicFrom(supabase, entityTable)
             .delete()
             .eq("id", recordId);
       if (result.error) throw result.error;

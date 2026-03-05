@@ -17,6 +17,7 @@ import { Camera, Loader2, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { entityKeys, userKeys } from "@/lib/query-keys";
+import { SafeImage } from "@/components/ui/safe-image";
 
 /** Accepted MIME types for avatar images */
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -168,10 +169,7 @@ export function AvatarUpload({ userId, avatarUrl, displayName }: AvatarUploadPro
       <div className="relative group">
         <div className="h-16 w-16 rounded-full overflow-hidden bg-muted flex items-center justify-center">
           {displayUrl ? (
-            // Use a plain img tag to avoid Next.js Image domain configuration
-            // for dynamic Supabase storage URLs
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <SafeImage
               src={displayUrl}
               alt={displayName ?? "Avatar"}
               className="h-full w-full object-cover"

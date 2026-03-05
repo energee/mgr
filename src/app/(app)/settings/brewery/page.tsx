@@ -183,7 +183,6 @@ export default function BrewerySettingsPage() {
                 <div key={field.name} className="grid gap-2">
                   <Label htmlFor={field.name}>{field.label}</Label>
                   <Select
-                    // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
                     value={form.watch(field.name)}
                     onValueChange={(value) =>
                       form.setValue(field.name, value as UnitPreferencesForm[typeof field.name])

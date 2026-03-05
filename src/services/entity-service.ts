@@ -22,6 +22,7 @@ import {
   ok,
   err,
   parseSupabaseError,
+  dynamicFrom,
 } from "./types";
 
 // =============================================================================
@@ -88,8 +89,7 @@ export const entityService = {
   ): Promise<ServiceResult<T[]>> {
     try {
       const table = readTable(entity);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = (supabase as any).from(table).select("*");
+      let query = dynamicFrom(supabase, table).select("*");
 
       // Apply exact-match filters
       if (options?.filters) {
@@ -154,9 +154,7 @@ export const entityService = {
   ): Promise<ServiceResult<T>> {
     try {
       const table = readTable(entity);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from(table)
+      const { data, error } = await dynamicFrom(supabase, table)
         .select("*")
         .eq("id", id)
         .single();
@@ -191,9 +189,7 @@ export const entityService = {
         return err({ code: "VALIDATION", issues: parsed.error.issues });
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: created, error } = await (supabase as any)
-        .from(entity.table)
+      const { data: created, error } = await dynamicFrom(supabase, entity.table)
         .insert(parsed.data)
         .select()
         .single();
@@ -232,9 +228,6 @@ export const entityService = {
         return err({ code: "VALIDATION", issues: parsed.error.issues });
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
       if (currentVersion !== undefined) {
         // Optimistic locking: include version check
         const updateData = {
@@ -243,8 +236,7 @@ export const entityService = {
           updated_at: new Date().toISOString(),
         };
 
-        const { data: updated, error } = await db
-          .from(entity.table)
+        const { data: updated, error } = await dynamicFrom(supabase, entity.table)
           .update(updateData)
           .eq("id", id)
           .eq("version", currentVersion)
@@ -267,8 +259,7 @@ export const entityService = {
       }
 
       // Standard update (no version check)
-      const { data: updated, error } = await db
-        .from(entity.table)
+      const { data: updated, error } = await dynamicFrom(supabase, entity.table)
         .update({ ...parsed.data, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
@@ -307,12 +298,8 @@ export const entityService = {
         });
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
       // Fetch current state
-      const { data: current, error: fetchError } = await db
-        .from(entity.table)
+      const { data: current, error: fetchError } = await dynamicFrom(supabase, entity.table)
         .select(sm.stateField)
         .eq("id", id)
         .single();
@@ -349,8 +336,7 @@ export const entityService = {
       // Perform the transition atomically — include current state in the WHERE
       // clause to prevent race conditions where another process changes the
       // state between our SELECT and UPDATE.
-      const { data: updated, error: updateError } = await db
-        .from(entity.table)
+      const { data: updated, error: updateError } = await dynamicFrom(supabase, entity.table)
         .update({ [sm.stateField]: targetState })
         .eq("id", id)
         .eq(sm.stateField, currentState)
@@ -391,12 +377,8 @@ export const entityService = {
     mode: "hard" | "soft"
   ): Promise<ServiceResult<void>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
       if (mode === "soft") {
-        const { error } = await db
-          .from(entity.table)
+        const { error } = await dynamicFrom(supabase, entity.table)
           .update({ is_active: false })
           .eq("id", id);
 
@@ -404,8 +386,7 @@ export const entityService = {
           return err(parseSupabaseError(error, { table: entity.table, id }));
         }
       } else {
-        const { error } = await db
-          .from(entity.table)
+        const { error } = await dynamicFrom(supabase, entity.table)
           .delete()
           .eq("id", id);
 

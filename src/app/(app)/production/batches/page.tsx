@@ -34,15 +34,14 @@ export default function BatchesPage() {
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
 
   // Custom action handler for batch-specific actions
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleAction = useCallback((actionName: string, record: any) => {
+  const handleAction = useCallback((actionName: string, record: Record<string, unknown>) => {
     if (actionName === "cancel" || actionName === "archive") {
-      setSelectedBatch(record as BatchRecord);
+      setSelectedBatch(record as unknown as BatchRecord);
       setShowTerminationDialog(true);
       return true;
     }
     if (actionName === "start_brew_day") {
-      setSelectedBatch(record as BatchRecord);
+      setSelectedBatch(record as unknown as BatchRecord);
       setShowStartBrewDay(true);
       return true;
     }

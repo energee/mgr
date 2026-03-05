@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { PortalShell } from "@/components/portal/portal-shell";
 import type { PortalCustomer } from "@/lib/portal-context";
+import { dynamicFrom } from "@/services/types";
 
 export const metadata: Metadata = {
   title: "Customer Portal",
@@ -23,10 +24,7 @@ export default async function PortalLayout({
   }
 
   // Find linked customers via junction table
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-  const { data: links } = await db
-    .from("customer_portal_users")
+  const { data: links } = await dynamicFrom(supabase, "customer_portal_users")
     .select("customer_id, customers(id, name, email)")
     .eq("user_id", user.id);
 
@@ -37,17 +35,13 @@ export default async function PortalLayout({
   // Auto-link by email on first login (no existing links)
   if (customers.length === 0 && user.email) {
     const adminDb = await createAdminClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const adminAny = adminDb as any;
-    const { data: matched } = await adminAny
-      .from("customers")
+    const { data: matched } = await dynamicFrom(adminDb, "customers")
       .select("id, name, email")
       .eq("email", user.email);
 
     if (matched?.length > 0) {
       for (const cust of matched) {
-        await adminAny
-          .from("customer_portal_users")
+        await dynamicFrom(adminDb, "customer_portal_users")
           .upsert({ customer_id: cust.id, user_id: user.id });
       }
       customers = matched.map((c: PortalCustomer) => ({
@@ -58,8 +52,7 @@ export default async function PortalLayout({
   }
 
   // Get brewery branding and contact info
-  const { data: settings } = await db
-    .from("system_settings")
+  const { data: settings } = await dynamicFrom(supabase, "system_settings")
     .select("key, value")
     .in("key", ["brewery_name", "brewery_logo_svg", "brewery_email"]);
 

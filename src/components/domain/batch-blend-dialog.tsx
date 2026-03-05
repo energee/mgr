@@ -12,6 +12,7 @@ import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys, entityKeys } from "@/lib/query-keys";
+import { dynamicFrom } from "@/services/types";
 import {
   Dialog,
   DialogContent,
@@ -84,8 +85,6 @@ export function BatchBlendDialog({
   onSuccess,
 }: BatchBlendDialogProps) {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const queryClient = useQueryClient();
   const [selections, setSelections] = useState<Map<string, SourceBatchSelection>>(new Map());
   const [globalNotes, setGlobalNotes] = useState("");
@@ -94,8 +93,7 @@ export function BatchBlendDialog({
   const { data: availableBatches, isLoading: batchesLoading } = useQuery({
     queryKey: batchKeys.list({ status: ["fermenting", "conditioning"], forBlend: true }),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("batches_with_brew_info")
+      const { data, error } = await dynamicFrom(supabase, "batches_with_brew_info")
         .select("id, batch_number, name, status, volume_bbl, actual_abv, actual_og, actual_fg, recipe_id")
         .in("status", ["fermenting", "conditioning"])
         .neq("id", batchId)
@@ -110,8 +108,7 @@ export function BatchBlendDialog({
   const { data: existingBlends } = useQuery({
     queryKey: batchKeys.blends(batchId),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("batch_blends")
+      const { data, error } = await dynamicFrom(supabase, "batch_blends")
         .select("source_batch_id")
         .eq("blend_batch_id", batchId);
       if (error) throw error;
@@ -124,8 +121,7 @@ export function BatchBlendDialog({
   const { data: blendInfoData } = useQuery({
     queryKey: batchKeys.list({ blendInfo: true }),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("batches_with_blend_info")
+      const { data, error } = await dynamicFrom(supabase, "batches_with_blend_info")
         .select("id, available_volume_bbl, volume_blended_away_bbl");
       if (error) throw error;
       return data as { id: string; available_volume_bbl: number; volume_blended_away_bbl: number }[];
@@ -237,7 +233,7 @@ export function BatchBlendDialog({
         notes: globalNotes || null,
       }));
 
-      const { error } = await db.from("batch_blends").insert(records);
+      const { error } = await dynamicFrom(supabase, "batch_blends").insert(records);
       if (error) throw error;
     },
     onSuccess: () => {
