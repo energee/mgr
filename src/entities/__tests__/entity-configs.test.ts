@@ -115,6 +115,19 @@ describe("Entity configs: uniqueness", () => {
 // =============================================================================
 
 describe("Entity configs: listColumns", () => {
+  it("every entity has a non-empty listColumns array", () => {
+    for (const entity of Array.from(entityRegistry.values())) {
+      expect(
+        Array.isArray(entity.listColumns),
+        `${entity.name}: 'listColumns' must be an array`
+      ).toBe(true);
+      expect(
+        entity.listColumns.length,
+        `${entity.name}: 'listColumns' must not be empty`
+      ).toBeGreaterThan(0);
+    }
+  });
+
   it("every entity with listColumns has at least one column with a header", () => {
     for (const entity of Array.from(entityRegistry.values())) {
       if (entity.listColumns && entity.listColumns.length > 0) {
@@ -135,7 +148,16 @@ describe("Entity configs: listColumns", () => {
 // =============================================================================
 
 describe("Entity configs: formSchema", () => {
-  it("every entity with a formSchema has a valid Zod schema (has parse method)", () => {
+  it("every entity has a formSchema defined", () => {
+    for (const entity of Array.from(entityRegistry.values())) {
+      expect(
+        entity.formSchema,
+        `${entity.name}: missing 'formSchema'`
+      ).toBeTruthy();
+    }
+  });
+
+  it("every entity formSchema is a valid Zod schema (has parse and safeParse methods)", () => {
     for (const entity of Array.from(entityRegistry.values())) {
       if (entity.formSchema) {
         expect(
@@ -356,6 +378,30 @@ describe("Entity configs: sections", () => {
       ).toBe(ids.length);
     }
   });
+
+  it("every section field has a name and label", () => {
+    for (const entity of Array.from(entityRegistry.values())) {
+      if (!entity.sections) continue;
+
+      for (const section of entity.sections) {
+        if (!section.fields) continue;
+
+        for (const field of section.fields) {
+          const prefix = `${entity.name}.sections['${section.id}']`;
+
+          expect(
+            field.name,
+            `${prefix}: field missing 'name'`
+          ).toBeTruthy();
+
+          expect(
+            field.label,
+            `${prefix}.fields['${field.name}']: missing 'label'`
+          ).toBeTruthy();
+        }
+      }
+    }
+  });
 });
 
 // =============================================================================
@@ -540,6 +586,35 @@ describe("Entity configs: valueDisplay", () => {
             ).toContain(config.color);
           }
         }
+      }
+    }
+  });
+});
+
+// =============================================================================
+// Searchable Fields
+// =============================================================================
+
+describe("Entity configs: searchableFields", () => {
+  it("searchableFields is an array of non-empty strings when present", () => {
+    for (const entity of Array.from(entityRegistry.values())) {
+      if (!entity.searchableFields) continue;
+
+      expect(
+        Array.isArray(entity.searchableFields),
+        `${entity.name}: 'searchableFields' must be an array`
+      ).toBe(true);
+
+      for (const field of entity.searchableFields) {
+        expect(
+          typeof field,
+          `${entity.name}: searchableFields entry must be a string, got ${typeof field}`
+        ).toBe("string");
+
+        expect(
+          field.length,
+          `${entity.name}: searchableFields contains an empty string`
+        ).toBeGreaterThan(0);
       }
     }
   });

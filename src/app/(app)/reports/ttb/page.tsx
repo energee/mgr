@@ -255,7 +255,7 @@ export default function TTBReportPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/reports">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Back to reports">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
@@ -467,6 +467,7 @@ export default function TTBReportPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -633,6 +634,7 @@ export default function TTBReportPage() {
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

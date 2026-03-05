@@ -91,8 +91,8 @@ All entity pages use universal components:
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00104`
-Next available: `00105`
+Current highest: `00130`
+Next available: `00131`
 
 ### Reference Files by Pattern
 

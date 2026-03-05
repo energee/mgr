@@ -1,14 +1,16 @@
 "use client";
 
-/**
- * Root-level error boundary.
- * Catches errors in the root layout that the app-level error.tsx cannot catch.
- * Reports errors to Sentry when configured.
- */
-
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
+/**
+ * Global error boundary that catches errors in the root layout itself.
+ *
+ * This component replaces the entire page (including <html> and <body>),
+ * so it must not import any app components or styles — only basic HTML.
+ * Sentry capture is safe here because sentry.client.config.ts initializes
+ * the SDK independently of the root layout.
+ */
 export default function GlobalError({
   error,
   reset,
@@ -19,25 +21,34 @@ export default function GlobalError({
   useEffect(() => {
     Sentry.captureException(error);
   }, [error]);
-
   return (
     <html lang="en">
       <body
         style={{
+          margin: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100vh",
           fontFamily: "system-ui, sans-serif",
+          backgroundColor: "#f9fafb",
+          color: "#111827",
           padding: "2rem",
         }}
       >
         <div style={{ maxWidth: "28rem", textAlign: "center" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+          <h2
+            style={{
+              fontSize: "1.25rem",
+              fontWeight: 600,
+              marginBottom: "0.5rem",
+            }}
+          >
             Something went wrong
           </h2>
           <p style={{ color: "#6b7280", marginBottom: "1rem" }}>
-            An unexpected error occurred. Please try again.
+            An unexpected error occurred. Please try again or contact support if
+            the problem persists.
           </p>
           {error.digest && (
             <p
@@ -52,16 +63,19 @@ export default function GlobalError({
             </p>
           )}
           <button
-            onClick={reset}
+            onClick={() => reset()}
             style={{
-              padding: "0.5rem 1rem",
+              padding: "0.5rem 1.5rem",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              color: "#fff",
+              backgroundColor: "#111827",
+              border: "none",
               borderRadius: "0.375rem",
-              border: "1px solid #d1d5db",
-              background: "white",
               cursor: "pointer",
             }}
           >
-            Try Again
+            Try again
           </button>
         </div>
       </body>

@@ -299,17 +299,17 @@ export default function SalesDashboardPage() {
 
       {/* Order Pipeline */}
       <DashboardSection title="Order Pipeline" viewAllHref="/sales/orders">
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           {pipelineStatuses.map((status, index) => (
             <Link
               key={status.key}
               href={`/sales/orders?status=${status.key}`}
-              className="flex-1 flex flex-col items-center p-3 rounded-lg border hover:bg-muted/50 transition-colors text-center relative"
+              className="flex flex-col items-center p-3 rounded-lg border hover:bg-muted/50 transition-colors text-center relative"
             >
               <span className="font-mono text-2xl font-semibold">{status.count}</span>
               <span className="text-xs text-muted-foreground">{status.label}</span>
               {index < pipelineStatuses.length - 1 && (
-                <span className="absolute -right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 z-10">
+                <span className="absolute -right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 z-10 hidden lg:block">
                   →
                 </span>
               )}

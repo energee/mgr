@@ -168,7 +168,7 @@ export default function OrderAllocationsPage({
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href={`/sales/orders/${id}`}>
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Back to order">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
@@ -265,6 +265,7 @@ export default function OrderAllocationsPage({
                         variant="ghost"
                         size="icon"
                         onClick={() => setDeleteId(alloc.id)}
+                        aria-label="Delete allocation"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

@@ -241,6 +241,9 @@ export const reportKeys = {
   /** Production summary report filtered by date range */
   productionSummary: (startDate: string, endDate: string) =>
     ["reports", "production-summary", startDate, endDate] as const,
+  /** Monthly production trend (last N months bar chart) */
+  productionTrend: (months: number) =>
+    ["reports", "production-trend", months] as const,
   /** Batch cost analysis — batches with their allocation costs for a date range */
   batchCost: (dateRange?: { from: string; to: string }) =>
     dateRange

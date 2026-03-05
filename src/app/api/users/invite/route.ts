@@ -20,6 +20,15 @@ import {
 } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ALL_ROLES } from "@/lib/permissions";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/users/invite" });
+
+/** Base URL for invite redirects. Prefers NEXT_PUBLIC_SITE_URL, falls back to NEXT_PUBLIC_APP_URL. */
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "http://localhost:3000";
 
 const inviteSchema = z.object({
   email: z.string().email("A valid email address is required"),
@@ -36,6 +45,8 @@ export const POST = withPermission(
       inviteSchema,
       request,
     );
+
+    log.info({ invitedBy: user.id, email, roles }, "User invite attempted");
 
     const adminDb = createAdminClient();
 
@@ -61,7 +72,7 @@ export const POST = withPermission(
         data: {
           display_name: display_name ?? undefined,
         },
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback`,
+        redirectTo: `${SITE_URL}/api/auth/callback`,
       });
 
     if (inviteError) {
@@ -108,13 +119,15 @@ export const POST = withPermission(
       .eq("id", userId);
 
     if (updateError) {
-      console.error(
-        "User invited but profile update failed:",
-        updateError,
+      log.error(
+        { error: updateError.message, userId, email },
+        "User invited but profile update failed",
       );
       // Don't throw — the invite was sent successfully.
       // The profile can be updated manually from the user detail page.
     }
+
+    log.info({ invitedBy: user.id, userId, email, roles }, "User invite completed");
 
     return successResponse(
       { id: userId, email, roles },

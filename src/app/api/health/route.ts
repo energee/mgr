@@ -21,9 +21,7 @@ export async function GET() {
       .limit(1);
 
     if (error) {
-      log.warn("Health check degraded: database unreachable", {
-        error: error.message,
-      });
+      log.warn({ error: error.message }, "Health check degraded: database unreachable");
       return NextResponse.json(
         { status: "degraded", database: "unreachable" },
         { status: 503 }
@@ -36,9 +34,7 @@ export async function GET() {
       { status: 200 }
     );
   } catch (err) {
-    log.error("Health check failed with exception", {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    log.error({ error: err instanceof Error ? err.message : String(err) }, "Health check failed with exception");
     return NextResponse.json(
       { status: "degraded", database: "unreachable" },
       { status: 503 }
