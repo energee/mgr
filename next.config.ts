@@ -16,7 +16,7 @@ const cspDirectives = [
   "default-src 'self'",
   `script-src 'self'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} 'unsafe-inline'`,
   "style-src 'self' 'unsafe-inline'",
-  `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} wss://*.supabase.co https://*.supabase.co`,
+  `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} wss://*.supabase.co https://*.supabase.co https://*.ingest.sentry.io`,
   "img-src 'self' data: blob:",
   "font-src 'self'",
   "frame-ancestors 'none'",

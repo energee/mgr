@@ -8,7 +8,7 @@ import { useEffect } from "react";
  *
  * This component replaces the entire page (including <html> and <body>),
  * so it must not import any app components or styles — only basic HTML.
- * Sentry capture is safe here because sentry.client.config.ts initializes
+ * Sentry capture is safe here because instrumentation-client.ts initializes
  * the SDK independently of the root layout.
  */
 export default function GlobalError({
