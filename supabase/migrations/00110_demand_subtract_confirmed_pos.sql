@@ -176,21 +176,23 @@ BEGIN
   ),
   -- Calculate outstanding quantities from confirmed POs (not draft or submitted)
   -- Outstanding = ordered - received for each line item
+  -- Pre-aggregate received quantities to avoid per-row LATERAL subqueries
+  po_received_summary AS (
+    SELECT pr.po_line_item_id, SUM(pr.quantity) as received_qty
+    FROM po_receives pr
+    GROUP BY pr.po_line_item_id
+  ),
   confirmed_po_quantities AS (
     SELECT
       pli.catalog_type,
       pli.catalog_id,
       COALESCE(
-        SUM(pli.quantity - COALESCE(recv.received_qty, 0)),
+        SUM(pli.quantity - COALESCE(prs.received_qty, 0)),
         0
       ) as on_order_qty
     FROM po_line_items pli
     JOIN purchase_orders po ON po.id = pli.po_id
-    LEFT JOIN LATERAL (
-      SELECT COALESCE(SUM(pr.quantity), 0) as received_qty
-      FROM po_receives pr
-      WHERE pr.po_line_item_id = pli.id
-    ) recv ON true
+    LEFT JOIN po_received_summary prs ON prs.po_line_item_id = pli.id
     WHERE po.status IN ('confirmed', 'partial', 'fulfilled')
     GROUP BY pli.catalog_type, pli.catalog_id
   ),

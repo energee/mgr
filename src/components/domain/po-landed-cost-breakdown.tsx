@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calculator } from "lucide-react";
+import { getCatalogTypeLabel } from "@/entities/po-line-item";
 
 // =============================================================================
 // Types
@@ -44,13 +45,6 @@ interface PoLandedCostBreakdownProps {
 // =============================================================================
 // Helpers
 // =============================================================================
-
-/**
- * Format a catalog type string for display (e.g., "malt" -> "Malt").
- */
-function formatCatalogType(type: string): string {
-  return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, " ");
-}
 
 /**
  * Format a markup percentage for display.
@@ -164,7 +158,7 @@ export function PoLandedCostBreakdown({ poId }: PoLandedCostBreakdownProps) {
               return (
                 <TableRow key={item.line_item_id ?? index}>
                   <TableCell className="font-medium">
-                    {formatCatalogType(item.catalog_type)}
+                    {getCatalogTypeLabel(item.catalog_type)}
                   </TableCell>
                   <TableCell className="text-right">{item.quantity}</TableCell>
                   <TableCell className="text-right">

@@ -34,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { yeastKeys, entityKeys } from "@/lib/query-keys";
 import type { YeastForm } from "@/lib/yeast-calculations";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 // =============================================================================
 // Types
@@ -298,9 +299,6 @@ function CostSpreadingSummary({
 
   if (!lineageSummary) return null;
 
-  const formatCurrency = (value: number | null) =>
-    value != null ? `$${Number(value).toFixed(2)}` : "\u2014";
-
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -354,7 +352,7 @@ function CostSpreadingSummary({
                     </TableCell>
                     <TableCell className="text-right">
                       {event.pitched_at
-                        ? new Date(event.pitched_at).toLocaleDateString()
+                        ? formatDate(event.pitched_at)
                         : "\u2014"}
                     </TableCell>
                     <TableCell className="text-right">

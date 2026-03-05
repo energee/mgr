@@ -137,6 +137,8 @@ export function POAcceptInventoryDialog({
       }
 
       const nameMap = new Map<string, string>();
+
+      // Resolve free-text types synchronously
       for (const [catalogType, items] of itemsByType) {
         if (isFreeTextCatalogType(catalogType)) {
           for (const item of items) {
@@ -145,23 +147,28 @@ export function POAcceptInventoryDialog({
               item.catalog_id
             );
           }
-          continue;
-        }
-
-        const table = CATALOG_TABLES[catalogType];
-        if (!table) continue;
-
-        const catalogIds = [...new Set(items.map((i) => i.catalog_id))];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: catalogItems } = await (supabase as any)
-          .from(table)
-          .select("id, name")
-          .in("id", catalogIds);
-
-        for (const ci of catalogItems ?? []) {
-          nameMap.set(`${catalogType}:${ci.id}`, ci.name);
         }
       }
+
+      // Resolve catalog names in parallel (one query per type)
+      const catalogQueries = Array.from(itemsByType.entries())
+        .filter(
+          ([catalogType]) =>
+            !isFreeTextCatalogType(catalogType) && CATALOG_TABLES[catalogType]
+        )
+        .map(async ([catalogType, items]) => {
+          const table = CATALOG_TABLES[catalogType];
+          const catalogIds = [...new Set(items.map((i) => i.catalog_id))];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: catalogItems } = await (supabase as any)
+            .from(table)
+            .select("id, name")
+            .in("id", catalogIds);
+          for (const ci of catalogItems ?? []) {
+            nameMap.set(`${catalogType}:${ci.id}`, ci.name);
+          }
+        });
+      await Promise.all(catalogQueries);
 
       return data.map((row) => ({
         ...row,
