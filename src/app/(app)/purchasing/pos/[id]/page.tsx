@@ -10,12 +10,14 @@
 
 import { use, useCallback, useState } from "react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { calculateLandedCost } from "@/lib/purchasing/landed-cost";
 import { POAcceptInventoryDialog } from "@/components/domain/po-accept-inventory-dialog";
-import { purchaseOrderKeys, entityKeys } from "@/lib/query-keys";
+import { PoLandedCostBreakdown } from "@/components/domain/po-landed-cost-breakdown";
+import { purchaseOrderKeys, entityKeys, landedCostKeys } from "@/lib/query-keys";
 
 export default function PurchaseOrderDetailPage({
   params,
@@ -25,6 +27,22 @@ export default function PurchaseOrderDetailPage({
   const { id } = use(params);
   const queryClient = useQueryClient();
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+
+  /** Fetch PO status to conditionally show the landed cost breakdown */
+  const LANDED_COST_STATUSES = ["partial", "fulfilled", "closed"];
+  const { data: poStatus } = useQuery({
+    queryKey: purchaseOrderKeys.detail(id),
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("purchase_orders")
+        .select("status")
+        .eq("id", id)
+        .single();
+      return data?.status as string | undefined;
+    },
+  });
+  const showLandedCost = !!poStatus && LANDED_COST_STATUSES.includes(poStatus);
 
   const handleAction = useCallback(
     (actionName: string): boolean => {
@@ -44,6 +62,9 @@ export default function PurchaseOrderDetailPage({
             // Invalidate related caches
             queryClient.invalidateQueries({
               queryKey: purchaseOrderKeys.landedCost(id),
+            });
+            queryClient.invalidateQueries({
+              queryKey: landedCostKeys.summary(id),
             });
             queryClient.invalidateQueries({
               queryKey: entityKeys.all("inventory_lots"),
@@ -73,6 +94,7 @@ export default function PurchaseOrderDetailPage({
         basePath="/purchasing/pos"
         onAction={handleAction}
       />
+      {showLandedCost && <PoLandedCostBreakdown poId={id} />}
       <POAcceptInventoryDialog
         poId={id}
         open={acceptDialogOpen}

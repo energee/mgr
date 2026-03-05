@@ -90,6 +90,18 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
       format: "date",
     },
     {
+      accessorKey: "unit_cost",
+      header: "Unit Cost",
+      sortable: true,
+      format: "currency",
+    },
+    {
+      accessorKey: "landed_cost",
+      header: "Landed Cost",
+      sortable: true,
+      format: "currency",
+    },
+    {
       accessorKey: "received_date",
       header: "Received",
       sortable: true,
