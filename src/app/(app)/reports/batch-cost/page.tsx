@@ -75,6 +75,9 @@ interface BatchCostRow {
   has_allocation_costs: boolean;
 }
 
+/** Shape of the nested recipe join from the batches query. */
+type BatchRecipeJoin = { id: string; name: string; brand: { name: string } | null } | null;
+
 /** Individual ingredient allocation cost for a batch */
 interface IngredientCostRow {
   allocation_id: string;
@@ -153,7 +156,7 @@ export default function BatchCostAnalysisPage() {
         ...new Set(
           batches
             .map((b) => {
-              const recipe = b.recipe as { id: string; name: string; brand: { name: string } | null } | null;
+              const recipe = b.recipe as BatchRecipeJoin;
               return recipe?.id;
             })
             .filter(Boolean) as string[]
@@ -201,7 +204,7 @@ export default function BatchCostAnalysisPage() {
 
       // Step 5: Build result rows
       const result: BatchCostRow[] = batches.map((b) => {
-        const recipe = b.recipe as { id: string; name: string; brand: { name: string } | null } | null;
+        const recipe = b.recipe as BatchRecipeJoin;
         const volumeBbl = b.volume_bbl;
 
         // Use allocation-based costs if available, otherwise fall back to recipe COGS
@@ -515,7 +518,6 @@ export default function BatchCostAnalysisPage() {
                   <TableHead className="text-right">
                     Ingredient Cost
                   </TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
                   <TableHead className="text-right">Cost / BBL</TableHead>
                 </TableRow>
               </TableHeader>
@@ -562,9 +564,6 @@ export default function BatchCostAnalysisPage() {
                             )}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        {formatCurrency(batch.ingredient_cost)}
-                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(batch.cost_per_bbl)}
                       </TableCell>
@@ -573,7 +572,7 @@ export default function BatchCostAnalysisPage() {
                     {/* Expanded ingredient detail */}
                     {expandedBatchId === batch.id && (
                       <TableRow>
-                        <TableCell colSpan={8} className="bg-muted/30 p-0">
+                        <TableCell colSpan={7} className="bg-muted/30 p-0">
                           <div className="px-8 py-4">
                             <h4 className="text-sm font-semibold mb-3">
                               Ingredient Cost Detail
