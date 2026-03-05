@@ -34,16 +34,14 @@ interface ChatEntityConfig {
   keyFields?: string[];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function entry(e: ChatEntityConfig): EntityConfig<any> {
+function entry(e: ChatEntityConfig): EntityConfig<Record<string, unknown>> {
   return {
     ...e,
     domain: "production" as const,
     description: "",
     formSchema: z.object({}),
     listColumns: [],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as EntityConfig<any>;
+  } as EntityConfig<Record<string, unknown>>;
 }
 
 /**

@@ -2,13 +2,12 @@ import type { ColumnSort, Row, RowData } from "@tanstack/react-table";
 import type { DataTableConfig } from "@/config/data-table";
 import type { FilterItemSchema } from "@/lib/parsers";
 
+/* eslint-disable @typescript-eslint/no-unused-vars -- TData/TValue required for module augmentation but not used in interface body */
 declare module "@tanstack/react-table" {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- TData required for module augmentation
   interface TableMeta<TData extends RowData> {
     queryKeys?: QueryKeys;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- TData and TValue required for module augmentation
   interface ColumnMeta<TData extends RowData, TValue> {
     label?: string;
     placeholder?: string;
@@ -19,6 +18,7 @@ declare module "@tanstack/react-table" {
     icon?: React.FC<React.SVGProps<SVGSVGElement>>;
   }
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 export interface QueryKeys {
   page: string;

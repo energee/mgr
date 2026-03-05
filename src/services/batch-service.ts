@@ -8,7 +8,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
-import { type ServiceResult, ok, err, parseSupabaseError } from "./types";
+import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc, dynamicFrom } from "./types";
 
 /** Result from the analyze_batch_performance RPC function. */
 export interface BatchPerformanceReport {
@@ -53,8 +53,7 @@ export const batchService = {
     batchId: string
   ): Promise<ServiceResult<BatchPerformanceReport>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
+      const { data, error } = await dynamicRpc(supabase,
         "analyze_batch_performance",
         { p_batch_id: batchId }
       );
@@ -82,12 +81,8 @@ export const batchService = {
     batchId: string
   ): Promise<ServiceResult<BlendCandidate[]>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
       // Get the source batch's recipe to find compatible batches
-      const { data: sourceBatch, error: fetchError } = await db
-        .from("batches")
+      const { data: sourceBatch, error: fetchError } = await dynamicFrom(supabase, "batches")
         .select("id, recipe_id, status")
         .eq("id", batchId)
         .single();
@@ -97,8 +92,7 @@ export const batchService = {
       }
 
       // Find other batches of the same recipe in blendable states
-      const { data: candidates, error: listError } = await db
-        .from("batches_with_brew_info")
+      const { data: candidates, error: listError } = await dynamicFrom(supabase, "batches_with_brew_info")
         .select("id, batch_number, recipe_name, status, volume_bbl, current_vessel_name")
         .eq("recipe_id", sourceBatch.recipe_id)
         .neq("id", batchId)

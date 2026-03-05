@@ -7,6 +7,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     rules: {
+      // React Hook Form's watch() is incompatible with React Compiler — suppress globally
+      "react-hooks/incompatible-library": "off",
       // Upgrade from recommended to strict
       "jsx-a11y/alt-text": "error",
       "jsx-a11y/aria-props": "error",
@@ -45,6 +47,30 @@ const eslintConfig = defineConfig([
       "jsx-a11y/role-supports-aria-props": "error",
       "jsx-a11y/scope": "error",
       "jsx-a11y/tabindex-no-positive": "error",
+    },
+  },
+  // Vendored UI components (diceui kanban/sortable/data-table, shadcn timeline/file-upload/alert)
+  // These are third-party code with patterns incompatible with React Compiler
+  // and intentional a11y overrides. Relax specific rules rather than inline-disabling.
+  {
+    files: [
+      "src/components/ui/kanban.tsx",
+      "src/components/ui/sortable.tsx",
+      "src/components/ui/timeline.tsx",
+      "src/components/ui/file-upload.tsx",
+      "src/components/ui/alert.tsx",
+      "src/components/data-table/data-table-filter-list.tsx",
+      "src/components/data-table/data-table-sort-list.tsx",
+      "src/components/ai-elements/prompt-input.tsx",
+    ],
+    rules: {
+      "react-hooks/preserve-manual-memoization": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "react-hooks/immutability": "off",
+      "jsx-a11y/role-supports-aria-props": "off",
+      "jsx-a11y/heading-has-content": "off",
+      "jsx-a11y/no-noninteractive-element-interactions": "off",
+      "jsx-a11y/no-autofocus": "off",
     },
   },
   // Override default ignores of eslint-config-next.

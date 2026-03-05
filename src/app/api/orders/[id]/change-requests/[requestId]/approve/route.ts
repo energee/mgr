@@ -1,5 +1,6 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
+import { dynamicRpc } from "@/services/types";
 
 export const POST = withPermission(
   "orders:write",
@@ -9,9 +10,7 @@ export const POST = withPermission(
       return errorResponse("BAD_REQUEST", "Missing request ID", undefined, 400);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabase as any;
-    const { error } = await db.rpc("apply_change_request", {
+    const { error } = await dynamicRpc(supabase, "apply_change_request", {
       p_change_request_id: requestId,
       p_approved_by: user.id,
     });

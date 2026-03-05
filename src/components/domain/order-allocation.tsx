@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Package, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { orderKeys, inventoryKeys } from "@/lib/query-keys";
+import { dynamicFrom } from "@/services/types";
 import { useBrands, usePackagingFormats } from "@/hooks/use-catalog";
 
 // =============================================================================
@@ -97,9 +98,7 @@ export function OrderAllocation({
   const { data: finishedGoods, isLoading: fgLoading } = useQuery({
     queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from("finished_goods_with_availability")
+      const { data, error } = await dynamicFrom(supabase, "finished_goods_with_availability")
         .select("id, lot_number, brand_id, selling_format_id, quantity, available_quantity, production_date")
         .gt("available_quantity", 0)
         .order("production_date", { ascending: true });

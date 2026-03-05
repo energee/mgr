@@ -17,6 +17,7 @@ import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicRpc } from "@/services/types";
 import {
   Dialog,
   DialogContent,
@@ -100,9 +101,7 @@ export function StartFermentationDialog({
       if (!selectedVessel) throw new Error("Vessel not found");
 
       // Use atomic function to ensure both operations succeed or fail together
-      // Note: Type assertion needed until supabase types are regenerated with migration 00024
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)("start_batch_fermentation", {
+      const { error } = await dynamicRpc(supabase, "start_batch_fermentation", {
         p_batch_id: batchId,
         p_vessel_id: values.vessel_id,
         p_volume_bbl: values.volume_bbl,
@@ -131,7 +130,6 @@ export function StartFermentationDialog({
     startMutation.mutate(values);
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const selectedVesselId = form.watch("vessel_id");
   const selectedVessel = vessels?.find((v) => v.id === selectedVesselId);
 

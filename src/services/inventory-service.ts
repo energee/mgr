@@ -8,7 +8,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
-import { type ServiceResult, ok, err, parseSupabaseError } from "./types";
+import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc, dynamicFrom } from "./types";
 
 /** Result from the get_inventory_overview RPC function. */
 export interface InventoryOverview {
@@ -55,8 +55,7 @@ export const inventoryService = {
     supabase: SupabaseClient<Database>
   ): Promise<ServiceResult<InventoryOverview>> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_inventory_overview");
+      const { data, error } = await dynamicRpc(supabase, "get_inventory_overview");
 
       if (error) {
         return err(parseSupabaseError(error));
@@ -87,13 +86,9 @@ export const inventoryService = {
       cutoff.setDate(cutoff.getDate() + daysAhead);
       const cutoffStr = cutoff.toISOString().split("T")[0];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
       // Use view for remaining_quantity; join inventory_items for name.
       // location is a plain text column (no FK to locations table).
-      const { data, error } = await db
-        .from("inventory_lots_with_quantities")
+      const { data, error } = await dynamicFrom(supabase, "inventory_lots_with_quantities")
         .select("id, lot_number, remaining_quantity, unit, expiration_date, location, item:inventory_items(name)")
         .not("expiration_date", "is", null)
         .lte("expiration_date", cutoffStr)

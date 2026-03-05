@@ -389,7 +389,6 @@ function FileUpload(props: FileUploadProps) {
     return {
       getState: () => state,
       dispatch: (action) => {
-        // eslint-disable-next-line react-hooks/immutability -- external store pattern requires mutable state
         state = reducer(state, action);
         for (const listener of listeners) {
           listener();
@@ -789,7 +788,6 @@ function FileUploadDropzone(props: FileUploadDropzoneProps) {
         dataTransfer.items.add(file);
       }
 
-      // eslint-disable-next-line react-hooks/immutability -- DOM API requires setting .files
       inputElement.files = dataTransfer.files;
       inputElement.dispatchEvent(new Event("change", { bubbles: true }));
     },
@@ -829,7 +827,6 @@ function FileUploadDropzone(props: FileUploadDropzoneProps) {
         dataTransfer.items.add(file);
       }
 
-      // eslint-disable-next-line react-hooks/immutability -- DOM API requires setting .files
       inputElement.files = dataTransfer.files;
       inputElement.dispatchEvent(new Event("change", { bubbles: true }));
     },

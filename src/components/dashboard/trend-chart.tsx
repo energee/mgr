@@ -11,7 +11,7 @@
  * - Responsive width
  */
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   BarChart,
   Bar,
@@ -27,6 +27,11 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import type {
+  Payload as TooltipPayload,
+  ValueType,
+  NameType,
+} from "recharts/types/component/DefaultTooltipContent";
 import { format, parseISO } from "date-fns";
 
 // =============================================================================
@@ -119,8 +124,7 @@ export function TrendChart({
   const yAxisFormatter = formatValue || ((v: number) => v.toLocaleString());
 
   // Shared tooltip label formatter (used by both chart types)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tooltipLabelFormatter = (_: any, payload: readonly any[]) => {
+  const tooltipLabelFormatter = (_: ReactNode, payload: ReadonlyArray<TooltipPayload<ValueType, NameType>>) => {
     const firstPayload = payload?.[0]?.payload;
     if (firstPayload?.[xKey]) {
       try {

@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, getSquareSettings } from "@/lib/square/client";
 import { verifyWebhookSignature } from "@/lib/square/webhook";
+import { dynamicFrom } from "@/services/types";
 
 // Square webhook event shape (subset of fields we care about)
 interface SquareWebhookEvent {
@@ -201,9 +202,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
 
     try {
       // Look up the catalog mapping with selling format container type
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: mapping } = await (admin as any)
-        .from("square_catalog_map")
+      const { data: mapping } = await dynamicFrom(admin, "square_catalog_map")
         .select("id, brand_id, selling_format_id, selling_formats(containers(type))")
         .eq("square_catalog_id", catalogObjectId)
         .eq("object_type", "ITEM_VARIATION")
@@ -238,9 +237,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
 
         // Find the most relevant finished good for this brand + selling format
         // (pick the one with the most available stock via FIFO by production date)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: fg } = await (admin as any)
-          .from("finished_goods_with_availability")
+        const { data: fg } = await dynamicFrom(admin, "finished_goods_with_availability")
           .select("id")
           .eq("brand_id", mapping.brand_id)
           .eq("selling_format_id", mapping.selling_format_id)

@@ -19,6 +19,7 @@ import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // =============================================================================
@@ -80,13 +81,10 @@ export default function InventoryDashboardPage() {
   const supabase = createClient();
 
   // Fetch low stock items (pre-filtered view)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const { data: lowStockItems = [] } = useQuery({
     queryKey: dashboardKeys.lowStock(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("inventory_low_stock_items")
+      const { data, error } = await dynamicFrom(supabase, "inventory_low_stock_items")
         .select("id, name, category, unit, reorder_point, current_qty")
         .order("name");
 
@@ -139,8 +137,7 @@ export default function InventoryDashboardPage() {
           const diffTime = expDate.getTime() - today.getTime();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const itemInfo = lot.inventory_items as any;
+          const itemInfo = lot.inventory_items as { name: string } | null;
 
           return {
             id: lot.id,
@@ -162,8 +159,7 @@ export default function InventoryDashboardPage() {
   const { data: inventorySummary = [] } = useQuery({
     queryKey: dashboardKeys.inventorySummary(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("inventory_summary_by_category")
+      const { data, error } = await dynamicFrom(supabase, "inventory_summary_by_category")
         .select("category, item_count, total_value");
 
       if (error) throw error;
@@ -333,8 +329,7 @@ function InventoryTrends() {
   const { data: inventoryTrends = [], isLoading } = useQuery({
     queryKey: dashboardKeys.trends.inventory(period),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_inventory_trends", {
+      const { data, error } = await dynamicRpc(supabase, "get_inventory_trends", {
         p_days: period,
       });
       if (error) {

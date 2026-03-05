@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { yeastKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,12 +59,10 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
   const { data: root, isLoading: rootLoading } = useQuery({
     queryKey: yeastKeys.lineageRoot(pitchId),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const supabase = createClient() as any;
+      const supabase = createClient();
 
       // Get the current pitch
-      const { data: currentPitch } = await supabase
-        .from("yeast_pitches_with_details")
+      const { data: currentPitch } = await dynamicFrom(supabase, "yeast_pitches_with_details")
         .select("*")
         .eq("id", pitchId)
         .single();
@@ -78,8 +77,7 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
       // Walk up the tree to find the root
       let current = currentPitch;
       while (current.parent_pitch_id) {
-        const { data: parent } = await supabase
-          .from("yeast_pitches_with_details")
+        const { data: parent } = await dynamicFrom(supabase, "yeast_pitches_with_details")
           .select("*")
           .eq("id", current.parent_pitch_id)
           .single();
@@ -98,12 +96,10 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
     queryFn: async () => {
       if (!root?.id || !root?.strain_id) return [];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const supabase = createClient() as any;
+      const supabase = createClient();
 
       // Fetch ALL pitches for this strain in one query
-      const { data: allPitches } = await supabase
-        .from("yeast_pitches_with_details")
+      const { data: allPitches } = await dynamicFrom(supabase, "yeast_pitches_with_details")
         .select("*")
         .eq("strain_id", root.strain_id);
 
@@ -145,10 +141,8 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
     queryFn: async () => {
       if (!root?.id) return null;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const supabase = createClient() as any;
-      const { data } = await supabase
-        .from("yeast_lineage_summary")
+      const supabase = createClient();
+      const { data } = await dynamicFrom(supabase, "yeast_lineage_summary")
         .select("*")
         .eq("root_id", root.id)
         .single();

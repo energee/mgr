@@ -17,6 +17,7 @@ import { dashboardKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
 import Link from "next/link";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { VESSEL_TYPES } from "@/entities/vessel";
 import { batchEntity } from "@/entities/batch";
 import { StatusBadge } from "@/components/universal/status-badge";
@@ -86,14 +87,11 @@ const DEFAULT_BATCH_COUNTS: BatchStatusCounts = {
 
 export default function DashboardPage() {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
   const { data: batchCounts = DEFAULT_BATCH_COUNTS } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("batch_status_counts")
+      const { data, error } = await dynamicFrom(supabase, "batch_status_counts")
         .select("status, count");
 
       if (error) throw error;
@@ -147,8 +145,7 @@ export default function DashboardPage() {
   const { data: vessels = [] } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("vessels_with_batch")
+      const { data, error } = await dynamicFrom(supabase, "vessels_with_batch")
         .select("*")
         .order("name");
 
@@ -171,8 +168,7 @@ export default function DashboardPage() {
   const { data: shortfalls = [] } = useQuery({
     queryKey: planningKeys.shortfalls({ includeDrafts: true, horizonWeeks: 8 }),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("calculate_production_shortfalls", {
+      const { data, error } = await dynamicRpc(supabase, "calculate_production_shortfalls", {
         p_include_drafts: true,
         p_horizon_weeks: 8,
       });
@@ -185,8 +181,7 @@ export default function DashboardPage() {
   });
 
   // Calculate per-type vessel utilization
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const vesselArray = vessels as any[];
+  const vesselArray = vessels as VesselStatus[];
   const vesselsByType = VESSEL_TYPES
     .map(({ value, label }) => {
       const ofType = vesselArray.filter((v) => v.vessel_type === value);
@@ -365,8 +360,7 @@ function ProductionTrends() {
   const { data: productionTrends = [], isLoading } = useQuery({
     queryKey: dashboardKeys.trends.production(period),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_production_trends", {
+      const { data, error } = await dynamicRpc(supabase, "get_production_trends", {
         p_days: period,
       });
       if (error) {

@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, escapeLike } from "@/lib/utils";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 
 // =============================================================================
 // Types
@@ -126,11 +127,7 @@ export default function NotificationsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: notificationKeys.list({ page, filterType, filterStatus, filterPriority, search }),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
-      let query = db
-        .from("notifications")
+      let query = dynamicFrom(supabase, "notifications")
         .select("*", { count: "exact" })
         .is("dismissed_at", null)
         .order("created_at", { ascending: false })
@@ -170,12 +167,10 @@ export default function NotificationsPage() {
   // Mark as read mutation - uses RPC function for consistency with NotificationsProvider
   const markAsReadMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
       // Call RPC for each notification (RPC handles single IDs)
       const results = await Promise.all(
         ids.map((id) =>
-          db.rpc("mark_notification_read", { p_notification_id: id })
+          dynamicRpc(supabase, "mark_notification_read", { p_notification_id: id })
         )
       );
       const error = results.find((r) => r.error)?.error;
@@ -194,12 +189,10 @@ export default function NotificationsPage() {
   // Dismiss mutation - uses RPC function for consistency with NotificationsProvider
   const dismissMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
       // Call RPC for each notification (RPC handles single IDs)
       const results = await Promise.all(
         ids.map((id) =>
-          db.rpc("dismiss_notification", { p_notification_id: id })
+          dynamicRpc(supabase, "dismiss_notification", { p_notification_id: id })
         )
       );
       const error = results.find((r) => r.error)?.error;

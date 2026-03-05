@@ -17,8 +17,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-// Cast Kanban to work with our generic type
-// The Dice UI Kanban uses a conditional type that TypeScript can't resolve with unresolved generics
+// KanbanProps<T> uses a conditional type `(T extends object ? GetItemValue<T> : ...)` that TypeScript
+// can't resolve with unresolved generics. ComponentType<any> is the only way to use it in EntityKanban<T>.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Kanban = KanbanBase as React.ComponentType<any>;
 

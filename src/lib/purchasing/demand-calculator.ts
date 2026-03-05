@@ -6,6 +6,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
+import { dynamicRpc } from "@/services/types";
 
 // =============================================================================
 // Types
@@ -63,8 +64,7 @@ export async function calculateIngredientDemand(
 ): Promise<IngredientDemand[]> {
   const supabase = createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)("calculate_ingredient_demand", {
+  const { data, error } = await dynamicRpc(supabase, "calculate_ingredient_demand", {
     p_horizon_weeks: horizonWeeks,
     p_include_planned: includePlanned,
     p_include_fermenting: includeFermenting,
@@ -86,8 +86,7 @@ export async function calculateIngredientShortfalls(
 ): Promise<IngredientShortfall[]> {
   const supabase = createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)("calculate_ingredient_shortfalls", {
+  const { data, error } = await dynamicRpc(supabase, "calculate_ingredient_shortfalls", {
     p_horizon_weeks: horizonWeeks,
   });
 

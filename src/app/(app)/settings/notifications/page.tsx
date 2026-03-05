@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { TimePicker } from "@/components/ui/time-picker";
 import { Loader2 } from "lucide-react";
+import { dynamicFrom } from "@/services/types";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useIsMac } from "@/hooks/use-is-mac";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
@@ -84,10 +85,7 @@ export default function NotificationPreferencesPage() {
   const { data: preferences, isLoading } = useQuery({
     queryKey: settingsKeys.notificationPreferences(),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data, error } = await db
-        .from("notification_preferences")
+      const { data, error } = await dynamicFrom(supabase, "notification_preferences")
         .select("*")
         .single();
 
@@ -127,16 +125,12 @@ export default function NotificationPreferencesPage() {
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async (values: PreferencesFormValues) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       // Upsert preferences
-      const { error } = await db
-        .from("notification_preferences")
+      const { error } = await dynamicFrom(supabase, "notification_preferences")
         .upsert(
           {
             user_id: user.id,
@@ -162,7 +156,6 @@ export default function NotificationPreferencesPage() {
     saveMutation.mutate(values);
   };
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
   const watchQuietHours = form.watch("quiet_hours_enabled");
   const watchEmailEnabled = form.watch("email_enabled");
 

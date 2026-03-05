@@ -14,6 +14,7 @@ import { AppHeader } from "@/components/domain/app-header";
 import { AppProviders } from "@/components/domain/app-providers";
 import { ChatLayout } from "@/components/domain/chat-layout";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { dynamicFrom } from "@/services/types";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -35,18 +36,14 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     .single();
 
   // Cast needed: generated types don't include the `roles` column yet
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const roles = ((profile as any)?.roles ?? ["viewer"]) as UserRole[];
+  const roles = ((profile as Record<string, unknown> | null)?.roles ?? ["viewer"]) as UserRole[];
 
   if (roles.length === 1 && roles[0] === "customer") {
     redirect("/portal/orders");
   }
 
   // Get brewery name and logo from system_settings
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
-  const { data: settings } = await db
-    .from("system_settings")
+  const { data: settings } = await dynamicFrom(supabase, "system_settings")
     .select("key, value")
     .in("key", ["brewery_name", "brewery_logo_svg"]);
 

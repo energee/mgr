@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { kegKeys } from "@/lib/query-keys";
+import { dynamicFrom } from "@/services/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
@@ -94,15 +95,12 @@ const agingStatusColors: Record<string, "default" | "secondary" | "destructive" 
 
 export default function KegReportsPage() {
   const supabase = createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
   // Fetch fleet summary
   const { data: fleetSummary, isLoading: loadingFleet } = useQuery({
     queryKey: kegKeys.fleetSummary(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("keg_fleet_summary")
+      const { data, error } = await dynamicFrom(supabase, "keg_fleet_summary")
         .select("*")
         .order("keg_type_name");
       if (error) throw error;
@@ -114,8 +112,7 @@ export default function KegReportsPage() {
   const { data: turnoverMetrics, isLoading: loadingTurnover } = useQuery({
     queryKey: kegKeys.turnoverMetrics(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("keg_turnover_metrics")
+      const { data, error } = await dynamicFrom(supabase, "keg_turnover_metrics")
         .select("*")
         .order("keg_type_name");
       if (error) throw error;
@@ -127,8 +124,7 @@ export default function KegReportsPage() {
   const { data: agingKegs, isLoading: loadingAging } = useQuery({
     queryKey: kegKeys.agingReport(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("keg_aging_report")
+      const { data, error } = await dynamicFrom(supabase, "keg_aging_report")
         .select("*")
         .neq("aging_status", "normal")
         .order("days_out", { ascending: false })
@@ -142,8 +138,7 @@ export default function KegReportsPage() {
   const { data: customerBalances, isLoading: loadingCustomers } = useQuery({
     queryKey: kegKeys.customerBalances(),
     queryFn: async () => {
-      const { data, error } = await db
-        .from("customer_keg_balances")
+      const { data, error } = await dynamicFrom(supabase, "customer_keg_balances")
         .select("*")
         .order("kegs_out", { ascending: false })
         .limit(10);

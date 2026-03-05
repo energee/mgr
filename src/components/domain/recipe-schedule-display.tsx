@@ -42,13 +42,11 @@ const STAGE_TYPE_LABELS: Record<string, string> = {
 };
 
 interface MashScheduleDisplayProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: { mash_schedule?: MashStep[] | any };
+  data: { mash_schedule?: MashStep[] | unknown };
 }
 
 interface FermentationScheduleDisplayProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: { fermentation_schedule?: FermentationStage[] | any };
+  data: { fermentation_schedule?: FermentationStage[] | unknown };
 }
 
 /**

@@ -293,7 +293,6 @@ export function BrewEventForm({
                   control={form.control}
                   name={`measurements.${index}.value`}
                   render={({ field }) => {
-                    // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
                     const metricKey = form.watch(`measurements.${index}.metric`);
                     const config = metricConfigMap.get(metricKey);
 

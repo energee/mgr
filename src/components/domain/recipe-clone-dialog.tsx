@@ -166,8 +166,7 @@ export function RecipeCloneDialog({
 
     if (rows && rows.length > 0) {
       const newRows = rows.map((row) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id, recipe_id, created_at, updated_at, ...data } = row as Record<string, unknown>;
+        const { id: _id, recipe_id: _recipe_id, created_at: _created_at, updated_at: _updated_at, ...data } = row as Record<string, unknown>;
         return { ...data, recipe_id: targetRecipeId };
       });
 
@@ -214,7 +213,6 @@ export function RecipeCloneDialog({
           <div className="space-y-2">
             <Label htmlFor="brand_id">Brand (optional)</Label>
             <Select
-              // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() incompatible with React Compiler
               value={form.watch("brand_id") || "_keep_original"}
               onValueChange={(v) => form.setValue("brand_id", v === "_keep_original" ? null : v)}
             >

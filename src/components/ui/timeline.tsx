@@ -174,7 +174,6 @@ function Timeline(props: TimelineProps) {
     items: new Map(),
   }));
 
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const store = React.useMemo<Store>(() => {
     return {
       subscribe: (cb) => {
@@ -233,7 +232,6 @@ function Timeline(props: TimelineProps) {
   return (
     <StoreContext.Provider value={store}>
       <TimelineContext.Provider value={contextValue}>
-        {/* eslint-disable-next-line jsx-a11y/role-supports-aria-props */}
         <RootPrimitive
           role="list"
           aria-orientation={orientation}

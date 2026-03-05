@@ -13,6 +13,7 @@ import type {
   EntityFilterDef,
 } from "@/types/entity";
 import type { FilterVariant, Option, ExtendedColumnFilter } from "@/types/data-table";
+import type { DynamicQueryBuilder } from "@/services/types";
 import { formatValue, escapeLike } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,8 +95,7 @@ const CellRenderer = memo(function CellRenderer<T>({
 export function buildDataTableColumns<T>(
   entity: EntityConfig<T>,
   dynamicFilterOptions: Record<string, { value: string; label: string }[]>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): ColumnDef<T, any>[] {
+): ColumnDef<T>[] {
   const filtersByField = new Map<string, EntityFilterDef>();
   entity.listFilters?.forEach((f) => filtersByField.set(f.field, f));
 
@@ -131,8 +131,7 @@ export function buildDataTableColumns<T>(
         const value = accessorKey ? row.getValue(accessorKey) : null;
         return <CellRenderer value={value} original={row.original} col={col} />;
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as ColumnDef<T, any>;
+    } as ColumnDef<T>;
   });
 }
 
@@ -284,8 +283,7 @@ export function buildSupabaseFiltersFromUrl<T>(
   urlFilters: ExtendedColumnFilter<T>[],
   joinOperator: "and" | "or" = "and"
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (query: any) => {
+  return (query: DynamicQueryBuilder) => {
     if (urlFilters.length === 0) return query;
 
     // When using "or" join, we need to build an .or() string
@@ -308,8 +306,7 @@ export function buildSupabaseFiltersFromUrl<T>(
 }
 
 /** Apply a single filter to a Supabase query (for "and" mode) */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyFilterToQuery(query: any, filter: ExtendedColumnFilter<any>) {
+function applyFilterToQuery<T>(query: DynamicQueryBuilder, filter: ExtendedColumnFilter<T>) {
   const { id, value, operator } = filter;
   if (value === undefined || value === null || value === "") {
     if (operator !== "isEmpty" && operator !== "isNotEmpty") return query;
@@ -358,8 +355,7 @@ function applyFilterToQuery(query: any, filter: ExtendedColumnFilter<any>) {
 }
 
 /** Build a PostgREST condition string for .or() usage */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildPostgrestCondition(filter: ExtendedColumnFilter<any>): string | null {
+function buildPostgrestCondition<T>(filter: ExtendedColumnFilter<T>): string | null {
   const { id, value, operator } = filter;
   if (value === undefined || value === null || value === "") {
     if (operator !== "isEmpty" && operator !== "isNotEmpty") return null;

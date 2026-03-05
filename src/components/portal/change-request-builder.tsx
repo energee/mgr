@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import {
   entityKeys,
   changeRequestKeys,
@@ -113,10 +114,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
   const { data: orderItems, isLoading: orderLoading } = useQuery<OrderItem[]>({
     queryKey: entityKeys.detail("orders", orderId),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data, error } = await db
-        .from("order_items")
+      const { data, error } = await dynamicFrom(supabase, "order_items")
         .select(
           "id, brand_id, selling_format_id, quantity, unit_price, brands(id, name), selling_formats(id, name)"
         )
@@ -131,10 +129,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
   const { data: availableGoods } = useQuery<FinishedGoodAvailability[]>({
     queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data, error } = await db
-        .from("finished_goods_with_availability")
+      const { data, error } = await dynamicFrom(supabase, "finished_goods_with_availability")
         .select(
           "brand_id, selling_format_id, available_quantity, brands(id, name), selling_formats(id, name)"
         )
@@ -309,12 +304,8 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
   // ---- Submit Mutation ----
   const mutation = useMutation({
     mutationFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-
       // 1. Create the change request
-      const { data: request, error: reqError } = await db
-        .from("order_change_requests")
+      const { data: request, error: reqError } = await dynamicFrom(supabase, "order_change_requests")
         .insert({
           order_id: orderId,
           requested_by: (await supabase.auth.getUser()).data.user?.id,
@@ -337,8 +328,7 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
       }));
 
       if (items.length > 0) {
-        const { error: itemsError } = await db
-          .from("order_change_request_items")
+        const { error: itemsError } = await dynamicFrom(supabase, "order_change_request_items")
           .insert(items);
         if (itemsError) throw itemsError;
       }

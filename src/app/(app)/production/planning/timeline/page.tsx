@@ -55,6 +55,7 @@ import {
   Clock,
 } from "lucide-react";
 import type { ProductionShortfall } from "@/types/planning";
+import { dynamicRpc } from "@/services/types";
 import { CreateBatchFromShortfall } from "@/components/domain/create-batch-from-shortfall";
 
 // =============================================================================
@@ -254,8 +255,7 @@ export default function ProductionTimelinePage() {
   const { data: shortfalls = [] } = useQuery({
     queryKey: planningKeys.shortfalls({ includeDrafts: true, horizonWeeks: weeksToShow + 2 }),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("calculate_production_shortfalls", {
+      const { data, error } = await dynamicRpc(supabase, "calculate_production_shortfalls", {
         p_include_drafts: true,
         p_horizon_weeks: weeksToShow + 2,
       });
