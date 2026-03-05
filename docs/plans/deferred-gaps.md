@@ -5,22 +5,15 @@
 
 ## PO Demand System
 
-### Yeast Missing from Demand Calculation
+### ~~Yeast Missing from Demand Calculation~~ RESOLVED
 - **Severity:** Medium
-- **Location:** `supabase/migrations/00053_ingredient_demand.sql` — `recipe_ingredients_normalized` view
-- **Problem:** The normalized view includes malts, hops, adjuncts, sugars, spices, and fruits but NOT yeast from `recipe_yeasts`. The shortfall function maps the 'yeast' category for inventory matching, but no demand is ever generated.
-- **Why deferred:** Yeast doesn't have simple weight-based quantities. It uses `pitch_rate` (million cells/mL/degP) which needs conversion to packs/vials based on batch volume and OG. This is a non-trivial calculation.
-- **Options:**
-  1. Add simplified "packs needed" calculation based on batch volume
-  2. Track yeast as a count-based ingredient with `quantity = 1` per recipe addition
+- **Status:** Resolved (migration 00110)
+- **Resolution:** Added yeast to `recipe_ingredients_normalized` view using simplified pack-based counting (1 pack per recipe addition, scaled by batch volume ratio). Uses 'pk' unit. Full pitch-rate-based calculation deferred as a future enhancement.
 
-### Shortfalls Don't Account for Existing POs
+### ~~Shortfalls Don't Account for Existing POs~~ RESOLVED
 - **Severity:** Medium
-- **Location:** `supabase/migrations/00053_ingredient_demand.sql:216-288` — `calculate_ingredient_shortfalls` function
-- **Problem:** Compares demand against current inventory but does NOT subtract quantities already on draft/submitted/confirmed POs. Refreshing the demand page after generating POs shows the same shortfalls, enabling duplicate PO generation.
-- **Options:**
-  1. Modify `calculate_ingredient_shortfalls` SQL to join against `po_line_items` where PO status is in `('draft', 'submitted', 'confirmed')` and subtract ordered quantities
-  2. Add a visual indicator on the demand page showing "X units already on PO-YYYY-NNN" per ingredient
+- **Status:** Resolved (migration 00110)
+- **Resolution:** Modified `calculate_ingredient_shortfalls` to subtract outstanding quantities from confirmed POs (status IN 'confirmed', 'partial', 'fulfilled'). Outstanding = ordered - received per line item. Returns new `on_order_qty` column displayed in the demand UI between "Available" and "Shortfall". Draft/submitted POs are intentionally excluded per design decision.
 
 ### Hardcoded 7-Day Lead Time
 - **Severity:** Low

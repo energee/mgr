@@ -129,6 +129,7 @@ export function SupplierGroupCard({
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Required</TableHead>
                     <TableHead className="text-right">Available</TableHead>
+                    <TableHead className="text-right">On Order</TableHead>
                     <TableHead className="text-right">Shortfall</TableHead>
                     <TableHead className="text-right w-[140px]">Order Qty</TableHead>
                     <TableHead>Unit</TableHead>
@@ -187,6 +188,11 @@ function LineItemRow({
       </TableCell>
       <TableCell className="text-right text-muted-foreground">
         {item.available_qty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">
+        {item.on_order_qty > 0
+          ? item.on_order_qty.toLocaleString(undefined, { maximumFractionDigits: 2 })
+          : "-"}
       </TableCell>
       <TableCell className="text-right">
         <Badge variant="secondary">

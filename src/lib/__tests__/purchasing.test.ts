@@ -33,6 +33,7 @@ function makeShortfall(
     catalog_name: "Pale Malt",
     total_required: 100,
     available_qty: 40,
+    on_order_qty: 0,
     shortfall_qty: 60,
     unit: "lbs",
     required_by_date: "2026-04-01",
