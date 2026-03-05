@@ -3,6 +3,7 @@
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { formatCurrency } from "@/lib/format";
 import { entityKeys, changeRequestKeys, portalKeys } from "@/lib/query-keys";
 import { usePortalCustomer } from "@/lib/portal-context";
 import {
@@ -43,12 +44,6 @@ function isBelowCutoff(orderStatus: string, cutoffState: string): boolean {
   return orderRank < cutoffRank;
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "-";

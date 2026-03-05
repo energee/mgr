@@ -48,7 +48,6 @@ interface PitchDetail {
   initial_viability: number | null;
   received_date: string | null;
   harvest_date: string | null;
-  parent_pitch_id: string | null;
 }
 
 interface LineageSummary {
@@ -96,7 +95,7 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
       const { data, error } = await supabase
         .from("yeast_pitches_with_remaining")
         .select(
-          "id, strain_name, strain_form, source_type, initial_viability, received_date, harvest_date, parent_pitch_id"
+          "id, strain_name, strain_form, source_type, initial_viability, received_date, harvest_date"
         )
         .eq("id", id)
         .single();
@@ -105,29 +104,18 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
     },
   });
 
-  // Find the root pitch ID for lineage summary queries
+  // Find the root pitch ID for lineage summary queries via server-side recursive CTE
   const { data: rootId } = useQuery({
     queryKey: yeastKeys.lineageRoot(id),
     queryFn: async () => {
-      // Walk up the parent chain to find the root purchase
-      let currentId = id;
-      let parentId = pitchDetail?.parent_pitch_id;
-
-      // Limit traversal to prevent infinite loops
-      let depth = 0;
-      while (parentId && depth < 20) {
-        currentId = parentId;
-        const { data } = await supabase
-          .from("yeast_pitches")
-          .select("parent_pitch_id")
-          .eq("id", currentId)
-          .single();
-        parentId = data?.parent_pitch_id ?? null;
-        depth++;
-      }
-      return currentId;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)(
+        "get_yeast_lineage_root",
+        { p_pitch_id: id },
+      ) as { data: string | null; error: Error | null };
+      if (error) throw error;
+      return data ?? id;
     },
-    enabled: !!pitchDetail,
   });
 
   // Fetch lineage summary for cost spreading

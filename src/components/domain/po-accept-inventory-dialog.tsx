@@ -44,10 +44,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, PackageCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import {
-  CATALOG_TABLES,
-  isFreeTextCatalogType,
-} from "@/entities/po-line-item";
+import { resolveCatalogNames } from "@/entities/po-line-item";
 import { poReceiveKeys, entityKeys } from "@/lib/query-keys";
 
 // =============================================================================
@@ -122,53 +119,8 @@ export function POAcceptInventoryDialog({
       if (error) throw error;
       if (!data || data.length === 0) return [] as UnacceptedReceive[];
 
-      // Resolve catalog names (same pattern as po-receiving.tsx)
-      const itemsByType = new Map<
-        string,
-        { catalog_id: string; receive_id: string }[]
-      >();
-      for (const row of data) {
-        const existing = itemsByType.get(row.catalog_type) ?? [];
-        existing.push({
-          catalog_id: row.catalog_id,
-          receive_id: row.receive_id,
-        });
-        itemsByType.set(row.catalog_type, existing);
-      }
-
-      const nameMap = new Map<string, string>();
-
-      // Resolve free-text types synchronously
-      for (const [catalogType, items] of itemsByType) {
-        if (isFreeTextCatalogType(catalogType)) {
-          for (const item of items) {
-            nameMap.set(
-              `${catalogType}:${item.catalog_id}`,
-              item.catalog_id
-            );
-          }
-        }
-      }
-
-      // Resolve catalog names in parallel (one query per type)
-      const catalogQueries = Array.from(itemsByType.entries())
-        .filter(
-          ([catalogType]) =>
-            !isFreeTextCatalogType(catalogType) && CATALOG_TABLES[catalogType]
-        )
-        .map(async ([catalogType, items]) => {
-          const table = CATALOG_TABLES[catalogType];
-          const catalogIds = [...new Set(items.map((i) => i.catalog_id))];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: catalogItems } = await (supabase as any)
-            .from(table)
-            .select("id, name")
-            .in("id", catalogIds);
-          for (const ci of catalogItems ?? []) {
-            nameMap.set(`${catalogType}:${ci.id}`, ci.name);
-          }
-        });
-      await Promise.all(catalogQueries);
+      // Resolve catalog names using shared utility
+      const nameMap = await resolveCatalogNames(supabase, data);
 
       return data.map((row) => ({
         ...row,
