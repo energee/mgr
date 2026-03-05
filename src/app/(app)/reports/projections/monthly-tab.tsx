@@ -395,8 +395,8 @@ export function MonthlyTab({ channelFilter }: MonthlyTabProps) {
                     tickFormatter={(v: number) => `${v} BBL`}
                   />
                   <Tooltip
-                    formatter={(value: number) => [
-                      `${value.toFixed(2)} BBL`,
+                    formatter={(value) => [
+                      `${Number(value).toFixed(2)} BBL`,
                       "Volume",
                     ]}
                   />
@@ -471,9 +471,9 @@ export function MonthlyTab({ channelFilter }: MonthlyTabProps) {
                     tickFormatter={(v: number) => formatCurrency(v)}
                   />
                   <Tooltip
-                    formatter={(value: number, name: string) => [
-                      formatCurrency(value),
-                      name,
+                    formatter={(value, name) => [
+                      formatCurrency(Number(value)),
+                      String(name),
                     ]}
                   />
                   <Legend />
