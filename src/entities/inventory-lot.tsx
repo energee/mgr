@@ -9,7 +9,9 @@ import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-type InventoryLot = Database["public"]["Tables"]["inventory_lots"]["Row"];
+/** Extended type including computed columns from the inventory_lots_with_quantities view */
+type InventoryLotWithQuantities =
+  Database["public"]["Views"]["inventory_lots_with_quantities"]["Row"];
 
 // =============================================================================
 // Zod Schema
@@ -35,7 +37,7 @@ export type InventoryLotFormValues = z.infer<typeof inventoryLotSchema>;
 // Entity Configuration
 // =============================================================================
 
-export const inventoryLotEntity: EntityConfig<InventoryLot> = {
+export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
   name: "inventory_lot",
   table: "inventory_lots",
   viewTable: "inventory_lots_with_quantities",
@@ -65,6 +67,16 @@ export const inventoryLotEntity: EntityConfig<InventoryLot> = {
     {
       accessorKey: "quantity",
       header: "Quantity",
+      sortable: true,
+    },
+    {
+      accessorKey: "remaining_quantity",
+      header: "Remaining",
+      sortable: true,
+    },
+    {
+      accessorKey: "allocated_quantity",
+      header: "Allocated",
       sortable: true,
     },
     {
@@ -124,6 +136,8 @@ export const inventoryLotEntity: EntityConfig<InventoryLot> = {
       title: "Quantities",
       fields: [
         { field: "quantity", label: "Quantity" },
+        { field: "remaining_quantity", label: "Remaining" },
+        { field: "allocated_quantity", label: "Allocated" },
         { field: "unit", label: "Unit" },
       ],
     },
@@ -199,6 +213,20 @@ export const inventoryLotEntity: EntityConfig<InventoryLot> = {
           label: "Quantity",
           type: "number",
           required: true,
+          colSpan: 4,
+        },
+        {
+          name: "remaining_quantity",
+          label: "Remaining",
+          type: "number",
+          editable: false,
+          colSpan: 4,
+        },
+        {
+          name: "allocated_quantity",
+          label: "Allocated",
+          type: "number",
+          editable: false,
           colSpan: 4,
         },
         {
