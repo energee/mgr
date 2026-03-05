@@ -29,6 +29,7 @@ test.describe("Production Workflow", () => {
   });
 
   test.skip("full production workflow: recipe -> batch -> brew log -> package", async ({
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     page,
   }) => {
     // TODO: Full E2E flow - skipped until test data seeding is set up

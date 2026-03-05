@@ -99,6 +99,7 @@ export function UnassignedShortfallsCard({
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Required</TableHead>
                 <TableHead className="text-right">Available</TableHead>
+                <TableHead className="text-right">On Order</TableHead>
                 <TableHead className="text-right">Shortfall</TableHead>
                 <TableHead>Unit</TableHead>
                 <TableHead className="w-[200px]">Assign Supplier</TableHead>
@@ -125,6 +126,11 @@ export function UnassignedShortfallsCard({
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {shortfall.available_qty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {shortfall.on_order_qty > 0
+                      ? shortfall.on_order_qty.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                      : "-"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Badge variant="secondary">

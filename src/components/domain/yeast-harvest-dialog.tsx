@@ -130,6 +130,7 @@ export function YeastHarvestDialog({
   });
 
   // Resolve selected strain from props
+  // eslint-disable-next-line react-hooks/incompatible-library
   const selectedPitchId = form.watch("source_pitch_id");
   const selectedStrain = pitchedStrains.find(
     (s) => s.pitch_id === selectedPitchId

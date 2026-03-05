@@ -17,6 +17,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { formatCurrency } from "@/lib/format";
 import { reportKeys } from "@/lib/query-keys";
 import {
   Card,
@@ -98,15 +99,6 @@ interface FinishedGoodDisplayRow {
 // Helper Functions
 // =============================================================================
 
-/** Format a number as USD currency */
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
 /** Format a number with commas and optional decimal places */
 function formatQuantity(value: number, decimals = 2): string {

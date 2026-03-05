@@ -328,6 +328,7 @@ export const purchaseOrderKeys = {
   lineItems: (poId: string) => ["po-line-items", poId] as const,
   lineItemsForReceive: (poId: string) => ["po-line-items-for-receive", poId] as const,
   nextNumber: () => ["purchase-orders", "next-number"] as const,
+  status: (poId: string) => ["purchase-order", poId, "status"] as const,
   landedCost: (poId: string) => ["purchase-order", poId, "landed-cost"] as const,
 };
 
@@ -339,9 +340,12 @@ export const yeastKeys = {
   all: () => ["yeast-pitches"] as const,
   detail: (id: string) => ["yeast-pitches", id] as const,
   available: () => ["yeast-pitches", "available"] as const,
+  brinks: () => ["yeast", "brinks"] as const,
+  brinksDetail: (vesselId: string) => ["yeast", "brinks", vesselId] as const,
   lineageRoot: (pitchId: string) => ["yeast-lineage-root", pitchId] as const,
   lineage: (rootId: string | undefined) => ["yeast-lineage", rootId] as const,
   lineageSummary: (rootId: string | undefined) => ["yeast-lineage-summary", rootId] as const,
+  costSpread: (pitchId: string) => ["yeast", "cost-spread", pitchId] as const,
   events: (pitchId: string) => ["yeast-pitch-events", pitchId] as const,
 };
 
@@ -411,6 +415,15 @@ export const purchasingKeys = {
       ? (["purchasing", "ingredient-shortfalls", options] as const)
       : (["purchasing", "ingredient-shortfalls"] as const),
   demandSummary: () => ["purchasing", "demand-summary"] as const,
+};
+
+// =============================================================================
+// Landed Cost Keys
+// =============================================================================
+
+export const landedCostKeys = {
+  /** Landed cost summary for a purchase order */
+  summary: (poId: string) => ["landed-cost", "summary", poId] as const,
 };
 
 // =============================================================================
@@ -620,6 +633,15 @@ export const squareKeys = {
     locationId
       ? (["square", "draft-sales", locationId] as const)
       : (["square", "draft-sales"] as const),
+};
+
+// =============================================================================
+// PO Receive Keys (for accept-into-inventory workflow)
+// =============================================================================
+
+export const poReceiveKeys = {
+  all: () => ["po-receives"] as const,
+  unaccepted: (poId: string) => ["po-receives", "unaccepted", poId] as const,
 };
 
 // =============================================================================

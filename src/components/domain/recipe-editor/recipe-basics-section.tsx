@@ -67,7 +67,7 @@ export function RecipeBasicsSection() {
   const queryClient = useQueryClient();
 
   const { optionsMap, isLoading: optionsLoading } = useDynamicOptions(DYNAMIC_FIELDS);
-  const styleOptions = optionsMap.style_id ?? [];
+  const styleOptions = useMemo(() => optionsMap.style_id ?? [], [optionsMap.style_id]);
   const brandOptions = optionsMap.brand_id ?? [];
 
   const form = useForm<BasicsFormValues>({
@@ -84,6 +84,7 @@ export function RecipeBasicsSection() {
   const { isDirty } = form.formState;
 
   // Sync form changes to context for live estimate updates
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedName = form.watch("name");
   const watchedBatchSize = form.watch("batch_size_bbl");
   const watchedBoilTime = form.watch("boil_time_min");

@@ -1067,6 +1067,56 @@ This is recalculated dynamically by the view when queried. The `yeast_lineage_su
 
 ---
 
+## Yeast Brinks UI
+
+The brinks management dashboard (`/production/yeast-pitches/brinks`) provides an at-a-glance overview of all brink vessels and their active yeast pitches.
+
+### Components
+
+| Component | Path | Description |
+|-----------|------|-------------|
+| `YeastBrinksOverview` | `src/components/domain/yeast-brinks-overview.tsx` | Card grid showing brink vessels with active pitch info |
+| `YeastViabilityChart` | `src/components/domain/yeast-viability-chart.tsx` | Recharts line chart of viability decay over time |
+
+### Brinks Overview
+
+- Queries vessels with `vessel_type = 'brink'`
+- For each brink, shows active pitches (`status IN ('in_stock', 'in_use')`) from `yeast_pitches_with_remaining`
+- Card displays: strain name, remaining quantity (lbs), current viability with color-coded status badge, days until 75% threshold, generation count
+- Empty brinks shown as dimmed cards with "Empty" label
+- Cards link to the yeast pitch detail page
+
+### Viability Tracking
+
+Viability is calculated client-side using `calculateViabilityDecay()` from `src/lib/yeast-calculations.ts`:
+
+- **Liquid yeast**: 2% decay per day (`0.98^daysOld`)
+- **Dry yeast**: 0.5% decay per day (`0.995^daysOld`)
+
+Status thresholds:
+| Status | Viability | Badge Color |
+|--------|-----------|-------------|
+| Excellent | >= 90% | Green |
+| Good | >= 75% | Blue |
+| Marginal | >= 50% | Yellow |
+| Low | >= 25% | Orange |
+| Inactive | < 25% | Red |
+
+The viability decay chart on the pitch detail page shows:
+- Projected viability over 90 days (or until < 10%)
+- Reference lines at 75% (good), 50% (marginal), 25% (low) thresholds
+- Vertical "Today" marker
+- Pitch event markers (diamond shapes) when yeast was used
+
+### Cost Spreading Display
+
+The pitch detail page includes a cost spreading summary card that:
+- Queries `yeast_lineage_summary` view for the pitch's lineage root
+- Shows total cost, number of batches, and cost per batch
+- Lists individual batch usage with allocated cost in a table
+
+---
+
 ## State Machine: Batch
 
 Batches represent cold-side only. Hot-side (brewing) is tracked in `brew_logs`.

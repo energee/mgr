@@ -52,6 +52,60 @@ export function isFreeTextCatalogType(type: string): boolean {
   return type === "other";
 }
 
+/**
+ * Resolves catalog item names in batch by type.
+ *
+ * Groups items by catalog_type, resolves free-text types directly,
+ * and queries catalog tables in parallel for the rest.
+ * Returns a Map keyed by `"catalog_type:catalog_id"` → display name.
+ */
+export async function resolveCatalogNames(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  items: Array<{ catalog_type: string; catalog_id: string }>,
+): Promise<Map<string, string>> {
+  const nameMap = new Map<string, string>();
+  if (items.length === 0) return nameMap;
+
+  // Group by catalog type
+  const itemsByType = new Map<string, string[]>();
+  for (const item of items) {
+    const existing = itemsByType.get(item.catalog_type) ?? [];
+    existing.push(item.catalog_id);
+    itemsByType.set(item.catalog_type, existing);
+  }
+
+  // Resolve free-text types synchronously
+  for (const [catalogType, catalogIds] of itemsByType) {
+    if (isFreeTextCatalogType(catalogType)) {
+      for (const id of catalogIds) {
+        nameMap.set(`${catalogType}:${id}`, id);
+      }
+    }
+  }
+
+  // Resolve catalog names in parallel (one query per type)
+  const catalogQueries = Array.from(itemsByType.entries())
+    .filter(
+      ([catalogType]) =>
+        !isFreeTextCatalogType(catalogType) && CATALOG_TABLES[catalogType],
+    )
+    .map(async ([catalogType, catalogIds]) => {
+      const table = CATALOG_TABLES[catalogType];
+      const uniqueIds = [...new Set(catalogIds)];
+      const { data: catalogItems } = await supabase
+        .from(table)
+        .select("id, name")
+        .in("id", uniqueIds);
+      for (const ci of catalogItems ?? []) {
+        nameMap.set(`${catalogType}:${ci.id}`, ci.name);
+      }
+    });
+  await Promise.all(catalogQueries);
+
+  return nameMap;
+}
+
 // =============================================================================
 // Zod Schema
 // =============================================================================
