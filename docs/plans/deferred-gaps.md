@@ -34,17 +34,15 @@
 - **Problem:** Items are sorted by `sort_order` (incrementing integer from generation order). The `generate_pick_list` function iterates by order item then by FIFO date, not by warehouse location. The legacy system sorts by `location_name → bin_name → lot_number`.
 - **Fix:** Update `generate_pick_list` to set `sort_order` based on location/bin, or sort client-side.
 
-### Pick List Does Not Create Allocations
+### ~~Pick List Does Not Create Allocations~~ RESOLVED
 - **Severity:** Low-Medium
-- **Location:** `supabase/migrations/00057_pick_list_tables.sql:140-232`
-- **Problem:** `generate_pick_list` only writes to `pick_list_items` but does not create corresponding `allocations` records. Finished goods referenced by pick list items are not reserved and could be allocated elsewhere.
-- **Design decision:** Should the pick list create allocations (reservation model), or should allocations be a prerequisite?
+- **Status:** Resolved (migration 00108, WS5)
+- **Resolution:** `generate_pick_list` now creates `planned` allocations alongside pick list items. When a pick list is completed, allocations transition to `completed`. Cancellation releases planned allocations.
 
-### Timestamps Not Auto-Populated on State Transitions
+### ~~Timestamps Not Auto-Populated on State Transitions~~ RESOLVED
 - **Severity:** Low
-- **Location:** `src/components/universal/entity-detail-unified.tsx:465-474`
-- **Problem:** Universal state transition mutation only updates `status`. The `started_at` and `completed_at` timestamps on `pick_lists` are never set.
-- **Fix:** Database trigger or entity config `onTransition` callback.
+- **Status:** Resolved (migration 00106, WS2)
+- **Resolution:** Added database trigger `pick_list_timestamp_trigger` that automatically sets `started_at` on transition to `in_progress` and `completed_at` on transition to `completed`.
 
 ## Landed Cost System
 
@@ -53,15 +51,12 @@
 - **Status:** Resolved (migration 00107, `POAcceptInventoryDialog`)
 - **Resolution:** Added "Accept into Inventory" dialog that creates `inventory_lots` from `po_receives` with `po_receive_id` FK set. Uses `get_unaccepted_po_receives()` SQL function to find receives needing acceptance. Action button appears on PO detail page for `partial`/`fulfilled` states.
 
-### No Landed Cost Breakdown Display
+### ~~No Landed Cost Breakdown Display~~ RESOLVED
 - **Severity:** Medium
-- **Location:** PO detail page (`src/app/(app)/purchasing/pos/[id]/page.tsx`)
-- **Problem:** After clicking "Calculate Landed Cost", user sees only a toast. There is no UI showing per-line-item breakdown (allocated shipping, landed cost per unit, markup). `getLandedCostSummary`, `formatLandedCost`, `landedCostMarkup` are never called from UI.
-- **Fix:** Create `LandedCostBreakdown` component using `getLandedCostSummary` with `useQuery` keyed on `purchaseOrderKeys.landedCost(poId)`.
-- **Blocked by:** ~~PO receiving → inventory lots pipeline must work first.~~ Unblocked (resolved by migration 00107).
+- **Status:** Resolved (WS4)
+- **Resolution:** Created `POLandedCostBreakdown` component (`src/components/domain/po-landed-cost-breakdown.tsx`) that displays per-line-item breakdown with allocated shipping, landed cost per unit, and markup. Integrated into PO detail page.
 
-### Landed Cost Not Visible in Inventory Lots List View
+### ~~Landed Cost Not Visible in Inventory Lots List View~~ RESOLVED
 - **Severity:** Low
-- **Location:** `src/entities/inventory-lot.tsx:51-86`
-- **Problem:** `listColumns` doesn't include `landed_cost` or `unit_cost`. Only visible in individual lot detail.
-- **Fix:** Add `landed_cost` column to `listColumns`.
+- **Status:** Resolved (WS4)
+- **Resolution:** Added `landed_cost` column to `inventory-lot.tsx` `listColumns`. Inventory lots list view now shows landed cost alongside other columns.
