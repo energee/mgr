@@ -174,7 +174,7 @@ async function resolveApiKey(
     .single();
 
   if (prefsError) {
-    log.error("Failed to read user API key", { error: prefsError.message, userId });
+    log.error({ error: prefsError.message, userId }, "Failed to read user API key");
   }
 
   if (prefs?.anthropic_api_key) {
@@ -191,7 +191,7 @@ async function resolveApiKey(
     .single();
 
   if (settingError) {
-    log.error("Failed to read global API key", { error: settingError.message });
+    log.error({ error: settingError.message }, "Failed to read global API key");
   }
 
   const globalKey = setting?.value;
@@ -209,7 +209,7 @@ export const POST = withAuth(async (request, { user, supabase }) => {
   const ip = getClientIp(request);
   const limiter = rateLimit(`chat:${ip}`, { windowMs: 60_000, maxRequests: 10 });
   if (!limiter.success) {
-    log.warn("Rate limit exceeded", { ip, userId: user.id });
+    log.warn({ ip, userId: user.id }, "Rate limit exceeded");
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
@@ -222,7 +222,7 @@ export const POST = withAuth(async (request, { user, supabase }) => {
   const apiKey = await resolveApiKey(supabase, user.id);
 
   if (!apiKey) {
-    log.warn("No API key configured for chat request", { userId: user.id });
+    log.warn({ userId: user.id }, "No API key configured for chat request");
     return NextResponse.json(
       { error: "No API key configured. Add your Anthropic API key in Settings." },
       { status: 400 },
@@ -232,12 +232,12 @@ export const POST = withAuth(async (request, { user, supabase }) => {
   const { messages, pageContext }: { messages: UIMessage[]; pageContext?: PageContext } =
     await request.json();
 
-  log.info("Chat request started", {
+  log.info({
     userId: user.id,
     messageCount: messages.length,
     section: pageContext?.section,
     entityType: pageContext?.entityType,
-  });
+  }, "Chat request started");
 
   const anthropic = createAnthropic({ apiKey });
   const tools = createChatTools(supabase);
@@ -252,10 +252,10 @@ export const POST = withAuth(async (request, { user, supabase }) => {
     stopWhen: stepCountIs(5),
   });
 
-  log.info("Chat stream initiated", {
+  log.info({
     userId: user.id,
     durationMs: Date.now() - startTime,
-  });
+  }, "Chat stream initiated");
 
   // Wrap the streaming Response as NextResponse to satisfy withAuth's return type
   const streamingResponse = result.toUIMessageStreamResponse();

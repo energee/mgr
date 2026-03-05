@@ -2253,6 +2253,7 @@ export type Database = {
           notes: string | null
           receive_date: string | null
           received_by: string | null
+          remainder_of: string | null
           ship_date: string | null
           shipped_by: string | null
           status: string
@@ -2267,6 +2268,7 @@ export type Database = {
           notes?: string | null
           receive_date?: string | null
           received_by?: string | null
+          remainder_of?: string | null
           ship_date?: string | null
           shipped_by?: string | null
           status?: string
@@ -2281,6 +2283,7 @@ export type Database = {
           notes?: string | null
           receive_date?: string | null
           received_by?: string | null
+          remainder_of?: string | null
           ship_date?: string | null
           shipped_by?: string | null
           status?: string
@@ -2314,6 +2317,20 @@ export type Database = {
             columns: ["from_bin_id"]
             isOneToOne: false
             referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_remainder_of_fkey"
+            columns: ["remainder_of"]
+            isOneToOne: false
+            referencedRelation: "location_transfers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_remainder_of_fkey"
+            columns: ["remainder_of"]
+            isOneToOne: false
+            referencedRelation: "location_transfers_with_details"
             referencedColumns: ["id"]
           },
           {
@@ -5471,6 +5488,7 @@ export type Database = {
           id: string
           inventory_lot_id: string | null
           quantity: number
+          quantity_shipped: number | null
           transfer_id: string
         }
         Insert: {
@@ -5479,6 +5497,7 @@ export type Database = {
           id?: string
           inventory_lot_id?: string | null
           quantity: number
+          quantity_shipped?: number | null
           transfer_id: string
         }
         Update: {
@@ -5487,6 +5506,7 @@ export type Database = {
           id?: string
           inventory_lot_id?: string | null
           quantity?: number
+          quantity_shipped?: number | null
           transfer_id?: string
         }
         Relationships: [
@@ -7951,6 +7971,7 @@ export type Database = {
           notes: string | null
           receive_date: string | null
           received_by: string | null
+          remainder_of: string | null
           ship_date: string | null
           shipped_by: string | null
           status: string | null
@@ -7986,6 +8007,20 @@ export type Database = {
             columns: ["from_bin_id"]
             isOneToOne: false
             referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_remainder_of_fkey"
+            columns: ["remainder_of"]
+            isOneToOne: false
+            referencedRelation: "location_transfers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_transfers_remainder_of_fkey"
+            columns: ["remainder_of"]
+            isOneToOne: false
+            referencedRelation: "location_transfers_with_details"
             referencedColumns: ["id"]
           },
           {
@@ -9658,6 +9693,10 @@ export type Database = {
         }
         Returns: string
       }
+      ship_transfer_partial: {
+        Args: { p_line_quantities: Json; p_transfer_id: string }
+        Returns: string
+      }
       suggest_recipe_improvements: {
         Args: { p_recipe_id: string }
         Returns: Json
@@ -9880,4 +9919,3 @@ export const Constants = {
     },
   },
 } as const
-

@@ -16,6 +16,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
+import { formatBbl } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -52,10 +53,12 @@ import Link from "next/link";
 import {
   startOfMonth,
   endOfMonth,
+  subMonths,
   format,
   differenceInDays,
   parseISO,
 } from "date-fns";
+import { TrendChart } from "@/components/dashboard/trend-chart";
 
 // =============================================================================
 // Types
@@ -105,11 +108,6 @@ const MONTHS = [
 // =============================================================================
 // Helper Functions
 // =============================================================================
-
-/** Format a barrel value to two decimal places with a fallback of zero. */
-function formatBbl(value: number | null | undefined): string {
-  return (value ?? 0).toFixed(2);
-}
 
 /** Generate year options: current year and 3 years back. */
 function getYearOptions(): number[] {
@@ -232,6 +230,59 @@ export default function ProductionSummaryPage() {
   });
 
   // ---------------------------------------------------------------------------
+  // 12-Month Trend Data
+  // ---------------------------------------------------------------------------
+
+  const TREND_MONTHS = 12;
+
+  const { data: trendData } = useQuery({
+    queryKey: reportKeys.productionTrend(TREND_MONTHS),
+    queryFn: async () => {
+      const now = new Date();
+      const trendStart = format(
+        startOfMonth(subMonths(now, TREND_MONTHS - 1)),
+        "yyyy-MM-dd"
+      );
+      const trendEnd = format(endOfMonth(now), "yyyy-MM-dd");
+
+      const { data, error: queryError } = await supabase
+        .from("batches")
+        .select("id, volume_bbl, updated_at")
+        .in("status", ["completed", "packaging"])
+        .gte("updated_at", trendStart)
+        .lte("updated_at", trendEnd + "T23:59:59Z");
+
+      if (queryError) throw queryError;
+
+      // Aggregate by month
+      const monthMap = new Map<string, { bbl: number; batches: number }>();
+
+      // Pre-populate all months so the chart has no gaps
+      for (let i = TREND_MONTHS - 1; i >= 0; i--) {
+        const d = subMonths(now, i);
+        const key = format(startOfMonth(d), "yyyy-MM-dd");
+        monthMap.set(key, { bbl: 0, batches: 0 });
+      }
+
+      for (const row of data ?? []) {
+        if (!row.updated_at) continue;
+        const key = format(startOfMonth(parseISO(row.updated_at)), "yyyy-MM-dd");
+        const entry = monthMap.get(key);
+        if (entry) {
+          entry.bbl += row.volume_bbl ?? 0;
+          entry.batches += 1;
+        }
+      }
+
+      return Array.from(monthMap.entries()).map(([date, v]) => ({
+        date,
+        volume_bbl: parseFloat(v.bbl.toFixed(2)),
+        batches: v.batches,
+      }));
+    },
+  });
+
+  // ---------------------------------------------------------------------------
   // Derived Data
   // ---------------------------------------------------------------------------
 
@@ -289,7 +340,7 @@ export default function ProductionSummaryPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/reports">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Back to reports">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
@@ -427,6 +478,32 @@ export default function ProductionSummaryPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Monthly Production Trend (12 months) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Monthly Production Volume</CardTitle>
+          <CardDescription>
+            Completed/packaged batch volume over the last 12 months
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {trendData && trendData.length > 0 ? (
+            <TrendChart
+              data={trendData}
+              xKey="date"
+              series={[
+                { key: "volume_bbl", label: "Volume (BBL)" },
+              ]}
+              type="bar"
+              height={280}
+              formatValue={(v) => `${v.toFixed(1)} BBL`}
+            />
+          ) : (
+            <Skeleton className="h-[280px] w-full" />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Production by Brand */}
       <Card>

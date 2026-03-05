@@ -175,7 +175,7 @@ export default function RecipeAdditionsPage({
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link href={`/production/recipes/${id}`}>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Back to recipe">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>

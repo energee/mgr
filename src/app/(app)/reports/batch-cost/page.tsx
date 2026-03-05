@@ -3,23 +3,28 @@
 /**
  * Batch Cost Analysis Report
  *
- * Shows per-batch ingredient cost breakdown derived from allocations.
- * Queries batches with their allocations (destination_type = 'batch'),
- * joins to inventory_lots for unit_cost, and calculates totals.
+ * Shows per-batch ingredient cost breakdown derived from allocations,
+ * with recipe-level COGS estimates as fallback when allocation data
+ * is unavailable.
  *
  * Features:
- * - Date range filtering (by batch created_at)
- * - Summary cards: avg cost/BBL, total material costs, batch count
- * - Cost breakdown table per batch
+ * - Date range filtering (default: last 6 months)
+ * - Summary cards: avg cost/batch, avg cost/BBL, total production cost
+ * - Cost breakdown table per batch (batch #, recipe, brand, volume, costs)
  * - Expandable ingredient-level detail per batch
+ *
+ * Data sources:
+ * - allocations (destination_type = 'batch') for actual ingredient costs
+ * - recipes_with_cogs for estimated ingredient costs when allocations are absent
+ * - recipes -> brands for brand name resolution
  */
 
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency } from "@/lib/format";
 import { reportKeys } from "@/lib/query-keys";
+import { formatCurrency, formatBbl } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -56,17 +61,23 @@ import Link from "next/link";
 // Types
 // =============================================================================
 
-/** A batch with its aggregated cost from allocations */
+/** A batch with its aggregated cost from allocations or recipe estimates */
 interface BatchCostRow {
   id: string;
   batch_number: string;
   name: string;
   recipe_name: string | null;
+  brand_name: string | null;
   volume_bbl: number | null;
-  total_ingredient_cost: number;
+  ingredient_cost: number;
   cost_per_bbl: number | null;
   status: string;
+  /** Whether cost data came from allocations (true) or recipe estimates (false) */
+  has_allocation_costs: boolean;
 }
+
+/** Shape of the nested recipe join from the batches query. */
+type BatchRecipeJoin = { id: string; name: string; brand: { name: string } | null } | null;
 
 /** Individual ingredient allocation cost for a batch */
 interface IngredientCostRow {
@@ -79,24 +90,17 @@ interface IngredientCostRow {
 }
 
 // =============================================================================
-// Helpers
-// =============================================================================
-
-
-function formatBbl(value: number | null | undefined): string {
-  if (value == null) return "--";
-  return value.toFixed(2);
-}
-
-// =============================================================================
 // Component
 // =============================================================================
 
 export default function BatchCostAnalysisPage() {
   const supabase = createClient();
 
-  // Default date range: last 3 months
-  const defaultFrom = format(startOfMonth(subMonths(new Date(), 3)), "yyyy-MM-dd");
+  // Default date range: last 6 months
+  const defaultFrom = format(
+    startOfMonth(subMonths(new Date(), 6)),
+    "yyyy-MM-dd"
+  );
   const defaultTo = format(endOfMonth(new Date()), "yyyy-MM-dd");
 
   const [fromDate, setFromDate] = useState(defaultFrom);
@@ -104,7 +108,7 @@ export default function BatchCostAnalysisPage() {
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
 
   // -------------------------------------------------------------------------
-  // Fetch batches with cost data from allocations
+  // Fetch batches with cost data from allocations + recipe COGS fallback
   // -------------------------------------------------------------------------
   const {
     data: batchCostData,
@@ -113,11 +117,11 @@ export default function BatchCostAnalysisPage() {
   } = useQuery({
     queryKey: reportKeys.batchCost({ from: fromDate, to: toDate }),
     queryFn: async () => {
-      // Step 1: Get batches in date range (exclude cancelled/archived)
+      // Step 1: Get batches in date range with recipe and brand info
       const { data: batches, error: batchErr } = await supabase
         .from("batches")
         .select(
-          "id, batch_number, name, status, volume_bbl, created_at, recipe:recipes(name)"
+          "id, batch_number, name, status, volume_bbl, created_at, recipe:recipes(id, name, brand:brands(name))"
         )
         .gte("created_at", fromDate)
         .lte("created_at", toDate + "T23:59:59Z")
@@ -129,18 +133,47 @@ export default function BatchCostAnalysisPage() {
 
       const batchIds = batches.map((b) => b.id);
 
-      // Step 2: Get all allocations destined for these batches
-      // source_type = 'inventory_lot' means ingredients from inventory
-      const { data: allocations, error: allocErr } = await supabase
-        .from("allocations")
-        .select("id, destination_id, quantity, unit_cost, source_id, source_type")
-        .eq("destination_type", "batch")
-        .in("destination_id", batchIds)
-        .in("status", ["completed", "planned"]);
+      // Steps 2 & 3: Fetch allocations and recipe COGS in parallel
+      const recipeIds = [
+        ...new Set(
+          batches
+            .map((b) => {
+              const recipe = b.recipe as BatchRecipeJoin;
+              return recipe?.id;
+            })
+            .filter(Boolean) as string[]
+        ),
+      ];
 
-      if (allocErr) throw allocErr;
+      const [allocResult, cogsResult] = await Promise.all([
+        supabase
+          .from("allocations")
+          .select("id, destination_id, quantity, unit_cost, source_id, source_type")
+          .eq("destination_type", "batch")
+          .in("destination_id", batchIds)
+          .in("status", ["completed", "planned"]),
+        recipeIds.length > 0
+          ? supabase
+              .from("recipes_with_cogs" as "recipes")
+              .select("id, total_cogs, cogs_per_bbl")
+              .in("id", recipeIds)
+          : Promise.resolve({ data: null, error: null }),
+      ]);
 
-      // Step 3: Aggregate costs per batch
+      if (allocResult.error) throw allocResult.error;
+      if (cogsResult.error) throw cogsResult.error;
+
+      const allocations = allocResult.data;
+
+      type RecipeCOGSRow = { id: string; total_cogs: number | null; cogs_per_bbl: number | null };
+      const recipeCOGSMap = new Map<string, RecipeCOGSRow>();
+      if (cogsResult.data) {
+        for (const row of cogsResult.data as unknown as RecipeCOGSRow[]) {
+          recipeCOGSMap.set(row.id, row);
+        }
+      }
+
+      // Step 4: Aggregate allocation costs per batch
       const costByBatch = new Map<string, number>();
       for (const alloc of allocations || []) {
         if (!alloc.destination_id) continue;
@@ -151,20 +184,42 @@ export default function BatchCostAnalysisPage() {
         );
       }
 
-      // Step 4: Build result rows
+      // Step 5: Build result rows
       const result: BatchCostRow[] = batches.map((b) => {
-        const recipe = b.recipe as { name: string } | null;
-        const totalCost = costByBatch.get(b.id) ?? 0;
+        const recipe = b.recipe as BatchRecipeJoin;
         const volumeBbl = b.volume_bbl;
+
+        // Use allocation-based costs if available, otherwise fall back to recipe COGS
+        const allocationCost = costByBatch.get(b.id);
+        const hasAllocationCosts = allocationCost !== undefined && allocationCost > 0;
+
+        let ingredientCost: number;
+        if (hasAllocationCosts) {
+          ingredientCost = allocationCost;
+        } else if (recipe?.id && recipeCOGSMap.has(recipe.id)) {
+          const cogs = recipeCOGSMap.get(recipe.id)!;
+          // Scale recipe COGS by batch volume if recipe has per-BBL cost
+          if (volumeBbl && volumeBbl > 0 && cogs.cogs_per_bbl) {
+            ingredientCost = cogs.cogs_per_bbl * volumeBbl;
+          } else {
+            ingredientCost = cogs.total_cogs ?? 0;
+          }
+        } else {
+          ingredientCost = 0;
+        }
+
         return {
           id: b.id,
           batch_number: b.batch_number,
           name: b.name,
           recipe_name: recipe?.name ?? null,
+          brand_name: recipe?.brand?.name ?? null,
           volume_bbl: volumeBbl,
-          total_ingredient_cost: totalCost,
-          cost_per_bbl: volumeBbl && volumeBbl > 0 ? totalCost / volumeBbl : null,
+          ingredient_cost: ingredientCost,
+          cost_per_bbl:
+            volumeBbl && volumeBbl > 0 ? ingredientCost / volumeBbl : null,
           status: b.status,
+          has_allocation_costs: hasAllocationCosts,
         };
       });
 
@@ -238,13 +293,20 @@ export default function BatchCostAnalysisPage() {
   // -------------------------------------------------------------------------
   const summary = useMemo(() => {
     if (!batchCostData || batchCostData.length === 0) {
-      return { avgCostPerBbl: 0, totalMaterialCost: 0, batchCount: 0 };
+      return {
+        avgCostPerBatch: 0,
+        avgCostPerBbl: 0,
+        totalProductionCost: 0,
+        batchCount: 0,
+      };
     }
 
-    const totalMaterialCost = batchCostData.reduce(
-      (sum, b) => sum + b.total_ingredient_cost,
+    const totalProductionCost = batchCostData.reduce(
+      (sum, b) => sum + b.ingredient_cost,
       0
     );
+
+    const avgCostPerBatch = totalProductionCost / batchCostData.length;
 
     const batchesWithVolume = batchCostData.filter(
       (b) => b.volume_bbl && b.volume_bbl > 0
@@ -254,11 +316,12 @@ export default function BatchCostAnalysisPage() {
       0
     );
     const avgCostPerBbl =
-      totalVolume > 0 ? totalMaterialCost / totalVolume : 0;
+      totalVolume > 0 ? totalProductionCost / totalVolume : 0;
 
     return {
+      avgCostPerBatch,
       avgCostPerBbl,
-      totalMaterialCost,
+      totalProductionCost,
       batchCount: batchCostData.length,
     };
   }, [batchCostData]);
@@ -278,7 +341,7 @@ export default function BatchCostAnalysisPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/reports">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Back to reports">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
@@ -335,7 +398,24 @@ export default function BatchCostAnalysisPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+              <DollarSign className="h-4 w-4" />
+              Avg Cost per Batch
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold font-mono">
+                {formatCurrency(summary.avgCostPerBatch)}
+              </div>
+            )}
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
@@ -357,7 +437,7 @@ export default function BatchCostAnalysisPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <DollarSign className="h-4 w-4" />
-              Total Material Costs
+              Total Production Cost
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -365,7 +445,7 @@ export default function BatchCostAnalysisPage() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <div className="text-2xl font-bold font-mono">
-                {formatCurrency(summary.totalMaterialCost)}
+                {formatCurrency(summary.totalProductionCost)}
               </div>
             )}
           </CardContent>
@@ -414,11 +494,11 @@ export default function BatchCostAnalysisPage() {
                 <TableRow>
                   <TableHead className="w-8" />
                   <TableHead>Batch #</TableHead>
-                  <TableHead>Name</TableHead>
                   <TableHead>Recipe</TableHead>
+                  <TableHead>Brand</TableHead>
                   <TableHead className="text-right">Volume (BBL)</TableHead>
                   <TableHead className="text-right">
-                    Total Ingredient Cost
+                    Ingredient Cost
                   </TableHead>
                   <TableHead className="text-right">Cost / BBL</TableHead>
                 </TableRow>
@@ -440,15 +520,31 @@ export default function BatchCostAnalysisPage() {
                       <TableCell className="font-mono">
                         {batch.batch_number}
                       </TableCell>
-                      <TableCell>{batch.name}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {batch.recipe_name ?? "--"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {batch.brand_name ?? "--"}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatBbl(batch.volume_bbl)}
                       </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        {formatCurrency(batch.total_ingredient_cost)}
+                      <TableCell className="text-right font-mono">
+                        <span
+                          title={
+                            batch.has_allocation_costs
+                              ? "From allocation records"
+                              : "Estimated from recipe COGS"
+                          }
+                        >
+                          {formatCurrency(batch.ingredient_cost)}
+                          {!batch.has_allocation_costs &&
+                            batch.ingredient_cost > 0 && (
+                              <span className="text-xs text-muted-foreground ml-1">
+                                *
+                              </span>
+                            )}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(batch.cost_per_bbl)}
@@ -463,7 +559,13 @@ export default function BatchCostAnalysisPage() {
                             <h4 className="text-sm font-semibold mb-3">
                               Ingredient Cost Detail
                             </h4>
-                            {detailLoading ? (
+                            {!batch.has_allocation_costs ? (
+                              <p className="text-sm text-muted-foreground">
+                                No allocation records for this batch. Cost
+                                shown is an estimate from the recipe&apos;s
+                                ingredient catalog prices.
+                              </p>
+                            ) : detailLoading ? (
                               <div className="space-y-2">
                                 {[...Array(3)].map((_, i) => (
                                   <Skeleton key={i} className="h-8 w-full" />
@@ -541,11 +643,11 @@ export default function BatchCostAnalysisPage() {
       <Card className="bg-muted/50">
         <CardContent className="pt-6">
           <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Costs are derived from allocation records
-            linking inventory lots to batches. Only allocations with status
-            &quot;completed&quot; or &quot;planned&quot; are included. If no
-            unit_cost is recorded on the allocation, the ingredient line
-            contributes $0 to the total.
+            <strong>Note:</strong> Costs are primarily derived from allocation
+            records linking inventory lots to batches. When no allocations
+            exist, ingredient costs are estimated from the recipe&apos;s
+            catalog prices (marked with *). Only allocations with status
+            &quot;completed&quot; or &quot;planned&quot; are included.
           </p>
         </CardContent>
       </Card>

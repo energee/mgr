@@ -3,8 +3,8 @@
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency } from "@/lib/format";
 import { entityKeys, changeRequestKeys, portalKeys } from "@/lib/query-keys";
+import { formatCurrency } from "@/lib/format";
 import { usePortalCustomer } from "@/lib/portal-context";
 import {
   Card,
@@ -43,7 +43,6 @@ function isBelowCutoff(orderStatus: string, cutoffState: string): boolean {
   if (orderRank === -1 || cutoffRank === -1) return false;
   return orderRank < cutoffRank;
 }
-
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "-";

@@ -3,9 +3,7 @@ import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
-
-/** Base URL for portal invite redirects. Prefers NEXT_PUBLIC_SITE_URL, falls back to NEXT_PUBLIC_APP_URL. */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+import { SITE_URL } from "@/lib/env";
 const PORTAL_REDIRECT_URL = `${SITE_URL}/api/auth/callback?redirect=/portal/orders`;
 
 export const POST = withPermission(

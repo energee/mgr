@@ -8,11 +8,30 @@ const analyzer = withBundleAnalyzer({
 });
 
 /**
+ * Build a Content-Security-Policy header value.
+ * Supabase project URL is allowed for API/auth calls and realtime websockets.
+ * In development, 'unsafe-eval' is required by Next.js fast-refresh.
+ */
+const cspDirectives = [
+  "default-src 'self'",
+  `script-src 'self'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} 'unsafe-inline'`,
+  "style-src 'self' 'unsafe-inline'",
+  `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} wss://*.supabase.co https://*.supabase.co https://*.ingest.sentry.io`,
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+];
+
+/**
  * Security headers applied to all routes.
- * Content-Security-Policy is intentionally omitted — see DEC-SEC-001
- * in docs/spec/decisions.md for tracking and requirements.
  */
 const securityHeaders = [
+  {
+    key: "Content-Security-Policy",
+    value: cspDirectives.join("; "),
+  },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   {

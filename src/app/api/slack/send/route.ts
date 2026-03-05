@@ -42,7 +42,7 @@ export async function POST(req: Request): Promise<Response> {
     .single();
 
   if (settingsErr || !settings) {
-    log.error("Failed to read slack_settings", { error: settingsErr?.message });
+    log.error({ error: settingsErr?.message }, "Failed to read slack_settings");
     return NextResponse.json({ error: "Config error" }, { status: 500 });
   }
 
@@ -88,18 +88,14 @@ export async function POST(req: Request): Promise<Response> {
     channel_overrides: (settings.channel_overrides as Record<string, string>) ?? {},
   };
 
-  log.info("Sending Slack notification", { type, priority, logId: log_id });
+  log.info({ type, priority, logId: log_id }, "Sending Slack notification");
 
   const result = await sendSlackNotification(slackSettings, notification, appUrl);
 
   if (result.ok) {
-    log.info("Slack notification sent successfully", { type, logId: log_id });
+    log.info({ type, logId: log_id }, "Slack notification sent successfully");
   } else {
-    log.error("Slack notification failed", {
-      type,
-      logId: log_id,
-      error: result.error,
-    });
+    log.error({ type, logId: log_id, error: result.error }, "Slack notification failed");
   }
 
   // Update log entry

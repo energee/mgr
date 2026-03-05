@@ -336,7 +336,7 @@ export default function ProductionTimelinePage() {
       <div className="h-[calc(100vh-120px)] flex flex-col bg-background">
         {/* Header */}
         <div className="flex-none border-b px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-4">
               <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
@@ -356,7 +356,7 @@ export default function ProductionTimelinePage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {/* Brand filter */}
               <Select
                 value={brandFilter}
@@ -443,9 +443,9 @@ export default function ProductionTimelinePage() {
         </div>
 
         {/* Timeline Grid */}
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex-1 overflow-hidden flex min-w-0">
           {/* Vessel Labels (Fixed) */}
-          <div className="flex-none w-40 border-r bg-muted/30">
+          <div className="flex-none w-28 md:w-40 border-r bg-muted/30">
             {/* Header spacer */}
             <div className="h-14 border-b px-3 flex items-end pb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vessels</span>
@@ -486,7 +486,7 @@ export default function ProductionTimelinePage() {
           </div>
 
           {/* Scrollable Timeline */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-x-auto overflow-y-hidden">
+          <div ref={scrollContainerRef} className="flex-1 overflow-x-auto overflow-y-hidden" style={{ WebkitOverflowScrolling: "touch" }}>
             <div style={{ width: days.length * 48 }} className="min-h-full">
               {/* Date Headers */}
               <div className="h-14 border-b flex sticky top-0 bg-background/95 backdrop-blur-sm z-10">
@@ -633,6 +633,7 @@ export default function ProductionTimelinePage() {
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setSelectedShortfall(shortfall)}
+                          aria-label={`Shortfall: ${shortfall.brand_name} — ${shortfall.shortfall_quantity} units`}
                           className={cn(
                             "absolute top-3 flex flex-col items-center gap-0.5 cursor-pointer",
                             "hover:scale-110 transition-transform z-10"
