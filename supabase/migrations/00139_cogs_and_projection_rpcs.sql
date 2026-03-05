@@ -173,7 +173,13 @@ BEGIN
       END AS unit_cogs
     FROM order_data od
     LEFT JOIN brands b ON b.id = od.brand_id
-    LEFT JOIN recipes r_active ON r_active.brand_id = b.id AND r_active.is_active = true
+    LEFT JOIN LATERAL (
+      SELECT r.id
+      FROM recipes r
+      WHERE r.brand_id = b.id AND r.is_active = true
+      ORDER BY r.updated_at DESC
+      LIMIT 1
+    ) r_active ON true
     LEFT JOIN recipes_with_cogs rwc ON rwc.id = r_active.id
     LEFT JOIN selling_formats sf ON sf.id = od.selling_format_id
     LEFT JOIN containers ct ON ct.id = sf.container_id

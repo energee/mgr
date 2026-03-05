@@ -55,24 +55,25 @@ interface COGSRow {
   brand_name: string | null;
   volume_bbl: number | null;
   malt_cost: number;
-  hops_cost: number;
+  hop_cost: number;
   yeast_cost: number;
   adjunct_cost: number;
   other_cost: number;
   total_ingredient_cost: number;
-  landed_cost: number | null;
+  total_landed_cost: number | null;
   cost_per_bbl: number | null;
   has_allocation_data: boolean;
 }
 
 /** Row returned by the margin_by_channel RPC */
 interface MarginRow {
+  channel_id: string;
   channel_name: string;
   order_count: number;
-  unit_count: number;
+  total_units: number;
   total_revenue: number;
   total_cogs: number;
-  margin: number;
+  gross_margin: number;
   margin_pct: number;
 }
 
@@ -131,7 +132,7 @@ export function COGSTab({ dateRange, channelFilter }: COGSTabProps) {
   const filteredMargin = useMemo(() => {
     if (!marginData) return [];
     if (!channelFilter) return marginData;
-    return marginData.filter((r) => r.channel_name === channelFilter);
+    return marginData.filter((r) => r.channel_id === channelFilter);
   }, [marginData, channelFilter]);
 
   // ---------------------------------------------------------------------------
@@ -333,7 +334,7 @@ export function COGSTab({ dateRange, channelFilter }: COGSTabProps) {
                         {formatCurrency(row.malt_cost)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(row.hops_cost)}
+                        {formatCurrency(row.hop_cost)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(row.yeast_cost)}
@@ -348,7 +349,7 @@ export function COGSTab({ dateRange, channelFilter }: COGSTabProps) {
                         {formatCurrency(row.total_ingredient_cost)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(row.landed_cost)}
+                        {formatCurrency(row.total_landed_cost)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(row.cost_per_bbl)}
@@ -393,7 +394,7 @@ export function COGSTab({ dateRange, channelFilter }: COGSTabProps) {
               </TableHeader>
               <TableBody>
                 {filteredMargin.map((row) => (
-                  <TableRow key={row.channel_name}>
+                  <TableRow key={row.channel_id}>
                     <TableCell className="font-medium">
                       {row.channel_name}
                     </TableCell>
@@ -401,7 +402,7 @@ export function COGSTab({ dateRange, channelFilter }: COGSTabProps) {
                       {row.order_count}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {row.unit_count}
+                      {row.total_units}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(row.total_revenue)}
@@ -410,7 +411,7 @@ export function COGSTab({ dateRange, channelFilter }: COGSTabProps) {
                       {formatCurrency(row.total_cogs)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(row.margin)}
+                      {formatCurrency(row.gross_margin)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       <span

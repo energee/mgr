@@ -9,7 +9,7 @@
  * 3. Expected Revenue — order-book revenue from `project_revenue` RPC
  */
 
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +19,7 @@ import { formatCurrency, formatBbl } from "@/lib/format";
 import {
   getCatalogTypeDisplay,
   formatQuantityWithUnit,
+  type IngredientShortfall,
 } from "@/lib/purchasing/demand-calculator";
 import {
   Card,
@@ -44,32 +45,19 @@ interface WeeklyTabProps {
   channelFilter: string | null;
 }
 
-/** Row from `calculate_ingredient_shortfalls` RPC */
-interface ShortfallRow {
-  catalog_type: string;
-  catalog_name: string;
-  available_qty: number;
-  on_order_qty: number;
-  total_required: number;
-  shortfall_qty: number;
-  unit: string;
-  order_by_date: string;
-  is_urgent: boolean;
-}
-
 /** Row from `project_finished_goods` RPC */
 interface FinishedGoodRow {
   brand_name: string;
   batch_number: string;
-  status: string;
+  batch_status: string;
   volume_bbl: number;
-  ready_date: string;
+  estimated_ready_date: string;
   confidence: "high" | "medium" | "low";
 }
 
 /** Row from `project_revenue` RPC */
 interface RevenueRow {
-  week_start: string;
+  projection_week: string;
   channel_id: string;
   channel_name: string;
   order_count: number;
@@ -125,7 +113,7 @@ export function WeeklyTab({ channelFilter }: WeeklyTabProps) {
         { p_horizon_weeks: 8 }
       );
       if (error) throw error;
-      return (data || []) as ShortfallRow[];
+      return (data || []) as IngredientShortfall[];
     },
   });
 
@@ -184,7 +172,7 @@ export function WeeklyTab({ channelFilter }: WeeklyTabProps) {
     >();
 
     for (const row of revenueFiltered) {
-      const week = row.week_start;
+      const week = row.projection_week;
       if (!grouped.has(week)) {
         grouped.set(week, { rows: [], totalOrders: 0, totalUnits: 0, totalRevenue: 0 });
       }
@@ -322,13 +310,13 @@ export function WeeklyTab({ channelFilter }: WeeklyTabProps) {
                       {row.batch_number}
                     </TableCell>
                     <TableCell className="capitalize">
-                      {row.status}
+                      {row.batch_status}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatBbl(row.volume_bbl)}
                     </TableCell>
                     <TableCell>
-                      {formatWeekLabel(row.ready_date)}
+                      {formatWeekLabel(row.estimated_ready_date)}
                     </TableCell>
                     <TableCell
                       className={`capitalize font-medium ${confidenceColorClass(row.confidence)}`}
@@ -370,7 +358,7 @@ export function WeeklyTab({ channelFilter }: WeeklyTabProps) {
               </TableHeader>
               <TableBody>
                 {revenueByWeek.map(([week, group]) => (
-                  <>
+                  <React.Fragment key={week}>
                     {group.rows.map((row, idx) => (
                       <TableRow key={`${week}-${row.channel_id}-${idx}`}>
                         {idx === 0 ? (
@@ -412,7 +400,7 @@ export function WeeklyTab({ channelFilter }: WeeklyTabProps) {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>

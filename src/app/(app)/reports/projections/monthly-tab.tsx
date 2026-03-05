@@ -149,6 +149,7 @@ export function MonthlyTab({ channelFilter }: MonthlyTabProps) {
   const {
     data: goodsData,
     isLoading: goodsLoading,
+    error: goodsError,
   } = useQuery({
     queryKey: reportKeys.projectedGoods(26),
     queryFn: async () => {
@@ -165,6 +166,7 @@ export function MonthlyTab({ channelFilter }: MonthlyTabProps) {
   const {
     data: revenueData,
     isLoading: revenueLoading,
+    error: revenueError,
   } = useQuery({
     queryKey: reportKeys.projectedRevenue(26, true),
     queryFn: async () => {
@@ -181,6 +183,7 @@ export function MonthlyTab({ channelFilter }: MonthlyTabProps) {
   const {
     data: shortfallData,
     isLoading: shortfallLoading,
+    error: shortfallError,
   } = useQuery({
     queryKey: purchasingKeys.ingredientShortfalls({ horizonWeeks: 26 }),
     queryFn: async () => {
@@ -378,7 +381,11 @@ export function MonthlyTab({ channelFilter }: MonthlyTabProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {goodsLoading ? (
+          {goodsError ? (
+            <p className="text-sm text-destructive py-4">
+              {goodsError instanceof Error ? goodsError.message : "Failed to load finished goods data"}
+            </p>
+          ) : goodsLoading ? (
             <Skeleton className="h-[300px] w-full" />
           ) : goodsByMonth.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">
@@ -454,7 +461,11 @@ export function MonthlyTab({ channelFilter }: MonthlyTabProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {revenueLoading ? (
+          {revenueError ? (
+            <p className="text-sm text-destructive py-4">
+              {revenueError instanceof Error ? revenueError.message : "Failed to load revenue data"}
+            </p>
+          ) : revenueLoading ? (
             <Skeleton className="h-[300px] w-full" />
           ) : revenueByMonth.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">
@@ -544,7 +555,11 @@ export function MonthlyTab({ channelFilter }: MonthlyTabProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {shortfallLoading ? (
+          {shortfallError ? (
+            <p className="text-sm text-destructive py-4">
+              {shortfallError instanceof Error ? shortfallError.message : "Failed to load shortfall data"}
+            </p>
+          ) : shortfallLoading ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[...Array(3)].map((_, i) => (
