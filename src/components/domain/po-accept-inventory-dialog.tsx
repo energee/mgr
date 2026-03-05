@@ -279,9 +279,6 @@ export function POAcceptInventoryDialog({
         queryKey: poReceiveKeys.unaccepted(poId),
       });
       queryClient.invalidateQueries({
-        queryKey: entityKeys.list("inventory_lots"),
-      });
-      queryClient.invalidateQueries({
         queryKey: entityKeys.all("inventory_lots"),
       });
       setRowStates({});
