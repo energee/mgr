@@ -88,14 +88,19 @@ rejected
 
 ```
 planned → in_transit → completed
-    ↓          ↓
-cancelled  cancelled
+    ↓   ↘       ↓
+    ↓  partial  cancelled
+    ↓
+cancelled
 ```
 
 | Transition | Trigger |
 |------------|---------|
-| planned → in_transit | Ship from origin |
+| planned → in_transit | Ship from origin (all lines fully shipped) |
+| planned → partial | Ship from origin (some lines partially shipped) |
 | in_transit → completed | Receive at destination |
+
+**Partial shipment:** When shipped quantities are less than requested on any line, the original transfer transitions to `partial` (terminal state) and a new `planned` transfer is auto-created for the remainder. The remainder transfer's `remainder_of` column references the original. The `ship_transfer_partial()` RPC handles this atomically.
 
 ### Vessel States
 

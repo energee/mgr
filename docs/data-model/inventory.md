@@ -301,12 +301,13 @@ Transfers of finished goods between locations/bins.
 | id | UUID | Primary key |
 | from_bin_id | UUID | FK to bins |
 | to_bin_id | UUID | FK to bins |
-| status | TEXT | Status: planned, in_transit, completed, cancelled |
+| status | TEXT | Status: planned, in_transit, partial, completed, cancelled |
 | ship_date | DATE | Ship date |
 | receive_date | DATE | Receive date |
 | shipped_by | UUID | FK to auth.users |
 | received_by | UUID | FK to auth.users |
 | delivery_id | UUID | FK to deliveries (nullable) |
+| remainder_of | UUID | FK to location_transfers (nullable). Set when this transfer was auto-created from a partial shipment. |
 | notes | TEXT | Notes |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
@@ -323,7 +324,8 @@ Line items for location transfers. Supports both finished goods and raw material
 | transfer_id | UUID | FK to location_transfers |
 | finished_good_id | UUID | FK to finished_goods (nullable) |
 | inventory_lot_id | UUID | FK to inventory_lots (nullable) |
-| quantity | INTEGER | Quantity transferred |
+| quantity | INTEGER | Quantity requested for transfer |
+| quantity_shipped | INTEGER | Actual quantity shipped (nullable). NULL = not yet shipped. Less than quantity = partial shipment. |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
 **Constraint:** Exactly one of `finished_good_id` or `inventory_lot_id` must be set (XOR).
@@ -334,15 +336,27 @@ Line items for location transfers. Supports both finished goods and raw material
 
 ```
 planned -> in_transit -> completed
-    |           |
-    v           v
-cancelled   cancelled
+    |   \        |
+    v    v       v
+cancelled partial cancelled
 ```
 
 | Transition | Trigger |
 |------------|---------|
-| planned -> in_transit | Ship from origin |
+| planned -> in_transit | Ship from origin (all lines fully shipped) |
+| planned -> partial | Ship from origin (some lines partially shipped; remainder transfer auto-created) |
 | in_transit -> completed | Receive at destination |
+
+### Partial Shipment Workflow
+
+When shipping a transfer, the `ship_transfer_partial(p_transfer_id, p_line_quantities)` RPC function accepts per-line shipped quantities. If any line has `quantity_shipped < quantity`:
+
+1. The original transfer is set to `partial` status (terminal)
+2. Each transfer line's `quantity_shipped` is recorded
+3. A new `planned` transfer is created with `remainder_of` pointing to the original
+4. Remainder lines are created for unshipped quantities (`quantity - quantity_shipped`)
+
+The `partial` state is terminal for the original transfer. The remainder transfer follows the normal lifecycle.
 
 ---
 
