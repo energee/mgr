@@ -618,6 +618,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     }
 
     setIsSubmitting(true);
+    const loadingId = toast.loading(isCreateMode ? "Creating..." : "Saving...");
     try {
       if (isCreateMode) {
         const { data: newRow, error } = await dynamicFrom(supabase, entity.table)
@@ -626,6 +627,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           .single();
         if (error) throw error;
         setFormErrors([]);
+        toast.dismiss(loadingId);
         toast.success(`${entity.displayName} created successfully`);
         const newId = (newRow as Record<string, unknown>).id as string;
         invalidateEntityCaches(newId);
@@ -642,6 +644,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
           if (!lockResult.success) {
             if (lockResult.conflicted) {
+              toast.dismiss(loadingId);
               conflictDialog.showConflict();
               setIsSubmitting(false);
               return;
@@ -658,11 +661,13 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         }
 
         setFormErrors([]);
+        toast.dismiss(loadingId);
         toast.success(`${entity.displayName} updated successfully`);
         invalidateEntityCaches(id);
         setEditing(false);
       }
     } catch (err) {
+      toast.dismiss(loadingId);
       const message = err instanceof Error ? err.message : "An unexpected error occurred";
       toast.error(message);
       console.error("Form submission error:", err);
@@ -807,19 +812,26 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const displayData = (data || ({} as T)) as T;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <Link
-            href={backUrl || path}
-            className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
-          >
-            <span aria-hidden="true"><Kbd>⌫</Kbd></span>
-            Back
-          </Link>
+          <nav className="flex items-center gap-1 text-xs">
+            <Link
+              href={backUrl || path}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {entity.displayNamePlural}
+            </Link>
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            <span className="text-foreground font-medium">
+              {isCreateMode
+                ? "New"
+                : header?.title || `${entity.displayName} ${id}`}
+            </span>
+          </nav>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-lg font-medium">
               {isCreateMode
                 ? `Create ${entity.displayName}`
                 : header?.title || `${entity.displayName} ${id}`}
@@ -832,13 +844,13 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             )}
           </div>
           {!isCreateMode && header?.subtitle && (
-            <p className="text-muted-foreground">{header.subtitle}</p>
+            <p className="text-sm text-muted-foreground">{header.subtitle}</p>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {editing && !isCreateMode && (
-            <Button variant="outline" onClick={handleCancel} disabled={isSubmitting}>
+            <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isSubmitting}>
               Cancel
               <span aria-hidden="true"><Kbd>Esc</Kbd></span>
             </Button>
@@ -846,16 +858,17 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
           {editing && (
             <Button
+              size="sm"
               onClick={handleSave}
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Saving..." : `Save ${entity.displayName}`}
+              {isSubmitting ? "Saving..." : "Save"}
               <span aria-hidden="true"><Kbd>⌘↵</Kbd></span>
             </Button>
           )}
 
           {canEdit && !editing && !isCreateMode && (
-            <Button variant="outline" onClick={startEditing}>
+            <Button variant="ghost" size="sm" onClick={startEditing}>
               <Pencil className="h-4 w-4" />
               Edit
               <span aria-hidden="true"><Kbd>E</Kbd></span>
@@ -868,7 +881,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
               (stateInfo && stateInfo.validTransitions.length > 0)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="ghost" size="sm">
                     Actions
                     <ChevronDown className="h-4 w-4 ml-2" />
                   </Button>
@@ -1213,7 +1226,7 @@ function UnifiedSectionCard<T>({
   // Shared section header for all rendering paths
   const sectionHeader = (
     <CardHeader className={headerClassName}>
-      <CardTitle>{section.title}</CardTitle>
+      <CardTitle className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{section.title}</CardTitle>
       {HeaderActions && <HeaderActions data={data} onAction={fireAction} />}
     </CardHeader>
   );
@@ -1241,7 +1254,7 @@ function UnifiedSectionCard<T>({
             <CardHeader>
               <CollapsibleTrigger className="flex items-center gap-2 group cursor-pointer w-full text-left">
                 <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-                <CardTitle>{section.title}</CardTitle>
+                <CardTitle className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{section.title}</CardTitle>
               </CollapsibleTrigger>
             </CardHeader>
             <CollapsibleContent>
@@ -1410,8 +1423,8 @@ function FieldSectionGroup<T>({
 }: SectionRenderProps<T> & { sections: UnifiedSectionDef<T>[] }) {
   return (
     <Card>
-      <CardContent className="pt-6">
-        <div className="space-y-6">
+      <CardContent className="pt-4">
+        <div className="space-y-4">
           {sections.map((section, idx) => (
             <InlineFieldSection
               key={section.id}
@@ -1474,7 +1487,7 @@ function InlineFieldSection<T>({
           {showDivider && <Separator className="mb-6" />}
           <CollapsibleTrigger className="flex items-center gap-1.5 group cursor-pointer w-full text-left mb-3">
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            <h3 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {section.title}
             </h3>
           </CollapsibleTrigger>
@@ -1487,7 +1500,7 @@ function InlineFieldSection<T>({
   return (
     <div>
       {showDivider && <Separator className="mb-6" />}
-      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+      <h3 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-3">
         {section.title}
       </h3>
       {fieldGrid}

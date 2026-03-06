@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { RefreshCw, Loader2, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 import { SupplierGroupCard } from "@/components/domain/supplier-group-card";
 import { UnassignedShortfallsCard } from "@/components/domain/unassigned-shortfalls-card";
@@ -339,7 +339,7 @@ export default function IngredientDemandPage() {
         <p className="text-sm text-muted-foreground py-12 text-center">Loading demand data...</p>
       ) : filteredShortfalls.length === 0 ? (
         <DashboardSection title="Status">
-          <DashboardEmpty message="No shortfalls detected — all ingredient demand is covered by available inventory" />
+          <DashboardEmpty message="No shortfalls detected — all ingredient demand is covered by available inventory" icon={PackageCheck} />
         </DashboardSection>
       ) : (
         <div className="space-y-4">
