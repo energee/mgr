@@ -129,6 +129,8 @@ interface CogsSkuRow {
 /** Cost breakdown by time period with ingredient category split */
 interface CogsPeriodRow {
   period: string;
+  /** ISO date used for chronological sorting (not displayed). */
+  _sortKey: string;
   total_cogs: number;
   malt_cost: number;
   hop_cost: number;
@@ -589,10 +591,11 @@ export default function CogsReportPage() {
         }
       }
 
-      // Build period rows
+      // Build period rows (keyed by display label, with _sortKey for ordering)
       const periodMap = new Map<
         string,
         {
+          _sortKey: string;
           total_cogs: number;
           malt_cost: number;
           hop_cost: number;
@@ -610,11 +613,14 @@ export default function CogsReportPage() {
 
         const date = parseISO(batchDate);
         let periodKey: string;
+        let sortKey: string;
         if (granularity === "quarterly") {
           const qStart = startOfQuarter(date);
           periodKey = `Q${Math.ceil((qStart.getMonth() + 1) / 3)} ${format(qStart, "yyyy")}`;
+          sortKey = format(qStart, "yyyy-MM");
         } else {
           periodKey = format(date, "MMM yyyy");
+          sortKey = format(startOfMonth(date), "yyyy-MM");
         }
 
         const lineCost = alloc.quantity * (alloc.unit_cost ?? 0);
@@ -623,6 +629,7 @@ export default function CogsReportPage() {
         const category = alloc.source_id ? (categoryByLotId.get(alloc.source_id) ?? "") : "";
 
         const existing = periodMap.get(periodKey) ?? {
+          _sortKey: sortKey,
           total_cogs: 0,
           malt_cost: 0,
           hop_cost: 0,
@@ -650,10 +657,11 @@ export default function CogsReportPage() {
         periodMap.set(periodKey, existing);
       }
 
-      // Convert to array and sort by period
+      // Convert to array and sort chronologically
       const result: CogsPeriodRow[] = Array.from(periodMap.entries())
         .map(([period, data]) => ({
           period,
+          _sortKey: data._sortKey,
           total_cogs: data.total_cogs,
           malt_cost: data.malt_cost,
           hop_cost: data.hop_cost,
@@ -662,7 +670,7 @@ export default function CogsReportPage() {
           other_cost: data.other_cost,
           batch_count: data.batchSet.size,
         }))
-        .sort((a, b) => a.period.localeCompare(b.period));
+        .sort((a, b) => a._sortKey.localeCompare(b._sortKey));
 
       return result;
     },

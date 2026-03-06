@@ -204,8 +204,13 @@ export default function IngredientProjectionsPage() {
         };
       });
 
-      // Step 4: For orders — find linked batches via order_items
+      // Step 4: For orders — find linked batches via order_items and build
+      // a recipe_id → orders lookup so we can attribute ingredients to orders.
       const orderIds = orders.map((o) => o.id);
+      const orderById = new Map(orders.map((o) => [o.id, o]));
+      /** Maps recipe_id → orders that need that recipe (via order_items → batch → recipe). */
+      const recipeIdToOrders = new Map<string, OrderSource[]>();
+
       if (orderIds.length > 0) {
         const { data: orderItemRows } = await supabase
           .from("order_items")
@@ -224,8 +229,25 @@ export default function IngredientProjectionsPage() {
               .select("id, recipe_id")
               .in("id", batchIdsFromOrders);
 
+            // Map batch_id → recipe_id
+            const batchToRecipe = new Map<string, string>();
             for (const ob of orderBatches ?? []) {
-              if (ob.recipe_id) recipeIdSet.add(ob.recipe_id);
+              if (ob.recipe_id) {
+                recipeIdSet.add(ob.recipe_id);
+                batchToRecipe.set(ob.id, ob.recipe_id);
+              }
+            }
+
+            // Build recipe_id → orders via order_items → batch → recipe
+            for (const oi of orderItemRows) {
+              if (!oi.batch_id) continue;
+              const recipeId = batchToRecipe.get(oi.batch_id);
+              const order = orderById.get(oi.order_id);
+              if (!recipeId || !order) continue;
+              const arr = recipeIdToOrders.get(recipeId) ?? [];
+              // Avoid duplicates (same order linked via multiple items)
+              if (!arr.some((o) => o.id === order.id)) arr.push(order);
+              recipeIdToOrders.set(recipeId, arr);
             }
           }
         }
@@ -294,7 +316,7 @@ export default function IngredientProjectionsPage() {
         return ingredientMap.get(key)!;
       }
 
-      // Build recipe -> batch/order lookup
+      // Build recipe -> batch lookup
       const recipeIdToBatches = new Map<string, BatchSource[]>();
       for (const b of batches) {
         if (!b.recipe_id) continue;
@@ -303,21 +325,39 @@ export default function IngredientProjectionsPage() {
         recipeIdToBatches.set(b.recipe_id, arr);
       }
 
+      /** Push batch and order sources for a recipe ingredient into an entry. */
+      function addSources(
+        entry: ReturnType<typeof getOrCreate>,
+        recipeId: string,
+        qty: number,
+      ) {
+        for (const b of recipeIdToBatches.get(recipeId) ?? []) {
+          entry.neededQty += qty;
+          entry.sources.push({
+            type: "batch",
+            id: b.id,
+            label: `${b.batch_number} - ${b.name}`,
+            qty,
+          });
+        }
+        for (const o of recipeIdToOrders.get(recipeId) ?? []) {
+          // Don't double-count neededQty — order demand is fulfilled via
+          // the linked batch, which was already counted above.
+          entry.sources.push({
+            type: "order",
+            id: o.id,
+            label: `${o.order_number}${o.customer_name ? ` - ${o.customer_name}` : ""}`,
+            qty,
+          });
+        }
+      }
+
       // Aggregate malts
       for (const rm of maltsResult.data ?? []) {
         const maltCatalog = rm.malts as { name: string } | null;
         const name = maltCatalog?.name ?? "Unknown Malt";
         const entry = getOrCreate(name, "malt", "lbs");
-        const linkedBatches = recipeIdToBatches.get(rm.recipe_id) ?? [];
-        for (const b of linkedBatches) {
-          entry.neededQty += rm.weight_lbs;
-          entry.sources.push({
-            type: "batch",
-            id: b.id,
-            label: `${b.batch_number} - ${b.name}`,
-            qty: rm.weight_lbs,
-          });
-        }
+        addSources(entry, rm.recipe_id, rm.weight_lbs);
       }
 
       // Aggregate hops
@@ -325,16 +365,7 @@ export default function IngredientProjectionsPage() {
         const hopCatalog = rh.hops as { name: string } | null;
         const name = hopCatalog?.name ?? "Unknown Hop";
         const entry = getOrCreate(name, "hop", "oz");
-        const linkedBatches = recipeIdToBatches.get(rh.recipe_id) ?? [];
-        for (const b of linkedBatches) {
-          entry.neededQty += rh.weight_oz;
-          entry.sources.push({
-            type: "batch",
-            id: b.id,
-            label: `${b.batch_number} - ${b.name}`,
-            qty: rh.weight_oz,
-          });
-        }
+        addSources(entry, rh.recipe_id, rh.weight_oz);
       }
 
       // Aggregate adjuncts
@@ -342,16 +373,7 @@ export default function IngredientProjectionsPage() {
         const adjunctCatalog = ra.adjuncts as { name: string } | null;
         const name = adjunctCatalog?.name ?? "Unknown Adjunct";
         const entry = getOrCreate(name, "adjunct", "lbs");
-        const linkedBatches = recipeIdToBatches.get(ra.recipe_id) ?? [];
-        for (const b of linkedBatches) {
-          entry.neededQty += ra.weight_lbs;
-          entry.sources.push({
-            type: "batch",
-            id: b.id,
-            label: `${b.batch_number} - ${b.name}`,
-            qty: ra.weight_lbs,
-          });
-        }
+        addSources(entry, ra.recipe_id, ra.weight_lbs);
       }
 
       // Aggregate yeasts (quantity = 1 pitch per batch)
@@ -359,16 +381,7 @@ export default function IngredientProjectionsPage() {
         const yeastCatalog = ry.yeasts as { name: string } | null;
         const name = yeastCatalog?.name ?? "Unknown Yeast";
         const entry = getOrCreate(name, "yeast", "pkg");
-        const linkedBatches = recipeIdToBatches.get(ry.recipe_id) ?? [];
-        for (const b of linkedBatches) {
-          entry.neededQty += 1;
-          entry.sources.push({
-            type: "batch",
-            id: b.id,
-            label: `${b.batch_number} - ${b.name}`,
-            qty: 1,
-          });
-        }
+        addSources(entry, ry.recipe_id, 1);
       }
 
       // Step 8: Compare against on-hand inventory
