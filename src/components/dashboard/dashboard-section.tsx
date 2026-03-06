@@ -6,6 +6,7 @@
  */
 
 import Link from "next/link";
+import { Inbox, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DashboardSectionProps {
@@ -49,10 +50,21 @@ export function DashboardSection({
 }
 
 /**
- * Empty state for dashboard sections
+ * Empty state for dashboard sections.
+ * Renders an optional icon above a centered message.
  */
-export function DashboardEmpty({ message }: { message: string }) {
+export function DashboardEmpty({
+  message,
+  icon: Icon = Inbox,
+}: {
+  message: string;
+  /** Lucide icon component to display above the message (defaults to Inbox) */
+  icon?: LucideIcon;
+}) {
   return (
-    <p className="text-sm text-muted-foreground py-6 text-center">{message}</p>
+    <div className="flex flex-col items-center justify-center gap-2 py-6">
+      <Icon className="size-8 text-muted-foreground/30" />
+      <p className="text-sm text-muted-foreground text-center">{message}</p>
+    </div>
   );
 }

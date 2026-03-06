@@ -13,7 +13,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { dashboardKeys, planningKeys } from "@/lib/query-keys";
+import { dashboardKeys, onboardingKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
 import Link from "next/link";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
@@ -21,6 +21,7 @@ import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { VESSEL_TYPES } from "@/entities/vessel";
 import { batchEntity } from "@/entities/batch";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { CheckCircle2, Circle, FlaskConical } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense } from "react";
@@ -80,6 +81,73 @@ const DEFAULT_BATCH_COUNTS: BatchStatusCounts = {
   packaging: 0,
   completed: 0,
 };
+
+// =============================================================================
+// Getting Started Checklist
+// =============================================================================
+
+/** Onboarding checklist shown when the brewery has minimal data. Hides once all steps are complete. */
+function GettingStartedChecklist() {
+  const supabase = createClient();
+
+  const { data: counts, isLoading } = useQuery({
+    queryKey: onboardingKeys.counts(),
+    queryFn: async () => {
+      const [locations, recipes, batches] = await Promise.all([
+        supabase.from("locations").select("*", { count: "exact", head: true }),
+        supabase.from("recipes").select("*", { count: "exact", head: true }),
+        supabase.from("batches").select("*", { count: "exact", head: true }),
+      ]);
+      return {
+        locations: locations.count ?? 0,
+        recipes: recipes.count ?? 0,
+        batches: batches.count ?? 0,
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (isLoading || !counts) return null;
+
+  const steps = [
+    { label: "Add your first location", href: "/settings/locations/new", done: counts.locations > 0 },
+    { label: "Create a recipe", href: "/production/recipes/new", done: counts.recipes > 0 },
+    { label: "Start your first batch", href: "/production/batches/new", done: counts.batches > 0 },
+  ];
+
+  const completedCount = steps.filter((s) => s.done).length;
+
+  // Hide when all steps are complete
+  if (completedCount === steps.length) return null;
+
+  return (
+    <DashboardSection title="Getting Started">
+      <div className="divide-y">
+        {steps.map((step) => (
+          <Link
+            key={step.href}
+            href={step.href}
+            className="flex items-center gap-3 py-2"
+          >
+            {step.done ? (
+              <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
+            ) : (
+              <Circle className="size-5 text-muted-foreground/40 shrink-0" />
+            )}
+            <span
+              className={`text-sm ${step.done ? "line-through text-muted-foreground" : ""}`}
+            >
+              {step.label}
+            </span>
+          </Link>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground mt-3">
+        {completedCount} of {steps.length} complete
+      </p>
+    </DashboardSection>
+  );
+}
 
 // =============================================================================
 // Component
@@ -224,6 +292,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Onboarding Checklist (hidden once all steps complete) */}
+      <GettingStartedChecklist />
+
       {/* Header with Stats Strip */}
       <div className="space-y-1">
         <div className="flex items-baseline justify-between">
@@ -252,7 +323,7 @@ export default function DashboardPage() {
           className="lg:col-span-3"
         >
           {activeBatches.length === 0 ? (
-            <DashboardEmpty message="No active batches" />
+            <DashboardEmpty message="No active batches" icon={FlaskConical} />
           ) : (
             <table className="w-full text-sm">
               <thead>
