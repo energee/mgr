@@ -208,6 +208,28 @@ cancelled  cancelled   cancelled   cancelled
 
 ---
 
+## RPC Functions
+
+### `calculate_ingredient_shortfalls(p_horizon_weeks)`
+
+Calculates ingredient shortfalls over a given horizon. Uses lead time cascade: `supplier_catalog.lead_time_days` -> `suppliers.default_lead_time_days` -> 7-day fallback.
+
+Returns: `catalog_type, catalog_id, catalog_name, total_required, available_qty, on_order_qty, shortfall_qty, unit, required_by_date, order_by_date, lead_time_days, preferred_supplier_id, preferred_supplier_name, min_order_qty, unit_price, is_urgent, batch_count`
+
+### `cogs_by_period(p_start_date, p_end_date)`
+
+Returns per-batch cost breakdown using allocation data from inventory lots. Pivots costs by ingredient category (grain, hops, yeast, adjunct, other). Falls back to recipe-estimated COGS when no allocation data exists.
+
+Returns: `batch_id, batch_number, recipe_name, brand_name, volume_bbl, malt_cost, hop_cost, yeast_cost, adjunct_cost, other_cost, total_ingredient_cost, total_landed_cost, cost_per_bbl, has_allocation_data`
+
+### `margin_by_channel(p_start_date, p_end_date)`
+
+Revenue vs estimated COGS by sales channel. Estimates unit COGS via `recipes_with_cogs.cogs_per_bbl / calculate_units_per_bbl()`. Customers without a sales channel are grouped as "Uncategorized".
+
+Returns: `channel_id, channel_name, order_count, total_units, total_revenue, total_cogs, gross_margin, margin_pct`
+
+---
+
 ## Indexes
 
 Performance indexes for purchasing domain tables:

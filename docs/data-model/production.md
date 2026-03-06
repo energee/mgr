@@ -1395,6 +1395,16 @@ CREATE INDEX idx_batch_additions_batch ON batch_additions(batch_id);
 CREATE INDEX idx_batches_recipe_variant ON batches(recipe_variant_id);
 ```
 
+## Report RPC Functions
+
+### `project_finished_goods(p_horizon_weeks)`
+
+Returns expected finished goods output from the production pipeline. Confidence levels based on batch status: conditioning=high, fermenting=medium, planned=low. Uses `batches_in_production_by_brand` view.
+
+Returns: `brand_id, brand_name, batch_id, batch_number, batch_status, volume_bbl, estimated_ready_date, projection_week, confidence`
+
+---
+
 ## Dashboard RPC Functions
 
 ### `get_production_trends(p_days integer DEFAULT 30)`

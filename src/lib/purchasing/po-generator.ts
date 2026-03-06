@@ -26,6 +26,7 @@ export interface POLineItemDraft {
   available_qty: number;
   on_order_qty: number;
   is_urgent: boolean;
+  lead_time_days: number;
 }
 
 export interface PODraft {
@@ -35,6 +36,7 @@ export interface PODraft {
   line_items: POLineItemDraft[];
   estimated_total: number;
   item_count: number;
+  max_lead_time_days: number;
 }
 
 // =============================================================================
@@ -89,6 +91,7 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
       available_qty: shortfall.available_qty,
       on_order_qty: shortfall.on_order_qty,
       is_urgent: shortfall.is_urgent,
+      lead_time_days: shortfall.lead_time_days,
     });
   }
 
@@ -104,6 +107,7 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
       0
     ),
     item_count: group.items.length,
+    max_lead_time_days: Math.max(...group.items.map(i => i.lead_time_days ?? 7), 7),
   }));
 }
 
@@ -214,7 +218,7 @@ export async function createDraftPO(draft: PODraft): Promise<string> {
   // Calculate expected date
   const orderByDate = new Date(draft.order_by_date);
   const expectedDate = new Date(orderByDate);
-  expectedDate.setDate(expectedDate.getDate() + 7); // Default 7 day lead time for multi-item POs
+  expectedDate.setDate(expectedDate.getDate() + (draft.max_lead_time_days ?? 7));
 
   // Create the PO
   const { data: po, error: poError } = await supabase
