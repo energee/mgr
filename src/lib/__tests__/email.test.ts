@@ -8,7 +8,7 @@
  * - Error handling for Resend API failures
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mock the Resend SDK before importing the module under test
@@ -34,12 +34,13 @@ describe("sendEmail", () => {
     mockSend.mockReset();
   });
 
-  it("returns skipped result when RESEND_API_KEY is not set", async () => {
-    // Ensure env has no API key
-    const originalKey = process.env.RESEND_API_KEY;
-    delete process.env.RESEND_API_KEY;
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
 
-    // Re-import to pick up env change
+  it("returns skipped result when RESEND_API_KEY is not set", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+
     const { sendEmail } = await import("../email");
 
     const result = await sendEmail({
@@ -51,14 +52,11 @@ describe("sendEmail", () => {
     expect(result.ok).toBe(true);
     expect(result.skipped).toBe(true);
     expect(mockSend).not.toHaveBeenCalled();
-
-    // Restore
-    if (originalKey) process.env.RESEND_API_KEY = originalKey;
   });
 
   it("sends email and returns id on success", async () => {
-    process.env.RESEND_API_KEY = "re_test_key";
-    process.env.RESEND_FROM_EMAIL = "test@brewery.com";
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "test@brewery.com");
 
     mockSend.mockResolvedValueOnce({
       data: { id: "msg_123" },
@@ -85,15 +83,11 @@ describe("sendEmail", () => {
     expect(callArgs.html).toBe("<p>Your order is confirmed</p>");
     expect(callArgs.text).toBe("Your order is confirmed");
     expect(callArgs.replyTo).toBe("support@brewery.com");
-
-    // Cleanup
-    delete process.env.RESEND_API_KEY;
-    delete process.env.RESEND_FROM_EMAIL;
   });
 
   it("returns error result when Resend API returns an error", async () => {
-    process.env.RESEND_API_KEY = "re_test_key";
-    process.env.RESEND_FROM_EMAIL = "test@brewery.com";
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "test@brewery.com");
 
     mockSend.mockResolvedValueOnce({
       data: null,
@@ -110,14 +104,11 @@ describe("sendEmail", () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe("Invalid API key");
-
-    delete process.env.RESEND_API_KEY;
-    delete process.env.RESEND_FROM_EMAIL;
   });
 
   it("returns error result when Resend throws an exception", async () => {
-    process.env.RESEND_API_KEY = "re_test_key";
-    process.env.RESEND_FROM_EMAIL = "test@brewery.com";
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "test@brewery.com");
 
     mockSend.mockRejectedValueOnce(new Error("Network timeout"));
 
@@ -131,14 +122,11 @@ describe("sendEmail", () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe("Network timeout");
-
-    delete process.env.RESEND_API_KEY;
-    delete process.env.RESEND_FROM_EMAIL;
   });
 
   it("wraps single to address in an array", async () => {
-    process.env.RESEND_API_KEY = "re_test_key";
-    process.env.RESEND_FROM_EMAIL = "test@brewery.com";
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "test@brewery.com");
 
     mockSend.mockResolvedValueOnce({ data: { id: "msg_456" }, error: null });
 
@@ -151,14 +139,11 @@ describe("sendEmail", () => {
     });
 
     expect(mockSend.mock.calls[0][0].to).toEqual(["solo@example.com"]);
-
-    delete process.env.RESEND_API_KEY;
-    delete process.env.RESEND_FROM_EMAIL;
   });
 
   it("passes array of recipients as-is", async () => {
-    process.env.RESEND_API_KEY = "re_test_key";
-    process.env.RESEND_FROM_EMAIL = "test@brewery.com";
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "test@brewery.com");
 
     mockSend.mockResolvedValueOnce({ data: { id: "msg_789" }, error: null });
 
@@ -174,9 +159,6 @@ describe("sendEmail", () => {
       "a@example.com",
       "b@example.com",
     ]);
-
-    delete process.env.RESEND_API_KEY;
-    delete process.env.RESEND_FROM_EMAIL;
   });
 });
 
@@ -186,9 +168,13 @@ describe("sendNotificationEmail", () => {
     mockSend.mockReset();
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("prefixes subject with [MGR]", async () => {
-    process.env.RESEND_API_KEY = "re_test_key";
-    process.env.RESEND_FROM_EMAIL = "test@brewery.com";
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "test@brewery.com");
 
     mockSend.mockResolvedValueOnce({ data: { id: "msg_notif" }, error: null });
 
@@ -203,8 +189,5 @@ describe("sendNotificationEmail", () => {
 
     expect(mockSend).toHaveBeenCalledOnce();
     expect(mockSend.mock.calls[0][0].subject).toBe("[MGR] Low Inventory Alert");
-
-    delete process.env.RESEND_API_KEY;
-    delete process.env.RESEND_FROM_EMAIL;
   });
 });
