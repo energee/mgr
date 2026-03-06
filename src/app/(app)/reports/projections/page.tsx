@@ -14,7 +14,7 @@
  * - By-batch and by-order breakdowns
  */
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
@@ -122,33 +122,40 @@ export default function IngredientProjectionsPage() {
     queryFn: async (): Promise<ProjectionData> => {
       const cutoffDate = format(addDays(new Date(), horizonDays), "yyyy-MM-dd");
 
-      // Step 1: Fetch planned/fermenting batches within horizon
-      const { data: batchRows, error: batchErr } = await supabase
-        .from("batches")
-        .select("id, batch_number, name, status, volume_bbl, planned_start_date, recipe_id, recipes(id, name)")
-        .in("status", ["planned", "fermenting"])
-        .or(`planned_start_date.lte.${cutoffDate},planned_start_date.is.null`);
+      // Steps 1-2: Fetch batches and orders in parallel
+      const [batchResult, orderResult] = await Promise.all([
+        supabase
+          .from("batches")
+          .select("id, batch_number, name, status, volume_bbl, planned_start_date, recipe_id, recipes(id, name)")
+          .in("status", ["planned", "fermenting"])
+          .or(`planned_start_date.lte.${cutoffDate},planned_start_date.is.null`),
+        supabase
+          .from("orders")
+          .select("id, order_number, status, scheduled_date, customers(name)")
+          .in("status", ["confirmed", "scheduled", "picking"])
+          .or(`scheduled_date.lte.${cutoffDate},scheduled_date.is.null`),
+      ]);
 
-      if (batchErr) throw batchErr;
+      if (batchResult.error) throw batchResult.error;
+      if (orderResult.error) throw orderResult.error;
 
-      // Step 2: Fetch confirmed/scheduled/picking orders within horizon
-      const { data: orderRows, error: orderErr } = await supabase
-        .from("orders")
-        .select("id, order_number, status, scheduled_date, customers(name)")
-        .in("status", ["confirmed", "scheduled", "picking"])
-        .or(`scheduled_date.lte.${cutoffDate},scheduled_date.is.null`);
+      const batchRows = batchResult.data;
+      const orderRows = orderResult.data;
 
-      if (orderErr) throw orderErr;
-
-      const batches: BatchSource[] = (batchRows ?? []).map((b) => ({
-        id: b.id,
-        batch_number: b.batch_number,
-        name: b.name,
-        recipe_id: b.recipe_id,
-        status: b.status,
-        planned_start_date: b.planned_start_date,
-        volume_bbl: b.volume_bbl,
-      }));
+      // Map batch rows into BatchSource[] and collect recipe IDs in a single pass
+      const recipeIdSet = new Set<string>();
+      const batches: BatchSource[] = (batchRows ?? []).map((b) => {
+        if (b.recipe_id) recipeIdSet.add(b.recipe_id);
+        return {
+          id: b.id,
+          batch_number: b.batch_number,
+          name: b.name,
+          recipe_id: b.recipe_id,
+          status: b.status,
+          planned_start_date: b.planned_start_date,
+          volume_bbl: b.volume_bbl,
+        };
+      });
 
       const orders: OrderSource[] = (orderRows ?? []).map((o) => {
         const customer = o.customers as { name: string } | null;
@@ -160,12 +167,6 @@ export default function IngredientProjectionsPage() {
           delivery_date: o.scheduled_date,
         };
       });
-
-      // Step 3: Collect recipe IDs from batches
-      const recipeIdSet = new Set<string>();
-      for (const b of batchRows ?? []) {
-        if (b.recipe_id) recipeIdSet.add(b.recipe_id);
-      }
 
       // Step 4: For orders — find linked batches via order_items
       const orderIds = orders.map((o) => o.id);
@@ -200,8 +201,8 @@ export default function IngredientProjectionsPage() {
         return { ingredients: [], batches, orders };
       }
 
-      // Step 5: Fetch recipe ingredients for all collected recipe IDs
-      const [maltsResult, hopsResult, adjunctsResult, yeastsResult] = await Promise.all([
+      // Steps 5-6: Fetch recipe ingredients and on-hand inventory in parallel
+      const [maltsResult, hopsResult, adjunctsResult, yeastsResult, inventoryResult] = await Promise.all([
         supabase
           .from("recipe_malts")
           .select("recipe_id, weight_lbs, malts(name)")
@@ -218,20 +219,19 @@ export default function IngredientProjectionsPage() {
           .from("recipe_yeasts")
           .select("recipe_id, yeasts(name)")
           .in("recipe_id", allRecipeIds),
+        supabase
+          .from("inventory_lots_with_quantities")
+          .select("inventory_item_id, remaining_quantity, unit, inventory_items(name, category)")
+          .gt("remaining_quantity", 0),
       ]);
 
       if (maltsResult.error) throw maltsResult.error;
       if (hopsResult.error) throw hopsResult.error;
       if (adjunctsResult.error) throw adjunctsResult.error;
       if (yeastsResult.error) throw yeastsResult.error;
+      if (inventoryResult.error) throw inventoryResult.error;
 
-      // Step 6: Fetch on-hand inventory
-      const { data: inventoryRows, error: invErr } = await supabase
-        .from("inventory_lots_with_quantities")
-        .select("inventory_item_id, remaining_quantity, unit, inventory_items(name, category)")
-        .gt("remaining_quantity", 0);
-
-      if (invErr) throw invErr;
+      const inventoryRows = inventoryResult.data;
 
       // Step 7: Build ingredient map — aggregate needed quantities by name + category
       type IngKey = string; // "category::name"
@@ -266,11 +266,6 @@ export default function IngredientProjectionsPage() {
         arr.push(b);
         recipeIdToBatches.set(b.recipe_id, arr);
       }
-
-      // For order-linked batches, we need a mapping from recipe_id to orders
-      const recipeIdToOrders = new Map<string, OrderSource[]>();
-      // This is a simplification — we track order_items with batch_id linking to recipes
-      // For now, we attribute order ingredient needs to the batch sources
 
       // Aggregate malts
       for (const rm of maltsResult.data ?? []) {

@@ -23,8 +23,8 @@ import {
   endOfMonth,
   parseISO,
   startOfQuarter,
-  endOfQuarter,
 } from "date-fns";
+import { formatCurrency, formatBbl } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -136,25 +136,6 @@ interface CogsPeriodRow {
 }
 
 // =============================================================================
-// Helpers
-// =============================================================================
-
-function formatCurrency(value: number | null | undefined): string {
-  if (value == null) return "--";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatBbl(value: number | null | undefined): string {
-  if (value == null) return "--";
-  return value.toFixed(2);
-}
-
-// =============================================================================
 // Component
 // =============================================================================
 
@@ -206,24 +187,23 @@ export default function CogsReportPage() {
 
       const batchIds = batches.map((b) => b.id);
 
-      // Step 2: Get all allocations destined for these batches
-      const { data: allocations, error: allocErr } = await supabase
-        .from("allocations")
-        .select(
-          "id, destination_id, quantity, unit_cost, source_id, source_type"
-        )
-        .eq("destination_type", "batch")
-        .in("destination_id", batchIds)
-        .in("status", ["completed", "planned"]);
+      // Step 2: Get allocations and finished goods in parallel
+      const [{ data: allocations, error: allocErr }, { data: finishedGoods, error: fgErr }] = await Promise.all([
+        supabase
+          .from("allocations")
+          .select(
+            "id, destination_id, quantity, unit_cost, source_id, source_type"
+          )
+          .eq("destination_type", "batch")
+          .in("destination_id", batchIds)
+          .in("status", ["completed", "planned"]),
+        supabase
+          .from("finished_goods")
+          .select("batch_id, quantity")
+          .in("batch_id", batchIds),
+      ]);
 
       if (allocErr) throw allocErr;
-
-      // Step 3: Get finished goods grouped by batch_id
-      const { data: finishedGoods, error: fgErr } = await supabase
-        .from("finished_goods")
-        .select("batch_id, quantity")
-        .in("batch_id", batchIds);
-
       if (fgErr) throw fgErr;
 
       // Step 4: Aggregate costs per batch
@@ -360,13 +340,19 @@ export default function CogsReportPage() {
       const batchIds = [...new Set(fgRows.map((fg) => fg.batch_id).filter(Boolean))] as string[];
       if (batchIds.length === 0) return [];
 
-      // Get batch costs from allocations
-      const { data: allocations, error: allocErr } = await supabase
-        .from("allocations")
-        .select("destination_id, quantity, unit_cost")
-        .eq("destination_type", "batch")
-        .in("destination_id", batchIds)
-        .in("status", ["completed", "planned"]);
+      // Get batch costs and batch info in parallel
+      const [{ data: allocations, error: allocErr }, { data: batchInfo }] = await Promise.all([
+        supabase
+          .from("allocations")
+          .select("destination_id, quantity, unit_cost")
+          .eq("destination_type", "batch")
+          .in("destination_id", batchIds)
+          .in("status", ["completed", "planned"]),
+        supabase
+          .from("batches")
+          .select("id, batch_number")
+          .in("id", batchIds),
+      ]);
 
       if (allocErr) throw allocErr;
 
@@ -390,12 +376,6 @@ export default function CogsReportPage() {
           (totalUnitsByBatch.get(fg.batch_id) ?? 0) + (fg.quantity ?? 0)
         );
       }
-
-      // Get batch numbers for display
-      const { data: batchInfo } = await supabase
-        .from("batches")
-        .select("id, batch_number")
-        .in("id", batchIds);
 
       const batchNumberMap = new Map<string, string>();
       for (const b of batchInfo || []) {
@@ -516,7 +496,7 @@ export default function CogsReportPage() {
       // Get batches in date range
       const { data: batches, error: batchErr } = await supabase
         .from("batches")
-        .select("id, created_at, volume_bbl")
+        .select("id, created_at")
         .gte("created_at", fromDate)
         .lte("created_at", toDate + "T23:59:59Z")
         .not("status", "in", '("cancelled","archived")');
