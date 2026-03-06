@@ -401,14 +401,18 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     defaultValues: formDefaults,
   });
 
-  // When data loads, reset form with record values + store version
+  // When data loads, reset form with record values + store version.
+  // Always track latest data, but only reset the form when not editing
+  // to prevent discarding the user's in-progress changes.
   const prevDataRef = useRef<T | null>(null);
   useEffect(() => {
-    if (data && data !== prevDataRef.current) {
+    if (data) {
       prevDataRef.current = data;
-      resetFormFromRecord(form, data as Record<string, unknown>, formDefaults, loadedVersionRef);
+      if (!editing) {
+        resetFormFromRecord(form, data as Record<string, unknown>, formDefaults, loadedVersionRef);
+      }
     }
-  }, [data, form, formDefaults]);
+  }, [data, form, formDefaults, editing]);
 
   // ---------------------------------------------------------------------------
   // onFieldChange subscription
