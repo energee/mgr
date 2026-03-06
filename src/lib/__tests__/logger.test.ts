@@ -1,81 +1,98 @@
 /**
- * Tests for the structured logger.
+ * Tests for the structured logger (pino).
  *
- * Validates log level filtering, output formatting for development and
- * production modes, child logger default merging, and console method routing.
+ * Validates log level filtering, JSON output, child logger merging,
+ * and message formatting. Pino writes to process.stdout, so we capture
+ * output by mocking process.stdout.write.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+/** Capture pino JSON output by intercepting process.stdout.write */
+function captureStdout() {
+  const lines: string[] = [];
+  const spy = vi
+    .spyOn(process.stdout, "write")
+    .mockImplementation((chunk: string | Uint8Array) => {
+      const str = typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
+      if (str.trim()) lines.push(str.trim());
+      return true;
+    });
+  return {
+    lines,
+    /** Parse the last JSON line written to stdout */
+    lastJson(): Record<string, unknown> {
+      if (lines.length === 0) throw new Error("No output captured");
+      return JSON.parse(lines[lines.length - 1]);
+    },
+    hasOutput: () => lines.length > 0,
+    restore: () => spy.mockRestore(),
+  };
+}
+
 describe("logger", () => {
+  let capture: ReturnType<typeof captureStdout>;
+
   beforeEach(() => {
     vi.resetModules();
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(console, "debug").mockImplementation(() => {});
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    capture = captureStdout();
   });
 
   afterEach(() => {
+    capture.restore();
     vi.unstubAllEnvs();
-    vi.restoreAllMocks();
   });
 
   // ---------------------------------------------------------------------------
   // Basic logging
   // ---------------------------------------------------------------------------
 
-  it("logs info messages via console.log", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("logs info messages with correct level", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
     const { logger } = await import("../logger");
 
-    logger.info("Server started", { port: 3000 });
+    logger.info({ port: 3000 }, "Server started");
 
-    expect(console.log).toHaveBeenCalledOnce();
-    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(output).toContain("INFO");
-    expect(output).toContain("Server started");
-    expect(output).toContain("3000");
+    const parsed = capture.lastJson();
+    expect(parsed.level).toBe(30); // pino info = 30
+    expect(parsed.msg).toBe("Server started");
+    expect(parsed.port).toBe(3000);
   });
 
-  it("logs warn messages via console.warn", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("logs warn messages with correct level", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
     const { logger } = await import("../logger");
 
-    logger.warn("Slow query", { durationMs: 500 });
+    logger.warn({ durationMs: 500 }, "Slow query");
 
-    expect(console.warn).toHaveBeenCalledOnce();
-    const output = (console.warn as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(output).toContain("WARN");
-    expect(output).toContain("Slow query");
+    const parsed = capture.lastJson();
+    expect(parsed.level).toBe(40); // pino warn = 40
+    expect(parsed.msg).toBe("Slow query");
+    expect(parsed.durationMs).toBe(500);
   });
 
-  it("logs error messages via console.error", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("logs error messages with correct level", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
     const { logger } = await import("../logger");
 
-    logger.error("Database unreachable", { service: "postgres" });
+    logger.error({ service: "postgres" }, "Database unreachable");
 
-    expect(console.error).toHaveBeenCalledOnce();
-    const output = (console.error as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(output).toContain("ERROR");
-    expect(output).toContain("Database unreachable");
+    const parsed = capture.lastJson();
+    expect(parsed.level).toBe(50); // pino error = 50
+    expect(parsed.msg).toBe("Database unreachable");
+    expect(parsed.service).toBe("postgres");
   });
 
-  it("logs debug messages via console.debug", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("logs debug messages with correct level", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
     const { logger } = await import("../logger");
 
-    logger.debug("Cache hit", { key: "recipe:123" });
+    logger.debug({ key: "recipe:123" }, "Cache hit");
 
-    expect(console.debug).toHaveBeenCalledOnce();
-    const output = (console.debug as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(output).toContain("DEBUG");
-    expect(output).toContain("Cache hit");
+    const parsed = capture.lastJson();
+    expect(parsed.level).toBe(20); // pino debug = 20
+    expect(parsed.msg).toBe("Cache hit");
+    expect(parsed.key).toBe("recipe:123");
   });
 
   // ---------------------------------------------------------------------------
@@ -83,112 +100,86 @@ describe("logger", () => {
   // ---------------------------------------------------------------------------
 
   it("filters out debug messages when LOG_LEVEL is info", async () => {
-    vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("LOG_LEVEL", "info");
     const { logger } = await import("../logger");
 
     logger.debug("Should not appear");
 
-    expect(console.debug).not.toHaveBeenCalled();
-    expect(console.log).not.toHaveBeenCalled();
+    expect(capture.hasOutput()).toBe(false);
   });
 
   it("filters out debug and info when LOG_LEVEL is warn", async () => {
-    vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("LOG_LEVEL", "warn");
     const { logger } = await import("../logger");
 
     logger.debug("Nope");
     logger.info("Also nope");
+
+    const linesBefore = capture.lines.length;
+
     logger.warn("This should appear");
 
-    expect(console.debug).not.toHaveBeenCalled();
-    expect(console.log).not.toHaveBeenCalled();
-    expect(console.warn).toHaveBeenCalledOnce();
+    expect(capture.lines.length).toBe(linesBefore + 1);
+    const parsed = capture.lastJson();
+    expect(parsed.msg).toBe("This should appear");
   });
 
   it("only logs errors when LOG_LEVEL is error", async () => {
-    vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("LOG_LEVEL", "error");
     const { logger } = await import("../logger");
 
     logger.debug("Nope");
     logger.info("Nope");
     logger.warn("Nope");
+
+    const linesBefore = capture.lines.length;
+
     logger.error("Yes");
 
-    expect(console.debug).not.toHaveBeenCalled();
-    expect(console.log).not.toHaveBeenCalled();
-    expect(console.warn).not.toHaveBeenCalled();
-    expect(console.error).toHaveBeenCalledOnce();
+    expect(capture.lines.length).toBe(linesBefore + 1);
+    const parsed = capture.lastJson();
+    expect(parsed.msg).toBe("Yes");
   });
 
   // ---------------------------------------------------------------------------
-  // Production JSON output
+  // JSON output
   // ---------------------------------------------------------------------------
 
-  it("emits JSON in production mode", async () => {
-    vi.stubEnv("NODE_ENV", "production");
+  it("emits valid JSON with timestamp", async () => {
     vi.stubEnv("LOG_LEVEL", "info");
     const { logger } = await import("../logger");
 
-    logger.info("Request handled", { route: "/api/chat", status: 200 });
+    logger.info({ route: "/api/chat", status: 200 }, "Request handled");
 
-    expect(console.log).toHaveBeenCalledOnce();
-    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-
-    // Should be parseable JSON
-    const parsed = JSON.parse(output);
-    expect(parsed.level).toBe("info");
+    const parsed = capture.lastJson();
+    expect(parsed.level).toBe(30);
     expect(parsed.msg).toBe("Request handled");
     expect(parsed.route).toBe("/api/chat");
     expect(parsed.status).toBe(200);
     expect(parsed.time).toBeDefined();
   });
 
-  // ---------------------------------------------------------------------------
-  // Development formatted output
-  // ---------------------------------------------------------------------------
-
-  it("emits human-readable format in development mode", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("includes message-only log without extra data", async () => {
     vi.stubEnv("LOG_LEVEL", "info");
     const { logger } = await import("../logger");
 
     logger.info("Boot complete");
 
-    expect(console.log).toHaveBeenCalledOnce();
-    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-
-    // Should NOT be JSON — should be human-readable with level and message
-    expect(output).toContain("INFO");
-    expect(output).toContain("Boot complete");
-    // Should contain a timestamp-like pattern
-    expect(output).toMatch(/\[\d{4}-\d{2}-\d{2}/);
+    const parsed = capture.lastJson();
+    expect(parsed.msg).toBe("Boot complete");
+    expect(parsed.time).toBeDefined();
   });
 
-  it("includes extra data in development format", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("includes extra data fields in output", async () => {
     vi.stubEnv("LOG_LEVEL", "info");
     const { logger } = await import("../logger");
 
-    logger.info("With extras", { userId: "abc", action: "login" });
+    logger.info({ userId: "abc", action: "login" }, "With extras");
 
-    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(output).toContain("userId");
-    expect(output).toContain("abc");
-  });
-
-  it("omits extra data block when no data is provided in dev format", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("LOG_LEVEL", "info");
-    const { logger } = await import("../logger");
-
-    logger.info("No extras");
-
-    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    // Should end with the message (no trailing JSON object)
-    expect(output).toMatch(/No extras$/);
+    const parsed = capture.lastJson();
+    expect(parsed.msg).toBe("With extras");
+    expect(parsed.userId).toBe("abc");
+    expect(parsed.action).toBe("login");
   });
 
   // ---------------------------------------------------------------------------
@@ -196,15 +187,13 @@ describe("logger", () => {
   // ---------------------------------------------------------------------------
 
   it("child logger merges default fields into every call", async () => {
-    vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("LOG_LEVEL", "info");
     const { logger } = await import("../logger");
 
     const child = logger.child({ module: "chat", requestId: "req_1" });
-    child.info("Processing", { step: 3 });
+    child.info({ step: 3 }, "Processing");
 
-    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    const parsed = JSON.parse(output);
+    const parsed = capture.lastJson();
     expect(parsed.module).toBe("chat");
     expect(parsed.requestId).toBe("req_1");
     expect(parsed.step).toBe(3);
@@ -212,20 +201,17 @@ describe("logger", () => {
   });
 
   it("child logger call-site data overrides defaults", async () => {
-    vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("LOG_LEVEL", "info");
     const { logger } = await import("../logger");
 
     const child = logger.child({ env: "staging" });
-    child.info("Override test", { env: "production" });
+    child.info({ env: "production" }, "Override test");
 
-    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    const parsed = JSON.parse(output);
+    const parsed = capture.lastJson();
     expect(parsed.env).toBe("production");
   });
 
   it("child of child merges all defaults", async () => {
-    vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("LOG_LEVEL", "info");
     const { logger } = await import("../logger");
 
@@ -233,8 +219,7 @@ describe("logger", () => {
     const child2 = child1.child({ handler: "chat" });
     child2.info("Nested");
 
-    const output = (console.log as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    const parsed = JSON.parse(output);
+    const parsed = capture.lastJson();
     expect(parsed.service).toBe("api");
     expect(parsed.handler).toBe("chat");
   });

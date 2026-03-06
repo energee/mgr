@@ -8,6 +8,9 @@
  * - Vessel utilization lanes
  * - Demand markers from orders
  * - Interactive batch creation and scheduling
+ *
+ * Responsive: narrows day columns (40px vs 48px) and adjusts row heights
+ * on mobile for better touch targets and readability.
  */
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -26,6 +29,7 @@ import {
   parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { batchEntity } from "@/entities/batch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -98,18 +102,45 @@ interface VesselInfo {
  * per-status values. The stateDisplay colors ("default", "info", etc.) are
  * mapped to Tailwind bg/border/text classes appropriate for the timeline bars.
  */
-const TIMELINE_COLOR_MAP: Record<string, { bg: string; border: string; text: string }> = {
-  default: { bg: "bg-secondary", border: "border-secondary-foreground/30", text: "text-secondary-foreground" },
-  info: { bg: "bg-orange-50", border: "border-orange-400", text: "text-orange-800" },
-  warning: { bg: "bg-amber-50", border: "border-amber-400", text: "text-amber-800" },
-  success: { bg: "bg-emerald-50", border: "border-emerald-400", text: "text-emerald-800" },
-  error: { bg: "bg-red-50", border: "border-red-400", text: "text-red-800" },
+const TIMELINE_COLOR_MAP: Record<
+  string,
+  { bg: string; border: string; text: string }
+> = {
+  default: {
+    bg: "bg-secondary",
+    border: "border-secondary-foreground/30",
+    text: "text-secondary-foreground",
+  },
+  info: {
+    bg: "bg-orange-50",
+    border: "border-orange-400",
+    text: "text-orange-800",
+  },
+  warning: {
+    bg: "bg-amber-50",
+    border: "border-amber-400",
+    text: "text-amber-800",
+  },
+  success: {
+    bg: "bg-emerald-50",
+    border: "border-emerald-400",
+    text: "text-emerald-800",
+  },
+  error: {
+    bg: "bg-red-50",
+    border: "border-red-400",
+    text: "text-red-800",
+  },
 };
 
 const FALLBACK_TIMELINE_COLORS = TIMELINE_COLOR_MAP.default;
 
 /** Resolve timeline bar colors for a batch status from entity stateDisplay config. */
-function getTimelineColors(status: string): { bg: string; border: string; text: string } {
+function getTimelineColors(status: string): {
+  bg: string;
+  border: string;
+  text: string;
+} {
   const stateDisplay = batchEntity.stateMachine?.stateDisplay;
   const semanticColor = stateDisplay?.[status]?.color ?? "default";
   return TIMELINE_COLOR_MAP[semanticColor] ?? FALLBACK_TIMELINE_COLORS;
@@ -138,8 +169,16 @@ export default function ProductionTimelinePage() {
 
   // View state
   const [weeksToShow, setWeeksToShow] = useState(6);
-  const [startDate, setStartDate] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [selectedShortfall, setSelectedShortfall] = useState<ProductionShortfall | null>(null);
+  const [startDate, setStartDate] = useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 1 }),
+  );
+  const [selectedShortfall, setSelectedShortfall] =
+    useState<ProductionShortfall | null>(null);
+  const isMobile = useIsMobile();
+
+  // Responsive day column width: narrower on mobile for better touch targets
+  const dayWidth = isMobile ? 40 : 48;
+  const dayWidthClass = isMobile ? "w-10" : "w-12";
 
   // Filter state
   const [brandFilter, setBrandFilter] = useState<string>("_all");
@@ -151,11 +190,15 @@ export default function ProductionTimelinePage() {
 
   // Fetch batches with recipe info
   const { data: batches = [] } = useQuery({
-    queryKey: entityKeys.timeline("batches_with_brew_info", startDate.toISOString()),
+    queryKey: entityKeys.timeline(
+      "batches_with_brew_info",
+      startDate.toISOString(),
+    ),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
-        .select(`
+        .select(
+          `
           id,
           batch_number,
           name,
@@ -171,7 +214,8 @@ export default function ProductionTimelinePage() {
             conditioning_days,
             brands:brand_id (name)
           )
-        `)
+        `,
+        )
         .in("status", ["planned", "fermenting", "conditioning", "packaging"])
         .gte("planned_start_date", addDays(startDate, -30).toISOString())
         .lte("planned_start_date", addDays(endDate, 30).toISOString())
@@ -180,10 +224,18 @@ export default function ProductionTimelinePage() {
       if (error) throw error;
 
       return (data || []).map((b) => {
-        const recipe = b.recipes as { name: string; brand_id: string; fermentation_days: number; conditioning_days: number; brands: { name: string } } | null;
+        const recipe = b.recipes as {
+          name: string;
+          brand_id: string;
+          fermentation_days: number;
+          conditioning_days: number;
+          brands: { name: string };
+        } | null;
         const fermDays = recipe?.fermentation_days || 14;
         const condDays = recipe?.conditioning_days || 7;
-        const startDt = b.planned_start_date ? parseISO(b.planned_start_date) : null;
+        const startDt = b.planned_start_date
+          ? parseISO(b.planned_start_date)
+          : null;
 
         return {
           ...b,
@@ -233,7 +285,10 @@ export default function ProductionTimelinePage() {
 
   // Fetch recipes for filtering (filtered by brand if selected)
   const { data: recipes = [] } = useQuery({
-    queryKey: brandFilter !== "_all" ? recipeKeys.byBrand(brandFilter) : recipeKeys.list(),
+    queryKey:
+      brandFilter !== "_all"
+        ? recipeKeys.byBrand(brandFilter)
+        : recipeKeys.list(),
     queryFn: async () => {
       let query = supabase
         .from("recipes")
@@ -253,12 +308,19 @@ export default function ProductionTimelinePage() {
 
   // Fetch shortfalls for demand markers
   const { data: shortfalls = [] } = useQuery({
-    queryKey: planningKeys.shortfalls({ includeDrafts: true, horizonWeeks: weeksToShow + 2 }),
+    queryKey: planningKeys.shortfalls({
+      includeDrafts: true,
+      horizonWeeks: weeksToShow + 2,
+    }),
     queryFn: async () => {
-      const { data, error } = await dynamicRpc(supabase, "calculate_production_shortfalls", {
-        p_include_drafts: true,
-        p_horizon_weeks: weeksToShow + 2,
-      });
+      const { data, error } = await dynamicRpc(
+        supabase,
+        "calculate_production_shortfalls",
+        {
+          p_include_drafts: true,
+          p_horizon_weeks: weeksToShow + 2,
+        },
+      );
       if (error) throw error;
       return (data || []) as ProductionShortfall[];
     },
@@ -293,33 +355,38 @@ export default function ProductionTimelinePage() {
   // Navigation
   const goToPrevious = () => setStartDate((d) => addWeeks(d, -weeksToShow));
   const goToNext = () => setStartDate((d) => addWeeks(d, weeksToShow));
-  const goToToday = () => setStartDate(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const goToToday = () =>
+    setStartDate(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
   // Scroll to today on mount
   useEffect(() => {
     if (scrollContainerRef.current) {
       const todayIndex = days.findIndex((d) => isToday(d));
       if (todayIndex > 0) {
-        const dayWidth = 48; // matches w-12
-        scrollContainerRef.current.scrollLeft = Math.max(0, (todayIndex - 3) * dayWidth);
+        scrollContainerRef.current.scrollLeft = Math.max(
+          0,
+          (todayIndex - 3) * dayWidth,
+        );
       }
     }
-  }, [days]);
+  }, [days, dayWidth]);
 
   // Calculate batch position and width
   const getBatchStyle = (batch: TimelineBatch) => {
     if (!batch.planned_start_date) return null;
 
     const batchStart = parseISO(batch.planned_start_date);
-    const totalDays = (batch.fermentation_days || 14) + (batch.conditioning_days || 7);
+    const totalDays =
+      (batch.fermentation_days || 14) + (batch.conditioning_days || 7);
 
     const startOffset = differenceInDays(batchStart, startDate);
     const duration = totalDays;
 
     if (startOffset + duration < 0 || startOffset > days.length) return null;
 
-    const left = Math.max(0, startOffset) * 48; // 48px per day (w-12)
-    const width = Math.min(duration, days.length - Math.max(0, startOffset)) * 48;
+    const left = Math.max(0, startOffset) * dayWidth;
+    const width =
+      Math.min(duration, days.length - Math.max(0, startOffset)) * dayWidth;
 
     return { left, width, startOffset, duration };
   };
@@ -344,19 +411,27 @@ export default function ProductionTimelinePage() {
               </h1>
               <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
                 <Link href="/production/planning">
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                  >
                     <List className="h-4 w-4 mr-1" />
                     List
                   </Button>
                 </Link>
-                <Button variant="ghost" size="sm" className="h-7 px-2 bg-background shadow-sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 bg-background shadow-sm"
+                >
                   <Calendar className="h-4 w-4 mr-1" />
                   Timeline
                 </Button>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               {/* Brand filter */}
               <Select
                 value={brandFilter}
@@ -366,7 +441,7 @@ export default function ProductionTimelinePage() {
                   setRecipeFilter("_all");
                 }}
               >
-                <SelectTrigger className="w-[140px] h-8">
+                <SelectTrigger className="w-full md:w-[140px] h-8">
                   <SelectValue placeholder="All Brands" />
                 </SelectTrigger>
                 <SelectContent>
@@ -381,7 +456,7 @@ export default function ProductionTimelinePage() {
 
               {/* Recipe filter */}
               <Select value={recipeFilter} onValueChange={setRecipeFilter}>
-                <SelectTrigger className="w-[160px] h-8">
+                <SelectTrigger className="w-full md:w-[160px] h-8">
                   <SelectValue placeholder="All Recipes" />
                 </SelectTrigger>
                 <SelectContent>
@@ -395,8 +470,11 @@ export default function ProductionTimelinePage() {
               </Select>
 
               {/* Time range selector */}
-              <Select value={weeksToShow.toString()} onValueChange={(v) => setWeeksToShow(parseInt(v))}>
-                <SelectTrigger className="w-[120px] h-8">
+              <Select
+                value={weeksToShow.toString()}
+                onValueChange={(v) => setWeeksToShow(parseInt(v))}
+              >
+                <SelectTrigger className="w-full md:w-[120px] h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -409,32 +487,59 @@ export default function ProductionTimelinePage() {
 
               {/* Navigation */}
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={goToPrevious} aria-label="Previous period">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={goToPrevious}
+                  aria-label="Previous period"
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="sm" className="h-8" onClick={goToToday}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={goToToday}
+                >
                   Today
                 </Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={goToNext} aria-label="Next period">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={goToNext}
+                  aria-label="Next period"
+                >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Legend — derive statuses from entity config (DEC-007) */}
-          <div className="flex items-center gap-4 mt-3 text-xs">
+          {/* Legend — derive statuses from entity config (DEC-007), hidden on mobile */}
+          <div className="hidden md:flex items-center gap-4 mt-3 text-xs">
             <span className="text-muted-foreground">Status:</span>
-            {Object.keys(batchEntity.stateMachine?.stateDisplay ?? {}).map((status) => {
-              const colors = getTimelineColors(status);
-              const label = batchEntity.stateMachine?.stateDisplay?.[status]?.label ?? status;
-              return (
-                <div key={status} className="flex items-center gap-1.5">
-                  <div className={cn("w-3 h-3 rounded-sm border", colors.bg, colors.border)} />
-                  <span className="text-muted-foreground">{label}</span>
-                </div>
-              );
-            })}
+            {Object.keys(batchEntity.stateMachine?.stateDisplay ?? {}).map(
+              (status) => {
+                const colors = getTimelineColors(status);
+                const label =
+                  batchEntity.stateMachine?.stateDisplay?.[status]?.label ??
+                  status;
+                return (
+                  <div key={status} className="flex items-center gap-1.5">
+                    <div
+                      className={cn(
+                        "w-3 h-3 rounded-sm border",
+                        colors.bg,
+                        colors.border,
+                      )}
+                    />
+                    <span className="text-muted-foreground">{label}</span>
+                  </div>
+                );
+              },
+            )}
             <div className="flex items-center gap-1.5 ml-4">
               <AlertTriangle className="h-3 w-3 text-destructive" />
               <span className="text-muted-foreground">Shortfall</span>
@@ -448,7 +553,9 @@ export default function ProductionTimelinePage() {
           <div className="flex-none w-28 md:w-40 border-r bg-muted/30">
             {/* Header spacer */}
             <div className="h-14 border-b px-3 flex items-end pb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vessels</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Vessels
+              </span>
             </div>
 
             {/* Vessel rows */}
@@ -456,20 +563,27 @@ export default function ProductionTimelinePage() {
               <div
                 key={vesselName}
                 className={cn(
-                  "h-16 border-b px-3 flex items-center",
-                  vesselName === "unassigned" && "bg-muted/50"
+                  "border-b px-3 flex items-center",
+                  isMobile ? "h-[52px]" : "h-16",
+                  vesselName === "unassigned" && "bg-muted/50",
                 )}
               >
                 <div className="truncate">
-                  <div className={cn(
-                    "font-medium text-sm",
-                    vesselName === "unassigned" ? "text-muted-foreground italic" : "text-foreground"
-                  )}>
+                  <div
+                    className={cn(
+                      "font-medium text-sm",
+                      vesselName === "unassigned"
+                        ? "text-muted-foreground italic"
+                        : "text-foreground",
+                    )}
+                  >
                     {vesselName === "unassigned" ? "Unassigned" : vesselName}
                   </div>
                   {vesselName !== "unassigned" && (
                     <div className="text-xs text-muted-foreground">
-                      {vessels.find((v) => v.name === vesselName)?.capacity_bbl || "—"} BBL
+                      {vessels.find((v) => v.name === vesselName)
+                        ?.capacity_bbl || "\u2014"}{" "}
+                      BBL
                     </div>
                   )}
                 </div>
@@ -479,15 +593,24 @@ export default function ProductionTimelinePage() {
             {/* Demand row label */}
             <div className="h-20 border-b px-3 flex items-center bg-destructive/5">
               <div>
-                <div className="font-medium text-sm text-destructive">Demand</div>
+                <div className="font-medium text-sm text-destructive">
+                  Demand
+                </div>
                 <div className="text-xs text-destructive/70">Shortfalls</div>
               </div>
             </div>
           </div>
 
           {/* Scrollable Timeline */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-x-auto overflow-y-hidden" style={{ WebkitOverflowScrolling: "touch" }}>
-            <div style={{ width: days.length * 48 }} className="min-h-full">
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-x-auto overflow-y-hidden"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            <div
+              style={{ width: days.length * dayWidth }}
+              className="min-h-full"
+            >
               {/* Date Headers */}
               <div className="h-14 border-b flex sticky top-0 bg-background/95 backdrop-blur-sm z-10">
                 {days.map((day, i) => {
@@ -498,9 +621,10 @@ export default function ProductionTimelinePage() {
                     <div
                       key={i}
                       className={cn(
-                        "w-12 flex-none border-r border-border/30 flex flex-col items-center justify-end pb-1",
+                        dayWidthClass,
+                        "flex-none border-r border-border/30 flex flex-col items-center justify-end pb-1",
                         isWeekStart && "border-l border-border",
-                        today && "bg-primary/5"
+                        today && "bg-primary/5",
                       )}
                     >
                       {isWeekStart && (
@@ -508,16 +632,20 @@ export default function ProductionTimelinePage() {
                           {format(day, "MMM")}
                         </div>
                       )}
-                      <div className={cn(
-                        "text-xs font-medium",
-                        today ? "text-primary" : "text-muted-foreground"
-                      )}>
+                      <div
+                        className={cn(
+                          "text-xs font-medium",
+                          today ? "text-primary" : "text-muted-foreground",
+                        )}
+                      >
                         {format(day, "d")}
                       </div>
-                      <div className={cn(
-                        "text-[10px]",
-                        today ? "text-primary" : "text-muted-foreground/60"
-                      )}>
+                      <div
+                        className={cn(
+                          "text-[10px]",
+                          today ? "text-primary" : "text-muted-foreground/60",
+                        )}
+                      >
                         {format(day, "EEE")}
                       </div>
                     </div>
@@ -526,81 +654,103 @@ export default function ProductionTimelinePage() {
               </div>
 
               {/* Vessel Rows */}
-              {Array.from(batchesByVessel.entries()).map(([vesselName, vesselBatches]) => (
-                <div
-                  key={vesselName}
-                  className={cn(
-                    "h-16 border-b relative",
-                    vesselName === "unassigned" && "bg-muted/20"
-                  )}
-                >
-                  {/* Grid lines */}
-                  <div className="absolute inset-0 flex pointer-events-none">
-                    {days.map((day, i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          "w-12 flex-none border-r border-border/20",
-                          day.getDay() === 1 && "border-l border-border/40",
-                          isToday(day) && "bg-primary/5"
-                        )}
-                      />
-                    ))}
-                  </div>
+              {Array.from(batchesByVessel.entries()).map(
+                ([vesselName, vesselBatches]) => (
+                  <div
+                    key={vesselName}
+                    className={cn(
+                      "border-b relative",
+                      isMobile ? "h-[52px]" : "h-16",
+                      vesselName === "unassigned" && "bg-muted/20",
+                    )}
+                  >
+                    {/* Grid lines */}
+                    <div className="absolute inset-0 flex pointer-events-none">
+                      {days.map((day, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            dayWidthClass,
+                            "flex-none border-r border-border/20",
+                            day.getDay() === 1 && "border-l border-border/40",
+                            isToday(day) && "bg-primary/5",
+                          )}
+                        />
+                      ))}
+                    </div>
 
-                  {/* Batch bars */}
-                  {vesselBatches.map((batch) => {
-                    const style = getBatchStyle(batch);
-                    if (!style) return null;
+                    {/* Batch bars */}
+                    {vesselBatches.map((batch) => {
+                      const style = getBatchStyle(batch);
+                      if (!style) return null;
 
-                    const colors = getTimelineColors(batch.status);
+                      const colors = getTimelineColors(batch.status);
 
-                    return (
-                      <Tooltip key={batch.id}>
-                        <TooltipTrigger asChild>
-                          <Link
-                            href={`/production/batches/${batch.id}`}
-                            className={cn(
-                              "absolute top-2 h-12 rounded-md border-2 flex items-center px-2 gap-1.5",
-                              "cursor-pointer transition-all hover:scale-[1.02] hover:z-20",
-                              "shadow-sm",
-                              colors.bg,
-                              colors.border,
-                              colors.text
-                            )}
-                            style={{ left: style.left, width: Math.max(style.width - 4, 40) }}
-                          >
-                            {STATUS_ICONS[batch.status]}
-                            <span className="text-xs font-medium truncate">
-                              {batch.batch_number}
-                            </span>
-                            {batch.volume_bbl && (
-                              <Badge variant="outline" className="ml-auto text-[10px] h-4 px-1 border-current/30">
-                                {batch.volume_bbl} BBL
-                              </Badge>
-                            )}
-                          </Link>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <div className="space-y-1">
-                            <div className="font-semibold">{batch.batch_number}</div>
-                            <div>{batch.name}</div>
-                            {batch.brand_name && (
-                              <div className="text-muted-foreground text-xs">{batch.brand_name} • {batch.recipe_name}</div>
-                            )}
-                            <div className="text-xs text-muted-foreground pt-1 border-t">
-                              {batch.fermentation_days}d ferm + {batch.conditioning_days}d cond
-                              {batch.estimated_ready_date && (
-                                <span className="ml-2">→ Ready {format(parseISO(batch.estimated_ready_date), "MMM d")}</span>
+                      return (
+                        <Tooltip key={batch.id}>
+                          <TooltipTrigger asChild>
+                            <Link
+                              href={`/production/batches/${batch.id}`}
+                              className={cn(
+                                "absolute top-1 rounded-md border-2 flex items-center px-2 gap-1.5",
+                                "cursor-pointer transition-all hover:scale-[1.02] hover:z-20",
+                                "shadow-sm",
+                                isMobile ? "h-[44px]" : "h-12",
+                                colors.bg,
+                                colors.border,
+                                colors.text,
                               )}
+                              style={{
+                                left: style.left,
+                                width: Math.max(style.width - 4, 40),
+                              }}
+                            >
+                              {STATUS_ICONS[batch.status]}
+                              <span className="text-xs font-medium truncate">
+                                {batch.batch_number}
+                              </span>
+                              {batch.volume_bbl && (
+                                <Badge
+                                  variant="outline"
+                                  className="ml-auto text-[10px] h-4 px-1 border-current/30"
+                                >
+                                  {batch.volume_bbl} BBL
+                                </Badge>
+                              )}
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <div className="space-y-1">
+                              <div className="font-semibold">
+                                {batch.batch_number}
+                              </div>
+                              <div>{batch.name}</div>
+                              {batch.brand_name && (
+                                <div className="text-muted-foreground text-xs">
+                                  {batch.brand_name} &bull; {batch.recipe_name}
+                                </div>
+                              )}
+                              <div className="text-xs text-muted-foreground pt-1 border-t">
+                                {batch.fermentation_days}d ferm +{" "}
+                                {batch.conditioning_days}d cond
+                                {batch.estimated_ready_date && (
+                                  <span className="ml-2">
+                                    &rarr; Ready{" "}
+                                    {format(
+                                      parseISO(batch.estimated_ready_date),
+                                      "MMM d",
+                                    )}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              ))}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                ),
+              )}
 
               {/* Demand/Shortfall Row */}
               <div className="h-20 border-b relative bg-destructive/5">
@@ -610,9 +760,10 @@ export default function ProductionTimelinePage() {
                     <div
                       key={i}
                       className={cn(
-                        "w-12 flex-none border-r border-border/20",
+                        dayWidthClass,
+                        "flex-none border-r border-border/20",
                         day.getDay() === 1 && "border-l border-border/40",
-                        isToday(day) && "bg-primary/5"
+                        isToday(day) && "bg-primary/5",
                       )}
                     />
                   ))}
@@ -626,28 +777,38 @@ export default function ProductionTimelinePage() {
 
                   if (offset < -7 || offset > days.length + 7) return null;
 
-                  const left = offset * 48;
+                  const left = offset * dayWidth;
 
                   return (
-                    <Tooltip key={`${shortfall.brand_id}-${shortfall.selling_format_id}-${idx}`}>
+                    <Tooltip
+                      key={`${shortfall.brand_id}-${shortfall.selling_format_id}-${idx}`}
+                    >
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setSelectedShortfall(shortfall)}
-                          aria-label={`Shortfall: ${shortfall.brand_name} — ${shortfall.shortfall_quantity} units`}
+                          aria-label={`Shortfall: ${shortfall.brand_name} \u2014 ${shortfall.shortfall_quantity} units`}
                           className={cn(
                             "absolute top-3 flex flex-col items-center gap-0.5 cursor-pointer",
-                            "hover:scale-110 transition-transform z-10"
+                            "hover:scale-110 transition-transform z-10",
                           )}
                           style={{ left: left + 8 }}
                         >
-                          <AlertTriangle className={cn(
-                            "h-5 w-5",
-                            shortfall.is_urgent ? "text-destructive" : "text-amber-500"
-                          )} />
-                          <div className={cn(
-                            "text-[10px] font-medium px-1.5 py-0.5 rounded",
-                            shortfall.is_urgent ? "bg-destructive/10 text-destructive" : "bg-amber-100 text-amber-700"
-                          )}>
+                          <AlertTriangle
+                            className={cn(
+                              "h-5 w-5",
+                              shortfall.is_urgent
+                                ? "text-destructive"
+                                : "text-amber-500",
+                            )}
+                          />
+                          <div
+                            className={cn(
+                              "text-[10px] font-medium px-1.5 py-0.5 rounded",
+                              shortfall.is_urgent
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-amber-100 text-amber-700",
+                            )}
+                          >
                             {shortfall.shortfall_quantity.toLocaleString()}
                           </div>
                         </button>
@@ -655,17 +816,28 @@ export default function ProductionTimelinePage() {
                       <TooltipContent side="top" className="max-w-xs">
                         <div className="space-y-1">
                           <div className="font-semibold flex items-center gap-2">
-                            {shortfall.is_urgent && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+                            {shortfall.is_urgent && (
+                              <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                            )}
                             {shortfall.brand_name}
                           </div>
                           <div>{shortfall.selling_format_name}</div>
                           <div className="text-xs text-muted-foreground">
-                            Need {shortfall.shortfall_quantity.toLocaleString()} by {format(demandDate, "MMM d")}
+                            Need{" "}
+                            {shortfall.shortfall_quantity.toLocaleString()} by{" "}
+                            {format(demandDate, "MMM d")}
                           </div>
                           <div className="text-xs text-muted-foreground pt-1 border-t">
-                            Brew by {format(brewDate, "MMM d")} ({shortfall.lead_time_days}d lead)
+                            Brew by {format(brewDate, "MMM d")} (
+                            {shortfall.lead_time_days}d lead)
                           </div>
-                          <Button size="sm" className="w-full mt-2 h-7 text-xs" variant={shortfall.is_urgent ? "destructive" : "secondary"}>
+                          <Button
+                            size="sm"
+                            className="w-full mt-2 h-7 text-xs"
+                            variant={
+                              shortfall.is_urgent ? "destructive" : "secondary"
+                            }
+                          >
                             <Plus className="h-3 w-3 mr-1" />
                             Create Batch
                           </Button>

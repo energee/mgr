@@ -627,7 +627,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           .single();
         if (error) throw error;
         setFormErrors([]);
-        toast.dismiss(loadingId);
         toast.success(`${entity.displayName} created successfully`);
         const newId = (newRow as Record<string, unknown>).id as string;
         invalidateEntityCaches(newId);
@@ -644,7 +643,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
           if (!lockResult.success) {
             if (lockResult.conflicted) {
-              toast.dismiss(loadingId);
               conflictDialog.showConflict();
               setIsSubmitting(false);
               return;
@@ -661,17 +659,16 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         }
 
         setFormErrors([]);
-        toast.dismiss(loadingId);
         toast.success(`${entity.displayName} updated successfully`);
         invalidateEntityCaches(id);
         setEditing(false);
       }
     } catch (err) {
-      toast.dismiss(loadingId);
       const message = err instanceof Error ? err.message : "An unexpected error occurred";
       toast.error(message);
       console.error("Form submission error:", err);
     } finally {
+      toast.dismiss(loadingId);
       setIsSubmitting(false);
     }
   }, [
