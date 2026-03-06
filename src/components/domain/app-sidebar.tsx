@@ -232,7 +232,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       {/* Logo */}
-      <SidebarHeader className="h-16 border-b border-sidebar-border justify-center">
+      <SidebarHeader className="h-12 border-b border-sidebar-border justify-center">
         <div className="flex items-center justify-between px-2">
           <Link href="/" className="flex items-center gap-2">
             <MGRIcon size={20} className="shrink-0" />

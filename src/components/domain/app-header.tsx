@@ -51,7 +51,7 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
   const logoutIconRef = useRef<AnimatedIconHandle>(null);
 
   return (
-    <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-6">
+    <header className="h-12 border-b flex items-center justify-between px-4">
       {/* Left side: menu trigger + brewery logo + name */}
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
@@ -62,7 +62,7 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
             className="h-8 w-8 object-contain"
           />
         )}
-        <h1 className="text-lg font-semibold">{breweryName}</h1>
+        <span className="text-sm font-medium">{breweryName}</span>
       </div>
 
       {/* Right side actions */}
