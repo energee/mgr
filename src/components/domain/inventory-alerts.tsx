@@ -294,7 +294,7 @@ export function InventoryAlerts({
                 </>
               )}
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" aria-label={isOpen ? "Collapse alerts" : "Expand alerts"}>
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
                   />

@@ -334,6 +334,7 @@ export function BrewEventForm({
                   type="button"
                   variant="ghost"
                   size="icon"
+                  aria-label="Remove event"
                   onClick={() => remove(index)}
                   className="h-10 w-10 text-muted-foreground hover:text-destructive"
                 >

@@ -760,12 +760,12 @@ export default function PricingPage() {
   return (
     <div className="space-y-4 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Pricing</h1>
           <p className="text-muted-foreground">Manage tier-based pricing matrix</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto">
           <Button
             variant={view === "matrix" ? "default" : "outline"}
             size="sm"
@@ -832,7 +832,7 @@ export default function PricingPage() {
             value={activeChannelId ?? undefined}
             onValueChange={setChannelOverride}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <TabsList>
                 {channels.map((ch) => (
                   <TabsTrigger key={ch.id} value={ch.id}>
@@ -982,7 +982,7 @@ export default function PricingPage() {
           )}
 
           {!!tiers?.length && !!formats.length && (
-            <div ref={tableRef} className="border rounded-lg overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+            <div ref={tableRef} className="overflow-x-auto border rounded-lg">
               <Table className="table-fixed">
                 <TableHeader className="sticky top-0 z-20">
                   {/* Container group header row */}

@@ -231,6 +231,7 @@ export function MashScheduleBuilder({
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Remove mash step"
                       onClick={() => handleRemove(step.id)}
                       disabled={disabled}
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"

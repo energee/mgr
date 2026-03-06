@@ -264,6 +264,7 @@ export default function OrderAllocationsPage({
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Delete allocation"
                         onClick={() => setDeleteId(alloc.id)}
                         aria-label="Delete allocation"
                       >

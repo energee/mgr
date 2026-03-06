@@ -320,6 +320,7 @@ export function YeastSelector({
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Remove yeast"
                     onClick={() => handleRemove(index)}
                     disabled={disabled}
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"

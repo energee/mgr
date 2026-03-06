@@ -28,17 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
-/**
- * Dynamic import for shiki's createHighlighter.
- * Shiki includes 1-3MB of WASM/grammars that should only load when syntax
- * highlighting is actually requested (i.e. when the AI chat panel is open
- * and a code block is rendered).
- */
-let shikiPromise: Promise<typeof import("shiki")> | null = null;
-const loadHighlighter = () => {
-  if (!shikiPromise) shikiPromise = import("shiki");
-  return shikiPromise.then((mod) => mod.createHighlighter);
-};
+// shiki is lazy-loaded to reduce initial bundle size (~1-3MB WASM/grammars)
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 const isItalic = (fontStyle: number | undefined) => fontStyle && fontStyle & 1;
@@ -148,12 +138,17 @@ const getHighlighter = (
     return cached;
   }
 
-  const highlighterPromise = loadHighlighter().then((createHighlighter) =>
-    createHighlighter({
-      langs: [language],
-      themes: ["github-light", "github-dark"],
-    })
-  );
+  const highlighterPromise = import("shiki")
+    .then(({ createHighlighter }) =>
+      createHighlighter({
+        langs: [language],
+        themes: ["github-light", "github-dark"],
+      })
+    )
+    .catch((err) => {
+      highlighterCache.delete(language);
+      throw err;
+    });
 
   highlighterCache.set(language, highlighterPromise);
   return highlighterPromise;
@@ -495,6 +490,7 @@ export const CodeBlockCopyButton = ({
       className={cn("shrink-0", className)}
       onClick={copyToClipboard}
       size="icon"
+      aria-label="Copy code"
       variant="ghost"
       {...props}
     >
