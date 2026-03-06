@@ -8,7 +8,7 @@
  */
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { EntityConfig, EntityColumnDef } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { formatValue } from "@/lib/utils";
@@ -69,15 +69,19 @@ export function EntityMobileCardList({
   const statusField = entity.stateMachine?.stateField as string | undefined;
 
   // ---- Pick the first 3 columns for subtitle rows, excluding title and status ----
-  const subtitleColumns = entity.listColumns
-    .filter((col) => {
-      const key = col.accessorKey as string | undefined;
-      if (!key) return false;
-      if (key === titleField) return false;
-      if (key === statusField) return false;
-      return true;
-    })
-    .slice(0, 3);
+  const subtitleColumns = useMemo(
+    () =>
+      entity.listColumns
+        .filter((col) => {
+          const key = col.accessorKey as string | undefined;
+          if (!key) return false;
+          if (key === titleField) return false;
+          if (key === statusField) return false;
+          return true;
+        })
+        .slice(0, 3),
+    [entity.listColumns, titleField, statusField],
+  );
 
   // ---- Empty state ----
   if (data.length === 0) {

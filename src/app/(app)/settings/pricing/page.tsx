@@ -405,14 +405,12 @@ function FormatManagement({
 /** Renders pricing data as stacked tier cards for narrow viewports. */
 function PricingMobileCards({
   tiers,
-  formats,
   formatGroups,
   priceMap,
   activeChannelId,
   onSave,
 }: {
   tiers: PricingTier[];
-  formats: SellingFormatWithContainer[];
   formatGroups: { containerName: string; containerType: string; formats: SellingFormatWithContainer[] }[];
   priceMap: Map<string, Map<string, PricingTierPrice>>;
   activeChannelId: string;
@@ -1061,7 +1059,6 @@ export default function PricingPage() {
             isMobile ? (
               <PricingMobileCards
                 tiers={tiers}
-                formats={formats}
                 formatGroups={formatGroups}
                 priceMap={priceMap}
                 activeChannelId={activeChannelId!}
