@@ -15,6 +15,7 @@ import { dashboardKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { InventoryAlerts } from "@/components/domain/inventory-alerts";
 import { Suspense } from "react";
+import { PackageCheck, Clock } from "lucide-react";
 import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
@@ -216,7 +217,7 @@ export default function InventoryDashboardPage() {
         {/* Low Stock Items */}
         <DashboardSection title="Low Stock Items" viewAllHref="/inventory/items">
           {lowStockItems.length === 0 ? (
-            <DashboardEmpty message="All items are stocked" />
+            <DashboardEmpty message="All items are stocked" icon={PackageCheck} />
           ) : (
             <div className="divide-y">
               {lowStockItems.slice(0, MAX_ITEMS_SHOWN).map((item) => {
@@ -252,7 +253,7 @@ export default function InventoryDashboardPage() {
         {/* Expiring Lots */}
         <DashboardSection title="Expiring Lots">
           {expiringLots.length === 0 ? (
-            <DashboardEmpty message="No lots expiring soon" />
+            <DashboardEmpty message="No lots expiring soon" icon={Clock} />
           ) : (
             <div className="divide-y">
               {expiringLots.slice(0, MAX_ITEMS_SHOWN).map((lot) => (

@@ -614,6 +614,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     }
 
     setIsSubmitting(true);
+    const loadingId = toast.loading(isCreateMode ? "Creating..." : "Saving...");
     try {
       if (isCreateMode) {
         const { data: newRow, error } = await dynamicFrom(supabase, entity.table)
@@ -622,6 +623,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
           .single();
         if (error) throw error;
         setFormErrors([]);
+        toast.dismiss(loadingId);
         toast.success(`${entity.displayName} created successfully`);
         const newId = (newRow as Record<string, unknown>).id as string;
         invalidateEntityCaches(newId);
@@ -638,6 +640,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
           if (!lockResult.success) {
             if (lockResult.conflicted) {
+              toast.dismiss(loadingId);
               conflictDialog.showConflict();
               setIsSubmitting(false);
               return;
@@ -654,11 +657,13 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         }
 
         setFormErrors([]);
+        toast.dismiss(loadingId);
         toast.success(`${entity.displayName} updated successfully`);
         invalidateEntityCaches(id);
         setEditing(false);
       }
     } catch (err) {
+      toast.dismiss(loadingId);
       const message = err instanceof Error ? err.message : "An unexpected error occurred";
       toast.error(message);
       console.error("Form submission error:", err);
@@ -807,13 +812,27 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <Link
-            href={backUrl || path}
-            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-          >
-            <span aria-hidden="true"><Kbd>⌫</Kbd></span>
-            Back
-          </Link>
+          <nav className="flex items-center gap-1 text-xs">
+            <Link
+              href={`/${entity.domain}`}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {entity.domain.charAt(0).toUpperCase() + entity.domain.slice(1)}
+            </Link>
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            <Link
+              href={backUrl || path}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {entity.displayNamePlural}
+            </Link>
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            <span className="text-foreground font-medium">
+              {isCreateMode
+                ? "New"
+                : header?.title || `${entity.displayName} ${id}`}
+            </span>
+          </nav>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-medium">
               {isCreateMode

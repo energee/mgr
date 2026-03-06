@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
@@ -43,8 +43,11 @@ export function EntityDeleteDialog({
   const verb = isSoft ? "Deactivate" : "Delete";
   const verbing = isSoft ? "Deactivating..." : "Deleting...";
 
+  const loadingIdRef = useRef<string | number | null>(null);
+
   const mutation = useMutation({
     mutationFn: async () => {
+      loadingIdRef.current = toast.loading(isSoft ? "Deactivating..." : "Deleting...");
       const result = isSoft
         ? await dynamicFrom(supabase, entityTable)
             .update({ is_active: false } as Record<string, unknown>)
@@ -55,12 +58,14 @@ export function EntityDeleteDialog({
       if (result.error) throw result.error;
     },
     onSuccess: () => {
+      if (loadingIdRef.current !== null) toast.dismiss(loadingIdRef.current);
       const pastVerb = isSoft ? "deactivated" : "deleted";
       toast.success(`${entityDisplayName} "${recordTitle}" ${pastVerb}`);
       onOpenChange(false);
       onSuccess();
     },
     onError: (err: unknown) => {
+      if (loadingIdRef.current !== null) toast.dismiss(loadingIdRef.current);
       const pgError = err as { code?: string; message?: string };
       if (pgError.code === "23503") {
         setErrorMessage(

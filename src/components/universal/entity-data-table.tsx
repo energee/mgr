@@ -63,7 +63,7 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, LayoutList, Kanban as KanbanIcon } from "lucide-react";
+import { Search, Inbox, LayoutList, Kanban as KanbanIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -122,6 +122,8 @@ export function EntityDataTable<T = Record<string, unknown>>({
       const stateField = entity.stateMachine.stateField;
       const transitions = entity.stateMachine.transitions;
 
+      const loadingId = toast.loading("Updating status...");
+
       // Validate transition is allowed before hitting the database
       const { data: current } = await dynamicFrom(supabase, entity.table)
         .select(stateField)
@@ -130,6 +132,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
       const currentState = current?.[stateField] as string | undefined;
       if (!currentState || !transitions[currentState]?.includes(toState)) {
+        toast.dismiss(loadingId);
         toast.error("Transition no longer valid — status may have changed");
         queryClient.invalidateQueries({ queryKey: entityKeys.all(fetchTable) });
         return;
@@ -140,6 +143,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         .eq("id", id);
 
       if (error) {
+        toast.dismiss(loadingId);
         toast.error("Failed to update status");
         return;
       }
@@ -153,6 +157,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         });
       }
 
+      toast.dismiss(loadingId);
       toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
     },
     [entity, supabase, queryClient, fetchTable],
@@ -520,12 +525,17 @@ export function EntityDataTable<T = Record<string, unknown>>({
         (row) => (row as Record<string, unknown>).id as string
       );
 
+      const loadingId = toast.loading(`Updating ${ids.length} item${ids.length === 1 ? "" : "s"}...`);
+
       // Fetch current states to validate transitions server-side
       const { data: currentData, error: fetchError } = await dynamicFrom(supabase, entity.table)
         .select(`id, ${stateField}`)
         .in("id", ids);
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        toast.dismiss(loadingId);
+        throw fetchError;
+      }
 
       // Only update rows where transition is valid
       const validIds = (currentData || [])
@@ -537,6 +547,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         .map((row: Record<string, unknown>) => row.id as string);
 
       if (validIds.length === 0) {
+        toast.dismiss(loadingId);
         toast.error("No valid transitions available. Data may have changed.");
         return 0;
       }
@@ -545,7 +556,10 @@ export function EntityDataTable<T = Record<string, unknown>>({
         .update({ [stateField]: targetStatus })
         .in("id", validIds);
 
-      if (error) throw error;
+      if (error) {
+        toast.dismiss(loadingId);
+        throw error;
+      }
 
       // Invalidate queries
       queryClient.invalidateQueries({
@@ -560,6 +574,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       // Clear selection
       setRowSelection({});
 
+      toast.dismiss(loadingId);
       return validIds.length;
     },
     [entity, selectedRows, supabase, queryClient, fetchTable]
@@ -685,6 +700,11 @@ export function EntityDataTable<T = Record<string, unknown>>({
             }
             noResultsContent={
               <div className="flex flex-col items-center justify-center gap-3 py-8">
+                {hasActiveFilters ? (
+                  <Search className="size-10 text-muted-foreground/30" />
+                ) : (
+                  <Inbox className="size-10 text-muted-foreground/30" />
+                )}
                 <div className="text-muted-foreground text-center">
                   {hasActiveFilters ? (
                     <>
@@ -794,7 +814,7 @@ function LoadingSkeleton({ columnCount }: { columnCount: number }) {
             <TableRow key={i}>
               {Array.from({ length: columnCount }).map((_, j) => (
                 <TableCell key={j}>
-                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" style={{ animationDelay: `${i * 75}ms` }} />
                 </TableCell>
               ))}
             </TableRow>

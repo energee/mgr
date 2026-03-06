@@ -16,6 +16,7 @@ import Link from "next/link";
 import { orderEntity } from "@/entities/order";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Suspense } from "react";
+import { ShoppingCart, Users, BarChart3 } from "lucide-react";
 import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
@@ -318,7 +319,7 @@ export default function SalesDashboardPage() {
         {/* Recent Orders */}
         <DashboardSection title="Recent Orders" viewAllHref="/sales/orders">
           {recentOrders.length === 0 ? (
-            <DashboardEmpty message="No orders yet" />
+            <DashboardEmpty message="No orders yet" icon={ShoppingCart} />
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -359,7 +360,7 @@ export default function SalesDashboardPage() {
         {/* Top Customers */}
         <DashboardSection title="Top Customers" viewAllHref="/sales/customers">
           {customerRevenue.length === 0 ? (
-            <DashboardEmpty message="No fulfilled orders yet" />
+            <DashboardEmpty message="No fulfilled orders yet" icon={Users} />
           ) : (
             <div className="divide-y">
               {customerRevenue.slice(0, MAX_CUSTOMERS_SHOWN).map((customer, index) => (
@@ -392,7 +393,7 @@ export default function SalesDashboardPage() {
       {/* Product Mix */}
       <DashboardSection title="Product Mix">
         {productMix.length === 0 ? (
-          <DashboardEmpty message="No product sales data yet" />
+          <DashboardEmpty message="No product sales data yet" icon={BarChart3} />
         ) : (
           <ProductMixBars products={productMix} />
         )}
