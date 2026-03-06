@@ -23,25 +23,21 @@ draft → in_progress → completed
 Batches represent cold-side (fermentation through packaging). Linked to brew logs via `brew_log_batches`.
 
 ```
-planned → fermenting → conditioning → packaging → completed
-    ↓
-cancelled
-
-fermenting ──┐
-conditioning ┼──→ archived
-packaging ───┘
+planned → fermenting → conditioning → packaging → completed → archived
+    ↓          ↓            ↓             ↓
+cancelled  cancelled   cancelled      (locked)
 ```
 
 States: `planned`, `fermenting`, `conditioning`, `packaging`, `completed`, `cancelled`, `archived`
 
 | Transition | Trigger |
 |------------|---------|
-| planned → fermenting | Transfer to fermenter or yeast pitch suggestion |
-| fermenting → conditioning | Transfer to brite tank suggestion |
-| conditioning → packaging | Start Packaging action |
-| packaging → completed | Complete action |
-| planned → cancelled | User cancellation |
-| fermenting/conditioning/packaging → archived | Archive action (e.g., stuck batch) |
+| planned → fermenting | Wort transferred from brew (linked via brew_log_batches) |
+| fermenting → conditioning | Transfer to brite tank |
+| conditioning → packaging | Packaging begins |
+| packaging → completed | All packaging sessions complete |
+| completed → archived | User archives batch |
+| any → cancelled | User cancellation (with checks) |
 
 ### Packaging Session States
 
@@ -63,7 +59,7 @@ cancelled  cancelled   (adjust only if downstream packed)
 ```
 draft → confirmed → scheduled → picking → packed → fulfilled
    ↓        ↓           ↓          ↓         ↓
-cancelled cancelled  cancelled cancelled  cancelled
+cancelled cancelled  cancelled cancelled cancelled
 ```
 
 States: `draft`, `confirmed`, `scheduled`, `picking`, `packed`, `fulfilled`, `cancelled`
@@ -75,7 +71,6 @@ States: `draft`, `confirmed`, `scheduled`, `picking`, `packed`, `fulfilled`, `ca
 | scheduled → picking | Start fulfillment |
 | picking → packed | All items picked, debit inventory |
 | packed → fulfilled | Shipped/picked up/served |
-| any (except fulfilled) → cancelled | User cancellation |
 
 ### Change Request States
 
@@ -116,23 +111,18 @@ cancelled
 
 ```
 dirty → caustic_cleaned → ready_for_use → in_use → dirty
-  ↓           ↓                ↓              ↓
-  └───────────┴────────────────┴──────────────┴──→ maintenance
-                                                       ↓
-                                                     dirty
+                                            ↓
+                                        maintenance
 ```
-
-States: `dirty`, `caustic_cleaned`, `ready_for_use`, `in_use`, `maintenance`
 
 | Transition | Trigger |
 |------------|---------|
-| dirty → caustic_cleaned | Start cleaning (caustic wash) |
-| dirty → ready_for_use | Mark ready (skip caustic step) |
-| caustic_cleaned → ready_for_use | Mark ready after cleaning |
-| ready_for_use → in_use | Assign batch to vessel |
-| in_use → dirty | Empty vessel (batch transferred out) |
-| any → maintenance | Start maintenance (escape hatch) |
-| maintenance → dirty | End maintenance |
+| dirty → caustic_cleaned | Caustic wash complete |
+| caustic_cleaned → ready_for_use | Sanitized and ready |
+| ready_for_use → in_use | Batch assigned to vessel |
+| in_use → dirty | Batch removed/transferred out |
+| any → maintenance | Vessel needs repair |
+| maintenance → dirty | Repair complete, needs cleaning |
 
 ### Purchase Order States
 
@@ -308,15 +298,18 @@ Allocations map to TTB report lines based on destination_type and sales_channel:
 
 | Current State | Action | Allowed? | Effect |
 |---------------|--------|----------|--------|
-| ready_for_use | Assign batch | ✓ | Transition to in_use, set current_batch_id |
-| in_use | Empty vessel | ✓ if batch transferred out | Transition to dirty, clear current_batch_id |
-| dirty | Start cleaning | ✓ | Transition to caustic_cleaned |
-| dirty | Mark ready | ✓ | Transition to ready_for_use (skip caustic step) |
-| caustic_cleaned | Mark ready | ✓ | Transition to ready_for_use |
-| any | Start maintenance | ✓ with confirmation | Transition to maintenance |
-| maintenance | End maintenance | ✓ | Transition to dirty |
+| dirty | Clean | ✓ | Begin caustic wash, transition to caustic_cleaned |
+| caustic_cleaned | Sanitize | ✓ | Complete sanitization, transition to ready_for_use |
+| ready_for_use | Assign batch | ✓ | Batch assigned, transition to in_use |
+| in_use | Release | ✓ if batch transferred out | Mark dirty, clear current_batch_id |
+| in_use | Force release | ✓ with override | Admin only; clears vessel without batch transfer |
+| maintenance | Complete | ✓ | Mark dirty, needs cleaning before reuse |
+| maintenance | Extend | ✓ | Update expected completion date |
 
-**Vessel states:** `dirty`, `caustic_cleaned`, `ready_for_use`, `in_use`, `maintenance`
+**Vessel state is derived from:**
+- Current batch assignment (in_use)
+- Active maintenance records
+- Cleaning status (dirty, caustic_cleaned, ready_for_use)
 
 ### Revision Tracking
 All adjustments logged in revisions array:

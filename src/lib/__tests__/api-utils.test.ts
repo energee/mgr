@@ -136,11 +136,11 @@ describe("getClientIp", () => {
     expect(getClientIp(request)).toBe("203.0.113.50");
   });
 
-  it("extracts first IP from x-forwarded-for with multiple entries", () => {
+  it("extracts last IP from x-forwarded-for with multiple entries", () => {
     const request = new Request("http://localhost", {
       headers: { "x-forwarded-for": "203.0.113.50, 70.41.3.18, 150.172.238.178" },
     });
-    expect(getClientIp(request)).toBe("203.0.113.50");
+    expect(getClientIp(request)).toBe("150.172.238.178");
   });
 
   it("extracts IP from x-real-ip header", () => {
@@ -150,14 +150,14 @@ describe("getClientIp", () => {
     expect(getClientIp(request)).toBe("198.51.100.42");
   });
 
-  it("prefers x-forwarded-for over x-real-ip", () => {
+  it("prefers x-real-ip over x-forwarded-for", () => {
     const request = new Request("http://localhost", {
       headers: {
         "x-forwarded-for": "203.0.113.50",
         "x-real-ip": "198.51.100.42",
       },
     });
-    expect(getClientIp(request)).toBe("203.0.113.50");
+    expect(getClientIp(request)).toBe("198.51.100.42");
   });
 
   it('returns "unknown" when no IP headers are present', () => {

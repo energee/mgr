@@ -476,16 +476,16 @@ These decisions need formal resolution (implement or reject):
 
 | # | Task | Category | Decision Needed |
 |---|------|----------|-----------------|
-| 37 | Yeast Brinks Model (DEC-SIMP-003) | Feature | Implement or reject? |
-| 38 | Unified Catalog Items (DEC-SIMP-001) | Feature | Implement or reject? |
-| 39 | Adjustment Approval Workflow (DEC-GAP-008) | Feature | Implement or reject? |
-| 40 | Packaging Session Rollback (DEC-GAP-002) | Feature | Implement or reject? |
-| 41 | Partial Transfer Handling (DEC-GAP-007) | Feature | Implement or reject? |
-| 42 | Email Notifications via Resend | Feature | Implement or defer? |
-| 43 | Update spec workflows (order, vessel, batch states) | Docs | After decisions finalized |
-| 44 | Update data model docs (roles, states) | Docs | After decisions finalized |
-| 45 | Projections Report | Feature | Scope TBD |
-| 46 | COGS Report | Feature | Scope TBD |
+| 37 | Yeast Brinks Model (DEC-SIMP-003) | Feature | ✅ Closed — implemented with modifications (event-based model) |
+| 38 | Unified Catalog Items (DEC-SIMP-001) | Feature | ✅ Closed — formally deferred (DEC-SIMP-001) |
+| 39 | Adjustment Approval Workflow (DEC-GAP-008) | Feature | ⏸ Deferred post-launch — schema ready |
+| 40 | Packaging Session Rollback (DEC-GAP-002) | Feature | ⏸ Deferred post-launch — rules documented |
+| 41 | Partial Transfer Handling (DEC-GAP-007) | Feature | ⏸ Deferred post-launch — schema ready |
+| 42 | Email Notifications via Resend | Feature | ✅ Implemented — service, API, templates, DB triggers |
+| 43 | Update spec workflows (order, vessel, batch states) | Docs | ✅ Done — workflows.md synced with implementation |
+| 44 | Update data model docs (roles, states) | Docs | ⏸ Deferred — update after decisions finalized |
+| 45 | Projections Report | Feature | ✅ Done — full report page implemented |
+| 46 | COGS Report | Feature | ✅ Done — 3-tab report (by batch, SKU, period) |
 
 ---
 

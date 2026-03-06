@@ -302,7 +302,7 @@ Available = Packaged - Allocated - Adjustments(negative) + Adjustments(positive)
 ```
 
 ### DEC-GAP-002: Packaging Session Rollback Rules
-**Status**: RESOLVED/DOCUMENTED
+**Status**: DEFERRED/POST-LAUNCH
 
 **Block rollback if**:
 - `allocations` exist with `status = 'completed'` for session's finished goods
@@ -318,8 +318,10 @@ Available = Packaged - Allocated - Adjustments(negative) + Adjustments(positive)
 
 #### Resolution
 
-**Status**: RESOLVED/DOCUMENTED
+**Status**: DEFERRED/POST-LAUNCH
 **Date**: 2026-02-26
+
+**Note**: Rollback rules documented. Implementation of rollback endpoint, validation logic, and automatic allocation cancellation deferred to post-launch.
 
 **Implementation notes**: Rollback rules are documented in `docs/spec/workflows.md` (Packaging Session Rules table) and `docs/data-model/packaging.md` (State Machine section). Application-layer validation enforces the blocking conditions. No database-level constraints were added for rollback rules since they require multi-table checks that are better suited to application logic.
 
@@ -376,7 +378,7 @@ Resolution order:
 3. No match → Flag line item for manual price entry; block order confirmation until resolved
 
 ### DEC-GAP-007: Partial Transfer Handling
-**Status**: RESOLVED/DOCUMENTED
+**Status**: DEFERRED/POST-LAUNCH
 
 **Flow**:
 1. Original transfer ships partial items
@@ -388,15 +390,17 @@ Resolution order:
 
 #### Resolution
 
-**Status**: RESOLVED/DOCUMENTED
+**Status**: DEFERRED/POST-LAUNCH
 **Date**: 2026-02-26
+
+**Note**: Auto-create-remainder transfer logic deferred to post-launch. Schema supports partial receives via per-line quantities on `transfer_lines`.
 
 **Implementation notes**: The schema supports partial transfers via the `location_transfers` and `transfer_lines` tables (see `docs/data-model/inventory.md`). `transfer_lines` tracks per-item quantities, enabling partial receives. Application-layer logic handles auto-creation of remainder transfers when a transfer is completed with fewer items than planned.
 
 **Caveats**: Auto-creation of remainder transfers is application-side logic, not a database trigger. The `transfer_lines` table supports both finished goods and raw materials via an XOR constraint (`finished_good_id` or `inventory_lot_id`, exactly one must be set).
 
 ### DEC-GAP-008: Adjustment Approval Workflow
-**Status**: RESOLVED/MODIFIED
+**Status**: DEFERRED/POST-LAUNCH
 
 **Original proposal**: Separate `inventory_adjustments` table with approval workflow.
 
@@ -432,8 +436,10 @@ inventory_adjustments:
 
 #### Resolution
 
-**Status**: RESOLVED/MODIFIED
+**Status**: DEFERRED/POST-LAUNCH
 **Date**: 2026-02-26
+
+**Note**: Schema ready — allocations table has approval fields (`requires_approval`, `approved_by`, `approved_at`, `rejection_reason`) and state machine supports `pending_approval` state. UI approval queue deferred to post-launch.
 
 **Implementation notes**: Instead of a separate `inventory_adjustments` table, the approval workflow was integrated directly into the unified `allocations` table. The following fields on `allocations` support the approval flow:
 - `requires_approval BOOLEAN` - Set by business rules when creating the allocation
@@ -642,7 +648,7 @@ Retain `brew_logs.events` as JSONB array.
 **Rationale**: Events are always fetched with the brew log, rarely queried independently. JSONB provides flexibility for varying event structures without schema changes.
 
 ### DEC-SIMP-003: Revised Yeast Management (Brinks Model)
-**Status**: RESOLVED/MODIFIED
+**Status**: CLOSED/IMPLEMENTED-WITH-MODIFICATIONS
 
 **Original proposal**: Replace simple `yeast_pitches` with a full three-table brinks model (`yeast_brinks`, `brink_viability_readings`, `yeast_pitches`).
 
@@ -686,9 +692,11 @@ yeast_pitches:
 
 #### Resolution
 
-**Status**: RESOLVED/MODIFIED
+**Status**: CLOSED/IMPLEMENTED-WITH-MODIFICATIONS
 **Date**: 2026-02-26
 **Migration**: `00095_yeast_workflow_unification.sql`
+
+**Note**: Event-based yeast model with `yeast_pitches` + `yeast_pitch_events` tables replaces the full brinks model. Viability decay and cost-spreading formulas implemented and tested (53 tests) in `src/lib/yeast-calculations.ts`.
 
 **Implementation notes**: An event-based yeast tracking model was implemented instead of the full three-table brinks model. The approach uses two tables:
 - `yeast_pitches` - Represents yeast sources (purchases or harvests stored in brink vessels). Tracks lineage via `parent_pitch_id`, weight-based quantity (`quantity_lbs`), cell counts in thousands, and links to brink vessels via `vessel_id` FK to the `vessels` table (brink is a vessel type).
