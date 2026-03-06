@@ -1,25 +1,21 @@
 /**
  * Status Badge
  *
- * Universal badge component for displaying entity status.
- * Color is determined by status machine configuration or defaults.
- *
- * Design: Refined, muted colors with warm undertones
+ * Universal badge for displaying entity status.
+ * Linear-inspired: small colored dot + text label, minimal chrome.
  */
 
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {
   status: string | null | undefined;
-  /** Optional color variant override */
   variant?: "default" | "success" | "warning" | "error" | "info";
-  /** Status display config from entity */
   config?: Record<string, { label: string; color: "default" | "success" | "warning" | "error" | "info" }>;
+  /** Use compact dot-only display (no text) */
+  dotOnly?: boolean;
 }
 
 const defaultColors: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
-  // Common statuses
   draft: "default",
   planned: "default",
   active: "info",
@@ -39,49 +35,35 @@ const defaultColors: Record<string, "default" | "success" | "warning" | "error" 
   error: "error",
 };
 
-// Refined color classes with warm undertones
-const colorClasses: Record<string, string> = {
-  default: "bg-secondary text-secondary-foreground border-transparent",
-  // Forest green - earthy success
-  success: "bg-emerald-50 text-emerald-700 border-emerald-200/50 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/50",
-  // Warm amber - attention without alarm
-  warning: "bg-amber-50 text-amber-700 border-amber-200/50 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50",
-  // Warm red - soft but clear error
-  error: "bg-red-50 text-red-700 border-red-200/50 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800/50",
-  // Copper/amber info - the signature accent
-  info: "bg-orange-50 text-orange-700 border-orange-200/50 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-800/50",
+const dotColors: Record<string, string> = {
+  default: "bg-muted-foreground",
+  success: "bg-emerald-500",
+  warning: "bg-amber-500",
+  error: "bg-red-500",
+  info: "bg-primary",
 };
 
-export function StatusBadge({ status, variant, config }: StatusBadgeProps) {
-  // Handle null/undefined status
+export function StatusBadge({ status, variant, config, dotOnly }: StatusBadgeProps) {
   if (!status) {
     return (
-      <Badge variant="outline" className={cn("capitalize font-medium border", colorClasses.default)}>
-        —
-      </Badge>
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className={cn("size-1.5 rounded-full shrink-0", dotColors.default)} />
+        {!dotOnly && <span>&mdash;</span>}
+      </span>
     );
   }
 
-  // Get label and color from config or defaults
   const label = config?.[status]?.label || formatStatus(status);
   const color = variant || config?.[status]?.color || defaultColors[status] || "default";
 
   return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "capitalize font-medium border",
-        colorClasses[color]
-      )}
-    >
-      {label}
-    </Badge>
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+      <span className={cn("size-1.5 rounded-full shrink-0", dotColors[color])} />
+      {!dotOnly && <span>{label}</span>}
+    </span>
   );
 }
 
-/**
- * Format a snake_case status to Title Case
- */
 function formatStatus(status: string): string {
   return status
     .split("_")

@@ -585,46 +585,44 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{entity.displayNamePlural}</h1>
+        <h1 className="text-lg font-medium">{entity.displayNamePlural}</h1>
         <div className="flex items-center gap-2">
           {entity.stateMachine && entity.kanbanConfig && (
-            <div className="flex gap-1">
+            <div className="flex gap-0.5">
               <Button
-                variant={viewMode === "table" ? "default" : "outline"}
-                size="icon"
-                className="h-8 w-8"
+                variant={viewMode === "table" ? "secondary" : "ghost"}
+                size="icon-xs"
                 onClick={() => setViewMode("table")}
                 aria-label="Table view"
                 aria-pressed={viewMode === "table"}
               >
-                <LayoutList className="h-4 w-4" />
+                <LayoutList className="h-3.5 w-3.5" />
               </Button>
               <Button
-                variant={viewMode === "board" ? "default" : "outline"}
-                size="icon"
-                className="h-8 w-8"
+                variant={viewMode === "board" ? "secondary" : "ghost"}
+                size="icon-xs"
                 onClick={() => setViewMode("board")}
                 aria-label="Board view"
                 aria-pressed={viewMode === "board"}
               >
-                <KanbanIcon className="h-4 w-4" />
+                <KanbanIcon className="h-3.5 w-3.5" />
               </Button>
             </div>
           )}
           {showCreate && (
-            <Button asChild={!onCreateClick} onClick={onCreateClick}>
+            <Button variant="ghost" size="sm" asChild={!onCreateClick} onClick={onCreateClick}>
               {onCreateClick ? (
                 <>
-                  New {entity.displayName}
-                  <span aria-hidden="true"><Kbd>N</Kbd></span>
+                  <span className="text-lg leading-none">+</span>
+                  New
                 </>
               ) : (
                 <Link href={`${path}/new`}>
-                  New {entity.displayName}
-                  <span aria-hidden="true"><Kbd>N</Kbd></span>
+                  <span className="text-lg leading-none">+</span>
+                  New
                 </Link>
               )}
             </Button>
@@ -732,13 +730,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
               {/* Global search */}
               {entity.searchableFields &&
                 entity.searchableFields.length > 0 && (
-                  <div className="relative w-full sm:w-auto sm:min-w-[250px] sm:max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:max-w-sm">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input
                       placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
                       value={globalFilter}
                       onChange={(e) => setGlobalFilter(e.target.value)}
-                      className="pl-10 pr-8 h-8"
+                      className="pl-8 pr-8 h-7 text-xs border-transparent bg-transparent focus-visible:border-border focus-visible:bg-background"
                     />
                     {!globalFilter && (
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
