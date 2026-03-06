@@ -11,7 +11,7 @@ interface DataTableAdvancedToolbarProps<TData>
 }
 
 export function DataTableAdvancedToolbar<TData>({
-  table,
+  table: _table,
   children,
   className,
   ...props
