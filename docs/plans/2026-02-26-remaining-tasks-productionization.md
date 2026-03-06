@@ -464,12 +464,12 @@ These decisions need formal resolution (implement or reject):
 | 27 | Use `escapeLike()` in API route search queries | API | S | ✅ Done — `escapeLike()` used in chat tools |
 | 28 | Add `@next/bundle-analyzer` and audit bundle | Performance | S | ✅ Done — `@next/bundle-analyzer` installed, unused `@rive-app/react-webgl2` removed (PR #218) |
 | 29 | Lazy-load `shiki` and `@rive-app/react-webgl2` | Performance | M | ✅ Done — shiki dynamically imported with cache eviction; rive removed (PR #218) |
-| 30 | Add dependency vulnerability scanning to CI | CI/CD | S | ✅ Partial — `pnpm audit --audit-level=high` runs on main branch pushes (e2e job in test.yml); not yet on PRs |
+| 30 | Add dependency vulnerability scanning to CI | CI/CD | S | ✅ Done — `pnpm audit --audit-level=high` in quality job (PRs) + e2e job (main) |
 | 31 | Add `engines` field to `package.json` | Config | S | ✅ Done — `"engines": { "node": ">=20" }` |
 | 32 | Centralize hardcoded query keys (notifications, revision-history) | API | S | ✅ Done — `notificationKeys.list()` used in notifications page |
 | 33 | Enhance `/api/health` to check database connectivity | API | S | ✅ Done — checks DB connectivity, returns degraded status on failure |
-| 34 | Add mobile-responsive improvements (Gantt, pricing matrix, data tables) | Frontend | L | ✅ Partial — sales dashboard and pricing page fixed (PR #218); Gantt/data tables still need work |
-| 35 | Accessibility: add `aria-live` on form errors, `aria-label` on icon buttons | Frontend | M | ✅ Mostly done — `role="alert"` + `aria-live="polite"` on form errors, 24+ aria-labels added; minor gap: brew event edit/delete buttons missing `aria-label` |
+| 34 | Add mobile-responsive improvements (Gantt, pricing matrix, data tables) | Frontend | L | ✅ Done — mobile card view for data tables, tier cards for pricing, responsive Gantt (40px columns, 44px touch targets, full-width controls) |
+| 35 | Accessibility: add `aria-live` on form errors, `aria-label` on icon buttons | Frontend | M | ✅ Done — `role="alert"` + `aria-live="polite"` on form errors, `aria-label` on all icon buttons including brew event edit/delete |
 | 36 | Disable `poweredByHeader` in next.config.ts | Security | S | ✅ Done — `poweredByHeader: false` |
 
 ### P3 — Deferred / Decision Required
@@ -491,15 +491,9 @@ These decisions need formal resolution (implement or reject):
 
 ## Remaining Open Items Summary
 
-Only **minor gaps** remain across P0–P2:
+**All P0–P2 tasks are complete.**
 
-| # | Task | Priority | Status |
-|---|------|----------|--------|
-| 30 | Vulnerability scanning on PRs (currently main-only) | P2 | Partial |
-| 34 | Mobile responsiveness (Gantt, data tables) | P2 | Partial |
-| 35 | Brew event edit/delete buttons missing `aria-label` | P2 | Minor gap |
-
-**Completion: 45/46 tasks done (98%), 1 partial**
+**Completion: 46/46 tasks done (100%)**
 
 ---
 
@@ -524,4 +518,4 @@ Only **minor gaps** remain across P0–P2:
 | Production Hardening | **A-** | Sentry, security headers, rate limiting, structured logging, poweredByHeader disabled |
 | Documentation | **B-** | Comprehensive but spec decisions still pending |
 | CI/CD | **B** | Good quality gate, no E2E or vuln scanning |
-| **Overall** | **A** | Production-ready; only minor gaps remain (PR vuln scanning, Gantt mobile, brew event a11y) |
+| **Overall** | **A+** | Production-ready; all P0–P2 tasks complete |
