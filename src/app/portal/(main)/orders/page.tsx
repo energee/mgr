@@ -17,14 +17,11 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { orderEntity } from "@/entities/order";
+import { formatDate as sharedFormatDate } from "@/lib/format";
 
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "-";
-  return new Date(dateString).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "-";
+  return sharedFormatDate(dateStr, { month: "short" });
 }
 
 export default function PortalOrdersPage() {

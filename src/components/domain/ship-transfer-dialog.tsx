@@ -97,50 +97,39 @@ export function ShipTransferDialog({
 
       const nameMap = new Map<string, string>();
 
-      if (fgIds.length > 0) {
-        const { data: fgs } = await supabase
-          .from("finished_goods_with_availability")
-          .select("id, brand_name, selling_format_name, lot_number")
-          .in("id", fgIds);
+      // Resolve FG and lot names in parallel (independent lookups)
+      const [fgResult, lotResult] = await Promise.all([
+        fgIds.length > 0
+          ? supabase
+              .from("finished_goods_with_availability")
+              .select("id, brand_name, selling_format_name, lot_number")
+              .in("id", fgIds)
+          : Promise.resolve({ data: null, error: null }),
+        lotIds.length > 0
+          ? supabase
+              .from("inventory_lots")
+              .select("id, lot_number, inventory_item:inventory_items(name)")
+              .in("id", lotIds)
+          : Promise.resolve({ data: null, error: null }),
+      ]);
 
-        for (const fg of fgs ?? []) {
-          const parts = [
-            fg.brand_name,
-            fg.selling_format_name,
-            fg.lot_number ? `(${fg.lot_number})` : null,
-          ].filter(Boolean);
-          nameMap.set(`fg:${fg.id}`, parts.join(" - "));
-        }
+      for (const fg of fgResult.data ?? []) {
+        const parts = [
+          fg.brand_name,
+          fg.selling_format_name,
+          fg.lot_number ? `(${fg.lot_number})` : null,
+        ].filter(Boolean);
+        nameMap.set(`fg:${fg.id}`, parts.join(" - "));
       }
 
-      if (lotIds.length > 0) {
-        const { data: lots } = await supabase
-          .from("inventory_lots")
-          .select("id, inventory_item_id, lot_number")
-          .in("id", lotIds);
-
-        if (lots && lots.length > 0) {
-          const itemIds = [
-            ...new Set(lots.map((l) => l.inventory_item_id)),
-          ];
-          const { data: items } = await supabase
-            .from("inventory_items")
-            .select("id, name")
-            .in("id", itemIds);
-
-          const itemNameMap = new Map<string, string>();
-          for (const item of items ?? []) {
-            itemNameMap.set(item.id, item.name);
-          }
-
-          for (const lot of lots) {
-            const itemName =
-              itemNameMap.get(lot.inventory_item_id) ?? "Unknown Item";
-            const display = lot.lot_number
-              ? `${itemName} (${lot.lot_number})`
-              : itemName;
-            nameMap.set(`lot:${lot.id}`, display);
-          }
+      if (lotResult.data && lotResult.data.length > 0) {
+        for (const lot of lotResult.data) {
+          const item = lot.inventory_item as { name: string } | null;
+          const itemName = item?.name ?? "Unknown Item";
+          const display = lot.lot_number
+            ? `${itemName} (${lot.lot_number})`
+            : itemName;
+          nameMap.set(`lot:${lot.id}`, display);
         }
       }
 

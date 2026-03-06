@@ -23,8 +23,10 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicFrom } from "@/services/types";
 import { reportKeys } from "@/lib/query-keys";
 import { formatCurrency, formatBbl } from "@/lib/format";
+import { fetchBatchIngredientDetail } from "@/lib/report-utils";
 import {
   Card,
   CardContent,
@@ -79,16 +81,6 @@ interface BatchCostRow {
 /** Shape of the nested recipe join from the batches query. */
 type BatchRecipeJoin = { id: string; name: string; brand: { name: string } | null } | null;
 
-/** Individual ingredient allocation cost for a batch */
-interface IngredientCostRow {
-  allocation_id: string;
-  ingredient_name: string;
-  quantity: number;
-  unit_cost: number | null;
-  total_cost: number;
-  lot_number: string | null;
-}
-
 // =============================================================================
 // Component
 // =============================================================================
@@ -96,15 +88,12 @@ interface IngredientCostRow {
 export default function BatchCostAnalysisPage() {
   const supabase = createClient();
 
-  // Default date range: last 6 months
-  const defaultFrom = format(
-    startOfMonth(subMonths(new Date(), 6)),
-    "yyyy-MM-dd"
+  const [fromDate, setFromDate] = useState(() =>
+    format(startOfMonth(subMonths(new Date(), 6)), "yyyy-MM-dd")
   );
-  const defaultTo = format(endOfMonth(new Date()), "yyyy-MM-dd");
-
-  const [fromDate, setFromDate] = useState(defaultFrom);
-  const [toDate, setToDate] = useState(defaultTo);
+  const [toDate, setToDate] = useState(() =>
+    format(endOfMonth(new Date()), "yyyy-MM-dd")
+  );
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
 
   // -------------------------------------------------------------------------
@@ -153,8 +142,7 @@ export default function BatchCostAnalysisPage() {
           .in("destination_id", batchIds)
           .in("status", ["completed", "planned"]),
         recipeIds.length > 0
-          ? supabase
-              .from("recipes_with_cogs" as "recipes")
+          ? dynamicFrom(supabase, "recipes_with_cogs")
               .select("id, total_cogs, cogs_per_bbl")
               .in("id", recipeIds)
           : Promise.resolve({ data: null, error: null }),
@@ -232,59 +220,7 @@ export default function BatchCostAnalysisPage() {
   // -------------------------------------------------------------------------
   const { data: ingredientDetail, isLoading: detailLoading } = useQuery({
     queryKey: reportKeys.batchCostDetail(expandedBatchId ?? ""),
-    queryFn: async () => {
-      if (!expandedBatchId) return [];
-
-      // Get allocations for this batch with source lot info
-      const { data: allocations, error: allocErr } = await supabase
-        .from("allocations")
-        .select("id, quantity, unit_cost, source_id, source_type, lot_number")
-        .eq("destination_type", "batch")
-        .eq("destination_id", expandedBatchId)
-        .in("status", ["completed", "planned"]);
-
-      if (allocErr) throw allocErr;
-      if (!allocations || allocations.length === 0) return [];
-
-      // Get source lot IDs to look up inventory item names
-      const lotIds = allocations
-        .filter((a) => a.source_type === "inventory_lot" && a.source_id)
-        .map((a) => a.source_id!);
-
-      const lotNameMap = new Map<string, string>();
-
-      if (lotIds.length > 0) {
-        const { data: lots } = await supabase
-          .from("inventory_lots")
-          .select("id, inventory_item:inventory_items(name)")
-          .in("id", lotIds);
-
-        if (lots) {
-          for (const lot of lots) {
-            const item = lot.inventory_item as { name: string } | null;
-            if (item) {
-              lotNameMap.set(lot.id, item.name);
-            }
-          }
-        }
-      }
-
-      const rows: IngredientCostRow[] = allocations.map((a) => ({
-        allocation_id: a.id,
-        ingredient_name:
-          a.source_id && lotNameMap.has(a.source_id)
-            ? lotNameMap.get(a.source_id)!
-            : a.source_type === "external"
-              ? "External"
-              : "Unknown",
-        quantity: a.quantity,
-        unit_cost: a.unit_cost,
-        total_cost: a.quantity * (a.unit_cost ?? 0),
-        lot_number: a.lot_number,
-      }));
-
-      return rows;
-    },
+    queryFn: () => fetchBatchIngredientDetail(supabase, expandedBatchId),
     enabled: !!expandedBatchId,
   });
 

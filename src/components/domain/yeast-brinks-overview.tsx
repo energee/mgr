@@ -8,6 +8,7 @@
  * the 75% viability threshold. Empty brinks are shown as dimmed cards.
  */
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -108,6 +109,17 @@ export function YeastBrinksOverview() {
 
   const isLoading = brinksLoading || pitchesLoading;
 
+  // Map vessel_id -> pitch for quick lookup (must be before early returns)
+  const pitchByVessel = useMemo(() => {
+    const map = new Map<string, ActivePitch>();
+    activePitches?.forEach((pitch) => {
+      if (pitch.vessel_id) {
+        map.set(pitch.vessel_id, pitch);
+      }
+    });
+    return map;
+  }, [activePitches]);
+
   if (isLoading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -134,14 +146,6 @@ export function YeastBrinksOverview() {
       </Card>
     );
   }
-
-  // Map vessel_id -> pitch for quick lookup
-  const pitchByVessel = new Map<string, ActivePitch>();
-  activePitches?.forEach((pitch) => {
-    if (pitch.vessel_id) {
-      pitchByVessel.set(pitch.vessel_id, pitch);
-    }
-  });
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

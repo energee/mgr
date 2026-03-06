@@ -28,6 +28,7 @@ import {
   startOfQuarter,
 } from "date-fns";
 import { formatCurrency, formatBbl } from "@/lib/format";
+import { fetchBatchIngredientDetail } from "@/lib/report-utils";
 import {
   Card,
   CardContent,
@@ -100,16 +101,6 @@ interface CogsBatchRow {
   units_packaged: number;
   cogs_per_unit: number | null;
   status: string;
-}
-
-/** Individual ingredient allocation cost for a batch */
-interface IngredientCostRow {
-  allocation_id: string;
-  ingredient_name: string;
-  quantity: number;
-  unit_cost: number | null;
-  total_cost: number;
-  lot_number: string | null;
 }
 
 /** Cost grouped by brand + selling format (SKU) */
@@ -327,57 +318,7 @@ export default function CogsReportPage() {
 
   const { data: ingredientDetail, isLoading: detailLoading } = useQuery({
     queryKey: reportKeys.batchCostDetail(expandedBatchId ?? ""),
-    queryFn: async () => {
-      if (!expandedBatchId) return [];
-
-      const { data: allocations, error: allocErr } = await supabase
-        .from("allocations")
-        .select("id, quantity, unit_cost, source_id, source_type, lot_number")
-        .eq("destination_type", "batch")
-        .eq("destination_id", expandedBatchId)
-        .in("status", ["completed", "planned"]);
-
-      if (allocErr) throw allocErr;
-      if (!allocations || allocations.length === 0) return [];
-
-      const lotIds = allocations
-        .filter((a) => a.source_type === "inventory_lot" && a.source_id)
-        .map((a) => a.source_id!);
-
-      const lotNameMap = new Map<string, string>();
-
-      if (lotIds.length > 0) {
-        const { data: lots } = await supabase
-          .from("inventory_lots")
-          .select("id, inventory_item:inventory_items(name)")
-          .in("id", lotIds);
-
-        if (lots) {
-          for (const lot of lots) {
-            const item = lot.inventory_item as { name: string } | null;
-            if (item) {
-              lotNameMap.set(lot.id, item.name);
-            }
-          }
-        }
-      }
-
-      const rows: IngredientCostRow[] = allocations.map((a) => ({
-        allocation_id: a.id,
-        ingredient_name:
-          a.source_id && lotNameMap.has(a.source_id)
-            ? lotNameMap.get(a.source_id)!
-            : a.source_type === "external"
-              ? "External"
-              : "Unknown",
-        quantity: a.quantity,
-        unit_cost: a.unit_cost,
-        total_cost: a.quantity * (a.unit_cost ?? 0),
-        lot_number: a.lot_number,
-      }));
-
-      return rows;
-    },
+    queryFn: () => fetchBatchIngredientDetail(supabase, expandedBatchId),
     enabled: !!expandedBatchId,
   });
 
@@ -757,16 +698,23 @@ export default function CogsReportPage() {
       };
     }
 
-    const totalCogs = periodData.reduce((sum, p) => sum + p.total_cogs, 0);
-    const totalBatches = periodData.reduce(
-      (sum, p) => sum + p.batch_count,
-      0
-    );
-    const totalMalt = periodData.reduce((s, r) => s + r.malt_cost, 0);
-    const totalHop = periodData.reduce((s, r) => s + r.hop_cost, 0);
-    const totalYeast = periodData.reduce((s, r) => s + r.yeast_cost, 0);
-    const totalAdjunct = periodData.reduce((s, r) => s + r.adjunct_cost, 0);
-    const totalOther = periodData.reduce((s, r) => s + r.other_cost, 0);
+    // Single-pass aggregation across all period rows
+    let totalCogs = 0;
+    let totalBatches = 0;
+    let totalMalt = 0;
+    let totalHop = 0;
+    let totalYeast = 0;
+    let totalAdjunct = 0;
+    let totalOther = 0;
+    for (const p of periodData) {
+      totalCogs += p.total_cogs;
+      totalBatches += p.batch_count;
+      totalMalt += p.malt_cost;
+      totalHop += p.hop_cost;
+      totalYeast += p.yeast_cost;
+      totalAdjunct += p.adjunct_cost;
+      totalOther += p.other_cost;
+    }
 
     // Period-over-period change (compare last 2 periods)
     let periodChange: number | null = null;
@@ -807,9 +755,7 @@ export default function CogsReportPage() {
   // Loading / error derivation
   // ---------------------------------------------------------------------------
 
-  const batchLoading = sharedLoading;
-  const batchError = sharedError;
-  const currentError = activeTab === "by-batch" ? batchError : activeTab === "by-sku" ? skuError : periodError;
+  const currentError = activeTab === "by-batch" ? sharedError : activeTab === "by-sku" ? skuError : periodError;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -903,7 +849,7 @@ export default function CogsReportPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {batchLoading ? (
+                {sharedLoading ? (
                   <Skeleton className="h-8 w-24" />
                 ) : (
                   <div className="text-2xl font-bold font-mono">
@@ -920,7 +866,7 @@ export default function CogsReportPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {batchLoading ? (
+                {sharedLoading ? (
                   <Skeleton className="h-8 w-24" />
                 ) : (
                   <div className="text-2xl font-bold font-mono">
@@ -937,7 +883,7 @@ export default function CogsReportPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {batchLoading ? (
+                {sharedLoading ? (
                   <Skeleton className="h-8 w-24" />
                 ) : (
                   <div className="text-2xl font-bold font-mono">
@@ -954,7 +900,7 @@ export default function CogsReportPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {batchLoading ? (
+                {sharedLoading ? (
                   <Skeleton className="h-8 w-24" />
                 ) : (
                   <div className="text-2xl font-bold font-mono">
@@ -974,7 +920,7 @@ export default function CogsReportPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {batchLoading ? (
+              {sharedLoading ? (
                 <div className="space-y-2">
                   {[...Array(5)].map((_, i) => (
                     <Skeleton key={i} className="h-10 w-full" />
