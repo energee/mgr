@@ -47,7 +47,7 @@ export function EntityDeleteDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      loadingIdRef.current = toast.loading(isSoft ? "Deactivating..." : "Deleting...");
+      loadingIdRef.current = toast.loading(verbing);
       const result = isSoft
         ? await dynamicFrom(supabase, entityTable)
             .update({ is_active: false } as Record<string, unknown>)

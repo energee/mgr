@@ -814,13 +814,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         <div className="space-y-1">
           <nav className="flex items-center gap-1 text-xs">
             <Link
-              href={`/${entity.domain}`}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {entity.domain.charAt(0).toUpperCase() + entity.domain.slice(1)}
-            </Link>
-            <ChevronRight className="h-3 w-3 text-muted-foreground" />
-            <Link
               href={backUrl || path}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
