@@ -354,6 +354,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Remove line item"
                     className="h-8 w-8 text-destructive"
                     onClick={() => deleteItem.mutate(item.id)}
                     disabled={deleteItem.isPending}
@@ -462,6 +463,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
               <TableCell>
                 <Button
                   size="icon"
+                  aria-label="Add line item"
                   className="h-8 w-8"
                   onClick={handleAdd}
                   disabled={addItem.isPending}

@@ -227,6 +227,7 @@ export function FermentationScheduleBuilder({
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Remove fermentation stage"
                       onClick={() => handleRemove(stage.id)}
                       disabled={disabled}
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"

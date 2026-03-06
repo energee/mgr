@@ -220,6 +220,7 @@ export function BatchAdditionForm({
             type="button"
             variant="ghost"
             size="icon"
+            aria-label="Close"
             onClick={onCancel}
             className="h-10 w-10"
           >

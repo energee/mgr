@@ -22,6 +22,10 @@ import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency as formatCurrencyBase } from "@/lib/format";
+
+/** Sales dashboard uses whole-dollar formatting for cleaner high-level display. */
+const formatCurrency = (v: number | null | undefined) => formatCurrencyBase(v, 0);
 
 // =============================================================================
 // Types
@@ -78,19 +82,6 @@ const DEFAULT_ORDER_COUNTS: OrderStatusCounts = {
   fulfilled: 0,
   cancelled: 0,
 };
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 // =============================================================================
 // Sub-Components
@@ -276,7 +267,7 @@ export default function SalesDashboardPage() {
     <div className="space-y-6">
       {/* Header with Stats Strip */}
       <div className="space-y-1">
-        <div className="flex items-baseline justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
           <h1 className="text-2xl font-semibold">Sales Dashboard</h1>
           <div className="flex items-center gap-4">
             <Suspense fallback={null}>
@@ -295,12 +286,12 @@ export default function SalesDashboardPage() {
 
       {/* Order Pipeline */}
       <DashboardSection title="Order Pipeline" viewAllHref="/sales/orders">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {pipelineStatuses.map((status, index) => (
             <Link
               key={status.key}
               href={`/sales/orders?status=${status.key}`}
-              className="flex flex-col items-center p-3 rounded-lg border hover:bg-muted/50 transition-colors text-center relative"
+              className="flex-1 min-w-[80px] flex flex-col items-center p-3 rounded-lg border hover:bg-muted/50 transition-colors text-center relative"
             >
               <span className="font-mono text-2xl font-semibold">{status.count}</span>
               <span className="text-xs text-muted-foreground">{status.label}</span>

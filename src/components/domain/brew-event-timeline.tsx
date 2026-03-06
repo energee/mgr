@@ -349,6 +349,7 @@ export function BrewEventTimeline({
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
+                                aria-label="Edit event"
                                 onClick={() => setEditingEvent(event)}
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -357,6 +358,7 @@ export function BrewEventTimeline({
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                aria-label="Delete event"
                                 onClick={() => setDeletingEventId(eventId)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />

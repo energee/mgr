@@ -538,6 +538,7 @@ function DataTableFilterItem<TData>({
         </div>
         <Button
           aria-controls={filterItemId}
+          aria-label="Remove filter"
           variant="outline"
           size="icon"
           className="size-8 rounded"
@@ -546,7 +547,7 @@ function DataTableFilterItem<TData>({
           <Trash2 />
         </Button>
         <SortableItemHandle asChild>
-          <Button variant="outline" size="icon" className="size-8 rounded">
+          <Button aria-label="Reorder filter" variant="outline" size="icon" className="size-8 rounded">
             <GripVertical />
           </Button>
         </SortableItemHandle>

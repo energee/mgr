@@ -637,6 +637,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label="Apply tier price"
                               className="h-8 w-8 shrink-0"
                               onClick={() => applyTierPrice(item.id, item.brand_id, item.selling_format_id)}
                             >
@@ -660,6 +661,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Remove item"
                     className="h-8 w-8 text-destructive"
                     onClick={() => deleteItem.mutate(item.id)}
                     disabled={deleteItem.isPending}
@@ -805,6 +807,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label={`Use tier price: $${newItem.suggestedPrice?.toFixed(2)}`}
                               className="h-8 w-8 shrink-0"
                               onClick={() => setNewItem({ ...newItem, unit_price: newItem.suggestedPrice || 0 })}
                             >
@@ -832,6 +835,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 <div className="flex gap-1">
                   <Button
                     size="icon"
+                    aria-label="Add item"
                     className="h-8 w-8"
                     onClick={handleAdd}
                     disabled={addItem.isPending}

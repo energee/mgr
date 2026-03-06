@@ -252,18 +252,27 @@ export const reportKeys = {
   /** Ingredient-level cost detail for a single batch */
   batchCostDetail: (batchId: string) =>
     ["reports", "batch-cost", "detail", batchId] as const,
-  /** COGS by period — per-batch cost breakdown by ingredient category */
-  cogs: (dateRange: { from: string; to: string }) =>
-    ["reports", "cogs", dateRange] as const,
-  /** Margin analysis by sales channel */
-  marginByChannel: (dateRange: { from: string; to: string }) =>
-    ["reports", "margin-by-channel", dateRange] as const,
-  /** Projected finished goods output from pipeline */
-  projectedGoods: (horizonWeeks: number) =>
-    ["reports", "projected-goods", horizonWeeks] as const,
-  /** Projected revenue from order book */
-  projectedRevenue: (horizonWeeks: number, includeDrafts: boolean) =>
-    ["reports", "projected-revenue", horizonWeeks, includeDrafts] as const,
+  /** Projections report — ingredient needs by time horizon */
+  projections: (horizonDays: number) =>
+    ["reports", "projections", horizonDays] as const,
+  /** COGS report — shared base data (batches + allocations + finished goods) */
+  cogsShared: (dateRange: { from: string; to: string }) =>
+    ["reports", "cogs", "shared", dateRange] as const,
+  /** COGS report — by batch tab */
+  cogsByBatch: (dateRange?: { from: string; to: string }) =>
+    dateRange
+      ? (["reports", "cogs", "by-batch", dateRange] as const)
+      : (["reports", "cogs", "by-batch"] as const),
+  /** COGS report — by SKU tab */
+  cogsBySku: (dateRange?: { from: string; to: string }) =>
+    dateRange
+      ? (["reports", "cogs", "by-sku", dateRange] as const)
+      : (["reports", "cogs", "by-sku"] as const),
+  /** COGS report — by period tab. Accepts extra keys (e.g. _shared) for cache-busting. */
+  cogsByPeriod: (granularity: "monthly" | "quarterly", dateRange?: Record<string, unknown>) =>
+    dateRange
+      ? (["reports", "cogs", "by-period", granularity, dateRange] as const)
+      : (["reports", "cogs", "by-period", granularity] as const),
 };
 
 // =============================================================================
