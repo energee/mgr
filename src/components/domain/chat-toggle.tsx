@@ -15,6 +15,7 @@ export function ChatToggle() {
         <Button
           variant="outline"
           size="icon"
+          aria-label={isOpen ? "Close Claude" : "Ask Claude"}
           onClick={toggle}
           className={`group fixed bottom-4 right-4 z-50 h-10 w-10 rounded-full shadow-lg transition-colors ${
             isOpen

@@ -38,6 +38,7 @@ import {
   getRecipeSuggestions,
   type ParameterAnalysis,
 } from "@/lib/ai/recipe-analyzer";
+import { createClient } from "@/lib/supabase/client";
 import { recipeKeys } from "@/lib/query-keys";
 
 // =============================================================================
@@ -137,6 +138,7 @@ function SuggestionItem({
 // =============================================================================
 
 export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeName, data }: RecipeAnalysisProps) {
+  const supabase = createClient();
   // Support both direct props and entity data prop
   const recipeId = propRecipeId || data?.id;
   const recipeName = propRecipeName || data?.name;
@@ -151,7 +153,7 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
     refetch: refetchCompliance,
   } = useQuery({
     queryKey: recipeKeys.styleCompliance(recipeId!),
-    queryFn: () => analyzeStyleCompliance(recipeId!),
+    queryFn: () => analyzeStyleCompliance(supabase, recipeId!),
     enabled: hasAnalyzed && !!recipeId,
     retry: false,
   });
@@ -163,7 +165,7 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
     refetch: refetchSuggestions,
   } = useQuery({
     queryKey: recipeKeys.suggestions(recipeId!),
-    queryFn: () => getRecipeSuggestions(recipeId!),
+    queryFn: () => getRecipeSuggestions(supabase, recipeId!),
     enabled: hasAnalyzed && !!recipeId,
     retry: false,
   });
@@ -211,7 +213,7 @@ export function RecipeAnalysis({ recipeId: propRecipeId, recipeName: propRecipeN
                 </Button>
               ) : (
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" aria-label={isOpen ? "Collapse analysis" : "Expand analysis"}>
                     <ChevronDown
                       className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
                     />

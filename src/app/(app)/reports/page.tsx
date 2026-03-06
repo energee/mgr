@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, ClipboardList, DollarSign, BarChart3, TrendingUp } from "lucide-react";
+import { FileText, ClipboardList, DollarSign, BarChart3, TrendingUp, Calculator } from "lucide-react";
 
 const reports = [
   {
@@ -34,10 +34,16 @@ const reports = [
     icon: ClipboardList,
   },
   {
-    title: "Projections & COGS",
-    description: "Cost analysis, margin tracking, and production forecasting",
+    title: "Ingredient Projections",
+    description: "Forward-looking ingredient needs from orders and batch schedule",
     href: "/reports/projections",
     icon: TrendingUp,
+  },
+  {
+    title: "Cost of Goods Sold",
+    description: "COGS analysis by batch, SKU, and time period",
+    href: "/reports/cogs",
+    icon: Calculator,
   },
 ];
 

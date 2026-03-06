@@ -5,6 +5,9 @@
  * analysis and improvement suggestions.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/supabase";
+
 // Types
 export interface StyleComplianceResult {
   recipe_id: string;
@@ -42,22 +45,13 @@ export interface RecipeSuggestionsResult {
   suggestions: RecipeSuggestion[];
 }
 
-// Cached lazy import to avoid pulling in browser-only createBrowserClient
-// when this module is imported server-side (e.g. for type re-exports).
-let clientImport: Promise<typeof import("@/lib/supabase/client")> | null = null;
-function getClientModule() {
-  if (!clientImport) clientImport = import("@/lib/supabase/client");
-  return clientImport;
-}
-
 /**
  * Analyze a recipe's compliance with its target style guidelines
  */
 export async function analyzeStyleCompliance(
+  supabase: SupabaseClient<Database>,
   recipeId: string
 ): Promise<StyleComplianceResult> {
-  const { createClient } = await getClientModule();
-  const supabase = createClient();
   const { data, error } = await supabase.rpc("analyze_recipe_style_compliance", {
     p_recipe_id: recipeId,
   });
@@ -73,10 +67,9 @@ export async function analyzeStyleCompliance(
  * Get AI-generated suggestions for improving a recipe
  */
 export async function getRecipeSuggestions(
+  supabase: SupabaseClient<Database>,
   recipeId: string
 ): Promise<RecipeSuggestionsResult> {
-  const { createClient } = await getClientModule();
-  const supabase = createClient();
   const { data, error } = await supabase.rpc("suggest_recipe_improvements", {
     p_recipe_id: recipeId,
   });
