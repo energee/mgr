@@ -46,12 +46,13 @@ export type BatchState = (typeof batchStates)[number];
 /** Valid state transitions: { fromState: [toStates] }
  * planned -> fermenting is triggered by Transfer (to fermenter) or Pitch Yeast suggestion.
  * fermenting -> conditioning is triggered by Transfer (to brite tank) suggestion.
- * Direct transitions (start_packaging, complete) use the state machine normally. */
+ * Direct transitions (start_packaging, complete) use the state machine normally.
+ * Cancel/archive are available as escape hatches from active production states. */
 export const batchTransitions: Record<string, string[]> = {
-  planned: ["fermenting"],       // via Transfer/Pitch suggestion
-  fermenting: ["conditioning"],  // via Transfer suggestion
-  conditioning: ["packaging"],
-  packaging: ["completed"],
+  planned: ["fermenting", "cancelled"],
+  fermenting: ["conditioning", "archived"],
+  conditioning: ["packaging", "archived"],
+  packaging: ["completed", "archived"],
   completed: [],
   cancelled: [],
   archived: [],

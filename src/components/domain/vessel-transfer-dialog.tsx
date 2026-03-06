@@ -150,6 +150,9 @@ export function VesselTransferDialog({
 
       if (transferError) throw transferError;
 
+      // Vessel occupancy (current_batch_id, status) is updated automatically
+      // by the handle_vessel_transfer() database trigger on vessel_transfers INSERT.
+
       // Return destination vessel info for smart state suggestion in onSuccess
       const destVessel = availableVessels?.find((v) => v.id === values.to_vessel_id);
       return { vesselName: destVessel?.name, vesselType: destVessel?.vessel_type };
@@ -186,6 +189,8 @@ export function VesselTransferDialog({
 
   const selectedVesselId = form.watch("to_vessel_id");
   const selectedVessel = availableVessels?.find((v) => v.id === selectedVesselId);
+  const watchedVolume = form.watch("volume_bbl");
+  const exceedsCapacity = !!(selectedVessel && watchedVolume > selectedVessel.capacity_bbl);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -212,7 +217,7 @@ export function VesselTransferDialog({
           <div className="space-y-2">
             <Label htmlFor="to_vessel_id">Destination Vessel</Label>
             <Select
-              value={form.watch("to_vessel_id")}
+              value={selectedVesselId}
               onValueChange={(v) => form.setValue("to_vessel_id", v)}
               disabled={vesselsLoading}
             >
@@ -251,7 +256,7 @@ export function VesselTransferDialog({
           <div className="space-y-2">
             <Label htmlFor="volume_bbl">Volume</Label>
             <UnitInput
-              value={form.watch("volume_bbl") || null}
+              value={watchedVolume || null}
               onChange={(val) => form.setValue("volume_bbl", val ?? 0, { shouldValidate: true })}
               unitType="volume"
               decimals={2}
@@ -263,8 +268,8 @@ export function VesselTransferDialog({
                 {form.formState.errors.volume_bbl.message}
               </p>
             )}
-            {selectedVessel && form.watch("volume_bbl") > selectedVessel.capacity_bbl && (
-              <p className="text-sm text-amber-600">
+            {exceedsCapacity && (
+              <p className="text-sm text-destructive">
                 Volume exceeds vessel capacity (<UnitDisplay value={selectedVessel.capacity_bbl} unitType="volume" />)
               </p>
             )}
@@ -291,7 +296,7 @@ export function VesselTransferDialog({
             </Button>
             <Button
               type="submit"
-              disabled={transferMutation.isPending || !availableVessels?.length}
+              disabled={transferMutation.isPending || !availableVessels?.length || exceedsCapacity}
               className="min-h-[44px]"
             >
               {transferMutation.isPending ? (

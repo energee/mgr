@@ -126,21 +126,15 @@ export const TRANSACTION_TYPES: {
   },
 ];
 
+// Derive transaction type enum values from TRANSACTION_TYPES (single source of truth)
+const TRANSACTION_TYPE_VALUES = TRANSACTION_TYPES.map((t) => t.value) as [KegTransactionType, ...KegTransactionType[]];
+
 // =============================================================================
 // Zod Schema
 // =============================================================================
 
 export const kegTransactionSchema = z.object({
-  transaction_type: z.enum([
-    "receive",
-    "fill",
-    "ship",
-    "return",
-    "clean",
-    "adjust",
-    "retire",
-    "maintain",
-  ]),
+  transaction_type: z.enum(TRANSACTION_TYPE_VALUES),
   selling_format_id: z.string().uuid("Select a selling format"),
   keg_owner_id: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().int().positive("Quantity must be at least 1"),
@@ -155,7 +149,31 @@ export const kegTransactionSchema = z.object({
   finished_good_id: z.string().uuid().nullable().optional(),
   notes: z.string().nullable().optional(),
   created_by_name: z.string().nullable().optional(),
-});
+}).refine(
+  (data) => {
+    // Fill transactions require a batch or finished good link for traceability
+    if (data.transaction_type === "fill") {
+      return !!data.batch_id || !!data.finished_good_id;
+    }
+    return true;
+  },
+  {
+    message: "Fill transactions require a linked batch or finished good",
+    path: ["batch_id"],
+  }
+).refine(
+  (data) => {
+    // Ship and return transactions require a customer for keg tracking
+    if (data.transaction_type === "ship" || data.transaction_type === "return") {
+      return !!data.customer_id;
+    }
+    return true;
+  },
+  {
+    message: "Ship and return transactions require a customer",
+    path: ["customer_id"],
+  }
+);
 
 export type KegTransactionFormValues = z.infer<typeof kegTransactionSchema>;
 

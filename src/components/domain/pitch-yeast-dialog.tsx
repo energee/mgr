@@ -419,9 +419,9 @@ export function PitchYeastDialog({
           {selectedPitch && watchedQuantity > 0 && (
             <div className="space-y-1">
               {isOverdrawing ? (
-                <p className="text-sm text-amber-600 flex items-center gap-1">
+                <p className="text-sm text-destructive flex items-center gap-1">
                   <AlertTriangle className="h-4 w-4" />
-                  Overdraw: brink only has{" "}
+                  Cannot pitch: brink only has{" "}
                   {selectedPitch.quantity_remaining_lbs} lbs remaining
                 </p>
               ) : (
@@ -459,7 +459,7 @@ export function PitchYeastDialog({
             </Button>
             <Button
               type="submit"
-              disabled={pitchMutation.isPending || !sortedPitches.length}
+              disabled={pitchMutation.isPending || !sortedPitches.length || isOverdrawing}
               className="min-h-[44px]"
             >
               {pitchMutation.isPending ? (
