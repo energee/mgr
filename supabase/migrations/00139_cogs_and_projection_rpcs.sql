@@ -99,7 +99,7 @@ BEGIN
     END AS cost_per_bbl,
     COALESCE(p.has_allocation_data, FALSE) AS has_allocation_data
   FROM batches b
-  JOIN recipes r ON r.id = b.recipe_id
+  LEFT JOIN recipes r ON r.id = b.recipe_id
   LEFT JOIN brands br ON br.id = r.brand_id
   LEFT JOIN pivoted p ON p.batch_id = b.id
   WHERE b.created_at >= p_start_date
@@ -139,8 +139,8 @@ BEGIN
   RETURN QUERY
   WITH order_data AS (
     SELECT
-      sc.id AS channel_id,
-      sc.name AS channel_name,
+      COALESCE(sc.id, '00000000-0000-0000-0000-000000000000'::uuid) AS channel_id,
+      COALESCE(sc.name, 'Uncategorized') AS channel_name,
       o.id AS order_id,
       oi.quantity,
       oi.unit_price,
@@ -148,7 +148,7 @@ BEGIN
       oi.selling_format_id
     FROM orders o
     JOIN customers c ON c.id = o.customer_id
-    JOIN sales_channels sc ON sc.id = c.sales_channel_id
+    LEFT JOIN sales_channels sc ON sc.id = c.sales_channel_id
     JOIN order_items oi ON oi.order_id = o.id
     WHERE o.status NOT IN ('draft', 'cancelled')
       AND o.order_date >= p_start_date
@@ -284,15 +284,15 @@ BEGIN
   RETURN QUERY
   SELECT
     DATE_TRUNC('week', COALESCE(o.scheduled_date, o.requested_date))::date AS projection_week,
-    sc.id AS channel_id,
-    sc.name AS channel_name,
+    COALESCE(sc.id, '00000000-0000-0000-0000-000000000000'::uuid) AS channel_id,
+    COALESCE(sc.name, 'Uncategorized') AS channel_name,
     COUNT(DISTINCT o.id)::integer AS order_count,
     SUM(oi.quantity)::bigint AS total_units,
     ROUND(SUM(oi.quantity * COALESCE(oi.unit_price, 0))::numeric, 2) AS total_revenue,
     p_include_drafts AS includes_drafts
   FROM orders o
   JOIN customers c ON c.id = o.customer_id
-  JOIN sales_channels sc ON sc.id = c.sales_channel_id
+  LEFT JOIN sales_channels sc ON sc.id = c.sales_channel_id
   JOIN order_items oi ON oi.order_id = o.id
   WHERE COALESCE(o.scheduled_date, o.requested_date) >= CURRENT_DATE
     AND COALESCE(o.scheduled_date, o.requested_date) <= CURRENT_DATE + (p_horizon_weeks * 7)
@@ -304,8 +304,8 @@ BEGIN
     )
   GROUP BY
     DATE_TRUNC('week', COALESCE(o.scheduled_date, o.requested_date)),
-    sc.id,
-    sc.name
+    COALESCE(sc.id, '00000000-0000-0000-0000-000000000000'::uuid),
+    COALESCE(sc.name, 'Uncategorized')
   ORDER BY projection_week, total_revenue DESC;
 END;
 $$;

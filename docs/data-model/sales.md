@@ -457,6 +457,16 @@ WHERE resolved_at IS NULL
 ORDER BY created_at DESC;
 ```
 
+## Report RPC Functions
+
+### `project_revenue(p_horizon_weeks, p_include_drafts)`
+
+Revenue projections by week and sales channel from future orders. Groups by `DATE_TRUNC('week', scheduled_date/requested_date)` and sales channel. Customers without a sales channel are grouped as "Uncategorized".
+
+Returns: `projection_week, channel_id, channel_name, order_count, total_units, total_revenue, includes_drafts`
+
+---
+
 ## Dashboard RPC Functions
 
 ### `get_sales_trends(p_days integer DEFAULT 30)`

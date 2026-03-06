@@ -3,11 +3,10 @@
 /**
  * COGS Tab Component
  *
- * Displays cost-of-goods-sold analysis with four sections:
+ * Displays cost-of-goods-sold analysis with three sections:
  * 1. Summary cards — total COGS, avg COGS/BBL, total revenue, gross margin %
  * 2. Batch cost table — per-batch ingredient cost breakdown by category
  * 3. Channel margin table — revenue vs COGS by sales channel
- * 4. Cost breakdown chart — stacked bar chart of costs by batch (optional)
  *
  * Data sources:
  * - `cogs_by_period` RPC for batch-level ingredient costs

@@ -21,6 +21,8 @@ import {
   formatQuantityWithUnit,
   type IngredientShortfall,
 } from "@/lib/purchasing/demand-calculator";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { batchEntity } from "@/entities/batch";
 import {
   Card,
   CardContent,
@@ -178,9 +180,9 @@ export function WeeklyTab({ channelFilter }: WeeklyTabProps) {
       }
       const group = grouped.get(week)!;
       group.rows.push(row);
-      group.totalOrders += row.order_count;
-      group.totalUnits += row.total_units;
-      group.totalRevenue += row.total_revenue;
+      group.totalOrders += Number(row.order_count);
+      group.totalUnits += Number(row.total_units);
+      group.totalRevenue += Number(row.total_revenue);
     }
 
     return Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
@@ -309,8 +311,11 @@ export function WeeklyTab({ channelFilter }: WeeklyTabProps) {
                     <TableCell className="font-mono">
                       {row.batch_number}
                     </TableCell>
-                    <TableCell className="capitalize">
-                      {row.batch_status}
+                    <TableCell>
+                      <StatusBadge
+                        status={row.batch_status}
+                        config={batchEntity.stateMachine?.stateDisplay}
+                      />
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatBbl(row.volume_bbl)}

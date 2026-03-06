@@ -107,7 +107,7 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
       0
     ),
     item_count: group.items.length,
-    max_lead_time_days: Math.max(...group.items.map(i => i.lead_time_days), 7),
+    max_lead_time_days: Math.max(...group.items.map(i => i.lead_time_days ?? 7), 7),
   }));
 }
 
