@@ -266,7 +266,6 @@ export default function OrderAllocationsPage({
                         size="icon"
                         aria-label="Delete allocation"
                         onClick={() => setDeleteId(alloc.id)}
-                        aria-label="Delete allocation"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

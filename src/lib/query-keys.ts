@@ -255,6 +255,9 @@ export const reportKeys = {
   /** Projections report — ingredient needs by time horizon */
   projections: (horizonDays: number) =>
     ["reports", "projections", horizonDays] as const,
+  /** COGS report — shared base data (batches + allocations + finished goods) */
+  cogsShared: (dateRange: { from: string; to: string }) =>
+    ["reports", "cogs", "shared", dateRange] as const,
   /** COGS report — by batch tab */
   cogsByBatch: (dateRange?: { from: string; to: string }) =>
     dateRange
@@ -265,8 +268,8 @@ export const reportKeys = {
     dateRange
       ? (["reports", "cogs", "by-sku", dateRange] as const)
       : (["reports", "cogs", "by-sku"] as const),
-  /** COGS report — by period tab */
-  cogsByPeriod: (granularity: "monthly" | "quarterly", dateRange?: { from: string; to: string }) =>
+  /** COGS report — by period tab. Accepts extra keys (e.g. _shared) for cache-busting. */
+  cogsByPeriod: (granularity: "monthly" | "quarterly", dateRange?: Record<string, unknown>) =>
     dateRange
       ? (["reports", "cogs", "by-period", granularity, dateRange] as const)
       : (["reports", "cogs", "by-period", granularity] as const),

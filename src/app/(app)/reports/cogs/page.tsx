@@ -10,6 +10,9 @@
  *
  * Data is derived from allocations (ingredient costs), finished_goods (units packaged),
  * and inventory_lots/inventory_items (category classification).
+ *
+ * A single shared query fetches batches-in-date-range, allocations, and finished goods.
+ * Each tab derives its specific view from this shared data via useMemo.
  */
 
 import React, { useState, useMemo } from "react";
@@ -135,6 +138,77 @@ interface CogsPeriodRow {
   batch_count: number;
 }
 
+/** Allocation row shape returned by the shared query */
+interface AllocationRow {
+  id: string;
+  destination_id: string | null;
+  quantity: number;
+  unit_cost: number | null;
+  source_id: string | null;
+  source_type: string | null;
+}
+
+/** Finished goods row shape returned by the shared query */
+interface FinishedGoodRow {
+  batch_id: string | null;
+  quantity: number | null;
+}
+
+/** Batch row shape returned by the shared query */
+interface SharedBatchRow {
+  id: string;
+  batch_number: string;
+  name: string;
+  status: string;
+  volume_bbl: number | null;
+  created_at: string;
+  recipe: { name: string } | null;
+}
+
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+/** Default date range: last 6 months. Computed once at module level. */
+const DEFAULT_FROM = format(
+  startOfMonth(subMonths(new Date(), 6)),
+  "yyyy-MM-dd"
+);
+const DEFAULT_TO = format(endOfMonth(new Date()), "yyyy-MM-dd");
+
+/**
+ * Aggregates numeric costs from allocations into a Map keyed by a caller-supplied
+ * key function. Each allocation's line cost is `quantity * (unit_cost ?? 0)`.
+ */
+function aggregateCostByKey<T extends { quantity: number; unit_cost: number | null }>(
+  allocations: T[],
+  keyFn: (alloc: T) => string | null
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const alloc of allocations) {
+    const key = keyFn(alloc);
+    if (!key) continue;
+    const lineCost = alloc.quantity * (alloc.unit_cost ?? 0);
+    map.set(key, (map.get(key) ?? 0) + lineCost);
+  }
+  return map;
+}
+
+/**
+ * Aggregates quantity from finished goods rows by batch_id.
+ * Returns a Map of batch_id -> total quantity.
+ */
+function aggregateUnitsByBatch(
+  finishedGoods: FinishedGoodRow[]
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const fg of finishedGoods) {
+    if (!fg.batch_id) continue;
+    map.set(fg.batch_id, (map.get(fg.batch_id) ?? 0) + (fg.quantity ?? 0));
+  }
+  return map;
+}
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -142,15 +216,8 @@ interface CogsPeriodRow {
 export default function CogsReportPage() {
   const supabase = createClient();
 
-  // Default date range: last 6 months
-  const defaultFrom = format(
-    startOfMonth(subMonths(new Date(), 6)),
-    "yyyy-MM-dd"
-  );
-  const defaultTo = format(endOfMonth(new Date()), "yyyy-MM-dd");
-
-  const [fromDate, setFromDate] = useState(defaultFrom);
-  const [toDate, setToDate] = useState(defaultTo);
+  const [fromDate, setFromDate] = useState(DEFAULT_FROM);
+  const [toDate, setToDate] = useState(DEFAULT_TO);
   const [activeTab, setActiveTab] = useState<
     "by-batch" | "by-sku" | "by-period"
   >("by-batch");
@@ -161,15 +228,15 @@ export default function CogsReportPage() {
   );
 
   // ---------------------------------------------------------------------------
-  // Tab 1 — By Batch: Fetch batches with cost + finished goods data
+  // Shared data query: batches + allocations + finished goods for date range
   // ---------------------------------------------------------------------------
 
   const {
-    data: batchCostData,
-    isLoading: batchLoading,
-    error: batchError,
+    data: sharedData,
+    isLoading: sharedLoading,
+    error: sharedError,
   } = useQuery({
-    queryKey: reportKeys.cogsByBatch({ from: fromDate, to: toDate }),
+    queryKey: reportKeys.cogsShared({ from: fromDate, to: toDate }),
     queryFn: async () => {
       // Step 1: Get batches in date range (exclude cancelled/archived)
       const { data: batches, error: batchErr } = await supabase
@@ -183,7 +250,9 @@ export default function CogsReportPage() {
         .order("batch_number", { ascending: true });
 
       if (batchErr) throw batchErr;
-      if (!batches || batches.length === 0) return [];
+      if (!batches || batches.length === 0) {
+        return { batches: [] as SharedBatchRow[], allocations: [] as AllocationRow[], finishedGoods: [] as FinishedGoodRow[] };
+      }
 
       const batchIds = batches.map((b) => b.id);
 
@@ -206,52 +275,49 @@ export default function CogsReportPage() {
       if (allocErr) throw allocErr;
       if (fgErr) throw fgErr;
 
-      // Step 4: Aggregate costs per batch
-      const costByBatch = new Map<string, number>();
-      for (const alloc of allocations || []) {
-        if (!alloc.destination_id) continue;
-        const lineCost = alloc.quantity * (alloc.unit_cost ?? 0);
-        costByBatch.set(
-          alloc.destination_id,
-          (costByBatch.get(alloc.destination_id) ?? 0) + lineCost
-        );
-      }
-
-      // Step 5: Aggregate units packaged per batch
-      const unitsByBatch = new Map<string, number>();
-      for (const fg of finishedGoods || []) {
-        if (!fg.batch_id) continue;
-        unitsByBatch.set(
-          fg.batch_id,
-          (unitsByBatch.get(fg.batch_id) ?? 0) + (fg.quantity ?? 0)
-        );
-      }
-
-      // Step 6: Build result rows
-      const result: CogsBatchRow[] = batches.map((b) => {
-        const recipe = b.recipe as { name: string } | null;
-        const totalCost = costByBatch.get(b.id) ?? 0;
-        const volumeBbl = b.volume_bbl;
-        const unitsPackaged = unitsByBatch.get(b.id) ?? 0;
-        return {
-          id: b.id,
-          batch_number: b.batch_number,
-          name: b.name,
-          recipe_name: recipe?.name ?? null,
-          volume_bbl: volumeBbl,
-          total_ingredient_cost: totalCost,
-          cost_per_bbl:
-            volumeBbl && volumeBbl > 0 ? totalCost / volumeBbl : null,
-          units_packaged: unitsPackaged,
-          cogs_per_unit:
-            unitsPackaged > 0 ? totalCost / unitsPackaged : null,
-          status: b.status,
-        };
-      });
-
-      return result;
+      return {
+        batches: batches.map((b) => ({
+          ...b,
+          recipe: b.recipe as { name: string } | null,
+        })) as SharedBatchRow[],
+        allocations: (allocations ?? []) as AllocationRow[],
+        finishedGoods: (finishedGoods ?? []) as FinishedGoodRow[],
+      };
     },
   });
+
+  // ---------------------------------------------------------------------------
+  // Tab 1 — By Batch: derive from shared data
+  // ---------------------------------------------------------------------------
+
+  const batchCostData = useMemo<CogsBatchRow[] | undefined>(() => {
+    if (!sharedData) return undefined;
+    const { batches, allocations, finishedGoods } = sharedData;
+    if (batches.length === 0) return [];
+
+    const costByBatch = aggregateCostByKey(allocations, (a) => a.destination_id);
+    const unitsByBatch = aggregateUnitsByBatch(finishedGoods);
+
+    return batches.map((b) => {
+      const totalCost = costByBatch.get(b.id) ?? 0;
+      const volumeBbl = b.volume_bbl;
+      const unitsPackaged = unitsByBatch.get(b.id) ?? 0;
+      return {
+        id: b.id,
+        batch_number: b.batch_number,
+        name: b.name,
+        recipe_name: b.recipe?.name ?? null,
+        volume_bbl: volumeBbl,
+        total_ingredient_cost: totalCost,
+        cost_per_bbl:
+          volumeBbl && volumeBbl > 0 ? totalCost / volumeBbl : null,
+        units_packaged: unitsPackaged,
+        cogs_per_unit:
+          unitsPackaged > 0 ? totalCost / unitsPackaged : null,
+        status: b.status,
+      };
+    });
+  }, [sharedData]);
 
   // ---------------------------------------------------------------------------
   // Fetch ingredient detail for expanded batch (shared by Tab 1)
@@ -314,7 +380,7 @@ export default function CogsReportPage() {
   });
 
   // ---------------------------------------------------------------------------
-  // Tab 2 — By SKU: Fetch finished goods and join with batch costs
+  // Tab 2 — By SKU: fetch FG with brand/format joins, derive costs from shared
   // ---------------------------------------------------------------------------
 
   const {
@@ -340,7 +406,9 @@ export default function CogsReportPage() {
       const batchIds = [...new Set(fgRows.map((fg) => fg.batch_id).filter(Boolean))] as string[];
       if (batchIds.length === 0) return [];
 
-      // Get batch costs and batch info in parallel
+      // Get batch number info (allocations come from shared data, but we need
+      // batch numbers for display and may have FG referencing batches outside
+      // the shared query's date range, so fetch fresh here)
       const [{ data: allocations, error: allocErr }, { data: batchInfo }] = await Promise.all([
         supabase
           .from("allocations")
@@ -357,15 +425,7 @@ export default function CogsReportPage() {
       if (allocErr) throw allocErr;
 
       // Aggregate total cost per batch
-      const costByBatch = new Map<string, number>();
-      for (const alloc of allocations || []) {
-        if (!alloc.destination_id) continue;
-        const lineCost = alloc.quantity * (alloc.unit_cost ?? 0);
-        costByBatch.set(
-          alloc.destination_id,
-          (costByBatch.get(alloc.destination_id) ?? 0) + lineCost
-        );
-      }
+      const costByBatch = aggregateCostByKey(allocations ?? [], (a) => a.destination_id);
 
       // Aggregate total FG units per batch (for proportional allocation)
       const totalUnitsByBatch = new Map<string, number>();
@@ -480,7 +540,8 @@ export default function CogsReportPage() {
   });
 
   // ---------------------------------------------------------------------------
-  // Tab 3 — By Period: Fetch category breakdown grouped by period
+  // Tab 3 — By Period: derive batch/allocation data from shared, fetch category
+  //         info separately (lot -> inventory_item.category)
   // ---------------------------------------------------------------------------
 
   const {
@@ -491,35 +552,15 @@ export default function CogsReportPage() {
     queryKey: reportKeys.cogsByPeriod(granularity, {
       from: fromDate,
       to: toDate,
+      _shared: sharedData?.batches.length ?? 0,
     }),
     queryFn: async () => {
-      // Get batches in date range
-      const { data: batches, error: batchErr } = await supabase
-        .from("batches")
-        .select("id, created_at")
-        .gte("created_at", fromDate)
-        .lte("created_at", toDate + "T23:59:59Z")
-        .not("status", "in", '("cancelled","archived")');
+      if (!sharedData || sharedData.batches.length === 0) return [];
 
-      if (batchErr) throw batchErr;
-      if (!batches || batches.length === 0) return [];
-
-      const batchIds = batches.map((b) => b.id);
-
-      // Get allocations for these batches
-      const { data: allocations, error: allocErr } = await supabase
-        .from("allocations")
-        .select(
-          "destination_id, quantity, unit_cost, source_id, source_type"
-        )
-        .eq("destination_type", "batch")
-        .in("destination_id", batchIds)
-        .in("status", ["completed", "planned"]);
-
-      if (allocErr) throw allocErr;
+      const { batches, allocations } = sharedData;
 
       // Get category info: source_id -> inventory_lot -> inventory_item.category
-      const lotSourceIds = (allocations || [])
+      const lotSourceIds = allocations
         .filter((a) => a.source_type === "inventory_lot" && a.source_id)
         .map((a) => a.source_id!);
 
@@ -562,7 +603,7 @@ export default function CogsReportPage() {
         }
       >();
 
-      for (const alloc of allocations || []) {
+      for (const alloc of allocations) {
         if (!alloc.destination_id) continue;
         const batchDate = batchDateMap.get(alloc.destination_id);
         if (!batchDate) continue;
@@ -625,7 +666,7 @@ export default function CogsReportPage() {
 
       return result;
     },
-    enabled: activeTab === "by-period",
+    enabled: activeTab === "by-period" && !!sharedData,
   });
 
   // ---------------------------------------------------------------------------
@@ -692,10 +733,20 @@ export default function CogsReportPage() {
     };
   }, [skuData]);
 
-  /** Tab 3 summary: period-level metrics */
+  /** Tab 3 summary: period-level metrics including category totals for the footer row */
   const periodSummary = useMemo(() => {
     if (!periodData || periodData.length === 0) {
-      return { totalCogs: 0, periodChange: null as number | null, avgCogsPerBatch: 0 };
+      return {
+        totalCogs: 0,
+        periodChange: null as number | null,
+        avgCogsPerBatch: 0,
+        totalMalt: 0,
+        totalHop: 0,
+        totalYeast: 0,
+        totalAdjunct: 0,
+        totalOther: 0,
+        totalBatches: 0,
+      };
     }
 
     const totalCogs = periodData.reduce((sum, p) => sum + p.total_cogs, 0);
@@ -703,6 +754,11 @@ export default function CogsReportPage() {
       (sum, p) => sum + p.batch_count,
       0
     );
+    const totalMalt = periodData.reduce((s, r) => s + r.malt_cost, 0);
+    const totalHop = periodData.reduce((s, r) => s + r.hop_cost, 0);
+    const totalYeast = periodData.reduce((s, r) => s + r.yeast_cost, 0);
+    const totalAdjunct = periodData.reduce((s, r) => s + r.adjunct_cost, 0);
+    const totalOther = periodData.reduce((s, r) => s + r.other_cost, 0);
 
     // Period-over-period change (compare last 2 periods)
     let periodChange: number | null = null;
@@ -718,6 +774,12 @@ export default function CogsReportPage() {
       totalCogs,
       periodChange,
       avgCogsPerBatch: totalBatches > 0 ? totalCogs / totalBatches : 0,
+      totalMalt,
+      totalHop,
+      totalYeast,
+      totalAdjunct,
+      totalOther,
+      totalBatches,
     };
   }, [periodData]);
 
@@ -734,10 +796,16 @@ export default function CogsReportPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Render
+  // Loading / error derivation
   // ---------------------------------------------------------------------------
 
+  const batchLoading = sharedLoading;
+  const batchError = sharedError;
   const currentError = activeTab === "by-batch" ? batchError : activeTab === "by-sku" ? skuError : periodError;
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -1485,32 +1553,22 @@ export default function CogsReportPage() {
                           {formatCurrency(periodSummary.totalCogs)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(
-                            periodData.reduce((s, r) => s + r.malt_cost, 0)
-                          )}
+                          {formatCurrency(periodSummary.totalMalt)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(
-                            periodData.reduce((s, r) => s + r.hop_cost, 0)
-                          )}
+                          {formatCurrency(periodSummary.totalHop)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(
-                            periodData.reduce((s, r) => s + r.yeast_cost, 0)
-                          )}
+                          {formatCurrency(periodSummary.totalYeast)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(
-                            periodData.reduce((s, r) => s + r.adjunct_cost, 0)
-                          )}
+                          {formatCurrency(periodSummary.totalAdjunct)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(
-                            periodData.reduce((s, r) => s + r.other_cost, 0)
-                          )}
+                          {formatCurrency(periodSummary.totalOther)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {periodData.reduce((s, r) => s + r.batch_count, 0)}
+                          {periodSummary.totalBatches}
                         </TableCell>
                       </TableRow>
                     )}

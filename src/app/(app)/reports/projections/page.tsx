@@ -18,6 +18,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
+import { formatDecimal } from "@/lib/format";
 import { format, addDays } from "date-fns";
 import {
   Card,
@@ -95,9 +96,44 @@ interface ProjectionData {
 // =============================================================================
 
 /** Format a numeric quantity to two decimal places, or "--" if null */
-function formatQty(value: number | null | undefined): string {
-  if (value == null) return "--";
-  return value.toFixed(2);
+const formatQty = formatDecimal;
+
+/** Ingredient row from the grouping helper */
+interface GroupedIngredientRow {
+  name: string;
+  category: string;
+  qty: number;
+  unit: string;
+}
+
+/**
+ * Group projection ingredients by a source type ("batch" or "order").
+ * Returns entries pairing each entity with its ingredient rows, filtered
+ * to only entities that have at least one ingredient source.
+ */
+function groupIngredientsBySource<T extends { id: string }>(
+  data: ProjectionData | undefined,
+  sourceType: "batch" | "order",
+  entities: T[],
+): { entity: T; ingredients: GroupedIngredientRow[] }[] {
+  if (!data) return [];
+  const map = new Map<string, { entity: T; ingredients: GroupedIngredientRow[] }>();
+  for (const entity of entities) {
+    map.set(entity.id, { entity, ingredients: [] });
+  }
+  for (const ing of data.ingredients) {
+    for (const src of ing.sources) {
+      if (src.type === sourceType && map.has(src.id)) {
+        map.get(src.id)!.ingredients.push({
+          name: ing.name,
+          category: ing.category,
+          qty: src.qty,
+          unit: ing.unit,
+        });
+      }
+    }
+  }
+  return Array.from(map.values()).filter((entry) => entry.ingredients.length > 0);
 }
 
 // =============================================================================
@@ -383,58 +419,17 @@ export default function IngredientProjectionsPage() {
   }, [projectionData]);
 
   // ---------------------------------------------------------------------------
-  // Group ingredients by batch for the "by-batch" tab
+  // Group ingredients by batch / order for the breakdown tabs
   // ---------------------------------------------------------------------------
-  const ingredientsByBatch = useMemo(() => {
-    if (!projectionData) return [];
-    const map = new Map<
-      string,
-      { batch: BatchSource; ingredients: { name: string; category: string; qty: number; unit: string }[] }
-    >();
-    for (const batch of projectionData.batches) {
-      map.set(batch.id, { batch, ingredients: [] });
-    }
-    for (const ing of projectionData.ingredients) {
-      for (const src of ing.sources) {
-        if (src.type === "batch" && map.has(src.id)) {
-          map.get(src.id)!.ingredients.push({
-            name: ing.name,
-            category: ing.category,
-            qty: src.qty,
-            unit: ing.unit,
-          });
-        }
-      }
-    }
-    return Array.from(map.values()).filter((entry) => entry.ingredients.length > 0);
-  }, [projectionData]);
+  const ingredientsByBatch = useMemo(
+    () => groupIngredientsBySource(projectionData, "batch", projectionData?.batches ?? []),
+    [projectionData],
+  );
 
-  // ---------------------------------------------------------------------------
-  // Group ingredients by order for the "by-order" tab
-  // ---------------------------------------------------------------------------
-  const ingredientsByOrder = useMemo(() => {
-    if (!projectionData) return [];
-    const map = new Map<
-      string,
-      { order: OrderSource; ingredients: { name: string; category: string; qty: number; unit: string }[] }
-    >();
-    for (const order of projectionData.orders) {
-      map.set(order.id, { order, ingredients: [] });
-    }
-    for (const ing of projectionData.ingredients) {
-      for (const src of ing.sources) {
-        if (src.type === "order" && map.has(src.id)) {
-          map.get(src.id)!.ingredients.push({
-            name: ing.name,
-            category: ing.category,
-            qty: src.qty,
-            unit: ing.unit,
-          });
-        }
-      }
-    }
-    return Array.from(map.values()).filter((entry) => entry.ingredients.length > 0);
-  }, [projectionData]);
+  const ingredientsByOrder = useMemo(
+    () => groupIngredientsBySource(projectionData, "order", projectionData?.orders ?? []),
+    [projectionData],
+  );
 
   // ---------------------------------------------------------------------------
   // Render
@@ -628,7 +623,7 @@ export default function IngredientProjectionsPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {ingredientsByBatch.map(({ batch, ingredients }) => (
+                  {ingredientsByBatch.map(({ entity: batch, ingredients }) => (
                     <div key={batch.id}>
                       <h3 className="text-sm font-semibold mb-2">
                         {batch.batch_number} - {batch.name}
@@ -679,7 +674,7 @@ export default function IngredientProjectionsPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {ingredientsByOrder.map(({ order, ingredients }) => (
+                  {ingredientsByOrder.map(({ entity: order, ingredients }) => (
                     <div key={order.id}>
                       <h3 className="text-sm font-semibold mb-2">
                         {order.order_number}

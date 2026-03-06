@@ -22,6 +22,10 @@ import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency as formatCurrencyBase } from "@/lib/format";
+
+/** Sales dashboard uses whole-dollar formatting for cleaner high-level display. */
+const formatCurrency = (v: number | null | undefined) => formatCurrencyBase(v, 0);
 
 // =============================================================================
 // Types
@@ -78,19 +82,6 @@ const DEFAULT_ORDER_COUNTS: OrderStatusCounts = {
   fulfilled: 0,
   cancelled: 0,
 };
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 // =============================================================================
 // Sub-Components
