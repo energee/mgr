@@ -306,7 +306,7 @@ export default function AccountSettingsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold">Account</h1>
+        <h1 className="text-lg font-medium">Account</h1>
         <p className="text-muted-foreground">
           Personal settings for your account
         </p>
