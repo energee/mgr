@@ -440,7 +440,7 @@ These decisions need formal resolution (implement or reject):
 | 8 | Renumber duplicate migrations (7 collisions, 16 files) | Database | M | ✅ Done — renumbered 00082–00129 with unique sequential numbers (PR #218) |
 | 9 | Migrate 5 legacy `EntityDetail` pages to `EntityDetailUnified` | Frontend | M | ✅ Done — no remaining imports of deprecated `EntityDetail` component |
 | 10 | Add missing FK indexes (~20 columns) | Database | S | ✅ Done — migration `00115_missing_fk_indexes.sql` |
-| 11 | Fix settings mobile navigation (add mobile nav alternative) | Frontend | S | ⬜ Open — settings sidebar still uses `hidden md:block` with no mobile alternative |
+| 11 | Fix settings mobile navigation (add mobile nav alternative) | Frontend | S | ✅ Done — mobile `<Select>` dropdown with `md:hidden` in `settings-nav.tsx` |
 | 12 | Centralize admin client creation (4 routes bypass `createAdminClient`) | API | S | ✅ Done — Slack routes use `createAdminClient()` |
 | 13 | Make chat route use `withAuth` wrapper | API | S | ✅ Done — `export const POST = withAuth(...)` |
 | 14 | Add per-page metadata/titles | Frontend | M | ✅ Done — 41 `layout.tsx` files with per-route metadata (PR #218) |
@@ -464,12 +464,12 @@ These decisions need formal resolution (implement or reject):
 | 27 | Use `escapeLike()` in API route search queries | API | S | ✅ Done — `escapeLike()` used in chat tools |
 | 28 | Add `@next/bundle-analyzer` and audit bundle | Performance | S | ✅ Done — `@next/bundle-analyzer` installed, unused `@rive-app/react-webgl2` removed (PR #218) |
 | 29 | Lazy-load `shiki` and `@rive-app/react-webgl2` | Performance | M | ✅ Done — shiki dynamically imported with cache eviction; rive removed (PR #218) |
-| 30 | Add dependency vulnerability scanning to CI | CI/CD | S | ⬜ Open — no dedicated vuln scanning step in workflows |
+| 30 | Add dependency vulnerability scanning to CI | CI/CD | S | ✅ Done — `pnpm audit --audit-level=high` in quality job (PRs) + e2e job (main) |
 | 31 | Add `engines` field to `package.json` | Config | S | ✅ Done — `"engines": { "node": ">=20" }` |
 | 32 | Centralize hardcoded query keys (notifications, revision-history) | API | S | ✅ Done — `notificationKeys.list()` used in notifications page |
 | 33 | Enhance `/api/health` to check database connectivity | API | S | ✅ Done — checks DB connectivity, returns degraded status on failure |
-| 34 | Add mobile-responsive improvements (Gantt, pricing matrix, data tables) | Frontend | L | ✅ Partial — sales dashboard and pricing page fixed (PR #218); Gantt/data tables still need work |
-| 35 | Accessibility: add `aria-live` on form errors, `aria-label` on icon buttons | Frontend | M | ✅ Done — `role="alert"` on FormMessage, 24+ aria-labels added (PR #218) |
+| 34 | Add mobile-responsive improvements (Gantt, pricing matrix, data tables) | Frontend | L | ✅ Done — mobile card view for data tables, tier cards for pricing, responsive Gantt (40px columns, 44px touch targets, full-width controls) |
+| 35 | Accessibility: add `aria-live` on form errors, `aria-label` on icon buttons | Frontend | M | ✅ Done — `role="alert"` + `aria-live="polite"` on form errors, `aria-label` on all icon buttons including brew event edit/delete |
 | 36 | Disable `poweredByHeader` in next.config.ts | Security | S | ✅ Done — `poweredByHeader: false` |
 
 ### P3 — Deferred / Decision Required
@@ -491,14 +491,9 @@ These decisions need formal resolution (implement or reject):
 
 ## Remaining Open Items Summary
 
-Only **2 items** remain open across P0–P2:
+**All P0–P2 tasks are complete.**
 
-| # | Task | Priority | Effort |
-|---|------|----------|--------|
-| 11 | Settings mobile navigation | P1 | S |
-| 30 | Dependency vulnerability scanning in CI | P2 | S |
-
-**Completion: 44/46 tasks done (96%)**
+**Completion: 46/46 tasks done (100%)**
 
 ---
 
@@ -523,4 +518,4 @@ Only **2 items** remain open across P0–P2:
 | Production Hardening | **A-** | Sentry, security headers, rate limiting, structured logging, poweredByHeader disabled |
 | Documentation | **B-** | Comprehensive but spec decisions still pending |
 | CI/CD | **B** | Good quality gate, no E2E or vuln scanning |
-| **Overall** | **A** | Production-ready; only settings mobile nav and CI vuln scanning remain |
+| **Overall** | **A+** | Production-ready; all P0–P2 tasks complete |

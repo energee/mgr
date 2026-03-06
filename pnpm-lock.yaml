@@ -80,9 +80,6 @@ importers:
       '@radix-ui/react-use-controllable-state':
         specifier: ^1.2.2
         version: 1.2.2(@types/react@19.2.14)(react@19.2.4)
-      '@rive-app/react-webgl2':
-        specifier: ^4.27.0
-        version: 4.27.0(react@19.2.4)
       '@sentry/nextjs':
         specifier: ^10.40.0
         version: 10.40.0(@opentelemetry/context-async-hooks@2.5.1(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.5.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.5.1(@opentelemetry/api@1.9.0))(next@16.1.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.105.2)
@@ -2074,14 +2071,6 @@ packages:
         optional: true
       react-redux:
         optional: true
-
-  '@rive-app/react-webgl2@4.27.0':
-    resolution: {integrity: sha512-OxIRJiTPJtvPDeUWXfXIx2WZ/6OqaTFWTaS9OE0oekHz80yT9kl41MEUZw7GlgY4l4Pzke7bkn8xEeVnDgPFIg==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0
-
-  '@rive-app/webgl2@2.35.0':
-    resolution: {integrity: sha512-T6fIVmsn9KiN0pMKOvuODhpnOzJHnhFU6injYmVkzsxKn+VIDhTC0FvR2vr520tR+JsZUBy04KUn61cxZCnUgA==}
 
   '@rolldown/pluginutils@1.0.0-rc.3':
     resolution: {integrity: sha512-eybk3TjzzzV97Dlj5c+XrBFW57eTNhzod66y9HrBlzJ6NsCrWCp/2kaPS3K9wJmurBC0Tdw4yPjXKZqlznim3Q==}
@@ -8098,13 +8087,6 @@ snapshots:
     optionalDependencies:
       react: 19.2.4
       react-redux: 9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@5.0.1)
-
-  '@rive-app/react-webgl2@4.27.0(react@19.2.4)':
-    dependencies:
-      '@rive-app/webgl2': 2.35.0
-      react: 19.2.4
-
-  '@rive-app/webgl2@2.35.0': {}
 
   '@rolldown/pluginutils@1.0.0-rc.3': {}
 

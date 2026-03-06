@@ -51,7 +51,9 @@ import {
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 import { useKeyboardShortcuts, type KeyboardShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { generateId } from "@/lib/id";
+import { EntityMobileCardList } from "./entity-mobile-card-list";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableAdvancedToolbar } from "@/components/data-table/data-table-advanced-toolbar";
@@ -109,6 +111,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<{ record: T; action: EntityActionDef<T> } | null>(null);
 
+  const isMobile = useIsMobile();
   const hasBulkActions = !!entity.stateMachine;
   const fetchTable = entity.viewTable || entity.table;
 
@@ -690,6 +693,29 @@ export function EntityDataTable<T = Record<string, unknown>>({
             basePath={path}
             onTransition={handleSingleTransition}
           />
+        ) : isMobile ? (
+          <>
+            {/* Search bar for mobile */}
+            {entity.searchableFields && entity.searchableFields.length > 0 && (
+              <div className="relative mb-3">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
+                  value={globalFilter}
+                  onChange={(e) => setGlobalFilter(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
+            )}
+            <EntityMobileCardList
+              entity={entity as EntityConfig<Record<string, unknown>>}
+              data={(data || []) as Record<string, unknown>[]}
+              basePath={path}
+              showCreate={showCreate}
+              onCreateClick={onCreateClick}
+              hasActiveFilters={!!hasActiveFilters}
+            />
+          </>
         ) : (
           <DataTable
             table={table}
