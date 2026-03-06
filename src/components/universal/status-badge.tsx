@@ -7,15 +7,17 @@
 
 import { cn } from "@/lib/utils";
 
+type StatusColor = "default" | "success" | "warning" | "error" | "info";
+
 interface StatusBadgeProps {
   status: string | null | undefined;
-  variant?: "default" | "success" | "warning" | "error" | "info";
-  config?: Record<string, { label: string; color: "default" | "success" | "warning" | "error" | "info" }>;
+  variant?: StatusColor;
+  config?: Record<string, { label: string; color: StatusColor }>;
   /** Use compact dot-only display (no text) */
   dotOnly?: boolean;
 }
 
-const defaultColors: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
+const defaultColors: Record<string, StatusColor> = {
   draft: "default",
   planned: "default",
   active: "info",
@@ -35,7 +37,7 @@ const defaultColors: Record<string, "default" | "success" | "warning" | "error" 
   error: "error",
 };
 
-const dotColors: Record<string, string> = {
+const dotColors: Record<StatusColor, string> = {
   default: "bg-muted-foreground",
   success: "bg-emerald-500",
   warning: "bg-amber-500",

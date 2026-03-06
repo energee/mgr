@@ -1210,7 +1210,7 @@ function UnifiedSectionCard<T>({
   // Shared section header for all rendering paths
   const sectionHeader = (
     <CardHeader className={headerClassName}>
-      <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{section.title}</CardTitle>
+      <CardTitle className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{section.title}</CardTitle>
       {HeaderActions && <HeaderActions data={data} onAction={fireAction} />}
     </CardHeader>
   );
@@ -1238,7 +1238,7 @@ function UnifiedSectionCard<T>({
             <CardHeader>
               <CollapsibleTrigger className="flex items-center gap-2 group cursor-pointer w-full text-left">
                 <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-                <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{section.title}</CardTitle>
+                <CardTitle className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{section.title}</CardTitle>
               </CollapsibleTrigger>
             </CardHeader>
             <CollapsibleContent>
