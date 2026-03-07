@@ -60,7 +60,7 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
         <SidebarTrigger className="md:hidden" />
         {breweryLogoSvg && (
           <span
-            className="h-8 w-8 inline-flex items-center justify-center text-foreground [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-current"
+            className="h-8 w-8 inline-flex items-center justify-center text-foreground [&_svg]:h-full [&_svg]:w-full [&_*]:fill-current"
             role="img"
             aria-label={breweryName || "Brewery logo"}
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(breweryLogoSvg) }}
