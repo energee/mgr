@@ -236,7 +236,7 @@ function RequirementRow({ requirement }: { requirement: ProductionRequirement })
   const productName = getProductDisplayName(requirement);
 
   return (
-    <TableRow className={cn(hasShortage && "bg-amber-50/50")}>
+    <TableRow className={cn(hasShortage && "bg-warning/10")}>
       <TableCell>
         <div className={cn("font-medium", requirement.is_tbd && "italic text-muted-foreground")}>
           {productName}
