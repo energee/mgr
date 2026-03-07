@@ -42,7 +42,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   AlertCircle,
-  TrendingUp,
   Package,
   ShoppingCart,
   AlertTriangle,
@@ -457,8 +456,7 @@ export default function IngredientProjectionsPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="h-6 w-6" />
+          <h1 className="text-2xl font-bold">
             Ingredient Projections
           </h1>
           <p className="text-muted-foreground">

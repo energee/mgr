@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FileText, Download, Printer, Calendar, AlertCircle, Beer, Package, Boxes, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Download, Printer, Calendar, AlertCircle, Beer, Package, Boxes, FileSpreadsheet } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DropdownMenu,
@@ -262,8 +262,7 @@ export default function TTBReportPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="h-6 w-6" />
+          <h1 className="text-2xl font-bold">
             TTB Report (Form 5130.9)
           </h1>
           <p className="text-muted-foreground">

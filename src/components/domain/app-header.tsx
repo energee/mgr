@@ -25,7 +25,7 @@ import type { AnimatedIconHandle } from "@/components/icons/animated";
 import { useRef } from "react";
 import { toast } from "sonner";
 import { NotificationBell } from "@/components/domain/notification-bell";
-import { SafeImage } from "@/components/ui/safe-image";
+import DOMPurify from "isomorphic-dompurify";
 import { Sun, Moon } from "lucide-react";
 
 interface AppHeaderProps {
@@ -59,10 +59,11 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
         {breweryLogoSvg && (
-          <SafeImage
-            src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(breweryLogoSvg)))}`}
-            alt={breweryName || "Brewery logo"}
-            className="h-8 w-8 object-contain"
+          <span
+            className="h-8 w-8 inline-flex items-center justify-center text-foreground [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-current"
+            role="img"
+            aria-label={breweryName || "Brewery logo"}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(breweryLogoSvg) }}
           />
         )}
         <span className="text-sm font-medium">{breweryName}</span>

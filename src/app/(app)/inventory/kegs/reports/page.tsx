@@ -29,7 +29,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
-  BarChart3,
   Package,
   Users,
   Clock,
@@ -173,8 +172,7 @@ export default function KegReportsPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BarChart3 className="h-6 w-6" />
+            <h1 className="text-2xl font-bold">
               Keg Reports
             </h1>
             <p className="text-muted-foreground">

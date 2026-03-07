@@ -147,8 +147,13 @@ const navigation: NavSection[] = [
     label: "Reports",
     icon: AnimatedBarChart3,
     items: [
-      { label: "All Reports", href: "/reports", icon: AnimatedFileText },
-      { label: "TTB Report", href: "/reports/ttb", icon: AnimatedClipboardList },
+      { label: "All Reports", href: "/reports", icon: AnimatedClipboardList },
+      { label: "TTB Report", href: "/reports/ttb", icon: AnimatedFileText },
+      { label: "Production Summary", href: "/reports/production-summary", icon: AnimatedBarChart3 },
+      { label: "Inventory Valuation", href: "/reports/inventory-valuation", icon: AnimatedDollarSign },
+      { label: "Batch Cost", href: "/reports/batch-cost", icon: AnimatedPackage },
+      { label: "Projections", href: "/reports/projections", icon: AnimatedTrendingUp },
+      { label: "COGS", href: "/reports/cogs", icon: AnimatedContainer },
     ],
   },
 ];
