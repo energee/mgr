@@ -1,11 +1,11 @@
 "use client";
 
-import DOMPurify from "isomorphic-dompurify";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { PortalProvider } from "@/lib/portal-context";
 import { Button } from "@/components/ui/button";
+import { SafeSvg } from "@/components/ui/safe-svg";
 import { LogOut } from "lucide-react";
 
 interface PortalShellProps {
@@ -79,10 +79,7 @@ export function PortalShell({
             <div className="flex items-center gap-6">
               <Link href="/portal/orders" className="flex items-center gap-2">
                 {breweryLogo ? (
-                  <span
-                    className="h-8 w-8 [&>svg]:h-full [&>svg]:w-full"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(breweryLogo) }}
-                  />
+                  <SafeSvg svg={breweryLogo} className="h-8 w-8" />
                 ) : (
                   <span className="text-lg font-semibold tracking-tight">
                     {breweryName || "Brewery"}

@@ -25,7 +25,7 @@ import type { AnimatedIconHandle } from "@/components/icons/animated";
 import { useRef } from "react";
 import { toast } from "sonner";
 import { NotificationBell } from "@/components/domain/notification-bell";
-import { SafeImage } from "@/components/ui/safe-image";
+import { SafeSvg } from "@/components/ui/safe-svg";
 import { Sun, Moon } from "lucide-react";
 
 interface AppHeaderProps {
@@ -59,10 +59,10 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
         {breweryLogoSvg && (
-          <SafeImage
-            src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(breweryLogoSvg)))}`}
-            alt={breweryName || "Brewery logo"}
-            className="h-8 w-8 object-contain"
+          <SafeSvg
+            svg={breweryLogoSvg}
+            className="h-8 w-8"
+            ariaLabel={breweryName || "Brewery logo"}
           />
         )}
         <span className="text-sm font-medium">{breweryName}</span>

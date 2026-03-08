@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Container, Plus, FileText, BarChart3, Users } from "lucide-react";
+import { ArrowLeft, Plus, FileText, BarChart3, Users } from "lucide-react";
 import { EntityList } from "@/components/universal/entity-list";
 import { kegInventoryEntity } from "@/entities/keg-inventory";
 
@@ -26,8 +26,7 @@ export default function KegInventoryPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Container className="h-6 w-6" />
+            <h1 className="text-2xl font-bold">
               Keg Inventory
             </h1>
             <p className="text-muted-foreground">

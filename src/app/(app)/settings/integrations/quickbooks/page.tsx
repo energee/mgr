@@ -462,8 +462,7 @@ export default function QuickBooksSettingsPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <QuickBooksIcon className="h-6 w-6" />
+          <h1 className="text-2xl font-bold">
             QuickBooks Online
           </h1>
           <p className="text-muted-foreground">
