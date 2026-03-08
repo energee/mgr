@@ -49,7 +49,6 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronRight,
-  ClipboardList,
   DollarSign,
   Hash,
   TrendingUp,
@@ -282,8 +281,7 @@ export default function BatchCostAnalysisPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ClipboardList className="h-6 w-6" />
+          <h1 className="text-2xl font-bold">
             Batch Cost Analysis
           </h1>
           <p className="text-muted-foreground">

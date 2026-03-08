@@ -44,7 +44,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
-  BarChart3,
   Calendar,
   AlertCircle,
 } from "lucide-react";
@@ -345,8 +344,7 @@ export default function ProductionSummaryPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BarChart3 className="h-6 w-6" />
+          <h1 className="text-2xl font-bold">
             Production Summary
           </h1>
           <p className="text-muted-foreground">

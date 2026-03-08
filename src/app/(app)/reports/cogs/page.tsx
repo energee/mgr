@@ -771,8 +771,7 @@ export default function CogsReportPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <DollarSign className="h-6 w-6" />
+          <h1 className="text-2xl font-bold">
             Cost of Goods Sold
           </h1>
           <p className="text-muted-foreground">

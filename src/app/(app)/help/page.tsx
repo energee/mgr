@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo } from "react";
-import { HelpCircle, ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Collapsible,
@@ -54,8 +54,7 @@ export default function HelpPage() {
     <div className="space-y-6 max-w-4xl">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <HelpCircle className="h-6 w-6" />
+        <h1 className="text-2xl font-bold">
           Help
         </h1>
         <p className="text-muted-foreground mt-1">
