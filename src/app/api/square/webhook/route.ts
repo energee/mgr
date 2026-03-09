@@ -335,7 +335,7 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
       event_type: "inventory.count.updated",
       event_id: event.event_id,
       note: "Logged for informational purposes only. MGR is source of truth for inventory.",
-      raw_data: event.data ?? null,
+      raw_data: (event.data ?? null) as import("@/types/supabase").Json,
     },
     completed_at: new Date().toISOString(),
   });
