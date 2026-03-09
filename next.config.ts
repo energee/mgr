@@ -14,6 +14,10 @@ const analyzer = withBundleAnalyzer({
  */
 const cspDirectives = [
   "default-src 'self'",
+  // 'unsafe-inline' is required for script-src because Next.js App Router injects
+  // inline scripts for hydration/bootstrapping. Removing it breaks the app at runtime.
+  // To eliminate it, Next.js would need nonce-based CSP support (not yet stable in
+  // App Router). See: https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy
   `script-src 'self'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} 'unsafe-inline'`,
   "style-src 'self' 'unsafe-inline'",
   `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} wss://*.supabase.co https://*.supabase.co https://*.ingest.sentry.io`,

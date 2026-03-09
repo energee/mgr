@@ -2,6 +2,9 @@
  * Health Check Endpoint
  *
  * Returns the overall health of the application, including database connectivity.
+ * Uses the admin client (service role key) because _schema_registry has RLS
+ * requiring auth.uid() IS NOT NULL, and this endpoint is unauthenticated.
+ * The service role key is server-side only and never exposed to browsers.
  * - 200 with { status: "ok", database: "connected" } when everything is healthy
  * - 503 with { status: "degraded", database: "unreachable" } when the database is down
  */

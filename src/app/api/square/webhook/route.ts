@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, getSquareSettings } from "@/lib/square/client";
 import { verifyWebhookSignature } from "@/lib/square/webhook";
+import { calculateVolumeOz } from "@/lib/square/utils";
 import { dynamicFrom } from "@/services/types";
 
 // Square webhook event shape (subset of fields we care about)
@@ -334,18 +335,8 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
       event_type: "inventory.count.updated",
       event_id: event.event_id,
       note: "Logged for informational purposes only. MGR is source of truth for inventory.",
-      raw_data: JSON.parse(JSON.stringify(event.data ?? null)),
+      raw_data: (event.data ?? null) as import("@/types/supabase").Json,
     },
     completed_at: new Date().toISOString(),
   });
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const STANDARD_POUR_OZ = 16;
-
-function calculateVolumeOz(quantity: number): number {
-  return quantity * STANDARD_POUR_OZ;
 }

@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mock Supabase admin client
+// Mock Supabase admin client (service role, bypasses RLS)
 // ---------------------------------------------------------------------------
 
 const mockSelect = vi.fn();
