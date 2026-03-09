@@ -218,12 +218,15 @@ export function earliestExpiration(
   lots: LotWithRemaining[],
   itemId: string
 ): string | null {
-  const dates = lots
-    .filter((l) => l.inventory_item_id === itemId && l.expiration_date !== null)
-    .map((l) => l.expiration_date!);
-
-  if (dates.length === 0) return null;
-  return dates.sort()[0];
+  let earliest: string | null = null;
+  for (const l of lots) {
+    if (l.inventory_item_id === itemId && l.expiration_date !== null) {
+      if (earliest === null || l.expiration_date < earliest) {
+        earliest = l.expiration_date;
+      }
+    }
+  }
+  return earliest;
 }
 
 // =============================================================================

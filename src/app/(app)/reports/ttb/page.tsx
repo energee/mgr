@@ -15,7 +15,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
-import { formatBbl } from "@/lib/format";
+import { getTaxClassLabel, formatTtbBbl } from "@/lib/ttb-utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -87,23 +87,7 @@ interface BatchSummary {
 // Helper Functions
 // =============================================================================
 
-/** TTB compliance wrapper: null volumes display as "0.00" (not "--") on regulatory forms. */
-function formatTtbBbl(value: number | null | undefined): string {
-  return formatBbl(value ?? 0);
-}
-
-function getTaxClassLabel(taxClass: string): string {
-  switch (taxClass) {
-    case "cellar":
-      return "Cellar (In-Process)";
-    case "keg":
-      return "Kegs";
-    case "bottled":
-      return "Canned/Bottled";
-    default:
-      return taxClass;
-  }
-}
+// getTaxClassLabel and formatTtbBbl imported from @/lib/ttb-utils
 
 function getTaxClassIcon(taxClass: string) {
   switch (taxClass) {

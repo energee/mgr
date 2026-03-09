@@ -335,10 +335,8 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
       event_type: "inventory.count.updated",
       event_id: event.event_id,
       note: "Logged for informational purposes only. MGR is source of truth for inventory.",
-      raw_data: JSON.parse(JSON.stringify(event.data ?? null)),
+      raw_data: event.data ?? null,
     },
     completed_at: new Date().toISOString(),
   });
 }
-
-// calculateVolumeOz imported from @/lib/square/utils
