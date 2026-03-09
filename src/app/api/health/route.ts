@@ -2,19 +2,20 @@
  * Health Check Endpoint
  *
  * Returns the overall health of the application, including database connectivity.
+ * Uses the anon client (not admin) since this is an unauthenticated endpoint.
  * - 200 with { status: "ok", database: "connected" } when everything is healthy
  * - 503 with { status: "degraded", database: "unreachable" } when the database is down
  */
 
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/health" });
 
 export async function GET() {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createClient();
     const { error } = await supabase
       .from("_schema_registry")
       .select("table_name")
