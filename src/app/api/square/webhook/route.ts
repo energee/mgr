@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, getSquareSettings } from "@/lib/square/client";
 import { verifyWebhookSignature } from "@/lib/square/webhook";
+import { calculateVolumeOz } from "@/lib/square/utils";
 import { dynamicFrom } from "@/services/types";
 
 // Square webhook event shape (subset of fields we care about)
@@ -340,12 +341,4 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const STANDARD_POUR_OZ = 16;
-
-function calculateVolumeOz(quantity: number): number {
-  return quantity * STANDARD_POUR_OZ;
-}
+// calculateVolumeOz imported from @/lib/square/utils

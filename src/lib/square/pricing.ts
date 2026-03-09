@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { dollarsToCents } from "./utils";
 
 interface TaproomPrice {
   brandId: string;
@@ -112,7 +113,7 @@ export async function resolveTaproomPrices(
       results.push({
         brandId,
         sellingFormatId: formatId,
-        priceCents: Math.round(priceDollars * 100),
+        priceCents: dollarsToCents(priceDollars),
       });
     }
   }
