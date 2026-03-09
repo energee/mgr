@@ -6,6 +6,7 @@
  */
 
 import { formatBbl } from "@/lib/format";
+import { getTaxClassLabel } from "@/lib/ttb-utils";
 
 // =============================================================================
 // CSV Export
@@ -196,18 +197,7 @@ function createDataRow(
   return row;
 }
 
-function getTaxClassLabel(taxClass: string): string {
-  switch (taxClass) {
-    case "cellar":
-      return "Cellar (In-Process)";
-    case "keg":
-      return "Kegs";
-    case "bottled":
-      return "Canned/Bottled";
-    default:
-      return taxClass;
-  }
-}
+// getTaxClassLabel imported from @/lib/ttb-utils
 
 /**
  * Export batch details to CSV

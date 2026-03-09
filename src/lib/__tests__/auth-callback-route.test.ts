@@ -130,4 +130,60 @@ describe("/api/auth/callback GET", () => {
     expect(location.searchParams.get("error")).toBe("auth_callback_error");
     expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
   });
+
+  it("redirects to login with error when code is empty string", async () => {
+    const response = await GET(makeRequest({ code: "" }));
+    const location = new URL(response.headers.get("location")!);
+
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("error")).toBe("auth_callback_error");
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+  });
+
+  it("preserves redirect path with query parameters on success", async () => {
+    mockExchangeCodeForSession.mockResolvedValueOnce({ error: null });
+
+    const response = await GET(
+      makeRequest({
+        code: "test-code",
+        redirect: "/production/batches?status=active",
+      })
+    );
+
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location")!);
+    expect(location.pathname).toBe("/production/batches");
+    expect(location.searchParams.get("status")).toBe("active");
+  });
+
+  it("prevents redirect with javascript: protocol variant", async () => {
+    mockExchangeCodeForSession.mockResolvedValueOnce({ error: null });
+
+    const response = await GET(
+      makeRequest({ code: "test-code", redirect: "javascript:alert(1)" })
+    );
+
+    // Does not start with / so isValidRedirect returns false
+    expect(new URL(response.headers.get("location")!).pathname).toBe("/");
+  });
+
+  it("does not call exchangeCodeForSession when code is missing", async () => {
+    await GET(makeRequest({ redirect: "/dashboard" }));
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+  });
+
+  it("ignores redirect param when code exchange fails", async () => {
+    mockExchangeCodeForSession.mockResolvedValueOnce({
+      error: { message: "expired code" },
+    });
+
+    const response = await GET(
+      makeRequest({ code: "expired", redirect: "/production/batches" })
+    );
+    const location = new URL(response.headers.get("location")!);
+
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("error")).toBe("auth_callback_error");
+  });
 });
