@@ -18,8 +18,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // pino is installed but not hoisted by pnpm; alias to the deep store path
-      // so Vite's import analysis can resolve it in mocked test files
+      // pino is a transitive dep (not hoisted by pnpm strict mode); alias to the
+      // pnpm store path so Vite can resolve it. Update version here when pino is upgraded.
       pino: path.resolve(
         __dirname,
         "node_modules/.pnpm/pino@10.3.1/node_modules/pino"

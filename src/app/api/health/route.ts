@@ -2,20 +2,22 @@
  * Health Check Endpoint
  *
  * Returns the overall health of the application, including database connectivity.
- * Uses the anon client (not admin) since this is an unauthenticated endpoint.
+ * Uses the admin client (service role key) because _schema_registry has RLS
+ * requiring auth.uid() IS NOT NULL, and this endpoint is unauthenticated.
+ * The service role key is server-side only and never exposed to browsers.
  * - 200 with { status: "ok", database: "connected" } when everything is healthy
  * - 503 with { status: "degraded", database: "unreachable" } when the database is down
  */
 
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/health" });
 
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from("_schema_registry")
       .select("table_name")

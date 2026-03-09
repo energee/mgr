@@ -1,31 +1,30 @@
 /**
  * Tests for the /api/health route handler.
  *
- * Mocks the Supabase anon client to verify:
+ * Mocks the Supabase admin client to verify:
  * - 200 "ok" when database is reachable
  * - 503 "degraded" when the database query returns an error
- * - 503 "degraded" when createClient throws an exception
+ * - 503 "degraded" when createAdminClient throws an exception
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mock Supabase client (anon, not admin)
+// Mock Supabase admin client (service role, bypasses RLS)
 // ---------------------------------------------------------------------------
 
 const mockSelect = vi.fn();
 const mockLimit = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: () =>
-    Promise.resolve({
-      from: () => ({
-        select: (...args: unknown[]) => {
-          mockSelect(...args);
-          return { limit: mockLimit };
-        },
-      }),
+  createAdminClient: () => ({
+    from: () => ({
+      select: (...args: unknown[]) => {
+        mockSelect(...args);
+        return { limit: mockLimit };
+      },
     }),
+  }),
 }));
 
 vi.mock("@/lib/logger", () => ({
