@@ -64,6 +64,7 @@ const ADDITIONS_SELECT = `
   )
 ` as const;
 
+/** Domain constants: brewing process timing labels (not entity status -- no stateMachine applies). */
 const TIMING_LABELS: Record<string, string> = {
   mash: "Mash",
   sparge: "Sparge",
@@ -73,12 +74,14 @@ const TIMING_LABELS: Record<string, string> = {
   packaging: "Packaging",
 };
 
+/** Domain constants: water chemistry target labels (not entity status). */
 const TARGET_LABELS: Record<string, string> = {
   mash: "Mash Water",
   sparge: "Sparge Water",
   kettle: "Kettle",
 };
 
+/** Domain constants: additive type labels (not entity status -- no stateMachine applies). */
 const TYPE_LABELS: Record<string, string> = {
   water_salt: "Water Salt",
   acid: "Acid",
@@ -88,6 +91,7 @@ const TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+/** Domain constants: additive type badge colors (not entity status). */
 const TYPE_COLORS: Record<string, string> = {
   water_salt: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   acid: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",

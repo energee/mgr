@@ -73,6 +73,7 @@ interface MaltCatalogItem {
 }
 
 /** Malt type display labels for the selector grouping */
+/** Domain constants: malt category labels (not entity status -- no stateMachine applies). */
 const MALT_TYPE_LABELS: Record<string, string> = {
   base: "Base Malts",
   specialty: "Specialty Malts",

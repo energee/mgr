@@ -50,6 +50,7 @@ type InviteFormValues = z.infer<typeof inviteFormSchema>;
 // Role display labels
 // ---------------------------------------------------------------------------
 
+/** Domain constants: user role display labels (derived from STAFF_ROLES, not entity status). */
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   production_manager: "Production Manager",
@@ -58,6 +59,7 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Viewer",
 };
 
+/** Domain constants: user role descriptions for the invite form. */
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   admin: "Full access to all features, settings, and user management",
   production_manager: "Manage production, inventory, purchasing, and vessels",

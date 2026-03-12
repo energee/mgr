@@ -60,6 +60,7 @@ interface Notification {
 // Constants
 // =============================================================================
 
+/** Domain constants: notification priority dot colors (not entity status -- no stateMachine applies). */
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: "bg-red-500",
   high: "bg-orange-500",
@@ -67,6 +68,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-gray-400",
 };
 
+/** Domain constants: notification priority badge variants (not entity status). */
 const PRIORITY_BADGE_VARIANTS: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
   urgent: "destructive",
   high: "default",
@@ -74,6 +76,7 @@ const PRIORITY_BADGE_VARIANTS: Record<string, "destructive" | "default" | "secon
   low: "outline",
 };
 
+/** Domain constants: notification type labels (not entity status -- no stateMachine applies). */
 const TYPE_LABELS: Record<string, string> = {
   batch_status: "Batch Status",
   order_status: "Order Status",
