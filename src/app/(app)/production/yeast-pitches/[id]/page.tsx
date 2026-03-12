@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicRpc } from "@/services/types";
 import { yeastKeys, entityKeys } from "@/lib/query-keys";
 import type { YeastForm } from "@/lib/yeast-calculations";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -109,11 +110,7 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
   const { data: rootId } = useQuery({
     queryKey: yeastKeys.lineageRoot(id),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
-        "get_yeast_lineage_root",
-        { p_pitch_id: id },
-      ) as { data: string | null; error: Error | null };
+      const { data, error } = await dynamicRpc(supabase, "get_yeast_lineage_root", { p_pitch_id: id });
       if (error) throw error;
       return data ?? id;
     },

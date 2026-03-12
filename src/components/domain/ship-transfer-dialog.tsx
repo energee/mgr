@@ -13,6 +13,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicRpc } from "@/services/types";
 import {
   Dialog,
   DialogContent,
@@ -202,14 +203,10 @@ export function ShipTransferDialog({
         quantity_shipped: shippedQuantities[line.id] ?? 0,
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
-        "ship_transfer_partial",
-        {
-          p_transfer_id: transferId,
-          p_line_quantities: lineQuantities,
-        }
-      ) as { data: string | null; error: Error | null };
+      const { data, error } = await dynamicRpc(supabase, "ship_transfer_partial", {
+        p_transfer_id: transferId,
+        p_line_quantities: lineQuantities,
+      });
 
       if (error) throw error;
       return data as string | null; // remainder transfer ID or null

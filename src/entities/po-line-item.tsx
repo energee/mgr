@@ -8,6 +8,8 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { dynamicFrom } from "@/services/types";
 
 type POLineItem = Database["public"]["Tables"]["po_line_items"]["Row"];
 
@@ -60,8 +62,7 @@ export function isFreeTextCatalogType(type: string): boolean {
  * Returns a Map keyed by `"catalog_type:catalog_id"` → display name.
  */
 export async function resolveCatalogNames(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  supabase: SupabaseClient<Database>,
   items: Array<{ catalog_type: string; catalog_id: string }>,
 ): Promise<Map<string, string>> {
   const nameMap = new Map<string, string>();
@@ -93,8 +94,7 @@ export async function resolveCatalogNames(
     .map(async ([catalogType, catalogIds]) => {
       const table = CATALOG_TABLES[catalogType];
       const uniqueIds = [...new Set(catalogIds)];
-      const { data: catalogItems } = await supabase
-        .from(table)
+      const { data: catalogItems } = await dynamicFrom(supabase, table)
         .select("id, name")
         .in("id", uniqueIds);
       for (const ci of catalogItems ?? []) {
