@@ -167,48 +167,6 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
     subtitle: "manufacturer",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Basic Info",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "manufacturer", label: "Manufacturer" },
-        { field: "product_code", label: "Product Code" },
-        { field: "type", label: "Type" },
-        { field: "form", label: "Form" },
-        { field: "is_active", label: "Active" },
-      ],
-    },
-    {
-      id: "fermentation",
-      title: "Fermentation Characteristics",
-      fields: [
-        { field: "attenuation_min", label: "Attenuation Min (%)" },
-        { field: "attenuation_max", label: "Attenuation Max (%)" },
-        { field: "attenuation_typical", label: "Attenuation Typical (%)" },
-        { field: "flocculation", label: "Flocculation" },
-        { field: "alcohol_tolerance", label: "Alcohol Tolerance (%)" },
-        { field: "pitching_rate", label: "Pitching Rate (M cells/mL/°P)" },
-      ],
-    },
-    {
-      id: "temperature",
-      title: "Temperature Range",
-      fields: [
-        { field: "temp_min_f", label: "Min Temp", format: "unit", unitType: "temperature" },
-        { field: "temp_ideal_f", label: "Ideal Temp", format: "unit", unitType: "temperature" },
-        { field: "temp_max_f", label: "Max Temp", format: "unit", unitType: "temperature" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Description",
-      fields: [{ field: "description", label: "Description", fullWidth: true }],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

@@ -121,29 +121,6 @@ export const locationEntity: EntityConfig<LocationWithPos> = {
     subtitle: "location_type",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Location Details",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "location_type", label: "Type" },
-        { field: "is_primary", label: "Primary Location" },
-        { field: "is_active", label: "Active" },
-        { field: "created_at", label: "Created", format: "datetime" },
-        { field: "updated_at", label: "Last Updated", format: "datetime" },
-      ],
-    },
-    {
-      id: "pos",
-      title: "POS Integration",
-      fields: [
-        { field: "square_location_id", label: "Square Location ID" },
-        { field: "pos_bin_name", label: "POS Inventory Bin" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

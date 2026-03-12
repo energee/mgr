@@ -287,42 +287,6 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
     subtitle: "created_at",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Transaction Details",
-      fields: [
-        { field: "transaction_type", label: "Type" },
-        { field: "keg_type_name", label: "Keg Type" },
-        { field: "keg_owner_name", label: "Keg Owner" },
-        { field: "quantity", label: "Quantity" },
-        { field: "from_state", label: "From State" },
-        { field: "to_state", label: "To State" },
-        { field: "from_location_name", label: "From Location" },
-        { field: "to_location_name", label: "To Location" },
-      ],
-    },
-    {
-      id: "related",
-      title: "Related Records",
-      fields: [
-        { field: "customer_name", label: "Customer" },
-        { field: "order_number", label: "Order" },
-        { field: "batch_number", label: "Batch" },
-        { field: "finished_good_name", label: "Finished Good" },
-      ],
-    },
-    {
-      id: "audit",
-      title: "Audit Information",
-      fields: [
-        { field: "notes", label: "Notes" },
-        { field: "created_by_name", label: "Created By" },
-        { field: "created_at", label: "Created At", format: "datetime" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

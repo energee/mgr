@@ -128,45 +128,6 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "po_number", label: "PO Number" },
-        { field: "status", label: "Status" },
-        { field: "order_date", label: "Order Date", format: "date" },
-        { field: "expected_date", label: "Expected Date", format: "date" },
-        { field: "submitted_at", label: "Submitted At", format: "datetime" },
-      ],
-    },
-    {
-      id: "costs",
-      title: "Costs",
-      fields: [
-        { field: "shipping_cost", label: "Shipping", format: "currency" },
-        { field: "tax", label: "Tax", format: "currency" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [{ field: "notes", label: "Notes", fullWidth: true }],
-      collapsible: true,
-    },
-    {
-      id: "qbo-sync",
-      title: "QuickBooks",
-      component: createQBOSyncDisplay("purchase_order"),
-    },
-    {
-      id: "revision-history",
-      title: "Revision History",
-      component: createRevisionHistoryDisplay("purchase_orders"),
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

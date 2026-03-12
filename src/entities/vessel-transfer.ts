@@ -104,20 +104,6 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
     subtitle: "transferred_at",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Transfer Details",
-      fields: [
-        { field: "transferred_at", label: "Date/Time", format: "datetime" },
-        { field: "from_vessel_id", label: "From Vessel", relation: { entity: "vessel", displayField: "name" } },
-        { field: "to_vessel_id", label: "To Vessel", relation: { entity: "vessel", displayField: "name" } },
-        { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
-        { field: "notes", label: "Notes" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------

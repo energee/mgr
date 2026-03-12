@@ -147,51 +147,6 @@ export const orderEntity: EntityConfig<Order> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "quick-links",
-      title: "Quick Actions",
-      component: OrderQuickLinks,
-    },
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "order_number", label: "Order Number" },
-        { field: "status", label: "Status" },
-        { field: "order_date", label: "Order Date", format: "date" },
-        { field: "requested_date", label: "Requested Date", format: "date" },
-        { field: "scheduled_date", label: "Scheduled Date", format: "date" },
-        { field: "fulfilled_date", label: "Fulfilled Date", format: "date" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-    {
-      id: "change-requests",
-      title: "Change Requests",
-      component: ChangeRequestReview,
-      collapsible: true,
-    },
-    {
-      id: "qbo-sync",
-      title: "QuickBooks",
-      component: createQBOSyncDisplay("order"),
-    },
-    {
-      id: "revision-history",
-      title: "Revision History",
-      component: createRevisionHistoryDisplay("orders"),
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

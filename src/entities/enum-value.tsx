@@ -172,32 +172,6 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
     subtitle: "enum_type",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Option Details",
-      fields: [
-        { field: "enum_type", label: "Category" },
-        { field: "value", label: "Stored Value" },
-        { field: "label", label: "Display Label" },
-        { field: "description", label: "Description" },
-        { field: "color", label: "Color" },
-        { field: "icon", label: "Icon" },
-        { field: "sort_order", label: "Sort Order" },
-        { field: "group_name", label: "Group" },
-        { field: "is_default", label: "Default?" },
-        { field: "is_active", label: "Enabled" },
-        { field: "created_at", label: "Created", format: "datetime" },
-        { field: "updated_at", label: "Last Updated", format: "datetime" },
-      ],
-    },
-    {
-      id: "metadata",
-      title: "Extra Data",
-      fields: [{ field: "metadata", label: "Extra Data", format: "json" }],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

@@ -151,22 +151,6 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
     subtitle: "state",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Keg Inventory Details",
-      fields: [
-        { field: "keg_type_name", label: "Keg Type" },
-        { field: "keg_owner_name", label: "Owner" },
-        { field: "state", label: "State" },
-        { field: "quantity", label: "Quantity" },
-        { field: "location_name", label: "Location" },
-        { field: "batch_number", label: "Batch" },
-        { field: "finished_good_name", label: "Finished Good" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified) - READ ONLY
   // ---------------------------------------------------------------------------

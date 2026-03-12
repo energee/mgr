@@ -135,37 +135,6 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
     subtitle: "category",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "category", label: "Category" },
-        { field: "sku", label: "SKU" },
-        { field: "unit", label: "Unit of Measure" },
-        { field: "is_active", label: "Active" },
-      ],
-    },
-    {
-      id: "reorder",
-      title: "Reorder Settings",
-      fields: [
-        { field: "reorder_point", label: "Reorder Point" },
-        { field: "reorder_qty", label: "Reorder Quantity" },
-        { field: "supplier", label: "Preferred Supplier" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------

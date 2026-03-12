@@ -80,26 +80,6 @@ export const poReceiveEntity: EntityConfig<POReceive> = {
     title: "lot_number",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Receipt Information",
-      fields: [
-        { field: "po_line_item_id", label: "PO Line Item" },
-        { field: "quantity", label: "Quantity Received" },
-        { field: "lot_number", label: "Lot Number" },
-        { field: "received_date", label: "Received Date", format: "date" },
-        { field: "expiration_date", label: "Expiration Date", format: "date" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [{ field: "notes", label: "Notes", fullWidth: true }],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

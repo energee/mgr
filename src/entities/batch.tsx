@@ -18,10 +18,7 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
-import { BatchRecipeContext } from "@/components/domain/batch-recipe-context";
-import { BatchCostBreakdown } from "@/components/domain/batch-cost-breakdown";
 import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
-import { BatchAdditionsDisplay } from "@/components/domain/batch-additions-display";
 import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-info";
 import { BatchInsights } from "@/components/domain/batch-insights";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
@@ -174,83 +171,6 @@ export const batchEntity: EntityConfig<Batch> = {
     subtitle: "name",
     badge: "status",
   },
-
-  detailSections: [
-    {
-      id: "quick-links",
-      title: "Quick Actions",
-      component: BatchQuickLinks,
-    },
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "batch_number", label: "Batch Number" },
-        { field: "name", label: "Name" },
-        { field: "status", label: "Status" },
-        { field: "planned_start_date", label: "Planned Start", format: "date" },
-        { field: "volume_bbl", label: "Volume", format: "unit", unitType: "volume" },
-        { field: "current_vessel_name", label: "Vessel" },
-      ],
-    },
-    {
-      id: "recipe-context",
-      title: "Recipe",
-      component: BatchRecipeContext,
-      collapsible: true,
-    },
-    {
-      id: "cost-breakdown",
-      title: "Cost Breakdown",
-      component: BatchCostBreakdown,
-      collapsible: true,
-    },
-    {
-      id: "brew-info",
-      title: "Brewing",
-      component: BatchBrewInfo,
-    },
-    {
-      id: "yeast",
-      title: "Yeast",
-      component: BatchYeastSection,
-    },
-    {
-      id: "additions",
-      title: "Cold-Side Additions",
-      component: BatchAdditionsDisplay,
-    },
-    {
-      id: "ai-insights",
-      title: "AI Insights",
-      component: BatchInsights,
-    },
-    {
-      id: "blend-history",
-      title: "Blend History",
-      component: BatchBlendHistory,
-      collapsible: true,
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-    {
-      id: "cancellation",
-      title: "Cancellation Details",
-      component: BatchCancellationInfo,
-    },
-    {
-      id: "revision-history",
-      title: "Revision History",
-      component: createRevisionHistoryDisplay("batches"),
-      collapsible: true,
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)

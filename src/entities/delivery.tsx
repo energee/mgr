@@ -153,45 +153,6 @@ export const deliveryEntity: EntityConfig<DeliveryView> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Delivery Details",
-      fields: [
-        { field: "delivery_number", label: "Delivery #" },
-        { field: "status", label: "Status" },
-        { field: "scheduled_date", label: "Scheduled Date", format: "date" },
-        { field: "driver_name", label: "Driver" },
-        { field: "vehicle", label: "Vehicle" },
-      ],
-    },
-    {
-      id: "shipping",
-      title: "Shipping",
-      fields: [
-        { field: "ship_date", label: "Shipped", format: "datetime" },
-        { field: "receive_date", label: "Received", format: "datetime" },
-      ],
-    },
-    {
-      id: "summary",
-      title: "Stops Summary",
-      fields: [
-        { field: "transfer_count", label: "Transfers" },
-        { field: "order_count", label: "Orders" },
-        { field: "total_stops", label: "Total Stops" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

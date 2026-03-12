@@ -184,20 +184,6 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
     title: "catalog_type",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Line Item Details",
-      fields: [
-        { field: "catalog_type", label: "Catalog Type" },
-        { field: "catalog_id", label: "Item ID" },
-        { field: "quantity", label: "Quantity" },
-        { field: "unit", label: "Unit" },
-        { field: "unit_price", label: "Unit Price", format: "currency" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

@@ -133,50 +133,6 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
     title: "lot_number",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Lot Information",
-      fields: [
-        { field: "lot_number", label: "Lot Number" },
-        { field: "inventory_item_id", label: "Inventory Item" },
-        { field: "location", label: "Storage Location" },
-      ],
-    },
-    {
-      id: "quantities",
-      title: "Quantities",
-      fields: [
-        { field: "quantity", label: "Quantity" },
-        { field: "remaining_quantity", label: "Remaining" },
-        { field: "allocated_quantity", label: "Allocated" },
-        { field: "unit", label: "Unit" },
-      ],
-    },
-    {
-      id: "costs",
-      title: "Costs",
-      fields: [
-        { field: "unit_cost", label: "Unit Cost", format: "currency" },
-        { field: "landed_cost", label: "Landed Cost", format: "currency" },
-      ],
-    },
-    {
-      id: "dates",
-      title: "Dates",
-      fields: [
-        { field: "received_date", label: "Received Date", format: "date" },
-        { field: "expiration_date", label: "Expiration Date", format: "date" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [{ field: "notes", label: "Notes", fullWidth: true }],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------
