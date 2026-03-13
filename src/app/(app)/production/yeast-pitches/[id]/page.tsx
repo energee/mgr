@@ -15,7 +15,9 @@
  */
 
 import { use, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
 import type { EntityConfig } from "@/types/entity";
@@ -83,6 +85,7 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
   const queryClient = useQueryClient();
   const supabase = createClient();
 
+  const router = useRouter();
   const [showCellCountDialog, setShowCellCountDialog] = useState(false);
   const [currentPitchData, setCurrentPitchData] = useState<{
     id: string;
@@ -186,9 +189,19 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
         setShowCellCountDialog(true);
         return true;
       }
+      if (actionName === "pitch_to_batch") {
+        toast.info("Yeast pitching is done from the batch detail page", {
+          description: "Navigate to a batch and use the Yeast section to pitch.",
+          action: {
+            label: "Go to Batches",
+            onClick: () => router.push("/production/batches"),
+          },
+        });
+        return true;
+      }
       return false;
     },
-    []
+    [router]
   );
 
   // Determine chart props
@@ -340,7 +353,19 @@ function CostSpreadingSummary({
                         : "\u2014"}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(lineageSummary.cost_per_batch)}
+                      {(() => {
+                        // Allocate cost proportionally by quantity pitched
+                        const totalQty = pitchEvents.reduce(
+                          (sum, e) => sum + (e.quantity_lbs ?? 0),
+                          0
+                        );
+                        if (!totalQty || !lineageSummary.original_cost || !event.quantity_lbs) {
+                          return "\u2014";
+                        }
+                        return formatCurrency(
+                          (lineageSummary.original_cost * event.quantity_lbs) / totalQty
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}

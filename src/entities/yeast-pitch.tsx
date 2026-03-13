@@ -8,6 +8,8 @@
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
+import { statesAsOptions } from "@/types/entity";
+import { StatusBadge } from "@/components/universal/status-badge";
 import type { Database } from "@/types/supabase";
 
 // Use the view type for computed fields (quantity_remaining_lbs, viability, etc.)
@@ -48,14 +50,6 @@ const SOURCE_TYPE_OPTIONS = [
   { value: "harvest", label: "Harvest" },
 ];
 
-const STATUS_OPTIONS = [
-  { value: "in_stock", label: "In Stock" },
-  { value: "in_use", label: "In Use" },
-  { value: "harvested", label: "Harvested" },
-  { value: "depleted", label: "Depleted" },
-  { value: "discarded", label: "Discarded" },
-];
-
 const STATUS_DISPLAY: Record<string, { label: string; color: "error" | "default" | "success" | "warning" | "info" }> = {
   in_stock: { label: "In Stock", color: "success" },
   in_use: { label: "In Use", color: "info" },
@@ -64,13 +58,37 @@ const STATUS_DISPLAY: Record<string, { label: string; color: "error" | "default"
   discarded: { label: "Discarded", color: "error" },
 };
 
-const VIABILITY_STATUS_DISPLAY: Record<string, { label: string; color: "default" | "secondary" | "destructive" | "outline" }> = {
-  excellent: { label: "Excellent", color: "default" },
-  good: { label: "Good", color: "secondary" },
-  marginal: { label: "Marginal", color: "outline" },
-  low: { label: "Low", color: "destructive" },
-  inactive: { label: "Inactive", color: "outline" },
+/** Viability status display config — uses the same color tokens as StatusBadge. */
+export const VIABILITY_STATUS_DISPLAY: Record<string, { label: string; color: "default" | "success" | "warning" | "error" | "info" }> = {
+  excellent: { label: "Excellent", color: "success" },
+  good: { label: "Good", color: "default" },
+  marginal: { label: "Marginal", color: "warning" },
+  low: { label: "Low", color: "error" },
+  inactive: { label: "Inactive", color: "default" },
 };
+
+// =============================================================================
+// State Machine (extracted for statesAsOptions)
+// =============================================================================
+
+const yeastPitchStates: string[] = ["in_stock", "in_use", "harvested", "depleted", "discarded"];
+
+const yeastPitchStateMachine = {
+  stateField: "status" as const,
+  initialState: "in_stock" as const,
+  states: yeastPitchStates,
+  transitions: {
+    in_stock: ["in_use", "discarded"],
+    in_use: ["harvested", "depleted", "discarded"],
+    harvested: [] as string[],
+    depleted: [] as string[],
+    discarded: [] as string[],
+  },
+  stateDisplay: STATUS_DISPLAY,
+};
+
+// Derive status options from state machine (single source of truth per DEC-007)
+const statusOptions = statesAsOptions(yeastPitchStateMachine);
 
 // =============================================================================
 // Entity Configuration
@@ -127,6 +145,12 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       accessorKey: "status",
       header: "Status",
       sortable: true,
+      render: (value) => (
+        <StatusBadge
+          status={value as string}
+          config={STATUS_DISPLAY}
+        />
+      ),
     },
     {
       accessorKey: "estimated_viability",
@@ -138,9 +162,10 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
         const status = pitch.viability_status || "good";
         const color = VIABILITY_STATUS_DISPLAY[status]?.color || "default";
         return (
-          <span className={color === "destructive" ? "text-destructive" : color === "secondary" ? "text-muted-foreground" : ""}>
-            {Math.round(Number(value))}%
-          </span>
+          <StatusBadge
+            status={`${Math.round(Number(value))}%`}
+            variant={color}
+          />
         );
       },
     },
@@ -163,7 +188,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       field: "status",
       type: "select",
       label: "Status",
-      options: STATUS_OPTIONS,
+      options: statusOptions,
     },
     {
       field: "source_type",
@@ -178,25 +203,13 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
     },
   ],
 
-  defaultSort: { column: "created_at", direction: "desc" },
+  defaultSort: { column: "days_old", direction: "asc" },
   searchableFields: ["strain_name", "strain_code", "notes"],
 
   // ---------------------------------------------------------------------------
-  // State Machine
+  // State Machine (uses extracted constant)
   // ---------------------------------------------------------------------------
-  stateMachine: {
-    stateField: "status",
-    initialState: "in_stock",
-    states: ["in_stock", "in_use", "harvested", "depleted", "discarded"],
-    transitions: {
-      in_stock: ["in_use", "discarded"],
-      in_use: ["harvested", "depleted", "discarded"],
-      harvested: [],  // Terminal - new pitch created from harvest
-      depleted: [],    // Terminal
-      discarded: [],   // Terminal
-    },
-    stateDisplay: STATUS_DISPLAY,
-  },
+  stateMachine: yeastPitchStateMachine,
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -208,14 +221,14 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       icon: "flask",
       type: "button" as const,
       fromStates: ["in_stock"],
-      // No toState - handled by custom dialog
+      // No toState - handled by custom dialog on the batch detail page
     },
     {
       name: "record_cell_count",
       label: "Record Cell Count",
       icon: "microscope",
       type: "button" as const,
-      fromStates: ["in_stock"],
+      fromStates: ["in_stock", "in_use"],
       // No toState - updates viability fields
     },
     {
@@ -224,7 +237,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       icon: "trash",
       type: "dropdown" as const,
       variant: "destructive" as const,
-      fromStates: ["in_stock"],
+      fromStates: ["in_stock", "in_use"],
       toState: "discarded",
     },
   ],
@@ -269,7 +282,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
           name: "status",
           label: "Status",
           type: "select",
-          options: STATUS_OPTIONS,
+          options: statusOptions,
           colSpan: 4,
         },
       ],
@@ -285,7 +298,6 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
           relation: { entity: "vessel", displayField: "name" },
           colSpan: 6,
         },
-        { name: "vessel_name", label: "Brink", editable: false, colSpan: 6 },
       ],
     },
     {
@@ -341,6 +353,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
           type: "number",
           format: "percentage",
           placeholder: "95",
+          defaultValue: 95,
           description: "Viability at time of receipt/harvest",
           colSpan: 4,
         },
