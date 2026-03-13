@@ -44,6 +44,7 @@ import {
   sgToPlato,
   formatCellCount,
 } from "@/lib/yeast-calculations";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -277,7 +278,7 @@ export function PitchYeastDialog({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Pitch yeast error:", error);
+      log.error("Pitch yeast error:", error);
       const message =
         error instanceof Error ? error.message : "Failed to pitch yeast";
       toast.error(message);

@@ -8,6 +8,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/types/supabase";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -115,7 +116,7 @@ export async function getEnumValues(
   const { data, error } = await query;
 
   if (error) {
-    console.error(`Failed to fetch enum values for ${enumType}:`, error);
+    log.error(`Failed to fetch enum values for ${enumType}:`, error);
     return [];
   }
 
@@ -139,7 +140,7 @@ export async function getAllEnums(): Promise<Record<string, EnumValue[]>> {
     .order("sort_order");
 
   if (error) {
-    console.error("Failed to fetch all enums:", error);
+    log.error("Failed to fetch all enums:", error);
     return {};
   }
 
@@ -177,7 +178,7 @@ export async function getEnumValue(
     .single();
 
   if (error) {
-    console.error(`Failed to fetch enum value ${enumType}.${value}:`, error);
+    log.error(`Failed to fetch enum value ${enumType}.${value}:`, error);
     return null;
   }
 
@@ -206,7 +207,7 @@ export async function getEnumDefault(enumType: EnumType | string): Promise<strin
     .single();
 
   if (error) {
-    console.error(`Failed to fetch default for ${enumType}:`, error);
+    log.error(`Failed to fetch default for ${enumType}:`, error);
     return null;
   }
 

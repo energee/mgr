@@ -41,6 +41,7 @@ import {
 } from "@/entities/po-line-item";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { purchaseOrderKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -261,7 +262,7 @@ export function POReceiving({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Receive error:", error);
+      log.error("Receive error:", error);
       toast.error("Failed to receive items");
     },
   });

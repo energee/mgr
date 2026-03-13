@@ -36,6 +36,7 @@ import {
   TrendChart,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -435,7 +436,7 @@ function ProductionTrends() {
         p_days: period,
       });
       if (error) {
-        console.error("Failed to fetch production trends:", error);
+        log.error("Failed to fetch production trends:", error);
         return [];
       }
       return (data || []) as Array<{

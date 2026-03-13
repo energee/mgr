@@ -98,37 +98,6 @@ export const supplierEntity: EntityConfig<Supplier> = {
     badge: "is_active",
   },
 
-  detailSections: [
-    {
-      id: "contact",
-      title: "Contact Information",
-      fields: [
-        { field: "contact_name", label: "Contact Name" },
-        { field: "contact_email", label: "Email" },
-        { field: "contact_phone", label: "Phone" },
-      ],
-    },
-    {
-      id: "terms",
-      title: "Terms & Logistics",
-      fields: [
-        { field: "payment_terms", label: "Payment Terms" },
-        { field: "default_lead_time_days", label: "Default Lead Time (days)" },
-      ],
-    },
-    {
-      id: "qbo-sync",
-      title: "QuickBooks",
-      component: createQBOSyncDisplay("supplier"),
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [{ field: "notes", label: "Notes", fullWidth: true }],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

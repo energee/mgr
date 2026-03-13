@@ -224,40 +224,6 @@ export const vesselEntity: EntityConfig<Vessel> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "vessel_type", label: "Type" },
-        { field: "capacity_bbl", label: "Capacity", format: "unit", unitType: "volume" },
-        { field: "status", label: "Status" },
-        { field: "is_active", label: "Active" },
-      ],
-    },
-    {
-      id: "current_batch",
-      title: "Current Batch",
-      component: VesselCurrentBatch,
-    },
-    {
-      id: "location",
-      title: "Location",
-      fields: [
-        { field: "location_id", label: "Location" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { dynamicRpc } from "@/services/types";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ import { Loader2, PackageCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { resolveCatalogNames } from "@/entities/po-line-item";
 import { poReceiveKeys, entityKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -110,19 +112,16 @@ export function POAcceptInventoryDialog({
   const { data: receives, isLoading: receivesLoading } = useQuery({
     queryKey: poReceiveKeys.unaccepted(poId),
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)(
-        "get_unaccepted_po_receives",
-        { p_po_id: poId }
-      ) as { data: RpcReceiveRow[] | null; error: Error | null };
+      const { data, error } = await dynamicRpc(supabase, "get_unaccepted_po_receives", { p_po_id: poId });
 
       if (error) throw error;
-      if (!data || data.length === 0) return [] as UnacceptedReceive[];
+      const rows = (data ?? []) as RpcReceiveRow[];
+      if (rows.length === 0) return [] as UnacceptedReceive[];
 
       // Resolve catalog names using shared utility
-      const nameMap = await resolveCatalogNames(supabase, data);
+      const nameMap = await resolveCatalogNames(supabase, rows);
 
-      return data.map((row) => ({
+      return rows.map((row: RpcReceiveRow) => ({
         ...row,
         catalog_name:
           nameMap.get(`${row.catalog_type}:${row.catalog_id}`) ??
@@ -244,7 +243,7 @@ export function POAcceptInventoryDialog({
       onClose();
     },
     onError: (error) => {
-      console.error("Accept into inventory error:", error);
+      log.error("Accept into inventory error:", error);
       toast.error("Failed to accept items into inventory");
     },
   });

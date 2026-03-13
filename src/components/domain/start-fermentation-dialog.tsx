@@ -39,6 +39,7 @@ import { Loader2, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import { batchKeys, vesselKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
+import { log } from "@/lib/client-logger";
 
 const startFermentationSchema = z.object({
   vessel_id: z.string().uuid("Please select a vessel"),
@@ -121,7 +122,7 @@ export function StartFermentationDialog({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Start fermentation error:", error);
+      log.error("Start fermentation error:", error);
       toast.error(error.message);
     },
   });

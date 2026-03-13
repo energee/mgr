@@ -105,6 +105,11 @@ interface BatchOption {
   current_vessel_name: string | null;
 }
 
+/**
+ * Domain constants: packaging-context batch sort priority.
+ * Batches closest to packaging readiness sort first. This is a domain-specific
+ * ordering for the packaging UI, not a status label/color map (DEC-007 N/A).
+ */
 const STATUS_SORT_ORDER: Record<string, number> = {
   conditioning: 1,
   packaging: 2,

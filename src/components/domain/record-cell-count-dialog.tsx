@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { yeastKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -118,7 +119,7 @@ export function RecordCellCountDialog({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Record cell count error:", error);
+      log.error("Record cell count error:", error);
       const message =
         error instanceof Error ? error.message : "Failed to record cell count";
       toast.error(message);

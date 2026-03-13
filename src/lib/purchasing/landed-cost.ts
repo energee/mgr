@@ -5,7 +5,13 @@
  * Landed cost includes the item unit price plus an allocated share of PO shipping costs.
  */
 
-import { createClient } from "@/lib/supabase/client";
+import { log } from "@/lib/client-logger";
+
+/** Lazy-import supabase client to avoid env validation at module load time. */
+async function getSupabase() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
 
 // =============================================================================
 // Types
@@ -41,14 +47,14 @@ export interface LandedCostSummary {
 export async function calculateLandedCost(
   poId: string
 ): Promise<LandedCostBreakdown[]> {
-  const supabase = createClient();
+  const supabase = await getSupabase();
 
   const { data, error } = await supabase.rpc("calculate_landed_cost", {
     p_po_id: poId,
   });
 
   if (error) {
-    console.error("Error calculating landed cost:", error);
+    log.error("Error calculating landed cost:", error);
     throw error;
   }
 
@@ -61,7 +67,7 @@ export async function calculateLandedCost(
 export async function getLandedCostSummary(
   poId: string
 ): Promise<LandedCostSummary> {
-  const supabase = createClient();
+  const supabase = await getSupabase();
 
   // Get the PO shipping cost
   const { data: po, error: poError } = await supabase
@@ -71,7 +77,7 @@ export async function getLandedCostSummary(
     .single();
 
   if (poError) {
-    console.error("Error fetching PO:", poError);
+    log.error("Error fetching PO:", poError);
     throw poError;
   }
 

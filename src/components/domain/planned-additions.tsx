@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Circle, Leaf, Apple, Sparkles, Beaker } from "lucide-react";
 import type { AdditionType } from "@/lib/batch-additions";
 import { recipeKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -155,7 +156,7 @@ export function PlannedAdditions({
 
         return additions;
       } catch (err) {
-        console.error("Failed to load planned additions:", err);
+        log.error("Failed to load planned additions:", err);
         throw err;
       }
     },

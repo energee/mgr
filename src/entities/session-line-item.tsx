@@ -97,21 +97,6 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
     title: "brand_id",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Line Item Details",
-      fields: [
-        { field: "brand_id", label: "Brand" },
-        { field: "selling_format_id", label: "Selling Format" },
-        { field: "keg_owner_id", label: "Keg Owner" },
-        { field: "planned_quantity", label: "Planned Quantity" },
-        { field: "actual_quantity", label: "Actual Quantity" },
-        { field: "created_at", label: "Created" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

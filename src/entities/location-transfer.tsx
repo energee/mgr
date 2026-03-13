@@ -185,58 +185,6 @@ export const locationTransferEntity: EntityConfig<LocationTransferView> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        {
-          field: "from_bin_id",
-          label: "From Bin",
-          relation: { entity: "bin", displayField: "name" },
-        },
-        {
-          field: "from_location_name" as keyof LocationTransferView & string,
-          label: "From Location",
-        },
-        {
-          field: "to_bin_id",
-          label: "To Bin",
-          relation: { entity: "bin", displayField: "name" },
-        },
-        {
-          field: "to_location_name" as keyof LocationTransferView & string,
-          label: "To Location",
-        },
-        { field: "status", label: "Status" },
-        {
-          field: "lines_count" as keyof LocationTransferView & string,
-          label: "Line Items",
-        },
-        {
-          field: "delivery_number" as keyof LocationTransferView & string,
-          label: "Delivery",
-        },
-      ],
-    },
-    {
-      id: "shipping",
-      title: "Shipping Details",
-      fields: [
-        { field: "ship_date", label: "Ship Date", format: "datetime" },
-        { field: "shipped_by", label: "Shipped By" },
-        { field: "receive_date", label: "Receive Date", format: "datetime" },
-        { field: "received_by", label: "Received By" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [{ field: "notes", label: "Notes", fullWidth: true }],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------

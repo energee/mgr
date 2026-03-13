@@ -22,6 +22,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -334,7 +335,7 @@ function InventoryTrends() {
         p_days: period,
       });
       if (error) {
-        console.error("Failed to fetch inventory trends:", error);
+        log.error("Failed to fetch inventory trends:", error);
         return [];
       }
       return (data || []) as Array<{

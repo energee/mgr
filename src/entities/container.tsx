@@ -125,24 +125,6 @@ export const containerEntity: EntityConfig<Container> = {
     title: "name",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Container Details",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "type", label: "Type" },
-        { field: "volume_oz", label: "Volume (oz)" },
-        { field: "volume_bbl", label: "Volume (BBL)" },
-        { field: "deposit_amount", label: "Deposit", format: "currency" },
-        { field: "is_active", label: "Active" },
-        { field: "position", label: "Display Order" },
-        { field: "created_at", label: "Created", format: "datetime" },
-        { field: "updated_at", label: "Last Updated", format: "datetime" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

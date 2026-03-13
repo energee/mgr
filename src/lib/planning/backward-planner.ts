@@ -6,6 +6,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -115,7 +116,7 @@ export async function getOrderDemand(horizonWeeks = 8): Promise<OrderDemand[]> {
     .order("requested_date", { ascending: true, nullsFirst: false });
 
   if (ordersError) {
-    console.error("Error fetching orders:", ordersError);
+    log.error("Error fetching orders:", ordersError);
     throw ordersError;
   }
 
@@ -142,7 +143,7 @@ export async function getOrderDemand(horizonWeeks = 8): Promise<OrderDemand[]> {
     .in("order_id", orderIds);
 
   if (itemsError) {
-    console.error("Error fetching order items:", itemsError);
+    log.error("Error fetching order items:", itemsError);
     throw itemsError;
   }
 
@@ -261,7 +262,7 @@ export async function getProductionRequirements(
       .select("brand_id, selling_format_id, available_quantity");
 
     if (invError) {
-      console.error("Error fetching inventory:", invError);
+      log.error("Error fetching inventory:", invError);
     } else if (inventory) {
       for (const inv of inventory) {
         const key = `brand:${inv.brand_id}:${inv.selling_format_id}`;

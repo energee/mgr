@@ -102,6 +102,7 @@ interface HopCatalogItem {
 }
 
 /** Hop type display labels for the selector grouping */
+/** Domain constants: hop category labels (not entity status -- no stateMachine applies). */
 const HOP_TYPE_LABELS: Record<string, string> = {
   bittering: "Bittering Hops",
   aroma: "Aroma Hops",

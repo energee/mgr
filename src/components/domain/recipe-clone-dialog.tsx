@@ -35,6 +35,7 @@ import { Loader2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { recipeKeys } from "@/lib/query-keys";
 import { useBrands } from "@/hooks/use-catalog";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -132,7 +133,7 @@ export function RecipeCloneDialog({
       onSuccess?.(newId);
     },
     onError: (error) => {
-      console.error("Clone error:", error);
+      log.error("Clone error:", error);
       const message = error instanceof Error ? error.message : "Failed to clone recipe";
       toast.error(message);
     },

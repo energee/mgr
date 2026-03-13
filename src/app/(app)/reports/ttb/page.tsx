@@ -48,6 +48,7 @@ import {
 import { batchEntity } from "@/entities/batch";
 import { dynamicRpc } from "@/services/types";
 import { getStateLabel } from "@/types/entity";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -135,7 +136,7 @@ export default function TTBReportPage() {
       });
 
       if (error) {
-        console.error("TTB Report Error:", error);
+        log.error("TTB Report Error:", error);
         // If function doesn't exist, fall back to legacy data
         if (error.code === "42883" || error.message?.includes("does not exist")) {
           return null; // Function not found

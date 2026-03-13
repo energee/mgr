@@ -104,6 +104,7 @@ const UNIT_OPTIONS = [
   { value: "tablets", label: "tablets" },
 ] as const;
 
+/** Domain constants: additive type labels (not entity status -- no stateMachine applies). */
 const TYPE_LABELS: Record<string, string> = {
   water_salt: "Water Salts",
   acid: "Acids",

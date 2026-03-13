@@ -127,33 +127,6 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
     subtitle: "code",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Owner Details",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "code", label: "Code" },
-        { field: "is_active", label: "Active" },
-        { field: "position", label: "Display Order" },
-      ],
-    },
-    {
-      id: "contact",
-      title: "Contact Information",
-      fields: [
-        { field: "contact_name", label: "Contact Name" },
-        { field: "contact_email", label: "Email" },
-        { field: "contact_phone", label: "Phone" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [{ field: "notes", label: "Notes" }],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------

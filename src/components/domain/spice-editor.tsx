@@ -96,6 +96,7 @@ const UNIT_OPTIONS = [
   { value: "each", label: "each" },
 ] as const;
 
+/** Domain constants: spice/herb type labels (not entity status -- no stateMachine applies). */
 const TYPE_LABELS: Record<string, string> = {
   spice: "Spices",
   herb: "Herbs",

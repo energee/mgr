@@ -40,6 +40,7 @@ import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { batchKeys, vesselKeys, entityKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
+import { log } from "@/lib/client-logger";
 
 const vesselTransferSchema = z.object({
   to_vessel_id: z.string().uuid("Please select a destination vessel"),
@@ -178,7 +179,7 @@ export function VesselTransferDialog({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Vessel transfer error:", error);
+      log.error("Vessel transfer error:", error);
       toast.error(error.message);
     },
   });

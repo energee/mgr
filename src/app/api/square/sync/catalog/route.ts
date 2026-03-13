@@ -19,6 +19,7 @@ import { getSquareClient, updateSquareSettings } from "@/lib/square/client";
 import { pushCatalog, deleteStaleItems } from "@/lib/square/catalog";
 import { resolveTaproomPrices } from "@/lib/square/pricing";
 import type { SquareSyncProduct, SquareSyncVariation } from "@/lib/square/types";
+import { log } from "@/lib/client-logger";
 
 // Supabase nested join shapes (not reflected in generated types)
 interface BrandJoin {
@@ -117,7 +118,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
 
     if (kegError) {
       // Draft keg query is optional; log and continue
-      console.error("Failed to query keg inventory:", kegError.message);
+      log.error("Failed to query keg inventory:", kegError.message);
     }
 
     // 4. Build unique brand + variation combinations

@@ -102,47 +102,6 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
     title: "lot_number",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Product Information",
-      fields: [
-        { field: "lot_number", label: "Lot Code" },
-        { field: "brand_id", label: "Brand" },
-        { field: "selling_format_id", label: "Selling Format" },
-        { field: "batch_id", label: "Source Batch" },
-      ],
-    },
-    {
-      id: "inventory",
-      title: "Inventory",
-      component: FGInventorySection,
-    },
-    {
-      id: "dates",
-      title: "Dates",
-      fields: [
-        { field: "production_date", label: "Production Date" },
-        { field: "best_by_date", label: "Best By" },
-        { field: "expiration_date", label: "Expiration" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-    {
-      id: "revision-history",
-      title: "Revision History",
-      component: createRevisionHistoryDisplay("finished_goods"),
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

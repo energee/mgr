@@ -144,7 +144,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       // Include current state in WHERE to prevent race conditions:
       // if another user changed the state between our SELECT and UPDATE,
       // this UPDATE will match 0 rows, and .select() returns an empty array.
-      const { data: updated, error } = await dynamicFrom(supabase, entity.table)
+      const { data: _updated, error } = await dynamicFrom(supabase, entity.table)
         .update({ [stateField]: toState })
         .eq("id", id)
         .eq(stateField, currentState)

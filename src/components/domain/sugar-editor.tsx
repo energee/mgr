@@ -88,6 +88,7 @@ const TIMING_OPTIONS = [
   { value: "packaging", label: "Packaging" },
 ] as const;
 
+/** Domain constants: sugar type labels (not entity status -- no stateMachine applies). */
 const TYPE_LABELS: Record<string, string> = {
   simple: "Simple Sugars",
   invert: "Invert Sugars",

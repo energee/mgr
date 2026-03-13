@@ -74,18 +74,6 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
     title: "name",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "cogs_max", label: "COGS Upper Bound", format: "currency" },
-        { field: "default_upc", label: "Default UPC" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

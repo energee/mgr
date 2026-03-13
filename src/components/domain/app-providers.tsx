@@ -14,6 +14,7 @@ import { KeyboardShortcutsProvider } from "@/components/domain/keyboard-shortcut
 import { ChatProvider } from "@/contexts/chat-context";
 import { createClient } from "@/lib/supabase/client";
 import type { UserRole } from "@/lib/permissions";
+import { log } from "@/lib/client-logger";
 
 interface AppProvidersProps {
   roles: UserRole[];
@@ -26,7 +27,7 @@ export function AppProviders({ roles, children }: AppProvidersProps) {
       .rpc("update_last_active")
       .then(({ error }) => {
         if (error && process.env.NODE_ENV === "development") {
-          console.warn("update_last_active failed:", error);
+          log.warn("update_last_active failed:", error);
         }
       });
   }, []);

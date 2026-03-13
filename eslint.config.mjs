@@ -9,6 +9,11 @@ const eslintConfig = defineConfig([
     rules: {
       // React Hook Form's watch() is incompatible with React Compiler — suppress globally
       "react-hooks/incompatible-library": "off",
+      // Allow unused vars prefixed with _ (common for destructuring to omit fields)
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
       // Upgrade from recommended to strict
       "jsx-a11y/alt-text": "error",
       "jsx-a11y/aria-props": "error",

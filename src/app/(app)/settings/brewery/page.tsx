@@ -33,6 +33,7 @@ import {
   useUnitPreferences,
   useUpdateUnitPreferences,
 } from "@/hooks/useUnitPreferences";
+import { log } from "@/lib/client-logger";
 // =============================================================================
 // Schema
 // =============================================================================
@@ -147,7 +148,7 @@ export default function BrewerySettingsPage() {
       await updatePreferences.mutateAsync(values);
       toast.success("Unit preferences saved");
     } catch (error) {
-      console.error("Failed to save preferences:", error);
+      log.error("Failed to save preferences:", error);
       toast.error("Failed to save preferences");
     }
   };

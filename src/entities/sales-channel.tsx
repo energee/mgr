@@ -91,27 +91,6 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
     title: "name",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "code", label: "Code" },
-        { field: "description", label: "Description" },
-        { field: "is_active", label: "Active" },
-        { field: "position", label: "Display Order" },
-      ],
-    },
-    {
-      id: "customer-portal",
-      title: "Customer Portal",
-      fields: [
-        { field: "change_request_cutoff_state", label: "Change Request Cutoff" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import { getStateLabel } from "@/types/entity";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -247,7 +248,7 @@ export function BatchBlendDialog({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Blend error:", error);
+      log.error("Blend error:", error);
       const message = error instanceof Error ? error.message : "Failed to create blend";
       toast.error(message);
     },

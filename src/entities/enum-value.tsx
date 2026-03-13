@@ -10,6 +10,7 @@ import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createClient } from "@/lib/supabase/client";
+import { log } from "@/lib/client-logger";
 
 type EnumValue = Database["public"]["Tables"]["enum_values"]["Row"];
 
@@ -61,7 +62,7 @@ export async function fetchEnumTypes(): Promise<{ value: string; label: string }
     .order("enum_type");
 
   if (error) {
-    console.error("Failed to fetch enum types:", error);
+    log.error("Failed to fetch enum types:", error);
     return [];
   }
 
@@ -171,32 +172,6 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
     title: "label",
     subtitle: "enum_type",
   },
-
-  detailSections: [
-    {
-      id: "overview",
-      title: "Option Details",
-      fields: [
-        { field: "enum_type", label: "Category" },
-        { field: "value", label: "Stored Value" },
-        { field: "label", label: "Display Label" },
-        { field: "description", label: "Description" },
-        { field: "color", label: "Color" },
-        { field: "icon", label: "Icon" },
-        { field: "sort_order", label: "Sort Order" },
-        { field: "group_name", label: "Group" },
-        { field: "is_default", label: "Default?" },
-        { field: "is_active", label: "Enabled" },
-        { field: "created_at", label: "Created", format: "datetime" },
-        { field: "updated_at", label: "Last Updated", format: "datetime" },
-      ],
-    },
-    {
-      id: "metadata",
-      title: "Extra Data",
-      fields: [{ field: "metadata", label: "Extra Data", format: "json" }],
-    },
-  ],
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)

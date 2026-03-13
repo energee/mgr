@@ -93,35 +93,6 @@ export const brandEntity: EntityConfig<Brand> = {
     subtitle: "variant",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Brand Information",
-      fields: [
-        { field: "name", label: "Name" },
-        { field: "variant", label: "Variant" },
-        { field: "style_id", label: "Style" },
-        { field: "abv", label: "ABV", render: (v) => (v ? `${v}%` : "—") },
-      ],
-    },
-    {
-      id: "description",
-      title: "Description",
-      fields: [
-        { field: "description", label: "Description", fullWidth: true },
-      ],
-    },
-    {
-      id: "untappd",
-      title: "Untappd",
-      fields: [
-        { field: "untappd_url", label: "Untappd URL" },
-        { field: "untappd_rating", label: "Rating" },
-      ],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------
