@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface CircleHelpIconHandle {
+export type CircleHelpIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface CircleHelpIconProps extends HTMLAttributes<HTMLDivElement> {
+type CircleHelpIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

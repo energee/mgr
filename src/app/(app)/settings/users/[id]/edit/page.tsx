@@ -10,7 +10,7 @@ import { use } from "react";
 import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
 import { userProfileEntity } from "@/entities/user-profile";
 
-interface EditUserPageProps {
+type EditUserPageProps = {
   params: Promise<{ id: string }>;
 }
 

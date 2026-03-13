@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface FileCheckIconHandle {
+export type FileCheckIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface FileCheckIconProps extends HTMLAttributes<HTMLDivElement> {
+type FileCheckIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

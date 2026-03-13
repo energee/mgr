@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export interface StatItem {
+export type StatItem = {
   /** The numeric or string value to display */
   value: number | string;
   /** Label shown after the value */
@@ -19,7 +19,7 @@ export interface StatItem {
   variant?: "default" | "warning";
 }
 
-interface StatsStripProps {
+type StatsStripProps = {
   /** Primary stats shown on the left */
   stats: StatItem[];
   /** Secondary stats pushed to the right */

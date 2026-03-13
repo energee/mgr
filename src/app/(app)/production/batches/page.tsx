@@ -17,7 +17,7 @@ import { batchKeys } from "@/lib/query-keys";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
 
-interface BatchRecord {
+type BatchRecord = {
   id: string;
   batch_number: string;
   name: string | null;

@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
 
-export interface FermentationStage {
+export type FermentationStage = {
   id: string;
   stage: "primary" | "secondary" | "diacetyl" | "lagering" | "conditioning" | "dry_hop" | "cold_crash";
   name: string;
@@ -68,7 +68,7 @@ const STAGE_PRESETS = [
   { name: "Conditioning (Brite)", stage: "conditioning", temp_f: 38, duration_days: 7 },
 ] as const;
 
-interface FermentationScheduleBuilderProps {
+type FermentationScheduleBuilderProps = {
   stages: FermentationStage[];
   onChange: (stages: FermentationStage[]) => void;
   disabled?: boolean;

@@ -16,7 +16,7 @@ type Orientation = "vertical" | "horizontal";
 type Variant = "default" | "alternate";
 type Status = "completed" | "active" | "pending";
 
-interface DivProps extends React.ComponentProps<"div"> {
+type DivProps = React.ComponentProps<"div"> & {
   asChild?: boolean;
 }
 
@@ -63,11 +63,11 @@ function useStore<T>(selector: (store: Store) => T): T {
   return React.useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 }
 
-interface StoreState {
+type StoreState = {
   items: Map<string, React.RefObject<ItemElement | null>>;
 }
 
-interface Store {
+type Store = {
   subscribe: (callback: () => void) => () => void;
   getState: () => StoreState;
   notify: () => void;
@@ -90,7 +90,7 @@ function useStoreContext(consumerName: string) {
   return context;
 }
 
-interface TimelineContextValue {
+type TimelineContextValue = {
   dir: Direction;
   orientation: Orientation;
   variant: Variant;
@@ -149,7 +149,7 @@ const timelineVariants = cva(
   },
 );
 
-interface TimelineProps extends DivProps {
+type TimelineProps = DivProps & {
   dir?: Direction;
   orientation?: Orientation;
   variant?: Variant;
@@ -247,7 +247,7 @@ function Timeline(props: TimelineProps) {
   );
 }
 
-interface TimelineItemContextValue {
+type TimelineItemContextValue = {
   id: string;
   status: Status;
   isAlternateRight: boolean;
@@ -592,7 +592,7 @@ const timelineConnectorVariants = cva("absolute z-0", {
   },
 });
 
-interface TimelineConnectorProps extends DivProps {
+type TimelineConnectorProps = DivProps & {
   forceMount?: boolean;
 }
 
@@ -680,7 +680,7 @@ function TimelineDescription(props: DivProps) {
   );
 }
 
-interface TimelineTimeProps extends React.ComponentProps<"time"> {
+type TimelineTimeProps = React.ComponentProps<"time"> & {
   asChild?: boolean;
 }
 

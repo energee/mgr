@@ -24,7 +24,7 @@ export type KegState =
   | "maintenance"
   | "retired";
 
-interface KegInventory {
+type KegInventory = {
   id: string;
   selling_format_id: string;
   keg_owner_id: string | null;

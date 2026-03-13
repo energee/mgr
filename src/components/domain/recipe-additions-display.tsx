@@ -101,7 +101,7 @@ const TYPE_COLORS: Record<string, string> = {
   other: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
 };
 
-interface AdditionRow {
+type AdditionRow = {
   id: string;
   additive_id: string;
   amount: number;
@@ -117,7 +117,7 @@ interface AdditionRow {
   } | null;
 }
 
-interface CatalogItem {
+type CatalogItem = {
   id: string;
   name: string;
   type: string;
@@ -126,7 +126,7 @@ interface CatalogItem {
 /** Gallons per barrel */
 const GAL_PER_BBL = 31.0;
 
-interface RecipeAdditionsDisplayProps {
+type RecipeAdditionsDisplayProps = {
   data: {
     id: string | null;
     water_profile_id?: string | null;

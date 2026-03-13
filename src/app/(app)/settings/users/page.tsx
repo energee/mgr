@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface DeleteTarget {
+type DeleteTarget = {
   id: string;
   name: string;
 }

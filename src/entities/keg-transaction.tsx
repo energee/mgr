@@ -27,7 +27,7 @@ export type KegTransactionType =
   | "retire"
   | "maintain";
 
-interface KegTransaction {
+type KegTransaction = {
   id: string;
   transaction_type: KegTransactionType;
   selling_format_id: string;

@@ -16,7 +16,7 @@ import { getStateLabel } from "@/types/entity";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { getColSpanClass } from "./field-utils";
 
-export interface FieldDisplayProps<T = Record<string, unknown>> {
+export type FieldDisplayProps<T = Record<string, unknown>> = {
   /** Unified field definition (uses `name` as key) */
   field: UnifiedFieldDef<T>;
   /** The raw value for this field */

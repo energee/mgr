@@ -17,14 +17,14 @@ import type { UnitType } from "@/lib/units";
 // Types
 // =============================================================================
 
-export interface BrewPhase {
+export type BrewPhase = {
   value: string;
   label: string;
   icon: string | null;
   group: string | null;
 }
 
-export interface BrewMetric {
+export type BrewMetric = {
   value: string;
   label: string;
   unit: string;
@@ -32,7 +32,7 @@ export interface BrewMetric {
   decimals?: number;
 }
 
-export interface BrewPhaseGroup {
+export type BrewPhaseGroup = {
   group: string;
   phases: BrewPhase[];
 }

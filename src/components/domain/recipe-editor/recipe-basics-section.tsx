@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface BasicsFormValues {
+type BasicsFormValues = {
   name: string;
   batch_size_bbl: number | null;
   boil_time_min: number | null;

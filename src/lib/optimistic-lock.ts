@@ -14,14 +14,14 @@ import { ConcurrentModificationError } from "./errors";
 // Types
 // =============================================================================
 
-export interface OptimisticLockResult<T> {
+export type OptimisticLockResult<T> = {
   success: boolean;
   data?: T;
   error?: string;
   conflicted?: boolean;
 }
 
-export interface VersionedRecord {
+export type VersionedRecord = {
   id: string;
   version: number;
 }

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
-interface ConflictDialogProps {
+type ConflictDialogProps = {
   /** Whether the dialog is open */
   open: boolean;
   /** Called when the dialog should close */

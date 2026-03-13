@@ -82,7 +82,7 @@ const terminationSchema = z.object({
 
 type TerminationFormValues = z.infer<typeof terminationSchema>;
 
-interface BatchCancellationDialogProps {
+type BatchCancellationDialogProps = {
   batchId: string;
   batchNumber: string;
   batchName: string | null;

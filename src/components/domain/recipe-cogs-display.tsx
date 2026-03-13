@@ -28,7 +28,7 @@ import { formatCurrency } from "@/lib/format";
 // Types
 // =============================================================================
 
-interface RecipeCOGS {
+type RecipeCOGS = {
   id: string;
   name: string;
   volume_bbl: number | null;
@@ -44,7 +44,7 @@ interface RecipeCOGS {
   total_hop_oz: number | null;
 }
 
-interface RecipeCOGSDisplayProps {
+type RecipeCOGSDisplayProps = {
   recipeId: string;
 }
 

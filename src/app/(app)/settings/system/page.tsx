@@ -108,7 +108,7 @@ const MONTH_OPTIONS = [
 // Hooks
 // =============================================================================
 
-interface SystemSettingRow {
+type SystemSettingRow = {
   key: string;
   value: unknown;
 }

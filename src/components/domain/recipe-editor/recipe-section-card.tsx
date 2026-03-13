@@ -11,7 +11,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface RecipeSectionCardProps {
+type RecipeSectionCardProps = {
   title: string;
   subtitle?: string;
   /** Slot for action buttons rendered in the card header */

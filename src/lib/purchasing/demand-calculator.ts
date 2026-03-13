@@ -18,7 +18,7 @@ async function getSupabase() {
 // Types
 // =============================================================================
 
-export interface IngredientDemand {
+export type IngredientDemand = {
   catalog_type: string;
   catalog_id: string;
   catalog_name: string;
@@ -28,7 +28,7 @@ export interface IngredientDemand {
   batch_count: number;
 }
 
-export interface IngredientShortfall {
+export type IngredientShortfall = {
   catalog_type: string;
   catalog_id: string;
   catalog_name: string;
@@ -48,7 +48,7 @@ export interface IngredientShortfall {
   batch_count: number;
 }
 
-export interface DemandSummary {
+export type DemandSummary = {
   totalDemand: number;
   coveredByInventory: number;
   shortfallCount: number;

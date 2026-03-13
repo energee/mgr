@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface FermentationFormValues {
+type FermentationFormValues = {
   fermentation_days: number | null;
   conditioning_days: number | null;
   fermentation_schedule: FermentationStage[] | null;

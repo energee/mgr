@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 
 // Types for report data
-interface FleetSummary {
+type FleetSummary = {
   selling_format_id: string;
   keg_type_name: string;
   volume_bbl: number;
@@ -55,7 +55,7 @@ interface FleetSummary {
   deposits_outstanding: number;
 }
 
-interface TurnoverMetric {
+type TurnoverMetric = {
   selling_format_id: string;
   keg_type_name: string;
   completed_cycles: number;
@@ -65,7 +65,7 @@ interface TurnoverMetric {
   annual_turnover_rate: number;
 }
 
-interface AgingKeg {
+type AgingKeg = {
   customer_id: string;
   customer_name: string;
   selling_format_id: string;
@@ -76,7 +76,7 @@ interface AgingKeg {
   deposit_at_risk: number;
 }
 
-interface CustomerBalance {
+type CustomerBalance = {
   customer_id: string;
   customer_name: string;
   selling_format_id: string;

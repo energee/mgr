@@ -47,7 +47,7 @@ const cellCountSchema = z.object({
 
 type CellCountFormValues = z.infer<typeof cellCountSchema>;
 
-interface RecordCellCountDialogProps {
+type RecordCellCountDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pitchId: string;

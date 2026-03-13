@@ -9,7 +9,7 @@
 
 import { SessionLineItemsEditor } from "./session-line-items-editor";
 
-interface SessionLineItemsDisplayProps {
+type SessionLineItemsDisplayProps = {
   data: { id: string; status?: string };
 }
 

@@ -54,7 +54,7 @@ const createBatchSchema = z.object({
 
 type CreateBatchFormValues = z.infer<typeof createBatchSchema>;
 
-interface CreateBatchFromShortfallProps {
+type CreateBatchFromShortfallProps = {
   shortfall: ProductionShortfall;
   open: boolean;
   onOpenChange: (open: boolean) => void;

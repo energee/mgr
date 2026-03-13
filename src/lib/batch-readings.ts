@@ -17,7 +17,7 @@ export type ReadingType =
   | "diacetyl"
   | "clarity";
 
-interface ReadingTypeConfig {
+type ReadingTypeConfig = {
   label: string;
   units: string[];
   defaultUnit: string;
@@ -90,7 +90,7 @@ export const READING_TYPES: Record<ReadingType, ReadingTypeConfig> = {
   },
 };
 
-export interface BatchReading {
+export type BatchReading = {
   reading_type: ReadingType;
   value: number | string;
   unit: string;
@@ -98,7 +98,7 @@ export interface BatchReading {
   notes?: string;
 }
 
-export interface ValidationResult {
+export type ValidationResult = {
   valid: boolean;
   warning?: string;
 }

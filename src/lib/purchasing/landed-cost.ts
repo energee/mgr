@@ -17,7 +17,7 @@ async function getSupabase() {
 // Types
 // =============================================================================
 
-export interface LandedCostBreakdown {
+export type LandedCostBreakdown = {
   lot_id: string | null;
   line_item_id: string | null;
   catalog_type: string;
@@ -27,7 +27,7 @@ export interface LandedCostBreakdown {
   landed_cost_per_unit: number;
 }
 
-export interface LandedCostSummary {
+export type LandedCostSummary = {
   po_id: string;
   shipping_cost: number;
   line_items: LandedCostBreakdown[];

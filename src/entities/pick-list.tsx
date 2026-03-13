@@ -17,7 +17,7 @@ import { PickListItems } from "@/components/domain/pick-list-items";
 // Types
 // =============================================================================
 
-interface PickListView {
+type PickListView = {
   id: string;
   order_id: string;
   status: string;

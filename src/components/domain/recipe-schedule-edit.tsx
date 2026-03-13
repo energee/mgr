@@ -13,7 +13,7 @@ import { MashScheduleEditor, type MashStep } from "./mash-schedule-editor";
 import { FermentationScheduleEditor, type FermentationStage } from "./fermentation-schedule-editor";
 
 // Matches the editComponent interface: { data: T; editing?: boolean; form?: unknown }
-interface ScheduleEditProps {
+type ScheduleEditProps = {
   data: Record<string, unknown>;
   editing?: boolean;
   form?: unknown;

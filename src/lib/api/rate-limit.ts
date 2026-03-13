@@ -17,14 +17,14 @@
  *   }
  */
 
-interface RateLimitConfig {
+type RateLimitConfig = {
   /** Duration of the sliding window in milliseconds. Defaults to 60000 (1 minute). */
   windowMs?: number;
   /** Maximum number of requests allowed within the window. Defaults to 10. */
   maxRequests?: number;
 }
 
-interface RateLimitResult {
+type RateLimitResult = {
   /** Whether the request is allowed. */
   success: boolean;
   /** Number of remaining requests in the current window. */
@@ -34,7 +34,7 @@ interface RateLimitResult {
 }
 
 /** A rate limit bucket stores timestamps and the window duration configured for it. */
-interface BucketEntry {
+type BucketEntry = {
   timestamps: number[];
   windowMs: number;
 }

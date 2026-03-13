@@ -45,7 +45,7 @@ import { recipeKeys } from "@/lib/query-keys";
 // Types
 // =============================================================================
 
-interface RecipeAnalysisProps {
+type RecipeAnalysisProps = {
   /** Direct recipe ID (for standalone usage) */
   recipeId?: string;
   recipeName?: string;

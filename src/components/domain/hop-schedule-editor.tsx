@@ -72,7 +72,7 @@ const TIMING_DISPLAY: Record<string, string> = {
   dry_hop: "\u2014",
 };
 
-export interface HopScheduleItem {
+export type HopScheduleItem = {
   id?: string;
   hop_id: string;
   weight_oz: number;
@@ -91,7 +91,7 @@ export interface HopScheduleItem {
   };
 }
 
-interface HopCatalogItem {
+type HopCatalogItem = {
   id: string;
   name: string;
   origin: string | null;
@@ -109,7 +109,7 @@ const HOP_TYPE_LABELS: Record<string, string> = {
   dual: "Dual Purpose",
 };
 
-interface HopScheduleEditorProps {
+type HopScheduleEditorProps = {
   items: HopScheduleItem[];
   onChange: (items: HopScheduleItem[]) => void;
   disabled?: boolean;

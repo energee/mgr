@@ -78,7 +78,7 @@ import {
 // Types
 // =============================================================================
 
-export interface EntityDataTableProps<T = Record<string, unknown>> {
+export type EntityDataTableProps<T = Record<string, unknown>> = {
   /** Entity configuration */
   entity: EntityConfig<T>;
   /** Base path for detail links (defaults to /{domain}/{table}) */

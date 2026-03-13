@@ -39,7 +39,7 @@ function getClient(): Resend | null {
 
 // -- Types --------------------------------------------------------------------
 
-export interface SendEmailOptions {
+export type SendEmailOptions = {
   /** Recipient email address (or array of addresses). */
   to: string | string[];
   /** Email subject line. */
@@ -52,7 +52,7 @@ export interface SendEmailOptions {
   replyTo?: string;
 }
 
-export interface SendEmailResult {
+export type SendEmailResult = {
   /** Whether the email was sent (or skipped) successfully. */
   ok: boolean;
   /** Resend message ID on success. */

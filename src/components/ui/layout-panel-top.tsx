@@ -6,12 +6,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface LayoutPanelTopIconHandle {
+export type LayoutPanelTopIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface LayoutPanelTopIconProps extends HTMLAttributes<HTMLDivElement> {
+type LayoutPanelTopIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

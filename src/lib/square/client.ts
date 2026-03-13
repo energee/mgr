@@ -1,7 +1,7 @@
 import { SquareClient } from "square";
 import { createAdminClient } from "@/lib/supabase/server";
 
-interface SquareSettings {
+type SquareSettings = {
   accessToken: string;
   webhookSignatureKey: string | null;
   isEnabled: boolean;

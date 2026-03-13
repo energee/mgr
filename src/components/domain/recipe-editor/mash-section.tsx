@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface MashFormValues {
+type MashFormValues = {
   mash_temp_f: number | null;
   target_mash_ph: number | null;
   mash_efficiency: number | null;

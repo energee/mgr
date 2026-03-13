@@ -47,7 +47,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface POLineItemWithReceived {
+type POLineItemWithReceived = {
   id: string;
   catalog_type: string;
   catalog_id: string;
@@ -58,7 +58,7 @@ interface POLineItemWithReceived {
   received_quantity: number;
 }
 
-interface ReceiveEntry {
+type ReceiveEntry = {
   po_line_item_id: string;
   quantity: number;
   lot_number: string;
@@ -66,7 +66,7 @@ interface ReceiveEntry {
   notes: string;
 }
 
-interface POReceivingProps {
+type POReceivingProps = {
   poId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;

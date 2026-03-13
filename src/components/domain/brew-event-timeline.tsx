@@ -113,7 +113,7 @@ const phaseColors: Record<string, string> = {
 // Types
 // =============================================================================
 
-interface BrewEventTimelineProps {
+type BrewEventTimelineProps = {
   events: BrewEvent[];
   onAddEvent?: (event: BrewEvent) => Promise<void>;
   onUpdateEvent?: (event: BrewEvent) => Promise<void>;

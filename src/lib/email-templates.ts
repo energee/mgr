@@ -18,14 +18,14 @@ import { formatStateLabel } from "@/types/entity";
 // =============================================================================
 
 /** Output of every template function */
-export interface EmailTemplate {
+export type EmailTemplate = {
   subject: string;
   html: string;
   text: string;
 }
 
 /** Notification metadata passed from database triggers */
-export interface NotificationContext {
+export type NotificationContext = {
   title: string;
   message: string | null;
   priority: string;
@@ -141,7 +141,7 @@ function priorityBadge(priority: string): string {
 // Template: Low Inventory Alert
 // =============================================================================
 
-export interface LowInventoryData {
+export type LowInventoryData = {
   itemName: string;
   sku: string | null;
   quantityOnHand: number;
@@ -208,7 +208,7 @@ Manage notification preferences: ${appUrl}/settings/notifications`;
 // Template: Order Status Change
 // =============================================================================
 
-export interface OrderStatusChangeData {
+export type OrderStatusChangeData = {
   orderNumber: string;
   customerName: string | null;
   oldStatus: string;
@@ -276,7 +276,7 @@ Manage notification preferences: ${appUrl}/settings/notifications`;
 // Template: Batch Status Change
 // =============================================================================
 
-export interface BatchStatusChangeData {
+export type BatchStatusChangeData = {
   batchNumber: string;
   batchName: string | null;
   oldStatus: string;

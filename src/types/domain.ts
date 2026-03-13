@@ -15,7 +15,7 @@ export type { BatchReading, ReadingType } from "@/lib/batch-readings";
  * A single event in a brew log's `events` JSON column.
  * Each event represents a phase of the brew day with optional measurements.
  */
-export interface BrewEvent {
+export type BrewEvent = {
   /** Brew phase identifier (e.g., "mash_in", "boil_start", "ko_end") */
   phase?: string;
   /** Timestamp when this event was recorded */
@@ -31,7 +31,7 @@ export interface BrewEvent {
 /**
  * A single measurement within a brew event.
  */
-export interface BrewMeasurement {
+export type BrewMeasurement = {
   /** Metric identifier (e.g., "temp_f", "gravity_plato", "volume_bbl") */
   metric?: string;
   /** Measured value */

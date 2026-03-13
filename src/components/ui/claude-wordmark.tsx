@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-interface ClaudeWordmarkProps {
+type ClaudeWordmarkProps = {
   className?: string;
 }
 

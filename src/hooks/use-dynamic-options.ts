@@ -22,7 +22,7 @@ import { dynamicFrom } from "@/services/types";
 import { log } from "@/lib/client-logger";
 
 // Minimal field shape accepted by the hook - covers both EntityFieldDef and UnifiedFieldDef
-interface DynamicOptionsField {
+type DynamicOptionsField = {
   name: string;
   type?: string;
   dynamicOptions?: {
@@ -38,7 +38,7 @@ interface DynamicOptionsField {
   };
 }
 
-export interface DynamicOptionsResult {
+export type DynamicOptionsResult = {
   optionsMap: Record<string, { value: string; label: string }[]>;
   isLoading: boolean;
 }

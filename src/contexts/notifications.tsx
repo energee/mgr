@@ -29,7 +29,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-export interface Notification {
+export type Notification = {
   id: string;
   type: string;
   title: string;
@@ -44,7 +44,7 @@ export interface Notification {
   created_at: string;
 }
 
-interface NotificationsContextValue {
+type NotificationsContextValue = {
   /** List of unread notifications */
   notifications: Notification[];
   /** Number of unread notifications */
@@ -71,7 +71,7 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(nul
 // Provider
 // =============================================================================
 
-interface NotificationsProviderProps {
+type NotificationsProviderProps = {
   children: ReactNode;
 }
 

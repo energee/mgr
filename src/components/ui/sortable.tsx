@@ -73,7 +73,7 @@ const ORIENTATION_KEYS: Record<string, string> = {
   mixed: "arrow",
 };
 
-interface SortableRootContextValue<T> {
+type SortableRootContextValue<T> = {
   id: string;
   items: UniqueIdentifier[];
   modifiers: DndContextProps["modifiers"];
@@ -95,7 +95,7 @@ function useSortableContext(consumerName: string) {
   return context;
 }
 
-interface GetItemValue<T> {
+type GetItemValue<T> = {
   /**
    * Callback that returns a unique identifier for each sortable item.
    * Required for array of objects.
@@ -315,7 +315,7 @@ function Sortable<T>(props: SortableProps<T>) {
 
 const SortableContentContext = React.createContext<boolean>(false);
 
-interface SortableContentProps extends React.ComponentProps<"div"> {
+type SortableContentProps = React.ComponentProps<"div"> & {
   strategy?: SortableContextProps["strategy"];
   children: React.ReactNode;
   asChild?: boolean;
@@ -358,7 +358,7 @@ function SortableContent(props: SortableContentProps) {
   );
 }
 
-interface SortableItemContextValue {
+type SortableItemContextValue = {
   id: string;
   attributes: DraggableAttributes;
   listeners: DraggableSyntheticListeners | undefined;
@@ -378,7 +378,7 @@ function useSortableItemContext(consumerName: string) {
   return context;
 }
 
-interface SortableItemProps extends React.ComponentProps<"div"> {
+type SortableItemProps = React.ComponentProps<"div"> & {
   value: UniqueIdentifier;
   asHandle?: boolean;
   asChild?: boolean;
@@ -482,7 +482,7 @@ function SortableItem(props: SortableItemProps) {
   );
 }
 
-interface SortableItemHandleProps extends React.ComponentProps<"button"> {
+type SortableItemHandleProps = React.ComponentProps<"button"> & {
   asChild?: boolean;
 }
 
@@ -539,8 +539,7 @@ const dropAnimation: DropAnimation = {
   }),
 };
 
-interface SortableOverlayProps
-  extends Omit<React.ComponentProps<typeof DragOverlay>, "children"> {
+type SortableOverlayProps = Omit<React.ComponentProps<typeof DragOverlay>, "children"> & {
   container?: Element | DocumentFragment | null;
   children?:
     | ((params: { value: UniqueIdentifier }) => React.ReactNode)

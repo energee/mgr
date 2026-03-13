@@ -18,7 +18,7 @@ import { extractBrewMeasurements } from "@/lib/brew-events";
 import type { BrewEvent } from "@/types/domain";
 import Link from "next/link";
 
-interface BatchBrewInfoProps {
+type BatchBrewInfoProps = {
   data: {
     id: string;
     name: string;
@@ -30,7 +30,7 @@ interface BatchBrewInfoProps {
   };
 }
 
-interface BrewSummaryLink {
+type BrewSummaryLink = {
   id: string;
   volume_bbl: number;
   notes: string | null;

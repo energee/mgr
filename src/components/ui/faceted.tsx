@@ -24,7 +24,7 @@ type FacetedValue<Multiple extends boolean> = Multiple extends true
   ? string[]
   : string;
 
-interface FacetedContextValue<Multiple extends boolean = boolean> {
+type FacetedContextValue<Multiple extends boolean = boolean> = {
   value?: FacetedValue<Multiple>;
   onItemSelect?: (value: string) => void;
   multiple?: Multiple;
@@ -42,8 +42,7 @@ function useFacetedContext(name: string) {
   return context;
 }
 
-interface FacetedProps<Multiple extends boolean = false>
-  extends React.ComponentProps<typeof Popover> {
+type FacetedProps<Multiple extends boolean = false> = React.ComponentProps<typeof Popover> & {
   value?: FacetedValue<Multiple>;
   onValueChange?: (value: FacetedValue<Multiple> | undefined) => void;
   children?: React.ReactNode;
@@ -127,7 +126,7 @@ function FacetedTrigger(props: React.ComponentProps<typeof PopoverTrigger>) {
   );
 }
 
-interface FacetedBadgeListProps extends React.ComponentProps<"div"> {
+type FacetedBadgeListProps = React.ComponentProps<"div"> & {
   options?: { label: string; value: string }[];
   max?: number;
   badgeClassName?: string;
@@ -221,7 +220,7 @@ const FacetedEmpty = CommandEmpty;
 
 const FacetedGroup = CommandGroup;
 
-interface FacetedItemProps extends React.ComponentProps<typeof CommandItem> {
+type FacetedItemProps = React.ComponentProps<typeof CommandItem> & {
   value: string;
 }
 

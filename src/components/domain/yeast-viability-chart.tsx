@@ -33,12 +33,12 @@ import { differenceInDays, addDays, format } from "date-fns";
 // Types
 // =============================================================================
 
-interface PitchEvent {
+type PitchEvent = {
   date: string;
   quantity: number;
 }
 
-interface YeastViabilityChartProps {
+type YeastViabilityChartProps = {
   /** Initial viability percentage (0-100) */
   initialViability: number;
   /** Date yeast was received or harvested (ISO string) */

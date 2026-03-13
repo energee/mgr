@@ -6,12 +6,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface DropletIconHandle {
+export type DropletIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface DropletIconProps extends HTMLAttributes<HTMLDivElement> {
+type DropletIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

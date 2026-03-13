@@ -87,13 +87,13 @@ import type { AnimatedIconHandle, AnimatedIconProps } from "@/components/icons/a
 
 type AnimatedIcon = React.ComponentType<AnimatedIconProps>;
 
-interface NavItem {
+type NavItem = {
   label: string;
   href: string;
   icon: AnimatedIcon;
 }
 
-interface NavSection {
+type NavSection = {
   label: string;
   icon: AnimatedIcon;
   items: NavItem[];

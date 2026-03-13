@@ -34,7 +34,7 @@ function srmToColor(srm: number | null): string {
 // Bag Count Calculations
 // =============================================================================
 
-interface GrainBagCalc {
+type GrainBagCalc = {
   name: string;
   weightLbs: number;
   bagWeightLbs: number | null;
@@ -43,7 +43,7 @@ interface GrainBagCalc {
   pct: number;
 }
 
-interface HopBagCalc {
+type HopBagCalc = {
   name: string;
   weightOz: number;
   bagWeightLbs: number | null;

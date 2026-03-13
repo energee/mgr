@@ -7,7 +7,7 @@ import {
   getPermissions,
 } from "@/lib/permissions";
 
-interface PermissionContextValue {
+type PermissionContextValue = {
   roles: UserRole[];
   permissions: Permission[];
   can: (permission: Permission) => boolean;
@@ -16,7 +16,7 @@ interface PermissionContextValue {
 
 const PermissionContext = createContext<PermissionContextValue | null>(null);
 
-interface PermissionProviderProps {
+type PermissionProviderProps = {
   roles: UserRole[];
   children: ReactNode;
 }

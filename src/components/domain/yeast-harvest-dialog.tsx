@@ -62,7 +62,7 @@ type HarvestFormValues = z.infer<typeof harvestSchema>;
 // Props
 // =============================================================================
 
-interface YeastHarvestDialogProps {
+type YeastHarvestDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   batchId: string;

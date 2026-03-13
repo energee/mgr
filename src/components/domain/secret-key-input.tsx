@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Loader2 } from "lucide-react";
 
-export interface SecretKeyInputProps {
+export type SecretKeyInputProps = {
   label: string;
   placeholder: string;
   inputType?: "password" | "url";

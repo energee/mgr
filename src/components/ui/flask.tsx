@@ -6,12 +6,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface FlaskIconHandle {
+export type FlaskIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface FlaskIconProps extends HTMLAttributes<HTMLDivElement> {
+type FlaskIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

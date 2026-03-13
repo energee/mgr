@@ -9,7 +9,7 @@
 
 // --- Types ---
 
-export interface WaterProfile {
+export type WaterProfile = {
   calcium_ppm: number;
   magnesium_ppm: number;
   sodium_ppm: number;
@@ -18,7 +18,7 @@ export interface WaterProfile {
   bicarbonate_ppm: number;
 }
 
-export interface SaltAdditions {
+export type SaltAdditions = {
   gypsum_g: number; // CaSO4
   calcium_chloride_g: number; // CaCl2
   epsom_salt_g: number; // MgSO4
@@ -28,7 +28,7 @@ export interface SaltAdditions {
   magnesium_chloride_g: number; // MgCl2
 }
 
-export interface GrainBillItem {
+export type GrainBillItem = {
   name: string;
   color_srm: number;
   weight_lb: number;
@@ -519,7 +519,7 @@ export const SALT_ADDITIVE_MAP: Record<keyof SaltAdditions, string> = {
   magnesium_chloride_g: "Magnesium Chloride",
 };
 
-export interface SaltAdditionItem {
+export type SaltAdditionItem = {
   additive_id: string;
   amount: number;
   unit: string;

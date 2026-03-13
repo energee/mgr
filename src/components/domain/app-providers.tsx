@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { UserRole } from "@/lib/permissions";
 import { log } from "@/lib/client-logger";
 
-interface AppProvidersProps {
+type AppProvidersProps = {
   roles: UserRole[];
   children: ReactNode;
 }

@@ -66,7 +66,7 @@ export function useKegOwners(): UseQueryResult<IdNamePair[]> {
  * A packaging format from the packaging_formats view (selling_formats + containers).
  * Used by the pricing matrix and format selectors.
  */
-export interface PackagingFormat {
+export type PackagingFormat = {
   id: string;
   name: string;
   container_type: string;

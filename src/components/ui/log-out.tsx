@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface LogOutIconHandle {
+export type LogOutIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface LogOutIconProps extends HTMLAttributes<HTMLDivElement> {
+type LogOutIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

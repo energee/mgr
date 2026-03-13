@@ -18,7 +18,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 // Types
 // =============================================================================
 
-interface LocationTransferView {
+type LocationTransferView = {
   id: string;
   from_bin_id: string;
   to_bin_id: string;

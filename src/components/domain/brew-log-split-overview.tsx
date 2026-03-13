@@ -33,14 +33,14 @@ const SEGMENT_COLORS = [
   "bg-teal-500",
 ];
 
-interface BrewLogSplitOverviewProps {
+type BrewLogSplitOverviewProps = {
   data: {
     id: string;
     [key: string]: unknown;
   };
 }
 
-interface LinkedBatch {
+type LinkedBatch = {
   id: string;
   volume_bbl: number;
   notes: string | null;

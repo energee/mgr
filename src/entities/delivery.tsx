@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 // Types
 // =============================================================================
 
-interface DeliveryView {
+type DeliveryView = {
   id: string;
   delivery_number: string;
   status: string;

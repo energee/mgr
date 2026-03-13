@@ -44,8 +44,7 @@ import { cn } from "@/lib/utils";
 const SORT_SHORTCUT_KEY = "s";
 const REMOVE_SORT_SHORTCUTS = ["backspace", "delete"];
 
-interface DataTableSortListProps<TData>
-  extends React.ComponentProps<typeof PopoverContent> {
+type DataTableSortListProps<TData> = React.ComponentProps<typeof PopoverContent> & {
   table: Table<TData>;
   disabled?: boolean;
 }
@@ -264,7 +263,7 @@ export function DataTableSortList<TData>({
   );
 }
 
-interface DataTableSortItemProps {
+type DataTableSortItemProps = {
   sort: ColumnSort;
   sortItemId: string;
   columns: { id: string; label: string }[];

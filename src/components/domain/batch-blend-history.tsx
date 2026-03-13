@@ -30,12 +30,12 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 // Types
 // =============================================================================
 
-interface BatchBlendHistoryProps {
+type BatchBlendHistoryProps = {
   data: { id: string; [key: string]: unknown };
 }
 
 /** Row shape returned by the batch_blend_details view. */
-interface BlendDetailRow {
+type BlendDetailRow = {
   id: string;
   blend_batch_id: string;
   blend_batch_number: string | null;

@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface SquareStackIconHandle {
+export type SquareStackIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface SquareStackIconProps extends HTMLAttributes<HTMLDivElement> {
+type SquareStackIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

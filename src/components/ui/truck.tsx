@@ -5,12 +5,12 @@ import { motion, useAnimation } from "motion/react";
 import type { HTMLAttributes } from "react";
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
-export interface TruckIconHandle {
+export type TruckIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface TruckIconProps extends HTMLAttributes<HTMLDivElement> {
+type TruckIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

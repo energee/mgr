@@ -58,7 +58,7 @@ function changeTypeLabel(changeType: string): string {
 // Types
 // ---------------------------------------------------------------------------
 
-interface OrderItem {
+type OrderItem = {
   id: string;
   brand_id: string;
   selling_format_id: string | null;
@@ -68,7 +68,7 @@ interface OrderItem {
   selling_formats: { id: string; name: string } | null;
 }
 
-interface Order {
+type Order = {
   id: string;
   order_number: string;
   status: string;
@@ -80,7 +80,7 @@ interface Order {
   order_items: OrderItem[];
 }
 
-interface ChangeRequestItem {
+type ChangeRequestItem = {
   id: string;
   change_type: string;
   order_item_id: string | null;
@@ -90,7 +90,7 @@ interface ChangeRequestItem {
   original_quantity: number | null;
 }
 
-interface ChangeRequest {
+type ChangeRequest = {
   id: string;
   status: string;
   notes: string | null;

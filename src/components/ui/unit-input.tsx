@@ -45,8 +45,7 @@ type AnyUnit =
   | GravityUnit
   | RetailVolumeUnit;
 
-interface UnitInputProps
-  extends Omit<React.ComponentProps<"input">, "value" | "onChange"> {
+type UnitInputProps = Omit<React.ComponentProps<"input">, "value" | "onChange"> & {
   /** Canonical value (BBL, lbs, °F, Plato, oz) */
   value: number | null | undefined;
   /** Callback with canonical value */
@@ -205,7 +204,7 @@ function getDefaultUnit(unitType: UnitType): AnyUnit {
 // Display-only variant
 // =============================================================================
 
-interface UnitDisplayProps {
+type UnitDisplayProps = {
   /** Canonical value (BBL, lbs, °F, Plato, oz) — always convert from this, never from displayed value */
   value: number | null | undefined;
   unitType: UnitType;

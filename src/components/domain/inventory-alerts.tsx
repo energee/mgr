@@ -45,34 +45,34 @@ import { batchEntity } from "@/entities/batch";
 // Types
 // =============================================================================
 
-interface FinishedGood {
+type FinishedGood = {
   brand: string;
   package_type: string;
   total_quantity: number;
   available_quantity: number;
 }
 
-interface RawMaterial {
+type RawMaterial = {
   item_name: string;
   item_type: string;
   quantity_available: number;
   unit: string;
 }
 
-interface BatchInProgress {
+type BatchInProgress = {
   batch_number: string;
   recipe_name: string;
   status: string;
   planned_start: string | null;
 }
 
-interface InventoryOverview {
+type InventoryOverview = {
   finished_goods: FinishedGood[] | null;
   raw_materials: RawMaterial[] | null;
   batches_in_progress: BatchInProgress[] | null;
 }
 
-interface InventoryAlertsProps {
+type InventoryAlertsProps = {
   /** Threshold below which to show low stock warning for finished goods */
   lowStockThreshold?: number;
   /** Whether to auto-expand when alerts are present */

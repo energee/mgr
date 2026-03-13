@@ -54,12 +54,12 @@ import { CircleDollarSignIcon } from "@/components/ui/circle-dollar-sign";
 import { TelescopeIcon } from "@/components/ui/telescope";
 import { CogIcon } from "@/components/ui/cog";
 
-export interface AnimatedIconHandle {
+export type AnimatedIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-export interface AnimatedIconProps {
+export type AnimatedIconProps = {
   className?: string;
   ref?: React.Ref<AnimatedIconHandle>;
 }

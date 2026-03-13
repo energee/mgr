@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface HandCoinsIconHandle {
+export type HandCoinsIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface HandCoinsIconProps extends HTMLAttributes<HTMLDivElement> {
+type HandCoinsIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

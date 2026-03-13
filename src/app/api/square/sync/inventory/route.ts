@@ -19,19 +19,19 @@ import { pushInventoryCounts } from "@/lib/square/inventory";
 import type { SquareSyncInventory, SquareSyncResult } from "@/lib/square/types";
 
 // Supabase nested join shapes (not reflected in generated types)
-interface SellingFormatJoin {
+type SellingFormatJoin = {
   id: string;
   unit_count: number | null;
 }
 
-interface FGWithSellingFormat {
+type FGWithSellingFormat = {
   id: string;
   brand_id: string;
   selling_format_id: string;
   selling_formats: SellingFormatJoin | null;
 }
 
-interface FGBrandOnly {
+type FGBrandOnly = {
   brand_id: string;
 }
 

@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface WhirlpoolFormValues {
+type WhirlpoolFormValues = {
   whirlpool_time_min: number | null;
   whirlpool_temp_f: number | null;
   whirlpool_rest_min: number | null;

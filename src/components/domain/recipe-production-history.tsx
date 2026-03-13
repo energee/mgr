@@ -25,7 +25,7 @@ import { batchEntity } from "@/entities/batch";
 import { BarChart3, TrendingUp } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
-interface RecipeProductionHistoryProps {
+type RecipeProductionHistoryProps = {
   data: { id: string; est_og?: number | null; [key: string]: unknown };
 }
 

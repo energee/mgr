@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface HardDriveDownloadIconHandle {
+export type HardDriveDownloadIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface HardDriveDownloadIconProps extends HTMLAttributes<HTMLDivElement> {
+type HardDriveDownloadIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

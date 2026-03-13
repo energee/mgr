@@ -48,7 +48,7 @@ const startFermentationSchema = z.object({
 
 type StartFermentationFormValues = z.infer<typeof startFermentationSchema>;
 
-interface StartFermentationDialogProps {
+type StartFermentationDialogProps = {
   batchId: string;
   batchNumber: string;
   plannedVolume?: number | null;

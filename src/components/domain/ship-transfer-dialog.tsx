@@ -42,7 +42,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface TransferLine {
+type TransferLine = {
   id: string;
   finished_good_id: string | null;
   inventory_lot_id: string | null;
@@ -51,7 +51,7 @@ interface TransferLine {
   item_name: string;
 }
 
-interface ShipTransferDialogProps {
+type ShipTransferDialogProps = {
   transferId: string;
   open: boolean;
   onClose: () => void;

@@ -16,7 +16,7 @@ import type {
 import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc } from "./types";
 
 /** Summary returned by the get_recipe_summary RPC function. */
-export interface RecipeSummary {
+export type RecipeSummary = {
   recipe_id: string;
   recipe_name: string;
   style_name: string | null;

@@ -1,6 +1,6 @@
 import React from "react";
 
-interface MGRIconProps {
+type MGRIconProps = {
   className?: string;
   size?: number;
 }

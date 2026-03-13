@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface CopyIconHandle {
+export type CopyIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface CopyIconProps extends HTMLAttributes<HTMLDivElement> {
+type CopyIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

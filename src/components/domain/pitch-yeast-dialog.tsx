@@ -60,7 +60,7 @@ const pitchYeastSchema = z.object({
 type PitchYeastFormValues = z.infer<typeof pitchYeastSchema>;
 
 /** Row shape returned from yeast_pitches_with_remaining view. */
-interface AvailablePitch {
+type AvailablePitch = {
   id: string;
   strain_id: string;
   strain_name: string;
@@ -71,7 +71,7 @@ interface AvailablePitch {
   status: string;
 }
 
-interface PitchYeastDialogProps {
+type PitchYeastDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   batchId: string;

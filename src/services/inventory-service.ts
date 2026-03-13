@@ -11,7 +11,7 @@ import type { Database } from "@/types/supabase";
 import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc, dynamicFrom } from "./types";
 
 /** Result from the get_inventory_overview RPC function. */
-export interface InventoryOverview {
+export type InventoryOverview = {
   finished_goods: Array<{
     brand_name: string;
     package_type_name: string;
@@ -34,7 +34,7 @@ export interface InventoryOverview {
 }
 
 /** An inventory lot approaching expiration. */
-export interface ExpiringLot {
+export type ExpiringLot = {
   id: string;
   item_name: string;
   lot_number: string;

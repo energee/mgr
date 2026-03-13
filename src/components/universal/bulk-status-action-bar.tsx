@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 
-interface BulkStatusActionBarProps<T> {
+type BulkStatusActionBarProps<T> = {
   entity: EntityConfig<T>;
   selectedRows: T[];
   onStatusChange: (targetStatus: string) => Promise<number | undefined>;

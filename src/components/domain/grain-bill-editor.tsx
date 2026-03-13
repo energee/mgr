@@ -45,7 +45,7 @@ import { Plus, Trash2, GripVertical, ChevronsUpDown, AlertTriangle } from "lucid
 import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";
 
-export interface GrainBillItem {
+export type GrainBillItem = {
   id?: string;
   malt_id: string;
   weight_lbs: number;
@@ -62,7 +62,7 @@ export interface GrainBillItem {
   };
 }
 
-interface MaltCatalogItem {
+type MaltCatalogItem = {
   id: string;
   name: string;
   maltster: string | null;
@@ -82,7 +82,7 @@ const MALT_TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-interface GrainBillEditorProps {
+type GrainBillEditorProps = {
   items: GrainBillItem[];
   onChange: (items: GrainBillItem[]) => void;
   disabled?: boolean;

@@ -41,7 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
 import { catalogKeys } from "@/lib/query-keys";
 
-export interface YeastItem {
+export type YeastItem = {
   id?: string;
   yeast_id: string;
   pitch_rate: number;
@@ -63,7 +63,7 @@ export interface YeastItem {
   };
 }
 
-interface YeastCatalogItem {
+type YeastCatalogItem = {
   id: string;
   name: string;
   manufacturer: string | null;
@@ -76,7 +76,7 @@ interface YeastCatalogItem {
   flocculation: string | null;
 }
 
-interface YeastSelectorProps {
+type YeastSelectorProps = {
   items: YeastItem[];
   onChange: (items: YeastItem[]) => void;
   disabled?: boolean;

@@ -93,7 +93,7 @@ export function getYearOptions(currentYear?: number): number[] {
 // =============================================================================
 
 /** Shape of the totals object produced by aggregating TTB report rows. */
-export interface TTBTotals {
+export type TTBTotals = {
   beginningInventory: number;
   beerProduced: number;
   totalAvailable: number;
@@ -108,7 +108,7 @@ export interface TTBTotals {
 }
 
 /** Row shape returned by the get_ttb_report database function. */
-export interface TTBReportRow {
+export type TTBReportRow = {
   report_year: number;
   report_month: number;
   report_period: string;

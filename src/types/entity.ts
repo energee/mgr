@@ -25,7 +25,7 @@ import type { ZodSchema } from "zod";
 // Core Entity Configuration
 // =============================================================================
 
-export interface EntityConfig<T = Record<string, unknown>> {
+export type EntityConfig<T = Record<string, unknown>> = {
   /** Unique identifier for this entity (e.g., 'batch', 'recipe') */
   name: string;
 
@@ -177,7 +177,7 @@ export type EntityColumnDef<T> = Omit<ColumnDef<T, unknown>, "accessorKey"> & {
   };
 };
 
-export interface QuickFilterDef {
+export type QuickFilterDef = {
   /** Tab label (e.g., "Active", "Completed") */
   label: string;
 
@@ -196,7 +196,7 @@ export interface QuickFilterDef {
   sort?: { column: string; direction: "asc" | "desc" };
 }
 
-export interface EntityFilterDef {
+export type EntityFilterDef = {
   /** Field to filter on */
   field: string;
 
@@ -226,7 +226,7 @@ export interface EntityFilterDef {
 // Detail View Types
 // =============================================================================
 
-export interface EntitySectionDef<T> {
+export type EntitySectionDef<T> = {
   /** Section identifier */
   id: string;
 
@@ -249,7 +249,7 @@ export interface EntitySectionDef<T> {
   tab?: string;
 }
 
-export interface EntityFieldDisplay<T> {
+export type EntityFieldDisplay<T> = {
   /** Field key */
   field: keyof T & string;
 
@@ -279,7 +279,7 @@ export interface EntityFieldDisplay<T> {
 // Form Types
 // =============================================================================
 
-export interface EntityFieldDef<T> {
+export type EntityFieldDef<T> = {
   /** Field key */
   name: keyof T & string;
 
@@ -360,7 +360,7 @@ export interface EntityFieldDef<T> {
  * Each field knows how to render in both display (view) and input (edit) mode.
  * Merges the concepts of EntityFieldDisplay (view) and EntityFieldDef (edit).
  */
-export interface UnifiedFieldDef<T = Record<string, unknown>> {
+export type UnifiedFieldDef<T = Record<string, unknown>> = {
   /** Field key (maps to record property) */
   name: keyof T & string;
 
@@ -455,7 +455,7 @@ export interface UnifiedFieldDef<T = Record<string, unknown>> {
  * Unified section definition for the combined detail/edit view.
  * Each section can contain either unified fields or a custom component.
  */
-export interface UnifiedSectionDef<T = Record<string, unknown>> {
+export type UnifiedSectionDef<T = Record<string, unknown>> = {
   /** Section identifier */
   id: string;
 
@@ -513,7 +513,7 @@ export interface UnifiedSectionDef<T = Record<string, unknown>> {
  * Configuration for displaying enum values (like category, type, etc.).
  * Mirrors stateDisplay pattern but for non-state fields.
  */
-export interface ValueDisplayConfig {
+export type ValueDisplayConfig = {
   field: string;
   display: Record<
     string,
@@ -528,13 +528,13 @@ export interface ValueDisplayConfig {
 // Kanban Board Types
 // =============================================================================
 
-export interface KanbanCardField<T> {
+export type KanbanCardField<T> = {
   field: keyof T & string;
   label: string;
   format?: "date" | "datetime" | "number";
 }
 
-export interface KanbanConfig<T> {
+export type KanbanConfig<T> = {
   /** Field for card title */
   titleField: keyof T & string;
   /** Optional field for card subtitle */
@@ -549,7 +549,7 @@ export interface KanbanConfig<T> {
 // State Machine Types
 // =============================================================================
 
-export interface StateMachineConfig<T> {
+export type StateMachineConfig<T> = {
   /** Field that holds the state */
   stateField: keyof T & string;
 
@@ -580,7 +580,7 @@ export interface StateMachineConfig<T> {
 // Action Types
 // =============================================================================
 
-export interface EntityActionDef<T> {
+export type EntityActionDef<T> = {
   /** Action identifier */
   name: string;
 
@@ -625,7 +625,7 @@ export interface EntityActionDef<T> {
 // Dialog Types
 // =============================================================================
 
-export interface EntityDialogConfig<T> {
+export type EntityDialogConfig<T> = {
   /** Dialog title */
   title: string;
 
@@ -655,7 +655,7 @@ export interface EntityDialogConfig<T> {
 // Relation Types
 // =============================================================================
 
-export interface EntityRelationDef {
+export type EntityRelationDef = {
   /** Relation name for reference */
   name: string;
 

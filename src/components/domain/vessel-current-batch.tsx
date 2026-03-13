@@ -10,7 +10,7 @@ import { FlaskConical } from "lucide-react";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
 
-interface VesselWithBatchData {
+type VesselWithBatchData = {
   current_batch_id?: string | null;
   batch_number?: string | null;
   batch_name?: string | null;
@@ -18,7 +18,7 @@ interface VesselWithBatchData {
   recipe_name?: string | null;
 }
 
-interface VesselCurrentBatchProps {
+type VesselCurrentBatchProps = {
   data: VesselWithBatchData;
 }
 

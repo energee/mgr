@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 
 /** Individual ingredient allocation cost for a batch */
-export interface IngredientCostRow {
+export type IngredientCostRow = {
   allocation_id: string;
   ingredient_name: string;
   quantity: number;

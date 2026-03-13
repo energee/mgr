@@ -37,7 +37,7 @@ import { getCatalogTypeLabel } from "@/entities/po-line-item";
 // Types
 // =============================================================================
 
-interface PoLandedCostBreakdownProps {
+type PoLandedCostBreakdownProps = {
   /** The purchase order ID to display landed cost breakdown for */
   poId: string;
 }

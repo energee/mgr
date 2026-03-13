@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Plus, Trash2, GripVertical, ChevronDown } from "lucide-react";
 
-export interface MashStep {
+export type MashStep = {
   id: string;
   step_type: "infusion" | "decoction" | "rest" | "mashout" | "acid_rest" | "protein_rest";
   name: string;
@@ -68,7 +68,7 @@ const STEP_PRESETS = [
   { name: "Mash Out", step_type: "mashout", temp_f: 170, duration_min: 10 },
 ] as const;
 
-interface MashScheduleBuilderProps {
+type MashScheduleBuilderProps = {
   steps: MashStep[];
   onChange: (steps: MashStep[]) => void;
   disabled?: boolean;

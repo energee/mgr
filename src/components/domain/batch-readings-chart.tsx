@@ -36,7 +36,7 @@ import { convertGravity } from "@/lib/batch-readings";
 // Types
 // =============================================================================
 
-interface BatchLog {
+type BatchLog = {
   id: string;
   batch_id: string;
   log_type: string;
@@ -44,7 +44,7 @@ interface BatchLog {
   created_at: string;
 }
 
-interface BatchReadingsChartProps {
+type BatchReadingsChartProps = {
   readings: BatchLog[];
   targetFG?: number | null; // Target FG in Plato
   className?: string;

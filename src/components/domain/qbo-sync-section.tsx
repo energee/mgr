@@ -21,7 +21,7 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
-interface QBOSyncSectionProps {
+type QBOSyncSectionProps = {
   entityType: "customer" | "supplier" | "order" | "purchase_order";
   entityId: string;
 }

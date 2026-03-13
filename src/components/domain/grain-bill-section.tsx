@@ -21,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface GrainBillSectionProps {
+type GrainBillSectionProps = {
   data: { id: string };
   editing?: boolean;
   /** Optional callback fired with current items after fetch sync or local edits */

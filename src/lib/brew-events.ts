@@ -7,7 +7,7 @@
 
 import type { BrewEvent } from "@/types/domain";
 
-export interface BrewMeasurementHighlight {
+export type BrewMeasurementHighlight = {
   label: string;
   value: string;
 }

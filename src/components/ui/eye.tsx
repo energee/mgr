@@ -6,12 +6,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface EyeIconHandle {
+export type EyeIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface EyeIconProps extends HTMLAttributes<HTMLDivElement> {
+type EyeIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

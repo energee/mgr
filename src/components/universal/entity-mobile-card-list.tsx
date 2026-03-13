@@ -16,7 +16,7 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 import { Button } from "@/components/ui/button";
 import { Search, Inbox } from "lucide-react";
 
-interface EntityMobileCardListProps {
+type EntityMobileCardListProps = {
   /** Entity configuration */
   entity: EntityConfig<Record<string, unknown>>;
   /** Data rows to render */

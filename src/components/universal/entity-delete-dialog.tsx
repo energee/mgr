@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
-interface EntityDeleteDialogProps {
+type EntityDeleteDialogProps = {
   entityTable: string;
   entityDisplayName: string;
   recordId: string;

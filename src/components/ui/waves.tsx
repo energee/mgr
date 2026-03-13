@@ -6,12 +6,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface WavesIconHandle {
+export type WavesIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface WavesIconProps extends HTMLAttributes<HTMLDivElement> {
+type WavesIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

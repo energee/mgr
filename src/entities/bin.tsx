@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 type Bin = Database["public"]["Tables"]["bins"]["Row"];
 
 // Extended type for list view (includes summary fields from bins_with_summary view)
-export interface BinView extends Bin {
+export type BinView = Bin & {
   location_name: string | null;
   location_type: string | null;
   fg_item_count: number | null;

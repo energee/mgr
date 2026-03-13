@@ -4,14 +4,14 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface BannerAction {
+type BannerAction = {
   label: string;
   href?: string;
   onClick?: () => void;
   icon?: React.ReactNode;
 }
 
-interface NextStepBannerProps {
+type NextStepBannerProps = {
   message: string;
   actions: BannerAction[];
   variant?: "info" | "success" | "default";
