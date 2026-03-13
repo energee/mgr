@@ -8,6 +8,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
+import { getHopUtilizationFactor } from "@/components/domain/recipe-editor/recipe-estimate-calc";
 import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,
@@ -131,24 +132,12 @@ export function HopScheduleEditor({
 
   const { data: hopCatalog = [], isLoading: loadingHops } = useCatalog<HopCatalogItem>(catalogKeys.hops(), "hops", "id, name, origin, type, alpha_acid_typical, flavor_profile, bag_weight_lbs", ["type", "name"]);
 
-  /** IBU contribution for a single hop addition (Tinseth formula) */
+  /** IBU contribution for a single hop addition (delegates to shared Tinseth formula) */
   const calculateIBU = useCallback(
     (item: HopScheduleItem): number => {
       if (!item.hop?.alpha_acid_typical || !item.weight_oz) return 0;
-
-      if (item.timing === "dry_hop") return 0;
-      if (item.timing === "whirlpool") {
-        const utilization = 0.05; // ~15-20% of a 20-min boil
-        const aau = item.weight_oz * item.hop.alpha_acid_typical;
-        return (aau * utilization * 74.89) / batchSizeGal;
-      }
-
-      const boilTime = item.timing === "first_wort" ? 60 : (item.boil_time_min || 0);
-      if (boilTime <= 0) return 0;
-
-      const bigness = 1.65 * Math.pow(0.000125, estimatedOG - 1);
-      const boilFactor = (1 - Math.exp(-0.04 * boilTime)) / 4.15;
-      const utilization = bigness * boilFactor;
+      const utilization = getHopUtilizationFactor(item.timing, item.boil_time_min, estimatedOG);
+      if (utilization <= 0) return 0;
       const aau = item.weight_oz * item.hop.alpha_acid_typical;
       return (aau * utilization * 74.89) / batchSizeGal;
     },

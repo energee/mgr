@@ -62,13 +62,13 @@ const DYNAMIC_FIELDS = [
 ];
 
 export function RecipeBasicsSection() {
-  const { recipe, updateRecipe, isSaving, startSaving } = useRecipeEditor();
+  const { recipe, updateRecipe, isSaving, startSaving, handleSaveError } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
   const { optionsMap, isLoading: optionsLoading } = useDynamicOptions(DYNAMIC_FIELDS);
   const styleOptions = useMemo(() => optionsMap.style_id ?? [], [optionsMap.style_id]);
-  const brandOptions = optionsMap.brand_id ?? [];
+  const brandOptions = useMemo(() => optionsMap.brand_id ?? [], [optionsMap.brand_id]);
 
   const form = useForm<BasicsFormValues>({
     defaultValues: {
@@ -83,36 +83,29 @@ export function RecipeBasicsSection() {
 
   const { isDirty } = form.formState;
 
-  // Sync form changes to context for live estimate updates
-  const watchedName = form.watch("name");
-  const watchedBatchSize = form.watch("batch_size_bbl");
-  const watchedBoilTime = form.watch("boil_time_min");
+  // Keep watches needed for Select value props in JSX
   const watchedStyleId = form.watch("style_id");
   const watchedBrandId = form.watch("brand_id");
-  const watchedVolumeBbl = form.watch("volume_bbl");
 
+  // Single sync to context via form.watch subscription
   useEffect(() => {
-    updateRecipe({
-      name: watchedName,
-      batch_size_bbl: watchedBatchSize,
-      boil_time_min: watchedBoilTime,
-      style_id: watchedStyleId,
-      brand_id: watchedBrandId,
-      volume_bbl: watchedVolumeBbl,
+    const subscription = form.watch((values) => {
+      const styleName = values.style_id
+        ? styleOptions.find((o) => o.value === values.style_id)?.label ?? null
+        : null;
+      updateRecipe({
+        name: values.name ?? recipe.name,
+        batch_size_bbl: values.batch_size_bbl,
+        boil_time_min: values.boil_time_min,
+        style_id: values.style_id,
+        style_name: styleName,
+        brand_id: values.brand_id,
+        volume_bbl: values.volume_bbl,
+      });
     });
-  }, [watchedName, watchedBatchSize, watchedBoilTime, watchedStyleId, watchedBrandId, watchedVolumeBbl, updateRecipe]);
-
-  // Look up style name for context display
-  const styleName = useMemo(() => {
-    if (!watchedStyleId) return null;
-    return styleOptions.find((o) => o.value === watchedStyleId)?.label ?? null;
-  }, [watchedStyleId, styleOptions]);
-
-  useEffect(() => {
-    if (styleName !== undefined) {
-      updateRecipe({ style_name: styleName });
-    }
-  }, [styleName, updateRecipe]);
+    return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- recipe.name is only a fallback default; including it recreates the subscription on every keystroke
+  }, [form, updateRecipe, styleOptions]);
 
   const stopSavingRef = useRef<(() => void) | null>(null);
 
@@ -141,9 +134,7 @@ export function RecipeBasicsSection() {
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
       toast.success("Recipe basics saved");
     },
-    onError: (error) => {
-      toast.error(error.message);
-    },
+    onError: handleSaveError,
     onSettled: () => {
       stopSavingRef.current?.();
       stopSavingRef.current = null;

@@ -228,6 +228,30 @@ export function LoginForm() {
         Sign in with magic link
       </Button>
 
+      {process.env.NODE_ENV === "development" && (
+        <>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="w-full" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Dev</span>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            disabled={isLoading}
+            onClick={() => {
+              window.location.href = `/api/auth/dev-login?redirect=${encodeURIComponent(redirect)}`;
+            }}
+          >
+            Dev Login (dev@brewery.test)
+          </Button>
+        </>
+      )}
+
       <p className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
         <Link href="/signup" className="underline hover:text-foreground">

@@ -22,10 +22,13 @@ import {
 } from "react";
 import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
 import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
+import type { MashStep } from "@/components/domain/mash-schedule-editor";
+import type { FermentationStage } from "@/components/domain/fermentation-schedule-editor";
 import {
   calculateEstimates,
   type RecipeEstimates,
 } from "./recipe-estimate-calc";
+import { toast } from "sonner";
 
 // =============================================================================
 // Types
@@ -64,8 +67,8 @@ export type RecipeData = {
   target_pitching_rate?: number | null;
   fermentation_days?: number | null;
   conditioning_days?: number | null;
-  mash_schedule?: unknown[] | null;
-  fermentation_schedule?: unknown[] | null;
+  mash_schedule?: MashStep[] | null;
+  fermentation_schedule?: FermentationStage[] | null;
   brew_day_notes?: string | null;
   tasting_notes?: string | null;
   development_notes?: string | null;
@@ -103,6 +106,10 @@ type RecipeEditorContextValue = {
   isSaving: boolean;
   /** Mark a section save as started. Returns a callback to mark it complete. */
   startSaving: () => () => void;
+  /** Refresh the recipe from the database (e.g., after a version conflict) */
+  refreshRecipe: () => void;
+  /** Handle save errors with version conflict detection and auto-reload */
+  handleSaveError: (error: Error) => void;
 };
 
 // =============================================================================
@@ -117,11 +124,14 @@ const RecipeEditorContext = createContext<RecipeEditorContextValue | null>(null)
 
 type RecipeEditorProviderProps = {
   initialRecipe: RecipeData;
+  /** Callback to reload recipe from the database */
+  onRefresh?: () => void;
   children: ReactNode;
 };
 
 export function RecipeEditorProvider({
   initialRecipe,
+  onRefresh,
   children,
 }: RecipeEditorProviderProps) {
   const [recipe, setRecipe] = useState<RecipeData>(initialRecipe);
@@ -147,6 +157,22 @@ export function RecipeEditorProvider({
   }, []);
 
   const isSaving = savingCount > 0;
+
+  const refreshRecipe = useCallback(() => {
+    onRefresh?.();
+  }, [onRefresh]);
+
+  /** Shared error handler for section save mutations with version conflict detection */
+  const handleSaveError = useCallback((error: Error) => {
+    if (error.message?.includes("version") || error.message?.includes("conflict")) {
+      toast.error("Someone else edited this recipe. Reloading...", {
+        description: "Your changes were not saved.",
+      });
+      onRefresh?.();
+    } else {
+      toast.error(error.message);
+    }
+  }, [onRefresh]);
 
   // Compute estimates reactively from current editor state
   const estimates = useMemo<RecipeEstimates>(() => {
@@ -180,8 +206,10 @@ export function RecipeEditorProvider({
       estimates,
       isSaving,
       startSaving,
+      refreshRecipe,
+      handleSaveError,
     }),
-    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving]
+    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving, refreshRecipe, handleSaveError]
   );
 
   return (

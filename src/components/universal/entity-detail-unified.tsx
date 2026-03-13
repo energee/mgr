@@ -346,7 +346,10 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const canEdit = showEdit && !!entity.formSchema && hasWritePermission;
 
   const fetchTable = entity.viewTable || entity.table;
-  const sections = useMemo(() => getUnifiedSections(entity), [entity]);
+  const sections = useMemo(() => {
+    const all = getUnifiedSections(entity);
+    return isCreateMode ? all.filter((s) => !s.hideOnCreate) : all;
+  }, [entity, isCreateMode]);
 
   // ---------------------------------------------------------------------------
   // Edit state

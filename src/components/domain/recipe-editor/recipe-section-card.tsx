@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,19 @@ export function RecipeSectionCard({
   children,
   className,
 }: RecipeSectionCardProps) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const sectionId = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const contentId = `section-content-${sectionId}`;
+  const storageKey = `recipe-section-${sectionId}`;
+
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return defaultCollapsed;
+    const stored = sessionStorage.getItem(storageKey);
+    return stored !== null ? stored === "true" : defaultCollapsed;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(storageKey, String(collapsed));
+  }, [storageKey, collapsed]);
 
   const headerContent = (
     <>
@@ -90,6 +102,8 @@ export function RecipeSectionCard({
             type="button"
             className="flex items-center gap-2 flex-1 cursor-pointer select-none"
             onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            aria-controls={contentId}
           >
             {headerContent}
           </button>
@@ -104,7 +118,7 @@ export function RecipeSectionCard({
           </div>
         )}
       </div>
-      {!collapsed && <div className="p-4">{children}</div>}
+      {!collapsed && <div id={contentId} className="p-4">{children}</div>}
     </div>
   );
 }

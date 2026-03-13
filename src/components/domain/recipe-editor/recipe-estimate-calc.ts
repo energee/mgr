@@ -80,6 +80,17 @@ const DEFAULT_ALPHA = 10;
 /** Default wort gravity used for utilization when OG is not yet computed */
 const DEFAULT_BOIL_GRAVITY = 1.050;
 
+/**
+ * Non-boil hop utilization factors.
+ * These are industry-standard defaults. Future work could make these
+ * configurable per equipment profile.
+ */
+export const HOP_UTILIZATION_FACTORS = {
+  whirlpool: 0.05,
+  mash: 0.08,
+  dry_hop: 0,
+} as const;
+
 // =============================================================================
 // IBU Utilization (Tinseth formula)
 // =============================================================================
@@ -124,12 +135,12 @@ export function getHopUtilizationFactor(
       return bigness * boilFactor;
     }
     case "whirlpool":
-      return 0.05;
+      return HOP_UTILIZATION_FACTORS.whirlpool;
     case "mash":
-      return 0.08;
+      return HOP_UTILIZATION_FACTORS.mash;
     default:
       // dry_hop, post-fermentation, etc. — no bitterness
-      return 0;
+      return HOP_UTILIZATION_FACTORS.dry_hop;
   }
 }
 
