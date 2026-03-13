@@ -33,6 +33,7 @@ import { containerEntity } from "./container";
 import { sellingFormatEntity } from "./selling-format";
 import { yeastStrainEntity } from "./yeast-strain";
 import { yeastPitchEntity } from "./yeast-pitch";
+import { yeastPitchEventEntity } from "./yeast-pitch-event";
 import { salesChannelEntity } from "./sales-channel";
 import { pricingTierEntity } from "./pricing-tier";
 import { pricingTierPriceEntity } from "./pricing-tier-price";
@@ -62,7 +63,7 @@ const allEntities: Array<import("@/types/entity").EntityConfig<any>> = [
   // Production
   batchEntity, brewLogEntity, recipeEntity, vesselEntity,
   vesselTransferEntity, packagingSessionEntity, sessionLineItemEntity,
-  yeastStrainEntity, yeastPitchEntity, beerStyleEntity, brandEntity,
+  yeastStrainEntity, yeastPitchEntity, yeastPitchEventEntity, beerStyleEntity, brandEntity,
   // Inventory
   inventoryItemEntity, inventoryLotEntity, allocationEntity,
   finishedGoodEntity, containerEntity, sellingFormatEntity, kegOwnerEntity,
@@ -132,6 +133,8 @@ export { yeastStrainEntity } from "./yeast-strain";
 export type { YeastStrainFormValues } from "./yeast-strain";
 export { yeastPitchEntity } from "./yeast-pitch";
 export type { YeastPitchFormValues } from "./yeast-pitch";
+export { yeastPitchEventEntity } from "./yeast-pitch-event";
+export type { YeastPitchEventFormValues } from "./yeast-pitch-event";
 export { salesChannelEntity } from "./sales-channel";
 export type { SalesChannelFormValues } from "./sales-channel";
 export { pricingTierEntity } from "./pricing-tier";
