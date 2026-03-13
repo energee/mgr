@@ -109,13 +109,31 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
     },
   });
 
-  // Find the root pitch ID for lineage summary queries via server-side recursive CTE
+  // Find the root pitch ID for lineage summary. Tries RPC; falls back to parent walk.
   const { data: rootId } = useQuery({
     queryKey: yeastKeys.lineageRoot(id),
     queryFn: async () => {
-      const { data, error } = await dynamicRpc(supabase, "get_yeast_lineage_root", { p_pitch_id: id });
-      if (error) throw error;
-      return data ?? id;
+      const { data: rpcResult, error: rpcError } = await dynamicRpc(
+        supabase,
+        "get_yeast_lineage_root",
+        { p_pitch_id: id }
+      );
+      if (!rpcError && rpcResult) return rpcResult as string;
+
+      // Fallback: walk up parent chain
+      let currentId = id;
+      for (;;) {
+        const { data: pitch } = await supabase
+          .from("yeast_pitches_with_remaining")
+          .select("id, parent_pitch_id, source_type")
+          .eq("id", currentId)
+          .single();
+
+        if (!pitch || !pitch.parent_pitch_id || pitch.source_type === "purchase") {
+          return pitch?.id ?? id;
+        }
+        currentId = pitch.parent_pitch_id;
+      }
     },
   });
 
