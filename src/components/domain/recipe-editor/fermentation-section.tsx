@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
@@ -29,7 +29,7 @@ type FermentationFormValues = {
 }
 
 export function FermentationSection() {
-  const { recipe, updateRecipe } = useRecipeEditor();
+  const { recipe, updateRecipe, isSaving, startSaving } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -44,8 +44,11 @@ export function FermentationSection() {
   const { isDirty } = form.formState;
   const fermSchedule = form.watch("fermentation_schedule");
 
+  const stopSavingRef = useRef<(() => void) | null>(null);
+
   const saveMutation = useMutation({
     mutationFn: async (values: FermentationFormValues) => {
+      stopSavingRef.current = startSaving();
       return updateWithOptimisticLockOrThrow(
         supabase,
         "recipes",
@@ -68,6 +71,10 @@ export function FermentationSection() {
     onError: (error) => {
       toast.error(error.message);
     },
+    onSettled: () => {
+      stopSavingRef.current?.();
+      stopSavingRef.current = null;
+    },
   });
 
   const onSubmit = useCallback(
@@ -78,12 +85,13 @@ export function FermentationSection() {
   return (
     <RecipeSectionCard
       title="Fermentation"
+      isDirty={isDirty}
       headerActions={
         isDirty ? (
           <Button
             size="sm"
             onClick={form.handleSubmit(onSubmit)}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || isSaving}
           >
             {saveMutation.isPending ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />

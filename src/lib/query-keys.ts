@@ -235,6 +235,9 @@ export const reportKeys = {
   /** Finished goods inventory valuation (packaging allocations) */
   inventoryValuationFinishedGoods: (asOfDate: string) =>
     ["reports", "inventory-valuation", asOfDate, "finished-goods"] as const,
+  /** Batch ingredient costs for FG valuation */
+  inventoryValuationBatchCosts: (asOfDate: string) =>
+    ["reports", "inventory-valuation", asOfDate, "batch-costs"] as const,
   production: () => ["reports", "production"] as const,
   ttbBatches: (year: number, month: number) =>
     ["ttb-batches", year, month] as const,

@@ -21,6 +21,11 @@ import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { vesselEntity } from "@/entities/vessel";
 import { packagingSessionEntity } from "@/entities/packaging-session";
 import { allocationEntity } from "@/entities/allocation";
+import { brewLogEntity } from "@/entities/brew-log";
+import { pickListEntity } from "@/entities/pick-list";
+import { recipeEntity } from "@/entities/recipe";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
 // =============================================================================
 // Test Helper
@@ -434,5 +439,112 @@ describe("State Machine Validation", () => {
     it("has 'planned' as the initial state", () => {
       expect(allocationEntity.stateMachine!.initialState).toBe("planned");
     });
+  });
+
+  // ===========================================================================
+  // SQL / TypeScript State Machine Sync Verification
+  // ===========================================================================
+
+  describe("SQL and TypeScript state machine sync", () => {
+    /**
+     * Parses the get_state_transitions() SQL function to extract the JSONB
+     * transition maps for each table. Returns a map of table_name to transitions.
+     */
+    function parseSqlTransitions(): Record<string, Record<string, string[]>> {
+      const sqlPath = resolve(
+        __dirname,
+        "../../../supabase/migrations/00143_server_side_state_machine.sql"
+      );
+      const sql = readFileSync(sqlPath, "utf-8");
+
+      // Extract the body of get_state_transitions between BEGIN and END
+      const fnMatch = sql.match(
+        /CREATE OR REPLACE FUNCTION get_state_transitions[\s\S]*?BEGIN([\s\S]*?)END;\s*\$\$/
+      );
+      if (!fnMatch) {
+        throw new Error("Could not find get_state_transitions function body in SQL");
+      }
+      const fnBody = fnMatch[1];
+
+      // Match each WHEN clause: WHEN 'table_name' THEN '{...}'::JSONB
+      const whenPattern = /WHEN\s+'(\w+)'\s+THEN\s+'(\{[^}]*(?:\{[^}]*\}[^}]*)*\})'\s*::JSONB/g;
+      const result: Record<string, Record<string, string[]>> = {};
+
+      let match;
+      while ((match = whenPattern.exec(fnBody)) !== null) {
+        const tableName = match[1];
+        const jsonStr = match[2];
+        result[tableName] = JSON.parse(jsonStr);
+      }
+
+      return result;
+    }
+
+    /** Maps SQL table names to their TypeScript entity configs. */
+    const tableToEntity: Record<string, { name: string; transitions: Record<string, string[]> }> = {
+      batches: { name: "batchEntity", transitions: batchEntity.stateMachine!.transitions },
+      orders: { name: "orderEntity", transitions: orderEntity.stateMachine!.transitions },
+      purchase_orders: { name: "purchaseOrderEntity", transitions: purchaseOrderEntity.stateMachine!.transitions },
+      packaging_sessions: { name: "packagingSessionEntity", transitions: packagingSessionEntity.stateMachine!.transitions },
+      brew_logs: { name: "brewLogEntity", transitions: brewLogEntity.stateMachine!.transitions },
+      allocations: { name: "allocationEntity", transitions: allocationEntity.stateMachine!.transitions },
+      pick_lists: { name: "pickListEntity", transitions: pickListEntity.stateMachine!.transitions },
+      recipes: { name: "recipeEntity", transitions: recipeEntity.stateMachine!.transitions },
+    };
+
+    const sqlTransitions = parseSqlTransitions();
+
+    it("SQL file contains transition maps for all expected tables", () => {
+      const expectedTables = Object.keys(tableToEntity);
+      for (const table of expectedTables) {
+        expect(
+          sqlTransitions,
+          `SQL is missing transition map for table "${table}"`
+        ).toHaveProperty(table);
+      }
+    });
+
+    for (const [tableName, entity] of Object.entries(tableToEntity)) {
+      describe(`${tableName}`, () => {
+        const sqlMap = sqlTransitions[tableName];
+        const tsMap = entity.transitions;
+
+        if (!sqlMap) {
+          it.skip(`skipped -- no SQL transitions found for ${tableName}`, () => {});
+          return;
+        }
+
+        it("every SQL state exists in the TypeScript config", () => {
+          const sqlStates = Object.keys(sqlMap);
+          const tsStates = Object.keys(tsMap);
+          for (const state of sqlStates) {
+            expect(
+              tsStates,
+              `State "${state}" is in SQL (${tableName}) but missing from ${entity.name}.stateMachine.transitions`
+            ).toContain(state);
+          }
+        });
+
+        it("every TypeScript state exists in the SQL map", () => {
+          const sqlStates = Object.keys(sqlMap);
+          const tsStates = Object.keys(tsMap);
+          for (const state of tsStates) {
+            expect(
+              sqlStates,
+              `State "${state}" is in ${entity.name}.stateMachine.transitions but missing from SQL (${tableName})`
+            ).toContain(state);
+          }
+        });
+
+        it("allowed transitions match exactly for every state", () => {
+          const allStates = new Set([...Object.keys(sqlMap), ...Object.keys(tsMap)]);
+          for (const state of allStates) {
+            const sqlTargets = [...(sqlMap[state] ?? [])].sort();
+            const tsTargets = [...(tsMap[state] ?? [])].sort();
+            expect(tsTargets).toEqual(sqlTargets);
+          }
+        });
+      });
+    }
   });
 });

@@ -1636,11 +1636,11 @@ function RelationTable({
             <TableBody>
               {items.map((item: Record<string, unknown>) => (
                 <TableRow key={item.id as string}>
-                  {columns.map((col) => {
+                  {columns.map((col, colIdx) => {
                     const key = col.accessorKey;
                     if (!key)
                       return (
-                        <TableCell key={`empty-${Math.random()}`}>
+                        <TableCell key={`empty-${colIdx}`}>
                           &mdash;
                         </TableCell>
                       );

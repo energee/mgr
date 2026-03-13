@@ -7,6 +7,12 @@
  * - Stats strip with inline filters
  * - Shortfalls grouped by supplier with editable quantities
  * - Per-supplier and bulk PO generation
+ *
+ * All page state (filters, quantity overrides, supplier assignments) is
+ * ephemeral React state by design. Demand planning is recalculated from
+ * current batch/inventory data on each page visit, so persisting user
+ * edits is unnecessary -- the underlying data changes frequently and
+ * stale overrides would be misleading.
  */
 
 import { useState, useMemo, useCallback } from "react";

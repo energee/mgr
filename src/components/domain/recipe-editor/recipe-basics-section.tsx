@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
@@ -62,7 +62,7 @@ const DYNAMIC_FIELDS = [
 ];
 
 export function RecipeBasicsSection() {
-  const { recipe, updateRecipe } = useRecipeEditor();
+  const { recipe, updateRecipe, isSaving, startSaving } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -114,8 +114,11 @@ export function RecipeBasicsSection() {
     }
   }, [styleName, updateRecipe]);
 
+  const stopSavingRef = useRef<(() => void) | null>(null);
+
   const saveMutation = useMutation({
     mutationFn: async (values: BasicsFormValues) => {
+      stopSavingRef.current = startSaving();
       return updateWithOptimisticLockOrThrow(
         supabase,
         "recipes",
@@ -141,6 +144,10 @@ export function RecipeBasicsSection() {
     onError: (error) => {
       toast.error(error.message);
     },
+    onSettled: () => {
+      stopSavingRef.current?.();
+      stopSavingRef.current = null;
+    },
   });
 
   const onSubmit = useCallback(
@@ -151,12 +158,13 @@ export function RecipeBasicsSection() {
   return (
     <RecipeSectionCard
       title="Recipe Basics"
+      isDirty={isDirty}
       headerActions={
         isDirty ? (
           <Button
             size="sm"
             onClick={form.handleSubmit(onSubmit)}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || isSaving}
           >
             {saveMutation.isPending ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />

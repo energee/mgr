@@ -71,7 +71,6 @@ type ProductionBatchRow = {
   status: string;
   volume_bbl: number | null;
   planned_start_date: string | null;
-  updated_at: string | null;
   recipe_id: string | null;
   recipes: {
     id: string;
@@ -115,16 +114,15 @@ function getYearOptions(): number[] {
 }
 
 /**
- * Calculate the number of days a batch spent in tank.
- * Uses planned_start_date as start and updated_at (completion timestamp) as end.
- * Returns null if either date is missing.
+ * Calculate the number of days a batch has been in tank.
+ * Uses planned_start_date as start and the current date as end.
+ * Returns null if the start date is missing.
  */
 function daysInTank(
   plannedStart: string | null,
-  updatedAt: string | null,
 ): number | null {
-  if (!plannedStart || !updatedAt) return null;
-  return differenceInDays(parseISO(updatedAt), parseISO(plannedStart));
+  if (!plannedStart) return null;
+  return differenceInDays(new Date(), parseISO(plannedStart));
 }
 
 /** Shared aggregation shape used by both brand and style summaries. */
@@ -194,6 +192,8 @@ export default function ProductionSummaryPage() {
   } = useQuery({
     queryKey: reportKeys.productionSummary(startDate, endDate),
     queryFn: async () => {
+      // Filter by planned_start_date (production date), not updated_at which
+      // changes on any record modification and is not a reliable production date.
       const { data, error: queryError } = await supabase
         .from("batches")
         .select(
@@ -204,7 +204,6 @@ export default function ProductionSummaryPage() {
           status,
           volume_bbl,
           planned_start_date,
-          updated_at,
           recipe_id,
           recipes (
             id,
@@ -219,9 +218,9 @@ export default function ProductionSummaryPage() {
         `
         )
         .in("status", ["completed", "packaging"])
-        .gte("updated_at", startDate)
-        .lte("updated_at", endDate + "T23:59:59Z")
-        .order("updated_at", { ascending: false });
+        .gte("planned_start_date", startDate)
+        .lte("planned_start_date", endDate + "T23:59:59Z")
+        .order("planned_start_date", { ascending: false });
 
       if (queryError) throw queryError;
       return (data ?? []) as unknown as ProductionBatchRow[];
@@ -246,14 +245,14 @@ export default function ProductionSummaryPage() {
 
       const { data, error: queryError } = await supabase
         .from("batches")
-        .select("id, volume_bbl, updated_at")
+        .select("id, volume_bbl, planned_start_date")
         .in("status", ["completed", "packaging"])
-        .gte("updated_at", trendStart)
-        .lte("updated_at", trendEnd + "T23:59:59Z");
+        .gte("planned_start_date", trendStart)
+        .lte("planned_start_date", trendEnd + "T23:59:59Z");
 
       if (queryError) throw queryError;
 
-      // Aggregate by month
+      // Aggregate by month using planned_start_date (production date)
       const monthMap = new Map<string, { bbl: number; batches: number }>();
 
       // Pre-populate all months so the chart has no gaps
@@ -264,8 +263,8 @@ export default function ProductionSummaryPage() {
       }
 
       for (const row of data ?? []) {
-        if (!row.updated_at) continue;
-        const key = format(startOfMonth(parseISO(row.updated_at)), "yyyy-MM-dd");
+        if (!row.planned_start_date) continue;
+        const key = format(startOfMonth(parseISO(row.planned_start_date)), "yyyy-MM-dd");
         const entry = monthMap.get(key);
         if (entry) {
           entry.bbl += row.volume_bbl ?? 0;
@@ -296,7 +295,7 @@ export default function ProductionSummaryPage() {
   const avgDaysInTank = useMemo(() => {
     if (!batches || batches.length === 0) return null;
     const days = batches
-      .map((b) => daysInTank(b.planned_start_date, b.updated_at))
+      .map((b) => daysInTank(b.planned_start_date))
       .filter((d): d is number => d !== null && d >= 0);
     if (days.length === 0) return null;
     return days.reduce((sum, d) => sum + d, 0) / days.length;

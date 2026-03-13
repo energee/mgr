@@ -583,9 +583,11 @@ export default function CogsReportPage() {
         existing.total_cogs += lineCost;
         existing.batchSet.add(alloc.destination_id);
 
-        if (category === "malt" || category === "grain") {
+        // Category values come from inventory_items.category in the database:
+        // "grain", "hops", "yeast", "adjunct", "packaging", "other"
+        if (category === "grain" || category === "malt") {
           existing.malt_cost += lineCost;
-        } else if (category === "hop") {
+        } else if (category === "hops" || category === "hop") {
           existing.hop_cost += lineCost;
         } else if (category === "yeast") {
           existing.yeast_cost += lineCost;

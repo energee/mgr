@@ -108,6 +108,13 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Validate: reject zero or negative weight entries
+      const invalidItems = hopItems.filter((item) => item.weight_oz <= 0);
+      if (invalidItems.length > 0) {
+        const names = invalidItems.map((item) => item.hop?.name || "Unknown").join(", ");
+        throw new Error(`Cannot save hop schedule: ${names} ${invalidItems.length === 1 ? "has" : "have"} zero or negative weight`);
+      }
+
       const { error: deleteError } = await supabase
         .from("recipe_hops")
         .delete()

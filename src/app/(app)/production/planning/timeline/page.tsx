@@ -852,7 +852,7 @@ export default function ProductionTimelinePage() {
         </div>
 
         {/* Today indicator */}
-        <div className="absolute bottom-4 right-4 bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+        <div className="absolute bottom-4 right-4 bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg" suppressHydrationWarning>
           {format(new Date(), "EEEE, MMM d")}
         </div>
       </div>

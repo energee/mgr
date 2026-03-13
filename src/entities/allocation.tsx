@@ -247,6 +247,7 @@ export const allocationEntity: EntityConfig<Allocation> = {
           label: "Status",
           type: "select",
           options: statusOptions,
+          editable: false,
           colSpan: 6,
         },
       ],
