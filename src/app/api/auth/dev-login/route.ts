@@ -43,12 +43,18 @@ export async function GET(request: NextRequest) {
     testUser = createData.user;
   }
 
-  // Always ensure admin role (DB trigger creates profile with 'viewer' by default)
+  // Ensure user_profiles has admin role (idempotent — runs every login)
   if (testUser) {
-    await admin.from("user_profiles").update({
-      full_name: "Dev User",
-      roles: ["admin"],
-    }).eq("id", testUser.id);
+    await admin.from("user_profiles").upsert(
+      {
+        id: testUser.id,
+        email: TEST_EMAIL,
+        display_name: "Dev User",
+        roles: ["admin"],
+        status: "active",
+      },
+      { onConflict: "id" },
+    );
   }
 
   // Sign in via the regular server client (sets session cookies)
