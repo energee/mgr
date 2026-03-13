@@ -5,6 +5,9 @@
  * computed estimates (OG, FG, ABV, IBU, SRM). Section components push
  * pre-save data via update callbacks; the sidebar reads computed estimates
  * reactively via useMemo.
+ *
+ * Also provides save coordination (isSaving / startSaving) to prevent
+ * concurrent optimistic-lock conflicts between independent sections.
  */
 
 "use client";
@@ -74,7 +77,7 @@ export type RecipeData = {
   est_ibu?: number | null;
   est_srm?: number | null;
   batch_count?: number | null;
-}
+};
 
 type RecipeEditorContextValue = {
   recipe: RecipeData;
@@ -91,7 +94,16 @@ type RecipeEditorContextValue = {
 
   /** Live-computed estimates from current editor state */
   estimates: RecipeEstimates;
-}
+
+  /**
+   * Whether any section save is currently in progress.
+   * Sections should disable their save buttons when this is true
+   * to prevent concurrent optimistic-lock conflicts.
+   */
+  isSaving: boolean;
+  /** Mark a section save as started. Returns a callback to mark it complete. */
+  startSaving: () => () => void;
+};
 
 // =============================================================================
 // Context
@@ -106,7 +118,7 @@ const RecipeEditorContext = createContext<RecipeEditorContextValue | null>(null)
 type RecipeEditorProviderProps = {
   initialRecipe: RecipeData;
   children: ReactNode;
-}
+};
 
 export function RecipeEditorProvider({
   initialRecipe,
@@ -115,10 +127,26 @@ export function RecipeEditorProvider({
   const [recipe, setRecipe] = useState<RecipeData>(initialRecipe);
   const [grainItems, setGrainItems] = useState<GrainBillItem[]>([]);
   const [hopItems, setHopItems] = useState<HopScheduleItem[]>([]);
+  const [savingCount, setSavingCount] = useState(0);
 
   const updateRecipe = useCallback((partial: Partial<RecipeData>) => {
     setRecipe((prev) => ({ ...prev, ...partial }));
   }, []);
+
+  /**
+   * Mark a section save as started. Returns a cleanup callback
+   * that marks the save as complete. Sections should call startSaving()
+   * before their mutation and the returned callback in onSettled.
+   * Uses functional state updates to avoid race conditions with concurrent saves.
+   */
+  const startSaving = useCallback(() => {
+    setSavingCount(prev => prev + 1);
+    return () => {
+      setSavingCount(prev => Math.max(0, prev - 1));
+    };
+  }, []);
+
+  const isSaving = savingCount > 0;
 
   // Compute estimates reactively from current editor state
   const estimates = useMemo<RecipeEstimates>(() => {
@@ -150,8 +178,10 @@ export function RecipeEditorProvider({
       hopItems,
       setHopItems,
       estimates,
+      isSaving,
+      startSaving,
     }),
-    [recipe, updateRecipe, grainItems, hopItems, estimates]
+    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving]
   );
 
   return (

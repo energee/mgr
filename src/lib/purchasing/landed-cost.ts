@@ -2,7 +2,8 @@
  * Landed Cost Calculation
  *
  * Utilities for calculating and displaying per-unit landed costs on inventory lots.
- * Landed cost includes the item unit price plus an allocated share of PO shipping costs.
+ * Landed cost includes the item unit price plus proportionally allocated shares of
+ * PO shipping cost and tax.
  */
 
 import { log } from "@/lib/client-logger";
@@ -24,16 +25,18 @@ export type LandedCostBreakdown = {
   quantity: number;
   unit_price: number | null;
   allocated_shipping: number;
+  allocated_tax: number;
   landed_cost_per_unit: number;
-}
+};
 
 export type LandedCostSummary = {
   po_id: string;
   shipping_cost: number;
+  tax: number;
   line_items: LandedCostBreakdown[];
   total_item_cost: number;
   total_landed_cost: number;
-}
+};
 
 // =============================================================================
 // Functions
@@ -63,16 +66,20 @@ export async function calculateLandedCost(
 
 /**
  * Get a full landed cost summary for a PO including totals.
+ *
+ * NOTE: This function has a write side-effect -- it calls `calculateLandedCost`
+ * which invokes the `calculate_landed_cost` RPC, updating the `landed_cost`
+ * column on each related `inventory_lots` row.
  */
 export async function getLandedCostSummary(
   poId: string
 ): Promise<LandedCostSummary> {
   const supabase = await getSupabase();
 
-  // Get the PO shipping cost
+  // Get the PO shipping cost and tax
   const { data: po, error: poError } = await supabase
     .from("purchase_orders")
-    .select("shipping_cost")
+    .select("shipping_cost, tax")
     .eq("id", poId)
     .single();
 
@@ -97,6 +104,7 @@ export async function getLandedCostSummary(
   return {
     po_id: poId,
     shipping_cost: po.shipping_cost || 0,
+    tax: po.tax || 0,
     line_items: lineItems,
     total_item_cost: totalItemCost,
     total_landed_cost: totalLandedCost,

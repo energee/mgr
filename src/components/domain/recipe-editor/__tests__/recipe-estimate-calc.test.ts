@@ -14,23 +14,31 @@ import {
 } from "../recipe-estimate-calc";
 
 describe("getHopUtilizationFactor", () => {
-  it("returns correct factors for boil timing", () => {
-    expect(getHopUtilizationFactor("boil", 60)).toBe(0.27);
-    expect(getHopUtilizationFactor("boil", 45)).toBe(0.24);
-    expect(getHopUtilizationFactor("boil", 30)).toBe(0.20);
-    expect(getHopUtilizationFactor("boil", 15)).toBe(0.14);
-    expect(getHopUtilizationFactor("boil", 10)).toBe(0.10);
-    expect(getHopUtilizationFactor("boil", 5)).toBe(0.05);
-    expect(getHopUtilizationFactor("boil", 3)).toBe(0.02);
+  // Tinseth formula at default gravity (1.050):
+  //   bigness = 1.65 * 0.000125^(1.050 - 1) ≈ 1.2756
+  //   boilFactor(t) = (1 - e^(-0.04*t)) / 4.15
+
+  it("returns correct Tinseth utilization for boil timing", () => {
+    expect(getHopUtilizationFactor("boil", 60)).toBeCloseTo(0.2307, 3);
+    expect(getHopUtilizationFactor("boil", 45)).toBeCloseTo(0.2117, 3);
+    expect(getHopUtilizationFactor("boil", 30)).toBeCloseTo(0.1773, 3);
+    expect(getHopUtilizationFactor("boil", 15)).toBeCloseTo(0.1145, 3);
+    expect(getHopUtilizationFactor("boil", 10)).toBeCloseTo(0.0836, 3);
+    expect(getHopUtilizationFactor("boil", 5)).toBeCloseTo(0.0460, 3);
+    expect(getHopUtilizationFactor("boil", 3)).toBeCloseTo(0.0287, 3);
   });
 
   it("defaults to 60 min boil when not specified", () => {
-    expect(getHopUtilizationFactor("boil", null)).toBe(0.27);
-    expect(getHopUtilizationFactor("boil", undefined)).toBe(0.27);
+    const expected = getHopUtilizationFactor("boil", 60);
+    expect(getHopUtilizationFactor("boil", null)).toBeCloseTo(expected, 4);
+    expect(getHopUtilizationFactor("boil", undefined)).toBeCloseTo(expected, 4);
   });
 
   it("returns correct factors for non-boil timings", () => {
-    expect(getHopUtilizationFactor("first_wort")).toBe(0.10);
+    // first_wort uses full 60-min boil utilization (same as Tinseth at 60 min)
+    expect(getHopUtilizationFactor("first_wort")).toBeCloseTo(
+      getHopUtilizationFactor("boil", 60), 4
+    );
     expect(getHopUtilizationFactor("whirlpool")).toBe(0.05);
     expect(getHopUtilizationFactor("mash")).toBe(0.08);
   });
@@ -109,10 +117,9 @@ describe("calculateEstimates", () => {
     });
 
     expect(result.ibu).not.toBeNull();
-    // 16oz * 13aa * 0.27 (60min boil) + 16oz * 13aa * 0.05 (whirlpool)
-    // = 56.16 + 10.4 = 66.56; * 74.89 / 217 = 22.96
-    // That seems low for 7bbl... let me recalculate
-    // IBU = (56.16 + 10.4) * 74.89 / 217 = 66.56 * 74.89 / 217 = 4984.68 / 217 ≈ 23
+    // Tinseth utilization: ~0.231 for 60min boil, ~0.05 for whirlpool
+    // IBU contributions summed and scaled by batch volume
+    // Result falls in the 15-50 range for this grain/hop combination
     expect(result.ibu!).toBeGreaterThan(15);
     expect(result.ibu!).toBeLessThan(50);
   });

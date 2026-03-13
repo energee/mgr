@@ -82,6 +82,10 @@ export default function BatchDetailPage({
         .single();
       if (error) throw error;
       // target_og is available in the view (via b.*) but not in generated types yet
+      // Runtime-validate required fields before casting
+      if (!data || typeof data.id !== "string") {
+        throw new Error("Batch detail query returned invalid data");
+      }
       return data as unknown as BatchDetail;
     },
   });

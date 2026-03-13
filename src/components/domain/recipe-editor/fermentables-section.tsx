@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
@@ -54,7 +54,7 @@ const YEAST_FIELDS = [
 ];
 
 export function FermentablesSection() {
-  const { recipe, updateRecipe, setGrainItems, setHopItems } = useRecipeEditor();
+  const { recipe, updateRecipe, setGrainItems, setHopItems, isSaving, startSaving } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -99,8 +99,11 @@ export function FermentablesSection() {
     [setHopItems]
   );
 
+  const stopSavingRef = useRef<(() => void) | null>(null);
+
   const saveMutation = useMutation({
     mutationFn: async (values: YeastFormValues) => {
+      stopSavingRef.current = startSaving();
       return updateWithOptimisticLockOrThrow(
         supabase,
         "recipes",
@@ -122,6 +125,10 @@ export function FermentablesSection() {
     },
     onError: (error) => {
       toast.error(error.message);
+    },
+    onSettled: () => {
+      stopSavingRef.current?.();
+      stopSavingRef.current = null;
     },
   });
 
@@ -171,7 +178,7 @@ export function FermentablesSection() {
               <Button
                 size="sm"
                 onClick={form.handleSubmit(onSubmit)}
-                disabled={saveMutation.isPending}
+                disabled={saveMutation.isPending || isSaving}
               >
                 {saveMutation.isPending ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />

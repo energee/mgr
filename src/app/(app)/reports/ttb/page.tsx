@@ -81,7 +81,7 @@ type BatchSummary = {
   name: string;
   status: string;
   volume_bbl: number | null;
-  updated_at: string | null;
+  planned_start_date: string | null;
 }
 
 // =============================================================================
@@ -155,13 +155,14 @@ export default function TTBReportPage() {
       const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
       const endDate = new Date(year, month, 0).toISOString().split("T")[0];
 
-      // Batches completed in the period
+      // Batches completed in the period (filter by planned_start_date, which
+      // represents the production date, not updated_at which changes on any edit)
       const { data: completedBatches, error: completedError } = await supabase
         .from("batches")
-        .select("id, batch_number, name, status, volume_bbl, updated_at")
+        .select("id, batch_number, name, status, volume_bbl, planned_start_date")
         .eq("status", "completed")
-        .gte("updated_at", startDate)
-        .lte("updated_at", endDate + "T23:59:59Z");
+        .gte("planned_start_date", startDate)
+        .lte("planned_start_date", endDate + "T23:59:59Z");
 
       if (completedError) throw completedError;
 

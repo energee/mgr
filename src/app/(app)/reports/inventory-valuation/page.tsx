@@ -79,6 +79,7 @@ type RawMaterialRow = {
 /** Finished good row from finished_goods_with_availability */
 type FinishedGoodRow = {
   id: string | null;
+  batch_id: string | null;
   brand_name: string | null;
   package_type_name: string | null;
   available_quantity: number | null;
@@ -90,7 +91,7 @@ type FinishedGoodDisplayRow = {
   brandName: string;
   packageType: string;
   quantity: number;
-  /** Placeholder unit cost estimate for finished goods */
+  /** Estimated unit cost derived from batch ingredient costs */
   unitCostEstimate: number;
   totalValue: number;
 }
@@ -163,7 +164,7 @@ export default function InventoryValuationPage() {
       const { data, error } = await supabase
         .from("finished_goods_with_availability")
         .select(
-          "id, brand_name, package_type_name, available_quantity, quantity"
+          "id, batch_id, brand_name, package_type_name, available_quantity, quantity"
         )
         .gt("available_quantity", 0)
         .lte("production_date", asOfDate);
@@ -171,6 +172,66 @@ export default function InventoryValuationPage() {
       if (error) throw error;
       return (data ?? []) as unknown as FinishedGoodRow[];
     },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Batch Costs Query (for FG valuation)
+  // ---------------------------------------------------------------------------
+  // Fetch ingredient costs per batch from allocations so that finished goods
+  // can be valued at their actual production cost rather than $0.
+  const {
+    data: batchCosts,
+  } = useQuery({
+    queryKey: reportKeys.inventoryValuationBatchCosts(asOfDate),
+    queryFn: async () => {
+      // Get unique batch IDs from finished goods
+      const batchIds = [...new Set(
+        (finishedGoods ?? [])
+          .map((fg) => fg.batch_id)
+          .filter((id): id is string => !!id),
+      )];
+      if (batchIds.length === 0) return new Map<string, { totalCost: number; totalUnits: number }>();
+
+      // Fetch allocation costs and FG unit counts per batch in parallel
+      const [{ data: allocations }, { data: fgRows }] = await Promise.all([
+        supabase
+          .from("allocations")
+          .select("destination_id, quantity, unit_cost")
+          .eq("destination_type", "batch")
+          .in("destination_id", batchIds)
+          .in("status", ["completed", "planned"]),
+        supabase
+          .from("finished_goods")
+          .select("batch_id, quantity")
+          .in("batch_id", batchIds),
+      ]);
+
+      // Sum costs per batch
+      const costMap = new Map<string, number>();
+      for (const a of allocations ?? []) {
+        if (!a.destination_id) continue;
+        const lineCost = (a.quantity ?? 0) * (a.unit_cost ?? 0);
+        costMap.set(a.destination_id, (costMap.get(a.destination_id) ?? 0) + lineCost);
+      }
+
+      // Sum total FG units per batch
+      const unitsMap = new Map<string, number>();
+      for (const fg of fgRows ?? []) {
+        if (!fg.batch_id) continue;
+        unitsMap.set(fg.batch_id, (unitsMap.get(fg.batch_id) ?? 0) + (fg.quantity ?? 0));
+      }
+
+      // Combine into cost-per-unit map
+      const result = new Map<string, { totalCost: number; totalUnits: number }>();
+      for (const batchId of batchIds) {
+        result.set(batchId, {
+          totalCost: costMap.get(batchId) ?? 0,
+          totalUnits: unitsMap.get(batchId) ?? 0,
+        });
+      }
+      return result;
+    },
+    enabled: !!finishedGoods && finishedGoods.length > 0,
   });
 
   // ---------------------------------------------------------------------------
@@ -236,37 +297,48 @@ export default function InventoryValuationPage() {
 
     const grouped = new Map<
       string,
-      { brandName: string; packageType: string; quantity: number }
+      { brandName: string; packageType: string; quantity: number; totalValue: number }
     >();
 
     for (const fg of finishedGoods) {
       const key = `${fg.brand_name ?? "Unknown"}::${fg.package_type_name ?? "Unknown"}`;
       const available = fg.available_quantity ?? 0;
-      const existing = grouped.get(key);
 
+      // Calculate per-unit cost from batch ingredient costs
+      let unitCost = 0;
+      if (fg.batch_id && batchCosts) {
+        const batchInfo = batchCosts.get(fg.batch_id);
+        if (batchInfo && batchInfo.totalUnits > 0) {
+          unitCost = batchInfo.totalCost / batchInfo.totalUnits;
+        }
+      }
+
+      const existing = grouped.get(key);
       if (existing) {
         existing.quantity += available;
+        existing.totalValue += available * unitCost;
       } else {
         grouped.set(key, {
           brandName: fg.brand_name ?? "Unknown",
           packageType: fg.package_type_name ?? "Unknown",
           quantity: available,
+          totalValue: available * unitCost,
         });
       }
     }
 
-    // Note: unit cost for finished goods is not tracked per-unit in the DB.
-    // We show quantity only; cost estimate is left as 0 until COGS is implemented.
+    // Unit cost is derived from batch ingredient costs allocated proportionally
+    // across all finished goods produced from that batch.
     return Array.from(grouped.values())
       .map((item) => ({
         brandName: item.brandName,
         packageType: item.packageType,
         quantity: item.quantity,
-        unitCostEstimate: 0,
-        totalValue: 0,
+        unitCostEstimate: item.quantity > 0 ? item.totalValue / item.quantity : 0,
+        totalValue: item.totalValue,
       }))
       .sort((a, b) => a.brandName.localeCompare(b.brandName) || a.packageType.localeCompare(b.packageType));
-  }, [finishedGoods]);
+  }, [finishedGoods, batchCosts]);
 
   // ---------------------------------------------------------------------------
   // Totals
@@ -416,7 +488,7 @@ export default function InventoryValuationPage() {
             )}
             {!isLoading && finishedGoodRows.length > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
-                Excludes finished goods (unit costs not yet tracked)
+                Finished goods valued at estimated ingredient cost per unit
               </p>
             )}
           </CardContent>
@@ -572,9 +644,9 @@ export default function InventoryValuationPage() {
               )}
               {finishedGoodRows.length > 0 && finishedGoodsTotal === 0 && (
                 <p className="text-sm text-muted-foreground mt-4">
-                  Finished goods unit costs are not currently tracked in the
-                  system. Once batch COGS tracking is implemented, values will
-                  appear here automatically.
+                  No ingredient cost data is available for these finished goods.
+                  Ensure batches have ingredient allocations recorded to see
+                  cost estimates here.
                 </p>
               )}
             </CardContent>
@@ -588,8 +660,8 @@ export default function InventoryValuationPage() {
           <p className="text-sm text-muted-foreground">
             <strong>Note:</strong> Raw material values are calculated using the
             weighted average unit cost from purchase receipts. Finished goods
-            values will be populated once batch-level COGS tracking is
-            implemented. All quantities reflect the remaining balance after
+            values are estimated from batch ingredient costs divided by total
+            units packaged. All quantities reflect the remaining balance after
             allocations (planned and completed).
           </p>
         </CardContent>

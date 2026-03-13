@@ -6,6 +6,13 @@
  * Shows allocated finished goods with quantities and bin locations.
  * Mobile-optimized for warehouse tablet use.
  * Printable layout with order details.
+ *
+ * @deprecated Use {@link PickListItems} from `./pick-list-items.tsx` instead.
+ * This component derives its pick list from raw allocations and uses ephemeral
+ * checkbox state. The newer `PickListItems` component works against the
+ * `pick_list_items` table with persistent picked quantities and server-side
+ * tracking. This component will be removed once all order pages migrate to
+ * the `pick_lists` entity workflow.
  */
 
 import { useQuery } from "@tanstack/react-query";

@@ -66,7 +66,7 @@ export const recipeSchema = z.object({
   target_water_profile_id: z.string().uuid().nullable().optional(),
   is_active: z.boolean().default(true),
   // Status
-  status: z.enum(["draft", "spec", "complete"]).default("complete"),
+  status: z.enum(["draft", "spec", "complete"]).default("draft"),
 });
 
 export type RecipeFormValues = z.infer<typeof recipeSchema>;
