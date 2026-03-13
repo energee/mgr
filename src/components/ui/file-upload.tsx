@@ -92,14 +92,14 @@ function getFileIcon(file: File) {
 
 type Direction = "ltr" | "rtl";
 
-interface FileState {
+type FileState = {
   file: File;
   progress: number;
   error?: string;
   status: "idle" | "uploading" | "error" | "success";
 }
 
-interface StoreState {
+type StoreState = {
   files: Map<File, FileState>;
   dragOver: boolean;
   invalid: boolean;
@@ -155,7 +155,7 @@ function useStore<T>(selector: (state: StoreState) => T): T {
   return React.useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 }
 
-interface FileUploadContextValue {
+type FileUploadContextValue = {
   inputId: string;
   dropzoneId: string;
   listId: string;
@@ -178,8 +178,7 @@ function useFileUploadContext(consumerName: string) {
   return context;
 }
 
-interface FileUploadProps
-  extends Omit<React.ComponentProps<"div">, "defaultValue" | "onChange"> {
+type FileUploadProps = Omit<React.ComponentProps<"div">, "defaultValue" | "onChange"> & {
   value?: File[];
   defaultValue?: File[];
   onValueChange?: (files: File[]) => void;
@@ -673,7 +672,7 @@ function FileUpload(props: FileUploadProps) {
   );
 }
 
-interface FileUploadDropzoneProps extends React.ComponentProps<"div"> {
+type FileUploadDropzoneProps = React.ComponentProps<"div"> & {
   asChild?: boolean;
 }
 
@@ -878,7 +877,7 @@ function FileUploadDropzone(props: FileUploadDropzoneProps) {
   );
 }
 
-interface FileUploadTriggerProps extends React.ComponentProps<"button"> {
+type FileUploadTriggerProps = React.ComponentProps<"button"> & {
   asChild?: boolean;
 }
 
@@ -917,7 +916,7 @@ function FileUploadTrigger(props: FileUploadTriggerProps) {
   );
 }
 
-interface FileUploadListProps extends React.ComponentProps<"div"> {
+type FileUploadListProps = React.ComponentProps<"div"> & {
   orientation?: "horizontal" | "vertical";
   asChild?: boolean;
   forceMount?: boolean;
@@ -958,7 +957,7 @@ function FileUploadList(props: FileUploadListProps) {
   );
 }
 
-interface FileUploadItemContextValue {
+type FileUploadItemContextValue = {
   id: string;
   fileState: FileState | undefined;
   nameId: string;
@@ -978,7 +977,7 @@ function useFileUploadItemContext(consumerName: string) {
   return context;
 }
 
-interface FileUploadItemProps extends React.ComponentProps<"div"> {
+type FileUploadItemProps = React.ComponentProps<"div"> & {
   value: File;
   asChild?: boolean;
 }
@@ -1052,7 +1051,7 @@ function FileUploadItem(props: FileUploadItemProps) {
   );
 }
 
-interface FileUploadItemPreviewProps extends React.ComponentProps<"div"> {
+type FileUploadItemPreviewProps = React.ComponentProps<"div"> & {
   render?: (file: File, fallback: () => React.ReactNode) => React.ReactNode;
   asChild?: boolean;
 }
@@ -1111,7 +1110,7 @@ function FileUploadItemPreview(props: FileUploadItemPreviewProps) {
   );
 }
 
-interface FileUploadItemMetadataProps extends React.ComponentProps<"div"> {
+type FileUploadItemMetadataProps = React.ComponentProps<"div"> & {
   asChild?: boolean;
   size?: "default" | "sm";
 }
@@ -1172,7 +1171,7 @@ function FileUploadItemMetadata(props: FileUploadItemMetadataProps) {
     </ItemMetadataPrimitive>
   );
 }
-interface FileUploadItemProgressProps extends React.ComponentProps<"div"> {
+type FileUploadItemProgressProps = React.ComponentProps<"div"> & {
   variant?: "linear" | "circular" | "fill";
   size?: number;
   asChild?: boolean;
@@ -1302,7 +1301,7 @@ function FileUploadItemProgress(props: FileUploadItemProgressProps) {
   }
 }
 
-interface FileUploadItemDeleteProps extends React.ComponentProps<"button"> {
+type FileUploadItemDeleteProps = React.ComponentProps<"button"> & {
   asChild?: boolean;
 }
 
@@ -1342,7 +1341,7 @@ function FileUploadItemDelete(props: FileUploadItemDeleteProps) {
   );
 }
 
-interface FileUploadClearProps extends React.ComponentProps<"button"> {
+type FileUploadClearProps = React.ComponentProps<"button"> & {
   forceMount?: boolean;
   asChild?: boolean;
 }

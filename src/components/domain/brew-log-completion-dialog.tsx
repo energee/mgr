@@ -55,7 +55,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface BrewLogCompletionDialogProps {
+type BrewLogCompletionDialogProps = {
   brewLogId: string;
   brewNumber: string;
   open: boolean;
@@ -63,7 +63,7 @@ interface BrewLogCompletionDialogProps {
   onSuccess: (firstBatchId?: string) => void;
 }
 
-interface LinkedBatch {
+type LinkedBatch = {
   id: string;
   batch_number: string;
   name: string;
@@ -74,7 +74,7 @@ interface LinkedBatch {
   link_volume_bbl: number | null;
 }
 
-interface AvailableVessel {
+type AvailableVessel = {
   id: string;
   name: string;
   vessel_type: string | null;

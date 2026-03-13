@@ -8,7 +8,7 @@
  * Single source of truth for in-app help.
  */
 
-export interface HelpSection {
+export type HelpSection = {
   id: string;
   title: string;
   content: string;

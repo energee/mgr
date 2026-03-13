@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-interface TimePickerProps {
+type TimePickerProps = {
   id?: string
   value?: string // "HH:mm" 24hr format (stored value)
   onChange?: (value: string) => void

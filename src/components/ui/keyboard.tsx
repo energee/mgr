@@ -6,12 +6,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface KeyboardIconHandle {
+export type KeyboardIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface KeyboardIconProps extends HTMLAttributes<HTMLDivElement> {
+type KeyboardIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

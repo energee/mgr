@@ -6,7 +6,7 @@
  * Centralizes the single `@next/next/no-img-element` suppression.
  */
 
-interface SafeImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+type SafeImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
   /** Image source — may be a data: URI, blob: URL, or remote URL. */
   src: string;
   alt: string;

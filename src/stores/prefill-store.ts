@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export interface NavigationIntent {
+export type NavigationIntent = {
   action: "navigate";
   url: string;
   prefillData?: Record<string, unknown>;
@@ -10,7 +10,7 @@ export interface NavigationIntent {
 
 const STORAGE_KEY = "mgr-prefill";
 
-interface PrefillStore {
+type PrefillStore = {
   prefillData: Record<string, unknown> | null;
   openDialog: string | null;
   setPrefill: (data: Record<string, unknown>, dialog?: string | null) => void;

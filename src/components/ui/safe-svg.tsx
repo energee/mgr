@@ -11,7 +11,7 @@ import DOMPurify from "isomorphic-dompurify";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 
-interface SafeSvgProps {
+type SafeSvgProps = {
   svg: string;
   className?: string;
   ariaLabel?: string;

@@ -50,7 +50,7 @@ import { catalogKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 // Types for adjunct entries
-export interface AdjunctItem {
+export type AdjunctItem = {
   id?: string;
   adjunct_id: string;
   weight_lbs: number;
@@ -67,7 +67,7 @@ export interface AdjunctItem {
   };
 }
 
-interface AdjunctCatalogItem {
+type AdjunctCatalogItem = {
   id: string;
   name: string;
   type: string;
@@ -76,7 +76,7 @@ interface AdjunctCatalogItem {
   requires_mash: boolean;
 }
 
-interface AdjunctEditorProps {
+type AdjunctEditorProps = {
   items: AdjunctItem[];
   onChange: (items: AdjunctItem[]) => void;
   disabled?: boolean;

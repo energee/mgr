@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 
-interface QBOTokens {
+type QBOTokens = {
   accessToken: string;
   refreshToken: string;
   realmId: string;

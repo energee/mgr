@@ -8,7 +8,7 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 
-interface PricingTierPrice {
+type PricingTierPrice = {
   id: string;
   pricing_tier_id: string;
   format_id: string;

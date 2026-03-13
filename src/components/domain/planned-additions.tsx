@@ -25,7 +25,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface PlannedAddition {
+type PlannedAddition = {
   id: string;
   type: AdditionType;
   name: string;
@@ -36,7 +36,7 @@ interface PlannedAddition {
 }
 
 /** Row from the batch_additions table */
-interface BatchAdditionRow {
+type BatchAdditionRow = {
   id: string;
   addition_type: string;
   catalog_id: string | null;
@@ -45,7 +45,7 @@ interface BatchAdditionRow {
   unit: string;
 }
 
-interface PlannedAdditionsProps {
+type PlannedAdditionsProps = {
   recipeId: string;
   actualAdditions: BatchAdditionRow[];
   className?: string;

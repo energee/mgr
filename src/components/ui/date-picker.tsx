@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/popover";
 import { TimePicker } from "@/components/ui/time-picker";
 
-interface DatePickerProps {
+type DatePickerProps = {
   id?: string;
   value?: string; // ISO date string (YYYY-MM-DD)
   onChange?: (value: string | undefined) => void;
@@ -70,7 +70,7 @@ export function DatePicker({
   );
 }
 
-interface DateTimePickerProps {
+type DateTimePickerProps = {
   id?: string;
   value?: string; // ISO datetime string
   onChange?: (value: string | undefined) => void;

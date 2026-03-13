@@ -39,7 +39,7 @@ import { toast } from "sonner";
 // Types
 // =============================================================================
 
-interface PickListItemRow {
+type PickListItemRow = {
   id: string;
   pick_list_id: string;
   order_item_id: string;
@@ -58,7 +58,7 @@ interface PickListItemRow {
   production_date?: string;
 }
 
-interface PickListItemsProps {
+type PickListItemsProps = {
   data: {
     id: string;
     status: string;

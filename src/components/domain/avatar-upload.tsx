@@ -32,7 +32,7 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/webp": "webp",
 };
 
-interface AvatarUploadProps {
+type AvatarUploadProps = {
   /** Current user ID (used as storage folder name) */
   userId: string;
   /** Current avatar URL, if any */

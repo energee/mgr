@@ -43,7 +43,7 @@ import { getCatalogTypeDisplay } from "@/lib/purchasing/demand-calculator";
 // Types
 // =============================================================================
 
-interface SupplierGroupCardProps {
+type SupplierGroupCardProps = {
   draft: PODraft;
   hasUrgentItems: boolean;
   onQuantityChange: (catalogType: string, catalogId: string, qty: number) => void;

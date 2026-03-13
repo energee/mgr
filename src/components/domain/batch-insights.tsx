@@ -39,7 +39,7 @@ import { batchKeys } from "@/lib/query-keys";
 // Types
 // =============================================================================
 
-interface BatchPerformanceResult {
+type BatchPerformanceResult = {
   batch_id: string;
   batch_number: string;
   status: string;
@@ -69,7 +69,7 @@ interface BatchPerformanceResult {
   };
 }
 
-interface BatchInsightsProps {
+type BatchInsightsProps = {
   /** Direct batch ID (for standalone usage) */
   batchId?: string;
   batchNumber?: string;

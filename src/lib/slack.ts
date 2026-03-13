@@ -7,14 +7,14 @@
 
 // -- Types --------------------------------------------------------------------
 
-export interface SlackSettings {
+export type SlackSettings = {
   webhook_url: string | null;
   default_channel: string | null;
   is_enabled: boolean;
   channel_overrides: Record<string, string>;
 }
 
-export interface SlackNotification {
+export type SlackNotification = {
   type: string;
   title: string;
   message: string | null;

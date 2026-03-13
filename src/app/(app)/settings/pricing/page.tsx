@@ -64,7 +64,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface SalesChannel {
+type SalesChannel = {
   id: string;
   name: string;
   code: string;
@@ -72,14 +72,14 @@ interface SalesChannel {
   is_active: boolean;
 }
 
-interface PricingTier {
+type PricingTier = {
   id: string;
   name: string;
   cogs_max: number | null;
 }
 
 /** A selling format with container info, from the packaging_formats view */
-interface SellingFormatWithContainer {
+type SellingFormatWithContainer = {
   id: string;
   name: string;
   container_id: string;
@@ -88,7 +88,7 @@ interface SellingFormatWithContainer {
   unit_count: number;
 }
 
-interface PricingTierPrice {
+type PricingTierPrice = {
   id: string;
   pricing_tier_id: string;
   format_id: string;
@@ -96,7 +96,7 @@ interface PricingTierPrice {
   price: number;
 }
 
-interface ChannelFormat {
+type ChannelFormat = {
   id: string;
   selling_format_id: string;
   sales_channel_id: string;

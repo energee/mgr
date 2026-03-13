@@ -39,7 +39,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-interface BatchAdditionsDisplayProps {
+type BatchAdditionsDisplayProps = {
   data: {
     id: string;
     recipe_variant_id?: string | null;
@@ -47,7 +47,7 @@ interface BatchAdditionsDisplayProps {
   };
 }
 
-interface BatchAddition {
+type BatchAddition = {
   id: string;
   addition_type: string;
   name: string;
@@ -60,7 +60,7 @@ interface BatchAddition {
   created_at: string;
 }
 
-interface PlannedAddition {
+type PlannedAddition = {
   id: string;
   type: string;
   name: string;

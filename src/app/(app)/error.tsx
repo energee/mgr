@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
 import { log } from "@/lib/client-logger";
 
-interface ErrorProps {
+type ErrorProps = {
   error: Error & { digest?: string };
   reset: () => void;
 }

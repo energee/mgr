@@ -16,7 +16,7 @@ import { ChatLayout } from "@/components/domain/chat-layout";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { dynamicFrom } from "@/services/types";
 
-interface AppLayoutProps {
+type AppLayoutProps = {
   children: ReactNode;
 }
 

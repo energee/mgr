@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-interface StatCardWithDeltaProps {
+type StatCardWithDeltaProps = {
   /** The primary value to display */
   value: string | number;
   /** Label below the value */

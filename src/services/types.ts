@@ -71,7 +71,7 @@ export type ServiceError =
 // =============================================================================
 
 /** Options for listing entity records. */
-export interface ListOptions {
+export type ListOptions = {
   /** Column-value filters to apply (exact match). */
   filters?: Record<string, unknown>;
   /** Free-text search across entity's searchableFields. */

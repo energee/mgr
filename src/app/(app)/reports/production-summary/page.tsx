@@ -64,7 +64,7 @@ import { TrendChart } from "@/components/dashboard/trend-chart";
 // =============================================================================
 
 /** Shape returned by the Supabase query for completed/packaged batches. */
-interface ProductionBatchRow {
+type ProductionBatchRow = {
   id: string;
   batch_number: string;
   name: string;
@@ -128,7 +128,7 @@ function daysInTank(
 }
 
 /** Shared aggregation shape used by both brand and style summaries. */
-interface ProductionAggregate {
+type ProductionAggregate = {
   key: string;
   label: string;
   batchCount: number;

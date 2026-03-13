@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
 import { log } from "@/lib/client-logger";
 
-interface RouteErrorProps {
+type RouteErrorProps = {
   error: Error & { digest?: string };
   reset: () => void;
   /** Domain label shown in the error message, e.g. "production" */

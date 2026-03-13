@@ -16,7 +16,7 @@ export const KeyboardShortcutsContext = createContext<{ openHelp: () => void }>(
   openHelp: () => {},
 });
 
-interface KeyboardShortcutsProviderProps {
+type KeyboardShortcutsProviderProps = {
   children: ReactNode;
 }
 

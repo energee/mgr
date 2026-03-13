@@ -81,7 +81,7 @@ const CANONICAL_UNIT_MAP: Partial<Record<ReadingType, string>> = {
   temperature: "f",
 };
 
-interface BatchReadingFormProps {
+type BatchReadingFormProps = {
   batchId: string;
   onSubmit: (data: BatchReading) => Promise<void>;
   onCancel?: () => void;

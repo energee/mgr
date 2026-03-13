@@ -46,7 +46,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface SourceBatch {
+type SourceBatch = {
   id: string;
   batch_number: string;
   name: string;
@@ -58,13 +58,13 @@ interface SourceBatch {
   recipe_id: string | null;
 }
 
-interface SourceBatchSelection {
+type SourceBatchSelection = {
   batchId: string;
   volumeBbl: number;
   notes: string;
 }
 
-interface BatchBlendDialogProps {
+type BatchBlendDialogProps = {
   batchId: string;
   batchNumber: string;
   batchName: string | null;

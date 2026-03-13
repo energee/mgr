@@ -37,7 +37,7 @@ import {
 import { Plus, Trash2, GripVertical, ChevronDown, FlaskConical, ChevronRight } from "lucide-react";
 
 // Types for fermentation stages
-export interface FermentationStage {
+export type FermentationStage = {
   id?: string;
   stage: "primary" | "secondary" | "diacetyl_rest" | "cold_crash" | "conditioning" | "lagering" | "custom";
   name: string;
@@ -47,7 +47,7 @@ export interface FermentationStage {
   position: number;
 }
 
-interface FermentationScheduleEditorProps {
+type FermentationScheduleEditorProps = {
   stages: FermentationStage[];
   onChange: (stages: FermentationStage[]) => void;
   disabled?: boolean;

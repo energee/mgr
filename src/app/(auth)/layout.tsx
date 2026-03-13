@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   title: "Sign In",
 };
 
-interface AuthLayoutProps {
+type AuthLayoutProps = {
   children: ReactNode;
 }
 

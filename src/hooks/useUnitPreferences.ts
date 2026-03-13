@@ -25,7 +25,7 @@ import type {
 // Types
 // =============================================================================
 
-export interface UnitPreferences {
+export type UnitPreferences = {
   volume_unit: VolumeUnit;
   weight_unit: WeightUnit;
   temperature_unit: TemperatureUnit;
@@ -33,7 +33,7 @@ export interface UnitPreferences {
   retail_volume_unit: RetailVolumeUnit;
 }
 
-export interface UserPreferences extends UnitPreferences {
+export type UserPreferences = UnitPreferences & {
   id: string;
   user_id: string;
   theme: "light" | "dark" | "system";

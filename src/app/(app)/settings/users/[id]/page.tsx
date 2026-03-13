@@ -10,7 +10,7 @@ import { use } from "react";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { userProfileEntity } from "@/entities/user-profile";
 
-interface UserDetailPageProps {
+type UserDetailPageProps = {
   params: Promise<{ id: string }>;
 }
 

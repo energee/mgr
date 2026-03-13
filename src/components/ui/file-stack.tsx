@@ -6,12 +6,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface FileStackIconHandle {
+export type FileStackIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface FileStackIconProps extends HTMLAttributes<HTMLDivElement> {
+type FileStackIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

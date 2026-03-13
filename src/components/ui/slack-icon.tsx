@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-interface SlackIconProps {
+type SlackIconProps = {
   className?: string;
 }
 

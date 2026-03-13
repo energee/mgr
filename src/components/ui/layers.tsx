@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface LayersIconHandle {
+export type LayersIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface LayersIconProps extends HTMLAttributes<HTMLDivElement> {
+type LayersIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

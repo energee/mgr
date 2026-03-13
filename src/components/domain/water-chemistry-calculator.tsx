@@ -52,7 +52,7 @@ import { Droplets, FlaskConical, Calculator, Check } from "lucide-react";
 // Types
 // =============================================================================
 
-interface WaterChemistryCalculatorProps {
+type WaterChemistryCalculatorProps = {
   sourceProfile?: WaterProfile | null;
   volumeGal?: number;
   grainBill?: GrainBillItem[];

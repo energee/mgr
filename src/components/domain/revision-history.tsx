@@ -56,7 +56,7 @@ function formatTimeAgo(date: Date): string {
 // Types
 // =============================================================================
 
-interface Revision {
+type Revision = {
   id: string;
   entity_type: string;
   entity_id: string;
@@ -69,7 +69,7 @@ interface Revision {
   change_reason: string | null;
 }
 
-interface RevisionHistoryProps {
+type RevisionHistoryProps = {
   /** Entity type (table name) */
   entityType: string;
   /** Entity ID */

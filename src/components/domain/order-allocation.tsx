@@ -44,7 +44,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface FinishedGoodAvailable {
+type FinishedGoodAvailable = {
   id: string;
   lot_number: string;
   brand_id: string;
@@ -54,12 +54,12 @@ interface FinishedGoodAvailable {
   production_date: string | null;
 }
 
-interface AllocationEntry {
+type AllocationEntry = {
   finished_good_id: string;
   quantity: number;
 }
 
-interface OrderAllocationProps {
+type OrderAllocationProps = {
   orderId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;

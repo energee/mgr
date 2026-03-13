@@ -26,7 +26,7 @@ const Kanban = KanbanBase as React.ComponentType<any>;
 // Types
 // =============================================================================
 
-interface EntityKanbanProps<T = Record<string, unknown>> {
+type EntityKanbanProps<T = Record<string, unknown>> = {
   entity: EntityConfig<T>;
   data: T[];
   basePath: string;

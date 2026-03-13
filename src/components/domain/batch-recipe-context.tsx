@@ -18,7 +18,7 @@ import { recipeKeys, recipeVariantKeys } from "@/lib/query-keys";
 // Types
 // =============================================================================
 
-interface RecipeEstimates {
+type RecipeEstimates = {
   id: string;
   name: string | null;
   style_name: string | null;
@@ -29,13 +29,13 @@ interface RecipeEstimates {
   est_srm: number | null;
 }
 
-interface RecipeVariant {
+type RecipeVariant = {
   id: string;
   name: string | null;
   description: string | null;
 }
 
-interface BatchRecipeContextProps {
+type BatchRecipeContextProps = {
   data: {
     id: string;
     recipe_id?: string | null;

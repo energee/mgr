@@ -28,7 +28,7 @@ When users ask "how do I..." in MGR, use the getAppGuide tool to look up navigat
 
 Summarize tool results clearly. Use tables for multi-row data.`;
 
-interface PageContext {
+type PageContext = {
   section?: string;
   entityType?: string;
   entityId?: string;

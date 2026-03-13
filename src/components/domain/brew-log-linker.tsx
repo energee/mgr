@@ -40,14 +40,14 @@ import Link from "next/link";
 import { batchKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 
-interface BrewLog {
+type BrewLog = {
   id: string;
   brew_number: string;
   brew_date: string;
   status: string;
 }
 
-interface LinkedBrewLog {
+type LinkedBrewLog = {
   id: string;
   brew_log_id: string;
   batch_id: string;
@@ -56,7 +56,7 @@ interface LinkedBrewLog {
   brew_log: BrewLog;
 }
 
-interface BrewLogLinkerProps {
+type BrewLogLinkerProps = {
   batchId: string;
   batchName: string;
 }

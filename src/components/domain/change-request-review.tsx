@@ -42,12 +42,12 @@ import { AlertTriangle, Check, X, ArrowUp, ArrowDown } from "lucide-react";
 // Types
 // =============================================================================
 
-interface ChangeRequestReviewProps {
+type ChangeRequestReviewProps = {
   parentId?: string;
   data?: { id: string | null } & Record<string, unknown>;
 }
 
-interface ChangeRequestItem {
+type ChangeRequestItem = {
   id: string;
   change_type: "add" | "modify" | "remove";
   order_item_id: string | null;
@@ -59,7 +59,7 @@ interface ChangeRequestItem {
   selling_formats: { name: string } | null;
 }
 
-interface PendingRequest {
+type PendingRequest = {
   id: string;
   status: string;
   notes: string | null;
@@ -68,7 +68,7 @@ interface PendingRequest {
   order_change_request_items: ChangeRequestItem[];
 }
 
-interface OrderItem {
+type OrderItem = {
   id: string;
   brand_id: string | null;
   selling_format_id: string | null;

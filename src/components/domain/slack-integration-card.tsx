@@ -52,7 +52,7 @@ const NOTIFICATION_TYPES = [
   { type: "system", label: "System Notifications", defaultChannel: "" },
 ] as const;
 
-interface SlackSettingsResponse {
+type SlackSettingsResponse = {
   webhook_url_masked: string | null;
   has_webhook: boolean;
   default_channel: string | null;

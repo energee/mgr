@@ -17,7 +17,7 @@
 // =============================================================================
 
 /** Grain bill item shape for estimate calculations */
-export interface EstimateGrainItem {
+export type EstimateGrainItem = {
   weight_lbs: number;
   /** Points per pound per gallon — falls back to 36 if missing */
   potential_ppg?: number | null;
@@ -26,7 +26,7 @@ export interface EstimateGrainItem {
 }
 
 /** Hop schedule item shape for estimate calculations */
-export interface EstimateHopItem {
+export type EstimateHopItem = {
   weight_oz: number;
   /** Alpha acid percentage — falls back to 10 if missing */
   alpha_acid?: number | null;
@@ -34,7 +34,7 @@ export interface EstimateHopItem {
   boil_time_min?: number | null;
 }
 
-export interface RecipeEstimateInputs {
+export type RecipeEstimateInputs = {
   grainItems: EstimateGrainItem[];
   hopItems: EstimateHopItem[];
   /** Batch size in barrels */
@@ -47,7 +47,7 @@ export interface RecipeEstimateInputs {
   targetAttenuation?: number | null;
 }
 
-export interface RecipeEstimates {
+export type RecipeEstimates = {
   og: number | null;
   fg: number | null;
   abv: number | null;

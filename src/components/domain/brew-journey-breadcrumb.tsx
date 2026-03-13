@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
-interface BreadcrumbSegment {
+type BreadcrumbSegment = {
   label: string;
   href?: string; // undefined = current page (non-clickable)
 }
 
-interface BrewJourneyBreadcrumbProps {
+type BrewJourneyBreadcrumbProps = {
   segments: BreadcrumbSegment[];
 }
 

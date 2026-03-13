@@ -54,7 +54,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface OrderItemRow {
+type OrderItemRow = {
   id: string;
   brand_id: string | null;
   selling_format_id: string | null;
@@ -64,13 +64,13 @@ interface OrderItemRow {
   notes: string | null;
 }
 
-interface OrderItemsEditorProps {
+type OrderItemsEditorProps = {
   orderId: string;
   customerId?: string | null;
   readOnly?: boolean;
 }
 
-interface NewItemState {
+type NewItemState = {
   brand_id: string;
   format_id: string;
   keg_owner_id: string;
@@ -80,7 +80,7 @@ interface NewItemState {
   tierName: string | null;
 }
 
-interface TierPriceResult {
+type TierPriceResult = {
   price: number;
   tier_name: string;
   is_brand_specific: boolean;

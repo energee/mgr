@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface YeastFormValues {
+type YeastFormValues = {
   yeast_id: string | null;
   target_attenuation: number | null;
   target_pitching_rate: number | null;

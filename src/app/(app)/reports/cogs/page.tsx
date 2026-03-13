@@ -90,7 +90,7 @@ import {
 // =============================================================================
 
 /** A batch with its aggregated cost and packaging units */
-interface CogsBatchRow {
+type CogsBatchRow = {
   id: string;
   batch_number: string;
   name: string;
@@ -104,7 +104,7 @@ interface CogsBatchRow {
 }
 
 /** Cost grouped by brand + selling format (SKU) */
-interface CogsSkuRow {
+type CogsSkuRow = {
   sku_name: string;
   brand_name: string;
   format_name: string;
@@ -118,7 +118,7 @@ interface CogsSkuRow {
 }
 
 /** Cost breakdown by time period with ingredient category split */
-interface CogsPeriodRow {
+type CogsPeriodRow = {
   period: string;
   /** ISO date used for chronological sorting (not displayed). */
   _sortKey: string;
@@ -132,7 +132,7 @@ interface CogsPeriodRow {
 }
 
 /** Allocation row shape returned by the shared query */
-interface AllocationRow {
+type AllocationRow = {
   id: string;
   destination_id: string | null;
   quantity: number;
@@ -142,13 +142,13 @@ interface AllocationRow {
 }
 
 /** Finished goods row shape returned by the shared query */
-interface FinishedGoodRow {
+type FinishedGoodRow = {
   batch_id: string | null;
   quantity: number | null;
 }
 
 /** Batch row shape returned by the shared query */
-interface SharedBatchRow {
+type SharedBatchRow = {
   id: string;
   batch_number: string;
   name: string;

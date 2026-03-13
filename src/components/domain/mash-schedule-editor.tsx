@@ -40,7 +40,7 @@ import {
 import { Plus, Trash2, GripVertical, ChevronDown, Thermometer } from "lucide-react";
 
 // Types for mash steps
-export interface MashStep {
+export type MashStep = {
   id?: string;
   step_type: "infusion" | "decoction" | "direct_heat" | "rest";
   name: string;
@@ -50,7 +50,7 @@ export interface MashStep {
   position: number;
 }
 
-interface MashScheduleEditorProps {
+type MashScheduleEditorProps = {
   steps: MashStep[];
   onChange: (steps: MashStep[]) => void;
   disabled?: boolean;

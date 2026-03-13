@@ -20,7 +20,7 @@ declare module "@tanstack/react-table" {
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
-export interface QueryKeys {
+export type QueryKeys = {
   page: string;
   perPage: string;
   sort: string;
@@ -28,7 +28,7 @@ export interface QueryKeys {
   joinOperator: string;
 }
 
-export interface Option {
+export type Option = {
   label: string;
   value: string;
   count?: number;
@@ -39,15 +39,15 @@ export type FilterOperator = DataTableConfig["operators"][number];
 export type FilterVariant = DataTableConfig["filterVariants"][number];
 export type JoinOperator = DataTableConfig["joinOperators"][number];
 
-export interface ExtendedColumnSort<TData> extends Omit<ColumnSort, "id"> {
+export type ExtendedColumnSort<TData> = Omit<ColumnSort, "id"> & {
   id: Extract<keyof TData, string>;
 }
 
-export interface ExtendedColumnFilter<TData> extends FilterItemSchema {
+export type ExtendedColumnFilter<TData> = FilterItemSchema & {
   id: Extract<keyof TData, string>;
 }
 
-export interface DataTableRowAction<TData> {
+export type DataTableRowAction<TData> = {
   row: Row<TData>;
   variant: "update" | "delete";
 }

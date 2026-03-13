@@ -48,7 +48,7 @@ const cloneSchema = z.object({
 
 type CloneFormValues = z.infer<typeof cloneSchema>;
 
-interface RecipeCloneDialogProps {
+type RecipeCloneDialogProps = {
   recipeId: string;
   recipeName: string;
   open: boolean;

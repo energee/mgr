@@ -7,13 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface ChartColumnIncreasingIconHandle {
+export type ChartColumnIncreasingIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface ChartColumnIncreasingIconProps
-  extends HTMLAttributes<HTMLDivElement> {
+type ChartColumnIncreasingIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

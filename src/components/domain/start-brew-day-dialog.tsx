@@ -32,7 +32,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface StartBrewDayDialogProps {
+type StartBrewDayDialogProps = {
   batchId: string;
   batchNumber: string;
   batchName: string | null;

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 type StatusColor = "default" | "success" | "warning" | "error" | "info";
 
-interface StatusBadgeProps {
+type StatusBadgeProps = {
   status: string | null | undefined;
   variant?: StatusColor;
   config?: Record<string, { label: string; color: StatusColor }>;

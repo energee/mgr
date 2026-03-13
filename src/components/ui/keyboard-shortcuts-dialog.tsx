@@ -17,12 +17,12 @@ import {
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useIsMac } from "@/hooks/use-is-mac";
 
-interface KeyboardShortcutsDialogProps {
+type KeyboardShortcutsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-interface ShortcutGroup {
+type ShortcutGroup = {
   title: string;
   shortcuts: { keys: string[]; description: string }[];
 }

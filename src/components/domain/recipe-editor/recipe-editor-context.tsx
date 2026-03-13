@@ -29,7 +29,7 @@ import {
 // =============================================================================
 
 /** Partial recipe row — fields the context cares about */
-export interface RecipeData {
+export type RecipeData = {
   id: string;
   name: string;
   version: number;
@@ -76,7 +76,7 @@ export interface RecipeData {
   batch_count?: number | null;
 }
 
-interface RecipeEditorContextValue {
+type RecipeEditorContextValue = {
   recipe: RecipeData;
   /** Update recipe data (for form field changes before save) */
   updateRecipe: (partial: Partial<RecipeData>) => void;
@@ -103,7 +103,7 @@ const RecipeEditorContext = createContext<RecipeEditorContextValue | null>(null)
 // Provider
 // =============================================================================
 
-interface RecipeEditorProviderProps {
+type RecipeEditorProviderProps = {
   initialRecipe: RecipeData;
   children: ReactNode;
 }

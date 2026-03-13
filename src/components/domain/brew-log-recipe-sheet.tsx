@@ -26,7 +26,7 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 // Types
 // =============================================================================
 
-interface RecipeData {
+type RecipeData = {
   id: string;
   name: string;
   style_name: string | null;
@@ -57,28 +57,28 @@ interface RecipeData {
   brew_day_notes: string | null;
 }
 
-interface MashStep {
+type MashStep = {
   name: string;
   step_type: string;
   temp_f: number;
   duration_min: number;
 }
 
-interface FermentationStage {
+type FermentationStage = {
   name: string;
   stage: string;
   temp_f: number;
   duration_days: number;
 }
 
-interface GrainBillRow {
+type GrainBillRow = {
   id: string;
   weight_lbs: number;
   position: number | null;
   malt: { name: string; type: string | null } | null;
 }
 
-interface HopScheduleRow {
+type HopScheduleRow = {
   id: string;
   weight_oz: number;
   timing: string;
@@ -92,7 +92,7 @@ interface HopScheduleRow {
 // Props
 // =============================================================================
 
-interface BrewLogRecipeSheetProps {
+type BrewLogRecipeSheetProps = {
   recipeId: string;
   recipeName: string;
   open: boolean;

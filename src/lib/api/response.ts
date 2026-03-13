@@ -6,18 +6,18 @@
 
 import { NextResponse } from "next/server";
 
-export interface PaginationMeta {
+export type PaginationMeta = {
   page: number;
   per_page: number;
   total: number;
 }
 
-export interface SuccessBody<T> {
+export type SuccessBody<T> = {
   data: T;
   meta?: PaginationMeta;
 }
 
-export interface ErrorBody {
+export type ErrorBody = {
   error: {
     code: string;
     message: string;

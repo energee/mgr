@@ -24,7 +24,7 @@ import { dynamicFrom } from "@/services/types";
 import { logger } from "@/lib/logger";
 
 // Square webhook event shape (subset of fields we care about)
-interface SquareWebhookEvent {
+type SquareWebhookEvent = {
   merchant_id?: string;
   type: string;
   event_id?: string;

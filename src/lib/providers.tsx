@@ -15,7 +15,7 @@ import { useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { CACHE_DURATIONS } from "@/lib/constants";
 
-interface ProvidersProps {
+type ProvidersProps = {
   children: ReactNode;
 }
 

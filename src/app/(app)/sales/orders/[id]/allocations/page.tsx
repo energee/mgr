@@ -43,7 +43,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface AllocationItem {
+type AllocationItem = {
   id: string;
   finished_good_id: string;
   lot_number: string;

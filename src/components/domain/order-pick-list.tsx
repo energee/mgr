@@ -40,7 +40,7 @@ import { useState } from "react";
 // Types
 // =============================================================================
 
-interface PickListItem {
+type PickListItem = {
   allocation_id: string;
   finished_good_id: string;
   lot_number: string;
@@ -52,7 +52,7 @@ interface PickListItem {
   production_date: string | null;
 }
 
-interface OrderDetails {
+type OrderDetails = {
   id: string;
   order_number: string;
   status: string;
@@ -61,7 +61,7 @@ interface OrderDetails {
   scheduled_date: string | null;
 }
 
-interface OrderPickListProps {
+type OrderPickListProps = {
   orderId: string;
 }
 

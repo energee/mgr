@@ -35,11 +35,11 @@ function viabilityColor(status: string | undefined): string {
   }
 }
 
-interface YeastLineageDisplayProps {
+type YeastLineageDisplayProps = {
   pitchId: string;
 }
 
-interface PitchNode {
+type PitchNode = {
   id: string;
   strain_id: string;
   strain_name?: string;

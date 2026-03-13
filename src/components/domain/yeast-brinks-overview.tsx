@@ -27,12 +27,12 @@ import {
 // Types
 // =============================================================================
 
-interface BrinkVessel {
+type BrinkVessel = {
   id: string;
   name: string;
 }
 
-interface ActivePitch {
+type ActivePitch = {
   id: string;
   strain_name: string | null;
   strain_form: string | null;

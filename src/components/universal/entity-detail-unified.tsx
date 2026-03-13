@@ -94,7 +94,7 @@ import { log } from "@/lib/client-logger";
 // Props
 // =============================================================================
 
-export interface EntityDetailUnifiedProps<T = Record<string, unknown>> {
+export type EntityDetailUnifiedProps<T = Record<string, unknown>> = {
   entity: EntityConfig<T>;
   id?: string; // undefined = create mode
   basePath?: string;
@@ -1355,7 +1355,7 @@ function FieldGrid<T>({
 // =============================================================================
 
 /** Common props shared by section rendering helpers. */
-interface SectionRenderProps<T> {
+type SectionRenderProps<T> = {
   data: T;
   entity: EntityConfig<T>;
   editing: boolean;

@@ -15,7 +15,7 @@ export type AdditionType = "dry_hop" | "fruit" | "adjunct" | "fining" | "spice" 
  */
 export type CatalogTable = "hops" | "fruits" | "adjuncts" | "additives" | "spices";
 
-interface AdditionTypeConfig {
+type AdditionTypeConfig = {
   label: string;
   catalogTable: CatalogTable | null;  // null for "other"
   defaultUnit: string;
@@ -56,7 +56,7 @@ export const ADDITION_TYPES: Record<AdditionType, AdditionTypeConfig> = {
   },
 };
 
-export interface BatchAddition {
+export type BatchAddition = {
   addition_type: AdditionType;
   ingredient_id?: string;
   ingredient_name: string;

@@ -18,14 +18,14 @@ import { formatCurrency } from "@/lib/format";
 // Types
 // =============================================================================
 
-interface RecipeCOGS {
+type RecipeCOGS = {
   id: string;
   name: string | null;
   cogs_per_bbl: number | null;
   total_cogs: number | null;
 }
 
-interface VariantCosts {
+type VariantCosts = {
   id: string;
   name: string | null;
   variant_addition_cost: number | null;
@@ -33,12 +33,12 @@ interface VariantCosts {
   est_total_cost: number | null;
 }
 
-interface BatchAdditionCost {
+type BatchAdditionCost = {
   id: string | null;
   estimated_cost: number | null;
 }
 
-interface BatchCostBreakdownProps {
+type BatchCostBreakdownProps = {
   data: {
     id: string;
     recipe_id?: string | null;

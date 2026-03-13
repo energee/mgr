@@ -53,7 +53,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface UnacceptedReceive {
+type UnacceptedReceive = {
   receive_id: string;
   po_line_item_id: string;
   catalog_type: string;
@@ -67,13 +67,13 @@ interface UnacceptedReceive {
   received_date: string | null;
 }
 
-interface RowState {
+type RowState = {
   selected: boolean;
   inventory_item_id: string;
   location: string;
 }
 
-interface POAcceptInventoryDialogProps {
+type POAcceptInventoryDialogProps = {
   poId: string;
   open: boolean;
   onClose: () => void;

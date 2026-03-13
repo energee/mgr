@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface UserIconHandle {
+export type UserIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface UserIconProps extends HTMLAttributes<HTMLDivElement> {
+type UserIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

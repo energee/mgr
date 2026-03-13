@@ -42,7 +42,7 @@ import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashb
 // Types
 // =============================================================================
 
-interface DemandFilters {
+type DemandFilters = {
   horizonWeeks: number;
   catalogType: string;
 }

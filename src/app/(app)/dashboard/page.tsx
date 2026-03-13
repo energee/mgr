@@ -42,7 +42,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface BatchStatusCounts {
+type BatchStatusCounts = {
   planned: number;
   fermenting: number;
   conditioning: number;
@@ -50,7 +50,7 @@ interface BatchStatusCounts {
   completed: number;
 }
 
-interface ActiveBatch {
+type ActiveBatch = {
   id: string;
   batch_number: string;
   name: string;
@@ -60,7 +60,7 @@ interface ActiveBatch {
   recipe_name?: string;
 }
 
-interface VesselStatus {
+type VesselStatus = {
   id: string;
   name: string;
   vessel_type: string;

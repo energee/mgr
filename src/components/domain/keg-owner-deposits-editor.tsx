@@ -26,18 +26,18 @@ import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
-interface KegOwnerDepositsEditorProps {
+type KegOwnerDepositsEditorProps = {
   kegOwnerId: string;
 }
 
-interface KegSellingFormat {
+type KegSellingFormat = {
   id: string;
   name: string;
   volume_bbl: number;
   deposit_amount: number;
 }
 
-interface OwnerDeposit {
+type OwnerDeposit = {
   id: string;
   keg_owner_id: string;
   selling_format_id: string;
