@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicRpc } from "@/services/types";
+import { resolveYeastLineageRoot } from "@/lib/yeast-lineage";
 import { yeastKeys, entityKeys } from "@/lib/query-keys";
 import type { YeastForm } from "@/lib/yeast-calculations";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -112,34 +112,12 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
   // Find the root pitch ID for lineage summary. Tries RPC; falls back to parent walk.
   const { data: rootId } = useQuery({
     queryKey: yeastKeys.lineageRoot(id),
-    queryFn: async () => {
-      const { data: rpcResult, error: rpcError } = await dynamicRpc(
-        supabase,
-        "get_yeast_lineage_root",
-        { p_pitch_id: id }
-      );
-      if (!rpcError && rpcResult) return rpcResult as string;
-
-      // Fallback: walk up parent chain
-      let currentId = id;
-      for (;;) {
-        const { data: pitch } = await supabase
-          .from("yeast_pitches_with_remaining")
-          .select("id, parent_pitch_id, source_type")
-          .eq("id", currentId)
-          .single();
-
-        if (!pitch || !pitch.parent_pitch_id || pitch.source_type === "purchase") {
-          return pitch?.id ?? id;
-        }
-        currentId = pitch.parent_pitch_id;
-      }
-    },
+    queryFn: () => resolveYeastLineageRoot(supabase, id),
   });
 
   // Fetch lineage summary for cost spreading
   const { data: lineageSummary, isLoading: lineageLoading } = useQuery({
-    queryKey: yeastKeys.costSpread(id),
+    queryKey: yeastKeys.lineageSummary(rootId),
     queryFn: async () => {
       if (!rootId) return null;
       const { data, error } = await supabase
@@ -314,6 +292,12 @@ function CostSpreadingSummary({
 
   if (!lineageSummary) return null;
 
+  // Compute total pitched quantity once for proportional cost allocation
+  const totalQty = pitchEvents.reduce(
+    (sum, e) => sum + (e.quantity_lbs ?? 0),
+    0
+  );
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -371,19 +355,11 @@ function CostSpreadingSummary({
                         : "\u2014"}
                     </TableCell>
                     <TableCell className="text-right">
-                      {(() => {
-                        // Allocate cost proportionally by quantity pitched
-                        const totalQty = pitchEvents.reduce(
-                          (sum, e) => sum + (e.quantity_lbs ?? 0),
-                          0
-                        );
-                        if (!totalQty || !lineageSummary.original_cost || !event.quantity_lbs) {
-                          return "\u2014";
-                        }
-                        return formatCurrency(
-                          (lineageSummary.original_cost * event.quantity_lbs) / totalQty
-                        );
-                      })()}
+                      {totalQty && lineageSummary.original_cost && event.quantity_lbs
+                        ? formatCurrency(
+                            (lineageSummary.original_cost * event.quantity_lbs) / totalQty
+                          )
+                        : "\u2014"}
                     </TableCell>
                   </TableRow>
                 ))}

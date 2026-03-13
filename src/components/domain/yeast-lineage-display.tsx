@@ -10,7 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicRpc } from "@/services/types";
+import { resolveYeastLineageRoot } from "@/lib/yeast-lineage";
 import { yeastKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { cn } from "@/lib/utils";
 import { shouldReplaceYeast } from "@/lib/yeast-calculations";
+import { formatCurrency } from "@/lib/format";
 import { yeastPitchEntity, VIABILITY_STATUS_DISPLAY } from "@/entities/yeast-pitch";
 
 type YeastLineageDisplayProps = {
@@ -44,32 +45,7 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
   // a client-side parent walk if the function isn't available (e.g. stale schema cache).
   const { data: rootId, isLoading: rootLoading } = useQuery({
     queryKey: yeastKeys.lineageRoot(pitchId),
-    queryFn: async () => {
-      const supabase = createClient();
-
-      // Try RPC first (single recursive CTE, no N+1)
-      const { data: rpcResult, error: rpcError } = await dynamicRpc(
-        supabase,
-        "get_yeast_lineage_root",
-        { p_pitch_id: pitchId }
-      );
-      if (!rpcError && rpcResult) return rpcResult as string;
-
-      // Fallback: walk up parent chain via the view
-      let currentId = pitchId;
-      for (;;) {
-        const { data: pitch } = await supabase
-          .from("yeast_pitches_with_remaining")
-          .select("id, parent_pitch_id, source_type")
-          .eq("id", currentId)
-          .single();
-
-        if (!pitch || !pitch.parent_pitch_id || pitch.source_type === "purchase") {
-          return pitch?.id ?? pitchId;
-        }
-        currentId = pitch.parent_pitch_id;
-      }
-    },
+    queryFn: () => resolveYeastLineageRoot(createClient(), pitchId),
   });
 
   // Fetch all descendants of the root and build the lineage tree
@@ -98,9 +74,11 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
 
       if (!allPitches || allPitches.length === 0) return [];
 
-      // Build a children map: parent_id -> children[]
+      // Build lookup maps: node-by-id (O(1) access) and parent-id -> children[]
+      const nodeMap = new Map<string, PitchNode>();
       const childrenMap = new Map<string | null, PitchNode[]>();
       for (const pitch of allPitches as (PitchNode & { parent_pitch_id?: string | null })[]) {
+        nodeMap.set(pitch.id, pitch);
         const parentId = pitch.parent_pitch_id ?? null;
         if (!childrenMap.has(parentId)) {
           childrenMap.set(parentId, []);
@@ -111,9 +89,7 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
       // DFS traversal from root to collect only descendants of this lineage
       const result: PitchNode[] = [];
       function dfs(nodeId: string) {
-        const node = (allPitches as (PitchNode & { parent_pitch_id?: string | null })[]).find(
-          (p) => p.id === nodeId
-        );
+        const node = nodeMap.get(nodeId);
         if (!node) return;
         result.push(node);
         const children = childrenMap.get(nodeId) || [];
@@ -207,13 +183,13 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
               <div>
                 <p className="text-muted-foreground">Original Cost</p>
                 <p className="font-medium">
-                  ${Number(summary.original_cost).toFixed(2)}
+                  {formatCurrency(summary.original_cost)}
                 </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Cost Per Batch</p>
                 <p className="font-medium">
-                  ${Number(summary.cost_per_batch).toFixed(2)}
+                  {formatCurrency(summary.cost_per_batch)}
                 </p>
               </div>
             </div>
