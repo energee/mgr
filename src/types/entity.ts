@@ -503,6 +503,9 @@ export type UnifiedSectionDef<T = Record<string, unknown>> = {
 
   /** Tab name if using tabbed layout */
   tab?: string;
+
+  /** Hide this section when creating a new entity */
+  hideOnCreate?: boolean;
 }
 
 // =============================================================================

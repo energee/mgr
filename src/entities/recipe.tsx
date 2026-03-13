@@ -251,6 +251,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
     {
       id: "estimates",
       title: "Calculated Estimates",
+      hideOnCreate: true,
       fields: [
         { name: "est_og", label: "Est. OG", editable: false, colSpan: 4 },
         { name: "est_fg", label: "Est. FG", editable: false, colSpan: 4 },
@@ -263,10 +264,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       id: "ai-analysis",
       title: "AI Analysis",
       component: RecipeAnalysis,
+      hideOnCreate: true,
     },
     {
       id: "volumes",
       title: "Volumes",
+      hideOnCreate: true,
       fields: [
         {
           name: "volume_bbl",
@@ -295,6 +298,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
     {
       id: "mash",
       title: "Mash Parameters",
+      hideOnCreate: true,
       fields: [
         {
           name: "mash_temp_f",
@@ -324,6 +328,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
     {
       id: "boil",
       title: "Boil & Whirlpool",
+      hideOnCreate: true,
       fields: [
         {
           name: "boil_time_min",
@@ -340,6 +345,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
     {
       id: "fermentation",
       title: "Fermentation",
+      hideOnCreate: true,
       fields: [
         {
           name: "target_attenuation",
@@ -376,16 +382,19 @@ export const recipeEntity: EntityConfig<Recipe> = {
       id: "mash_schedule",
       title: "Mash Schedule",
       component: MashScheduleDisplay,
+      hideOnCreate: true,
     },
     {
       id: "fermentation_schedule",
       title: "Fermentation Schedule",
       component: FermentationScheduleDisplay,
+      hideOnCreate: true,
     },
     {
       id: "additions",
       title: "Additions",
       component: RecipeAdditionsDisplay,
+      hideOnCreate: true,
     },
     {
       id: "notes",
@@ -422,6 +431,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
       title: "Revision History",
       component: createRevisionHistoryDisplay("recipes"),
       collapsible: true,
+      hideOnCreate: true,
     },
   ],
 

@@ -28,7 +28,7 @@ type WhirlpoolFormValues = {
 }
 
 export function WhirlpoolSection() {
-  const { recipe, updateRecipe, isSaving, startSaving } = useRecipeEditor();
+  const { recipe, updateRecipe, isSaving, startSaving, handleSaveError } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -66,9 +66,7 @@ export function WhirlpoolSection() {
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
       toast.success("Whirlpool parameters saved");
     },
-    onError: (error) => {
-      toast.error(error.message);
-    },
+    onError: handleSaveError,
     onSettled: () => {
       stopSavingRef.current?.();
       stopSavingRef.current = null;

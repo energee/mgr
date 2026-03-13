@@ -270,6 +270,49 @@ describe("calculateEstimates", () => {
     expect(result.ibu!).toBeGreaterThan(0);
   });
 
+  it("adjusts hop utilization based on calculated OG (gravity correction)", () => {
+    const highGravityGrains: EstimateGrainItem[] = [
+      { weight_lbs: 600, potential_ppg: 37, color_lovibond: 2 },
+    ];
+    const lowGravityGrains: EstimateGrainItem[] = [
+      { weight_lbs: 200, potential_ppg: 37, color_lovibond: 2 },
+    ];
+    const hops: EstimateHopItem[] = [
+      { weight_oz: 16, alpha_acid: 13, timing: "boil", boil_time_min: 60 },
+    ];
+
+    const highGravity = calculateEstimates({
+      grainItems: highGravityGrains, hopItems: hops, batchSizeBbl: 7, mashEfficiency: 75,
+    });
+    const lowGravity = calculateEstimates({
+      grainItems: lowGravityGrains, hopItems: hops, batchSizeBbl: 7, mashEfficiency: 75,
+    });
+
+    // Higher gravity reduces hop utilization, so IBU should be lower
+    const highUtil = getHopUtilizationFactor("boil", 60, highGravity.og);
+    const lowUtil = getHopUtilizationFactor("boil", 60, lowGravity.og);
+    expect(highUtil).toBeLessThan(lowUtil);
+  });
+
+  it("first_wort utilization matches 60-min boil at same gravity", () => {
+    const gravity = 1.055;
+    expect(getHopUtilizationFactor("first_wort", null, gravity))
+      .toBeCloseTo(getHopUtilizationFactor("boil", 60, gravity), 6);
+  });
+
+  it("applies consistent rounding: OG/FG 3dp, ABV/SRM 1dp, IBU integer", () => {
+    const result = calculateEstimates({
+      grainItems: [{ weight_lbs: 372, potential_ppg: 37, color_lovibond: 5 }],
+      hopItems: [{ weight_oz: 16, alpha_acid: 13, timing: "boil", boil_time_min: 60 }],
+      batchSizeBbl: 7, mashEfficiency: 75, targetAttenuation: 75,
+    });
+    expect(result.og!.toString().split(".")[1]?.length).toBeLessThanOrEqual(3);
+    expect(result.fg!.toString().split(".")[1]?.length).toBeLessThanOrEqual(3);
+    expect(result.abv!.toString().split(".")[1]?.length).toBeLessThanOrEqual(1);
+    expect(result.srm!.toString().split(".")[1]?.length).toBeLessThanOrEqual(1);
+    expect(Number.isInteger(result.ibu)).toBe(true);
+  });
+
   it("dry hop additions do not contribute to IBU", () => {
     const dryHops: EstimateHopItem[] = [
       { weight_oz: 32, alpha_acid: 13, timing: "dry_hop", boil_time_min: null },
