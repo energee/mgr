@@ -137,19 +137,20 @@ BEGIN
       "cancelled":        []
     }'::JSONB
 
-    -- Pick Lists: pending → in_progress → completed
+    -- Pick Lists: draft → assigned → in_progress → completed
     WHEN 'pick_lists' THEN '{
-      "pending":     ["in_progress", "cancelled"],
+      "draft":       ["assigned", "cancelled"],
+      "assigned":    ["in_progress", "cancelled"],
       "in_progress": ["completed", "cancelled"],
       "completed":   [],
       "cancelled":   []
     }'::JSONB
 
-    -- Recipes: draft → spec → complete (simple linear)
+    -- Recipes: draft → spec → complete (linear, complete is terminal)
     WHEN 'recipes' THEN '{
       "draft":    ["spec", "complete"],
-      "spec":     ["draft", "complete"],
-      "complete": ["draft"]
+      "spec":     ["complete"],
+      "complete": []
     }'::JSONB
 
     ELSE NULL

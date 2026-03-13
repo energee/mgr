@@ -18,7 +18,6 @@ import {
   useState,
   useMemo,
   useCallback,
-  useRef,
   type ReactNode,
 } from "react";
 import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
@@ -129,7 +128,6 @@ export function RecipeEditorProvider({
   const [grainItems, setGrainItems] = useState<GrainBillItem[]>([]);
   const [hopItems, setHopItems] = useState<HopScheduleItem[]>([]);
   const [savingCount, setSavingCount] = useState(0);
-  const savingCountRef = useRef(0);
 
   const updateRecipe = useCallback((partial: Partial<RecipeData>) => {
     setRecipe((prev) => ({ ...prev, ...partial }));
@@ -139,13 +137,12 @@ export function RecipeEditorProvider({
    * Mark a section save as started. Returns a cleanup callback
    * that marks the save as complete. Sections should call startSaving()
    * before their mutation and the returned callback in onSettled.
+   * Uses functional state updates to avoid race conditions with concurrent saves.
    */
   const startSaving = useCallback(() => {
-    savingCountRef.current += 1;
-    setSavingCount(savingCountRef.current);
+    setSavingCount(prev => prev + 1);
     return () => {
-      savingCountRef.current = Math.max(0, savingCountRef.current - 1);
-      setSavingCount(savingCountRef.current);
+      setSavingCount(prev => Math.max(0, prev - 1));
     };
   }, []);
 

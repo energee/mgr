@@ -192,7 +192,8 @@ export function OrderAllocation({
     },
     onError: (error) => {
       log.error("Allocation error:", error);
-      toast.error("Failed to allocate inventory");
+      const message = error instanceof Error ? error.message : "Failed to allocate inventory";
+      toast.error(`Failed to allocate inventory: ${message}`);
     },
   });
 

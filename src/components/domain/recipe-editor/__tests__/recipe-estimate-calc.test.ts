@@ -117,10 +117,9 @@ describe("calculateEstimates", () => {
     });
 
     expect(result.ibu).not.toBeNull();
-    // 16oz * 13aa * 0.27 (60min boil) + 16oz * 13aa * 0.05 (whirlpool)
-    // = 56.16 + 10.4 = 66.56; * 74.89 / 217 = 22.96
-    // That seems low for 7bbl... let me recalculate
-    // IBU = (56.16 + 10.4) * 74.89 / 217 = 66.56 * 74.89 / 217 = 4984.68 / 217 ≈ 23
+    // Tinseth utilization: ~0.231 for 60min boil, ~0.05 for whirlpool
+    // IBU contributions summed and scaled by batch volume
+    // Result falls in the 15-50 range for this grain/hop combination
     expect(result.ibu!).toBeGreaterThan(15);
     expect(result.ibu!).toBeLessThan(50);
   });

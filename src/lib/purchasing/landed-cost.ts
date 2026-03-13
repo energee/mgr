@@ -2,7 +2,8 @@
  * Landed Cost Calculation
  *
  * Utilities for calculating and displaying per-unit landed costs on inventory lots.
- * Landed cost includes the item unit price plus an allocated share of PO shipping costs.
+ * Landed cost includes the item unit price plus proportionally allocated shares of
+ * PO shipping cost and tax.
  */
 
 import { log } from "@/lib/client-logger";
@@ -65,6 +66,10 @@ export async function calculateLandedCost(
 
 /**
  * Get a full landed cost summary for a PO including totals.
+ *
+ * NOTE: This function has a write side-effect -- it calls `calculateLandedCost`
+ * which invokes the `calculate_landed_cost` RPC, updating the `landed_cost`
+ * column on each related `inventory_lots` row.
  */
 export async function getLandedCostSummary(
   poId: string
