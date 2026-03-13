@@ -221,7 +221,7 @@ Never hardcode status color maps, label maps, or state arrays. Derive everything
 ```typescript
 // CORRECT: Use StatusBadge with entity config
 import { StatusBadge } from "@/components/universal/status-badge";
-<StatusBadge status={value} stateDisplay={orderEntity.stateMachine?.stateDisplay} />
+<StatusBadge status={value} config={orderEntity.stateMachine?.stateDisplay} />
 
 // CORRECT: Derive state lists from config
 const states = Object.keys(orderEntity.stateMachine?.states ?? {});

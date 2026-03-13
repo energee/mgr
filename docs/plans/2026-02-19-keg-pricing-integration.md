@@ -119,7 +119,7 @@ Run: `supabase migration up` or apply via Supabase MCP
 
 **Step 3: Regenerate Supabase types**
 
-Run: `pnpm supabase gen types typescript --local > src/types/supabase.ts`
+Run: `bun supabase gen types typescript --local > src/types/supabase.ts`
 
 **Step 4: Commit**
 
@@ -206,13 +206,13 @@ git commit -m "feat: enable auto-pricing for keg-type order items"
 
 **Step 1: Run type check**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 
 Expected: 0 errors. The function signature is unchanged (same params, same return type), so TypeScript types are compatible.
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 Fix any errors introduced by the changes.
 

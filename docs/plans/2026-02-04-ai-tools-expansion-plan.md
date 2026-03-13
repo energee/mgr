@@ -36,7 +36,7 @@
 
 **Step 1: Install zustand**
 
-Run: `pnpm add zustand`
+Run: `bun add zustand`
 Expected: Package added to dependencies
 
 **Step 2: Create the prefill store**
@@ -80,7 +80,7 @@ export const usePrefillStore = create<PrefillStore>((set, get) => ({
 
 **Step 3: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 4: Commit**
@@ -167,7 +167,7 @@ Note: The exact location depends on how parts are iterated. Read the current fil
 
 **Step 4: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -221,7 +221,7 @@ export default function NewBatchPage() {
 
 **Step 2: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
@@ -270,7 +270,7 @@ useEffect(() => {
 
 **Step 2: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
@@ -331,7 +331,7 @@ useEffect(() => {
 
 **Step 2: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
@@ -443,7 +443,7 @@ searchBatches: tool({
 
 **Step 3: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 4: Commit**
@@ -568,7 +568,7 @@ getCustomers: tool({
 
 **Step 4: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -754,7 +754,7 @@ lookupEntity: tool({
 
 **Step 4: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -856,7 +856,7 @@ createBatch: tool({
 
 **Step 2: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
@@ -978,7 +978,7 @@ transitionBatch: tool({
 
 **Step 2: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
@@ -1059,7 +1059,7 @@ addBatchReading: tool({
 
 **Step 2: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
@@ -1110,7 +1110,7 @@ ${getHelpContentForSystemPrompt()}`;
 
 **Step 2: Verify build**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**

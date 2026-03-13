@@ -502,7 +502,7 @@ refactor: migrate recipe delete to universal EntityDeleteDialog
 **Step 1: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 Fix any errors introduced by the changes.
@@ -510,7 +510,7 @@ Fix any errors introduced by the changes.
 **Step 2: Verify build**
 
 ```bash
-pnpm build
+bun build
 ```
 
 **Step 3: Commit any lint fixes**

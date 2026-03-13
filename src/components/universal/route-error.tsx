@@ -8,9 +8,11 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
+import { log } from "@/lib/client-logger";
 
 interface RouteErrorProps {
   error: Error & { digest?: string };
@@ -20,9 +22,10 @@ interface RouteErrorProps {
 }
 
 export function RouteError({ error, reset, domain }: RouteErrorProps) {
+  const router = useRouter();
   useEffect(() => {
     Sentry.captureException(error);
-    console.error(`${domain} error boundary:`, error);
+    log.error(`${domain} error boundary:`, error);
   }, [error, domain]);
 
   return (
@@ -36,7 +39,7 @@ export function RouteError({ error, reset, domain }: RouteErrorProps) {
         <p className="text-xs text-muted-foreground">Error ID: {error.digest}</p>
       )}
       <div className="flex gap-2">
-        <Button variant="outline" onClick={() => window.location.href = "/"}>
+        <Button variant="outline" onClick={() => router.push("/")}>
           Go Home
         </Button>
         <Button onClick={reset}>

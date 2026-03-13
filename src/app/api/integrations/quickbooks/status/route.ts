@@ -5,13 +5,13 @@
  * POST: Toggles the auto-sync setting in system_settings.
  */
 
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { getTokens, getAutoSyncEnabled, qboClient } from "@/lib/quickbooks";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { QBOCompanyInfo, QBOQueryResponse } from "@/lib/quickbooks";
 
-export const GET = withAuth(async () => {
+export const GET = withPermission("integrations:manage", async () => {
   const tokens = await getTokens();
   const autoSyncEnabled = await getAutoSyncEnabled();
 
@@ -48,7 +48,7 @@ export const GET = withAuth(async () => {
   }
 });
 
-export const POST = withAuth(async (request) => {
+export const POST = withPermission("integrations:manage", async (request) => {
   const body = await request.json();
   const { auto_sync_enabled } = body;
 

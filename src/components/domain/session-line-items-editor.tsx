@@ -544,8 +544,9 @@ export function SessionLineItemsEditor({
                   <Input
                     type="number"
                     min={0}
-                    value={item.planned_quantity ?? ""}
-                    onChange={(e) =>
+                    key={`planned-${item.id}-${item.planned_quantity}`}
+                    defaultValue={item.planned_quantity ?? ""}
+                    onBlur={(e) =>
                       updateItem.mutate({
                         id: item.id,
                         field: "planned_quantity",
@@ -564,8 +565,9 @@ export function SessionLineItemsEditor({
                   <Input
                     type="number"
                     min={0}
-                    value={item.actual_quantity ?? ""}
-                    onChange={(e) =>
+                    key={`actual-${item.id}-${item.actual_quantity}`}
+                    defaultValue={item.actual_quantity ?? ""}
+                    onBlur={(e) =>
                       updateItem.mutate({
                         id: item.id,
                         field: "actual_quantity",

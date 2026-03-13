@@ -79,12 +79,12 @@ WHERE table_name = 'recipes';
 
 **Step 2: Apply migration locally**
 
-Run: `pnpm supabase migration up --local`
+Run: `bun supabase migration up --local`
 Expected: Migration applies successfully
 
 **Step 3: Verify schema changes**
 
-Run: `pnpm supabase db dump --local --schema public | grep -A5 "order_items\|recipes"`
+Run: `bun supabase db dump --local --schema public | grep -A5 "order_items\|recipes"`
 Expected: New columns visible in schema dump
 
 **Step 4: Commit**
@@ -176,7 +176,7 @@ Add after brand_id field:
 
 **Step 4: Run lint to verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -285,7 +285,7 @@ stateMachine: recipeStateMachine,
 
 **Step 7: Run lint to verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 8: Commit**
@@ -611,7 +611,7 @@ export { inventoryLotEntity } from "./inventory-lot";
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 4: Commit**
@@ -695,7 +695,7 @@ export default async function EditInventoryLotPage({ params }: Props) {
 
 **Step 5: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 6: Commit**
@@ -906,7 +906,7 @@ export { poReceiveEntity } from "./po-receive";
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 4: Commit**
@@ -966,7 +966,7 @@ Add after quantity column:
 
 **Step 4: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 5: Commit**
@@ -1174,7 +1174,7 @@ export function POReceiveDialog({
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 3: Commit**
@@ -1643,7 +1643,7 @@ export { allocationEntity } from "./allocation";
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 4: Commit**
@@ -1708,7 +1708,7 @@ export default function NewAllocationPage() {
 
 **Step 4: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 5: Commit**
@@ -2139,7 +2139,7 @@ export const planningKeys = {
 
 **Step 4: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 5: Commit**
@@ -2175,12 +2175,12 @@ Under Production > Planning:
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors
 
 **Step 3: Verify navigation renders**
 
-Run: `pnpm dev`
+Run: `bun dev`
 Navigate to sidebar and verify new items appear
 
 **Step 4: Commit**
@@ -2201,12 +2201,12 @@ git commit -m "feat(nav): add inventory lots, allocations, and backward planning
 
 **Step 1: Generate types from local database**
 
-Run: `pnpm supabase gen types typescript --local > src/types/supabase.ts`
+Run: `bun supabase gen types typescript --local > src/types/supabase.ts`
 Expected: Types regenerated with new columns
 
 **Step 2: Verify types compile**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No type errors
 
 **Step 3: Commit**

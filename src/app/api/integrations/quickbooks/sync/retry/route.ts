@@ -5,7 +5,7 @@
  * Body: { syncLogId: string }
  */
 
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import {
@@ -27,7 +27,7 @@ const SYNC_FUNCTIONS: Record<
   purchase_order: syncBill,
 };
 
-export const POST = withAuth(async (request) => {
+export const POST = withPermission("integrations:manage", async (request) => {
   const tokens = await getTokens();
   if (!tokens) {
     return errorResponse(

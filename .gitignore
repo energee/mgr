@@ -46,6 +46,12 @@ bun-debug.log*
 # worktrees
 .worktrees/
 
+# Claude agent working directory
+.claude/
+
+# pnpm store (legacy)
+.pnpm-store/
+
 # vercel
 .vercel
 
@@ -53,6 +59,3 @@ bun-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 .playwright-mcp/
-
-# worktrees
-.worktrees/

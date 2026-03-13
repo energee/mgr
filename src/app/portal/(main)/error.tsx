@@ -6,9 +6,11 @@
  * Catches unhandled errors within the customer portal routes.
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
+import { log } from "@/lib/client-logger";
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -17,7 +19,8 @@ interface ErrorProps {
 
 export default function PortalError({ error, reset }: ErrorProps) {
   useEffect(() => {
-    console.error("Portal error boundary caught:", error);
+    Sentry.captureException(error);
+    log.error("Portal error boundary caught:", error);
   }, [error]);
 
   return (

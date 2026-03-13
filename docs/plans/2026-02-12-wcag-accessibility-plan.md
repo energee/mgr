@@ -222,7 +222,7 @@ export function FieldInput({
 **Step 4: Run lint to verify**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 Expected: No new errors (existing warnings unchanged).
@@ -298,7 +298,7 @@ Find `<Kbd>` elements that appear alongside button text (like `<Kbd>N</Kbd>` on 
 **Step 4: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 **Step 5: Commit**
@@ -424,7 +424,7 @@ Same pattern as Task 4 — find `<Kbd>` elements next to buttons and wrap with `
 **Step 4: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 **Step 5: Commit**
@@ -516,7 +516,7 @@ alt={breweryName || "Brewery logo"}
 **Step 4: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 **Step 5: Commit**
@@ -557,7 +557,7 @@ And close the `</nav>` before `</SidebarContent>`.
 **Step 2: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 **Step 3: Commit**
@@ -616,7 +616,7 @@ Inside the `<figure>`, after `</ChartContainer>`:
 **Step 3: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 **Step 4: Commit**
@@ -696,7 +696,7 @@ export default eslintConfig;
 **Step 2: Run lint and fix any new errors**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 Fix any errors surfaced by the stricter rules. These should be minimal since Tasks 1-8 already fixed the main issues.
@@ -716,7 +716,7 @@ git commit -m "fix(a11y): enable strict jsx-a11y ESLint rules"
 **Step 1: Run full lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 Expected: 0 errors. Warnings may remain for pre-existing issues outside our scope.
@@ -724,7 +724,7 @@ Expected: 0 errors. Warnings may remain for pre-existing issues outside our scop
 **Step 2: Run build**
 
 ```bash
-pnpm build
+bun build
 ```
 
 Expected: Build succeeds with no type errors.

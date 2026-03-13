@@ -623,7 +623,7 @@ export function usePortalCustomer() {
 **Step 4: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/app/\(portal\)/layout.tsx src/components/portal/portal-shell.tsx src/lib/portal-context.tsx
 git commit -m "feat: add portal layout with customer auth and auto-linking"
 ```
@@ -657,7 +657,7 @@ Reference: existing auth check pattern in `src/app/(app)/layout.tsx`.
 **Step 2: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/app/\(app\)/layout.tsx
 git commit -m "feat: redirect customer-role users from admin app to portal"
 ```
@@ -684,7 +684,7 @@ Reference: `src/app/(auth)/login/login-form.tsx` for the `signInWithOtp` call pa
 **Step 2: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/app/\(portal\)/login/page.tsx
 git commit -m "feat: add portal magic link login page"
 ```
@@ -711,7 +711,7 @@ Use existing UI components: `Table`, `Badge`, `Card` from shadcn/ui. Reference o
 **Step 2: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/app/\(portal\)/orders/page.tsx
 git commit -m "feat: add portal order list page"
 ```
@@ -745,7 +745,7 @@ Reference: Order state ordering from entity config: `["draft", "confirmed", "sch
 **Step 2: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/app/\(portal\)/orders/\[id\]/page.tsx
 git commit -m "feat: add portal order detail page with change request status"
 ```
@@ -799,7 +799,7 @@ export default function NewChangeRequestPage({ params }: { params: Promise<{ id:
 **Step 3: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/app/\(portal\)/orders/\[id\]/change-request/new/page.tsx src/components/portal/change-request-builder.tsx
 git commit -m "feat: add change request builder for customer portal"
 ```
@@ -845,7 +845,7 @@ Pattern reference: `revision-history` section in same file (lines 175-179).
 **Step 3: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/components/domain/change-request-review.tsx src/entities/order.tsx
 git commit -m "feat: add change request inline diff review on admin order detail"
 ```
@@ -919,7 +919,7 @@ export const POST = withRoles(
 **Step 3: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/app/api/orders/\[id\]/change-requests/
 git commit -m "feat: add approve/reject API routes for change requests"
 ```
@@ -972,7 +972,7 @@ Also add to `formFields` for the legacy form (if still used).
 **Step 2: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/entities/sales-channel.tsx
 git commit -m "feat: add change request cutoff state config to sales channel entity"
 ```
@@ -1051,7 +1051,7 @@ The `onAction` handler in the customer detail/list page will call `POST /api/cus
 **Step 3: Lint and commit**
 
 ```bash
-pnpm lint
+bun lint
 git add src/app/api/customers/\[id\]/invite/route.ts src/entities/customer.tsx
 git commit -m "feat: add Send Portal Invite action for customers"
 ```
@@ -1072,7 +1072,7 @@ Or use the Supabase MCP `generate_typescript_types` tool.
 
 **Step 2: Fix any type errors from the new schema**
 
-Run `pnpm lint` and fix any issues.
+Run `bun lint` and fix any issues.
 
 **Step 3: Commit**
 
@@ -1100,7 +1100,7 @@ git commit -m "chore: regenerate TypeScript types for customer portal schema"
 **Step 2: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 **Step 3: Final commit if any cleanup needed**

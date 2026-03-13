@@ -78,7 +78,7 @@ interface NotificationsProviderProps {
 export function NotificationsProvider({ children }: NotificationsProviderProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
+  const [_channel, setChannel] = useState<RealtimeChannel | null>(null);
 
   // Fetch unread notifications
   const {
@@ -106,6 +106,10 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
 
   // Set up realtime subscription
   useEffect(() => {
+    // Local variable captures the channel so cleanup can reference it
+    // (state setter alone would leave the cleanup closure with a stale null)
+    let activeChannel: RealtimeChannel | null = null;
+
     const setupRealtime = async () => {
       // Get current user
       const {
@@ -155,18 +159,19 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         )
         .subscribe();
 
+      activeChannel = newChannel;
       setChannel(newChannel);
     };
 
     setupRealtime();
 
-    // Cleanup on unmount
+    // Cleanup on unmount — uses local activeChannel, not stale state
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
+      if (activeChannel) {
+        supabase.removeChannel(activeChannel);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once realtime subscription; supabase/queryClient are stable singletons, channel is set inside the effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once realtime subscription; supabase/queryClient are stable singletons
   }, []);
 
   // Mark as read mutation

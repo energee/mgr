@@ -205,7 +205,7 @@ Remove all `recipe_id` references from the entity config:
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun typecheck`
 Expected: May have type errors in components that still reference `recipe_id` — that's expected and will be fixed in subsequent tasks.
 
 **Step 3: Commit**
@@ -307,7 +307,7 @@ interface LinkedBatch {
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun typecheck`
 Expected: Clean or shows errors in other files (not this one).
 
 **Step 3: Commit**
@@ -386,7 +386,7 @@ import { brewLogKeys, entityKeys } from "@/lib/query-keys";
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun typecheck`
 Expected: Clean or shows errors in remaining files.
 
 **Step 3: Commit**
@@ -421,7 +421,7 @@ At line 376, remove `recipe_id: effectiveRecipeId,` from the brew log insert obj
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun typecheck`
 
 **Step 3: Commit**
 
@@ -474,7 +474,7 @@ interface BrewSummaryLink {
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun typecheck`
 
 **Step 3: Commit**
 
@@ -561,7 +561,7 @@ Update the linked brew log display at line 292 to remove recipe reference:
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun typecheck`
 
 **Step 3: Commit**
 
@@ -608,17 +608,17 @@ git commit -m "docs: update brew logs data model to reflect batch-centric design
 
 **Step 1: Run full typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun typecheck`
 Expected: 0 errors
 
 **Step 2: Run lint**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm lint`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun lint`
 Expected: 0 errors (or only pre-existing warnings)
 
 **Step 3: Run tests**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && pnpm vitest run`
+Run: `cd /Users/tedslesinski/Repos/mgr/.worktrees/brewlog && bun vitest run`
 Expected: All tests pass
 
 **Step 4: If any failures, fix and re-run until clean**

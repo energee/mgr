@@ -373,8 +373,9 @@ function buildPostgrestCondition<T>(filter: ExtendedColumnFilter<T>): string | n
     case "notInArray": {
       const arr = Array.isArray(value) ? value : [value];
       // PostgREST doesn't have a direct "not in" - use multiple neq joined with and
-      // For or() context, this returns multiple conditions that should be anded
-      return arr.map((v) => `${id}.neq.${escapePostgrestOrValue(String(v))}`).join(",");
+      // Wrap in nested and() to avoid tautology when inside an or() context
+      const conditions = arr.map((v) => `${id}.neq.${escapePostgrestOrValue(String(v))}`).join(",");
+      return arr.length > 1 ? `and(${conditions})` : conditions;
     }
     case "lt":
       return `${id}.lt.${escapePostgrestOrValue(String(value))}`;

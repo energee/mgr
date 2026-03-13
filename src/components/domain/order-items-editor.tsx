@@ -444,8 +444,8 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
 
   // Handle add item
   const handleAdd = () => {
-    if (!newItem.brand_id && !newItem.format_id) {
-      toast.error("Please select a brand or format");
+    if (!newItem.brand_id || !newItem.format_id) {
+      toast.error("Please select a brand and format");
       return;
     }
     if (newItem.quantity < 1) {

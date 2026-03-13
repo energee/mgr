@@ -20,7 +20,7 @@
 Run in the worktree (`/Users/tedslesinski/Repos/mgr/.worktrees/feat-ai-chat`):
 
 ```bash
-pnpm add ai @ai-sdk/react @ai-sdk/anthropic
+bun add ai @ai-sdk/react @ai-sdk/anthropic
 ```
 
 **Step 2: Install AI Elements chatbot components**
@@ -49,7 +49,7 @@ Expected: `conversation/` and `message/` directories (or similar files).
 **Step 4: Commit**
 
 ```bash
-git add package.json pnpm-lock.yaml src/components/ai-elements/
+git add package.json bun.lock src/components/ai-elements/
 git commit -m "chore: install ai sdk and ai-elements chatbot components"
 ```
 
@@ -78,7 +78,7 @@ export const chatKeys = {
 **Step 2: Run tests**
 
 ```bash
-pnpm test
+bun test
 ```
 
 Expected: All 262 tests pass (query-keys tests still pass).
@@ -132,7 +132,7 @@ Note: The `ANTHROPIC_API_KEY` env var must be set. The AI SDK reads it automatic
 **Step 2: Verify the route compiles**
 
 ```bash
-pnpm typecheck
+bun typecheck
 ```
 
 Expected: No type errors.
@@ -304,7 +304,7 @@ Note: We build this from existing shadcn primitives (Button, Textarea) rather th
 **Step 2: Run typecheck**
 
 ```bash
-pnpm typecheck
+bun typecheck
 ```
 
 Expected: No type errors.
@@ -435,7 +435,7 @@ Remove the old `<div className="flex-1 flex flex-col">`, `<AppHeader>`, and `<ma
 **Step 4: Run typecheck and dev server**
 
 ```bash
-pnpm typecheck
+bun typecheck
 ```
 
 Expected: No type errors.
@@ -467,7 +467,7 @@ The user must replace `your-key-here` with their actual Anthropic API key.
 Start the dev server and open the chat panel. Send a test message. If you get a streaming response, it works.
 
 ```bash
-pnpm dev
+bun dev
 ```
 
 No commit for this step (env files are gitignored).
@@ -481,7 +481,7 @@ No commit for this step (env files are gitignored).
 **Step 1: Start dev server**
 
 ```bash
-pnpm dev
+bun dev
 ```
 
 **Step 2: Verify chat toggle**
@@ -508,7 +508,7 @@ pnpm dev
 **Step 5: Run all tests**
 
 ```bash
-pnpm test
+bun test
 ```
 
 Expected: All 262 tests still pass.
