@@ -49,6 +49,7 @@ import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { extractBrewMeasurements } from "@/lib/brew-events";
 import type { BrewEvent } from "@/types/domain";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -337,7 +338,7 @@ export function BrewLogCompletionDialog({
       onOpenChange(false);
       onSuccess(linkedBatches[0]?.id);
     } catch (error) {
-      console.error("Complete brew error:", error);
+      log.error("Complete brew error:", error);
       const message =
         error instanceof Error ? error.message : "Failed to complete brew";
       toast.error(message);

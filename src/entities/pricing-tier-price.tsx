@@ -92,19 +92,6 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
     title: "price",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "pricing_tier_id", label: "Pricing Tier" },
-        { field: "format_id", label: "Selling Format" },
-        { field: "sales_channel_id", label: "Sales Channel" },
-        { field: "price", label: "Price", format: "currency" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

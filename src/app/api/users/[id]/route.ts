@@ -4,6 +4,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/server";
+import { log } from "@/lib/client-logger";
 
 /**
  * DELETE /api/users/:id
@@ -53,7 +54,7 @@ export const DELETE = withPermission("users:manage", async (_request, { user, pa
 
   if (authError) {
     // Profile already removed — log but don't fail
-    console.error("Failed to delete auth user (profile already removed):", authError);
+    log.error("Failed to delete auth user (profile already removed):", authError);
   }
 
   return successResponse({ deleted: true });

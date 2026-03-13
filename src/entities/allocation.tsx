@@ -202,62 +202,6 @@ export const allocationEntity: EntityConfig<Allocation> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "status", label: "Status" },
-        { field: "source_type", label: "Source Type" },
-        { field: "source_id", label: "Source ID" },
-        { field: "destination_type", label: "Destination Type" },
-        { field: "destination_id", label: "Destination ID" },
-      ],
-    },
-    {
-      id: "quantities",
-      title: "Quantities",
-      fields: [
-        { field: "quantity", label: "Quantity", format: "number" },
-        { field: "volume_bbl", label: "Volume (BBL)", format: "unit", unitType: "volume" },
-        { field: "unit_cost", label: "Unit Cost", format: "currency" },
-        { field: "lot_number", label: "Lot Number" },
-      ],
-    },
-    {
-      id: "reason",
-      title: "Reason",
-      fields: [
-        { field: "reason_code", label: "Reason Code" },
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-    {
-      id: "approval",
-      title: "Approval",
-      fields: [
-        { field: "requires_approval", label: "Requires Approval" },
-        { field: "approved_by", label: "Approved By" },
-        { field: "approved_at", label: "Approved At", format: "datetime" },
-        { field: "rejection_reason", label: "Rejection Reason", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-    {
-      id: "timestamps",
-      title: "Timestamps",
-      fields: [
-        { field: "created_at", label: "Created", format: "datetime" },
-        { field: "created_by", label: "Created By" },
-        { field: "completed_at", label: "Completed", format: "datetime" },
-        { field: "cancelled_at", label: "Cancelled", format: "datetime" },
-        { field: "updated_at", label: "Updated", format: "datetime" },
-      ],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

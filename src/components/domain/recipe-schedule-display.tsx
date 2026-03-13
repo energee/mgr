@@ -22,7 +22,7 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 import type { MashStep } from "./mash-schedule-editor";
 import type { FermentationStage } from "./fermentation-schedule-editor";
 
-// Step type labels
+/** Domain constants: mash step type labels (not entity status -- no stateMachine applies). */
 const STEP_TYPE_LABELS: Record<string, string> = {
   infusion: "Infusion",
   decoction: "Decoction",
@@ -30,7 +30,7 @@ const STEP_TYPE_LABELS: Record<string, string> = {
   rest: "Rest",
 };
 
-// Stage type labels
+/** Domain constants: fermentation stage type labels (not entity status -- no stateMachine applies). */
 const STAGE_TYPE_LABELS: Record<string, string> = {
   primary: "Primary",
   secondary: "Secondary",

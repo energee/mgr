@@ -42,7 +42,6 @@ export function FermentationSection() {
   });
 
   const { isDirty } = form.formState;
-  // eslint-disable-next-line react-hooks/incompatible-library
   const fermSchedule = form.watch("fermentation_schedule");
 
   const saveMutation = useMutation({

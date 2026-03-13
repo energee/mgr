@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Play, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -141,7 +142,7 @@ export function StartBrewDayDialog({
       onOpenChange(false);
       onSuccess(brewLogId);
     } catch (error) {
-      console.error("Start brew day error:", error);
+      log.error("Start brew day error:", error);
       const message =
         error instanceof Error ? error.message : "Failed to start brew day";
       toast.error(message);

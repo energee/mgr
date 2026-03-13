@@ -95,6 +95,7 @@ const UNIT_OPTIONS = [
   { value: "can", label: "can" },
 ] as const;
 
+/** Domain constants: fruit type labels (not entity status -- no stateMachine applies). */
 const TYPE_LABELS: Record<string, string> = {
   puree: "Purees",
   whole: "Whole Fruit",
@@ -104,6 +105,7 @@ const TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+/** Domain constants: fruit form labels (not entity status -- no stateMachine applies). */
 const FORM_LABELS: Record<string, string> = {
   fresh: "Fresh",
   frozen: "Frozen",

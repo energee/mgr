@@ -88,6 +88,7 @@ const TIMING_OPTIONS = [
   { value: "fermentation", label: "Fermentation" },
 ] as const;
 
+/** Domain constants: adjunct type labels (not entity status -- no stateMachine applies). */
 const TYPE_LABELS: Record<string, string> = {
   grain: "Unmalted Grains",
   extract: "Extracts",

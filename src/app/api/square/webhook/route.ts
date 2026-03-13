@@ -21,6 +21,7 @@ import { getSquareClient, getSquareSettings } from "@/lib/square/client";
 import { verifyWebhookSignature } from "@/lib/square/webhook";
 import { calculateVolumeOz } from "@/lib/square/utils";
 import { dynamicFrom } from "@/services/types";
+import { log } from "@/lib/client-logger";
 
 // Square webhook event shape (subset of fields we care about)
 interface SquareWebhookEvent {
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     // Log error but still return 200 to prevent Square retries.
     // The error details are captured in the sync log where possible.
-    console.error(
+    log.error(
       `[Square Webhook] Error processing ${event.type}:`,
       err instanceof Error ? err.message : err
     );
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
 async function handlePaymentCompleted(event: SquareWebhookEvent) {
   const payment = event.data?.object?.payment;
   if (!payment) {
-    console.warn("[Square Webhook] payment.completed event missing payment object");
+    log.warn("[Square Webhook] payment.completed event missing payment object");
     return;
   }
 
@@ -139,7 +140,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
   const squareLocationId = payment.location_id;
 
   if (!orderId) {
-    console.warn("[Square Webhook] payment.completed event missing order_id");
+    log.warn("[Square Webhook] payment.completed event missing order_id");
     return;
   }
 
@@ -155,7 +156,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
     .maybeSingle();
 
   if (existingLog) {
-    console.info(
+    log.info(
       `[Square Webhook] Duplicate payment.completed for order ${orderId}, skipping`
     );
     return;
@@ -164,7 +165,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
   // Fetch full order details from Square
   const client = await getSquareClient();
   if (!client) {
-    console.error("[Square Webhook] Square client not available");
+    log.error("[Square Webhook] Square client not available");
     return;
   }
 
@@ -172,7 +173,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
   const order = orderResponse.order;
 
   if (!order?.lineItems?.length) {
-    console.info(
+    log.info(
       `[Square Webhook] Order ${orderId} has no line items, skipping`
     );
     return;

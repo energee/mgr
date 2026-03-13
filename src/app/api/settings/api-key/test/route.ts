@@ -3,6 +3,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import { withPermission } from "@/lib/api/auth";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { clientEnv, getServerEnv } from "@/lib/env";
 
 /**
  * POST /api/settings/api-key/test
@@ -16,9 +17,10 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
   let apiKey: string | null = null;
 
   if (scope === "global") {
+    const { SUPABASE_SERVICE_ROLE_KEY } = getServerEnv();
     const admin = createServiceClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      clientEnv.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
     );
     const { data } = await admin
       .from("system_settings")

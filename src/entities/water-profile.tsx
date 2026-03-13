@@ -18,7 +18,7 @@ export type { WaterProfileFormValues } from "@/lib/schemas/water-profile";
 /** Render a numeric value or em-dash for null/undefined */
 const ppm = (value: unknown): string => (value != null ? `${value}` : "—");
 
-/** Mineral field definitions shared between sections and formFields */
+/** Mineral field definitions reused across sections */
 const mineralFields = [
   { name: "calcium_ppm", label: "Ca²⁺", type: "number", placeholder: "0", colSpan: 2 },
   { name: "magnesium_ppm", label: "Mg²⁺", type: "number", placeholder: "0", colSpan: 2 },
@@ -102,33 +102,6 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
   ],
 
   formSchema: waterProfileSchema,
-
-  formFields: [
-    {
-      name: "name",
-      label: "Name",
-      type: "text",
-      placeholder: "e.g., City Tap Water",
-      required: true,
-      colSpan: 6,
-    },
-    {
-      name: "is_active",
-      label: "Active",
-      type: "switch",
-      description: "Inactive profiles hidden from recipe dropdowns",
-      defaultValue: true,
-      colSpan: 6,
-    },
-    {
-      name: "description",
-      label: "Description",
-      type: "textarea",
-      placeholder: "Describe this water source...",
-      colSpan: 12,
-    },
-    ...mineralFields,
-  ],
 
   actions: [
     {

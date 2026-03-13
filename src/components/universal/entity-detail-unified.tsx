@@ -88,6 +88,7 @@ import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
 import type { UseFormReturn } from "react-hook-form";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Props
@@ -666,7 +667,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     } catch (err) {
       const message = err instanceof Error ? err.message : "An unexpected error occurred";
       toast.error(message);
-      console.error("Form submission error:", err);
+      log.error("Form submission error:", err);
     } finally {
       toast.dismiss(loadingId);
       setIsSubmitting(false);
@@ -1563,7 +1564,7 @@ function RelationTable({
         if (error) throw error;
         return data || [];
       } catch (err) {
-        console.error(
+        log.error(
           `Failed to load ${relatedEntity.displayNamePlural}:`,
           err,
           JSON.stringify(err),

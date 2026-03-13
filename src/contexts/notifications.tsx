@@ -23,6 +23,7 @@ import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { notificationKeys } from "@/lib/query-keys";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -93,7 +94,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         .limit(50);
 
       if (error) {
-        console.error("Failed to fetch notifications:", error.message, error.code, error.details);
+        log.error("Failed to fetch notifications:", error.message, error.code, error.details);
         return [];
       }
 

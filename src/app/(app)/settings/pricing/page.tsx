@@ -58,6 +58,7 @@ import { EntityList } from "@/components/universal/entity-list";
 import { pricingTierEntity } from "@/entities/pricing-tier";
 import { salesChannelEntity } from "@/entities/sales-channel";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -654,7 +655,7 @@ export default function PricingPage() {
       });
     },
     onError: (error) => {
-      console.error("Failed to save price:", error);
+      log.error("Failed to save price:", error);
       toast.error("Failed to save price");
     },
   });
@@ -704,7 +705,7 @@ export default function PricingPage() {
       setBulkValue("");
     },
     onError: (error) => {
-      console.error("Bulk adjust failed:", error);
+      log.error("Bulk adjust failed:", error);
       toast.error("Failed to adjust prices");
     },
   });
@@ -751,7 +752,7 @@ export default function PricingPage() {
       setCopyFromChannel("");
     },
     onError: (error) => {
-      console.error("Copy channel failed:", error);
+      log.error("Copy channel failed:", error);
       toast.error("Failed to copy prices");
     },
   });

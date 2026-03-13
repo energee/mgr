@@ -155,35 +155,6 @@ export const pickListEntity: EntityConfig<PickListView> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "order_number" as keyof PickListView & string, label: "Order Number" },
-        { field: "customer_name" as keyof PickListView & string, label: "Customer" },
-        { field: "status", label: "Status" },
-        { field: "assigned_to_name" as keyof PickListView & string, label: "Assigned To" },
-        { field: "generated_at", label: "Generated", format: "datetime" },
-        { field: "started_at", label: "Started", format: "datetime" },
-        { field: "completed_at", label: "Completed", format: "datetime" },
-      ],
-    },
-    {
-      id: "pick-items",
-      title: "Pick Items",
-      component: PickListItems,
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------

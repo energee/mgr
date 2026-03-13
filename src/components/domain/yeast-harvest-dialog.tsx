@@ -41,6 +41,7 @@ import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { yeastKeys, vesselKeys, batchKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Schema
@@ -128,7 +129,6 @@ export function YeastHarvestDialog({
   });
 
   // Resolve selected strain from props
-  // eslint-disable-next-line react-hooks/incompatible-library
   const selectedPitchId = form.watch("source_pitch_id");
   const selectedStrain = pitchedStrains.find(
     (s) => s.pitch_id === selectedPitchId
@@ -181,7 +181,7 @@ export function YeastHarvestDialog({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Harvest error:", error);
+      log.error("Harvest error:", error);
       toast.error("Failed to record harvest", {
         description: error instanceof Error ? error.message : "Unknown error",
       });

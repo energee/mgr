@@ -156,36 +156,6 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Overview",
-      fields: [
-        { field: "brew_number", label: "Brew Number" },
-        { field: "brew_date", label: "Brew Date", format: "date" },
-        { field: "status", label: "Status" },
-      ],
-    },
-    {
-      id: "timeline",
-      title: "Brew Day Timeline",
-      component: BrewLogTimeline,
-    },
-    {
-      id: "split-overview",
-      title: "Batch Splits",
-      component: BrewLogSplitOverview,
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------

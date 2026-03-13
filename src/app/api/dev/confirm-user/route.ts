@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { clientEnv, getServerEnv } from "@/lib/env";
 
 export async function POST(request: NextRequest) {
   // Defense-in-depth: require both NODE_ENV=development AND explicit opt-in
@@ -21,9 +22,10 @@ export async function POST(request: NextRequest) {
   }
 
   // Use admin client to bypass RLS
+  const { SUPABASE_SERVICE_ROLE_KEY } = getServerEnv();
   const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    clientEnv.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 

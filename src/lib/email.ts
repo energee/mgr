@@ -8,6 +8,7 @@
  */
 
 import { Resend } from "resend";
+import { log } from "@/lib/client-logger";
 
 // -- Configuration ------------------------------------------------------------
 
@@ -16,7 +17,7 @@ const FROM_EMAIL_DEFAULT = "MGR Brewery <noreply@yourdomain.com>";
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? FROM_EMAIL_DEFAULT;
 
 if (RESEND_API_KEY && FROM_EMAIL === FROM_EMAIL_DEFAULT) {
-  console.warn(
+  log.warn(
     "[email] RESEND_API_KEY is set but RESEND_FROM_EMAIL is not configured. " +
       "Emails will fail because the default domain is not verified with Resend. " +
       "Set RESEND_FROM_EMAIL in your environment variables.",
@@ -76,7 +77,7 @@ export async function sendEmail(
   const client = getClient();
 
   if (!client) {
-    console.warn(
+    log.warn(
       "[email] RESEND_API_KEY not set — skipping email:",
       options.subject,
     );
@@ -94,14 +95,14 @@ export async function sendEmail(
     });
 
     if (error) {
-      console.error("[email] Resend API error:", error.message);
+      log.error("[email] Resend API error:", error.message);
       return { ok: false, error: error.message };
     }
 
     return { ok: true, id: data?.id };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[email] Failed to send:", message);
+    log.error("[email] Failed to send:", message);
     return { ok: false, error: message };
   }
 }

@@ -152,33 +152,6 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
     badge: "status",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Session Details",
-      fields: [
-        { field: "id", label: "Session ID" },
-        { field: "session_date", label: "Date" },
-        { field: "status", label: "Status" },
-        { field: "created_at", label: "Created" },
-        { field: "updated_at", label: "Last Updated" },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      fields: [
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-      collapsible: true,
-    },
-    {
-      id: "line_items",
-      title: "Line Items",
-      component: SessionLineItemsDisplay,
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------

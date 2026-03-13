@@ -403,4 +403,4 @@ When adding new tables or modifying schema:
 1. Update the relevant data model markdown file
 2. Create a new migration in `supabase/migrations/`
 3. Update `_schema_registry` entries in the migration
-4. Run `pnpm db:generate` to regenerate TypeScript types
+4. Run `bun db:generate` to regenerate TypeScript types

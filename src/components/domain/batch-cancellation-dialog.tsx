@@ -47,6 +47,7 @@ import {
 import { Loader2, XCircle, Archive, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types & Constants
@@ -173,7 +174,7 @@ export function BatchCancellationDialog({
       onSuccess?.();
     },
     onError: (error: unknown) => {
-      console.error(`${mode} batch error:`, JSON.stringify(error, null, 2));
+      log.error(`${mode} batch error:`, JSON.stringify(error, null, 2));
       // Supabase errors have message, code, details, hint properties
       const pgError = error as { message?: string; code?: string; details?: string; hint?: string };
       const message = pgError?.message || (error instanceof Error ? error.message : `Failed to ${mode} batch`);

@@ -84,7 +84,6 @@ export function RecipeBasicsSection() {
   const { isDirty } = form.formState;
 
   // Sync form changes to context for live estimate updates
-  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedName = form.watch("name");
   const watchedBatchSize = form.watch("batch_size_bbl");
   const watchedBoilTime = form.watch("boil_time_min");

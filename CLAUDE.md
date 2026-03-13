@@ -349,5 +349,5 @@ When a test-driven fix is feasible: first write a failing test that reproduces t
 
 ## When making commits
 
-1. Always run `pnpm lint` before committing and fix any errors introduced by your changes
+1. Always run `bun lint` before committing and fix any errors introduced by your changes
 2. Never put Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>

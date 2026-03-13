@@ -36,6 +36,7 @@ import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useIsMac } from "@/hooks/use-is-mac";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SafeImage } from "@/components/ui/safe-image";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Schema
@@ -262,7 +263,7 @@ export default function SystemSettingsPage() {
       });
       toast.success("System settings saved");
     } catch (error) {
-      console.error("Failed to save settings:", error);
+      log.error("Failed to save settings:", error);
       toast.error("Failed to save settings");
     }
   };

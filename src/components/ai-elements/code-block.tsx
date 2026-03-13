@@ -28,6 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { log } from "@/lib/client-logger";
 // shiki is lazy-loaded to reduce initial bundle size (~1-3MB WASM/grammars)
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
@@ -225,7 +226,7 @@ export const highlightCode = (
       }
     })
     .catch((error) => {
-      console.error("Failed to highlight code:", error);
+      log.error("Failed to highlight code:", error);
       subscribers.delete(tokensCacheKey);
     });
 

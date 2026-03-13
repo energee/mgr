@@ -257,10 +257,6 @@ export function buildActionsColumn<T>(
 // Input Escaping
 // =============================================================================
 
-/** @deprecated Use `escapeLike` from `@/lib/utils` instead. */
-export function escapeLikeValue(value: string): string {
-  return escapeLike(value);
-}
 
 /** Escape special characters for PostgREST .or() filter strings */
 export function escapePostgrestOrValue(value: string): string {
@@ -314,9 +310,9 @@ function applyFilterToQuery<T>(query: DynamicQueryBuilder, filter: ExtendedColum
 
   switch (operator) {
     case "iLike":
-      return query.ilike(id, `%${escapeLikeValue(String(value))}%`);
+      return query.ilike(id, `%${escapeLike(String(value))}%`);
     case "notILike":
-      return query.not(id, "ilike", `%${escapeLikeValue(String(value))}%`);
+      return query.not(id, "ilike", `%${escapeLike(String(value))}%`);
     case "eq":
       return query.eq(id, value);
     case "ne":

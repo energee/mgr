@@ -1,6 +1,7 @@
 import type { SquareClient } from "square";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { SquareSyncProduct, SquareSyncResult, SquareSyncVariation } from "./types";
+import { log } from "@/lib/client-logger";
 
 function variationKey(variation: SquareSyncVariation): string {
   return `fmt-${variation.sellingFormatId}`;
@@ -245,7 +246,7 @@ export async function deleteStaleItems(
     await client.catalog.batchDelete({ objectIds: squareIdsToDelete });
   } catch (err) {
     // Log but continue to clean up local mappings even if Square delete fails
-    console.error(
+    log.error(
       "Square catalog batch delete error:",
       err instanceof Error ? err.message : err
     );

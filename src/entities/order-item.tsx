@@ -108,24 +108,6 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
     title: "brand_id",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Item Details",
-      fields: [
-        { field: "brand_id", label: "Brand" },
-        { field: "style_id", label: "Style (TBD)" },
-        { field: "tbd_notes", label: "TBD Notes" },
-        { field: "selling_format_id", label: "Selling Format" },
-        { field: "quantity", label: "Quantity" },
-        { field: "unit_price", label: "Unit Price", format: "currency" },
-        { field: "batch_id", label: "Batch" },
-        { field: "keg_owner_id", label: "Keg Owner" },
-        { field: "notes", label: "Notes" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

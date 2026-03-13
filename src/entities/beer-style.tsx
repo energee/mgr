@@ -132,42 +132,6 @@ export const beerStyleEntity: EntityConfig<BeerStyle> = {
     subtitle: "category",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Style Information",
-      fields: [
-        { field: "name", label: "Style Name" },
-        { field: "category", label: "Category" },
-        { field: "is_bjcp", label: "BJCP Official", render: (v) => (v ? "Yes" : "No") },
-        { field: "is_active", label: "Active", render: (v) => (v ? "Yes" : "No") },
-      ],
-    },
-    {
-      id: "vital-stats",
-      title: "Vital Statistics",
-      fields: [
-        { field: "og_min", label: "OG Min" },
-        { field: "og_max", label: "OG Max" },
-        { field: "fg_min", label: "FG Min" },
-        { field: "fg_max", label: "FG Max" },
-        { field: "abv_min", label: "ABV Min (%)" },
-        { field: "abv_max", label: "ABV Max (%)" },
-        { field: "ibu_min", label: "IBU Min" },
-        { field: "ibu_max", label: "IBU Max" },
-        { field: "srm_min", label: "SRM Min" },
-        { field: "srm_max", label: "SRM Max" },
-      ],
-    },
-    {
-      id: "description",
-      title: "Description",
-      fields: [
-        { field: "description", label: "Description", fullWidth: true },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
   // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ import { calculateLandedCost } from "@/lib/purchasing/landed-cost";
 import { POAcceptInventoryDialog } from "@/components/domain/po-accept-inventory-dialog";
 import { PoLandedCostBreakdown } from "@/components/domain/po-landed-cost-breakdown";
 import { purchaseOrderKeys, entityKeys, landedCostKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 const LANDED_COST_STATUSES = ["partial", "fulfilled", "closed"];
 
@@ -74,7 +75,7 @@ export default function PurchaseOrderDetailPage({
               queryKey: entityKeys.detail("purchase_orders", id),
             });
           } catch (err) {
-            console.error("Failed to calculate landed cost:", err);
+            log.error("Failed to calculate landed cost:", err);
             toast.error("Failed to calculate landed cost");
           }
         };

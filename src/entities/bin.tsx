@@ -162,34 +162,6 @@ export const binEntity: EntityConfig<Bin> = {
     badge: "bin_type",
   },
 
-  detailSections: [
-    {
-      id: "overview",
-      title: "Bin Details",
-      fields: [
-        { field: "name", label: "Name" },
-        {
-          field: "location_id",
-          label: "Location",
-          relation: { entity: "location", displayField: "name" },
-        },
-        { field: "bin_type", label: "Type" },
-        { field: "capacity", label: "Capacity", format: "number" },
-        { field: "is_active", label: "Active" },
-        { field: "notes", label: "Notes", fullWidth: true },
-      ],
-    },
-    {
-      id: "contents_summary",
-      title: "Contents Summary",
-      fields: [
-        { field: "fg_item_count" as keyof Bin & string, label: "Finished Goods Items", format: "number" },
-        { field: "rm_item_count" as keyof Bin & string, label: "Raw Material Items", format: "number" },
-        { field: "total_item_count" as keyof Bin & string, label: "Total Items", format: "number" },
-      ],
-    },
-  ],
-
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
   // ---------------------------------------------------------------------------
