@@ -236,7 +236,7 @@ Replace scrollbar thumb colors (lines 323-337):
 
 **Step 9: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && bun typecheck`
 Expected: PASS (CSS-only changes)
 
 **Step 10: Commit**
@@ -447,7 +447,7 @@ function formatStatus(status: string): string {
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && bun typecheck`
 
 StatusBadge previously used Badge component. Search for all usages to make sure no callers depend on the Badge wrapper behavior. The `StatusBadge` is used via:
 - `entity-detail-unified.tsx` line 824: `<StatusBadge status={...} config={...} />`
@@ -681,7 +681,7 @@ Replace `className="space-y-4"` (line 588) with `className="space-y-3"`.
 
 **Step 4: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && bun typecheck`
 
 **Step 5: Commit**
 
@@ -797,7 +797,7 @@ Change `className="space-y-6"` to `className="space-y-4"` on the main wrapper di
 
 **Step 4: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && bun typecheck`
 
 **Step 5: Commit**
 
@@ -892,20 +892,20 @@ git commit -m "style: match sidebar header height to compact app header"
 
 **Step 1: Run full typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && bun typecheck`
 Expected: 0 errors
 
 **Step 2: Run lint**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && pnpm lint`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && bun lint`
 Expected: 0 errors (or only pre-existing warnings)
 
 **Step 3: Run tests**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && pnpm test`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && bun test`
 Expected: All pass (UI-only changes shouldn't break logic tests)
 
 **Step 4: Build**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && pnpm build`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-3 && bun build`
 Expected: Successful build

@@ -101,7 +101,7 @@ export function getRolesForPermission(permission: Permission): StaffRole[] {
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
@@ -183,7 +183,7 @@ export function withPermission(permission: Permission, handler: PermissionHandle
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 3: Commit**
 
@@ -718,7 +718,7 @@ For routes with manual auth (settings/api-key, slack/settings), refactor to use 
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 3: Commit**
 
@@ -864,7 +864,7 @@ export function AppProviders({ roles, children }: AppProvidersProps) {
 
 **Step 5: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 6: Commit**
 
@@ -942,7 +942,7 @@ Change `role_display` → `roles` in detail view with appropriate formatting.
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 4: Commit**
 
@@ -1010,7 +1010,7 @@ const canEdit = writePermission ? can(writePermission) : false;
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 4: Commit**
 
@@ -1060,7 +1060,7 @@ Use Supabase MCP `generate_typescript_types` to regenerate types after the migra
 
 **Step 2: Fix any type errors**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 Any references to `profile.role` need updating to `profile.roles`. Grep for `.role` accesses on user profile objects.
 

@@ -54,7 +54,7 @@ export const POST = withPermission(
       .limit(1)
       .maybeSingle();
 
-    const adminDb = createAdminClient();
+    const adminDb = await createAdminClient();
 
     // Already linked -- resend magic link
     if (existingLink?.user_id) {

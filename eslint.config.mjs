@@ -52,6 +52,9 @@ const eslintConfig = defineConfig([
       "jsx-a11y/role-supports-aria-props": "error",
       "jsx-a11y/scope": "error",
       "jsx-a11y/tabindex-no-positive": "error",
+      // All console usage must go through the centralized logger
+      // (src/lib/logger.ts for server, src/lib/client-logger.ts for client)
+      "no-console": "error",
     },
   },
   // Vendored UI components (diceui kanban/sortable/data-table, shadcn timeline/file-upload/alert)
@@ -76,6 +79,13 @@ const eslintConfig = defineConfig([
       "jsx-a11y/heading-has-content": "off",
       "jsx-a11y/no-noninteractive-element-interactions": "off",
       "jsx-a11y/no-autofocus": "off",
+    },
+  },
+  // Scripts and Supabase edge functions use console directly (no logger available)
+  {
+    files: ["scripts/**", "supabase/**"],
+    rules: {
+      "no-console": "off",
     },
   },
   // Override default ignores of eslint-config-next.

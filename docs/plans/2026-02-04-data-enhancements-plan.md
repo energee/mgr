@@ -392,7 +392,7 @@ function OrderItemsSection({ data }: { data: Record<string, unknown> }) {
 
 **Step 2: Verify the fix**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors.
 
 Navigate to any order detail page and confirm:
@@ -452,7 +452,7 @@ export const finishedGoodKeys = {
 
 **Step 2: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors (unused exports are fine — they'll be used in later tasks).
 
 **Step 3: Commit**
@@ -616,7 +616,7 @@ In the add-item row and inline edit, after the quantity input, check if quantity
 
 **Step 6: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors.
 
 Navigate to an order, add an item:
@@ -901,7 +901,7 @@ export type { BinFormValues } from "./bin";
 
 **Step 3: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors.
 
 **Step 4: Commit**
@@ -1003,7 +1003,7 @@ In `src/components/domain/app-sidebar.tsx`, add to the Inventory section (around
 
 **Step 6: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors.
 
 **Step 7: Commit**
@@ -1226,7 +1226,7 @@ import { FGInventorySection } from "@/components/domain/fg-inventory-section";
 
 **Step 3: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors.
 
 Navigate to a finished good detail page. Confirm:
@@ -1536,7 +1536,7 @@ export type { LocationTransferFormValues } from "./location-transfer";
 
 **Step 3: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 4: Commit**
 
@@ -1630,7 +1630,7 @@ In `src/components/domain/app-sidebar.tsx`, in the Inventory section after the B
 
 **Step 5: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 6: Commit**
 
@@ -1927,7 +1927,7 @@ export type { DeliveryFormValues } from "./delivery";
 
 **Step 3: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 4: Commit**
 
@@ -2036,7 +2036,7 @@ In `src/entities/order.tsx`, add a `belongsTo` relation for delivery:
 
 **Step 6: Verify**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 7: Commit**
 
@@ -2056,7 +2056,7 @@ git commit -m "feat: add delivery pages, sidebar nav, and order-delivery relatio
 After the migration is applied, regenerate Supabase TypeScript types:
 
 ```bash
-pnpm supabase gen types typescript --project-id <project-id> > src/types/supabase.ts
+bun supabase gen types typescript --project-id <project-id> > src/types/supabase.ts
 ```
 
 Or use the Supabase MCP `generate_typescript_types` tool.
@@ -2067,7 +2067,7 @@ Review entity configs that reference view types. Update type definitions if the 
 
 **Step 3: Full lint check**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Fix any errors introduced by new code.
 
 **Step 4: Commit**

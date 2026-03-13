@@ -256,7 +256,7 @@ Apply via the Supabase MCP `apply_migration` tool. Project ID from `list_project
 
 **Step 3: Regenerate TypeScript types**
 
-Run: `pnpm supabase gen types typescript --project-id <PROJECT_ID> > src/types/supabase.ts`
+Run: `bun supabase gen types typescript --project-id <PROJECT_ID> > src/types/supabase.ts`
 
 Or use the Supabase MCP `generate_typescript_types` tool and write the output to `src/types/supabase.ts`.
 
@@ -294,7 +294,7 @@ export const waterAdditionProfileKeys = {
 
 **Step 2: Verify**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 
 **Step 3: Commit**
 
@@ -346,7 +346,7 @@ export type WaterAdditionProfileFormValues = z.infer<typeof waterAdditionProfile
 
 **Step 3: Verify**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 
 **Step 4: Commit**
 
@@ -498,7 +498,7 @@ export type { WaterAdditionProfileFormValues } from "@/lib/schemas/water-additio
 
 **Step 3: Verify**
 
-Run: `pnpm typecheck` (will fail until ProfileAdditionsEditor exists — that's expected, continue to next task)
+Run: `bun typecheck` (will fail until ProfileAdditionsEditor exists — that's expected, continue to next task)
 
 **Step 4: Commit**
 
@@ -951,7 +951,7 @@ export function ProfileAdditionsEditor({ data }: ProfileAdditionsEditorProps) {
 
 **Step 2: Verify**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 
 **Step 3: Commit**
 
@@ -1052,7 +1052,7 @@ Add it after "Yeast Strains" in the Catalogs items array.
 
 **Step 3: Verify**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 
 **Step 4: Commit**
 
@@ -1104,7 +1104,7 @@ Find the same `use_default_additions` field in `formFields` and replace with the
 
 **Step 3: Verify**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 
 **Step 4: Commit**
 
@@ -1136,7 +1136,7 @@ Key changes:
 
 **Step 2: Verify**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 
 **Step 3: Commit**
 
@@ -1182,7 +1182,7 @@ Change the page header from "Manage Additions" to something clearer like "Recipe
 
 **Step 4: Verify**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 
 **Step 5: Commit**
 
@@ -1245,12 +1245,12 @@ git commit -m "docs: update data model and decisions for water addition profiles
 
 **Step 1: Run full typecheck**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: zero errors
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: zero new errors
 
 **Step 3: Run Supabase security advisors**

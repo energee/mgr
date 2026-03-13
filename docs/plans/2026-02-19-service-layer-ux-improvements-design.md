@@ -39,7 +39,7 @@ The MGR codebase has grown to 36 entity types with a powerful entity config patt
 Before any type-tightening work, regenerate `src/types/supabase.ts` from the current database schema. ~30% of `as any` casts exist because the generated types are missing views (`vessels_with_current_batch`, `notification_queue`, etc.) and RPC functions (`analyze_batch_performance`, `get_inventory_overview`, `archive_batch`, `start_batch_fermentation`, etc.) added after the last type generation.
 
 ```bash
-pnpm exec supabase gen types typescript --project-id <id> > src/types/supabase.ts
+bunx supabase gen types typescript --project-id <id> > src/types/supabase.ts
 ```
 
 #### Define JSON Field Types
@@ -430,7 +430,7 @@ if (error) throw new Error(`Failed to search recipes: ${error.message}`);
 5. **AI tool replacement** — Replace handcrafted tools with config-driven + service-backed tools. Add confirmed writes. Add structured result renderers.
 6. **Data fetching & error handling** — Fix silent failures, centralize API routes, replace hardcoded constants, add error/loading boundaries.
 
-Each phase validates with `pnpm typecheck && pnpm lint` before proceeding.
+Each phase validates with `bun typecheck && bun lint` before proceeding.
 
 ## Out of Scope
 

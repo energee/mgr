@@ -51,6 +51,6 @@
 
 ## Verification
 
-- `pnpm typecheck`: 0 errors
-- `pnpm test`: 719 passing (+50 new), 2 pre-existing failures (api-utils getClientIp)
-- `pnpm lint`: 0 errors, 10 pre-existing warnings (React Hook Form + React Compiler)
+- `bun typecheck`: 0 errors
+- `bun test`: 719 passing (+50 new), 2 pre-existing failures (api-utils getClientIp)
+- `bun lint`: 0 errors, 10 pre-existing warnings (React Hook Form + React Compiler)

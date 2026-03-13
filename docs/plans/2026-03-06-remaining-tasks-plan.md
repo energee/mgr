@@ -42,7 +42,7 @@ Add before the closing `};` of `reportKeys`:
 
 **Step 2: Run typecheck**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: PASS
 
 **Step 3: Commit**
@@ -82,7 +82,7 @@ Add to the icon imports: `TrendingUp, Calculator` from `lucide-react`.
 
 **Step 2: Run typecheck**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: PASS
 
 **Step 3: Commit**
@@ -151,7 +151,7 @@ Component:
 
 **Step 3: Run typecheck and dev server check**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: PASS
 
 **Step 4: Commit**
@@ -220,7 +220,7 @@ Tab 3 — By Period:
 
 **Step 3: Run typecheck**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: PASS
 
 **Step 4: Commit**
@@ -251,7 +251,7 @@ Test "prefers x-forwarded-for over x-real-ip" (line ~153-161):
 
 **Step 2: Run tests**
 
-Run: `pnpm vitest run src/lib/__tests__/api-utils.test.ts`
+Run: `bun vitest run src/lib/__tests__/api-utils.test.ts`
 Expected: ALL PASS (was 2 failing, now 0)
 
 **Step 3: Commit**
@@ -364,17 +364,17 @@ git commit -m "docs: close/defer P3 decisions, update audit with final dispositi
 
 **Step 1: Run full test suite**
 
-Run: `pnpm vitest run`
+Run: `bun vitest run`
 Expected: ALL PASS (including previously-failing getClientIp tests)
 
 **Step 2: Run typecheck**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: PASS
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: 0 errors (warnings ok)
 
 **Step 4: Push**

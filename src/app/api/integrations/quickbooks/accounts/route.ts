@@ -5,13 +5,13 @@
  * PUT: Save account mappings.
  */
 
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { qboClient, getTokens } from "@/lib/quickbooks";
 import type { QBOAccount, QBOQueryResponse } from "@/lib/quickbooks";
 
-export const GET = withAuth(async () => {
+export const GET = withPermission("integrations:manage", async () => {
   const tokens = await getTokens();
   if (!tokens) {
     return errorResponse(
@@ -42,7 +42,7 @@ export const GET = withAuth(async () => {
   }
 });
 
-export const PUT = withAuth(async (request) => {
+export const PUT = withPermission("integrations:manage", async (request) => {
   const { mappings } = (await request.json()) as {
     mappings: {
       category: string;

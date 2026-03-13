@@ -275,7 +275,7 @@ export function StartBrewDayDialog({
 
 **Step 2: Verify types compile**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Clean (no errors)
 
 **Step 3: Commit**
@@ -310,7 +310,7 @@ In `src/entities/batch.tsx`, add this entry at the **beginning** of the `actions
 
 **Step 2: Verify types compile**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Clean
 
 **Step 3: Commit**
@@ -431,7 +431,7 @@ export default function RecipeDetailPage({
 
 **Step 3: Verify types compile**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Clean
 
 **Step 4: Commit**
@@ -556,7 +556,7 @@ export default function BatchesPage() {
 
 **Step 2: Verify types compile**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Clean
 
 **Step 3: Commit**
@@ -629,7 +629,7 @@ Note: Keep the recipe query on this page — it's still used for the breadcrumb.
 
 **Step 2: Verify types compile**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Clean
 
 **Step 3: Commit**
@@ -677,7 +677,7 @@ export default function BrewLogsPage() {
 
 **Step 2: Verify types compile**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Clean
 
 **Step 3: Commit**
@@ -693,17 +693,17 @@ git commit -m "feat: remove Start Brew Day button from brew logs list page"
 
 **Step 1: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: Clean
 
 **Step 2: Run typecheck**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Clean
 
 **Step 3: Run tests**
 
-Run: `pnpm vitest run`
+Run: `bun vitest run`
 Expected: All 254 tests pass
 
 **Step 4: Verify no stale references**

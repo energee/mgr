@@ -14,7 +14,7 @@
  * - Pagination is handled client-side by TanStack Table
  */
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table";
@@ -316,7 +316,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const activeTabValue = activeQuickFilter?.label ?? "_all";
 
   // Apply default quick filter on initial load (when no filters are set)
-  const hasAppliedDefault = useMemo(() => ({ current: false }), []);
+  const hasAppliedDefault = useRef(false);
   useEffect(() => {
     if (!quickFilters || hasAppliedDefault.current) return;
     hasAppliedDefault.current = true;

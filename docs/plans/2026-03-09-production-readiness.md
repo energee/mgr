@@ -40,7 +40,7 @@ password: z.string().min(8, "Password must be at least 8 characters"),
 
 **Step 3: Run typecheck**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Zero errors
 
 **Step 4: Commit**
@@ -81,7 +81,7 @@ In `src/lib/__tests__/health-route.test.ts`, update the mock to match the new im
 
 **Step 3: Run tests**
 
-Run: `pnpm test src/lib/__tests__/health-route.test.ts`
+Run: `bun test src/lib/__tests__/health-route.test.ts`
 Expected: All tests pass
 
 **Step 4: Commit**
@@ -106,7 +106,7 @@ Read `next.config.ts` and find the Content-Security-Policy header. Remove `'unsa
 
 **Step 2: Build and verify**
 
-Run: `pnpm build`
+Run: `bun build`
 Expected: Build succeeds. If it fails with CSP violations, revert and document.
 
 **Step 3: Commit (if change was possible)**
@@ -252,7 +252,7 @@ describe("TTB Report Calculations", () => {
 
 **Step 3: Run tests**
 
-Run: `pnpm test src/lib/__tests__/ttb-report.test.ts`
+Run: `bun test src/lib/__tests__/ttb-report.test.ts`
 Expected: All tests pass
 
 **Step 4: Commit**
@@ -306,7 +306,7 @@ describe("Entity State Transitions", () => {
 
 **Step 2: Run tests**
 
-Run: `pnpm test src/services/__tests__/entity-transitions.test.ts`
+Run: `bun test src/services/__tests__/entity-transitions.test.ts`
 Expected: All tests pass
 
 **Step 3: Commit**
@@ -344,7 +344,7 @@ Test at minimum:
 
 **Step 3: Run tests**
 
-Run: `pnpm test src/lib/__tests__/allocation-calculations.test.ts`
+Run: `bun test src/lib/__tests__/allocation-calculations.test.ts`
 Expected: All tests pass
 
 **Step 4: Commit**
@@ -373,7 +373,7 @@ Add to existing test file:
 
 **Step 2: Run tests**
 
-Run: `pnpm test src/lib/__tests__/auth-callback-route.test.ts`
+Run: `bun test src/lib/__tests__/auth-callback-route.test.ts`
 Expected: All tests pass (existing + new)
 
 **Step 3: Commit**
@@ -411,7 +411,7 @@ Test at minimum:
 
 **Step 3: Run tests**
 
-Run: `pnpm test src/lib/__tests__/square-integration.test.ts`
+Run: `bun test src/lib/__tests__/square-integration.test.ts`
 Expected: All tests pass
 
 **Step 4: Commit**
@@ -429,22 +429,22 @@ git commit -m "test: add Square pricing and webhook verification tests"
 
 **Step 1: Run full test suite**
 
-Run: `pnpm test`
+Run: `bun test`
 Expected: All tests pass
 
 **Step 2: Run type check**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Zero errors
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 4: Run build**
 
-Run: `pnpm build`
+Run: `bun build`
 Expected: Build succeeds
 
 **Step 5: Final commit if any remaining changes**

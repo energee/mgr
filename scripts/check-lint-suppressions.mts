@@ -4,7 +4,7 @@
  *
  * Counts eslint-disable and @ts- suppression comments in src/.
  * Fails if the count exceeds the budget, preventing regression.
- * Run via: pnpm lint:suppressions
+ * Run via: bun lint:suppressions
  */
 
 import { execFileSync } from "node:child_process";

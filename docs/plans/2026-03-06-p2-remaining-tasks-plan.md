@@ -20,12 +20,12 @@
 The file has merge conflict markers starting at line 49. Fix by:
 1. Removing the conflict markers (`<<<<<<< HEAD`, `=======`, `>>>>>>> ...`)
 2. Keeping the e2e job content
-3. Adding `pnpm audit` as the final step in the `quality` job (not just e2e)
+3. Adding `bun pm audit` as the final step in the `quality` job (not just e2e)
 
 ```yaml
 # Add after the Build step (line 47) in the quality job:
       - name: Check for dependency vulnerabilities
-        run: pnpm audit --audit-level=high
+        run: bun pm audit --audit-level=high
         continue-on-error: true
 ```
 
@@ -275,7 +275,7 @@ Keep the toolbar (search, filters, sort, pagination) visible above the mobile ca
 
 **Step 3: Verify typecheck passes**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/implementation && pnpm typecheck`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/implementation && bun typecheck`
 Expected: Zero errors
 
 **Step 4: Commit**
@@ -422,7 +422,7 @@ With:
 
 **Step 4: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Zero errors
 
 **Step 5: Commit**
@@ -549,7 +549,7 @@ Wrap the legend div (line 426) with a responsive class:
 
 **Step 7: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: Zero errors
 
 **Step 8: Commit**
@@ -574,9 +574,9 @@ Fully interactive — drag/tap behaviors preserved."
 
 ```bash
 cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/implementation
-pnpm typecheck
-pnpm lint
-pnpm test
+bun typecheck
+bun lint
+bun test
 ```
 
 All must pass with zero errors.
@@ -584,7 +584,7 @@ All must pass with zero errors.
 **Step 2: Update the productionization doc**
 
 Update task statuses:
-- Task 30: Change to "Done" — `pnpm audit` in quality job (PRs) + e2e job (main)
+- Task 30: Change to "Done" — `bun pm audit` in quality job (PRs) + e2e job (main)
 - Task 34: Change to "Done" — mobile card view for data tables, card layout for pricing, responsive Gantt
 - Task 35: Already marked "Mostly done" — note the only remaining gap is brew event buttons (verified as already fixed)
 

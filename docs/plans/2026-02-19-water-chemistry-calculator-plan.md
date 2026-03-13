@@ -137,7 +137,7 @@ Also add the target fields to `formFields` array (same field definitions) and up
 
 **Step 3: Run typecheck**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: No new errors from these changes (pre-existing brew_logs/QBO errors only)
 
 **Step 4: Commit**
@@ -227,7 +227,7 @@ describe("mapSaltAdditionsToItems", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm vitest run src/lib/__tests__/water-chemistry.test.ts`
+Run: `bun vitest run src/lib/__tests__/water-chemistry.test.ts`
 Expected: FAIL — `SALT_ADDITIVE_MAP` and `mapSaltAdditionsToItems` not exported
 
 **Step 3: Implement the mapping**
@@ -281,7 +281,7 @@ export function mapSaltAdditionsToItems(
 
 **Step 4: Run tests to verify they pass**
 
-Run: `pnpm vitest run src/lib/__tests__/water-chemistry.test.ts`
+Run: `bun vitest run src/lib/__tests__/water-chemistry.test.ts`
 Expected: ALL PASS
 
 **Step 5: Commit**
@@ -559,7 +559,7 @@ Below the table, when `resultingProfile` and `sourceProfile` exist, show a compa
 
 **Step 10: Run typecheck and lint**
 
-Run: `pnpm typecheck && pnpm lint`
+Run: `bun typecheck && bun lint`
 Expected: No new errors
 
 **Step 11: Commit**
@@ -771,7 +771,7 @@ In the `WaterTreatmentSection` component, render `WaterChemistrySummary` above t
 
 **Step 6: Run typecheck and lint**
 
-Run: `pnpm typecheck && pnpm lint`
+Run: `bun typecheck && bun lint`
 Expected: No new errors
 
 **Step 7: Commit**
@@ -796,7 +796,7 @@ If `docs/data-model/` has a file for water_addition_profiles, update it to inclu
 
 **Step 2: Run full verification**
 
-Run: `pnpm typecheck && pnpm lint && pnpm vitest run src/lib/__tests__/water-chemistry.test.ts`
+Run: `bun typecheck && bun lint && bun vitest run src/lib/__tests__/water-chemistry.test.ts`
 Expected: All pass (pre-existing brew_logs/QBO errors are the only type errors)
 
 **Step 3: Commit any remaining doc changes**

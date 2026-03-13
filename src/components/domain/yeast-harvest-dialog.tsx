@@ -268,7 +268,7 @@ export function YeastHarvestDialog({
                     </SelectItem>
                   ))}
                   {brinks?.length === 0 && (
-                    <SelectItem value="_no_brinks" disabled>
+                    <SelectItem value="_none" disabled>
                       No available brinks
                     </SelectItem>
                   )}

@@ -5,7 +5,7 @@
  * Body: { entityType: SyncEntityType, entityIds: string[] }
  */
 
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import {
   syncCustomer,
@@ -26,7 +26,7 @@ const SYNC_FUNCTIONS: Record<
   purchase_order: syncBill,
 };
 
-export const POST = withAuth(async (request) => {
+export const POST = withPermission("integrations:manage", async (request) => {
   const tokens = await getTokens();
   if (!tokens) {
     return errorResponse(
@@ -41,6 +41,15 @@ export const POST = withAuth(async (request) => {
     entityType: SyncEntityType;
     entityIds: string[];
   };
+
+  if (entityIds?.length > 50) {
+    return errorResponse(
+      "VALIDATION_ERROR",
+      "entityIds[] cannot exceed 50 items",
+      undefined,
+      400
+    );
+  }
 
   if (!entityType || !entityIds?.length) {
     return errorResponse(

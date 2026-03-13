@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withPermission } from "@/lib/api/auth";
 import { createAdminClient } from "@/lib/supabase/server";
-import { log } from "@/lib/client-logger";
+import { logger } from "@/lib/logger";
 
 // Pending type generation -- anthropic_api_key is added by migration 00064
 // but not yet in generated Supabase types. Remove after next `supabase gen types`.
@@ -36,7 +36,8 @@ export const GET = withPermission("settings:manage", async (req, { supabase, use
       .single();
 
     if (error) {
-      log.error("[api-key] Failed to check global key:", error.message);
+      logger.error("[api-key] Failed to check global key: %s", error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     const value = data?.value;
@@ -55,7 +56,8 @@ export const GET = withPermission("settings:manage", async (req, { supabase, use
       .single<UserPrefsApiKeyRow>();
 
     if (error) {
-      log.error("[api-key] Failed to check user key:", error.message);
+      logger.error("[api-key] Failed to check user key: %s", error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     const key = data?.anthropic_api_key;
@@ -81,7 +83,8 @@ export const GET = withPermission("settings:manage", async (req, { supabase, use
       .maybeSingle();
 
     if (error) {
-      log.error(`[api-key] Failed to check ${id} key:`, error.message);
+      logger.error(`[api-key] Failed to check ${id} key: %s`, error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     const value = data?.value;
@@ -113,17 +116,16 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
         .eq("key", "anthropic_api_key");
 
       if (error) {
-        log.error("[api-key] Failed to remove global key:", error.message);
+        logger.error("[api-key] Failed to remove global key: %s", error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     } else {
       const { error } = await admin
         .from("system_settings")
-        .update({ value: key })
-        .eq("key", "anthropic_api_key");
+        .upsert({ key: "anthropic_api_key", value: key }, { onConflict: "key" });
 
       if (error) {
-        log.error("[api-key] Failed to save global key:", error.message);
+        logger.error("[api-key] Failed to save global key: %s", error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     }
@@ -140,7 +142,7 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
       .eq("user_id", user.id);
 
     if (error) {
-      log.error("[api-key] Failed to save user key:", error.message);
+      logger.error("[api-key] Failed to save user key: %s", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true });
@@ -170,7 +172,7 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
           .eq("key", settingsKey);
 
         if (error) {
-          log.error(`[api-key] Failed to remove ${id} key:`, error.message);
+          logger.error(`[api-key] Failed to remove ${id} key: %s`, error.message);
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
       }
@@ -181,7 +183,7 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
         .eq("key", settingsKey);
 
       if (error) {
-        log.error(`[api-key] Failed to save ${id} key:`, error.message);
+        logger.error(`[api-key] Failed to save ${id} key: %s`, error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     } else {
@@ -190,7 +192,7 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
         .insert({ key: settingsKey, value: key });
 
       if (error) {
-        log.error(`[api-key] Failed to insert ${id} key:`, error.message);
+        logger.error(`[api-key] Failed to insert ${id} key: %s`, error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     }

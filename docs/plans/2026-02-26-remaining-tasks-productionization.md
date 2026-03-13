@@ -349,7 +349,7 @@ Every `process.env.NEXT_PUBLIC_SUPABASE_URL!` uses `!` assertion. Missing env va
 ### 7.4 Missing from CI
 
 - No E2E/integration test step in pipeline
-- No dependency vulnerability scanning (`pnpm audit` or Dependabot)
+- No dependency vulnerability scanning (`bun pm audit` or Dependabot)
 
 ---
 
@@ -464,7 +464,7 @@ These decisions need formal resolution (implement or reject):
 | 27 | Use `escapeLike()` in API route search queries | API | S | ✅ Done — `escapeLike()` used in chat tools |
 | 28 | Add `@next/bundle-analyzer` and audit bundle | Performance | S | ✅ Done — `@next/bundle-analyzer` installed, unused `@rive-app/react-webgl2` removed (PR #218) |
 | 29 | Lazy-load `shiki` and `@rive-app/react-webgl2` | Performance | M | ✅ Done — shiki dynamically imported with cache eviction; rive removed (PR #218) |
-| 30 | Add dependency vulnerability scanning to CI | CI/CD | S | ✅ Done — `pnpm audit --audit-level=high` in quality job (PRs) + e2e job (main) |
+| 30 | Add dependency vulnerability scanning to CI | CI/CD | S | ✅ Done — `bun pm audit --audit-level=high` in quality job (PRs) + e2e job (main) |
 | 31 | Add `engines` field to `package.json` | Config | S | ✅ Done — `"engines": { "node": ">=20" }` |
 | 32 | Centralize hardcoded query keys (notifications, revision-history) | API | S | ✅ Done — `notificationKeys.list()` used in notifications page |
 | 33 | Enhance `/api/health` to check database connectivity | API | S | ✅ Done — checks DB connectivity, returns degraded status on failure |

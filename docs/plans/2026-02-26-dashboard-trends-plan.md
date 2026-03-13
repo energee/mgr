@@ -48,7 +48,7 @@ it("trends keys with different days are unique", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm vitest run src/lib/__tests__/query-keys.test.ts`
+Run: `bun vitest run src/lib/__tests__/query-keys.test.ts`
 Expected: FAIL — `dashboardKeys.trends` is undefined
 
 **Step 3: Write minimal implementation**
@@ -80,12 +80,12 @@ export const dashboardKeys = {
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm vitest run src/lib/__tests__/query-keys.test.ts`
+Run: `bun vitest run src/lib/__tests__/query-keys.test.ts`
 Expected: ALL PASS
 
 **Step 5: Run typecheck**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No errors
 
 **Step 6: Commit**
@@ -206,7 +206,7 @@ export { PeriodSelector, usePeriod } from "./period-selector";
 
 **Step 3: Run typecheck**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No errors
 
 **Step 4: Commit**
@@ -337,7 +337,7 @@ export { StatCardWithDelta, calculateDelta } from "./stat-card-with-delta";
 
 **Step 3: Run typecheck**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No errors
 
 **Step 4: Commit**
@@ -598,7 +598,7 @@ export { TrendChart } from "./trend-chart";
 
 **Step 3: Run typecheck**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No errors
 
 **Step 4: Commit**
@@ -968,7 +968,7 @@ After the closing `</div>` of the two-column layout (the `grid gap-6 lg:grid-col
 
 **Step 4: Run typecheck and lint**
 
-Run: `pnpm tsc --noEmit && pnpm lint`
+Run: `bun tsc --noEmit && bun lint`
 Expected: No errors
 
 **Step 5: Commit**
@@ -1091,7 +1091,7 @@ After the "Inventory by Category" section and before the AI alerts, add:
 
 **Step 4: Run typecheck and lint**
 
-Run: `pnpm tsc --noEmit && pnpm lint`
+Run: `bun tsc --noEmit && bun lint`
 Expected: No errors
 
 **Step 5: Commit**
@@ -1232,7 +1232,7 @@ Note: `formatCurrency` already exists in this file's helper functions.
 
 **Step 4: Run typecheck and lint**
 
-Run: `pnpm tsc --noEmit && pnpm lint`
+Run: `bun tsc --noEmit && bun lint`
 Expected: No errors
 
 **Step 5: Commit**
@@ -1250,22 +1250,22 @@ git commit -m "feat: add sales dashboard trends with revenue and order charts"
 
 **Step 1: Run full test suite**
 
-Run: `pnpm vitest run`
+Run: `bun vitest run`
 Expected: All tests pass
 
 **Step 2: Run full type check**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No errors
 
 **Step 3: Run linter**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No errors (or only pre-existing warnings)
 
 **Step 4: Run build**
 
-Run: `pnpm build`
+Run: `bun build`
 Expected: Build succeeds
 
 **Step 5: Manual smoke test**

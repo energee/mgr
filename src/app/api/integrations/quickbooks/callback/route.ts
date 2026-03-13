@@ -12,7 +12,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens, saveTokens } from "@/lib/quickbooks";
-import { log } from "@/lib/client-logger";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest): Promise<Response> {
   // Verify user is authenticated via session cookie
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     settingsUrl.searchParams.set("qbo_connected", "true");
     return NextResponse.redirect(settingsUrl);
   } catch (err) {
-    log.error("[QBO Callback] Token exchange failed:", err);
+    logger.error({ err: err instanceof Error ? err : undefined }, "[QBO Callback] Token exchange failed");
     settingsUrl.searchParams.set("qbo_error", "Token exchange failed");
     return NextResponse.redirect(settingsUrl);
   }

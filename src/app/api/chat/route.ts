@@ -183,7 +183,7 @@ async function resolveApiKey(
 
   // Fall back to global key from system_settings.
   // Uses service role client (no cookie auth) to bypass RLS.
-  const adminDb = createAdminClient();
+  const adminDb = await createAdminClient();
   const { data: setting, error: settingError } = await adminDb
     .from("system_settings")
     .select("value")

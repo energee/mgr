@@ -8,9 +8,9 @@
 
 ## Task 30: CI Vulnerability Scanning on PRs
 
-**Problem**: `pnpm audit --audit-level=high` only runs on main branch pushes (e2e job), not during PR review.
+**Problem**: `bun pm audit --audit-level=high` only runs on main branch pushes (e2e job), not during PR review.
 
-**Solution**: Add `pnpm audit --audit-level=high` step to the `quality` job in `.github/workflows/test.yml` after the build step. Use `continue-on-error: true` (informational, non-blocking). Also fix any merge conflict markers in the file.
+**Solution**: Add `bun pm audit --audit-level=high` step to the `quality` job in `.github/workflows/test.yml` after the build step. Use `continue-on-error: true` (informational, non-blocking). Also fix any merge conflict markers in the file.
 
 ---
 
