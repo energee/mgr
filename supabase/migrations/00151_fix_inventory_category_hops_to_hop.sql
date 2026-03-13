@@ -4,6 +4,8 @@
 -- enum registry uses 'hop' (singular). The validation trigger (00040)
 -- was added after seeding, so existing rows bypassed validation.
 
+BEGIN;
+
 -- Temporarily disable the validation trigger to allow the update
 ALTER TABLE inventory_items DISABLE TRIGGER validate_catalog_type;
 
@@ -12,3 +14,5 @@ SET category = 'hop'
 WHERE category = 'hops';
 
 ALTER TABLE inventory_items ENABLE TRIGGER validate_catalog_type;
+
+COMMIT;

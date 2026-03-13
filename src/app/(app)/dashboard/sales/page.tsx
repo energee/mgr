@@ -173,11 +173,14 @@ export default function SalesDashboardPage() {
 
       // Fetch pre-aggregated totals only for displayed orders
       const orderIds = (orders || []).map((o) => o.id);
-      const totals = orderIds.length > 0
-        ? (await dynamicFrom(supabase, "order_totals")
-            .select("order_id, total_value")
-            .in("order_id", orderIds)).data
-        : [];
+      let totals: { order_id: string; total_value: number }[] = [];
+      if (orderIds.length > 0) {
+        const { data, error: totalsError } = await dynamicFrom(supabase, "order_totals")
+          .select("order_id, total_value")
+          .in("order_id", orderIds);
+        if (totalsError) throw totalsError;
+        totals = data ?? [];
+      }
 
       const totalMap = new Map<string, number>();
       for (const t of totals ?? []) {

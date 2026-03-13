@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
   // Ensure user_profiles has admin role (idempotent — runs every login)
   if (testUser) {
-    await admin.from("user_profiles").upsert(
+    const { error: upsertError } = await admin.from("user_profiles").upsert(
       {
         id: testUser.id,
         email: TEST_EMAIL,
@@ -55,6 +55,12 @@ export async function GET(request: NextRequest) {
       },
       { onConflict: "id" },
     );
+    if (upsertError) {
+      return NextResponse.json(
+        { error: "Failed to upsert user profile", detail: upsertError.message },
+        { status: 500 },
+      );
+    }
   }
 
   // Sign in via the regular server client (sets session cookies)
