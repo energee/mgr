@@ -72,7 +72,6 @@ export function FermentablesSection() {
   const { isDirty } = form.formState;
 
   // Sync yeast/attenuation to context
-  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedYeast = form.watch("yeast_id");
   const watchedAttenuation = form.watch("target_attenuation");
   const watchedPitchRate = form.watch("target_pitching_rate");
