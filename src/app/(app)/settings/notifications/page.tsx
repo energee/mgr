@@ -34,6 +34,7 @@ import { dynamicFrom } from "@/services/types";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useIsMac } from "@/hooks/use-is-mac";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { log } from "@/lib/client-logger";
 
 
 // =============================================================================
@@ -147,7 +148,7 @@ export default function NotificationPreferencesPage() {
       toast.success("Preferences saved");
     },
     onError: (error) => {
-      console.error("Failed to save preferences:", error);
+      log.error("Failed to save preferences:", error);
       toast.error("Failed to save preferences");
     },
   });

@@ -7,6 +7,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { dynamicRpc } from "@/services/types";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -71,7 +72,7 @@ export async function calculateIngredientDemand(
   });
 
   if (error) {
-    console.error("Error calculating ingredient demand:", error);
+    log.error("Error calculating ingredient demand:", error);
     throw error;
   }
 
@@ -91,7 +92,7 @@ export async function calculateIngredientShortfalls(
   });
 
   if (error) {
-    console.error("Error calculating ingredient shortfalls:", error);
+    log.error("Error calculating ingredient shortfalls:", error);
     throw error;
   }
 

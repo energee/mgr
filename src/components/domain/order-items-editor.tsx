@@ -48,6 +48,7 @@ import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { orderKeys, finishedGoodKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -237,7 +238,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       });
 
       if (error) {
-        console.error("Price lookup error:", error);
+        log.error("Price lookup error:", error);
         return null;
       }
 
@@ -246,7 +247,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       }
       return null;
     } catch (e) {
-      console.error("Price lookup failed:", e);
+      log.error("Price lookup failed:", e);
       return null;
     }
   }, [effectiveCustomerId, supabase]);

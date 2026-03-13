@@ -21,6 +21,7 @@ import {
 import { useNotifications, type Notification } from "@/contexts/notifications";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Helper Functions
@@ -182,7 +183,7 @@ export function NotificationBell() {
     try {
       await markAsRead(id);
     } catch (error) {
-      console.error("Failed to mark notification as read:", error);
+      log.error("Failed to mark notification as read:", error);
     }
   };
 
@@ -190,7 +191,7 @@ export function NotificationBell() {
     try {
       await dismiss(id);
     } catch (error) {
-      console.error("Failed to dismiss notification:", error);
+      log.error("Failed to dismiss notification:", error);
     }
   };
 
@@ -198,7 +199,7 @@ export function NotificationBell() {
     try {
       await markAllAsRead();
     } catch (error) {
-      console.error("Failed to mark all notifications as read:", error);
+      log.error("Failed to mark all notifications as read:", error);
     }
   };
 

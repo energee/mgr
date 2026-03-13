@@ -47,6 +47,7 @@ import { Loader2, PackageCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { resolveCatalogNames } from "@/entities/po-line-item";
 import { poReceiveKeys, entityKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -242,7 +243,7 @@ export function POAcceptInventoryDialog({
       onClose();
     },
     onError: (error) => {
-      console.error("Accept into inventory error:", error);
+      log.error("Accept into inventory error:", error);
       toast.error("Failed to accept items into inventory");
     },
   });

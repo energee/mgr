@@ -9,6 +9,7 @@ import { withAuth } from "@/lib/api/auth";
 import { successResponse } from "@/lib/api/response";
 import { revokeToken, clearTokens } from "@/lib/quickbooks";
 import { createAdminClient } from "@/lib/supabase/server";
+import { log } from "@/lib/client-logger";
 
 // Supabase requires a WHERE clause for deletes; use a nil UUID that will never match a real row
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
@@ -28,7 +29,7 @@ export const POST = withAuth(async () => {
     await clearQBOData();
     return successResponse({ disconnected: true });
   } catch (err) {
-    console.error("[QBO Disconnect] Error:", err);
+    log.error("[QBO Disconnect] Error:", err);
     // Still clear data even if revoke fails
     await clearQBOData();
     return successResponse({ disconnected: true, revokeError: true });

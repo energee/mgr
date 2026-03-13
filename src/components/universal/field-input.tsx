@@ -41,6 +41,7 @@ import { UnitInput } from "@/components/ui/unit-input";
 import { X } from "lucide-react";
 import type { FC } from "react";
 import { getColSpanClass } from "./field-utils";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Minimal field shape (compatible with both EntityFieldDef and UnifiedFieldDef)
@@ -360,7 +361,7 @@ export function renderFieldInput(
 
     case "unit":
       if (!field.unitType) {
-        console.warn(`Field ${field.name} has type "unit" but no unitType specified`);
+        log.warn(`Field ${field.name} has type "unit" but no unitType specified`);
         return (
           <Input
             id={field.name}

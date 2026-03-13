@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Truck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { transferKeys, entityKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -247,7 +248,7 @@ export function ShipTransferDialog({
       onClose();
     },
     onError: (error) => {
-      console.error("Ship transfer error:", error);
+      log.error("Ship transfer error:", error);
       toast.error("Failed to ship transfer", {
         description:
           error instanceof Error ? error.message : "An error occurred",

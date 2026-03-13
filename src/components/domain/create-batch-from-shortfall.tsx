@@ -37,6 +37,7 @@ import {
 import { Loader2, FlaskConical, Calendar, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductionShortfall } from "@/types/planning";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -179,7 +180,7 @@ export function CreateBatchFromShortfall({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Create batch error:", error);
+      log.error("Create batch error:", error);
       const message = error instanceof Error ? error.message : "Failed to create batch";
       toast.error(message);
     },

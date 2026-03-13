@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { orderKeys, inventoryKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
 import { useBrands, usePackagingFormats } from "@/hooks/use-catalog";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -147,7 +148,7 @@ export function OrderAllocation({
       onSuccess?.();
     },
     onError: (error) => {
-      console.error("Allocation error:", error);
+      log.error("Allocation error:", error);
       toast.error("Failed to allocate inventory");
     },
   });

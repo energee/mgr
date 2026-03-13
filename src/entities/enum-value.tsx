@@ -10,6 +10,7 @@ import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createClient } from "@/lib/supabase/client";
+import { log } from "@/lib/client-logger";
 
 type EnumValue = Database["public"]["Tables"]["enum_values"]["Row"];
 
@@ -61,7 +62,7 @@ export async function fetchEnumTypes(): Promise<{ value: string; label: string }
     .order("enum_type");
 
   if (error) {
-    console.error("Failed to fetch enum types:", error);
+    log.error("Failed to fetch enum types:", error);
     return [];
   }
 

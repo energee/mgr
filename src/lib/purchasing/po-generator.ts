@@ -7,6 +7,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { IngredientShortfall } from "./demand-calculator";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -127,7 +128,7 @@ export async function generateNextPONumber(): Promise<string> {
     .limit(1);
 
   if (error) {
-    console.error("Error getting last PO number:", error);
+    log.error("Error getting last PO number:", error);
     throw error;
   }
 
@@ -180,7 +181,7 @@ export async function createDraftPOFromShortfall(
     .single();
 
   if (poError) {
-    console.error("Error creating PO:", poError);
+    log.error("Error creating PO:", poError);
     throw poError;
   }
 
@@ -197,7 +198,7 @@ export async function createDraftPOFromShortfall(
     });
 
   if (lineError) {
-    console.error("Error creating PO line item:", lineError);
+    log.error("Error creating PO line item:", lineError);
     // Delete the PO if line item creation fails
     await supabase.from("purchase_orders").delete().eq("id", po.id);
     throw lineError;
@@ -235,7 +236,7 @@ export async function createDraftPO(draft: PODraft): Promise<string> {
     .single();
 
   if (poError) {
-    console.error("Error creating PO:", poError);
+    log.error("Error creating PO:", poError);
     throw poError;
   }
 
@@ -254,7 +255,7 @@ export async function createDraftPO(draft: PODraft): Promise<string> {
     .insert(lineItems);
 
   if (lineError) {
-    console.error("Error creating PO line items:", lineError);
+    log.error("Error creating PO line items:", lineError);
     // Delete the PO if line items creation fails
     await supabase.from("purchase_orders").delete().eq("id", po.id);
     throw lineError;

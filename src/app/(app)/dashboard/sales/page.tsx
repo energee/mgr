@@ -23,6 +23,7 @@ import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency as formatCurrencyBase } from "@/lib/format";
+import { log } from "@/lib/client-logger";
 
 /** Sales dashboard uses whole-dollar formatting for cleaner high-level display. */
 const formatCurrency = (v: number | null | undefined) => formatCurrencyBase(v, 0);
@@ -430,7 +431,7 @@ function SalesTrends() {
         p_days: period,
       });
       if (error) {
-        console.error("Failed to fetch sales trends:", error);
+        log.error("Failed to fetch sales trends:", error);
         return [];
       }
       return (data || []) as Array<{

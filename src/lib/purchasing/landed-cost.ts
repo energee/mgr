@@ -6,6 +6,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -48,7 +49,7 @@ export async function calculateLandedCost(
   });
 
   if (error) {
-    console.error("Error calculating landed cost:", error);
+    log.error("Error calculating landed cost:", error);
     throw error;
   }
 
@@ -71,7 +72,7 @@ export async function getLandedCostSummary(
     .single();
 
   if (poError) {
-    console.error("Error fetching PO:", poError);
+    log.error("Error fetching PO:", poError);
     throw poError;
   }
 

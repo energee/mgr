@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dynamicOptionsKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { dynamicFrom } from "@/services/types";
+import { log } from "@/lib/client-logger";
 
 // Minimal field shape accepted by the hook - covers both EntityFieldDef and UnifiedFieldDef
 interface DynamicOptionsField {
@@ -107,7 +108,7 @@ export function useDynamicOptions(fields: DynamicOptionsField[]): DynamicOptions
             .order(relation.displayField);
 
           if (error) {
-            console.error(`Failed to fetch options for ${field.name}:`, error);
+            log.error(`Failed to fetch options for ${field.name}:`, error);
             return { fieldName: field.name, options: [] };
           }
 

@@ -37,6 +37,7 @@ import { ArrowLeft, Plus, Package, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { OrderAllocation } from "@/components/domain/order-allocation";
 import { orderKeys, inventoryKeys } from "@/lib/query-keys";
+import { log } from "@/lib/client-logger";
 
 // =============================================================================
 // Types
@@ -154,7 +155,7 @@ export default function OrderAllocationsPage({
       setDeleteId(null);
     },
     onError: (error) => {
-      console.error("Delete error:", error);
+      log.error("Delete error:", error);
       toast.error("Failed to remove allocation");
     },
   });
