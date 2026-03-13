@@ -24,11 +24,14 @@ const serverEnvSchema = z.object({
 /**
  * Client-safe env vars (NEXT_PUBLIC_* prefix).
  * Validated at import time — throws on missing vars.
+ * Set SKIP_ENV_VALIDATION=1 to bypass (e.g. during `next build` without env vars).
  */
-export const clientEnv = clientEnvSchema.parse({
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-});
+export const clientEnv = process.env.SKIP_ENV_VALIDATION
+  ? (process.env as unknown as z.infer<typeof clientEnvSchema>)
+  : clientEnvSchema.parse({
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    });
 
 /**
  * Server-only env vars. Call from server components, API routes,
