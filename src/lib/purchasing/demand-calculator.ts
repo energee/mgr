@@ -5,9 +5,14 @@
  * batches and identifying shortfalls requiring purchase orders.
  */
 
-import { createClient } from "@/lib/supabase/client";
 import { dynamicRpc } from "@/services/types";
 import { log } from "@/lib/client-logger";
+
+/** Lazy-import supabase client to avoid env validation at module load time. */
+async function getSupabase() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
 
 // =============================================================================
 // Types
@@ -63,7 +68,7 @@ export async function calculateIngredientDemand(
   includePlanned = true,
   includeFermenting = true
 ): Promise<IngredientDemand[]> {
-  const supabase = createClient();
+  const supabase = await getSupabase();
 
   const { data, error } = await dynamicRpc(supabase, "calculate_ingredient_demand", {
     p_horizon_weeks: horizonWeeks,
@@ -85,7 +90,7 @@ export async function calculateIngredientDemand(
 export async function calculateIngredientShortfalls(
   horizonWeeks = 8
 ): Promise<IngredientShortfall[]> {
-  const supabase = createClient();
+  const supabase = await getSupabase();
 
   const { data, error } = await dynamicRpc(supabase, "calculate_ingredient_shortfalls", {
     p_horizon_weeks: horizonWeeks,

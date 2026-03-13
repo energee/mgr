@@ -5,9 +5,14 @@
  * Groups shortfalls by supplier and creates draft POs with line items.
  */
 
-import { createClient } from "@/lib/supabase/client";
 import type { IngredientShortfall } from "./demand-calculator";
 import { log } from "@/lib/client-logger";
+
+/** Lazy-import supabase client to avoid env validation at module load time. */
+async function getSupabase() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
 
 // =============================================================================
 // Types
@@ -116,7 +121,7 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
  * Generate next PO number in format PO-YYYY-NNN
  */
 export async function generateNextPONumber(): Promise<string> {
-  const supabase = createClient();
+  const supabase = await getSupabase();
   const year = new Date().getFullYear();
   const prefix = `PO-${year}-`;
 
@@ -151,7 +156,7 @@ export async function createDraftPOFromShortfall(
   shortfall: IngredientShortfall,
   poNumber?: string
 ): Promise<string> {
-  const supabase = createClient();
+  const supabase = await getSupabase();
 
   // Generate PO number if not provided
   const finalPONumber = poNumber || await generateNextPONumber();
@@ -211,7 +216,7 @@ export async function createDraftPOFromShortfall(
  * Create a draft PO from a PODraft object (multiple line items)
  */
 export async function createDraftPO(draft: PODraft): Promise<string> {
-  const supabase = createClient();
+  const supabase = await getSupabase();
 
   // Generate PO number
   const poNumber = await generateNextPONumber();
