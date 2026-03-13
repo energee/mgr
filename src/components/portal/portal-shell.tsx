@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SafeSvg } from "@/components/ui/safe-svg";
 import { LogOut } from "lucide-react";
 
-interface PortalShellProps {
+type PortalShellProps = {
   children: React.ReactNode;
   customers: { id: string; name: string }[];
   breweryName?: string | null;

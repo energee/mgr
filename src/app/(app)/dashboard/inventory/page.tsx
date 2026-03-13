@@ -28,7 +28,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface LowStockItem {
+type LowStockItem = {
   id: string;
   name: string;
   category: string;
@@ -37,7 +37,7 @@ interface LowStockItem {
   unit: string;
 }
 
-interface ExpiringLot {
+type ExpiringLot = {
   id: string;
   item_name: string;
   lot_number: string;
@@ -47,7 +47,7 @@ interface ExpiringLot {
   days_until_expiry: number;
 }
 
-interface InventorySummary {
+type InventorySummary = {
   category: string;
   item_count: number;
   total_value: number;

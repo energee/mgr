@@ -19,7 +19,7 @@ const PERIODS = [
 
 const DEFAULT_PERIOD = 30;
 
-interface PeriodSelectorProps {
+type PeriodSelectorProps = {
   /** Additional className for the container */
   className?: string;
 }

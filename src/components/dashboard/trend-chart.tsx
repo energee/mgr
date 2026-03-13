@@ -38,7 +38,7 @@ import { format, parseISO } from "date-fns";
 // Types
 // =============================================================================
 
-interface TrendSeries {
+type TrendSeries = {
   /** Data key in the data array */
   key: string;
   /** Display label in tooltip/legend */
@@ -47,7 +47,7 @@ interface TrendSeries {
   color?: string;
 }
 
-interface TrendChartProps {
+type TrendChartProps = {
   /** Array of data points, each with a date field and metric fields */
   data: Array<Record<string, unknown>>;
   /** Key in data for the x-axis date values (ISO date string) */

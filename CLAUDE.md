@@ -6,6 +6,7 @@
 - Backend: PostgREST with PostgreSQL
 - Config: JSON, YAML
 - Always prefer TypeScript over plain JavaScript for new files
+- Always use `type` aliases, never `interface`, unless inside a `declare module` block (which requires `interface` for declaration merging)
 
 ## Quick Context
 

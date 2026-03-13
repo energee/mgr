@@ -14,7 +14,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-export interface EnumValue {
+export type EnumValue = {
   value: string;
   label: string;
   description: string | null;
@@ -25,7 +25,7 @@ export interface EnumValue {
   metadata: Json;
 }
 
-export interface EnumMetadata {
+export type EnumMetadata = {
   next_states?: string[];
   permissions?: string[];
   temp_range_f?: [number, number];

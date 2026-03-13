@@ -15,7 +15,7 @@ const ChatPanel = dynamic(
   { ssr: false }
 );
 
-interface ChatLayoutProps {
+type ChatLayoutProps = {
   children: React.ReactNode;
   header: React.ReactNode;
 }

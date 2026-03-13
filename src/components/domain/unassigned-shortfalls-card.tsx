@@ -41,7 +41,7 @@ import { getCatalogTypeDisplay } from "@/lib/purchasing/demand-calculator";
 // Types
 // =============================================================================
 
-interface UnassignedShortfallsCardProps {
+type UnassignedShortfallsCardProps = {
   shortfalls: IngredientShortfall[];
   onAssignSupplier: (
     catalogType: string,

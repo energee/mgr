@@ -1,12 +1,12 @@
 "use client";
 import { createContext, useContext } from "react";
 
-export interface PortalCustomer {
+export type PortalCustomer = {
   id: string;
   name: string;
 }
 
-interface PortalContextValue {
+type PortalContextValue = {
   customers: PortalCustomer[];
   customerIds: string[];
 }

@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 
 // Pending type generation -- anthropic_api_key is added by migration 00064
 // but not yet in generated Supabase types. Remove after next `supabase gen types`.
-interface UserPrefsApiKeyRow {
+type UserPrefsApiKeyRow = {
   anthropic_api_key: string | null;
 }
 

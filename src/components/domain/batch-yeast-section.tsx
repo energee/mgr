@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Types
 // ---------------------------------------------------------------------------
 
-interface BatchYeastSummaryRow {
+type BatchYeastSummaryRow = {
   event_id: string;
   pitch_id: string;
   strain_id: string;
@@ -42,7 +42,7 @@ interface BatchYeastSummaryRow {
   pitched_at: string | null;
 }
 
-interface BatchYeastSectionProps {
+type BatchYeastSectionProps = {
   /** Entity data passed by EntityDetailUnified section component pattern */
   data: {
     id: string;

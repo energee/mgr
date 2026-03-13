@@ -61,7 +61,7 @@ function getPriorityColor(priority: Notification["priority"]): string {
 // Notification Item
 // =============================================================================
 
-interface NotificationItemProps {
+type NotificationItemProps = {
   notification: Notification;
   onMarkAsRead: (id: string) => void;
   onDismiss: (id: string) => void;

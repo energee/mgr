@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Package } from "lucide-react";
 
-interface POReceiveDialogProps {
+type POReceiveDialogProps = {
   poLineItemId: string;
   itemDescription: string;
   outstandingQty: number;

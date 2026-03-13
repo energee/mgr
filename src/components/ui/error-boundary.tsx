@@ -6,12 +6,12 @@ import { Button } from "./button";
 import { Card, CardContent, CardHeader, CardTitle } from "./card";
 import { AlertTriangle } from "lucide-react";
 
-interface Props {
+type Props = {
   children: ReactNode;
   fallback?: ReactNode;
 }
 
-interface State {
+type State = {
   hasError: boolean;
   error?: Error;
 }

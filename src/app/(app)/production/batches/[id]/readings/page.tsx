@@ -33,7 +33,7 @@ import type { Json } from "@/types/supabase";
 import { batchKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
 
-interface BatchLog {
+type BatchLog = {
   id: string;
   batch_id: string;
   log_type: string;

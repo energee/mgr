@@ -12,7 +12,7 @@ import { getTaxClassLabel } from "@/lib/ttb-utils";
 // CSV Export
 // =============================================================================
 
-interface CSVRow {
+type CSVRow = {
   [key: string]: string | number | null | undefined;
 }
 
@@ -76,7 +76,7 @@ export function downloadCSV(csv: string, filename: string): void {
 // TTB Report Specific Exports
 // =============================================================================
 
-export interface TTBReportData {
+export type TTBReportData = {
   report_year: number;
   report_month: number;
   report_period: string;
@@ -97,7 +97,7 @@ export interface TTBReportData {
   in_process_ending_bbl: number;
 }
 
-export interface TTBBatchData {
+export type TTBBatchData = {
   batch_number: string;
   name: string;
   status: string;

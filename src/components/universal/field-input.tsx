@@ -47,7 +47,7 @@ import { log } from "@/lib/client-logger";
 // Minimal field shape (compatible with both EntityFieldDef and UnifiedFieldDef)
 // =============================================================================
 
-interface FieldDef {
+type FieldDef = {
   name: string;
   label: string;
   type?: string;
@@ -71,7 +71,7 @@ interface FieldDef {
 // ARIA props for accessible form fields
 // =============================================================================
 
-interface FieldAriaProps {
+type FieldAriaProps = {
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
   "aria-required"?: boolean;
@@ -81,7 +81,7 @@ interface FieldAriaProps {
 // FieldInput Props
 // =============================================================================
 
-export interface FieldInputProps {
+export type FieldInputProps = {
   /** Field definition (EntityFieldDef or UnifiedFieldDef) */
   field: FieldDef;
 

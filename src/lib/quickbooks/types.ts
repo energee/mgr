@@ -1,10 +1,10 @@
 // QBO API base types
-export interface QBORef {
+export type QBORef = {
   value: string;
   name?: string;
 }
 
-export interface QBOAddress {
+export type QBOAddress = {
   Line1?: string;
   Line2?: string;
   City?: string;
@@ -13,16 +13,16 @@ export interface QBOAddress {
   Country?: string;
 }
 
-export interface QBOEmailAddress {
+export type QBOEmailAddress = {
   Address?: string;
 }
 
-export interface QBOPhoneNumber {
+export type QBOPhoneNumber = {
   FreeFormNumber?: string;
 }
 
 // QBO Customer (maps from MGR Customer)
-export interface QBOCustomer {
+export type QBOCustomer = {
   Id?: string;
   DisplayName: string;
   CompanyName?: string;
@@ -35,7 +35,7 @@ export interface QBOCustomer {
 }
 
 // QBO Vendor (maps from MGR Supplier)
-export interface QBOVendor {
+export type QBOVendor = {
   Id?: string;
   DisplayName: string;
   CompanyName?: string;
@@ -46,7 +46,7 @@ export interface QBOVendor {
 }
 
 // QBO Invoice line
-export interface QBOInvoiceLine {
+export type QBOInvoiceLine = {
   Amount: number;
   Description?: string;
   DetailType: "SalesItemLineDetail";
@@ -57,7 +57,7 @@ export interface QBOInvoiceLine {
 }
 
 // QBO Invoice (maps from MGR Order)
-export interface QBOInvoice {
+export type QBOInvoice = {
   Id?: string;
   DocNumber?: string;
   CustomerRef: QBORef;
@@ -69,7 +69,7 @@ export interface QBOInvoice {
 }
 
 // QBO Bill line
-export interface QBOBillLine {
+export type QBOBillLine = {
   Amount: number;
   Description?: string;
   DetailType: "AccountBasedExpenseLineDetail";
@@ -79,7 +79,7 @@ export interface QBOBillLine {
 }
 
 // QBO Bill (maps from MGR Purchase Order)
-export interface QBOBill {
+export type QBOBill = {
   Id?: string;
   DocNumber?: string;
   VendorRef: QBORef;
@@ -91,7 +91,7 @@ export interface QBOBill {
 }
 
 // QBO Account (chart of accounts)
-export interface QBOAccount {
+export type QBOAccount = {
   Id: string;
   Name: string;
   AccountType: string;
@@ -101,13 +101,13 @@ export interface QBOAccount {
 }
 
 // QBO Company Info
-export interface QBOCompanyInfo {
+export type QBOCompanyInfo = {
   CompanyName: string;
   Country?: string;
 }
 
 // API response wrapper
-export interface QBOQueryResponse<T> {
+export type QBOQueryResponse<T> = {
   QueryResponse: {
     [key: string]: T[] | number | undefined;
     startPosition?: number;
@@ -116,7 +116,7 @@ export interface QBOQueryResponse<T> {
   };
 }
 
-export interface QBOEntityResponse<T> {
+export type QBOEntityResponse<T> = {
   [key: string]: T;
 }
 
@@ -126,7 +126,7 @@ export type QBOEntityType = "Customer" | "Vendor" | "Invoice" | "Bill";
 export type SyncAction = "create" | "update" | "retry";
 export type SyncStatus = "pending" | "success" | "error";
 
-export interface SyncMapping {
+export type SyncMapping = {
   id: string;
   entity_type: SyncEntityType;
   entity_id: string;
@@ -135,7 +135,7 @@ export interface SyncMapping {
   last_synced_at: string;
 }
 
-export interface SyncLogEntry {
+export type SyncLogEntry = {
   id: string;
   entity_type: SyncEntityType;
   entity_id: string;

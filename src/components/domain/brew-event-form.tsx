@@ -64,7 +64,7 @@ type EventFormValues = z.infer<typeof eventFormSchema>;
 // Component
 // =============================================================================
 
-interface BrewEventFormProps {
+type BrewEventFormProps = {
   onSubmit: (data: BrewEvent) => Promise<void>;
   onCancel?: () => void;
   isSubmitting?: boolean;

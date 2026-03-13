@@ -16,7 +16,7 @@ import { usePathname } from "next/navigation";
 // Page context parsing
 // ---------------------------------------------------------------------------
 
-interface PageContext {
+type PageContext = {
   section?: string;
   entityType?: string;
   entityId?: string;
@@ -93,7 +93,7 @@ function parsePageContext(pathname: string): PageContext | undefined {
 // Context
 // ---------------------------------------------------------------------------
 
-interface ChatContextValue {
+type ChatContextValue = {
   isOpen: boolean;
   toggle: () => void;
   close: () => void;
@@ -113,7 +113,7 @@ export function useChatContext() {
 // Provider
 // ---------------------------------------------------------------------------
 
-interface ChatProviderProps {
+type ChatProviderProps = {
   children: ReactNode;
 }
 

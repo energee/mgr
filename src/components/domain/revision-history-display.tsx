@@ -9,7 +9,7 @@
 
 import { RevisionHistory } from "./revision-history";
 
-interface RevisionHistoryDisplayProps {
+type RevisionHistoryDisplayProps = {
   data: { id: string | null };
   /** Table name to query revisions for */
   entityType: string;

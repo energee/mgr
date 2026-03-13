@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface WaypointsIconHandle {
+export type WaypointsIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface WaypointsIconProps extends HTMLAttributes<HTMLDivElement> {
+type WaypointsIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

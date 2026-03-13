@@ -15,7 +15,7 @@ import { log } from "@/lib/client-logger";
 /**
  * Order demand with line items for planning
  */
-export interface OrderDemand {
+export type OrderDemand = {
   order_id: string;
   order_number: string;
   customer_id: string | null;
@@ -30,7 +30,7 @@ export interface OrderDemand {
 /**
  * Order item with TBD support
  */
-export interface OrderItemDemand {
+export type OrderItemDemand = {
   item_id: string;
   brand_id: string | null;
   brand_name: string | null;
@@ -47,7 +47,7 @@ export interface OrderItemDemand {
 /**
  * Aggregated production requirement
  */
-export interface ProductionRequirement {
+export type ProductionRequirement = {
   brand_id: string | null;
   brand_name: string | null;
   selling_format_id: string | null;
@@ -72,7 +72,7 @@ export interface ProductionRequirement {
 /**
  * Summary statistics for backward planning
  */
-export interface BackwardPlanningSummary {
+export type BackwardPlanningSummary = {
   totalOrders: number;
   totalLineItems: number;
   tbdItems: number;

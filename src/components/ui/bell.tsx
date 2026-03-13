@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface BellIconHandle {
+export type BellIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface BellIconProps extends HTMLAttributes<HTMLDivElement> {
+type BellIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

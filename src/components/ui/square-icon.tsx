@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-interface SquareIconProps {
+type SquareIconProps = {
   className?: string;
 }
 

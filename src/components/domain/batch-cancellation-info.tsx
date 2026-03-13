@@ -13,7 +13,7 @@
 import { format } from "date-fns";
 import { Archive, XCircle } from "lucide-react";
 
-interface BatchCancellationInfoProps {
+type BatchCancellationInfoProps = {
   data: {
     status?: string | null;
     // Cancellation fields (for planned batches)

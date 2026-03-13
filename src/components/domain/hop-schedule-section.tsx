@@ -24,7 +24,7 @@ import { toast } from "sonner";
 /** Barrels to gallons conversion factor */
 const BBL_TO_GAL = 31.0;
 
-interface HopScheduleSectionProps {
+type HopScheduleSectionProps = {
   data: {
     id: string;
     batch_size_bbl?: number | null;

@@ -13,7 +13,7 @@ import { KegOwnerDepositsEditor } from "@/components/domain/keg-owner-deposits-e
 // Types
 // =============================================================================
 
-interface KegOwner {
+type KegOwner = {
   id: string;
   name: string;
   code: string;

@@ -23,7 +23,7 @@ import {
   Beer,
 } from "lucide-react";
 
-interface BatchQuickLinksProps {
+type BatchQuickLinksProps = {
   data: {
     id: string;
   };

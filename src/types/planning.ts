@@ -9,7 +9,7 @@
 // Shortfall Calculation Result
 // =============================================================================
 
-export interface ProductionShortfall {
+export type ProductionShortfall = {
   brand_id: string;
   brand_name: string;
   selling_format_id: string;
@@ -31,7 +31,7 @@ export interface ProductionShortfall {
 // Demand Aggregation
 // =============================================================================
 
-export interface DemandByProduct {
+export type DemandByProduct = {
   brand_id: string;
   selling_format_id: string;
   demand_week: string;
@@ -47,7 +47,7 @@ export interface DemandByProduct {
 // Supply Aggregation
 // =============================================================================
 
-export interface SupplyByProduct {
+export type SupplyByProduct = {
   brand_id: string;
   selling_format_id: string;
   total_quantity: number;
@@ -60,7 +60,7 @@ export interface SupplyByProduct {
 // In-Production Batches
 // =============================================================================
 
-export interface BatchInProduction {
+export type BatchInProduction = {
   brand_id: string;
   batch_id: string;
   batch_number: string;
@@ -79,7 +79,7 @@ export interface BatchInProduction {
 // Planning Filters & Options
 // =============================================================================
 
-export interface PlanningFilters {
+export type PlanningFilters = {
   includeDrafts: boolean;
   horizonWeeks: number;
   brandId?: string;
@@ -95,7 +95,7 @@ export const DEFAULT_PLANNING_FILTERS: PlanningFilters = {
 // Planning Summary (for dashboard card)
 // =============================================================================
 
-export interface PlanningSummary {
+export type PlanningSummary = {
   totalDemand: number;
   availableSupply: number;
   inProduction: number;

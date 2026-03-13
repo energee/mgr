@@ -75,13 +75,13 @@ const additionSchema = z.object({
 
 type AdditionFormValues = z.infer<typeof additionSchema>;
 
-interface CatalogItem {
+type CatalogItem = {
   id: string;
   name: string;
   type?: string;
 }
 
-interface BatchAdditionFormProps {
+type BatchAdditionFormProps = {
   batchId: string;
   onSubmit: (data: BatchAddition) => Promise<void>;
   onCancel?: () => void;

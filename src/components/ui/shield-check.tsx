@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface ShieldCheckIconHandle {
+export type ShieldCheckIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface ShieldCheckIconProps extends HTMLAttributes<HTMLDivElement> {
+type ShieldCheckIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

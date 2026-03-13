@@ -63,7 +63,7 @@ import Link from "next/link";
 // =============================================================================
 
 /** A batch with its aggregated cost from allocations or recipe estimates */
-interface BatchCostRow {
+type BatchCostRow = {
   id: string;
   batch_number: string;
   name: string;

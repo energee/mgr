@@ -6,12 +6,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface BoxesIconHandle {
+export type BoxesIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface BoxesIconProps extends HTMLAttributes<HTMLDivElement> {
+type BoxesIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

@@ -14,14 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
-interface EntityErrorBoundaryProps {
+type EntityErrorBoundaryProps = {
   children: ReactNode;
   entity: EntityConfig<Record<string, unknown>>;
   /** Called when user clicks retry */
   onRetry?: () => void;
 }
 
-interface State {
+type State = {
   hasError: boolean;
   error?: Error;
 }

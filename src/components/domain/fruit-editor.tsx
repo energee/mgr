@@ -49,7 +49,7 @@ import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react"
 import { catalogKeys } from "@/lib/query-keys";
 
 // Types for fruit entries
-export interface FruitItem {
+export type FruitItem = {
   id?: string;
   fruit_id: string;
   amount: number;
@@ -66,7 +66,7 @@ export interface FruitItem {
   };
 }
 
-interface FruitCatalogItem {
+type FruitCatalogItem = {
   id: string;
   name: string;
   type: string;
@@ -74,7 +74,7 @@ interface FruitCatalogItem {
   sugar_content: number | null;
 }
 
-interface FruitEditorProps {
+type FruitEditorProps = {
   items: FruitItem[];
   onChange: (items: FruitItem[]) => void;
   disabled?: boolean;

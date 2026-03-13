@@ -8,7 +8,7 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 
-interface SyncResponse {
+type SyncResponse = {
   data?: unknown;
   error?: { message?: string; details?: unknown };
 }

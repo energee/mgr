@@ -52,7 +52,7 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 // Types
 // =============================================================================
 
-interface SessionLineItemRow {
+type SessionLineItemRow = {
   id: string;
   brand_id: string;
   brand_name: string;
@@ -69,12 +69,12 @@ interface SessionLineItemRow {
   }>;
 }
 
-interface SessionLineItemsEditorProps {
+type SessionLineItemsEditorProps = {
   sessionId: string;
   readOnly?: boolean;
 }
 
-interface NewItemState {
+type NewItemState = {
   brand_id: string;
   format_id: string;
   keg_owner_id: string;
@@ -96,7 +96,7 @@ const EMPTY_NEW_ITEM: NewItemState = {
 // Batch Selection
 // =============================================================================
 
-interface BatchOption {
+type BatchOption = {
   id: string;
   batch_number: string;
   name: string;

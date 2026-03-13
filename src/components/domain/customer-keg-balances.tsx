@@ -25,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Package, RotateCcw } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
-interface CustomerKegBalance {
+type CustomerKegBalance = {
   customer_id: string;
   customer_name: string;
   selling_format_id: string;
@@ -36,7 +36,7 @@ interface CustomerKegBalance {
   deposit_value: number;
 }
 
-interface CustomerKegBalancesProps {
+type CustomerKegBalancesProps = {
   customerId: string;
   showActions?: boolean;
 }

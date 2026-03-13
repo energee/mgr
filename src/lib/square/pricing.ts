@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { dollarsToCents } from "./utils";
 import { logger } from "@/lib/logger";
 
-interface TaproomPrice {
+type TaproomPrice = {
   brandId: string;
   sellingFormatId: string;
   priceCents: number;

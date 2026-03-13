@@ -54,7 +54,7 @@ import Link from "next/link";
 // =============================================================================
 
 /** Raw material lot row from inventory_lots_with_quantities + inventory_items */
-interface RawMaterialLot {
+type RawMaterialLot = {
   id: string | null;
   inventory_item_id: string | null;
   remaining_quantity: number | null;
@@ -67,7 +67,7 @@ interface RawMaterialLot {
 }
 
 /** Aggregated raw material row for display */
-interface RawMaterialRow {
+type RawMaterialRow = {
   itemName: string;
   category: string;
   totalQuantity: number;
@@ -77,7 +77,7 @@ interface RawMaterialRow {
 }
 
 /** Finished good row from finished_goods_with_availability */
-interface FinishedGoodRow {
+type FinishedGoodRow = {
   id: string | null;
   brand_name: string | null;
   package_type_name: string | null;
@@ -86,7 +86,7 @@ interface FinishedGoodRow {
 }
 
 /** Aggregated finished good row for display */
-interface FinishedGoodDisplayRow {
+type FinishedGoodDisplayRow = {
   brandName: string;
   packageType: string;
   quantity: number;

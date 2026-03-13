@@ -49,7 +49,7 @@ import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react"
 import { catalogKeys } from "@/lib/query-keys";
 
 // Types for spice entries
-export interface SpiceItem {
+export type SpiceItem = {
   id?: string;
   spice_id: string;
   amount: number;
@@ -67,7 +67,7 @@ export interface SpiceItem {
   };
 }
 
-interface SpiceCatalogItem {
+type SpiceCatalogItem = {
   id: string;
   name: string;
   type: string;
@@ -75,7 +75,7 @@ interface SpiceCatalogItem {
   typical_unit: string | null;
 }
 
-interface SpiceEditorProps {
+type SpiceEditorProps = {
   items: SpiceItem[];
   onChange: (items: SpiceItem[]) => void;
   disabled?: boolean;

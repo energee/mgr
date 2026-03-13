@@ -66,7 +66,7 @@ import { CreateBatchFromShortfall } from "@/components/domain/create-batch-from-
 // Types
 // =============================================================================
 
-interface TimelineBatch {
+type TimelineBatch = {
   id: string;
   batch_number: string;
   name: string;
@@ -83,7 +83,7 @@ interface TimelineBatch {
   estimated_ready_date?: string;
 }
 
-interface VesselInfo {
+type VesselInfo = {
   id: string;
   name: string;
   vessel_type: string;

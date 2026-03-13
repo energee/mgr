@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-interface ClaudeIconProps {
+type ClaudeIconProps = {
   className?: string;
 }
 

@@ -69,7 +69,7 @@ import {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-interface VariantHopItem {
+type VariantHopItem = {
   hop_id: string;
   hop_name?: string;
   weight_oz: number;
@@ -78,7 +78,7 @@ interface VariantHopItem {
   position: number;
 }
 
-interface VariantAdjunctItem {
+type VariantAdjunctItem = {
   adjunct_id: string;
   adjunct_name?: string;
   amount: number;
@@ -87,7 +87,7 @@ interface VariantAdjunctItem {
   position: number;
 }
 
-interface VariantFruitItem {
+type VariantFruitItem = {
   fruit_id: string;
   fruit_name?: string;
   amount: number;
@@ -96,7 +96,7 @@ interface VariantFruitItem {
   position: number;
 }
 
-interface VariantSpiceItem {
+type VariantSpiceItem = {
   spice_id: string;
   spice_name?: string;
   amount: number;
@@ -135,7 +135,7 @@ function newSimpleAddition(
   }
 }
 
-interface VariantItem {
+type VariantItem = {
   id?: string;
   name: string;
   description: string | null;
@@ -147,13 +147,13 @@ interface VariantItem {
   spices: VariantSpiceItem[];
 }
 
-interface CostData {
+type CostData = {
   id: string;
   est_total_cost: number | null;
   est_cost_per_bbl: number | null;
 }
 
-interface RecipeVariantEditorProps {
+type RecipeVariantEditorProps = {
   data: { id: string; [key: string]: unknown };
 }
 
@@ -177,14 +177,14 @@ const UNIT_OPTIONS = [
 
 // ── Catalog types ───────────────────────────────────────────────────────────
 
-interface HopCatalogItem {
+type HopCatalogItem = {
   id: string;
   name: string;
   origin: string | null;
   alpha_acid_typical: number | null;
 }
 
-interface SimpleAdditionCatalog {
+type SimpleAdditionCatalog = {
   id: string;
   name: string;
 }

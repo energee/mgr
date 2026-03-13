@@ -17,7 +17,7 @@ type CustomerBase = Database["public"]["Tables"]["customers"]["Row"];
 
 // Extended type for list/detail view (includes fields from customers_with_order_summary view)
 // Note: View fields are added here since they may not be in generated types yet
-interface Customer extends CustomerBase {
+type Customer = CustomerBase & {
   // Fields from sales_channels and pricing_tiers joins
   sales_channel_name?: string | null;
   price_tier_name?: string | null;

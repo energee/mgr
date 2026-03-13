@@ -50,7 +50,7 @@ import { catalogKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 // Types for sugar entries
-export interface SugarItem {
+export type SugarItem = {
   id?: string;
   sugar_id: string;
   weight_lbs: number;
@@ -67,7 +67,7 @@ export interface SugarItem {
   };
 }
 
-interface SugarCatalogItem {
+type SugarCatalogItem = {
   id: string;
   name: string;
   type: string;
@@ -76,7 +76,7 @@ interface SugarCatalogItem {
   fermentability: number | null;
 }
 
-interface SugarEditorProps {
+type SugarEditorProps = {
   items: SugarItem[];
   onChange: (items: SugarItem[]) => void;
   disabled?: boolean;

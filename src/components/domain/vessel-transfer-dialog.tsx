@@ -50,7 +50,7 @@ const vesselTransferSchema = z.object({
 
 type VesselTransferFormValues = z.infer<typeof vesselTransferSchema>;
 
-interface VesselTransferDialogProps {
+type VesselTransferDialogProps = {
   batchId: string;
   batchNumber: string;
   /** Current batch status, used to determine smart state suggestions. */

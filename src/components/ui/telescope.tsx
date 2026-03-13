@@ -7,12 +7,12 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface TelescopeIconHandle {
+export type TelescopeIconHandle = {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface TelescopeIconProps extends HTMLAttributes<HTMLDivElement> {
+type TelescopeIconProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 }
 

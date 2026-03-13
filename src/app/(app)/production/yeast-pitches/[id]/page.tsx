@@ -42,7 +42,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 // Types
 // =============================================================================
 
-interface PitchDetail {
+type PitchDetail = {
   id: string;
   strain_name: string | null;
   strain_form: string | null;
@@ -52,7 +52,7 @@ interface PitchDetail {
   harvest_date: string | null;
 }
 
-interface LineageSummary {
+type LineageSummary = {
   root_id: string;
   strain_name: string | null;
   original_cost: number | null;
@@ -62,7 +62,7 @@ interface LineageSummary {
   max_generations: number | null;
 }
 
-interface PitchEvent {
+type PitchEvent = {
   id: string;
   batch_id: string;
   quantity_lbs: number | null;
@@ -74,7 +74,7 @@ interface PitchEvent {
 // Page Component
 // =============================================================================
 
-interface YeastPitchDetailPageProps {
+type YeastPitchDetailPageProps = {
   params: Promise<{ id: string }>;
 }
 

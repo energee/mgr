@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 
 // Types
-export interface StyleComplianceResult {
+export type StyleComplianceResult = {
   recipe_id: string;
   recipe_name: string;
   style_name: string;
@@ -24,21 +24,21 @@ export interface StyleComplianceResult {
   overall_compliance: boolean;
 }
 
-export interface ParameterAnalysis {
+export type ParameterAnalysis = {
   value: number | null;
   min: number | null;
   max: number | null;
   status: "in_range" | "below_range" | "above_range" | "unknown";
 }
 
-export interface RecipeSuggestion {
+export type RecipeSuggestion = {
   category: string;
   severity: "info" | "warning" | "error";
   message: string;
   parameter: string;
 }
 
-export interface RecipeSuggestionsResult {
+export type RecipeSuggestionsResult = {
   recipe_id: string;
   recipe_name: string;
   suggestion_count: number;

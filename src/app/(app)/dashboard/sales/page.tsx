@@ -32,7 +32,7 @@ const formatCurrency = (v: number | null | undefined) => formatCurrencyBase(v, 0
 // Types
 // =============================================================================
 
-interface OrderStatusCounts {
+type OrderStatusCounts = {
   draft: number;
   confirmed: number;
   scheduled: number;
@@ -42,7 +42,7 @@ interface OrderStatusCounts {
   cancelled: number;
 }
 
-interface RecentOrder {
+type RecentOrder = {
   id: string;
   order_number: string;
   status: string;
@@ -51,7 +51,7 @@ interface RecentOrder {
   total_value: number;
 }
 
-interface CustomerRevenue {
+type CustomerRevenue = {
   customer_id: string;
   customer_name: string;
   order_count: number;
@@ -59,7 +59,7 @@ interface CustomerRevenue {
   sales_channel?: string;
 }
 
-interface ProductMix {
+type ProductMix = {
   brand_id: string;
   brand_name: string;
   total_quantity: number;

@@ -45,7 +45,7 @@ import Link from "next/link";
 // Types
 // ---------------------------------------------------------------------------
 
-interface OrderItem {
+type OrderItem = {
   id: string;
   brand_id: string;
   selling_format_id: string | null;
@@ -55,7 +55,7 @@ interface OrderItem {
   selling_formats: { id: string; name: string } | null;
 }
 
-interface FinishedGoodAvailability {
+type FinishedGoodAvailability = {
   brand_id: string;
   selling_format_id: string | null;
   available_quantity: number;
@@ -63,7 +63,7 @@ interface FinishedGoodAvailability {
   selling_formats: { id: string; name: string } | null;
 }
 
-interface ItemChange {
+type ItemChange = {
   changeType: "modify" | "remove" | "add" | null;
   orderItemId?: string;
   brandId: string;

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { ClipboardList, Package, ArrowRight, ListPlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface OrderQuickLinksProps {
+type OrderQuickLinksProps = {
   data: {
     id: string;
     status: string;

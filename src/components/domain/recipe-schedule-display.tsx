@@ -41,11 +41,11 @@ const STAGE_TYPE_LABELS: Record<string, string> = {
   custom: "Custom",
 };
 
-interface MashScheduleDisplayProps {
+type MashScheduleDisplayProps = {
   data: { mash_schedule?: MashStep[] | unknown };
 }
 
-interface FermentationScheduleDisplayProps {
+type FermentationScheduleDisplayProps = {
   data: { fermentation_schedule?: FermentationStage[] | unknown };
 }
 

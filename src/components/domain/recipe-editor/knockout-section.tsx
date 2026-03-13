@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface KnockoutFormValues {
+type KnockoutFormValues = {
   target_ko_temp_f: number | null;
   target_ko_volume_bbl: number | null;
 }

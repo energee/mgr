@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface DataTablePaginationProps<TData> extends React.ComponentProps<"div"> {
+type DataTablePaginationProps<TData> = React.ComponentProps<"div"> & {
   table: Table<TData>;
 }
 

@@ -28,7 +28,7 @@ import { NotificationBell } from "@/components/domain/notification-bell";
 import { SafeSvg } from "@/components/ui/safe-svg";
 import { Sun, Moon } from "lucide-react";
 
-interface AppHeaderProps {
+type AppHeaderProps = {
   user: User;
   breweryName: string;
   breweryLogoSvg?: string | null;

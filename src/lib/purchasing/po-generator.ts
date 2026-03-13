@@ -18,7 +18,7 @@ async function getSupabase() {
 // Types
 // =============================================================================
 
-export interface POLineItemDraft {
+export type POLineItemDraft = {
   catalog_type: string;
   catalog_id: string;
   catalog_name: string;
@@ -35,7 +35,7 @@ export interface POLineItemDraft {
   lead_time_days: number;
 }
 
-export interface PODraft {
+export type PODraft = {
   supplier_id: string;
   supplier_name: string;
   order_by_date: string;

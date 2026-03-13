@@ -24,7 +24,7 @@ import { Loader2 } from "lucide-react";
 import { finishedGoodKeys } from "@/lib/query-keys";
 import Link from "next/link";
 
-interface FGInventorySectionProps {
+type FGInventorySectionProps = {
   data: Record<string, unknown>;
 }
 

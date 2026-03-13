@@ -14,7 +14,7 @@ import { FieldInput } from "./field-input";
 import type { UnifiedFieldDef, EntityConfig } from "@/types/entity";
 import type { UseFormReturn } from "react-hook-form";
 
-interface UnifiedFieldProps {
+type UnifiedFieldProps = {
   field: UnifiedFieldDef<Record<string, unknown>>;
   editing: boolean;
   isCreateMode: boolean;

@@ -22,13 +22,13 @@ import type { SquareSyncProduct, SquareSyncVariation } from "@/lib/square/types"
 import { logger } from "@/lib/logger";
 
 // Supabase nested join shapes (not reflected in generated types)
-interface BrandJoin {
+type BrandJoin = {
   id: string;
   name: string;
   description: string | null;
 }
 
-interface FGWithBrand {
+type FGWithBrand = {
   id: string;
   brand_id: string;
   selling_format_id: string | null;

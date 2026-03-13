@@ -9,7 +9,7 @@
 
 import { useEffect, useCallback, useState } from "react";
 
-export interface KeyboardShortcut {
+export type KeyboardShortcut = {
   key: string;
   label: string;
   description: string;

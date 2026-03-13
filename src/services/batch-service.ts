@@ -11,7 +11,7 @@ import type { Database } from "@/types/supabase";
 import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc, dynamicFrom } from "./types";
 
 /** Result from the analyze_batch_performance RPC function. */
-export interface BatchPerformanceReport {
+export type BatchPerformanceReport = {
   batch_id: string;
   batch_number: string;
   recipe_name: string;
@@ -34,7 +34,7 @@ export interface BatchPerformanceReport {
 }
 
 /** Lightweight batch record for blend candidate selection. */
-export interface BlendCandidate {
+export type BlendCandidate = {
   id: string;
   batch_number: string;
   recipe_name: string;

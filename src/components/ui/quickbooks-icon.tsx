@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-interface QuickBooksIconProps {
+type QuickBooksIconProps = {
   className?: string;
 }
 

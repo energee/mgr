@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface WaterFormValues {
+type WaterFormValues = {
   water_profile_id: string | null;
   target_water_profile_id: string | null;
   mash_water_volume_gal: number | null;

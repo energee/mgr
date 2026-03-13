@@ -53,7 +53,7 @@ import Link from "next/link";
 // =============================================================================
 
 /** A projected ingredient with needed vs on-hand quantities */
-interface ProjectedIngredient {
+type ProjectedIngredient = {
   name: string;
   category: "malt" | "hop" | "adjunct" | "yeast";
   unit: string;
@@ -64,7 +64,7 @@ interface ProjectedIngredient {
 }
 
 /** A batch within the projection horizon */
-interface BatchSource {
+type BatchSource = {
   id: string;
   batch_number: string;
   name: string;
@@ -75,7 +75,7 @@ interface BatchSource {
 }
 
 /** An order within the projection horizon */
-interface OrderSource {
+type OrderSource = {
   id: string;
   order_number: string;
   customer_name: string | null;
@@ -84,7 +84,7 @@ interface OrderSource {
 }
 
 /** Shape returned from the query function */
-interface ProjectionData {
+type ProjectionData = {
   ingredients: ProjectedIngredient[];
   batches: BatchSource[];
   orders: OrderSource[];
@@ -98,7 +98,7 @@ interface ProjectionData {
 const formatQty = formatDecimal;
 
 /** Ingredient row from the grouping helper */
-interface GroupedIngredientRow {
+type GroupedIngredientRow = {
   name: string;
   category: string;
   qty: number;

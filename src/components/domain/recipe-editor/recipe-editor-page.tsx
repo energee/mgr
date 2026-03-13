@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Copy } from "lucide-react";
 import Link from "next/link";
 
-interface RecipeEditorPageProps {
+type RecipeEditorPageProps = {
   id: string;
 }
 

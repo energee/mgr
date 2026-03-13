@@ -52,40 +52,40 @@ import { toast } from "sonner";
 // Types
 // =============================================================================
 
-interface CatalogItem {
+type CatalogItem = {
   id: string;
   name: string;
   type: string | null;
 }
 
-interface AdjunctCatalogItem extends CatalogItem {
+type AdjunctCatalogItem = CatalogItem & {
   potential_ppg: number | null;
 }
 
-interface FruitCatalogItem extends CatalogItem {
+type FruitCatalogItem = CatalogItem & {
   form: string | null;
 }
 
-interface BaseIngredientRow {
+type BaseIngredientRow = {
   id?: string;
   position: number;
   timing: string | null;
   notes: string | null;
 }
 
-interface AdjunctRow extends BaseIngredientRow {
+type AdjunctRow = BaseIngredientRow & {
   adjunct_id: string;
   weight_lbs: number;
   adjunct?: AdjunctCatalogItem;
 }
 
-interface SugarRow extends BaseIngredientRow {
+type SugarRow = BaseIngredientRow & {
   sugar_id: string;
   weight_lbs: number;
   sugar?: CatalogItem;
 }
 
-interface SpiceRow extends BaseIngredientRow {
+type SpiceRow = BaseIngredientRow & {
   spice_id: string;
   amount: number;
   unit: string;
@@ -93,7 +93,7 @@ interface SpiceRow extends BaseIngredientRow {
   spice?: CatalogItem;
 }
 
-interface FruitRow extends BaseIngredientRow {
+type FruitRow = BaseIngredientRow & {
   fruit_id: string;
   amount: number;
   unit: string;
@@ -117,7 +117,7 @@ const TIMING_OPTIONS = [
 // Main Component
 // =============================================================================
 
-interface OtherIngredientsSectionProps {
+type OtherIngredientsSectionProps = {
   data: { id: string };
   editing?: boolean;
 }

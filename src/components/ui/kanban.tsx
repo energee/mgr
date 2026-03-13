@@ -157,7 +157,7 @@ const ITEM_NAME = "KanbanItem";
 const ITEM_HANDLE_NAME = "KanbanItemHandle";
 const OVERLAY_NAME = "KanbanOverlay";
 
-interface KanbanContextValue<T> {
+type KanbanContextValue<T> = {
   id: string;
   items: Record<UniqueIdentifier, T[]>;
   modifiers: DndContextProps["modifiers"];
@@ -181,7 +181,7 @@ function useKanbanContext(consumerName: string) {
   return context;
 }
 
-interface GetItemValue<T> {
+type GetItemValue<T> = {
   /**
    * Callback that returns a unique identifier for each kanban item. Required for array of objects.
    * @example getItemValue={(item) => item.id}
@@ -645,7 +645,7 @@ function Kanban<T>(props: KanbanProps<T>) {
 
 const KanbanBoardContext = React.createContext<boolean>(false);
 
-interface KanbanBoardProps extends React.ComponentProps<"div"> {
+type KanbanBoardProps = React.ComponentProps<"div"> & {
   children: React.ReactNode;
   asChild?: boolean;
 }
@@ -688,7 +688,7 @@ function KanbanBoard(props: KanbanBoardProps) {
   );
 }
 
-interface KanbanColumnContextValue {
+type KanbanColumnContextValue = {
   id: string;
   attributes: DraggableAttributes;
   listeners: DraggableSyntheticListeners | undefined;
@@ -713,7 +713,7 @@ function useKanbanColumnContext(consumerName: string) {
 const animateLayoutChanges: AnimateLayoutChanges = (args) =>
   defaultAnimateLayoutChanges({ ...args, wasDragging: true });
 
-interface KanbanColumnProps extends React.ComponentProps<"div"> {
+type KanbanColumnProps = React.ComponentProps<"div"> & {
   value: UniqueIdentifier;
   children: React.ReactNode;
   asChild?: boolean;
@@ -832,7 +832,7 @@ function KanbanColumn(props: KanbanColumnProps) {
   );
 }
 
-interface KanbanColumnHandleProps extends React.ComponentProps<"button"> {
+type KanbanColumnHandleProps = React.ComponentProps<"button"> & {
   asChild?: boolean;
 }
 
@@ -874,7 +874,7 @@ function KanbanColumnHandle(props: KanbanColumnHandleProps) {
   );
 }
 
-interface KanbanItemContextValue {
+type KanbanItemContextValue = {
   id: string;
   attributes: DraggableAttributes;
   listeners: DraggableSyntheticListeners | undefined;
@@ -895,7 +895,7 @@ function useKanbanItemContext(consumerName: string) {
   return context;
 }
 
-interface KanbanItemProps extends React.ComponentProps<"div"> {
+type KanbanItemProps = React.ComponentProps<"div"> & {
   value: UniqueIdentifier;
   asHandle?: boolean;
   asChild?: boolean;
@@ -993,7 +993,7 @@ function KanbanItem(props: KanbanItemProps) {
   );
 }
 
-interface KanbanItemHandleProps extends React.ComponentProps<"button"> {
+type KanbanItemHandleProps = React.ComponentProps<"button"> & {
   asChild?: boolean;
 }
 
@@ -1047,8 +1047,7 @@ const dropAnimation: DropAnimation = {
   }),
 };
 
-interface KanbanOverlayProps
-  extends Omit<React.ComponentProps<typeof DragOverlay>, "children"> {
+type KanbanOverlayProps = Omit<React.ComponentProps<typeof DragOverlay>, "children"> & {
   container?: Element | DocumentFragment | null;
   children?:
     | React.ReactNode

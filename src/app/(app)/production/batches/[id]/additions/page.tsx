@@ -31,7 +31,7 @@ import { format } from "date-fns";
 import { batchKeys, batchAdditionKeys } from "@/lib/query-keys";
 
 /** Row from the batch_additions table */
-interface BatchAdditionRow {
+type BatchAdditionRow = {
   id: string;
   batch_id: string;
   addition_type: string;

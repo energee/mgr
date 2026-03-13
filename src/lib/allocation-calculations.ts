@@ -14,7 +14,7 @@
 // =============================================================================
 
 /** A raw allocation record with quantity and optional cost info. */
-export interface AllocationRecord {
+export type AllocationRecord = {
   id: string;
   quantity: number;
   unit_cost: number | null;
@@ -24,14 +24,14 @@ export interface AllocationRecord {
 }
 
 /** An inventory lot with received quantity and allocation info. */
-export interface LotQuantity {
+export type LotQuantity = {
   lot_id: string;
   received_quantity: number;
   allocated_quantity: number;
 }
 
 /** A finished good supply entry with total and allocated quantities. */
-export interface SupplyEntry {
+export type SupplyEntry = {
   brand_id: string;
   selling_format_id: string;
   total_quantity: number;
@@ -39,7 +39,7 @@ export interface SupplyEntry {
 }
 
 /** A demand line item for shortage calculation. */
-export interface DemandItem {
+export type DemandItem = {
   brand_id: string | null;
   selling_format_id: string | null;
   quantity: number;
@@ -48,7 +48,7 @@ export interface DemandItem {
 }
 
 /** Result of a shortage calculation for one product. */
-export interface ShortageResult {
+export type ShortageResult = {
   key: string;
   total_demand: number;
   available_quantity: number;
@@ -186,7 +186,7 @@ export function calculateShortages(
 // =============================================================================
 
 /** A lot with remaining quantity for aggregation. */
-export interface LotWithRemaining {
+export type LotWithRemaining = {
   inventory_item_id: string | null;
   remaining_quantity: number;
   expiration_date: string | null;

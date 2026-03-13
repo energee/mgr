@@ -19,7 +19,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 export type { UserRole };
 export type UserStatus = "active" | "inactive" | "pending";
 
-interface UserProfile {
+type UserProfile = {
   id: string;
   email: string | null;
   display_name: string | null;

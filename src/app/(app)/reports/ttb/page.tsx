@@ -54,7 +54,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface TTBReportRow {
+type TTBReportRow = {
   report_year: number;
   report_month: number;
   report_period: string;
@@ -75,7 +75,7 @@ interface TTBReportRow {
   in_process_ending_bbl: number;
 }
 
-interface BatchSummary {
+type BatchSummary = {
   id: string;
   batch_number: string;
   name: string;

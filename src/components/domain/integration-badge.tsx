@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 
 export type IntegrationStatus = "connected" | "active" | "enabled" | "not_connected";
 
-interface IntegrationBadgeProps {
+type IntegrationBadgeProps = {
   status: IntegrationStatus;
 }
 

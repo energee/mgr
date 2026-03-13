@@ -17,7 +17,7 @@ import { z } from "zod";
  * Minimal entity config sufficient for entityService.list() and
  * entityService.getById(). Only includes fields the service layer reads.
  */
-interface ChatEntityConfig {
+type ChatEntityConfig = {
   name: string;
   table: string;
   viewTable?: string;

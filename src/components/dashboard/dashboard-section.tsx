@@ -9,7 +9,7 @@ import Link from "next/link";
 import { Inbox, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface DashboardSectionProps {
+type DashboardSectionProps = {
   /** Section title (displayed uppercase with tracking) */
   title: string;
   /** Optional link to full list view */

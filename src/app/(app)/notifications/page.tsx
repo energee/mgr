@@ -42,7 +42,7 @@ import { dynamicFrom, dynamicRpc } from "@/services/types";
 // Types
 // =============================================================================
 
-interface Notification {
+type Notification = {
   id: string;
   type: string;
   title: string;

@@ -73,8 +73,7 @@ const THROTTLE_MS = 50;
 const FILTER_SHORTCUT_KEY = "f";
 const REMOVE_FILTER_SHORTCUTS = ["backspace", "delete"];
 
-interface DataTableFilterListProps<TData>
-  extends React.ComponentProps<typeof PopoverContent> {
+type DataTableFilterListProps<TData> = React.ComponentProps<typeof PopoverContent> & {
   table: Table<TData>;
   debounceMs?: number;
   throttleMs?: number;
@@ -322,7 +321,7 @@ export function DataTableFilterList<TData>({
   );
 }
 
-interface DataTableFilterItemProps<TData> {
+type DataTableFilterItemProps<TData> = {
   filter: ExtendedColumnFilter<TData>;
   index: number;
   filterItemId: string;

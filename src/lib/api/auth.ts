@@ -18,7 +18,7 @@ import { dynamicFrom } from "@/services/types";
 import { errorResponse } from "./response";
 import { ApiError, handleApiError } from "./errors";
 
-export interface AuthContext {
+export type AuthContext = {
   user: User;
   supabase: SupabaseClient<Database>;
 }
@@ -28,7 +28,7 @@ type AuthHandler = (
   context: AuthContext & { params?: Record<string, string> }
 ) => Promise<NextResponse>;
 
-export interface PermissionContext extends AuthContext {
+export type PermissionContext = AuthContext & {
   roles: UserRole[];
   permissions: Permission[];
 }

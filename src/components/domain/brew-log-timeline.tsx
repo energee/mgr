@@ -17,7 +17,7 @@ import type { Database } from "@/types/supabase";
 
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];
 
-interface BrewLogTimelineProps {
+type BrewLogTimelineProps = {
   data: BrewLog;
   /** Action trigger from headerActions via UnifiedSectionCard */
   actionTrigger?: { action: string; seq: number } | null;

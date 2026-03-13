@@ -45,7 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, GripVertical, ChevronsUpDown } from "lucide-react";
 import { catalogKeys } from "@/lib/query-keys";
 
-export interface AdditionItem {
+export type AdditionItem = {
   id?: string;
   additive_id: string;
   amount: number;
@@ -63,7 +63,7 @@ export interface AdditionItem {
   };
 }
 
-interface AdditiveCatalogItem {
+type AdditiveCatalogItem = {
   id: string;
   name: string;
   type: string;
@@ -72,7 +72,7 @@ interface AdditiveCatalogItem {
   typical_unit: string | null;
 }
 
-interface AdditionsEditorProps {
+type AdditionsEditorProps = {
   items: AdditionItem[];
   onChange: (items: AdditionItem[]) => void;
   disabled?: boolean;

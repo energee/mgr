@@ -1,5 +1,5 @@
 /** A product to push to Square catalog */
-export interface SquareSyncProduct {
+export type SquareSyncProduct = {
   brandId: string;
   brandName: string;
   description?: string;
@@ -9,7 +9,7 @@ export interface SquareSyncProduct {
   variations: SquareSyncVariation[];
 }
 
-export interface SquareSyncVariation {
+export type SquareSyncVariation = {
   /** Selling format ID (unified identifier for all format types) */
   sellingFormatId: string;
   name: string; // e.g., "16oz 4-Pack", "1/2 BBL Draft"
@@ -19,13 +19,13 @@ export interface SquareSyncVariation {
   squareVersion?: bigint;
 }
 
-export interface SquareSyncInventory {
+export type SquareSyncInventory = {
   squareVariationId: string;
   squareLocationId: string;
   quantity: number; // in selling units
 }
 
-export interface SquareSyncResult {
+export type SquareSyncResult = {
   success: boolean;
   itemsSynced: number;
   itemsFailed: number;

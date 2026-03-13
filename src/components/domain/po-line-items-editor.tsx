@@ -52,7 +52,7 @@ import {
 // Types
 // =============================================================================
 
-interface POLineItemRow {
+type POLineItemRow = {
   id: string;
   catalog_type: string;
   catalog_id: string;
@@ -62,12 +62,12 @@ interface POLineItemRow {
   unit_price: number | null;
 }
 
-interface POLineItemsEditorProps {
+type POLineItemsEditorProps = {
   poId: string;
   readOnly?: boolean;
 }
 
-interface NewItemState {
+type NewItemState = {
   catalog_type: string;
   catalog_id: string;
   quantity: number;
@@ -75,7 +75,7 @@ interface NewItemState {
   unit_price: number;
 }
 
-interface CatalogItem {
+type CatalogItem = {
   id: string;
   name: string;
 }

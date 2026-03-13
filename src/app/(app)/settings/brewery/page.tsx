@@ -52,7 +52,7 @@ type UnitPreferencesForm = z.infer<typeof unitPreferencesSchema>;
 // Unit Preference Field Definitions
 // =============================================================================
 
-interface UnitField {
+type UnitField = {
   name: keyof UnitPreferencesForm;
   label: string;
   description: string;

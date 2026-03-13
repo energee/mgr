@@ -11,13 +11,13 @@
 
 export type YeastForm = "liquid" | "dry";
 
-export interface ViabilityResult {
+export type ViabilityResult = {
   viability: number;
   status: "excellent" | "good" | "marginal" | "low" | "inactive";
   daysOld: number;
 }
 
-export interface PitchingRateResult {
+export type PitchingRateResult = {
   cellsNeeded: number; // thousands of cells
   packagesNeeded: number;
   starterRecommended: boolean;
@@ -25,7 +25,7 @@ export interface PitchingRateResult {
   lbsNeeded?: number;
 }
 
-export interface CellCountEstimate {
+export type CellCountEstimate = {
   cellsThousand: number;
   confidence: "high" | "medium" | "low";
   notes: string;
