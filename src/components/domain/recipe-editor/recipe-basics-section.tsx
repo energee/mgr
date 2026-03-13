@@ -62,7 +62,7 @@ const DYNAMIC_FIELDS = [
 ];
 
 export function RecipeBasicsSection() {
-  const { recipe, updateRecipe, isSaving, startSaving, refreshRecipe } = useRecipeEditor();
+  const { recipe, updateRecipe, isSaving, startSaving, handleSaveError } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -104,7 +104,8 @@ export function RecipeBasicsSection() {
       });
     });
     return () => subscription.unsubscribe();
-  }, [form, updateRecipe, styleOptions, recipe.name]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- recipe.name is only a fallback default; including it recreates the subscription on every keystroke
+  }, [form, updateRecipe, styleOptions]);
 
   const stopSavingRef = useRef<(() => void) | null>(null);
 
@@ -133,16 +134,7 @@ export function RecipeBasicsSection() {
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
       toast.success("Recipe basics saved");
     },
-    onError: (error) => {
-      if (error.message?.includes("version") || error.message?.includes("conflict")) {
-        toast.error("Someone else edited this recipe. Reloading...", {
-          description: "Your changes were not saved.",
-        });
-        refreshRecipe();
-      } else {
-        toast.error(error.message);
-      }
-    },
+    onError: handleSaveError,
     onSettled: () => {
       stopSavingRef.current?.();
       stopSavingRef.current = null;

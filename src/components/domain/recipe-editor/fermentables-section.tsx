@@ -56,7 +56,7 @@ const YEAST_FIELDS = [
 ];
 
 export function FermentablesSection() {
-  const { recipe, updateRecipe, setGrainItems, setHopItems, isSaving, startSaving, refreshRecipe } = useRecipeEditor();
+  const { recipe, updateRecipe, setGrainItems, setHopItems, isSaving, startSaving, handleSaveError } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -126,16 +126,7 @@ export function FermentablesSection() {
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
       toast.success("Yeast settings saved");
     },
-    onError: (error) => {
-      if (error.message?.includes("version") || error.message?.includes("conflict")) {
-        toast.error("Someone else edited this recipe. Reloading...", {
-          description: "Your changes were not saved.",
-        });
-        refreshRecipe();
-      } else {
-        toast.error(error.message);
-      }
-    },
+    onError: handleSaveError,
     onSettled: () => {
       stopSavingRef.current?.();
       stopSavingRef.current = null;

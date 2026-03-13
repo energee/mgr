@@ -28,6 +28,7 @@ import {
   calculateEstimates,
   type RecipeEstimates,
 } from "./recipe-estimate-calc";
+import { toast } from "sonner";
 
 // =============================================================================
 // Types
@@ -107,6 +108,8 @@ type RecipeEditorContextValue = {
   startSaving: () => () => void;
   /** Refresh the recipe from the database (e.g., after a version conflict) */
   refreshRecipe: () => void;
+  /** Handle save errors with version conflict detection and auto-reload */
+  handleSaveError: (error: Error) => void;
 };
 
 // =============================================================================
@@ -159,6 +162,18 @@ export function RecipeEditorProvider({
     onRefresh?.();
   }, [onRefresh]);
 
+  /** Shared error handler for section save mutations with version conflict detection */
+  const handleSaveError = useCallback((error: Error) => {
+    if (error.message?.includes("version") || error.message?.includes("conflict")) {
+      toast.error("Someone else edited this recipe. Reloading...", {
+        description: "Your changes were not saved.",
+      });
+      onRefresh?.();
+    } else {
+      toast.error(error.message);
+    }
+  }, [onRefresh]);
+
   // Compute estimates reactively from current editor state
   const estimates = useMemo<RecipeEstimates>(() => {
     return calculateEstimates({
@@ -192,8 +207,9 @@ export function RecipeEditorProvider({
       isSaving,
       startSaving,
       refreshRecipe,
+      handleSaveError,
     }),
-    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving, refreshRecipe]
+    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving, refreshRecipe, handleSaveError]
   );
 
   return (
