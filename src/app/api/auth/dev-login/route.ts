@@ -10,6 +10,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { isValidRedirect } from "@/lib/auth-utils";
 
 const TEST_EMAIL = "dev@brewery.test";
 const TEST_PASSWORD = "devpassword123";
@@ -64,9 +65,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const safeRedirect = redirect.startsWith("/") && !redirect.startsWith("//") && !redirect.includes("://")
-    ? redirect
-    : "/";
+  const safeRedirect = isValidRedirect(redirect) ? redirect : "/";
 
   return NextResponse.redirect(new URL(safeRedirect, request.nextUrl.origin));
 }

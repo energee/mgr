@@ -212,7 +212,9 @@ export default function ProductionPlanningPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {shortfalls.map((shortfall, index) => (
+              {shortfalls.map((shortfall, index) => {
+                const overdue = isPast(shortfall.recommended_brew_start);
+                return (
                 <TableRow key={`${shortfall.brand_id}-${shortfall.selling_format_id}-${shortfall.demand_week}-${index}`}>
                   <TableCell>
                     <div className="font-medium">{shortfall.brand_name}</div>
@@ -241,14 +243,14 @@ export default function ProductionPlanningPage() {
                     <div className="flex items-center gap-2">
                       <span
                         className={
-                          isPast(shortfall.recommended_brew_start)
+                          overdue
                             ? "text-destructive font-medium"
                             : ""
                         }
                       >
                         {formatDate(shortfall.recommended_brew_start)}
                       </span>
-                      {isPast(shortfall.recommended_brew_start) && (
+                      {overdue && (
                         <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                           OVERDUE
                         </Badge>
@@ -269,7 +271,8 @@ export default function ProductionPlanningPage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
