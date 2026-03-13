@@ -11,18 +11,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getColumnPinningStyle } from "@/lib/data-table";
+import { NON_NAVIGABLE_COLUMN_IDS } from "@/lib/data-table-adapter";
 import { cn } from "@/lib/utils";
 
 type DataTableProps<TData> = React.ComponentProps<"div"> & {
   table: TanstackTable<TData>;
   actionBar?: React.ReactNode;
   noResultsContent?: React.ReactNode;
+  /** Called when a row is clicked (excluding select checkboxes and action menu cells) */
+  onRowClick?: (row: TData) => void;
 }
 
 export function DataTable<TData>({
   table,
   actionBar,
   noResultsContent,
+  onRowClick,
   children,
   className,
   ...props
@@ -61,18 +65,32 @@ export function DataTable<TData>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className={cn(onRowClick && "cursor-pointer")}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      style={getColumnPinningStyle({ column: cell.column })}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const isExcluded = NON_NAVIGABLE_COLUMN_IDS.includes(
+                      cell.column.id as (typeof NON_NAVIGABLE_COLUMN_IDS)[number],
+                    );
+                    return (
+                      <TableCell
+                        key={cell.id}
+                        style={getColumnPinningStyle({ column: cell.column })}
+                        onClick={
+                          onRowClick && !isExcluded
+                            ? (e) => {
+                                if ((e.target as HTMLElement).closest("a, button")) return;
+                                onRowClick(row.original);
+                              }
+                            : undefined
+                        }
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))
             ) : (
