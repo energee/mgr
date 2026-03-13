@@ -14,20 +14,23 @@ import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
 import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
-import { cn } from "@/lib/utils";
 import { Package } from "lucide-react";
 
-/** Map SRM to approximate CSS color for the beer color indicator */
-function srmToColor(srm: number | null): string {
-  if (!srm || srm <= 0) return "bg-amber-100";
-  if (srm <= 2) return "bg-yellow-100";
-  if (srm <= 4) return "bg-yellow-300";
-  if (srm <= 6) return "bg-amber-300";
-  if (srm <= 9) return "bg-amber-500";
-  if (srm <= 14) return "bg-amber-700";
-  if (srm <= 20) return "bg-orange-800";
-  if (srm <= 30) return "bg-red-900";
-  return "bg-stone-900";
+/** SRM-to-hex color lookup table for continuous beer color display */
+const SRM_COLORS: [number, string][] = [
+  [0, "#FFE699"], [2, "#FFD878"], [4, "#FFCA5A"], [6, "#FFBF42"],
+  [8, "#FBB123"], [10, "#F8A600"], [13, "#E58500"], [17, "#CE6B00"],
+  [20, "#A85600"], [24, "#8D4C00"], [29, "#6B3A00"], [35, "#4C2900"],
+  [40, "#361F00"],
+];
+
+/** Map SRM value to hex color for the beer color indicator */
+function srmToHex(srm: number | null): string {
+  if (!srm || srm <= 0) return SRM_COLORS[0][1];
+  for (let i = SRM_COLORS.length - 1; i >= 0; i--) {
+    if (srm >= SRM_COLORS[i][0]) return SRM_COLORS[i][1];
+  }
+  return SRM_COLORS[0][1];
 }
 
 // =============================================================================
@@ -142,10 +145,8 @@ export function RecipeSidebar() {
           <EstimateCard label="IBU" value={estimates.ibu?.toString() ?? "\u2014"} />
           <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
             <div
-              className={cn(
-                "h-4 w-4 rounded-full border",
-                srmToColor(estimates.srm)
-              )}
+              className="h-4 w-4 rounded-full border"
+              style={{ backgroundColor: srmToHex(estimates.srm) }}
             />
             <div>
               <div className="text-xs text-muted-foreground">SRM</div>
@@ -172,7 +173,7 @@ export function RecipeSidebar() {
         </div>
 
         {grainCalc.grains.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No grains</p>
+          <p className="text-sm text-muted-foreground">No grains added yet. Add malts in the Fermentables section to see estimates.</p>
         ) : (
           <div className="space-y-1.5">
             {grainCalc.grains.map((g, i) => (
@@ -225,7 +226,7 @@ export function RecipeSidebar() {
         </div>
 
         {hopCalc.hops.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hops</p>
+          <p className="text-sm text-muted-foreground">No hops added yet. Add hops in the Fermentables section to calculate IBU.</p>
         ) : (
           <div className="space-y-1.5">
             {hopCalc.hops.map((h, i) => (
