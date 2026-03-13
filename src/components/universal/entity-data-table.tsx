@@ -111,6 +111,14 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<{ record: T; action: EntityActionDef<T> } | null>(null);
 
+  const handleRowClick = useCallback(
+    (row: T) => {
+      const id = (row as Record<string, unknown>).id;
+      if (id) router.push(`${path}/${id}`);
+    },
+    [path, router],
+  );
+
   const isMobile = useIsMobile();
   const hasBulkActions = !!entity.stateMachine;
   const fetchTable = entity.viewTable || entity.table;
@@ -719,6 +727,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         ) : (
           <DataTable
             table={table}
+            onRowClick={handleRowClick}
             actionBar={
               hasBulkActions && selectedRows.length > 0 && hasValidBulkTransitions ? (
                 <BulkStatusActionBar

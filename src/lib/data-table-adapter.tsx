@@ -5,6 +5,9 @@
  * Pure translation layer — no entity config changes needed.
  */
 
+/** Column IDs reserved for non-navigable columns (checkboxes, action menus). */
+export const NON_NAVIGABLE_COLUMN_IDS = ["select", "actions"] as const;
+
 import type { ColumnDef } from "@tanstack/react-table";
 import type {
   EntityConfig,

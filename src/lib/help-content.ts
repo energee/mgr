@@ -34,12 +34,12 @@ Quick start:
     content: `The sidebar on the left is the main navigation. Sections expand/collapse when clicked.
 
 - Dashboards: Production, Inventory, and Sales overviews
-- Production: Batches, Recipes, Vessels, Transfers, Brew Logs, Yeast Pitches, Planning
-- Packaging: Packaging Sessions and Finished Goods
-- Inventory: Inventory Items
+- Production: Planning, Backward Planning, Batches, Recipes, Vessels, Transfers, Brew Logs, Yeast Pitches
+- Packaging: Packaging Sessions
+- Inventory: Raw Materials, Finished Goods, Lots, Allocations, Kegs, Bins, Transfers, Deliveries
 - Purchasing: Ingredient Demand, Suppliers, Purchase Orders
 - Sales: Orders, Pick Lists, Customers
-- Reports: TTB Report and other analytics
+- Reports: TTB Report, Production Summary, Inventory Valuation, Batch Cost, Projections, COGS
 - Settings: Brewery config, locations, users, integrations, catalog data
 - Help: This guide (accessible from the sidebar footer)
 
@@ -61,7 +61,9 @@ Sales Dashboard (/dashboard/sales): Open orders, revenue trends, and top custome
     title: "Production",
     content: `Production is the core of MGR. Key pages:
 
-Planning (/production/planning): Visual calendar of scheduled batches and vessel availability.
+Planning (/production/planning): Demand-driven production planning with List and Timeline views. Shows demand, available supply, shortfalls, and urgent counts in a stats strip. Configure the time window with a weeks selector (4, 8, or 12 weeks) and toggle a "Drafts" switch to include or exclude draft orders. Create batches directly from shortfalls.
+
+Backward Planning (/production/planning/backward): Order-driven view that calculates production requirements from confirmed orders. Shows demand by product and package format, highlights shortages, and displays demand weeks and shortfall quantities. Configure the planning horizon and drill into individual order line items.
 
 Batches (/production/batches): Track batches through their lifecycle: Planned → Brewing → Fermenting → Conditioning → Carbonating → Completed. Create a new batch from a recipe or from scratch.
 
@@ -78,16 +80,28 @@ Yeast Pitches (/production/yeast-pitches): Track yeast usage and harvesting acro
   {
     id: "packaging",
     title: "Packaging",
-    content: `Packaging Sessions (/production/packaging): Record when beer is packaged into cans, bottles, or kegs. Link to a batch and specify quantities per format.
-
-Finished Goods (/inventory/finished-goods): View packaged inventory ready for sale. Tracks quantities by brand and package format.`,
+    content: `Packaging Sessions (/production/packaging): Record when beer is packaged into cans, bottles, or kegs. Link to a batch and specify quantities per format.`,
   },
   {
     id: "inventory",
     title: "Inventory",
-    content: `Inventory Items (/inventory/items): All raw materials and supplies. Track quantities, costs, and locations. Items are allocated to batches automatically when brewing.
+    content: `Inventory uses an allocation-based system -- quantities are calculated from allocation records, never stored as mutable balances. This ensures accuracy and full traceability.
 
-Inventory uses an allocation-based system -- quantities are calculated from allocation records, never stored as mutable balances. This ensures accuracy and full traceability.`,
+Raw Materials (/inventory/items): All raw materials and supplies. Track quantities, costs, and locations. Items are allocated to batches automatically when brewing.
+
+Finished Goods (/inventory/finished-goods): View packaged inventory ready for sale. Tracks quantities by brand and package format.
+
+Lots (/inventory/lots): Track inventory by lot number for traceability. Each lot ties back to a supplier delivery or production run.
+
+Allocations (/inventory/allocations): View and manage inventory allocations -- the records that link inventory to batches, orders, and other consumers.
+
+Kegs (/inventory/kegs): Track individual kegs through fill, dispatch, and return cycles.
+
+Bins (/inventory/bins): Manage storage bins and their contents within locations.
+
+Transfers (/inventory/transfers): Move inventory between locations (e.g., warehouse to cold room).
+
+Deliveries (/inventory/deliveries): Record incoming deliveries from suppliers. Links to purchase orders and creates lot records.`,
   },
   {
     id: "purchasing",
@@ -117,21 +131,31 @@ TTB Report (/reports/ttb): Generate the federal Brewer's Report of Operations (F
   {
     id: "settings",
     title: "Settings",
-    content: `Settings (/settings): Central configuration hub.
+    content: `Settings (/settings): Central configuration hub organized into four groups.
 
+GENERAL:
+Account (/settings/account): Your personal profile and preferences.
 System Settings (/settings/system): API keys (Anthropic for AI assistant), tax rates, compliance settings.
-
 Brewery Settings (/settings/brewery): Brewery name, units of measurement, general preferences.
-
 Users (/settings/users): Manage team members and roles.
-
-Locations (/settings/locations): Warehouses, cold rooms, and storage areas.
-
 Notifications (/settings/notifications): Configure notification preferences.
-
 Integrations (/settings/integrations): Connect Square, Slack, QuickBooks, and other services.
 
-Catalog pages: Package Formats, Keg Types, Yeast Strains, Sales Channels, Pricing Tiers, and Enum Registry for managing lookup data used throughout the app.`,
+CATALOGS:
+Locations (/settings/locations): Warehouses, cold rooms, and storage areas used for inventory tracking.
+Yeast Strains (/settings/yeasts): Manage yeast varieties with attenuation ranges, temperature ranges, and flocculation data.
+Water Profiles (/settings/water-profiles): Define water chemistry profiles (calcium, magnesium, sulfate, chloride, etc.) for recipe formulation.
+Beer Styles (/settings/beer-styles): BJCP style guidelines with OG, FG, ABV, IBU, and SRM ranges for style compliance checking.
+Brands (/settings/brands): Manage your beer brands used across recipes, batches, and finished goods.
+
+COMMERCE:
+Package Formats (/settings/containers): Manage physical containers (cans, bottles, kegs) and their selling formats.
+Selling Formats (/settings/selling-formats): Define how containers are sold (singles, 4-packs, cases, per keg).
+Sales Channels (/settings/sales-channels): Categorize customers by channel (taproom, distribution, online) for pricing rules.
+Pricing (/settings/pricing): Spreadsheet-style pricing matrix -- set prices by tier and selling format per sales channel.
+
+ADMIN:
+Status & Options (/settings/status-options): Manage lookup values and enum options used throughout the app.`,
   },
   {
     id: "ai-assistant",
