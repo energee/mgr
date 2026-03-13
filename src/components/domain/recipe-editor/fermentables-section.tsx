@@ -20,6 +20,8 @@ import { useRecipeEditor } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { GrainBillSection } from "@/components/domain/grain-bill-section";
 import { HopScheduleSection } from "@/components/domain/hop-schedule-section";
+import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
+import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
 import { OtherIngredientsSection } from "@/components/domain/other-ingredients-section";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,29 +73,30 @@ export function FermentablesSection() {
 
   const { isDirty } = form.formState;
 
-  // Sync yeast/attenuation to context
+  // Sync yeast/attenuation to context via form.watch subscription
   const watchedYeast = form.watch("yeast_id");
-  const watchedAttenuation = form.watch("target_attenuation");
-  const watchedPitchRate = form.watch("target_pitching_rate");
 
   useEffect(() => {
-    updateRecipe({
-      yeast_id: watchedYeast,
-      target_attenuation: watchedAttenuation,
-      target_pitching_rate: watchedPitchRate,
+    const subscription = form.watch((values) => {
+      updateRecipe({
+        yeast_id: values.yeast_id,
+        target_attenuation: values.target_attenuation,
+        target_pitching_rate: values.target_pitching_rate,
+      });
     });
-  }, [watchedYeast, watchedAttenuation, watchedPitchRate, updateRecipe]);
+    return () => subscription.unsubscribe();
+  }, [form, updateRecipe]);
 
   // Wire grain/hop data changes to context
   const handleGrainChange = useCallback(
-    (items: Parameters<NonNullable<Parameters<typeof GrainBillSection>[0]["onDataChange"]>>[0]) => {
+    (items: GrainBillItem[]) => {
       setGrainItems(items);
     },
     [setGrainItems]
   );
 
   const handleHopChange = useCallback(
-    (items: Parameters<NonNullable<Parameters<typeof HopScheduleSection>[0]["onDataChange"]>>[0]) => {
+    (items: HopScheduleItem[]) => {
       setHopItems(items);
     },
     [setHopItems]
@@ -138,7 +141,7 @@ export function FermentablesSection() {
   );
 
   return (
-    <RecipeSectionCard title="Fermentables & Ingredients">
+    <RecipeSectionCard title="Fermentables & Ingredients" isDirty={isDirty}>
       <div className="space-y-6">
         {/* Grain Bill */}
         <div>

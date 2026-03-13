@@ -39,7 +39,7 @@ export function MashSection() {
       mash_temp_f: recipe.mash_temp_f ?? null,
       target_mash_ph: recipe.target_mash_ph ?? null,
       mash_efficiency: recipe.mash_efficiency ?? null,
-      mash_schedule: (recipe.mash_schedule as MashStep[] | null) ?? null,
+      mash_schedule: recipe.mash_schedule ?? null,
     },
   });
 
@@ -166,7 +166,7 @@ export function MashSection() {
         <div>
           <h4 className="text-sm font-medium mb-2">Mash Schedule</h4>
           <MashScheduleEditor
-            steps={(mashSchedule ?? []) as MashStep[]}
+            steps={mashSchedule ?? []}
             onChange={(newSteps) => {
               form.setValue("mash_schedule", newSteps, { shouldDirty: true });
             }}

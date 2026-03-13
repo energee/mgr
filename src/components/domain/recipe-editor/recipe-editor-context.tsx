@@ -22,6 +22,8 @@ import {
 } from "react";
 import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
 import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
+import type { MashStep } from "@/components/domain/mash-schedule-editor";
+import type { FermentationStage } from "@/components/domain/fermentation-schedule-editor";
 import {
   calculateEstimates,
   type RecipeEstimates,
@@ -64,8 +66,8 @@ export type RecipeData = {
   target_pitching_rate?: number | null;
   fermentation_days?: number | null;
   conditioning_days?: number | null;
-  mash_schedule?: unknown[] | null;
-  fermentation_schedule?: unknown[] | null;
+  mash_schedule?: MashStep[] | null;
+  fermentation_schedule?: FermentationStage[] | null;
   brew_day_notes?: string | null;
   tasting_notes?: string | null;
   development_notes?: string | null;

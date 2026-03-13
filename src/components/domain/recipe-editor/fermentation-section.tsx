@@ -37,7 +37,7 @@ export function FermentationSection() {
     defaultValues: {
       fermentation_days: recipe.fermentation_days ?? null,
       conditioning_days: recipe.conditioning_days ?? null,
-      fermentation_schedule: (recipe.fermentation_schedule as FermentationStage[] | null) ?? null,
+      fermentation_schedule: recipe.fermentation_schedule ?? null,
     },
   });
 
@@ -134,7 +134,7 @@ export function FermentationSection() {
         <div>
           <h4 className="text-sm font-medium mb-2">Fermentation Schedule</h4>
           <FermentationScheduleEditor
-            stages={(fermSchedule ?? []) as FermentationStage[]}
+            stages={fermSchedule ?? []}
             onChange={(newStages) => {
               form.setValue("fermentation_schedule", newStages, { shouldDirty: true });
             }}

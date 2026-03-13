@@ -83,17 +83,18 @@ export function WaterChemistrySection() {
   const watchedTargetProfile = form.watch("target_water_profile_id");
   const watchedMashWater = form.watch("mash_water_volume_gal");
   const watchedSpargeWater = form.watch("sparge_water_volume_gal");
-  const watchedPreboil = form.watch("preboil_volume_bbl");
-
   useEffect(() => {
-    updateRecipe({
-      water_profile_id: watchedSourceProfile,
-      target_water_profile_id: watchedTargetProfile,
-      mash_water_volume_gal: watchedMashWater,
-      sparge_water_volume_gal: watchedSpargeWater,
-      preboil_volume_bbl: watchedPreboil,
+    const subscription = form.watch((values) => {
+      updateRecipe({
+        water_profile_id: values.water_profile_id,
+        target_water_profile_id: values.target_water_profile_id,
+        mash_water_volume_gal: values.mash_water_volume_gal,
+        sparge_water_volume_gal: values.sparge_water_volume_gal,
+        preboil_volume_bbl: values.preboil_volume_bbl,
+      });
     });
-  }, [watchedSourceProfile, watchedTargetProfile, watchedMashWater, watchedSpargeWater, watchedPreboil, updateRecipe]);
+    return () => subscription.unsubscribe();
+  }, [form, updateRecipe]);
 
   const stopSavingRef = useRef<(() => void) | null>(null);
 
