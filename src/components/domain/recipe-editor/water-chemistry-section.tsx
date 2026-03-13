@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
@@ -59,7 +59,7 @@ const WATER_PROFILE_FIELDS = [
 ];
 
 export function WaterChemistrySection() {
-  const { recipe, updateRecipe } = useRecipeEditor();
+  const { recipe, updateRecipe, isSaving, startSaving } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -95,8 +95,11 @@ export function WaterChemistrySection() {
     });
   }, [watchedSourceProfile, watchedTargetProfile, watchedMashWater, watchedSpargeWater, watchedPreboil, updateRecipe]);
 
+  const stopSavingRef = useRef<(() => void) | null>(null);
+
   const saveMutation = useMutation({
     mutationFn: async (values: WaterFormValues) => {
+      stopSavingRef.current = startSaving();
       return updateWithOptimisticLockOrThrow(
         supabase,
         "recipes",
@@ -121,6 +124,10 @@ export function WaterChemistrySection() {
     onError: (error) => {
       toast.error(error.message);
     },
+    onSettled: () => {
+      stopSavingRef.current?.();
+      stopSavingRef.current = null;
+    },
   });
 
   const onSubmit = useCallback(
@@ -131,12 +138,13 @@ export function WaterChemistrySection() {
   return (
     <RecipeSectionCard
       title="Water Chemistry"
+      isDirty={isDirty}
       headerActions={
         isDirty ? (
           <Button
             size="sm"
             onClick={form.handleSubmit(onSubmit)}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || isSaving}
           >
             {saveMutation.isPending ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />

@@ -94,6 +94,13 @@ export function GrainBillSection({ data, editing, onDataChange }: GrainBillSecti
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Validate: reject zero or negative weight entries
+      const invalidItems = grainItems.filter((item) => item.weight_lbs <= 0);
+      if (invalidItems.length > 0) {
+        const names = invalidItems.map((item) => item.malt?.name || "Unknown").join(", ");
+        throw new Error(`Cannot save grain bill: ${names} ${invalidItems.length === 1 ? "has" : "have"} zero or negative weight`);
+      }
+
       const { error: deleteError } = await supabase
         .from("recipe_malts")
         .delete()

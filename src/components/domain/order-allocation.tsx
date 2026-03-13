@@ -114,23 +114,66 @@ export function OrderAllocation({
   const { data: brands } = useBrands();
   const { data: packagingFormats } = usePackagingFormats();
 
-  // Create allocations mutation
+  // Create allocations mutation with duplicate prevention
   const allocateMutation = useMutation({
     mutationFn: async (entries: AllocationEntry[]) => {
-      const allocationsToInsert = entries
-        .filter((e) => e.quantity > 0)
-        .map((entry) => ({
-          source_type: "finished_good",
-          source_id: entry.finished_good_id,
-          destination_type: "order",
-          destination_id: orderId,
-          quantity: entry.quantity,
-          status: "planned",
-        }));
+      const validEntries = entries.filter((e) => e.quantity > 0);
 
-      if (allocationsToInsert.length === 0) {
+      if (validEntries.length === 0) {
         throw new Error("No allocations to create");
       }
+
+      // Check for existing allocations of the same lots to this order
+      const fgIds = validEntries.map((e) => e.finished_good_id);
+      const { data: existing, error: checkError } = await supabase
+        .from("allocations")
+        .select("source_id")
+        .eq("destination_type", "order")
+        .eq("destination_id", orderId)
+        .eq("source_type", "finished_good")
+        .in("source_id", fgIds)
+        .in("status", ["planned", "completed"]);
+
+      if (checkError) throw checkError;
+
+      const alreadyAllocated = new Set((existing ?? []).map((a) => a.source_id));
+      if (alreadyAllocated.size > 0) {
+        const duplicateEntries = validEntries.filter((e) => alreadyAllocated.has(e.finished_good_id));
+        if (duplicateEntries.length === validEntries.length) {
+          throw new Error("All selected lots are already allocated to this order");
+        }
+        // Filter out duplicates and warn the user
+        const filteredEntries = validEntries.filter((e) => !alreadyAllocated.has(e.finished_good_id));
+        toast.warning(
+          `${duplicateEntries.length} lot(s) already allocated to this order — skipped`
+        );
+        if (filteredEntries.length === 0) return;
+        // Continue with non-duplicate entries
+        const allocationsToInsert = filteredEntries.map((entry) => ({
+          source_type: "finished_good" as const,
+          source_id: entry.finished_good_id,
+          destination_type: "order" as const,
+          destination_id: orderId,
+          quantity: entry.quantity,
+          status: "planned" as const,
+        }));
+
+        const { error } = await supabase
+          .from("allocations")
+          .insert(allocationsToInsert);
+
+        if (error) throw error;
+        return;
+      }
+
+      const allocationsToInsert = validEntries.map((entry) => ({
+        source_type: "finished_good" as const,
+        source_id: entry.finished_good_id,
+        destination_type: "order" as const,
+        destination_id: orderId,
+        quantity: entry.quantity,
+        status: "planned" as const,
+      }));
 
       const { error } = await supabase
         .from("allocations")

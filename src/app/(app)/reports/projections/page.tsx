@@ -375,12 +375,15 @@ export default function IngredientProjectionsPage() {
         addSources(entry, ra.recipe_id, ra.weight_lbs);
       }
 
-      // Aggregate yeasts (quantity = 1 pitch per batch)
+      // Aggregate yeasts using actual quantity from recipe (defaults to 1 if unset).
+      // The quantity column is added by migration 00145; until the Supabase types
+      // are regenerated we access it via an unknown cast.
       for (const ry of yeastsResult.data ?? []) {
         const yeastCatalog = ry.yeasts as { name: string } | null;
         const name = yeastCatalog?.name ?? "Unknown Yeast";
         const entry = getOrCreate(name, "yeast", "pkg");
-        addSources(entry, ry.recipe_id, 1);
+        const yeastQty = (ry as unknown as { quantity?: number }).quantity ?? 1;
+        addSources(entry, ry.recipe_id, yeastQty);
       }
 
       // Step 8: Compare against on-hand inventory

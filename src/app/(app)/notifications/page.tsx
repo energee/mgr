@@ -445,7 +445,7 @@ export default function NotificationsPage() {
                           {TYPE_LABELS[notification.type] || notification.type}
                         </Badge>
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
                         {formatDate(notification.created_at)}
                       </span>
                     </div>

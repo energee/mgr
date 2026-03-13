@@ -263,7 +263,16 @@ export function POReceiving({
     },
     onError: (error) => {
       log.error("Receive error:", error);
-      toast.error("Failed to receive items");
+      // NOTE: PO receiving inserts all po_receives rows in a single batch insert,
+      // so partial failures at the insert stage are unlikely. However, subsequent
+      // status update or re-query steps can still fail after the insert succeeds.
+      // A future improvement would be to wrap the entire receive flow (insert +
+      // status update) in a server-side RPC for true atomicity.
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to receive items: ${message}`, {
+        description: "Some records may have been saved. Please refresh and verify.",
+        duration: 8000,
+      });
     },
   });
 

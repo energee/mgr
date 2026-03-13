@@ -32,7 +32,7 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-interface StartBrewDayDialogProps {
+type StartBrewDayDialogProps = {
   batchId: string;
   batchNumber: string;
   batchName: string | null;
@@ -41,7 +41,7 @@ interface StartBrewDayDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (brewLogId: string) => void;
-}
+};
 
 // =============================================================================
 // Helpers
@@ -113,7 +113,7 @@ export function StartBrewDayDialog({
           brew_number: brewNumber.trim(),
           brew_date: brewDate,
           brewer_id: currentUser?.id ?? null,
-          status: "in_progress",
+          status: "draft",
         })
         .select("id")
         .single();

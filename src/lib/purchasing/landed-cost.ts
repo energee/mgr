@@ -17,23 +17,25 @@ async function getSupabase() {
 // Types
 // =============================================================================
 
-export interface LandedCostBreakdown {
+export type LandedCostBreakdown = {
   lot_id: string | null;
   line_item_id: string | null;
   catalog_type: string;
   quantity: number;
   unit_price: number | null;
   allocated_shipping: number;
+  allocated_tax: number;
   landed_cost_per_unit: number;
-}
+};
 
-export interface LandedCostSummary {
+export type LandedCostSummary = {
   po_id: string;
   shipping_cost: number;
+  tax: number;
   line_items: LandedCostBreakdown[];
   total_item_cost: number;
   total_landed_cost: number;
-}
+};
 
 // =============================================================================
 // Functions
@@ -69,10 +71,10 @@ export async function getLandedCostSummary(
 ): Promise<LandedCostSummary> {
   const supabase = await getSupabase();
 
-  // Get the PO shipping cost
+  // Get the PO shipping cost and tax
   const { data: po, error: poError } = await supabase
     .from("purchase_orders")
-    .select("shipping_cost")
+    .select("shipping_cost, tax")
     .eq("id", poId)
     .single();
 
@@ -97,6 +99,7 @@ export async function getLandedCostSummary(
   return {
     po_id: poId,
     shipping_cost: po.shipping_cost || 0,
+    tax: po.tax || 0,
     line_items: lineItems,
     total_item_cost: totalItemCost,
     total_landed_cost: totalLandedCost,

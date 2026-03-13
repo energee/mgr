@@ -37,10 +37,10 @@ import { getCatalogTypeLabel } from "@/entities/po-line-item";
 // Types
 // =============================================================================
 
-interface PoLandedCostBreakdownProps {
+type PoLandedCostBreakdownProps = {
   /** The purchase order ID to display landed cost breakdown for */
   poId: string;
-}
+};
 
 // =============================================================================
 // Helpers
@@ -129,10 +129,19 @@ export function PoLandedCostBreakdown({ poId }: PoLandedCostBreakdownProps) {
           <Calculator className="h-5 w-5" />
           Landed Cost Breakdown
         </CardTitle>
-        {data.shipping_cost > 0 && (
+        {(data.shipping_cost > 0 || data.tax > 0) && (
           <p className="text-sm text-muted-foreground">
-            Shipping cost of {formatLandedCost(data.shipping_cost)} allocated
-            proportionally by line item value.
+            {[
+              data.shipping_cost > 0
+                ? `Shipping ${formatLandedCost(data.shipping_cost)}`
+                : null,
+              data.tax > 0
+                ? `Tax ${formatLandedCost(data.tax)}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" + ")}{" "}
+            allocated proportionally by line item value.
           </p>
         )}
       </CardHeader>
@@ -144,6 +153,7 @@ export function PoLandedCostBreakdown({ poId }: PoLandedCostBreakdownProps) {
               <TableHead className="text-right">Qty</TableHead>
               <TableHead className="text-right">Unit Price</TableHead>
               <TableHead className="text-right">Alloc. Shipping</TableHead>
+              <TableHead className="text-right">Alloc. Tax</TableHead>
               <TableHead className="text-right">Landed Cost/Unit</TableHead>
               <TableHead className="text-right">Markup</TableHead>
             </TableRow>
@@ -167,6 +177,9 @@ export function PoLandedCostBreakdown({ poId }: PoLandedCostBreakdownProps) {
                   <TableCell className="text-right">
                     {formatLandedCost(item.allocated_shipping)}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {formatLandedCost(item.allocated_tax)}
+                  </TableCell>
                   <TableCell className="text-right font-medium">
                     {formatLandedCost(item.landed_cost_per_unit)}
                   </TableCell>
@@ -187,6 +200,9 @@ export function PoLandedCostBreakdown({ poId }: PoLandedCostBreakdownProps) {
               </TableCell>
               <TableCell className="text-right font-medium">
                 {formatLandedCost(data.shipping_cost)}
+              </TableCell>
+              <TableCell className="text-right font-medium">
+                {formatLandedCost(data.tax)}
               </TableCell>
               <TableCell className="text-right font-medium">
                 {formatLandedCost(data.total_landed_cost)}

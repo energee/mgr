@@ -149,6 +149,7 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
           label: "Status",
           type: "select",
           options: statusOptions,
+          editable: false,
           colSpan: 6,
         },
         {

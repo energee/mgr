@@ -8,7 +8,7 @@
  * - OG:  1 + (totalPoints * efficiency / 100) / batchGal / 1000
  * - FG:  1 + (OG - 1) * (1 - attenuation / 100)
  * - ABV: (OG - 1) * 1000 * (attenuation / 100) * 131.25 / 1000
- * - IBU: weightedIbuFactor * 74.89 / batchGal  (Tinseth timing factors)
+ * - IBU: weightedIbuFactor * 74.89 / batchGal  (Tinseth utilization formula)
  * - SRM: 1.4922 * (mcuSum / batchGal) ^ 0.6859  (Morey equation)
  */
 
@@ -17,24 +17,24 @@
 // =============================================================================
 
 /** Grain bill item shape for estimate calculations */
-export interface EstimateGrainItem {
+export type EstimateGrainItem = {
   weight_lbs: number;
   /** Points per pound per gallon — falls back to 36 if missing */
   potential_ppg?: number | null;
   /** Color in Lovibond — falls back to 2 if missing */
   color_lovibond?: number | null;
-}
+};
 
 /** Hop schedule item shape for estimate calculations */
-export interface EstimateHopItem {
+export type EstimateHopItem = {
   weight_oz: number;
   /** Alpha acid percentage — falls back to 10 if missing */
   alpha_acid?: number | null;
   timing: string;
   boil_time_min?: number | null;
-}
+};
 
-export interface RecipeEstimateInputs {
+export type RecipeEstimateInputs = {
   grainItems: EstimateGrainItem[];
   hopItems: EstimateHopItem[];
   /** Batch size in barrels */
@@ -45,15 +45,15 @@ export interface RecipeEstimateInputs {
   mashEfficiency?: number | null;
   /** Target attenuation percentage (default: 75) */
   targetAttenuation?: number | null;
-}
+};
 
-export interface RecipeEstimates {
+export type RecipeEstimates = {
   og: number | null;
   fg: number | null;
   abv: number | null;
   ibu: number | null;
   srm: number | null;
-}
+};
 
 // =============================================================================
 // Constants
@@ -77,31 +77,52 @@ const DEFAULT_ATTENUATION = 75;
 /** Default alpha acid percentage for hops without catalog data */
 const DEFAULT_ALPHA = 10;
 
+/** Default wort gravity used for utilization when OG is not yet computed */
+const DEFAULT_BOIL_GRAVITY = 1.050;
+
 // =============================================================================
-// IBU Timing Factors (Tinseth approximation)
+// IBU Utilization (Tinseth formula)
 // =============================================================================
 
 /**
- * Returns the utilization factor for a hop addition based on timing and boil time.
- * Matches the SQL CASE expression in the recipes_with_estimates view.
+ * Returns the utilization factor for a hop addition using the Tinseth formula.
+ *
+ * For boil additions:
+ *   utilization = bigness * boilTimeFactor
+ *   bigness     = 1.65 * 0.000125^(wortGravity - 1)
+ *   boilFactor  = (1 - e^(-0.04 * boilTime)) / 4.15
+ *
+ * For non-boil timings, fixed utilization values are used:
+ *   first_wort  = full boil utilization at 60 min
+ *   whirlpool   = 0.05 (~15-20% of a 20-min boil addition)
+ *   mash        = 0.08 (limited isomerization during mash)
+ *   dry_hop     = 0 (no bitterness contribution)
+ *
+ * @param timing - Hop addition timing (boil, first_wort, whirlpool, mash, dry_hop)
+ * @param boilTimeMin - Boil time in minutes (used only for "boil" timing)
+ * @param wortGravity - Estimated OG for gravity adjustment (default: 1.050)
  */
 export function getHopUtilizationFactor(
   timing: string,
-  boilTimeMin?: number | null
+  boilTimeMin?: number | null,
+  wortGravity?: number | null
 ): number {
+  const gravity = wortGravity ?? DEFAULT_BOIL_GRAVITY;
+
   switch (timing) {
     case "boil": {
       const bt = boilTimeMin ?? 60;
-      if (bt >= 60) return 0.27;
-      if (bt >= 45) return 0.24;
-      if (bt >= 30) return 0.20;
-      if (bt >= 15) return 0.14;
-      if (bt >= 10) return 0.10;
-      if (bt >= 5) return 0.05;
-      return 0.02;
+      if (bt <= 0) return 0;
+      const bigness = 1.65 * Math.pow(0.000125, gravity - 1);
+      const boilFactor = (1 - Math.exp(-0.04 * bt)) / 4.15;
+      return bigness * boilFactor;
     }
-    case "first_wort":
-      return 0.10;
+    case "first_wort": {
+      // Treat as a full 60-min boil addition
+      const bigness = 1.65 * Math.pow(0.000125, gravity - 1);
+      const boilFactor = (1 - Math.exp(-0.04 * 60)) / 4.15;
+      return bigness * boilFactor;
+    }
     case "whirlpool":
       return 0.05;
     case "mash":
@@ -137,10 +158,17 @@ export function calculateEstimates(inputs: RecipeEstimateInputs): RecipeEstimate
     0
   );
 
-  // Hop IBU factor
+  // Compute a preliminary OG for hop utilization gravity adjustment.
+  // We need OG to calculate utilization, so compute it from grain data first.
+  let preliminaryOG = DEFAULT_BOIL_GRAVITY;
+  if (totalGrainLbs > 0 && batchGal > 0) {
+    preliminaryOG = 1 + (totalPoints * efficiency) / 100 / batchGal / 1000;
+  }
+
+  // Hop IBU factor — uses Tinseth utilization with gravity adjustment
   const weightedIbuFactor = inputs.hopItems.reduce((sum, h) => {
     const alpha = h.alpha_acid ?? DEFAULT_ALPHA;
-    const utilization = getHopUtilizationFactor(h.timing, h.boil_time_min);
+    const utilization = getHopUtilizationFactor(h.timing, h.boil_time_min, preliminaryOG);
     return sum + h.weight_oz * alpha * utilization;
   }, 0);
 

@@ -2,7 +2,8 @@
  * RecipeSectionCard - Reusable section card wrapper for recipe editor.
  *
  * Provides a consistent card layout with title, optional subtitle,
- * collapsible toggle, and optional header actions slot.
+ * collapsible toggle, optional header actions slot, and an unsaved
+ * changes indicator (amber dot next to title when isDirty is true).
  */
 
 "use client";
@@ -11,23 +12,26 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface RecipeSectionCardProps {
+type RecipeSectionCardProps = {
   title: string;
   subtitle?: string;
   /** Slot for action buttons rendered in the card header */
   headerActions?: ReactNode;
+  /** Whether the section has unsaved changes (shows visual indicator) */
+  isDirty?: boolean;
   /** Whether the section can be collapsed (default: false) */
   collapsible?: boolean;
   /** Whether the section starts collapsed (default: false) */
   defaultCollapsed?: boolean;
   children: ReactNode;
   className?: string;
-}
+};
 
 export function RecipeSectionCard({
   title,
   subtitle,
   headerActions,
+  isDirty = false,
   collapsible = false,
   defaultCollapsed = false,
   children,
@@ -48,7 +52,16 @@ export function RecipeSectionCard({
           </span>
         )}
         <div className="text-left">
-          <h3 className="text-sm font-semibold">{title}</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-semibold">{title}</h3>
+            {isDirty && (
+              <span
+                className="h-2 w-2 rounded-full bg-amber-500 shrink-0"
+                title="Unsaved changes"
+                aria-label="Unsaved changes"
+              />
+            )}
+          </div>
           {subtitle && (
             <p className="text-xs text-muted-foreground">{subtitle}</p>
           )}

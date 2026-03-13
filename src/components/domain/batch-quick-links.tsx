@@ -7,7 +7,6 @@
  * - Brew Log (linked hot-side log, if any)
  * - Readings (fermentation metrics)
  * - Additions (dry hops, fruit, etc.)
- * - History (timeline of all events)
  */
 
 import Link from "next/link";
@@ -18,16 +17,15 @@ import { Button } from "@/components/ui/button";
 import {
   Thermometer,
   FlaskConical,
-  History,
   ArrowRight,
   Beer,
 } from "lucide-react";
 
-interface BatchQuickLinksProps {
+type BatchQuickLinksProps = {
   data: {
     id: string;
   };
-}
+};
 
 export function BatchQuickLinks({ data }: BatchQuickLinksProps) {
   const supabase = createClient();
@@ -78,12 +76,6 @@ export function BatchQuickLinks({ data }: BatchQuickLinksProps) {
       label: "Additions",
       description: "Dry hops, fruit, finings, and adjuncts",
       icon: FlaskConical,
-    },
-    {
-      href: `/production/batches/${data.id}/history`,
-      label: "Batch History",
-      description: "Timeline of all batch events",
-      icon: History,
     },
   );
 
