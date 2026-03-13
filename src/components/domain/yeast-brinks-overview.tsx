@@ -6,6 +6,10 @@
  * Dashboard card grid showing all brink vessels and their current yeast pitches.
  * Displays viability status, remaining quantity, generation, and days until
  * the 75% viability threshold. Empty brinks are shown as dimmed cards.
+ *
+ * Viability data comes from the yeast_pitches_with_remaining view (single source
+ * of truth). The only client-side calculation is days-until-threshold, which
+ * requires the decay rate constant from yeast-calculations.
  */
 
 import { useMemo } from "react";
@@ -16,9 +20,9 @@ import { yeastKeys, vesselKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/universal/status-badge";
+import { VIABILITY_STATUS_DISPLAY } from "@/entities/yeast-pitch";
 import {
-  calculateViabilityDecay,
-  getViabilityStatus,
   daysUntilViabilityThreshold,
   type YeastForm,
 } from "@/lib/yeast-calculations";
@@ -37,37 +41,11 @@ type ActivePitch = {
   strain_name: string | null;
   strain_form: string | null;
   quantity_remaining_lbs: number | null;
-  initial_viability: number | null;
-  received_date: string | null;
-  harvest_date: string | null;
+  estimated_viability: number | null;
+  viability_status: string | null;
   generation: number | null;
   vessel_id: string | null;
   days_old: number | null;
-}
-
-// =============================================================================
-// Viability Badge
-// =============================================================================
-
-const VIABILITY_BADGE_CLASSES: Record<string, string> = {
-  excellent: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  good: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  marginal: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  low: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  inactive: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-};
-
-function ViabilityBadge({ status }: { status: string }) {
-  const label = status.charAt(0).toUpperCase() + status.slice(1);
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-        VIABILITY_BADGE_CLASSES[status] || VIABILITY_BADGE_CLASSES.inactive
-      }`}
-    >
-      {label}
-    </span>
-  );
 }
 
 // =============================================================================
@@ -91,14 +69,14 @@ export function YeastBrinksOverview() {
     },
   });
 
-  // Fetch active yeast pitches in brinks
+  // Fetch active yeast pitches in brinks — uses view-computed viability fields
   const { data: activePitches, isLoading: pitchesLoading } = useQuery({
     queryKey: yeastKeys.brinks(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("yeast_pitches_with_remaining")
         .select(
-          "id, strain_name, strain_form, quantity_remaining_lbs, initial_viability, received_date, harvest_date, generation, vessel_id, days_old"
+          "id, strain_name, strain_form, quantity_remaining_lbs, estimated_viability, viability_status, generation, vessel_id, days_old"
         )
         .in("status", ["in_stock", "in_use"])
         .not("vessel_id", "is", null);
@@ -183,17 +161,14 @@ function BrinkCard({
     );
   }
 
-  // Calculate viability from initial values (client-side recalculation)
+  // Use view-computed viability (single source of truth — avoids duplicate calculation)
+  const viability = pitch.estimated_viability ?? 0;
+  const viabilityStatus = pitch.viability_status || "good";
   const form: YeastForm = (pitch.strain_form as YeastForm) || "liquid";
   const daysOld = pitch.days_old ?? 0;
-  const initialViability = pitch.initial_viability ?? 95;
-  const viabilityResult = calculateViabilityDecay(initialViability, daysOld, form);
-  const viabilityStatus = getViabilityStatus(viabilityResult.viability);
-  const daysUntil75 = daysUntilViabilityThreshold(
-    viabilityResult.viability,
-    75,
-    form
-  );
+
+  // Days-until-threshold is the one value not in the view (needs decay rate constant)
+  const daysUntil75 = daysUntilViabilityThreshold(viability, 75, form);
 
   return (
     <Link href={`/production/yeast-pitches/${pitch.id}`}>
@@ -221,15 +196,18 @@ function BrinkCard({
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Viability</span>
             <div className="flex items-center gap-2">
-              <span className="font-medium">{Math.round(viabilityResult.viability)}%</span>
-              <ViabilityBadge status={viabilityStatus} />
+              <span className="font-medium">{Math.round(viability)}%</span>
+              <StatusBadge
+                status={viabilityStatus}
+                config={VIABILITY_STATUS_DISPLAY}
+              />
             </div>
           </div>
 
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Days to 75%</span>
             <span className="font-medium">
-              {viabilityResult.viability <= 75
+              {viability <= 75
                 ? "Below threshold"
                 : `${daysUntil75}d`}
             </span>

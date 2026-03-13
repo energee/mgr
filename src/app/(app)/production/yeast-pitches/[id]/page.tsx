@@ -15,7 +15,9 @@
  */
 
 import { use, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
 import type { EntityConfig } from "@/types/entity";
@@ -33,7 +35,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicRpc } from "@/services/types";
+import { resolveYeastLineageRoot } from "@/lib/yeast-lineage";
 import { yeastKeys, entityKeys } from "@/lib/query-keys";
 import type { YeastForm } from "@/lib/yeast-calculations";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -83,6 +85,7 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
   const queryClient = useQueryClient();
   const supabase = createClient();
 
+  const router = useRouter();
   const [showCellCountDialog, setShowCellCountDialog] = useState(false);
   const [currentPitchData, setCurrentPitchData] = useState<{
     id: string;
@@ -106,19 +109,15 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
     },
   });
 
-  // Find the root pitch ID for lineage summary queries via server-side recursive CTE
+  // Find the root pitch ID for lineage summary. Tries RPC; falls back to parent walk.
   const { data: rootId } = useQuery({
     queryKey: yeastKeys.lineageRoot(id),
-    queryFn: async () => {
-      const { data, error } = await dynamicRpc(supabase, "get_yeast_lineage_root", { p_pitch_id: id });
-      if (error) throw error;
-      return data ?? id;
-    },
+    queryFn: () => resolveYeastLineageRoot(supabase, id),
   });
 
   // Fetch lineage summary for cost spreading
   const { data: lineageSummary, isLoading: lineageLoading } = useQuery({
-    queryKey: yeastKeys.costSpread(id),
+    queryKey: yeastKeys.lineageSummary(rootId),
     queryFn: async () => {
       if (!rootId) return null;
       const { data, error } = await supabase
@@ -186,9 +185,19 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
         setShowCellCountDialog(true);
         return true;
       }
+      if (actionName === "pitch_to_batch") {
+        toast.info("Yeast pitching is done from the batch detail page", {
+          description: "Navigate to a batch and use the Yeast section to pitch.",
+          action: {
+            label: "Go to Batches",
+            onClick: () => router.push("/production/batches"),
+          },
+        });
+        return true;
+      }
       return false;
     },
-    []
+    [router]
   );
 
   // Determine chart props
@@ -283,6 +292,12 @@ function CostSpreadingSummary({
 
   if (!lineageSummary) return null;
 
+  // Compute total pitched quantity once for proportional cost allocation
+  const totalQty = pitchEvents.reduce(
+    (sum, e) => sum + (e.quantity_lbs ?? 0),
+    0
+  );
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -340,7 +355,11 @@ function CostSpreadingSummary({
                         : "\u2014"}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(lineageSummary.cost_per_batch)}
+                      {totalQty && lineageSummary.original_cost && event.quantity_lbs
+                        ? formatCurrency(
+                            (lineageSummary.original_cost * event.quantity_lbs) / totalQty
+                          )
+                        : "\u2014"}
                     </TableCell>
                   </TableRow>
                 ))}

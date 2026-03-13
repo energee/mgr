@@ -10,7 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicFrom } from "@/services/types";
+import { resolveYeastLineageRoot } from "@/lib/yeast-lineage";
 import { yeastKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,22 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { cn } from "@/lib/utils";
 import { shouldReplaceYeast } from "@/lib/yeast-calculations";
-import { yeastPitchEntity } from "@/entities/yeast-pitch";
-
-function viabilityColor(status: string | undefined): string {
-  switch (status) {
-    case "excellent":
-      return "text-green-600";
-    case "good":
-      return "text-green-500";
-    case "marginal":
-      return "text-yellow-500";
-    case "low":
-      return "text-orange-500";
-    default:
-      return "text-red-500";
-  }
-}
+import { formatCurrency } from "@/lib/format";
+import { yeastPitchEntity, VIABILITY_STATUS_DISPLAY } from "@/entities/yeast-pitch";
 
 type YeastLineageDisplayProps = {
   pitchId: string;
@@ -55,72 +41,55 @@ type PitchNode = {
 }
 
 export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
-  // Find the root of the lineage (the original purchase)
-  const { data: root, isLoading: rootLoading } = useQuery({
+  // Find the root of the lineage. Tries the server-side RPC first; falls back to
+  // a client-side parent walk if the function isn't available (e.g. stale schema cache).
+  const { data: rootId, isLoading: rootLoading } = useQuery({
     queryKey: yeastKeys.lineageRoot(pitchId),
-    queryFn: async () => {
-      const supabase = createClient();
-
-      // Get the current pitch
-      const { data: currentPitch } = await dynamicFrom(supabase, "yeast_pitches_with_details")
-        .select("*")
-        .eq("id", pitchId)
-        .single();
-
-      if (!currentPitch) return null;
-
-      // If this is a purchase, it's the root
-      if (currentPitch.source_type === "purchase") {
-        return currentPitch;
-      }
-
-      // Walk up the tree to find the root
-      let current = currentPitch;
-      while (current.parent_pitch_id) {
-        const { data: parent } = await dynamicFrom(supabase, "yeast_pitches_with_details")
-          .select("*")
-          .eq("id", current.parent_pitch_id)
-          .single();
-
-        if (!parent) break;
-        current = parent;
-      }
-
-      return current;
-    },
+    queryFn: () => resolveYeastLineageRoot(createClient(), pitchId),
   });
 
-  // Get all pitches in the lineage with a single query
+  // Fetch all descendants of the root and build the lineage tree
   const { data: lineage, isLoading: lineageLoading } = useQuery({
-    queryKey: yeastKeys.lineage(root?.id),
+    queryKey: yeastKeys.lineage(rootId),
     queryFn: async () => {
-      if (!root?.id || !root?.strain_id) return [];
+      if (!rootId) return [];
 
       const supabase = createClient();
 
-      // Fetch ALL pitches for this strain in one query
-      const { data: allPitches } = await dynamicFrom(supabase, "yeast_pitches_with_details")
-        .select("*")
-        .eq("strain_id", root.strain_id);
+      // Fetch the root pitch first
+      const { data: rootPitch } = await supabase
+        .from("yeast_pitches_with_remaining")
+        .select("id, strain_id, strain_name, source_type, generation, status, cost, harvest_date, received_date, estimated_viability, viability_status, parent_pitch_id")
+        .eq("id", rootId)
+        .single();
+
+      if (!rootPitch?.strain_id) return [];
+
+      // Fetch all pitches that share the same strain — DFS below filters to only
+      // those reachable from root, so unrelated lineages for the same strain are excluded.
+      const { data: allPitches } = await supabase
+        .from("yeast_pitches_with_remaining")
+        .select("id, strain_id, strain_name, source_type, generation, status, cost, harvest_date, received_date, estimated_viability, viability_status, parent_pitch_id")
+        .eq("strain_id", rootPitch.strain_id);
 
       if (!allPitches || allPitches.length === 0) return [];
 
-      // Build a children map: parent_id -> children[]
+      // Build lookup maps: node-by-id (O(1) access) and parent-id -> children[]
+      const nodeMap = new Map<string, PitchNode>();
       const childrenMap = new Map<string | null, PitchNode[]>();
-      for (const pitch of allPitches as PitchNode[]) {
-        const parentId = (pitch as PitchNode & { parent_pitch_id?: string | null }).parent_pitch_id ?? null;
+      for (const pitch of allPitches as (PitchNode & { parent_pitch_id?: string | null })[]) {
+        nodeMap.set(pitch.id, pitch);
+        const parentId = pitch.parent_pitch_id ?? null;
         if (!childrenMap.has(parentId)) {
           childrenMap.set(parentId, []);
         }
         childrenMap.get(parentId)!.push(pitch);
       }
 
-      // DFS traversal starting from root to produce depth-first order
+      // DFS traversal from root to collect only descendants of this lineage
       const result: PitchNode[] = [];
       function dfs(nodeId: string) {
-        const node = (allPitches as (PitchNode & { parent_pitch_id?: string | null })[]).find(
-          (p) => p.id === nodeId
-        );
+        const node = nodeMap.get(nodeId);
         if (!node) return;
         result.push(node);
         const children = childrenMap.get(nodeId) || [];
@@ -129,27 +98,28 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
         }
       }
 
-      dfs(root.id);
+      dfs(rootId);
       return result;
     },
-    enabled: !!root?.id,
+    enabled: !!rootId,
   });
 
   // Get lineage summary for cost info
   const { data: summary } = useQuery({
-    queryKey: yeastKeys.lineageSummary(root?.id),
+    queryKey: yeastKeys.lineageSummary(rootId),
     queryFn: async () => {
-      if (!root?.id) return null;
+      if (!rootId) return null;
 
       const supabase = createClient();
-      const { data } = await dynamicFrom(supabase, "yeast_lineage_summary")
+      const { data } = await supabase
+        .from("yeast_lineage_summary")
         .select("*")
-        .eq("root_id", root.id)
+        .eq("root_id", rootId)
         .single();
 
       return data;
     },
-    enabled: !!root?.id,
+    enabled: !!rootId,
   });
 
   const isLoading = rootLoading || lineageLoading;
@@ -213,13 +183,13 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
               <div>
                 <p className="text-muted-foreground">Original Cost</p>
                 <p className="font-medium">
-                  ${Number(summary.original_cost).toFixed(2)}
+                  {formatCurrency(summary.original_cost)}
                 </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Cost Per Batch</p>
                 <p className="font-medium">
-                  ${Number(summary.cost_per_batch).toFixed(2)}
+                  {formatCurrency(summary.cost_per_batch)}
                 </p>
               </div>
             </div>
@@ -293,15 +263,13 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
                   </span>
                 )}
 
-                {/* Viability */}
+                {/* Viability — uses shared VIABILITY_STATUS_DISPLAY config (DEC-007) */}
                 {pitch.estimated_viability != null && (
-                    <span
-                      className={cn(
-                        "ml-auto text-xs",
-                        viabilityColor(pitch.viability_status)
-                      )}
-                    >
-                      {Math.round(pitch.estimated_viability)}%
+                    <span className="ml-auto">
+                      <StatusBadge
+                        status={`${Math.round(pitch.estimated_viability)}%`}
+                        variant={VIABILITY_STATUS_DISPLAY[pitch.viability_status || "good"]?.color || "default"}
+                      />
                     </span>
                   )}
               </div>
