@@ -38,6 +38,9 @@ export const clientEnv = process.env.SKIP_ENV_VALIDATION
  * and server actions only — never from client components.
  */
 export function getServerEnv() {
+  if (typeof window !== "undefined") {
+    throw new Error("getServerEnv() must not be called in client-side code");
+  }
   return serverEnvSchema.parse({
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   });
