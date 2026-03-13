@@ -9,8 +9,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 const TEST_EMAIL = "dev@brewery.test";
 const TEST_PASSWORD = "devpassword123";
@@ -25,10 +24,10 @@ export async function GET(request: NextRequest) {
 
   // Ensure test user exists (idempotent)
   const { data: existingUsers } = await admin.auth.admin.listUsers();
-  const testUser = existingUsers?.users?.find((u) => u.email === TEST_EMAIL);
+  let testUser = existingUsers?.users?.find((u) => u.email === TEST_EMAIL);
 
   if (!testUser) {
-    const { error: createError } = await admin.auth.admin.createUser({
+    const { data: createData, error: createError } = await admin.auth.admin.createUser({
       email: TEST_EMAIL,
       password: TEST_PASSWORD,
       email_confirm: true,
@@ -40,18 +39,15 @@ export async function GET(request: NextRequest) {
         { status: 500 },
       );
     }
+    testUser = createData.user;
+  }
 
-    // Create a user_profiles entry with admin role so the test user has full access
-    const { data: newUser } = await admin.auth.admin.listUsers();
-    const created = newUser?.users?.find((u) => u.email === TEST_EMAIL);
-    if (created) {
-      await admin.from("user_profiles").upsert({
-        id: created.id,
-        email: TEST_EMAIL,
-        full_name: "Dev User",
-        roles: ["admin"],
-      });
-    }
+  // Always ensure admin role (DB trigger creates profile with 'viewer' by default)
+  if (testUser) {
+    await admin.from("user_profiles").update({
+      full_name: "Dev User",
+      roles: ["admin"],
+    }).eq("id", testUser.id);
   }
 
   // Sign in via the regular server client (sets session cookies)

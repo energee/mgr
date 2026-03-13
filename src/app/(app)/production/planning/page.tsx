@@ -238,15 +238,22 @@ export default function ProductionPlanningPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={
-                        isPast(shortfall.recommended_brew_start)
-                          ? "text-amber-600 font-medium"
-                          : ""
-                      }
-                    >
-                      {formatDate(shortfall.recommended_brew_start)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={
+                          isPast(shortfall.recommended_brew_start)
+                            ? "text-destructive font-medium"
+                            : ""
+                        }
+                      >
+                        {formatDate(shortfall.recommended_brew_start)}
+                      </span>
+                      {isPast(shortfall.recommended_brew_start) && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                          OVERDUE
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {shortfall.lead_time_days}d lead time
                     </div>
