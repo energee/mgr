@@ -57,12 +57,9 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
       sortable: true,
     },
     {
-      accessorKey: "inventory_item_id",
+      accessorKey: "item_name",
       header: "Item",
-      relation: {
-        entity: "inventory_item",
-        displayField: "name",
-      },
+      sortable: true,
     },
     {
       accessorKey: "quantity",

@@ -202,8 +202,8 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
 
   function getRowClassName(changeType: ChangeRequestItem["change_type"]): string {
     switch (changeType) {
-      case "add": return "bg-green-50 dark:bg-green-950/20";
-      case "remove": return "bg-red-50 dark:bg-red-950/20";
+      case "add": return "bg-green-50 dark:bg-green-900/40";
+      case "remove": return "bg-red-50 dark:bg-red-900/40";
       default: return "";
     }
   }

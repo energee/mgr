@@ -49,6 +49,10 @@ bun-debug.log*
 # Claude agent working directory
 .claude/
 
+# legacy lockfiles
+package-lock.json
+pnpm-lock.yaml
+
 # pnpm store (legacy)
 .pnpm-store/
 

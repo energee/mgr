@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "setup": "bun install && ln -s \"$CONDUCTOR_ROOT_PATH/.env\" .env",
+    "run": "bun dev --port $CONDUCTOR_PORT"
+  },
+  "runScriptMode": "nonconcurrent"
+}

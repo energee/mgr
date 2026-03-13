@@ -212,7 +212,9 @@ export default function ProductionPlanningPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {shortfalls.map((shortfall, index) => (
+              {shortfalls.map((shortfall, index) => {
+                const overdue = isPast(shortfall.recommended_brew_start);
+                return (
                 <TableRow key={`${shortfall.brand_id}-${shortfall.selling_format_id}-${shortfall.demand_week}-${index}`}>
                   <TableCell>
                     <div className="font-medium">{shortfall.brand_name}</div>
@@ -238,15 +240,22 @@ export default function ProductionPlanningPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={
-                        isPast(shortfall.recommended_brew_start)
-                          ? "text-amber-600 font-medium"
-                          : ""
-                      }
-                    >
-                      {formatDate(shortfall.recommended_brew_start)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={
+                          overdue
+                            ? "text-destructive font-medium"
+                            : ""
+                        }
+                      >
+                        {formatDate(shortfall.recommended_brew_start)}
+                      </span>
+                      {overdue && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                          OVERDUE
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {shortfall.lead_time_days}d lead time
                     </div>
@@ -262,7 +271,8 @@ export default function ProductionPlanningPage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

@@ -354,7 +354,10 @@ export default function InventoryValuationPage() {
   const grandTotal = rawMaterialsTotal + finishedGoodsTotal;
 
   const isLoading = rawLoading || fgLoading;
-  const error = rawError || fgError;
+  // Only show error banner when query failed AND returned no data
+  const rawFailed = rawError && !rawMaterialLots;
+  const fgFailed = fgError && !finishedGoods;
+  const error = rawFailed ? rawError : fgFailed ? fgError : null;
 
   // ---------------------------------------------------------------------------
   // Category subtotals for raw materials

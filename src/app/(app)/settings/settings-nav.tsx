@@ -50,8 +50,8 @@ const settingsNav = [
   {
     heading: "Commerce",
     items: [
-      { label: "Package Formats", href: "/settings/formats" },
-      { label: "Kegs", href: "/settings/keg-types" },
+      { label: "Package Formats", href: "/settings/selling-formats" },
+      { label: "Kegs", href: "/settings/containers" },
       { label: "Pricing", href: "/settings/pricing" },
     ],
   },
