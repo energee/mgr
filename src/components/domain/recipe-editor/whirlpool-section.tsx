@@ -28,7 +28,7 @@ type WhirlpoolFormValues = {
 }
 
 export function WhirlpoolSection() {
-  const { recipe, updateRecipe, isSaving, startSaving } = useRecipeEditor();
+  const { recipe, updateRecipe, isSaving, startSaving, refreshRecipe } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -67,7 +67,14 @@ export function WhirlpoolSection() {
       toast.success("Whirlpool parameters saved");
     },
     onError: (error) => {
-      toast.error(error.message);
+      if (error.message?.includes("version") || error.message?.includes("conflict")) {
+        toast.error("Someone else edited this recipe. Reloading...", {
+          description: "Your changes were not saved.",
+        });
+        refreshRecipe();
+      } else {
+        toast.error(error.message);
+      }
     },
     onSettled: () => {
       stopSavingRef.current?.();

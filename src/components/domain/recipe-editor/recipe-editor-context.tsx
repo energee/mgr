@@ -105,6 +105,8 @@ type RecipeEditorContextValue = {
   isSaving: boolean;
   /** Mark a section save as started. Returns a callback to mark it complete. */
   startSaving: () => () => void;
+  /** Refresh the recipe from the database (e.g., after a version conflict) */
+  refreshRecipe: () => void;
 };
 
 // =============================================================================
@@ -119,11 +121,14 @@ const RecipeEditorContext = createContext<RecipeEditorContextValue | null>(null)
 
 type RecipeEditorProviderProps = {
   initialRecipe: RecipeData;
+  /** Callback to reload recipe from the database */
+  onRefresh?: () => void;
   children: ReactNode;
 };
 
 export function RecipeEditorProvider({
   initialRecipe,
+  onRefresh,
   children,
 }: RecipeEditorProviderProps) {
   const [recipe, setRecipe] = useState<RecipeData>(initialRecipe);
@@ -149,6 +154,10 @@ export function RecipeEditorProvider({
   }, []);
 
   const isSaving = savingCount > 0;
+
+  const refreshRecipe = useCallback(() => {
+    onRefresh?.();
+  }, [onRefresh]);
 
   // Compute estimates reactively from current editor state
   const estimates = useMemo<RecipeEstimates>(() => {
@@ -182,8 +191,9 @@ export function RecipeEditorProvider({
       estimates,
       isSaving,
       startSaving,
+      refreshRecipe,
     }),
-    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving]
+    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving, refreshRecipe]
   );
 
   return (

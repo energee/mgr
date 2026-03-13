@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
@@ -31,6 +31,7 @@ import { recipeEntity } from "@/entities/recipe";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Copy } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 
 type RecipeEditorPageProps = {
@@ -42,7 +43,7 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
   const router = useRouter();
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
 
-  const { data: recipe, isLoading, error } = useQuery({
+  const { data: recipe, isLoading, error, refetch } = useQuery({
     queryKey: recipeKeys.detail(id),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -54,6 +55,18 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
       return data as unknown as RecipeData;
     },
   });
+
+  // Intercept Cmd+S to prevent browser save dialog and guide user
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        toast.info("Use the Save button in each section to save changes");
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleCloneSuccess = useCallback(
     (newRecipeId: string) => {
@@ -84,7 +97,7 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
   }
 
   return (
-    <RecipeEditorProvider initialRecipe={recipe}>
+    <RecipeEditorProvider initialRecipe={recipe} onRefresh={refetch}>
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
