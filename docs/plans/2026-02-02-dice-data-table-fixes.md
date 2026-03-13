@@ -27,7 +27,7 @@ In `src/hooks/use-dynamic-filter-options.ts`:
 
 **Step 2: Verify no infinite re-renders**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 3: Commit**
 
@@ -99,7 +99,7 @@ Replace `columnFilters.length > 0` with `urlFilters.length > 0`.
 
 **Step 5: Verify and commit**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 ```bash
 git add src/components/universal/entity-data-table.tsx src/lib/data-table-adapter.tsx
@@ -349,7 +349,7 @@ rm src/components/data-table/data-table-slider-filter.tsx
 
 **Step 2: Verify nothing breaks**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 3: Commit**
 
@@ -365,13 +365,13 @@ git commit -m "chore: remove unused Dice UI data table files"
 **Step 1: Run full lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 **Step 2: Run type check**
 
 ```bash
-pnpm tsc --noEmit
+bun tsc --noEmit
 ```
 
 Fix any issues found.

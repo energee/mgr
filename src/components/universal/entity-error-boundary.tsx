@@ -8,6 +8,7 @@
  */
 
 import { Component, ReactNode } from "react";
+import { log } from "@/lib/client-logger";
 import type { EntityConfig } from "@/types/entity";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +37,7 @@ export class EntityErrorBoundary extends Component<EntityErrorBoundaryProps, Sta
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error(
+    log.error(
       `[EntityErrorBoundary] Error in ${this.props.entity.displayName}:`,
       error,
       errorInfo

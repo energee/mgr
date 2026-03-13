@@ -431,7 +431,7 @@ Update `src/lib/__tests__/yeast-calculations.test.ts`:
 **Step 4: Run tests**
 
 ```bash
-pnpm vitest run src/lib/__tests__/yeast-calculations.test.ts
+bun vitest run src/lib/__tests__/yeast-calculations.test.ts
 ```
 
 Expected: All tests pass.
@@ -439,7 +439,7 @@ Expected: All tests pass.
 **Step 5: Run typecheck**
 
 ```bash
-pnpm typecheck
+bun typecheck
 ```
 
 Note: This will likely show errors in components that reference `cellsBillion`. Those will be fixed in later tasks. Verify that the calculation file itself has no errors.
@@ -502,7 +502,7 @@ vessel_type: z.enum([
 **Step 3: Run typecheck**
 
 ```bash
-pnpm typecheck
+bun typecheck
 ```
 
 **Step 4: Commit**
@@ -607,7 +607,7 @@ relations: [
 **Step 7: Run typecheck**
 
 ```bash
-pnpm typecheck
+bun typecheck
 ```
 
 **Step 8: Commit**
@@ -663,7 +663,7 @@ export const vesselKeys = {
 **Step 3: Run typecheck**
 
 ```bash
-pnpm typecheck
+bun typecheck
 ```
 
 **Step 4: Commit**
@@ -762,13 +762,13 @@ The component should:
 **Step 2: Run typecheck**
 
 ```bash
-pnpm typecheck
+bun typecheck
 ```
 
 **Step 3: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 **Step 4: Commit**
@@ -844,7 +844,7 @@ Remove: source pitch status update to 'harvested' (the source pitch stays in_sto
 **Step 5: Run typecheck and lint**
 
 ```bash
-pnpm typecheck && pnpm lint
+bun typecheck && bun lint
 ```
 
 **Step 6: Commit**
@@ -925,7 +925,7 @@ Currently the transfer dialog may only be invoked from fermenting state. The dia
 **Step 4: Run typecheck and lint**
 
 ```bash
-pnpm typecheck && pnpm lint
+bun typecheck && bun lint
 ```
 
 **Step 5: Commit**
@@ -1170,7 +1170,7 @@ Add dialog renders alongside existing ones:
 **Step 8: Run typecheck and lint**
 
 ```bash
-pnpm typecheck && pnpm lint
+bun typecheck && bun lint
 ```
 
 **Step 9: Commit**
@@ -1259,7 +1259,7 @@ Remove: harvest dialog state and trigger (harvest is now on batch detail).
 **Step 4: Run typecheck and lint**
 
 ```bash
-pnpm typecheck && pnpm lint
+bun typecheck && bun lint
 ```
 
 **Step 5: Commit**
@@ -1286,7 +1286,7 @@ Record Cell Count. Add RecordCellCountDialog for lab measurements."
 
 **Step 1: Fix all remaining typecheck errors**
 
-Run `pnpm typecheck` and fix any remaining references to:
+Run `bun typecheck` and fix any remaining references to:
 - `cellsBillion` → `cellsThousand`
 - `cell_count_billion` → `cell_count_thousand`
 - `yeast_pitches_with_details` → `yeast_pitches_with_remaining`
@@ -1305,7 +1305,7 @@ Update `docs/data-model/production.md` with:
 **Step 3: Run full validation**
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm vitest run
+bun typecheck && bun lint && bun vitest run
 ```
 
 All must pass.
@@ -1340,7 +1340,7 @@ Run the dev server and manually verify:
 **Step 2: Run full test suite**
 
 ```bash
-pnpm vitest run && pnpm typecheck && pnpm lint
+bun vitest run && bun typecheck && bun lint
 ```
 
 **Step 3: Run security advisors**

@@ -77,7 +77,7 @@ export default async function AuthLayout({ children }: AuthLayoutProps) {
 
 **Step 2: Run typecheck**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: PASS — no type changes, just JSX restructure
 
 **Step 3: Commit**
@@ -126,7 +126,7 @@ export default function LoginPage() {
 
 **Step 2: Run typecheck**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: PASS — removed Card imports, simpler JSX
 
 **Step 3: Commit**
@@ -174,12 +174,12 @@ export default function SignupPage() {
 
 **Step 2: Run typecheck**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: PASS
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: PASS — no unused imports, clean output
 
 **Step 4: Commit**
@@ -195,7 +195,7 @@ git commit -m "feat: signup page uses split-screen layout headings instead of Ca
 
 **Step 1: Start dev server and verify**
 
-Run: `pnpm dev`
+Run: `bun dev`
 
 Check:
 - `/login` — split layout on desktop, centered form on mobile

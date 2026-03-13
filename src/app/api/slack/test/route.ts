@@ -14,7 +14,7 @@ export const POST = withPermission("integrations:manage", async (req) => {
   let webhookUrl: string | null = body.webhookUrl ?? null;
 
   if (!webhookUrl) {
-    const admin = createAdminClient();
+    const admin = await createAdminClient();
     const { data: settings } = await admin
       .from("slack_settings")
       .select("webhook_url")

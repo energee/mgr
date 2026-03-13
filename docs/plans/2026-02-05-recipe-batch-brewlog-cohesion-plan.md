@@ -425,7 +425,7 @@ git commit -m "feat: add recipe variant cost and batch addition cost views"
 
 **Step 1: Generate types**
 
-Run: `pnpm supabase gen types typescript --project-id <project-id> > src/types/supabase.ts`
+Run: `bun supabase gen types typescript --project-id <project-id> > src/types/supabase.ts`
 
 Or use the Supabase MCP `generate_typescript_types` tool and write the output to `src/types/supabase.ts`.
 
@@ -1169,7 +1169,7 @@ git commit -m "docs: update production data model for variants and batch additio
 
 **Step 1: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 2: Fix any lint errors**
 

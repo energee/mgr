@@ -1,9 +1,9 @@
 /**
  * RecipeBasicsSection - Compact always-editable row for core recipe fields.
  *
- * Renders name, batch_size_bbl, boil_time_min, and style/brand dropdowns in a
- * single responsive row. Saves independently to the recipes table via
- * optimistic locking.
+ * Renders name, batch_size_bbl, volume_bbl, boil_time_min, and style/brand
+ * dropdowns in a single responsive row. Saves independently to the recipes
+ * table via optimistic locking.
  */
 
 "use client";
@@ -168,7 +168,7 @@ export function RecipeBasicsSection() {
         ) : null
       }
     >
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         <div className="col-span-2">
           <Label htmlFor="recipe-name" className="text-xs">
             Recipe Name
@@ -190,6 +190,20 @@ export function RecipeBasicsSection() {
             step="0.5"
             min="0"
             {...form.register("batch_size_bbl", { valueAsNumber: true })}
+            placeholder="e.g., 7"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="volume-bbl" className="text-xs">
+            Recipe Volume (BBL)
+          </Label>
+          <Input
+            id="volume-bbl"
+            type="number"
+            step="0.5"
+            min="0"
+            {...form.register("volume_bbl", { valueAsNumber: true })}
             placeholder="e.g., 7"
           />
         </div>

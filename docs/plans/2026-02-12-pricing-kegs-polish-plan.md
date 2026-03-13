@@ -561,7 +561,7 @@ git commit -m "feat: pricing matrix visual polish — COGS subtitles, empty cell
 **Step 1: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 Fix any errors.

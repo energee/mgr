@@ -12,7 +12,7 @@
  * inventory_item, and optionally sets a storage location.
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicRpc } from "@/services/types";
@@ -93,6 +93,14 @@ export function POAcceptInventoryDialog({
 
   // Per-row state: selected, inventory_item_id, location
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
+
+  // Reset state when dialog opens (clean slate for each session)
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- dialog reset on open is intentional
+      setRowStates({});
+    }
+  }, [open]);
 
   // RPC return type (matches get_unaccepted_po_receives SQL function)
   type RpcReceiveRow = {

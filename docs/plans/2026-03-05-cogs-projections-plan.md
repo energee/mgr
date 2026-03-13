@@ -241,7 +241,7 @@ describe("groupShortfallsBySupplier", () => {
 
 **Step 2: Run test to verify it passes (this tests existing logic)**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm vitest run src/lib/purchasing/__tests__/po-generator.test.ts`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun vitest run src/lib/purchasing/__tests__/po-generator.test.ts`
 Expected: PASS
 
 **Step 3: Update createDraftPO to use supplier lead time**
@@ -272,12 +272,12 @@ expectedDate.setDate(expectedDate.getDate() + (draft.max_lead_time_days ?? 7));
 
 **Step 4: Run tests**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm vitest run src/lib/purchasing/__tests__/po-generator.test.ts`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun vitest run src/lib/purchasing/__tests__/po-generator.test.ts`
 Expected: PASS
 
 **Step 5: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm tsc --noEmit`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun tsc --noEmit`
 Expected: No errors
 
 **Step 6: Commit**
@@ -687,7 +687,7 @@ projectedRevenue: (horizonWeeks: number, includeDrafts: boolean) =>
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm tsc --noEmit`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun tsc --noEmit`
 Expected: No errors
 
 **Step 3: Commit**
@@ -727,7 +727,7 @@ Key implementation details:
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm tsc --noEmit`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun tsc --noEmit`
 Expected: No errors
 
 **Step 3: Commit**
@@ -773,7 +773,7 @@ Key implementation details:
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm tsc --noEmit`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun tsc --noEmit`
 Expected: No errors
 
 **Step 3: Commit**
@@ -806,7 +806,7 @@ Key implementation details:
 
 **Step 2: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm tsc --noEmit`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun tsc --noEmit`
 Expected: No errors
 
 **Step 3: Commit**
@@ -973,12 +973,12 @@ Add `TrendingUp` to the lucide-react import.
 
 **Step 3: Run typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm tsc --noEmit`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun tsc --noEmit`
 Expected: No errors
 
 **Step 4: Run lint**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm lint`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -997,22 +997,22 @@ and Monthly Outlook tabs. Shared date range and channel filters."
 
 **Step 1: Run full typecheck**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm tsc --noEmit`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun tsc --noEmit`
 Expected: No errors
 
 **Step 2: Run lint**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm lint`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun lint`
 Expected: No new errors
 
 **Step 3: Run tests**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm vitest run`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun vitest run`
 Expected: All pass
 
 **Step 4: Build**
 
-Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && pnpm build`
+Run: `cd /Users/tedslesinski/Repos/mgr/.claude/worktrees/workstream-1 && bun build`
 Expected: Success
 
 **Step 5: Verify all files created/modified**

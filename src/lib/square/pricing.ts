@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { dollarsToCents } from "./utils";
-import { log } from "@/lib/client-logger";
+import { logger } from "@/lib/logger";
 
 interface TaproomPrice {
   brandId: string;
@@ -35,10 +35,7 @@ export async function resolveTaproomPrices(
     .single();
 
   if (channelError || !taproomChannel) {
-    log.error(
-      "Taproom sales channel not found:",
-      channelError?.message ?? "no data"
-    );
+    logger.error("Taproom sales channel not found: %s", channelError?.message ?? "no data");
     return [];
   }
 

@@ -49,12 +49,12 @@ export function ChatLayout({ children, header }: ChatLayoutProps) {
 
 **Step 2: Verify build passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 3: Verify dev server works**
 
-Run: `pnpm dev` — navigate to any authenticated page, confirm:
+Run: `bun dev` — navigate to any authenticated page, confirm:
 1. Page loads without chat panel JS in initial bundle
 2. Click the Claude toggle button (bottom-right) — chat panel appears
 3. Cmd+. keyboard shortcut still works (handled by ChatProvider, which is still eager)
@@ -102,10 +102,10 @@ Note: `@radix-ui/*` packages are already imported from specific subpackages (e.g
 
 **Step 2: Verify build passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
-Run: `pnpm build`
+Run: `bun build`
 Expected: Build completes successfully. May see reduced chunk sizes in output.
 
 **Step 3: Commit**
@@ -138,7 +138,7 @@ This is a single-line change. The rest of the file stays identical.
 
 **Step 2: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 3: Commit**
@@ -205,7 +205,7 @@ Summary of changes:
 
 **Step 3: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 4: Commit**
@@ -272,7 +272,7 @@ Summary:
 
 **Step 3: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 4: Commit**
@@ -328,7 +328,7 @@ All three: 60s → 120s
 
 **Step 3: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 4: Commit**
@@ -515,12 +515,12 @@ export function useDynamicFilterOptions(
 
 **Step 2: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 3: Run tests**
 
-Run: `pnpm test`
+Run: `bun test`
 Expected: All tests pass
 
 **Step 4: Commit**
@@ -613,12 +613,12 @@ To:
 
 **Step 2: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 3: Run tests**
 
-Run: `pnpm test`
+Run: `bun test`
 Expected: All tests pass
 
 **Step 4: Commit**
@@ -676,7 +676,7 @@ To:
 
 **Step 2: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 3: Commit**
@@ -726,7 +726,7 @@ export default function AppLoading() {
 
 **Step 2: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 3: Commit**
@@ -806,7 +806,7 @@ export default function AppError({ error, reset }: ErrorProps) {
 
 **Step 2: Verify typecheck passes**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 3: Commit**
@@ -825,27 +825,27 @@ card with 'Try Again' and 'Go to Dashboard' options."
 
 **Step 1: Run full type check**
 
-Run: `pnpm typecheck`
+Run: `bun typecheck`
 Expected: 0 errors
 
 **Step 2: Run full test suite**
 
-Run: `pnpm test`
+Run: `bun test`
 Expected: All tests pass
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors introduced
 
 **Step 4: Run build**
 
-Run: `pnpm build`
+Run: `bun build`
 Expected: Build succeeds. Note any bundle size changes in output.
 
 **Step 5: Smoke test**
 
-Run: `pnpm dev` and verify:
+Run: `bun dev` and verify:
 1. Dashboard loads — stats appear after initial fetch
 2. Navigate between pages — loading skeleton appears briefly
 3. Open chat panel (Cmd+. or click toggle) — panel loads and works

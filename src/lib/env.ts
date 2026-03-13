@@ -38,6 +38,9 @@ export const clientEnv = process.env.SKIP_ENV_VALIDATION
  * and server actions only — never from client components.
  */
 export function getServerEnv() {
+  if (typeof window !== "undefined") {
+    throw new Error("getServerEnv() must not be called in client-side code");
+  }
   return serverEnvSchema.parse({
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   });
@@ -51,4 +54,10 @@ export function getServerEnv() {
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
   process.env.NEXT_PUBLIC_APP_URL ||
-  "http://localhost:3000";
+  (() => {
+    if (process.env.NODE_ENV === "production") {
+      // eslint-disable-next-line no-console -- env.ts loads before logger is available
+      console.warn("[env] WARNING: NEXT_PUBLIC_SITE_URL is not set. Invite redirects will use localhost:3000.");
+    }
+    return "http://localhost:3000";
+  })();

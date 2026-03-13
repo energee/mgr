@@ -665,9 +665,9 @@ Replace all `package_type_id` queries/lookups with `selling_format_id` → `sell
 
 ### Task 21: Final validation
 
-**Step 1:** Run `pnpm typecheck` — must pass with zero errors
-**Step 2:** Run `pnpm lint` — fix any errors introduced
-**Step 3:** Run `pnpm test` — all tests must pass
+**Step 1:** Run `bun typecheck` — must pass with zero errors
+**Step 2:** Run `bun lint` — fix any errors introduced
+**Step 3:** Run `bun test` — all tests must pass
 **Step 4:** Run `supabase db reset` — verify clean migration
 **Step 5:** Manual smoke test: create a container, add selling formats, enable in channels, set prices in matrix
 

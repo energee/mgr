@@ -8,7 +8,7 @@
  * Creates inventory_lots records to track received materials.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -109,6 +109,16 @@ export function POReceiving({
 
   // Track receive quantities per line item
   const [receives, setReceives] = useState<Record<string, ReceiveEntry>>({});
+  const [globalNotes, setGlobalNotes] = useState("");
+
+  // Reset state when dialog opens (clean slate for each session)
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- dialog reset on open is intentional
+      setReceives({});
+      setGlobalNotes("");
+    }
+  }, [open]);
 
   // Fetch PO line items with received quantities and resolved catalog names
   const { data: lineItems, isLoading } = useQuery({
@@ -164,7 +174,7 @@ export function POReceiving({
           quantity: entry.quantity,
           lot_number: entry.lot_number || null,
           expiration_date: entry.expiration_date || null,
-          notes: entry.notes || null,
+          notes: globalNotes || entry.notes || null,
         }));
 
       if (receivesToInsert.length === 0) {
@@ -437,6 +447,8 @@ export function POReceiving({
                 <Textarea
                   placeholder="Optional notes about this receive..."
                   className="min-h-[60px]"
+                  value={globalNotes}
+                  onChange={(e) => setGlobalNotes(e.target.value)}
                 />
               </div>
             )}

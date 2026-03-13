@@ -118,7 +118,11 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
 }
 
 /**
- * Generate next PO number in format PO-YYYY-NNN
+ * Generates the next PO number by reading the highest existing number and incrementing.
+ *
+ * TODO: This has a read-then-write race condition — concurrent calls can generate
+ * duplicate PO numbers. Should be replaced with a database sequence or atomic
+ * server-side function. See review branch findings C5.
  */
 export async function generateNextPONumber(): Promise<string> {
   const supabase = await getSupabase();

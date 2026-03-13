@@ -50,7 +50,7 @@ The following were explicitly deprioritized:
 - Critical path: recipe → batch → brew log → readings → package → order → fulfill
 - Customer portal flow: login → view orders → submit change request
 
-**Validation:** `pnpm test:coverage` shows >80% for `src/lib/`. Playwright runs critical workflow E2E.
+**Validation:** `bun test:coverage` shows >80% for `src/lib/`. Playwright runs critical workflow E2E.
 
 **Dependencies:** None — foundational.
 
@@ -176,7 +176,7 @@ The following were explicitly deprioritized:
 - Close completed issues in `.beads/issues.jsonl` (Square, Slack, QuickBooks)
 - Update `docs/spec/decisions.md` with completed decisions
 
-**Validation:** `pnpm lint`, `pnpm typecheck`, `pnpm test` all clean. Performance queries verified.
+**Validation:** `bun lint`, `bun typecheck`, `bun test` all clean. Performance queries verified.
 
 **Dependencies:** Phases 1-4 complete.
 

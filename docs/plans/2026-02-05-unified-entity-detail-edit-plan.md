@@ -181,12 +181,12 @@ Add a new section to `EntityConfig` between the Detail View and Form sections (a
 
 **Step 4: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No type errors (sections is optional, backward compatible)
 
 **Step 5: Lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: Clean
 
 **Step 6: Commit**
@@ -246,12 +246,12 @@ In `entity-detail.tsx`, update SectionCard to use the new `FieldDisplay` compone
 
 **Step 3: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No type errors
 
 **Step 4: Verify the app renders correctly**
 
-Run: `pnpm dev` and manually check a detail page (e.g., `/settings/locations/[any-id]`)
+Run: `bun dev` and manually check a detail page (e.g., `/settings/locations/[any-id]`)
 Expected: Looks identical to before
 
 **Step 5: Commit**
@@ -299,12 +299,12 @@ Update `entity-form.tsx` to import `FieldInput` and `useDynamicOptions` from the
 
 **Step 4: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 Expected: No type errors
 
 **Step 5: Verify forms work**
 
-Run: `pnpm dev` and test creating/editing an entity (e.g., `/settings/locations/new`)
+Run: `bun dev` and test creating/editing an entity (e.g., `/settings/locations/new`)
 Expected: Form renders and submits identically
 
 **Step 6: Commit**
@@ -381,7 +381,7 @@ export function UnifiedField({
 
 **Step 2: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 
 **Step 3: Commit**
 
@@ -448,7 +448,7 @@ export function EditFooter({ form, onSave, onCancel, isSubmitting }: EditFooterP
 
 **Step 2: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 
 **Step 3: Commit**
 
@@ -518,13 +518,13 @@ Export as `EntityDetailUnified` and also as a wrapped version with error boundar
 
 **Step 3: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 
 **Step 4: Verify with pilot entity**
 
 Temporarily update the location detail page to use `EntityDetailUnified` and verify it renders identically to the current page.
 
-Run: `pnpm dev`, navigate to a location detail page
+Run: `bun dev`, navigate to a location detail page
 Expected: Same layout, same data, same actions
 
 Revert the page change (we'll do the permanent switch in Task 8).
@@ -627,7 +627,7 @@ Add an `isCreateMode` prop (or derive from `!id`). When in create mode:
 
 **Step 10: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 
 **Step 11: Commit**
 
@@ -762,11 +762,11 @@ export default function NewLocationPage() {
 
 **Step 5: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 
 **Step 6: Test manually**
 
-Run: `pnpm dev`
+Run: `bun dev`
 
 Test checklist:
 - [ ] Navigate to `/settings/locations` - list renders normally
@@ -782,7 +782,7 @@ Test checklist:
 
 **Step 7: Lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Fix any lint errors.
 
 **Step 8: Commit**
@@ -831,7 +831,7 @@ Work through all 10 entities listed above.
 
 **Step 2: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 
 **Step 3: Test manually**
 
@@ -839,7 +839,7 @@ Spot check 2-3 migrated entities in the browser to ensure view and edit work cor
 
 **Step 4: Lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 5: Commit**
 
@@ -907,7 +907,7 @@ Work through all 6 entities listed above.
 
 **Step 2: Verify build**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 
 **Step 3: Test manually**
 
@@ -919,7 +919,7 @@ Test each migrated entity in the browser:
 
 **Step 4: Lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 5: Commit**
 
@@ -1006,13 +1006,13 @@ Also update the "Entity Configuration" section to show `sections` instead of sep
 
 **Step 3: Verify no broken imports**
 
-Run: `pnpm tsc --noEmit`
+Run: `bun tsc --noEmit`
 
 Ensure no file still imports from a deleted edit page directory.
 
 **Step 4: Lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 
 **Step 5: Final manual test**
 

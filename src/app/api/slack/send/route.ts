@@ -32,7 +32,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const admin = createAdminClient();
+  const admin = await createAdminClient();
 
   // Validate secret against stored value
   const { data: settings, error: settingsErr } = await admin

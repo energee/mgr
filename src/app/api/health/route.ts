@@ -17,7 +17,7 @@ const log = logger.child({ route: "/api/health" });
 
 export async function GET() {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createAdminClient();
     const { error } = await supabase
       .from("_schema_registry")
       .select("table_name")

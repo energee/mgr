@@ -43,7 +43,7 @@ export const POST = withPermission(
 
     log.info({ invitedBy: user.id, email, roles }, "User invite attempted");
 
-    const adminDb = createAdminClient();
+    const adminDb = await createAdminClient();
 
     // Check if a user_profiles row already exists for this email
     const { data: existingProfile } = await adminDb

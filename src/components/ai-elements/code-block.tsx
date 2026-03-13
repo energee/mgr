@@ -400,11 +400,15 @@ export const CodeBlockContent = ({
   const codeKey = `${code}\0${language}`;
 
   useEffect(() => {
+    let live = true;
     const key = `${code}\0${language}`;
     // Subscribe to async highlighting result
     highlightCode(code, language, (result) => {
-      setAsyncEntry({ key, tokens: result });
+      if (live) setAsyncEntry({ key, tokens: result });
     });
+    return () => {
+      live = false;
+    };
   }, [code, language]);
 
   // Use async result only if it matches current code/language, otherwise show sync

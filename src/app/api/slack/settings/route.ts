@@ -11,7 +11,7 @@ const log = logger.child({ route: "/api/slack/settings" });
  * Returns Slack configuration with the webhook URL masked for security.
  */
 export const GET = withPermission("integrations:manage", async () => {
-  const admin = createAdminClient();
+  const admin = await createAdminClient();
   const { data, error } = await admin
     .from("slack_settings")
     .select("webhook_url, default_channel, is_enabled, channel_overrides, updated_at")
@@ -67,7 +67,7 @@ export const PUT = withPermission("integrations:manage", async (req) => {
     channel_overrides?: Record<string, string>;
   };
 
-  const admin = createAdminClient();
+  const admin = await createAdminClient();
 
   // Build update payload with only provided fields
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };

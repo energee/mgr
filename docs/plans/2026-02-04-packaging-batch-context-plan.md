@@ -305,7 +305,7 @@ git commit -m "feat: show batch info in read-only packaging line items"
 **Step 1: Run lint**
 
 ```bash
-pnpm lint
+bun lint
 ```
 
 Fix any errors introduced by the changes.

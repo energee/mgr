@@ -21,7 +21,7 @@
 Run from the worktree root (`/Users/tedslesinski/Repos/mgr/.worktrees/new-features`):
 
 ```bash
-pnpm dlx shadcn@latest add "https://diceui.com/r/combobox.json"
+bunx shadcn@latest add "https://diceui.com/r/combobox.json"
 ```
 
 Accept any prompts to install dependencies. This will:
@@ -40,7 +40,7 @@ Expected: `OK`
 **Step 3: Verify it compiles**
 
 ```bash
-cd /Users/tedslesinski/Repos/mgr/.worktrees/new-features && pnpm lint 2>&1 | grep -c "error" || echo "0 errors"
+cd /Users/tedslesinski/Repos/mgr/.worktrees/new-features && bun lint 2>&1 | grep -c "error" || echo "0 errors"
 ```
 
 Expected: No new errors introduced (pre-existing warnings are fine).
@@ -57,7 +57,7 @@ This understanding is critical for Task 2.
 **Step 5: Commit**
 
 ```bash
-git add src/components/ui/combobox.tsx package.json pnpm-lock.yaml
+git add src/components/ui/combobox.tsx package.json bun.lock
 git commit -m "feat: install Dice UI combobox component"
 ```
 
@@ -151,7 +151,7 @@ Adjust the implementation to match the actual installed component API.
 **Step 3: Verify lint passes**
 
 ```bash
-cd /Users/tedslesinski/Repos/mgr/.worktrees/new-features && pnpm lint
+cd /Users/tedslesinski/Repos/mgr/.worktrees/new-features && bun lint
 ```
 
 Fix any lint errors. Pre-existing warnings are fine.
@@ -172,7 +172,7 @@ git commit -m "feat: use combobox for relation fields in entity forms"
 **Step 1: Start dev server**
 
 ```bash
-cd /Users/tedslesinski/Repos/mgr/.worktrees/new-features && pnpm dev
+cd /Users/tedslesinski/Repos/mgr/.worktrees/new-features && bun dev
 ```
 
 **Step 2: Test a relation field with few options**

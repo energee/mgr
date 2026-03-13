@@ -79,7 +79,7 @@ export function NextStepBanner({ message, actions, variant = "info" }: NextStepB
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
@@ -190,7 +190,7 @@ The `onAction` for the banner's buttons should trigger the same action handlers 
 
 **Step 3: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 4: Commit**
@@ -325,7 +325,7 @@ Note: Need to add `useRouter` import and `const router = useRouter()`.
 
 **Step 4: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -432,7 +432,7 @@ Remove `src/app/(app)/production/brew-logs/[id]/events/page.tsx` and the `events
 
 **Step 4: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -587,7 +587,7 @@ export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
 
 **Step 4: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -756,7 +756,7 @@ Note: Check how EntityList renders its header. If it already has a header row wi
 
 **Step 4: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -967,7 +967,7 @@ onSuccess(firstBatchId);
 
 **Step 8: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 9: Commit**
@@ -1077,7 +1077,7 @@ segments.push({ label: batch?.batch_number ?? "Batch" });
 
 **Step 4: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 5: Commit**
@@ -1161,7 +1161,7 @@ const primaryBrewLog = brewLogLinks?.[0];
 
 **Step 2: Run lint**
 
-Run: `pnpm lint`
+Run: `bun lint`
 Expected: No new errors
 
 **Step 3: Commit**
