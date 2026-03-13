@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys } from "@/lib/query-keys";
-import { RecipeEditorProvider, type RecipeData } from "./recipe-editor-context";
+import { RecipeEditorProvider, useRecipeEditor, type RecipeData } from "./recipe-editor-context";
 import { RecipeBasicsSection } from "./recipe-basics-section";
 import { FermentablesSection } from "./fermentables-section";
 import { WaterChemistrySection } from "./water-chemistry-section";
@@ -134,6 +134,11 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
           </div>
         </div>
 
+        {/* Mobile sticky estimates bar */}
+        <div className="lg:hidden sticky top-0 z-10 -mx-4 px-4 py-2 bg-background/95 backdrop-blur border-b">
+          <MobileEstimatesBar />
+        </div>
+
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           {/* Left: Sections */}
@@ -168,6 +173,22 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
         onSuccess={handleCloneSuccess}
       />
     </RecipeEditorProvider>
+  );
+}
+
+/** Compact estimates bar shown on mobile viewports */
+function MobileEstimatesBar() {
+  const { estimates } = useRecipeEditor();
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <div className="flex gap-4">
+        <span><span className="text-muted-foreground">OG</span>{" "}<span className="font-mono font-medium">{estimates.og?.toFixed(3) ?? "\u2014"}</span></span>
+        <span><span className="text-muted-foreground">FG</span>{" "}<span className="font-mono font-medium">{estimates.fg?.toFixed(3) ?? "\u2014"}</span></span>
+        <span><span className="text-muted-foreground">ABV</span>{" "}<span className="font-mono font-medium">{estimates.abv !== null ? `${estimates.abv}%` : "\u2014"}</span></span>
+        <span><span className="text-muted-foreground">IBU</span>{" "}<span className="font-mono font-medium">{estimates.ibu?.toString() ?? "\u2014"}</span></span>
+        <span><span className="text-muted-foreground">SRM</span>{" "}<span className="font-mono font-medium">{estimates.srm?.toString() ?? "\u2014"}</span></span>
+      </div>
+    </div>
   );
 }
 
