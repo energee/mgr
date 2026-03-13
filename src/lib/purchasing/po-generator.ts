@@ -46,6 +46,16 @@ export type PODraft = {
 }
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/** Lazy-import supabase client to avoid env validation at module load time. */
+async function getSupabase() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
+
+// =============================================================================
 // Functions
 // =============================================================================
 
