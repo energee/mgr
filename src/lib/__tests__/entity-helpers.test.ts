@@ -87,7 +87,7 @@ const categoryDisplay: ValueDisplayConfig = {
   field: "category",
   display: {
     grain: { label: "Grain" },
-    hops: { label: "Hops" },
+    hop: { label: "Hop" },
     yeast: { label: "Yeast" },
   },
 };
@@ -297,7 +297,7 @@ describe("valuesAsOptions", () => {
     const options = valuesAsOptions(categoryDisplay);
     expect(options).toEqual([
       { value: "grain", label: "Grain" },
-      { value: "hops", label: "Hops" },
+      { value: "hop", label: "Hop" },
       { value: "yeast", label: "Yeast" },
     ]);
   });
@@ -356,7 +356,7 @@ describe("getValueDisplay", () => {
 describe("getValueLabel", () => {
   it("returns label from valueDisplay when available", () => {
     expect(getValueLabel(mockEntity, "priority", "medium")).toBe("Medium");
-    expect(getValueLabel(mockEntity, "category", "hops")).toBe("Hops");
+    expect(getValueLabel(mockEntity, "category", "hop")).toBe("Hop");
   });
 
   it("falls back to formatStateLabel for unknown value", () => {

@@ -39,10 +39,12 @@ const categoryDisplayConfig: ValueDisplayConfig = {
   field: "category",
   display: {
     grain: { label: "Grain", color: "default" },
-    hops: { label: "Hops", color: "success" },
+    hop: { label: "Hop", color: "success" },
     yeast: { label: "Yeast", color: "info" },
     adjunct: { label: "Adjunct", color: "warning" },
+    chemical: { label: "Chemical", color: "info" },
     packaging: { label: "Packaging", color: "default" },
+    equipment: { label: "Equipment", color: "default" },
     other: { label: "Other", color: "default" },
   },
 };
