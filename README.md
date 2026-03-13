@@ -21,14 +21,14 @@ A full-stack brewery management system covering production, inventory, purchasin
 ### Prerequisites
 
 - Node.js 20+
-- [pnpm](https://pnpm.io/) (`corepack enable && corepack prepare pnpm@latest --activate`)
+- [Bun](https://bun.sh/) (`curl -fsSL https://bun.sh/install | bash`)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 
 ### Setup
 
 ```bash
 # 1. Install dependencies
-pnpm install
+bun install
 
 # 2. Configure environment
 cp .env.example .env.local
@@ -38,10 +38,10 @@ cp .env.example .env.local
 supabase db push
 
 # 4. Generate TypeScript types from your database schema
-pnpm db:generate
+bun db:generate
 
 # 5. Start dev server (uses Turbopack)
-pnpm dev
+bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -91,17 +91,17 @@ supabase/
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev` | Start dev server (Turbopack) |
-| `pnpm build` | Production build |
-| `pnpm typecheck` | Run `tsc --noEmit` |
-| `pnpm lint` | ESLint |
-| `pnpm lint:fix` | ESLint with auto-fix |
-| `pnpm test` | Run unit tests (Vitest) |
-| `pnpm test:watch` | Tests in watch mode |
-| `pnpm e2e` | Run Playwright end-to-end tests |
-| `pnpm db:generate` | Generate Supabase TypeScript types |
-| `pnpm db:generate:local` | Generate types from local Supabase |
-| `pnpm analyze` | Bundle analysis |
+| `bun dev` | Start dev server (Turbopack) |
+| `bun build` | Production build |
+| `bun typecheck` | Run `tsc --noEmit` |
+| `bun lint` | ESLint |
+| `bun lint:fix` | ESLint with auto-fix |
+| `bun test` | Run unit tests (Vitest) |
+| `bun test:watch` | Tests in watch mode |
+| `bun e2e` | Run Playwright end-to-end tests |
+| `bun db:generate` | Generate Supabase TypeScript types |
+| `bun db:generate:local` | Generate types from local Supabase |
+| `bun analyze` | Bundle analysis |
 
 ## Architecture
 
