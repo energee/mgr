@@ -38,9 +38,11 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect } from "react";
 import { batchKeys, vesselKeys, entityKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
+import { isDuplicateTransfer } from "./vessel-transfer-utils";
 
 const vesselTransferSchema = z.object({
   to_vessel_id: z.string().uuid("Please select a destination vessel"),
@@ -121,6 +123,25 @@ export function VesselTransferDialog({
     enabled: open,
   });
 
+  // Calculate remaining volume (batch volume minus already-transferred volume)
+  const { data: transferredVolume } = useQuery({
+    queryKey: batchKeys.remainingVolume(batchId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vessel_transfers")
+        .select("volume_bbl")
+        .eq("batch_id", batchId);
+      if (error) throw error;
+      const total = (data ?? []).reduce((sum, t) => sum + Number(t.volume_bbl), 0);
+      return total;
+    },
+    enabled: open,
+  });
+
+  const remainingVolume = currentVolume
+    ? Math.max(0, currentVolume - (transferredVolume ?? 0))
+    : 0;
+
   // Filter out the source vessel
   const availableVessels = vessels?.filter((v) => v.id !== fromVesselId);
 
@@ -134,9 +155,37 @@ export function VesselTransferDialog({
     },
   });
 
+  // Update volume when remaining volume is calculated
+  useEffect(() => {
+    if (remainingVolume > 0 && open) {
+      form.setValue("volume_bbl", remainingVolume);
+    }
+  }, [remainingVolume, open, form]);
+
   // Transfer mutation
   const transferMutation = useMutation({
     mutationFn: async (values: VesselTransferFormValues) => {
+      // Pre-check: look for a recent transfer to the same destination
+      const { data: existing } = await supabase
+        .from("vessel_transfers")
+        .select("id, transferred_at")
+        .eq("batch_id", batchId)
+        .eq("to_vessel_id", values.to_vessel_id)
+        .order("transferred_at", { ascending: false })
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        const lastTransferredAt = existing[0].transferred_at;
+        if (isDuplicateTransfer(lastTransferredAt)) {
+          const minutesAgo = Math.floor(
+            (Date.now() - new Date(lastTransferredAt).getTime()) / 60000
+          );
+          throw new Error(
+            `This batch was already transferred to this vessel ${minutesAgo} minute(s) ago. Wait a moment or choose a different vessel.`
+          );
+        }
+      }
+
       // Create the vessel transfer record
       const { error: transferError } = await supabase
         .from("vessel_transfers")
@@ -149,7 +198,13 @@ export function VesselTransferDialog({
           notes: values.notes || null,
         });
 
-      if (transferError) throw transferError;
+      if (transferError) {
+        // Friendly message for unique constraint violations
+        if (transferError.code === "23505") {
+          throw new Error("A transfer with these exact details already exists.");
+        }
+        throw transferError;
+      }
 
       // Vessel occupancy (current_batch_id, status) is updated automatically
       // by the handle_vessel_transfer() database trigger on vessel_transfers INSERT.

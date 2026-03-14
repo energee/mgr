@@ -14,7 +14,9 @@
  */
 
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
-import { statesAsOptions } from "@/types/entity";
+import { statesAsOptions, getValueLabel } from "@/types/entity";
+import { Badge } from "@/components/ui/badge";
+import { vesselEntity } from "./vessel";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
@@ -24,6 +26,7 @@ import { BatchInsights } from "@/components/domain/batch-insights";
 import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
 import { BatchBlendHistory } from "@/components/domain/batch-blend-history";
 import { BatchYeastSection } from "@/components/domain/batch-yeast-section";
+import { BatchTransferTimeline } from "@/components/domain/batch-transfer-timeline";
 import { batchSchema, batchStates, batchTransitions } from "@/lib/schemas/batch";
 
 // Re-export schema so existing client-side imports keep working
@@ -41,6 +44,7 @@ type Batch = BatchTable & {
   brew_date: string | null;
   current_vessel_id: string | null;
   current_vessel_name: string | null;
+  current_vessel_type: string | null;
   volume_from_brews_bbl: number | null;
 };
 
@@ -125,6 +129,20 @@ export const batchEntity: EntityConfig<Batch> = {
       accessorKey: "current_vessel_name",
       header: "Vessel",
       sortable: true,
+      render: (value, row) => {
+        if (!value) return null;
+        const batch = row as Batch;
+        return (
+          <span className="flex items-center gap-1.5">
+            {value as string}
+            {batch.current_vessel_type && (
+              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                {getValueLabel(vesselEntity, "vessel_type", batch.current_vessel_type)}
+              </Badge>
+            )}
+          </span>
+        );
+      },
     },
   ],
 
@@ -134,6 +152,17 @@ export const batchEntity: EntityConfig<Batch> = {
       type: "multiselect",
       label: "Status",
       options: statusOptions,
+    },
+    {
+      field: "current_vessel_name",
+      type: "select",
+      label: "Vessel",
+      dynamicOptions: {
+        table: "vessels",
+        valueField: "name",
+        labelField: "name",
+        orderBy: "name",
+      },
     },
   ],
 
@@ -279,15 +308,24 @@ export const batchEntity: EntityConfig<Batch> = {
       ],
     },
     {
+      id: "transfer-timeline",
+      title: "Transfer History",
+      component: BatchTransferTimeline,
+      collapsible: true,
+      hideOnCreate: true,
+    },
+    {
       id: "cancellation",
       title: "Cancellation Details",
       component: BatchCancellationInfo,
+      hideOnCreate: true,
     },
     {
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("batches"),
       collapsible: true,
+      hideOnCreate: true,
     },
   ],
 
