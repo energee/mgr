@@ -61,26 +61,26 @@ function formatTime12(time: string): string {
   return `${h}:${mStr} ${suffix}`;
 }
 
+/** Fallback labels for common phase/metric keys when enum data is unavailable */
+const FALLBACK_LABELS: Record<string, string> = {
+  temp_f: "Temp (\u00b0F)",
+  temp_c: "Temp (\u00b0C)",
+  gravity_plato: "Gravity (\u00b0P)",
+  gravity_sg: "Gravity (SG)",
+  ph: "pH",
+  do_ppb: "DO (ppb)",
+  amount_oz: "Amount (oz)",
+  amount_lbs: "Amount (lbs)",
+  volume_bbl: "Volume (BBL)",
+  volume_gal: "Volume (gal)",
+  flow_rate_gpm: "Flow Rate (GPM)",
+  ko_start: "Knockout Start",
+  ko_end: "Knockout End",
+};
+
 /** Convert snake_case to Title Case for fallback display when enum labels unavailable */
 function formatSnakeCase(s: string): string {
-  // Special cases for common metric abbreviations
-  const SPECIAL_LABELS: Record<string, string> = {
-    temp_f: "Temp (\u00b0F)",
-    temp_c: "Temp (\u00b0C)",
-    gravity_plato: "Gravity (\u00b0P)",
-    gravity_sg: "Gravity (SG)",
-    ph: "pH",
-    do_ppb: "DO (ppb)",
-    amount_oz: "Amount (oz)",
-    amount_lbs: "Amount (lbs)",
-    volume_bbl: "Volume (BBL)",
-    volume_gal: "Volume (gal)",
-    flow_rate_gpm: "Flow Rate (GPM)",
-    ko_start: "Knockout Start",
-    ko_end: "Knockout End",
-  };
-  if (SPECIAL_LABELS[s]) return SPECIAL_LABELS[s];
-  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return FALLBACK_LABELS[s] ?? s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -282,10 +282,12 @@ export function BrewEventTimeline({
 
             {/* Events */}
             <div className="space-y-4">
-              {sortedEvents.map((event, index) => {
+              {(() => {
+                const phaseLabelMap = phaseData?.labelMap ?? new Map<string, string>();
+                const metricConfigMap = metricData?.configMap ?? new Map();
+                return sortedEvents.map((event, index) => {
                 const eventId = event.id || `event-${index}`;
                 const PhaseIcon = getPhaseIcon(event.phase);
-                const phaseLabelMap = phaseData?.labelMap ?? new Map<string, string>();
                 const phaseLabel =
                   event.phase === "other"
                     ? (event.custom_phase || "Other")
@@ -322,7 +324,6 @@ export function BrewEventTimeline({
                             <>
                               <span className="text-muted-foreground/40">|</span>
                               {event.measurements.map((m, mIndex) => {
-                                const metricConfigMap = metricData?.configMap ?? new Map();
                                 const config = metricConfigMap.get(m.metric);
                                 const unitType = config?.unitType;
                                 const decimals = config?.decimals ?? 2;
@@ -391,7 +392,8 @@ export function BrewEventTimeline({
                       </div>
                     </div>
                   );
-                })}
+                });
+              })()}
               </div>
             </div>
           )}
