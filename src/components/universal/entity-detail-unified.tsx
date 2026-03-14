@@ -110,6 +110,8 @@ export type EntityDetailUnifiedProps<T = Record<string, unknown>> = {
     value: unknown,
     form: UseFormReturn<Record<string, unknown>>,
   ) => void;
+  /** Hide the internal breadcrumb navigation (useful when a parent provides its own breadcrumb) */
+  hideBreadcrumb?: boolean;
 }
 
 // =============================================================================
@@ -331,6 +333,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   defaultValues,
   disabledFields,
   onFieldChange,
+  hideBreadcrumb,
 }: EntityDetailUnifiedProps<T>) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -817,20 +820,22 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <nav className="flex items-center gap-1 text-xs">
-            <Link
-              href={backUrl || path}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {entity.displayNamePlural}
-            </Link>
-            <ChevronRight className="h-3 w-3 text-muted-foreground" />
-            <span className="text-foreground font-medium">
-              {isCreateMode
-                ? "New"
-                : header?.title || `${entity.displayName} ${id}`}
-            </span>
-          </nav>
+          {!hideBreadcrumb && (
+            <nav className="flex items-center gap-1 text-xs">
+              <Link
+                href={backUrl || path}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {entity.displayNamePlural}
+              </Link>
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              <span className="text-foreground font-medium">
+                {isCreateMode
+                  ? "New"
+                  : header?.title || `${entity.displayName} ${id}`}
+              </span>
+            </nav>
+          )}
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-medium">
               {isCreateMode

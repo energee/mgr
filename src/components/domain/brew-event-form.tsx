@@ -124,15 +124,33 @@ export function BrewEventForm({
     await onSubmit(event);
   };
 
+  /** Default metrics to suggest when adding a measurement for each phase */
+  const PHASE_DEFAULT_METRICS: Record<string, string> = {
+    strike_water: "temp_f",
+    mash_in: "temp_f",
+    mash_rest: "ph",
+    mash_step: "gravity_plato",
+    vorlauf: "temp_f",
+    runoff_start: "gravity_plato",
+    runoff_end: "gravity_plato",
+    sparge_start: "temp_f",
+    sparge_end: "temp_f",
+    kettle_full: "volume_bbl",
+    boil_start: "gravity_plato",
+    boil_end: "gravity_plato",
+    hop_addition: "amount_oz",
+    adjunct_addition: "amount_oz",
+    whirlpool_start: "temp_f",
+    whirlpool_rest: "temp_f",
+    whirlpool_end: "temp_f",
+    ko_start: "temp_f",
+    ko_end: "gravity_plato",
+    yeast_pitch: "temp_f",
+    flow_rate_change: "flow_rate_gpm",
+  };
+
   const addMeasurement = () => {
-    let defaultMetric = "temp_f";
-
-    if (selectedPhase === "boil_end" || selectedPhase === "ko_end") {
-      defaultMetric = "gravity_plato";
-    } else if (selectedPhase === "hop_addition" || selectedPhase === "adjunct_addition") {
-      defaultMetric = "amount_oz";
-    }
-
+    const defaultMetric = PHASE_DEFAULT_METRICS[selectedPhase] || "temp_f";
     append({ metric: defaultMetric, value: "", custom_metric: null });
   };
 
@@ -165,6 +183,11 @@ export function BrewEventForm({
                 onValueChange={(value) => {
                   field.onChange(value);
                   setSelectedPhase(value);
+                  // Auto-add default measurement when phase changes and no measurements exist
+                  if (form.getValues("measurements").length === 0) {
+                    const defaultMetric = PHASE_DEFAULT_METRICS[value] || "temp_f";
+                    append({ metric: defaultMetric, value: "", custom_metric: null });
+                  }
                 }}
               >
                 <SelectTrigger className="h-12">

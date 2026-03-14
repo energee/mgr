@@ -113,6 +113,11 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       sortable: true,
     },
     {
+      accessorKey: "recipe_name",
+      header: "Recipe",
+      sortable: true,
+    },
+    {
       accessorKey: "brew_date",
       header: "Brew Date",
       sortable: true,
@@ -132,6 +137,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
     {
       accessorKey: "batch_numbers",
       header: "Batches",
+      render: (value) => (value as string) || "—",
     },
   ],
 
@@ -217,6 +223,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           type: "textarea",
           fullWidth: true,
           colSpan: 12,
+          placeholder: "Add observations about this brew day...",
         },
       ],
     },

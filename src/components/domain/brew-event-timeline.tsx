@@ -61,6 +61,28 @@ function formatTime12(time: string): string {
   return `${h}:${mStr} ${suffix}`;
 }
 
+/** Convert snake_case to Title Case for fallback display when enum labels unavailable */
+function formatSnakeCase(s: string): string {
+  // Special cases for common metric abbreviations
+  const SPECIAL_LABELS: Record<string, string> = {
+    temp_f: "Temp (\u00b0F)",
+    temp_c: "Temp (\u00b0C)",
+    gravity_plato: "Gravity (\u00b0P)",
+    gravity_sg: "Gravity (SG)",
+    ph: "pH",
+    do_ppb: "DO (ppb)",
+    amount_oz: "Amount (oz)",
+    amount_lbs: "Amount (lbs)",
+    volume_bbl: "Volume (BBL)",
+    volume_gal: "Volume (gal)",
+    flow_rate_gpm: "Flow Rate (GPM)",
+    ko_start: "Knockout Start",
+    ko_end: "Knockout End",
+  };
+  if (SPECIAL_LABELS[s]) return SPECIAL_LABELS[s];
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   droplet: Droplet,
   grain: FlaskConical,
@@ -267,7 +289,7 @@ export function BrewEventTimeline({
                 const phaseLabel =
                   event.phase === "other"
                     ? (event.custom_phase || "Other")
-                    : (phaseLabelMap.get(event.phase) || event.phase);
+                    : (phaseLabelMap.get(event.phase) || formatSnakeCase(event.phase));
                 const colorClass = phaseColors[event.phase] || phaseColors.other;
 
                   return (
@@ -306,7 +328,7 @@ export function BrewEventTimeline({
                                 const decimals = config?.decimals ?? 2;
                                 const label = m.metric === "other"
                                   ? m.custom_metric || "Other"
-                                  : config?.label || m.metric;
+                                  : config?.label || formatSnakeCase(m.metric);
 
                                 return (
                                   <span
