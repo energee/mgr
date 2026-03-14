@@ -21,7 +21,7 @@
 | `src/entities/batch.tsx` | Modify | hideOnCreate, vessel filter, vessel type badge column |
 | `src/components/domain/vessel-transfer-dialog.tsx` | Modify | Pre-check duplicate query, friendly error, remaining volume |
 | `src/components/domain/batch-transfer-timeline.tsx` | Create | Visual transfer timeline component |
-| `src/app/(app)/production/batches/[id]/page.tsx` | Modify | Mount transfer timeline component |
+| `src/entities/batch.tsx` | Modify (also) | Register transfer timeline section |
 | `src/lib/query-keys.ts` | Modify | Add transfer timeline query key |
 | `src/components/domain/__tests__/vessel-transfer-dedup.test.ts` | Create | Unit test for duplicate pre-check |
 | `e2e/batch-vessel-display.spec.ts` | Create | E2e test for batch vessel column |
@@ -255,13 +255,8 @@ UPDATE vessels
 SET vessel_type = 'kettle'
 WHERE name = 'Kettle' AND vessel_type != 'kettle';
 
--- =============================================================================
--- 8. Update _schema_registry for vessel_transfers with index info
--- =============================================================================
-
-UPDATE _schema_registry
-SET ai_context = ai_context || '["idx_vessel_transfers_unique_per_batch prevents duplicate transfers per batch+vessel+timestamp"]'::jsonb
-WHERE table_name = 'vessel_transfers';
+-- Note: No _schema_registry entry for the index — indexes aren't tables.
+-- The index is self-documenting via its COMMENT ON INDEX above.
 ```
 
 - [ ] **Step 2: Verify migration file is saved**
@@ -631,6 +626,7 @@ git commit -m "feat: vessel transfer dialog — remaining volume, duplicate pre-
  *
  * Shows the journey of a batch through the brewery's vessels:
  * Kettle → FV3 → BT2 with dates, volumes, and vessel types.
+ * Queries the `vessel_transfers_with_details` view (created in migration 00066).
  * Uses the existing Timeline UI component for consistent styling.
  */
 
@@ -751,10 +747,10 @@ git add src/components/domain/batch-transfer-timeline.tsx
 git commit -m "feat: add batch transfer timeline component"
 ```
 
-### Task 8: Mount timeline on batch detail page
+### Task 8: Register timeline in batch entity config
 
 **Files:**
-- Modify: `src/app/(app)/production/batches/[id]/page.tsx`
+- Modify: `src/entities/batch.tsx`
 
 - [ ] **Step 1: Import and render timeline**
 
@@ -870,7 +866,7 @@ describe("isDuplicateTransfer", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it passes**
+- [ ] **Step 3: Run the test to verify it passes**
 
 Run: `bun vitest run src/components/domain/__tests__/vessel-transfer-dedup.test.ts`
 Expected: All 6 tests PASS
