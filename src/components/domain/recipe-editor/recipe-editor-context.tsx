@@ -106,8 +106,6 @@ type RecipeEditorContextValue = {
   isSaving: boolean;
   /** Mark a section save as started. Returns a callback to mark it complete. */
   startSaving: () => () => void;
-  /** Refresh the recipe from the database (e.g., after a version conflict) */
-  refreshRecipe: () => void;
   /** Handle save errors with version conflict detection and auto-reload */
   handleSaveError: (error: Error) => void;
 };
@@ -158,10 +156,6 @@ export function RecipeEditorProvider({
 
   const isSaving = savingCount > 0;
 
-  const refreshRecipe = useCallback(() => {
-    onRefresh?.();
-  }, [onRefresh]);
-
   /** Shared error handler for section save mutations with version conflict detection */
   const handleSaveError = useCallback((error: Error) => {
     if (error.message?.includes("version") || error.message?.includes("conflict")) {
@@ -206,10 +200,9 @@ export function RecipeEditorProvider({
       estimates,
       isSaving,
       startSaving,
-      refreshRecipe,
       handleSaveError,
     }),
-    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving, refreshRecipe, handleSaveError]
+    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving, handleSaveError]
   );
 
   return (
