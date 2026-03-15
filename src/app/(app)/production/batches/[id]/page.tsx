@@ -25,6 +25,8 @@ import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/vessel-transfer-dialog";
 import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
 import { PackagingBatchDialog } from "@/components/domain/packaging-batch-dialog";
+import { AddToPackagingSessionDialog } from "@/components/domain/add-to-packaging-session-dialog";
+import { BatchPackagingHistory } from "@/components/domain/batch-packaging-history";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
 import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
 import { Package } from "lucide-react";
@@ -58,6 +60,7 @@ export default function BatchDetailPage({
   );
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
   const [showStartPackaging, setShowStartPackaging] = useState(false);
+  const [showAddToSession, setShowAddToSession] = useState(false);
 
   const queryClient = useQueryClient();
   const supabase = createClient();
@@ -331,6 +334,19 @@ export default function BatchDetailPage({
         </div>
       )}
 
+      {batch?.status === "packaging" && !existingSession && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+          <Package className="h-4 w-4 text-amber-600" />
+          <span>This batch is in packaging status but has no linked session.</span>
+          <button
+            onClick={() => setShowAddToSession(true)}
+            className="font-medium text-amber-600 underline"
+          >
+            Add to Session
+          </button>
+        </div>
+      )}
+
       {bannerConfig && (
         <NextStepBanner
           message={bannerConfig.message}
@@ -345,6 +361,8 @@ export default function BatchDetailPage({
         basePath="/production/batches"
         onAction={handleAction}
       />
+
+      <BatchPackagingHistory batchId={id} />
 
       {batch && batch.id && batch.batch_number && (
         <>
@@ -418,6 +436,17 @@ export default function BatchDetailPage({
             <PackagingBatchDialog
               open={showStartPackaging}
               onOpenChange={setShowStartPackaging}
+              batchId={id}
+              batchNumber={batch.batch_number}
+              brandId={recipeBrand.id}
+              brandName={recipeBrand.name}
+            />
+          )}
+
+          {showAddToSession && recipeBrand && (
+            <AddToPackagingSessionDialog
+              open={showAddToSession}
+              onOpenChange={setShowAddToSession}
               batchId={id}
               batchNumber={batch.batch_number}
               brandId={recipeBrand.id}
