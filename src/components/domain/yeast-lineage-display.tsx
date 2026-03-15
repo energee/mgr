@@ -41,11 +41,13 @@ type PitchNode = {
 }
 
 export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
+  const supabase = createClient();
+
   // Find the root of the lineage. Tries the server-side RPC first; falls back to
   // a client-side parent walk if the function isn't available (e.g. stale schema cache).
   const { data: rootId, isLoading: rootLoading } = useQuery({
     queryKey: yeastKeys.lineageRoot(pitchId),
-    queryFn: () => resolveYeastLineageRoot(createClient(), pitchId),
+    queryFn: () => resolveYeastLineageRoot(supabase, pitchId),
   });
 
   // Fetch all descendants of the root and build the lineage tree
@@ -53,8 +55,6 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
     queryKey: yeastKeys.lineage(rootId),
     queryFn: async () => {
       if (!rootId) return [];
-
-      const supabase = createClient();
 
       // Fetch the root pitch first
       const { data: rootPitch } = await supabase
@@ -110,7 +110,6 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
     queryFn: async () => {
       if (!rootId) return null;
 
-      const supabase = createClient();
       const { data } = await supabase
         .from("yeast_lineage_summary")
         .select("*")
@@ -263,14 +262,18 @@ export function YeastLineageDisplay({ pitchId }: YeastLineageDisplayProps) {
                   </span>
                 )}
 
-                {/* Viability — uses shared VIABILITY_STATUS_DISPLAY config (DEC-007) */}
+                {/* Viability percentage with color from VIABILITY_STATUS_DISPLAY */}
                 {pitch.estimated_viability != null && (
-                    <span className="ml-auto">
-                      <StatusBadge
-                        status={`${Math.round(pitch.estimated_viability)}%`}
-                        variant={VIABILITY_STATUS_DISPLAY[pitch.viability_status || "good"]?.color || "default"}
-                      />
-                    </span>
+                    <Badge
+                      variant="outline"
+                      className={cn("ml-auto text-xs", {
+                        "border-emerald-500/30 text-emerald-600": VIABILITY_STATUS_DISPLAY[pitch.viability_status || "good"]?.color === "success",
+                        "border-amber-500/30 text-amber-600": VIABILITY_STATUS_DISPLAY[pitch.viability_status || "good"]?.color === "warning",
+                        "border-red-500/30 text-red-600": VIABILITY_STATUS_DISPLAY[pitch.viability_status || "good"]?.color === "error",
+                      })}
+                    >
+                      {Math.round(pitch.estimated_viability)}%
+                    </Badge>
                   )}
               </div>
             );
