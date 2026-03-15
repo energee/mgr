@@ -72,7 +72,7 @@ Junction table: which selling formats appear in which sales channel. Replaces th
 
 ## `packaging_sessions`
 
-Packaging sessions (group multiple products/batches packaged together).
+Packaging sessions (group multiple products/batches packaged together). Created from batch detail pages when batches are ready for packaging.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -80,9 +80,12 @@ Packaging sessions (group multiple products/batches packaged together).
 | session_date | DATE | Session date |
 | status | TEXT | Status: planned, in_progress, completed, revised, cancelled |
 | notes | TEXT | Notes |
+| completed_at | TIMESTAMPTZ | Timestamp when session was marked completed. Set by BEFORE UPDATE trigger. |
 | created_by | UUID | FK to auth.users |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**BEFORE UPDATE trigger:** `packaging_session_before_update` — sets `completed_at` when status transitions to `completed`, blocks `planned → completed` bypass (must go through `in_progress`), blocks completion if session has zero line items.
 
 **Audit trail:** All changes tracked in `entity_revisions` table (entity_type='packaging_session'). See `docs/data-model/system.md`.
 
@@ -90,7 +93,7 @@ Packaging sessions (group multiple products/batches packaged together).
 
 ## `session_line_items`
 
-Line items within a packaging session.
+Line items within a packaging session. Each line item represents one product (brand + format) being packaged from a single batch.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -98,17 +101,13 @@ Line items within a packaging session.
 | session_id | UUID | FK to [packaging_sessions](#packaging_sessions) |
 | brand_id | UUID | FK to [brands](./production.md#brands) |
 | selling_format_id | UUID | FK to [selling_formats](#selling_formats) |
-| source_batches | JSONB | Source batch allocations |
+| keg_owner_id | UUID | FK to keg_owners (nullable, for keg formats) |
+| batch_id | UUID | FK to [batches](./production.md#batches) — source batch for this line item |
 | planned_quantity | INTEGER | Planned quantity |
 | actual_quantity | INTEGER | Actual quantity |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
-**source_batches schema:**
-```json
-[
-  { "batch_id": "uuid", "planned_qty": 100, "actual_qty": 98 }
-]
-```
+**Unique constraint:** `(session_id, batch_id, selling_format_id) WHERE batch_id IS NOT NULL` — prevents duplicate line items for the same batch+format within a session.
 
 ---
 
@@ -193,7 +192,7 @@ INSERT INTO allocations (
   quantity, volume_bbl,
   status                          -- 'completed'
 ) VALUES (
-  'batch', session_line.source_batches[0].batch_id,
+  'batch', session_line.batch_id,
   'finished_good', new_fg.id,
   session_line.actual_quantity,
   calculated_volume_bbl,
@@ -202,6 +201,22 @@ INSERT INTO allocations (
 ```
 
 See [inventory.md](./inventory.md#allocations) for complete allocation documentation.
+
+---
+
+## Views
+
+### `packaging_sessions_with_summary`
+
+Packaging sessions with aggregated line item counts, brand names, and quantity totals.
+
+Includes computed fields: `line_count`, `brands`, `total_planned`, `total_actual`, `total_variance` (actual - planned).
+
+### `brand_packaging_summary`
+
+Aggregated packaging totals per brand and selling format. Used on the brand detail page.
+
+Columns: `brand_id`, `brand_name`, `selling_format_id`, `format_name`, `total_quantity`, `session_count`.
 
 ---
 
@@ -217,6 +232,10 @@ cancelled   cancelled    (adjust only if no downstream orders packed)
 | Transition | Trigger |
 |------------|---------|
 | planned -> in_progress | Start packaging |
-| in_progress -> completed | Finish, create finished goods + allocations |
+| in_progress -> completed | Completion review modal confirms all actuals entered |
 | completed -> revised | Adjust quantities |
-| completed -> (rollback) | Only if no downstream orders packed |
+| planned -> completed | **BLOCKED** — must go through in_progress (enforced by trigger) |
+
+**Batch-initiated creation:** Sessions are typically created from the batch detail page ("Start Packaging" action on conditioning batches). This creates the session, adds a line item with the batch as source, and transitions the batch to `packaging` status.
+
+**UI pattern:** In-progress sessions render a custom `PackagingDayView` component (full-width table with highlighted actual-quantity column and live variance). All other states render via `EntityDetailUnified`.
