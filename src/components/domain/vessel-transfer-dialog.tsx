@@ -176,15 +176,19 @@ export function VesselTransferDialog({
   // Prevents the auto-fill from overwriting user input on query refetch.
   const volumeTouchedRef = useRef(false);
 
-  // Auto-fill volume from remaining volume on dialog open.
-  // Resets touched flag when dialog opens; skips fill if user has edited.
+  // Reset touched flag when dialog closes, so next open gets auto-fill
   useEffect(() => {
-    if (!open) return;
-    volumeTouchedRef.current = false;
-    if (remainingVolume > 0) {
+    if (!open) {
+      volumeTouchedRef.current = false;
+    }
+  }, [open]);
+
+  // Auto-fill volume from remaining volume, but skip if user has edited
+  useEffect(() => {
+    if (open && remainingVolume > 0 && !volumeTouchedRef.current) {
       form.setValue("volume_bbl", remainingVolume);
     }
-  }, [remainingVolume, open]); // form.setValue is stable per RHF docs
+  }, [remainingVolume, open, form]);
 
   // Transfer mutation
   const transferMutation = useMutation({
@@ -193,11 +197,20 @@ export function VesselTransferDialog({
       // Note: the DB unique index (idx_vessel_transfers_unique_per_batch)
       // provides the actual constraint; this check avoids a less-friendly
       // constraint violation error in the common case.
-      const { data: existing } = await supabase
+      let preCheckQuery = supabase
         .from("vessel_transfers")
         .select("id, transferred_at")
         .eq("batch_id", batchId)
-        .eq("to_vessel_id", values.to_vessel_id)
+        .eq("to_vessel_id", values.to_vessel_id);
+
+      // Match the DB unique index which includes from_vessel_id
+      if (fromVesselId) {
+        preCheckQuery = preCheckQuery.eq("from_vessel_id", fromVesselId);
+      } else {
+        preCheckQuery = preCheckQuery.is("from_vessel_id", null);
+      }
+
+      const { data: existing } = await preCheckQuery
         .order("transferred_at", { ascending: false })
         .limit(1);
 
