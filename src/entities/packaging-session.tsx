@@ -123,15 +123,16 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
     },
     {
       accessorKey: "total_variance",
-      header: "Variance",
+      header: "Var %",
       sortable: true,
-      render: (value, row) => {
-        const v = value as number | null;
-        const status = (row as PackagingSession).status;
-        if (status !== "completed" && status !== "revised") return "—";
-        if (v === null || v === undefined) return "—";
-        const color = v === 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-green-600";
-        return <span className={color}>{v > 0 ? `+${v}` : v}</span>;
+      render: (_value, row) => {
+        const session = row as PackagingSession;
+        if (session.status !== "completed" && session.status !== "revised") return "—";
+        const planned = session.total_planned;
+        if (!planned || planned === 0) return "—";
+        const pct = ((session.total_actual ?? 0) - planned) / planned * 100;
+        const color = Math.abs(pct) <= 5 ? "text-green-600" : "text-red-600";
+        return <span className={color}>{pct >= 0 ? "+" : ""}{pct.toFixed(1)}%</span>;
       },
     },
     {

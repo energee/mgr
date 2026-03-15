@@ -910,6 +910,14 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
       {showReview && (
         <PackagingCompletionReview
           sessionId={sessionId}
+          items={(items ?? []).map((item) => ({
+            id: item.id,
+            brand_name: item.brand_name,
+            batch_number: item.batch_number,
+            format_name: item.selling_format_name,
+            planned_quantity: item.planned_quantity,
+            actual_quantity: item.actual_quantity,
+          }))}
           open={showReview}
           onOpenChange={setShowReview}
           onCompleted={handleCompleted}
