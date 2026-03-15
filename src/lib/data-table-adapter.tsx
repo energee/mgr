@@ -93,7 +93,10 @@ const CellRenderer = memo(function CellRenderer<T>({
 
 /**
  * Maps EntityColumnDef[] + EntityFilterDef[] → Dice UI ColumnDef[] with meta.
- * Joins filters onto matching columns by field name.
+ * Joins filters onto matching columns by field name. Filters that don't match
+ * any visible column get appended as hidden filter-only columns so the filter
+ * UI can still discover and render them (e.g. filtering on `brand_id` when the
+ * display column is `brand_name`).
  */
 export function buildDataTableColumns<T>(
   entity: EntityConfig<T>,
@@ -102,9 +105,13 @@ export function buildDataTableColumns<T>(
   const filtersByField = new Map<string, EntityFilterDef>();
   entity.listFilters?.forEach((f) => filtersByField.set(f.field, f));
 
-  return entity.listColumns.map((col: EntityColumnDef<T>) => {
+  const matchedFilterFields = new Set<string>();
+
+  const visibleColumns = entity.listColumns.map((col: EntityColumnDef<T>) => {
     const accessorKey = col.accessorKey as string | undefined;
     const filter = accessorKey ? filtersByField.get(accessorKey) : undefined;
+
+    if (filter) matchedFilterFields.add(filter.field);
 
     // Build options from filter definition
     let options: Option[] | undefined;
@@ -136,6 +143,36 @@ export function buildDataTableColumns<T>(
       },
     } as ColumnDef<T>;
   });
+
+  // Append hidden filter-only columns for filters that don't match any visible column.
+  const hiddenFilterColumns: ColumnDef<T>[] = [];
+  for (const filter of entity.listFilters ?? []) {
+    if (matchedFilterFields.has(filter.field)) continue;
+
+    const rawOptions =
+      dynamicFilterOptions[filter.field] || filter.options || [];
+    const options = rawOptions.map((opt) => ({
+      label: opt.label,
+      value: opt.value,
+    }));
+
+    hiddenFilterColumns.push({
+      id: filter.field,
+      accessorKey: filter.field as keyof T & string,
+      header: filter.label,
+      enableSorting: false,
+      enableHiding: false,
+      enableColumnFilter: true,
+      meta: {
+        label: filter.label,
+        variant: toFilterVariant(filter.type),
+        ...(options.length > 0 ? { options } : {}),
+      },
+      cell: () => null,
+    } as ColumnDef<T>);
+  }
+
+  return [...visibleColumns, ...hiddenFilterColumns];
 }
 
 // =============================================================================
