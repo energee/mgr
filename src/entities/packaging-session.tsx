@@ -26,6 +26,7 @@ type PackagingSession = PackagingSessionTable & {
   brands: string | null;
   total_planned: number | null;
   total_actual: number | null;
+  total_variance: number | null;
 };
 
 // =============================================================================
@@ -121,6 +122,19 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
       render: (value) => (value && Number(value) > 0) ? String(value) : "—",
     },
     {
+      accessorKey: "total_variance",
+      header: "Variance",
+      sortable: true,
+      render: (value, row) => {
+        const v = value as number | null;
+        const status = (row as PackagingSession).status;
+        if (status !== "completed" && status !== "revised") return "—";
+        if (v === null || v === undefined) return "—";
+        const color = v === 0 ? "text-green-600" : v < 0 ? "text-red-600" : "text-green-600";
+        return <span className={color}>{v > 0 ? `+${v}` : v}</span>;
+      },
+    },
+    {
       accessorKey: "line_count",
       header: "Items",
       sortable: true,
@@ -190,6 +204,13 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
         {
           name: "updated_at",
           label: "Last Updated",
+          format: "datetime",
+          editable: false,
+          colSpan: 6,
+        },
+        {
+          name: "completed_at",
+          label: "Completed",
           format: "datetime",
           editable: false,
           colSpan: 6,
