@@ -51,7 +51,7 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
     },
   });
 
-  // Fetch commitments (allocations to orders)
+  // Fetch commitments (allocations to orders) with order number
   const { data: commitments, isLoading: commitmentsLoading } = useQuery({
     queryKey: finishedGoodKeys.commitments(fgId),
     queryFn: async () => {
@@ -64,7 +64,28 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
         .in("status", ["planned", "completed"])
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return rows;
+
+      // Fetch order numbers for display
+      if (rows && rows.length > 0) {
+        const orderIds = rows
+          .map((r) => r.destination_id)
+          .filter((id): id is string => id !== null);
+        const uniqueOrderIds = [...new Set(orderIds)];
+        const { data: orders } = uniqueOrderIds.length > 0
+          ? await supabase
+              .from("orders")
+              .select("id, order_number")
+              .in("id", uniqueOrderIds)
+          : { data: [] as { id: string; order_number: string }[] };
+        const orderMap = new Map(
+          (orders ?? []).map((o) => [o.id, o.order_number])
+        );
+        return rows.map((r) => ({
+          ...r,
+          order_number: r.destination_id ? (orderMap.get(r.destination_id) ?? null) : null,
+        }));
+      }
+      return rows?.map((r) => ({ ...r, order_number: null as string | null })) ?? [];
     },
   });
 
@@ -160,7 +181,7 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Destination</TableHead>
+                <TableHead>Order</TableHead>
                 <TableHead className="text-right">Quantity</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -173,7 +194,7 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
                       href={`/sales/orders/${row.destination_id}`}
                       className="text-primary hover:underline"
                     >
-                      Order
+                      {row.order_number ?? "Order"}
                     </Link>
                   </TableCell>
                   <TableCell className="text-right">{row.quantity}</TableCell>

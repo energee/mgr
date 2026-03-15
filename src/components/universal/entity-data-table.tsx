@@ -17,7 +17,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table";
+import type { ColumnDef, SortingState, PaginationState, VisibilityState } from "@tanstack/react-table";
 import {
   useReactTable,
   getCoreRowModel,
@@ -271,6 +271,20 @@ export function EntityDataTable<T = Record<string, unknown>>({
     return [...dataColumns, actionsColumn];
   }, [entity, dynamicFilterOptions, path, onAction, hasBulkActions, handleSingleTransition]);
 
+  // Hide filter-only columns (filters whose field doesn't match any listColumn accessorKey)
+  const columnVisibility = useMemo((): VisibilityState => {
+    const listColumnKeys = new Set(
+      entity.listColumns.map((c) => (c.accessorKey as string) || c.id).filter(Boolean)
+    );
+    const vis: VisibilityState = {};
+    for (const filter of entity.listFilters ?? []) {
+      if (!listColumnKeys.has(filter.field)) {
+        vis[filter.field] = false;
+      }
+    }
+    return vis;
+  }, [entity.listColumns, entity.listFilters]);
+
   // ---------------------------------------------------------------------------
   // URL-synced filter state (read from nuqs — DataTableFilterList writes here)
   // ---------------------------------------------------------------------------
@@ -477,6 +491,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       sorting,
       globalFilter,
       pagination,
+      columnVisibility,
       ...(hasBulkActions ? { rowSelection } : {}),
     },
     onSortingChange: setSorting,

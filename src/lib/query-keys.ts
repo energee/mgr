@@ -608,6 +608,11 @@ export const portalKeys = {
 
 export const finishedGoodKeys = {
   all: () => ["finished-goods"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["finished-goods", "list", filters] as const)
+      : (["finished-goods", "list"] as const),
+  detail: (id: string) => ["finished-goods", id] as const,
   brandAvailability: () => ["finished-goods", "brand-availability"] as const,
   availability: (brandId: string, sellingFormatId: string) =>
     ["finished-goods", "availability", brandId, sellingFormatId] as const,
