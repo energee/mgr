@@ -45,8 +45,9 @@ import {
 } from "@/components/ui/combobox";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { sessionLineItemKeys, packagingKeys } from "@/lib/query-keys";
+import { sessionLineItemKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
+import { useBatchesForBrand } from "@/hooks/use-packaging";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
@@ -92,73 +93,6 @@ const EMPTY_NEW_ITEM: NewItemState = {
 // =============================================================================
 // Batch Selection
 // =============================================================================
-
-type BatchOption = {
-  id: string;
-  batch_number: string;
-  name: string;
-  status: string;
-  volume_bbl: number | null;
-  current_vessel_name: string | null;
-}
-
-/**
- * Domain constants: packaging-context batch sort priority.
- * Batches closest to packaging readiness sort first. This is a domain-specific
- * ordering for the packaging UI, not a status label/color map (DEC-007 N/A).
- */
-const STATUS_SORT_ORDER: Record<string, number> = {
-  conditioning: 1,
-  packaging: 2,
-  fermenting: 3,
-  planned: 4,
-};
-
-
-function useBatchesForBrand(brandId: string | null) {
-  const supabase = createClient();
-  return useQuery({
-    queryKey: packagingKeys.batchesForBrand(brandId ?? ""),
-    queryFn: async () => {
-      if (!brandId) return [];
-      // Get active batches from the view
-      const { data, error } = await supabase
-        .from("batches_with_brew_info")
-        .select(
-          "id, batch_number, name, status, volume_bbl, current_vessel_name, recipe_id"
-        )
-        .in("status", ["planned", "fermenting", "conditioning", "packaging"]);
-      if (error) throw error;
-
-      // Filter by brand through recipes
-      const recipeIds = [
-        ...new Set(
-          (data ?? [])
-            .map((b) => b.recipe_id)
-            .filter((id): id is string => id != null)
-        ),
-      ];
-      if (recipeIds.length === 0) return [];
-
-      const { data: recipes, error: recipeError } = await supabase
-        .from("recipes")
-        .select("id, brand_id")
-        .in("id", recipeIds)
-        .eq("brand_id", brandId);
-      if (recipeError) throw recipeError;
-
-      const validRecipeIds = new Set((recipes ?? []).map((r) => r.id));
-      return (data ?? [])
-        .filter((b) => b.recipe_id && validRecipeIds.has(b.recipe_id))
-        .sort(
-          (a, b) =>
-            (STATUS_SORT_ORDER[a.status ?? ""] ?? 99) -
-            (STATUS_SORT_ORDER[b.status ?? ""] ?? 99)
-        ) as BatchOption[];
-    },
-    enabled: !!brandId,
-  });
-}
 
 function BatchCell({
   brandId,
