@@ -134,7 +134,7 @@ export function VesselTransferDialog({
   // Only counts transfers from this specific vessel to avoid double-counting
   // on multi-hop batches (e.g., Kettle→FV→BT each move the same volume).
   const { data: transferredVolume } = useQuery({
-    queryKey: batchKeys.remainingVolume(batchId),
+    queryKey: batchKeys.remainingVolume(batchId, fromVesselId),
     queryFn: async () => {
       let query = supabase
         .from("vessel_transfers")
@@ -167,28 +167,24 @@ export function VesselTransferDialog({
     resolver: zodResolver(vesselTransferSchema),
     defaultValues: {
       to_vessel_id: "",
-      volume_bbl: currentVolume || 0,
+      volume_bbl: 0,
       notes: "",
     },
   });
 
   // Track whether the user has manually edited the volume field.
-  // Prevents the auto-fill useEffect from overwriting user input on refetch.
+  // Prevents the auto-fill from overwriting user input on query refetch.
   const volumeTouchedRef = useRef(false);
 
-  // Reset dirty flag when dialog opens/closes
+  // Auto-fill volume from remaining volume on dialog open.
+  // Resets touched flag when dialog opens; skips fill if user has edited.
   useEffect(() => {
-    if (open) {
-      volumeTouchedRef.current = false;
-    }
-  }, [open]);
-
-  // Auto-fill volume from remaining volume, but only if the user hasn't edited it
-  useEffect(() => {
-    if (remainingVolume > 0 && open && !volumeTouchedRef.current) {
+    if (!open) return;
+    volumeTouchedRef.current = false;
+    if (remainingVolume > 0) {
       form.setValue("volume_bbl", remainingVolume);
     }
-  }, [remainingVolume, open, form]);
+  }, [remainingVolume, open]); // form.setValue is stable per RHF docs
 
   // Transfer mutation
   const transferMutation = useMutation({

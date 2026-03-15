@@ -114,7 +114,8 @@ export const batchKeys = {
   yeast: (id: string) => ["batches", id, "yeast"] as const,
   yeastSummary: (id: string) => ["batch-yeast-summary", id] as const,
   transfers: (id: string) => ["batches", id, "transfers"] as const,
-  remainingVolume: (id: string) => ["batches", id, "remaining-volume"] as const,
+  remainingVolume: (id: string, fromVesselId?: string | null) =>
+    ["batches", id, "remaining-volume", fromVesselId ?? "_initial"] as const,
 };
 
 // =============================================================================
