@@ -209,6 +209,7 @@ export default function BrewLogDetailPage({
         id={id}
         basePath="/production/brew-logs"
         onAction={handleAction}
+        hideBreadcrumb
       />
 
       {brewLog && (
