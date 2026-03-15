@@ -8,9 +8,14 @@
  * via the `onSuggestTransition` callback, allowing the caller to handle
  * state changes through proper state machine transitions.
  *
- * Suggestion logic:
- * - planned batch -> fermenter/unitank => suggest "fermenting"
- * - fermenting batch -> brite tank => suggest "conditioning"
+ * Features:
+ * - Auto-fills volume from the batch's current volume
+ * - Duplicate detection: pre-checks for recent transfers to the same
+ *   destination vessel within a 5-minute window (UX convenience;
+ *   the DB unique index provides the actual constraint)
+ * - Smart state suggestions based on destination vessel type:
+ *   - planned batch -> fermenter/unitank => suggest "fermenting"
+ *   - fermenting batch -> brite tank => suggest "conditioning"
  */
 
 import { useForm } from "react-hook-form";
@@ -38,9 +43,13 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect, useRef } from "react";
 import { batchKeys, vesselKeys, entityKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
+import { getValueLabel } from "@/types/entity";
+import { vesselEntity } from "@/entities/vessel";
+import { isDuplicateTransfer } from "./vessel-transfer-utils";
 
 const vesselTransferSchema = z.object({
   to_vessel_id: z.string().uuid("Please select a destination vessel"),
@@ -121,6 +130,35 @@ export function VesselTransferDialog({
     enabled: open,
   });
 
+  // Calculate volume already transferred OUT of the current source vessel.
+  // Only counts transfers from this specific vessel to avoid double-counting
+  // on multi-hop batches (e.g., Kettle→FV→BT each move the same volume).
+  const { data: transferredVolume } = useQuery({
+    queryKey: batchKeys.remainingVolume(batchId, fromVesselId),
+    queryFn: async () => {
+      let query = supabase
+        .from("vessel_transfers")
+        .select("volume_bbl")
+        .eq("batch_id", batchId);
+
+      if (fromVesselId) {
+        query = query.eq("from_vessel_id", fromVesselId);
+      } else {
+        query = query.is("from_vessel_id", null);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      const total = (data ?? []).reduce((sum, t) => sum + Number(t.volume_bbl), 0);
+      return total;
+    },
+    enabled: open,
+  });
+
+  const remainingVolume = currentVolume
+    ? Math.max(0, currentVolume - (transferredVolume ?? 0))
+    : 0;
+
   // Filter out the source vessel
   const availableVessels = vessels?.filter((v) => v.id !== fromVesselId);
 
@@ -129,14 +167,65 @@ export function VesselTransferDialog({
     resolver: zodResolver(vesselTransferSchema),
     defaultValues: {
       to_vessel_id: "",
-      volume_bbl: currentVolume || 0,
+      volume_bbl: 0,
       notes: "",
     },
   });
 
+  // Track whether the user has manually edited the volume field.
+  // Prevents the auto-fill from overwriting user input on query refetch.
+  const volumeTouchedRef = useRef(false);
+
+  // Reset touched flag when dialog closes, so next open gets auto-fill
+  useEffect(() => {
+    if (!open) {
+      volumeTouchedRef.current = false;
+    }
+  }, [open]);
+
+  // Auto-fill volume from remaining volume, but skip if user has edited
+  useEffect(() => {
+    if (open && remainingVolume > 0 && !volumeTouchedRef.current) {
+      form.setValue("volume_bbl", remainingVolume);
+    }
+  }, [remainingVolume, open, form]);
+
   // Transfer mutation
   const transferMutation = useMutation({
     mutationFn: async (values: VesselTransferFormValues) => {
+      // Pre-check: UX convenience to catch accidental double-submits.
+      // Note: the DB unique index (idx_vessel_transfers_unique_per_batch)
+      // provides the actual constraint; this check avoids a less-friendly
+      // constraint violation error in the common case.
+      let preCheckQuery = supabase
+        .from("vessel_transfers")
+        .select("id, transferred_at")
+        .eq("batch_id", batchId)
+        .eq("to_vessel_id", values.to_vessel_id);
+
+      // Match the DB unique index which includes from_vessel_id
+      if (fromVesselId) {
+        preCheckQuery = preCheckQuery.eq("from_vessel_id", fromVesselId);
+      } else {
+        preCheckQuery = preCheckQuery.is("from_vessel_id", null);
+      }
+
+      const { data: existing } = await preCheckQuery
+        .order("transferred_at", { ascending: false })
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        const lastTransferredAt = existing[0].transferred_at;
+        if (isDuplicateTransfer(lastTransferredAt)) {
+          const minutesAgo = Math.floor(
+            (Date.now() - new Date(lastTransferredAt).getTime()) / 60000
+          );
+          throw new Error(
+            `This batch was already transferred to this vessel ${minutesAgo} minute(s) ago. Wait a moment or choose a different vessel.`
+          );
+        }
+      }
+
       // Create the vessel transfer record
       const { error: transferError } = await supabase
         .from("vessel_transfers")
@@ -149,7 +238,13 @@ export function VesselTransferDialog({
           notes: values.notes || null,
         });
 
-      if (transferError) throw transferError;
+      if (transferError) {
+        // Friendly message for unique constraint violations
+        if (transferError.code === "23505") {
+          throw new Error("A transfer with these exact details already exists.");
+        }
+        throw transferError;
+      }
 
       // Vessel occupancy (current_batch_id, status) is updated automatically
       // by the handle_vessel_transfer() database trigger on vessel_transfers INSERT.
@@ -235,7 +330,7 @@ export function VesselTransferDialog({
                     <SelectItem key={vessel.id} value={vessel.id}>
                       <span className="font-medium">{vessel.name}</span>
                       <span className="text-muted-foreground ml-2">
-                        ({vessel.vessel_type} &middot; <UnitDisplay value={vessel.capacity_bbl} unitType="volume" />)
+                        ({getValueLabel(vesselEntity, "vessel_type", vessel.vessel_type)} &middot; <UnitDisplay value={vessel.capacity_bbl} unitType="volume" />)
                       </span>
                     </SelectItem>
                   ))
@@ -258,7 +353,10 @@ export function VesselTransferDialog({
             <Label htmlFor="volume_bbl">Volume</Label>
             <UnitInput
               value={watchedVolume || null}
-              onChange={(val) => form.setValue("volume_bbl", val ?? 0, { shouldValidate: true })}
+              onChange={(val) => {
+                volumeTouchedRef.current = true;
+                form.setValue("volume_bbl", val ?? 0, { shouldValidate: true });
+              }}
               unitType="volume"
               decimals={2}
               placeholder="e.g., 7"
