@@ -528,6 +528,14 @@ export const sessionLineItemKeys = {
 export const packagingKeys = {
   batchesForBrand: (brandId: string) =>
     ["packaging", "batches-for-brand", brandId] as const,
+  historyForBatch: (batchId: string) =>
+    ["packaging", "history", batchId] as const,
+  brandSummary: (brandId: string, dateRange?: { from: string; to: string }) =>
+    ["packaging", "brand-summary", brandId, dateRange] as const,
+  schedule: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["packaging", "schedule", filters] as const)
+      : (["packaging", "schedule"] as const),
 };
 
 // =============================================================================
