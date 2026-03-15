@@ -15,6 +15,7 @@
 
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions, getValueLabel } from "@/types/entity";
+import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { vesselEntity } from "./vessel";
 import type { Database } from "@/types/supabase";
@@ -157,11 +158,15 @@ export const batchEntity: EntityConfig<Batch> = {
       field: "current_vessel_name",
       type: "select",
       label: "Vessel",
-      dynamicOptions: {
-        table: "vessels",
-        valueField: "name",
-        labelField: "name",
-        orderBy: "name",
+      fetchOptions: async () => {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("vessels")
+          .select("name")
+          .not("current_batch_id", "is", null)
+          .eq("is_active", true)
+          .order("name");
+        return (data ?? []).map((v) => ({ value: v.name, label: v.name }));
       },
     },
   ],
