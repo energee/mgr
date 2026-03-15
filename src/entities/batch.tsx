@@ -81,7 +81,7 @@ export const batchEntity: EntityConfig<Batch> = {
   // ---------------------------------------------------------------------------
   name: "batch",
   table: "batches",
-  viewTable: "batches_with_brew_info",  // Includes brew_date, actual_og from linked brew_logs
+  viewTable: "batches_with_brew_info",  // Includes brew stats (brew_date, actual_og, brew_count) + current vessel info (id, name, type)
   displayName: "Batch",
   displayNamePlural: "Batches",
   description: "Production batches from brewing through packaging",

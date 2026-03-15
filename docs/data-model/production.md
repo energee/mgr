@@ -593,6 +593,9 @@ Production batches (cold-side: fermentation through packaging). Hot-side data co
 - `actual_og` - from linked brew_log events (weighted average if multiple brews)
 - `volume_from_brews_bbl` - total wort volume from linked brews
 - `brew_count` - number of contributing brews
+- `current_vessel_id` - UUID of the vessel currently holding this batch
+- `current_vessel_name` - name of the current vessel
+- `current_vessel_type` - type of the current vessel (fermenter, brite, unitank, etc.)
 
 **Planned vs Actual:**
 - `planned_start_date` - when we plan to start fermentation (for scheduling)

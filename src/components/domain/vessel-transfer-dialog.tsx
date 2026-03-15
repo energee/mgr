@@ -8,9 +8,14 @@
  * via the `onSuggestTransition` callback, allowing the caller to handle
  * state changes through proper state machine transitions.
  *
- * Suggestion logic:
- * - planned batch -> fermenter/unitank => suggest "fermenting"
- * - fermenting batch -> brite tank => suggest "conditioning"
+ * Features:
+ * - Auto-fills volume from the batch's current volume
+ * - Duplicate detection: pre-checks for recent transfers to the same
+ *   destination vessel within a 5-minute window (UX convenience;
+ *   the DB unique index provides the actual constraint)
+ * - Smart state suggestions based on destination vessel type:
+ *   - planned batch -> fermenter/unitank => suggest "fermenting"
+ *   - fermenting batch -> brite tank => suggest "conditioning"
  */
 
 import { useForm } from "react-hook-form";
@@ -38,10 +43,12 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { batchKeys, vesselKeys, entityKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
+import { getValueLabel } from "@/types/entity";
+import { vesselEntity } from "@/entities/vessel";
 import { isDuplicateTransfer } from "./vessel-transfer-utils";
 
 const vesselTransferSchema = z.object({
@@ -123,14 +130,24 @@ export function VesselTransferDialog({
     enabled: open,
   });
 
-  // Calculate remaining volume (batch volume minus already-transferred volume)
+  // Calculate volume already transferred OUT of the current source vessel.
+  // Only counts transfers from this specific vessel to avoid double-counting
+  // on multi-hop batches (e.g., Kettle→FV→BT each move the same volume).
   const { data: transferredVolume } = useQuery({
     queryKey: batchKeys.remainingVolume(batchId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("vessel_transfers")
         .select("volume_bbl")
         .eq("batch_id", batchId);
+
+      if (fromVesselId) {
+        query = query.eq("from_vessel_id", fromVesselId);
+      } else {
+        query = query.is("from_vessel_id", null);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       const total = (data ?? []).reduce((sum, t) => sum + Number(t.volume_bbl), 0);
       return total;
@@ -155,9 +172,20 @@ export function VesselTransferDialog({
     },
   });
 
-  // Update volume when remaining volume is calculated
+  // Track whether the user has manually edited the volume field.
+  // Prevents the auto-fill useEffect from overwriting user input on refetch.
+  const volumeTouchedRef = useRef(false);
+
+  // Reset dirty flag when dialog opens/closes
   useEffect(() => {
-    if (remainingVolume > 0 && open) {
+    if (open) {
+      volumeTouchedRef.current = false;
+    }
+  }, [open]);
+
+  // Auto-fill volume from remaining volume, but only if the user hasn't edited it
+  useEffect(() => {
+    if (remainingVolume > 0 && open && !volumeTouchedRef.current) {
       form.setValue("volume_bbl", remainingVolume);
     }
   }, [remainingVolume, open, form]);
@@ -165,7 +193,10 @@ export function VesselTransferDialog({
   // Transfer mutation
   const transferMutation = useMutation({
     mutationFn: async (values: VesselTransferFormValues) => {
-      // Pre-check: look for a recent transfer to the same destination
+      // Pre-check: UX convenience to catch accidental double-submits.
+      // Note: the DB unique index (idx_vessel_transfers_unique_per_batch)
+      // provides the actual constraint; this check avoids a less-friendly
+      // constraint violation error in the common case.
       const { data: existing } = await supabase
         .from("vessel_transfers")
         .select("id, transferred_at")
@@ -290,7 +321,7 @@ export function VesselTransferDialog({
                     <SelectItem key={vessel.id} value={vessel.id}>
                       <span className="font-medium">{vessel.name}</span>
                       <span className="text-muted-foreground ml-2">
-                        ({vessel.vessel_type} &middot; <UnitDisplay value={vessel.capacity_bbl} unitType="volume" />)
+                        ({getValueLabel(vesselEntity, "vessel_type", vessel.vessel_type)} &middot; <UnitDisplay value={vessel.capacity_bbl} unitType="volume" />)
                       </span>
                     </SelectItem>
                   ))
@@ -313,7 +344,10 @@ export function VesselTransferDialog({
             <Label htmlFor="volume_bbl">Volume</Label>
             <UnitInput
               value={watchedVolume || null}
-              onChange={(val) => form.setValue("volume_bbl", val ?? 0, { shouldValidate: true })}
+              onChange={(val) => {
+                volumeTouchedRef.current = true;
+                form.setValue("volume_bbl", val ?? 0, { shouldValidate: true });
+              }}
               unitType="volume"
               decimals={2}
               placeholder="e.g., 7"
