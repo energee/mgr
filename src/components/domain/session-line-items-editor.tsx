@@ -4,7 +4,8 @@
  * Session Line Items Editor
  *
  * Inline editor for packaging session line items. Each line item represents
- * a product (brand + format) being packaged with planned/actual quantities.
+ * a product (brand + format) being packaged from a single source batch
+ * with planned/actual quantities.
  *
  * Uses unified selling_format_id (containers + selling_formats model).
  */
@@ -62,11 +63,7 @@ type SessionLineItemRow = {
   keg_owner_name: string | null;
   planned_quantity: number | null;
   actual_quantity: number | null;
-  source_batches: Array<{
-    batch_id: string;
-    planned_qty: number | null;
-    actual_qty: number | null;
-  }>;
+  batch_id: string | null;
 }
 
 type SessionLineItemsEditorProps = {
@@ -256,12 +253,7 @@ export function SessionLineItemsEditor({
           (item.keg_owners as { name: string } | null)?.name || null,
         planned_quantity: item.planned_quantity,
         actual_quantity: item.actual_quantity,
-        source_batches:
-          (item.source_batches as Array<{
-            batch_id: string;
-            planned_qty: number | null;
-            actual_qty: number | null;
-          }>) ?? [],
+        batch_id: item.batch_id as string | null,
       })) as SessionLineItemRow[];
     },
   });
@@ -285,23 +277,14 @@ export function SessionLineItemsEditor({
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
       const isKeg = kegFormatIds.has(item.format_id);
-      const sourceBatches = item.batch_id
-        ? [
-            {
-              batch_id: item.batch_id,
-              planned_qty: item.planned_quantity,
-              actual_qty: item.actual_quantity,
-            },
-          ]
-        : [];
       const { error } = await supabase.from("session_line_items").insert({
         session_id: sessionId,
         brand_id: item.brand_id,
         selling_format_id: item.format_id || null,
         keg_owner_id: isKeg ? item.keg_owner_id || null : null,
+        batch_id: item.batch_id || null,
         planned_quantity: item.planned_quantity,
         actual_quantity: item.actual_quantity,
-        source_batches: sourceBatches,
       });
       if (error) throw error;
     },
@@ -456,18 +439,12 @@ export function SessionLineItemsEditor({
               <TableCell>
                 <BatchCell
                   brandId={item.brand_id}
-                  currentBatchId={item.source_batches?.[0]?.batch_id ?? ""}
+                  currentBatchId={item.batch_id ?? ""}
                   onSelect={(batchId) =>
                     updateItem.mutate({
                       id: item.id,
-                      field: "source_batches",
-                      value: [
-                        {
-                          batch_id: batchId,
-                          planned_qty: item.planned_quantity,
-                          actual_qty: item.actual_quantity,
-                        },
-                      ],
+                      field: "batch_id",
+                      value: batchId,
                     })
                   }
                   readOnly={readOnly}
