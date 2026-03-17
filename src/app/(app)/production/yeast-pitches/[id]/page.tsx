@@ -355,7 +355,7 @@ function CostSpreadingSummary({
                         : "\u2014"}
                     </TableCell>
                     <TableCell className="text-right">
-                      {totalQty && lineageSummary.original_cost && event.quantity_lbs
+                      {totalQty > 0 && lineageSummary.original_cost != null && event.quantity_lbs != null
                         ? formatCurrency(
                             (lineageSummary.original_cost * event.quantity_lbs) / totalQty
                           )

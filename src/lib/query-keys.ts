@@ -114,6 +114,9 @@ export const batchKeys = {
   yeast: (id: string) => ["batches", id, "yeast"] as const,
   yeastSummary: (id: string) => ["batch-yeast-summary", id] as const,
   recipeBrand: (id: string) => ["batch-recipe-brand", id] as const,
+  transfers: (id: string) => ["batches", id, "transfers"] as const,
+  remainingVolume: (id: string, fromVesselId?: string | null) =>
+    ["batches", id, "remaining-volume", fromVesselId ?? "_initial"] as const,
 };
 
 // =============================================================================
@@ -619,6 +622,11 @@ export const portalKeys = {
 
 export const finishedGoodKeys = {
   all: () => ["finished-goods"] as const,
+  list: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["finished-goods", "list", filters] as const)
+      : (["finished-goods", "list"] as const),
+  detail: (id: string) => ["finished-goods", id] as const,
   brandAvailability: () => ["finished-goods", "brand-availability"] as const,
   availability: (brandId: string, sellingFormatId: string) =>
     ["finished-goods", "availability", brandId, sellingFormatId] as const,

@@ -2,10 +2,11 @@
  * Finished Good Entity Configuration
  *
  * Finished goods represent packaged products ready for sale.
- * They are created through packaging sessions and tracked with lot numbers.
+ * They are created through packaging sessions (internal) or manually (external/contract).
  * Each finished good references a selling_format (unified container packaging).
  *
- * This is a read-only entity view - finished goods are created by packaging sessions.
+ * Internal FGs: created automatically when a packaging session completes.
+ * External FGs: created manually with notes documenting the source.
  */
 
 import { z } from "zod";
@@ -18,7 +19,7 @@ import { FGInventorySection } from "@/components/domain/fg-inventory-section";
 type FinishedGoodView = Database["public"]["Views"]["finished_goods_with_availability"]["Row"];
 
 // =============================================================================
-// Zod Schema (for future edit support if needed)
+// Zod Schema
 // =============================================================================
 
 export const finishedGoodSchema = z.object({
@@ -26,12 +27,18 @@ export const finishedGoodSchema = z.object({
   brand_id: z.string().uuid(),
   selling_format_id: z.string().uuid().nullable().optional(),
   batch_id: z.string().uuid().nullable().optional(),
-  quantity: z.coerce.number().int().min(0),
+  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
   production_date: z.string().nullable().optional(),
   best_by_date: z.string().nullable().optional(),
   expiration_date: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-});
+}).refine(
+  (data) => data.batch_id || (data.notes && data.notes.trim().length > 0),
+  {
+    message: "Notes are required for external finished goods (no source batch)",
+    path: ["notes"],
+  }
+);
 
 export type FinishedGoodFormValues = z.infer<typeof finishedGoodSchema>;
 
@@ -88,18 +95,39 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
   ],
 
   listFilters: [
-    // Note: dynamicOptions not yet supported in EntityFilterDef type
-    // For now using basic filters, will add brand/selling format when type supports it
+    {
+      field: "brand_id",
+      type: "select",
+      label: "Brand",
+      dynamicOptions: {
+        table: "brands",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "name",
+      },
+    },
+    {
+      field: "selling_format_id",
+      type: "select",
+      label: "Format",
+      dynamicOptions: {
+        table: "selling_formats",
+        valueField: "id",
+        labelField: "name",
+        orderBy: "name",
+      },
+    },
   ],
 
   defaultSort: { column: "production_date", direction: "desc" },
-  searchableFields: ["lot_number", "notes"],
+  searchableFields: ["lot_number", "brand_name", "selling_format_name", "notes"],
 
   // ---------------------------------------------------------------------------
   // Detail View
   // ---------------------------------------------------------------------------
   detailHeader: {
     title: "lot_number",
+    subtitle: "brand_name" as keyof FinishedGoodView & string,
   },
 
   // ---------------------------------------------------------------------------
@@ -156,6 +184,7 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
     {
       id: "inventory",
       title: "Inventory",
+      hideOnCreate: true,
       component: FGInventorySection,
     },
     {
@@ -202,13 +231,14 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
     {
       id: "revision-history",
       title: "Revision History",
+      hideOnCreate: true,
       component: createRevisionHistoryDisplay("finished_goods"),
       collapsible: true,
     },
   ],
 
   // ---------------------------------------------------------------------------
-  // Form (read-only entity, minimal form for future use)
+  // Form
   // ---------------------------------------------------------------------------
   formSchema: finishedGoodSchema,
 
@@ -221,6 +251,14 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       entity: "batch",
       type: "belongsTo",
       foreignKey: "batch_id",
+    },
+    {
+      name: "allocations",
+      entity: "allocation",
+      type: "hasMany",
+      foreignKey: "source_id",
+      showInDetail: true,
+      detailTab: "Allocations",
     },
   ],
 
