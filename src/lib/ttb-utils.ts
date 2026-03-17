@@ -10,7 +10,7 @@
  * - Tax classes: cellar (in-process), keg, bottled (canned/bottled)
  */
 
-import { formatBbl } from "@/lib/format";
+import { formatDecimal } from "@/lib/format";
 
 // =============================================================================
 // Constants
@@ -48,7 +48,7 @@ export function gallonsToBbl(gallons: number): number {
  * On federal regulatory forms, blank/null volumes must appear as zero.
  */
 export function formatTtbBbl(value: number | null | undefined): string {
-  return formatBbl(value ?? 0);
+  return formatDecimal(value ?? 0);
 }
 
 // =============================================================================
