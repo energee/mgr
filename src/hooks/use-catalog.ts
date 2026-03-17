@@ -93,11 +93,3 @@ export function usePackagingFormats(): UseQueryResult<PackagingFormat[]> {
   });
 }
 
-/** Check if a selling format ID refers to a keg container type */
-export function isKegFormat(
-  formatId: string | null,
-  formats: PackagingFormat[] | undefined
-): boolean {
-  if (!formatId || !formats) return false;
-  return formats.some((f) => f.id === formatId && f.container_type === "keg");
-}
