@@ -175,12 +175,12 @@ export const vesselEntity: EntityConfig<Vessel> = {
       sortable: false,
       render: (_value, row) => {
         const viewRow = row as unknown as VesselWithBatch;
-        if (!viewRow.batch_name && !viewRow.batch_number) {
+        if (!viewRow.batch_name && !viewRow.batch_code) {
           return <span className="text-muted-foreground">Empty</span>;
         }
         return (
           <span className="font-medium">
-            {viewRow.batch_number || viewRow.batch_name}
+            {viewRow.batch_code || viewRow.batch_name}
           </span>
         );
       },

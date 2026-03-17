@@ -269,7 +269,7 @@ describe("paginatedResponse", () => {
 describe("batchSchema validation", () => {
   it("accepts valid batch data", () => {
     const result = batchSchema.safeParse({
-      batch_number: "2024-001",
+      batch_code: "2024-001",
       name: "Hazy IPA #5",
       status: "planned",
       recipe_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -278,13 +278,13 @@ describe("batchSchema validation", () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.batch_number).toBe("2024-001");
+      expect(result.data.batch_code).toBe("2024-001");
       expect(result.data.name).toBe("Hazy IPA #5");
       expect(result.data.status).toBe("planned");
     }
   });
 
-  it("requires batch_number", () => {
+  it("requires batch_code", () => {
     const result = batchSchema.safeParse({
       name: "IPA",
     });
@@ -292,29 +292,29 @@ describe("batchSchema validation", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       const paths = result.error.issues.map((i) => i.path.join("."));
-      expect(paths).toContain("batch_number");
+      expect(paths).toContain("batch_code");
     }
   });
 
-  it("rejects empty batch_number", () => {
+  it("rejects empty batch_code", () => {
     const result = batchSchema.safeParse({
-      batch_number: "",
+      batch_code: "",
       name: "IPA",
     });
 
     expect(result.success).toBe(false);
     if (!result.success) {
       const batchNumberIssue = result.error.issues.find(
-        (i) => i.path[0] === "batch_number"
+        (i) => i.path[0] === "batch_code"
       );
       expect(batchNumberIssue).toBeDefined();
-      expect(batchNumberIssue?.message).toBe("Batch number is required");
+      expect(batchNumberIssue?.message).toBe("Batch code is required");
     }
   });
 
   it("requires name", () => {
     const result = batchSchema.safeParse({
-      batch_number: "2024-001",
+      batch_code: "2024-001",
     });
 
     expect(result.success).toBe(false);
@@ -326,7 +326,7 @@ describe("batchSchema validation", () => {
 
   it("rejects empty name", () => {
     const result = batchSchema.safeParse({
-      batch_number: "2024-001",
+      batch_code: "2024-001",
       name: "",
     });
 
@@ -339,7 +339,7 @@ describe("batchSchema validation", () => {
 
   it("defaults status to 'planned' when not provided", () => {
     const result = batchSchema.safeParse({
-      batch_number: "2024-001",
+      batch_code: "2024-001",
       name: "Pilsner",
     });
 
@@ -351,7 +351,7 @@ describe("batchSchema validation", () => {
 
   it("accepts nullable optional fields as null", () => {
     const result = batchSchema.safeParse({
-      batch_number: "2024-001",
+      batch_code: "2024-001",
       name: "Stout",
       recipe_id: null,
       planned_start_date: null,
@@ -366,7 +366,7 @@ describe("batchSchema validation", () => {
 
   it("accepts minimal valid data (only required fields)", () => {
     const result = batchSchema.safeParse({
-      batch_number: "B001",
+      batch_code: "B001",
       name: "Test Batch",
     });
 
@@ -375,7 +375,7 @@ describe("batchSchema validation", () => {
 
   it("rejects invalid UUID for recipe_id", () => {
     const result = batchSchema.safeParse({
-      batch_number: "2024-001",
+      batch_code: "2024-001",
       name: "IPA",
       recipe_id: "not-a-uuid",
     });
@@ -385,7 +385,7 @@ describe("batchSchema validation", () => {
 
   it("coerces string numbers for volume_bbl", () => {
     const result = batchSchema.safeParse({
-      batch_number: "2024-001",
+      batch_code: "2024-001",
       name: "IPA",
       volume_bbl: "10.5",
     });
@@ -399,7 +399,7 @@ describe("batchSchema validation", () => {
 
   it("coerces string numbers for actual_fg and actual_abv", () => {
     const result = batchSchema.safeParse({
-      batch_number: "2024-001",
+      batch_code: "2024-001",
       name: "IPA",
       actual_fg: "1.012",
       actual_abv: "6.5",

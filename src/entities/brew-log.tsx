@@ -135,7 +135,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       ),
     },
     {
-      accessorKey: "batch_numbers",
+      accessorKey: "batch_codes",
       header: "Batches",
       render: (value) => (value as string) || "—",
     },

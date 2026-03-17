@@ -115,7 +115,7 @@ export default function BatchAdditionsPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches")
-        .select("id, batch_number, name, status, recipe_id")
+        .select("id, batch_code, name, status, recipe_id")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -224,7 +224,7 @@ export default function BatchAdditionsPage({
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">{batch?.name || batch?.batch_number}</h1>
+          <h1 className="text-2xl font-bold">{batch?.name || batch?.batch_code}</h1>
           <p className="text-muted-foreground">Fermentation Additions</p>
         </div>
         {!showForm && (

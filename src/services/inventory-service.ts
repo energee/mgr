@@ -20,7 +20,7 @@ export type InventoryOverview = {
     total_quantity: number;
   }>;
   batches_in_progress: Array<{
-    batch_number: string;
+    batch_code: string;
     recipe_name: string;
     status: string;
     volume_bbl: number;

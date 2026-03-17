@@ -68,7 +68,7 @@ import { CreateBatchFromShortfall } from "@/components/domain/create-batch-from-
 
 type TimelineBatch = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   planned_start_date: string | null;
@@ -200,7 +200,7 @@ export default function ProductionTimelinePage() {
         .select(
           `
           id,
-          batch_number,
+          batch_code,
           name,
           status,
           planned_start_date,
@@ -707,7 +707,7 @@ export default function ProductionTimelinePage() {
                             >
                               {STATUS_ICONS[batch.status]}
                               <span className="text-xs font-medium truncate">
-                                {batch.batch_number}
+                                {batch.batch_code}
                               </span>
                               {batch.volume_bbl && (
                                 <Badge
@@ -722,7 +722,7 @@ export default function ProductionTimelinePage() {
                           <TooltipContent side="top">
                             <div className="space-y-1">
                               <div className="font-semibold">
-                                {batch.batch_number}
+                                {batch.batch_code}
                               </div>
                               <div>{batch.name}</div>
                               {batch.brand_name && (

@@ -41,7 +41,7 @@ export function RecipeProductionHistory({
       const { data, error } = await supabase
         .from("batches_with_brew_info")
         .select(
-          "id, batch_number, name, status, brew_date, actual_og, volume_bbl, volume_from_brews_bbl, recipe_variant_id"
+          "id, batch_code, name, status, brew_date, actual_og, volume_bbl, volume_from_brews_bbl, recipe_variant_id"
         )
         .eq("recipe_id", recipeId)
         .order("brew_date", { ascending: false });
@@ -146,7 +146,7 @@ export function RecipeProductionHistory({
         <TableHeader>
           <TableRow>
             <TableHead>Brew Date</TableHead>
-            <TableHead>Batch #</TableHead>
+            <TableHead>Batch Code</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Variant</TableHead>
             <TableHead>Status</TableHead>
@@ -167,7 +167,7 @@ export function RecipeProductionHistory({
                   href={`/production/batches/${batch.id}`}
                   className="font-medium hover:underline"
                 >
-                  {batch.batch_number}
+                  {batch.batch_code}
                 </Link>
               </TableCell>
               <TableCell>{batch.name || "—"}</TableCell>

@@ -430,7 +430,7 @@ export function buildEmailFromNotification(
       return batchStatusChangeTemplate(
         {
           batchNumber:
-            (metadata.batch_number as string) ?? "Unknown",
+            (metadata.batch_code as string) ?? "Unknown",
           batchName: (metadata.batch_name as string) ?? null,
           oldStatus: (metadata.old_status as string) ?? "unknown",
           newStatus: (metadata.new_status as string) ?? "unknown",

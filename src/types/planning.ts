@@ -63,7 +63,7 @@ export type SupplyByProduct = {
 export type BatchInProduction = {
   brand_id: string;
   batch_id: string;
-  batch_number: string;
+  batch_code: string;
   batch_name: string;
   status: string;
   planned_start_date: string | null;

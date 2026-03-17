@@ -13,7 +13,7 @@ import { z } from "zod";
 // =============================================================================
 
 export const batchSchema = z.object({
-  batch_number: z.string().min(1, "Batch number is required"),
+  batch_code: z.string().optional(),
   name: z.string().min(1, "Name is required"),
   status: z.string().default("planned"),
   recipe_id: z.string().uuid().nullable().optional(),

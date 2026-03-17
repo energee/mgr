@@ -58,7 +58,7 @@ type RawMaterial = {
 }
 
 type BatchInProgress = {
-  batch_number: string;
+  batch_code: string;
   recipe_name: string;
   status: string;
   planned_start: string | null;
@@ -196,11 +196,11 @@ function BatchesInProgressSection({ batches }: { batches: BatchInProgress[] }) {
       <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
         {batches.map((batch, idx) => (
           <div
-            key={`${batch.batch_number}-${idx}`}
+            key={`${batch.batch_code}-${idx}`}
             className="flex items-center justify-between p-2 text-sm"
           >
             <div>
-              <span className="font-medium">{batch.batch_number}</span>
+              <span className="font-medium">{batch.batch_code}</span>
               <span className="text-muted-foreground ml-1">
                 {batch.recipe_name}
               </span>

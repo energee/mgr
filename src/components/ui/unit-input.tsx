@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { formatSmartDecimal } from "@/lib/format";
 import { useUnitPreferences } from "@/hooks/useUnitPreferences";
 import {
   getUnitOptions,
@@ -106,7 +107,7 @@ export function UnitInput({
   // Convert canonical value to display value
   const displayValue = React.useMemo(() => {
     if (value == null) return "";
-    return toDisplayValue(value, unitType, displayUnit).toFixed(decimals);
+    return formatSmartDecimal(toDisplayValue(value, unitType, displayUnit), decimals);
   }, [value, unitType, displayUnit, decimals]);
 
   // Handle input change
@@ -244,7 +245,7 @@ export function UnitDisplay({
 
   return (
     <span className={className}>
-      {displayValue.toFixed(decimals)}{" "}
+      {formatSmartDecimal(displayValue, decimals)}{" "}
       <button
         type="button"
         onClick={cycleUnit}
