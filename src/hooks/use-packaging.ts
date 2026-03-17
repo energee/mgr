@@ -2,8 +2,10 @@
  * Packaging hooks — shared between session-line-items-editor and packaging-day-view.
  */
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { usePackagingFormats } from "@/hooks/use-catalog";
 import { packagingKeys } from "@/lib/query-keys";
 
 export type BatchOption = {
@@ -32,6 +34,23 @@ const STATUS_SORT_ORDER: Record<string, number> = {
  * Uses a single query with an inner join on recipes to filter server-side,
  * avoiding a waterfall of two sequential queries.
  */
+/**
+ * Returns a memoized Set of selling_format IDs that represent keg containers.
+ * Eliminates duplicate kegFormatIds memos across packaging components.
+ */
+export function useKegFormatIds(): Set<string> {
+  const { data: packagingFormats } = usePackagingFormats();
+  return useMemo(
+    () =>
+      new Set(
+        packagingFormats
+          ?.filter((f) => f.container_type === "keg")
+          .map((f) => f.id)
+      ),
+    [packagingFormats]
+  );
+}
+
 export function useBatchesForBrand(brandId: string | null) {
   const supabase = createClient();
   return useQuery({

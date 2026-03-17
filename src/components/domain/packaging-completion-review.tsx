@@ -63,7 +63,7 @@ export function PackagingCompletionReview({
   const [notes, setNotes] = useState("");
 
   const missingActualCount = items.filter(
-    (item) => item.actual_quantity === null || item.actual_quantity === undefined
+    (item) => item.actual_quantity == null
   ).length;
 
   const totalPlanned = items.reduce(

@@ -114,14 +114,14 @@ export default function BatchDetailPage({
     },
   });
 
-  // Fetch recipe info for StartBrewDayDialog
+  // Fetch recipe info (includes brand for packaging dialog)
   const { data: recipe } = useQuery({
     queryKey: recipeKeys.detail(batch?.recipe_id ?? ""),
     queryFn: async () => {
       if (!batch?.recipe_id) return null;
       const { data, error } = await supabase
         .from("recipes")
-        .select("id, name")
+        .select("id, name, brand_id, brands(id, name)")
         .eq("id", batch.recipe_id)
         .single();
       if (error) throw error;
@@ -130,27 +130,11 @@ export default function BatchDetailPage({
     enabled: !!batch?.recipe_id,
   });
 
-  // Fetch brand info from batch's recipe (batch -> recipe -> brand)
-  const { data: recipeBrand } = useQuery({
-    queryKey: batchKeys.recipeBrand(id),
-    queryFn: async () => {
-      const { data: batchData } = await supabase
-        .from("batches")
-        .select("recipe_id, recipes(brand_id, brands(id, name))")
-        .eq("id", id)
-        .single();
-      const recipe = batchData?.recipes as {
-        brand_id: string;
-        brands: { id: string; name: string };
-      } | null;
-      return recipe?.brands ?? null;
-    },
-    enabled: !!batch,
-  });
+  const recipeBrand = (recipe?.brands as { id: string; name: string } | null) ?? null;
 
   // Fetch existing packaging session for batches already in packaging state
   const { data: existingSession } = useQuery({
-    queryKey: packagingKeys.historyForBatch(id),
+    queryKey: packagingKeys.activeSessionForBatch(id),
     queryFn: async () => {
       const { data } = await supabase
         .from("session_line_items")

@@ -9,7 +9,7 @@
  * creates a session + line item and transitions the batch to "packaging".
  */
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -38,6 +38,8 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { entityKeys, batchKeys } from "@/lib/query-keys";
 import { usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
+import { useKegFormatIds } from "@/hooks/use-packaging";
+import { createNameFilter } from "@/lib/combobox-filter";
 
 // =============================================================================
 // Types
@@ -78,15 +80,7 @@ export function PackagingBatchDialog({
   const { data: kegOwners } = useKegOwners();
 
   // O(1) keg format lookup
-  const kegFormatIds = useMemo(
-    () =>
-      new Set(
-        packagingFormats
-          ?.filter((f) => f.container_type === "keg")
-          .map((f) => f.id)
-      ),
-    [packagingFormats]
-  );
+  const kegFormatIds = useKegFormatIds();
 
   const isKeg = kegFormatIds.has(formatId);
 
@@ -172,15 +166,7 @@ export function PackagingBatchDialog({
                   setKegOwnerId("");
                 }
               }}
-              onFilter={(values, search) => {
-                const term = search.toLowerCase();
-                return values.filter((v) =>
-                  packagingFormats
-                    ?.find((f) => f.id === v)
-                    ?.name.toLowerCase()
-                    .includes(term)
-                );
-              }}
+              onFilter={createNameFilter(packagingFormats)}
             >
               <ComboboxAnchor>
                 <ComboboxInput placeholder="Select format" />
@@ -209,15 +195,7 @@ export function PackagingBatchDialog({
               <Combobox
                 value={kegOwnerId}
                 onValueChange={setKegOwnerId}
-                onFilter={(values, search) => {
-                  const term = search.toLowerCase();
-                  return values.filter((v) =>
-                    kegOwners
-                      ?.find((o) => o.id === v)
-                      ?.name.toLowerCase()
-                      .includes(term)
-                  );
-                }}
+                onFilter={createNameFilter(kegOwners)}
               >
                 <ComboboxAnchor>
                   <ComboboxInput placeholder="Keg owner (optional)" />

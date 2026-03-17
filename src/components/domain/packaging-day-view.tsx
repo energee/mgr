@@ -49,7 +49,8 @@ import { Plus, Trash2, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { sessionLineItemKeys, entityKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
-import { useBatchesForBrand } from "@/hooks/use-packaging";
+import { useBatchesForBrand, useKegFormatIds } from "@/hooks/use-packaging";
+import { createNameFilter } from "@/lib/combobox-filter";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { PackagingCompletionReview } from "./packaging-completion-review";
 
@@ -219,15 +220,7 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
   const { data: kegOwners } = useKegOwners();
 
   // O(1) keg format lookup
-  const kegFormatIds = useMemo(
-    () =>
-      new Set(
-        packagingFormats
-          ?.filter((f) => f.container_type === "keg")
-          .map((f) => f.id)
-      ),
-    [packagingFormats]
-  );
+  const kegFormatIds = useKegFormatIds();
 
   // Batch options for the quick-add row
   const { data: newItemBatches, isLoading: newItemBatchesLoading } =
@@ -488,15 +481,7 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
                   <Combobox
                     value={item.selling_format_id ?? ""}
                     onValueChange={(v) => handleFormatChange(item.id, v)}
-                    onFilter={(values, search) => {
-                      const term = search.toLowerCase();
-                      return values.filter((v) =>
-                        packagingFormats
-                          ?.find((f) => f.id === v)
-                          ?.name.toLowerCase()
-                          .includes(term)
-                      );
-                    }}
+                    onFilter={createNameFilter(packagingFormats)}
                   >
                     <ComboboxAnchor className="h-8">
                       <ComboboxInput
@@ -532,15 +517,7 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
                             value: v || null,
                           })
                         }
-                        onFilter={(values, search) => {
-                          const term = search.toLowerCase();
-                          return values.filter((v) =>
-                            kegOwners
-                              ?.find((o) => o.id === v)
-                              ?.name.toLowerCase()
-                              .includes(term)
-                          );
-                        }}
+                        onFilter={createNameFilter(kegOwners)}
                       >
                         <ComboboxAnchor className="h-8">
                           <ComboboxInput
@@ -638,15 +615,7 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
                 onValueChange={(v) =>
                   setNewItem({ ...newItem, brand_id: v, batch_id: "" })
                 }
-                onFilter={(values, search) => {
-                  const term = search.toLowerCase();
-                  return values.filter((v) =>
-                    brands
-                      ?.find((b) => b.id === v)
-                      ?.name.toLowerCase()
-                      .includes(term)
-                  );
-                }}
+                onFilter={createNameFilter(brands)}
               >
                 <ComboboxAnchor className="h-8">
                   <ComboboxInput
@@ -732,15 +701,7 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
                           : "",
                     });
                   }}
-                  onFilter={(values, search) => {
-                    const term = search.toLowerCase();
-                    return values.filter((v) =>
-                      packagingFormats
-                        ?.find((f) => f.id === v)
-                        ?.name.toLowerCase()
-                        .includes(term)
-                    );
-                  }}
+                  onFilter={createNameFilter(packagingFormats)}
                 >
                   <ComboboxAnchor className="h-8">
                     <ComboboxInput
@@ -771,15 +732,7 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
                     onValueChange={(v) =>
                       setNewItem({ ...newItem, keg_owner_id: v })
                     }
-                    onFilter={(values, search) => {
-                      const term = search.toLowerCase();
-                      return values.filter((v) =>
-                        kegOwners
-                          ?.find((o) => o.id === v)
-                          ?.name.toLowerCase()
-                          .includes(term)
-                      );
-                    }}
+                    onFilter={createNameFilter(kegOwners)}
                   >
                     <ComboboxAnchor className="h-8">
                       <ComboboxInput

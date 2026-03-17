@@ -47,7 +47,8 @@ import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sessionLineItemKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
-import { useBatchesForBrand } from "@/hooks/use-packaging";
+import { useBatchesForBrand, useKegFormatIds } from "@/hooks/use-packaging";
+import { createNameFilter } from "@/lib/combobox-filter";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 // =============================================================================
@@ -197,11 +198,8 @@ export function SessionLineItemsEditor({
   const { data: packagingFormats } = usePackagingFormats();
   const { data: kegOwners } = useKegOwners();
 
-  // O(1) keg format lookup — avoids O(n) isKegFormat() calls in render
-  const kegFormatIds = useMemo(
-    () => new Set(packagingFormats?.filter((f) => f.container_type === "keg").map((f) => f.id)),
-    [packagingFormats]
-  );
+  // O(1) keg format lookup
+  const kegFormatIds = useKegFormatIds();
 
   // Batch options for new item row
   const { data: newItemBatches, isLoading: newItemBatchesLoading } =
@@ -315,13 +313,6 @@ export function SessionLineItemsEditor({
     [items]
   );
 
-  // Helper: get display format name
-  const getFormatName = (item: SessionLineItemRow) =>
-    item.selling_format_name ?? "—";
-
-  const getFormatId = (item: SessionLineItemRow) =>
-    item.selling_format_id ?? "";
-
   // Handle add item
   const handleAdd = () => {
     if (!newItem.brand_id) {
@@ -391,7 +382,7 @@ export function SessionLineItemsEditor({
               <TableCell>
                 {readOnly ? (
                   <span className="flex items-center gap-1.5">
-                    {getFormatName(item)}
+                    {item.selling_format_name ?? "—"}
                     {item.selling_format_id && kegFormatIds.has(item.selling_format_id) && item.keg_owner_name && (
                       <Badge variant="outline" className="text-xs">{item.keg_owner_name}</Badge>
                     )}
@@ -399,12 +390,9 @@ export function SessionLineItemsEditor({
                 ) : (
                   <div className="space-y-1">
                     <Combobox
-                      value={getFormatId(item)}
+                      value={item.selling_format_id ?? ""}
                       onValueChange={(v) => handleFormatChange(item.id, v)}
-                      onFilter={(values, search) => {
-                        const term = search.toLowerCase();
-                        return values.filter((v) => packagingFormats?.find((f) => f.id === v)?.name.toLowerCase().includes(term));
-                      }}
+                      onFilter={createNameFilter(packagingFormats)}
                     >
                       <ComboboxAnchor className="h-8">
                         <ComboboxInput className="h-8" placeholder="Select format" />
@@ -430,10 +418,7 @@ export function SessionLineItemsEditor({
                         onValueChange={(v) =>
                           updateItem.mutate({ id: item.id, field: "keg_owner_id", value: v || null })
                         }
-                        onFilter={(values, search) => {
-                          const term = search.toLowerCase();
-                          return values.filter((v) => kegOwners?.find((o) => o.id === v)?.name.toLowerCase().includes(term));
-                        }}
+                        onFilter={createNameFilter(kegOwners)}
                       >
                         <ComboboxAnchor className="h-8">
                           <ComboboxInput className="h-8" placeholder="Keg owner (optional)" />
@@ -520,10 +505,7 @@ export function SessionLineItemsEditor({
                   onValueChange={(v) =>
                     setNewItem({ ...newItem, brand_id: v, batch_id: "" })
                   }
-                  onFilter={(values, search) => {
-                    const term = search.toLowerCase();
-                    return values.filter((v) => brands?.find((b) => b.id === v)?.name.toLowerCase().includes(term));
-                  }}
+                  onFilter={createNameFilter(brands)}
                 >
                   <ComboboxAnchor className="h-8">
                     <ComboboxInput className="h-8" placeholder="Select brand" />
@@ -592,10 +574,7 @@ export function SessionLineItemsEditor({
                         keg_owner_id: format?.container_type === "keg" ? newItem.keg_owner_id : "",
                       });
                     }}
-                    onFilter={(values, search) => {
-                      const term = search.toLowerCase();
-                      return values.filter((v) => packagingFormats?.find((f) => f.id === v)?.name.toLowerCase().includes(term));
-                    }}
+                    onFilter={createNameFilter(packagingFormats)}
                   >
                     <ComboboxAnchor className="h-8">
                       <ComboboxInput className="h-8" placeholder="Select format" />
@@ -619,10 +598,7 @@ export function SessionLineItemsEditor({
                     <Combobox
                       value={newItem.keg_owner_id}
                       onValueChange={(v) => setNewItem({ ...newItem, keg_owner_id: v })}
-                      onFilter={(values, search) => {
-                        const term = search.toLowerCase();
-                        return values.filter((v) => kegOwners?.find((o) => o.id === v)?.name.toLowerCase().includes(term));
-                      }}
+                      onFilter={createNameFilter(kegOwners)}
                     >
                       <ComboboxAnchor className="h-8">
                         <ComboboxInput className="h-8" placeholder="Keg owner (optional)" />

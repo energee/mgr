@@ -531,6 +531,8 @@ export const packagingKeys = {
     ["packaging", "batches-for-brand", brandId] as const,
   historyForBatch: (batchId: string) =>
     ["packaging", "history", batchId] as const,
+  activeSessionForBatch: (batchId: string) =>
+    ["packaging", "active-session", batchId] as const,
   brandSummary: (brandId: string, dateRange?: { from: string; to: string }) =>
     ["packaging", "brand-summary", brandId, dateRange] as const,
   schedule: (filters?: Record<string, unknown>) =>

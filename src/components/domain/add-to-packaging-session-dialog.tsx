@@ -87,16 +87,13 @@ export function AddToPackagingSessionDialog({
         sessionId = newSession.id;
       }
 
-      // Insert line item (batch_id not in generated types yet, use type assertion)
-      const lineItem = {
+      // Insert line item linking batch to session
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- batch_id not in generated types yet
+      const { error: lineError } = await (supabase.from("session_line_items") as any).insert({
         session_id: sessionId,
         brand_id: brandId,
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (lineItem as any).batch_id = batchId;
-      const { error: lineError } = await supabase
-        .from("session_line_items")
-        .insert(lineItem);
+        batch_id: batchId,
+      });
       if (lineError) throw lineError;
 
       return sessionId;
@@ -108,8 +105,8 @@ export function AddToPackagingSessionDialog({
       onOpenChange(false);
       router.push(`/production/packaging/${sessionId}`);
     },
-    onError: (err: Error) => {
-      toast.error(`Failed to add to session: ${err.message}`);
+    onError: (err: unknown) => {
+      toast.error(`Failed to add to session: ${err instanceof Error ? err.message : "Unknown error"}`);
     },
   });
 
