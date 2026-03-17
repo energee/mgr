@@ -157,8 +157,7 @@ export default function KegReportsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4">
           <Link href="/inventory/kegs">
             <Button variant="ghost" size="icon" aria-label="Back to kegs">
               <ArrowLeft className="h-4 w-4" />
@@ -172,7 +171,6 @@ export default function KegReportsPage() {
               Fleet analytics, turnover metrics, and aging alerts
             </p>
           </div>
-        </div>
       </div>
 
       {/* Summary Cards */}

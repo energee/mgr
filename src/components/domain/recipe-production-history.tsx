@@ -22,7 +22,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
-import { BarChart3 } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 type RecipeProductionHistoryProps = {
@@ -76,12 +75,9 @@ export function RecipeProductionHistory({
 
   if (!batches || batches.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-6 text-center">
-        <BarChart3 className="h-10 w-10 text-muted-foreground/50 mb-3" />
-        <p className="text-muted-foreground">
-          No batches have been brewed from this recipe yet.
-        </p>
-      </div>
+      <p className="text-muted-foreground py-6 text-center">
+        No batches have been brewed from this recipe yet.
+      </p>
     );
   }
 
