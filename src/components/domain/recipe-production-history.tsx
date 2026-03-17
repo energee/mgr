@@ -22,7 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
-import { BarChart3, TrendingUp } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
 
 type RecipeProductionHistoryProps = {
@@ -111,8 +111,7 @@ export function RecipeProductionHistory({
       {/* Performance Summary */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div>
-          <div className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-            <BarChart3 className="h-3.5 w-3.5" />
+          <div className="text-sm font-medium text-muted-foreground">
             Total Batches
           </div>
           <div className="text-lg font-semibold">{totalBatches}</div>
@@ -127,8 +126,7 @@ export function RecipeProductionHistory({
         )}
         {ogVariance != null && (
           <div>
-            <div className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5" />
+            <div className="text-sm font-medium text-muted-foreground">
               OG Variance
             </div>
             <div

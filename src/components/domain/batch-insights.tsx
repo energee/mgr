@@ -28,7 +28,6 @@ import {
   ChevronDown,
   BarChart3,
   Target,
-  Activity,
   RefreshCw,
   TrendingUp,
   TrendingDown,
@@ -149,8 +148,7 @@ function FermentationStatus({
 }) {
   return (
     <div className="space-y-2">
-      <h4 className="font-medium flex items-center gap-2">
-        <Activity className="h-4 w-4" />
+      <h4 className="font-medium">
         Fermentation Progress
       </h4>
       <div className="border rounded-lg p-3 space-y-2">
@@ -304,8 +302,7 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
             <>
               {/* Performance Metrics */}
               <div>
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <Target className="h-4 w-4" />
+                <h4 className="font-medium mb-3">
                   Actuals vs Targets
                 </h4>
                 <div className="border rounded-lg p-3">

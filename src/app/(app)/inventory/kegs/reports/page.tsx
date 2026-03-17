@@ -27,14 +27,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft,
-  Package,
-  Users,
-  Clock,
-  AlertTriangle,
-  TrendingUp,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 // Types for report data
 type FleetSummary = {
@@ -185,9 +178,8 @@ export default function KegReportsPage() {
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Fleet</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {loadingFleet ? (
@@ -204,9 +196,8 @@ export default function KegReportsPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Out with Customers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {loadingFleet ? (
@@ -221,9 +212,8 @@ export default function KegReportsPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Utilization</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {loadingFleet ? (
@@ -238,9 +228,8 @@ export default function KegReportsPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Deposits Outstanding</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {loadingFleet ? (
@@ -262,10 +251,7 @@ export default function KegReportsPage() {
         {/* Fleet Summary by Type */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Fleet Summary by Type
-            </CardTitle>
+            <CardTitle>Fleet Summary by Type</CardTitle>
             <CardDescription>Inventory counts by keg type and state</CardDescription>
           </CardHeader>
           <CardContent>
@@ -309,10 +295,7 @@ export default function KegReportsPage() {
         {/* Turnover Metrics */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Turnover Metrics
-            </CardTitle>
+            <CardTitle>Turnover Metrics</CardTitle>
             <CardDescription>Average cycle time and annual turnover rate</CardDescription>
           </CardHeader>
           <CardContent>
@@ -356,10 +339,7 @@ export default function KegReportsPage() {
         {/* Top Customers by Kegs Out */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Top Customers by Kegs Out
-            </CardTitle>
+            <CardTitle>Top Customers by Kegs Out</CardTitle>
             <CardDescription>Customers with most kegs in circulation</CardDescription>
           </CardHeader>
           <CardContent>
@@ -406,10 +386,7 @@ export default function KegReportsPage() {
         {/* Aging Kegs Alert */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Aging Kegs
-            </CardTitle>
+            <CardTitle>Aging Kegs</CardTitle>
             <CardDescription>Kegs out longer than 30 days</CardDescription>
           </CardHeader>
           <CardContent>

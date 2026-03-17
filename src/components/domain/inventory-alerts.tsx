@@ -31,8 +31,6 @@ import {
 import {
   AlertTriangle,
   ChevronDown,
-  Package,
-  Warehouse,
   Beaker,
   RefreshCw,
   CheckCircle2,
@@ -97,8 +95,7 @@ function FinishedGoodsSection({
 
   return (
     <div className="space-y-2">
-      <h4 className="font-medium flex items-center gap-2">
-        <Package className="h-4 w-4" />
+      <h4 className="font-medium">
         Finished Goods ({goods.length})
       </h4>
       <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
@@ -156,8 +153,7 @@ function RawMaterialsSection({ materials }: { materials: RawMaterial[] }) {
 
   return (
     <div className="space-y-2">
-      <h4 className="font-medium flex items-center gap-2">
-        <Warehouse className="h-4 w-4" />
+      <h4 className="font-medium">
         Raw Materials ({materials.length})
       </h4>
       <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
@@ -194,8 +190,7 @@ function RawMaterialsSection({ materials }: { materials: RawMaterial[] }) {
 function BatchesInProgressSection({ batches }: { batches: BatchInProgress[] }) {
   return (
     <div className="space-y-2">
-      <h4 className="font-medium flex items-center gap-2">
-        <Beaker className="h-4 w-4" />
+      <h4 className="font-medium">
         Batches In Progress ({batches.length})
       </h4>
       <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
@@ -272,10 +267,7 @@ export function InventoryAlerts({
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Warehouse className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Inventory Overview</CardTitle>
-            </div>
+            <CardTitle className="text-lg">Inventory Overview</CardTitle>
             <div className="flex items-center gap-2">
               {!isLoading && overview && (
                 <>
