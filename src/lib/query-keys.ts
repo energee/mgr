@@ -113,6 +113,7 @@ export const batchKeys = {
   availableBrewLogs: (id: string) => ["available-brew-logs", id] as const,
   yeast: (id: string) => ["batches", id, "yeast"] as const,
   yeastSummary: (id: string) => ["batch-yeast-summary", id] as const,
+  recipeBrand: (id: string) => ["batch-recipe-brand", id] as const,
 };
 
 // =============================================================================

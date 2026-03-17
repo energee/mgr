@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { entityKeys, packagingKeys } from "@/lib/query-keys";
+import { formatDate } from "@/lib/format";
 import { Loader2 } from "lucide-react";
 
 type AddToPackagingSessionDialogProps = {
@@ -139,7 +140,7 @@ export function AddToPackagingSessionDialog({
                 </SelectItem>
                 {sessions?.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.session_date ? new Date(s.session_date).toLocaleDateString() : "No date"} — {s.status}
+                    {s.session_date ? formatDate(s.session_date) : "No date"} — {s.status}
                   </SelectItem>
                 ))}
               </SelectContent>

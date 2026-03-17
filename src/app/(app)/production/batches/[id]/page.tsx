@@ -132,7 +132,7 @@ export default function BatchDetailPage({
 
   // Fetch brand info from batch's recipe (batch -> recipe -> brand)
   const { data: recipeBrand } = useQuery({
-    queryKey: ["batch-recipe-brand", id],
+    queryKey: batchKeys.recipeBrand(id),
     queryFn: async () => {
       const { data: batchData } = await supabase
         .from("batches")

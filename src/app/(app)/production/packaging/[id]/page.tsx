@@ -32,7 +32,7 @@ export default function PackagingSessionDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("packaging_sessions")
-        .select("id, status")
+        .select("id, session_date, status, notes")
         .eq("id", id)
         .single();
       if (error) throw error;

@@ -29,7 +29,8 @@ const STATUS_SORT_ORDER: Record<string, number> = {
 
 /**
  * Fetch batches that belong to a given brand (via recipe FK).
- * Filters to active statuses and sorts by packaging readiness.
+ * Uses a single query with an inner join on recipes to filter server-side,
+ * avoiding a waterfall of two sequential queries.
  */
 export function useBatchesForBrand(brandId: string | null) {
   const supabase = createClient();
@@ -40,35 +41,17 @@ export function useBatchesForBrand(brandId: string | null) {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
         .select(
-          "id, batch_number, name, status, volume_bbl, current_vessel_name, recipe_id"
+          "id, batch_number, name, status, volume_bbl, current_vessel_name, recipe_id, recipes!inner(brand_id)"
         )
-        .in("status", ["planned", "fermenting", "conditioning", "packaging"]);
+        .in("status", ["planned", "fermenting", "conditioning", "packaging"])
+        .eq("recipes.brand_id" as string, brandId);
       if (error) throw error;
 
-      const recipeIds = [
-        ...new Set(
-          (data ?? [])
-            .map((b) => b.recipe_id)
-            .filter((id): id is string => id != null)
-        ),
-      ];
-      if (recipeIds.length === 0) return [];
-
-      const { data: recipes, error: recipeError } = await supabase
-        .from("recipes")
-        .select("id, brand_id")
-        .in("id", recipeIds)
-        .eq("brand_id", brandId);
-      if (recipeError) throw recipeError;
-
-      const validRecipeIds = new Set((recipes ?? []).map((r) => r.id));
-      return (data ?? [])
-        .filter((b) => b.recipe_id && validRecipeIds.has(b.recipe_id))
-        .sort(
-          (a, b) =>
-            (STATUS_SORT_ORDER[a.status ?? ""] ?? 99) -
-            (STATUS_SORT_ORDER[b.status ?? ""] ?? 99)
-        ) as BatchOption[];
+      return ((data ?? []) as unknown as BatchOption[]).sort(
+        (a, b) =>
+          (STATUS_SORT_ORDER[a.status ?? ""] ?? 99) -
+          (STATUS_SORT_ORDER[b.status ?? ""] ?? 99)
+      );
     },
     enabled: !!brandId,
   });

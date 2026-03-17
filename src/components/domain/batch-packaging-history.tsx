@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
+import { formatDate } from "@/lib/format";
 
 type PackagingHistoryRow = {
   id: string;
@@ -104,7 +105,7 @@ export function BatchPackagingHistory({ batchId }: { batchId: string }) {
                   href={`/production/packaging/${item.session_id}`}
                   className="text-blue-600 underline"
                 >
-                  {new Date(item.session_date).toLocaleDateString()}
+                  {formatDate(item.session_date)}
                 </Link>
               </TableCell>
               <TableCell>{item.format_name ?? "—"}</TableCell>

@@ -306,10 +306,14 @@ export function SessionLineItemsEditor({
   });
 
   // Calculate totals
-  const totalPlanned =
-    items?.reduce((sum, item) => sum + (item.planned_quantity || 0), 0) || 0;
-  const totalActual =
-    items?.reduce((sum, item) => sum + (item.actual_quantity || 0), 0) || 0;
+  const totalPlanned = useMemo(
+    () => items?.reduce((sum, item) => sum + (item.planned_quantity || 0), 0) || 0,
+    [items]
+  );
+  const totalActual = useMemo(
+    () => items?.reduce((sum, item) => sum + (item.actual_quantity || 0), 0) || 0,
+    [items]
+  );
 
   // Helper: get display format name
   const getFormatName = (item: SessionLineItemRow) =>
