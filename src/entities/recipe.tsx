@@ -69,8 +69,10 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
     {
       accessorKey: "volume_bbl",
-      header: "Volume (BBL)",
+      header: "Volume",
       sortable: true,
+      format: "unit",
+      unitType: "volume",
     },
     {
       accessorKey: "mash_efficiency",

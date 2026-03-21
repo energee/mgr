@@ -12,7 +12,7 @@ import { batchEntity } from "@/entities/batch";
 
 type VesselWithBatchData = {
   current_batch_id?: string | null;
-  batch_number?: string | null;
+  batch_code?: string | null;
   batch_name?: string | null;
   batch_status?: string | null;
   recipe_name?: string | null;
@@ -39,7 +39,7 @@ export function VesselCurrentBatch({ data }: VesselCurrentBatchProps) {
           href={`/production/batches/${data.current_batch_id}`}
           className="text-lg font-semibold hover:underline"
         >
-          {data.batch_number || data.batch_name || "View Batch"}
+          {data.batch_code || data.batch_name || "View Batch"}
         </Link>
         {data.batch_status && (
           <StatusBadge

@@ -19,7 +19,7 @@ import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
 
 type BatchRecord = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string | null;
   status: string | null;
   volume_bbl: number | null;
@@ -64,7 +64,7 @@ export default function BatchesPage() {
         <>
           <BatchCancellationDialog
             batchId={selectedBatch.id}
-            batchNumber={selectedBatch.batch_number}
+            batchNumber={selectedBatch.batch_code}
             batchName={selectedBatch.name}
             currentStatus={selectedBatch.status}
             currentVolume={selectedBatch.volume_bbl}
@@ -76,7 +76,7 @@ export default function BatchesPage() {
 
           <StartBrewDayDialog
             batchId={selectedBatch.id}
-            batchNumber={selectedBatch.batch_number}
+            batchNumber={selectedBatch.batch_code}
             batchName={selectedBatch.name}
             recipeName={null}
             volumeBbl={selectedBatch.volume_bbl}

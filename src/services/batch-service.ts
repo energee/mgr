@@ -13,7 +13,7 @@ import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc, dynamicFro
 /** Result from the analyze_batch_performance RPC function. */
 export type BatchPerformanceReport = {
   batch_id: string;
-  batch_number: string;
+  batch_code: string;
   recipe_name: string;
   status: string;
   metrics: {
@@ -36,7 +36,7 @@ export type BatchPerformanceReport = {
 /** Lightweight batch record for blend candidate selection. */
 export type BlendCandidate = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   recipe_name: string;
   status: string;
   volume_bbl: number | null;
@@ -93,7 +93,7 @@ export const batchService = {
 
       // Find other batches of the same recipe in blendable states
       const { data: candidates, error: listError } = await dynamicFrom(supabase, "batches_with_brew_info")
-        .select("id, batch_number, recipe_name, status, volume_bbl, current_vessel_name")
+        .select("id, batch_code, recipe_name, status, volume_bbl, current_vessel_name")
         .eq("recipe_id", sourceBatch.recipe_id)
         .neq("id", batchId)
         .in("status", ["fermenting", "conditioning", "packaging"]);
