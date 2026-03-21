@@ -92,8 +92,8 @@ All entity pages use universal components:
 
 ### Migration Naming
 Pattern: `00XXX_description.sql`
-Current highest: `00139`
-Next available: `00140`
+Current highest: `00155`
+Next available: `00156`
 
 ### Reference Files by Pattern
 
@@ -108,6 +108,9 @@ Next available: `00140`
 | Section with independent save | `src/components/domain/recipe-editor/recipe-basics-section.tsx` |
 | Shared editor context | `src/components/domain/recipe-editor/recipe-editor-context.tsx` |
 | Client-side calculations | `src/components/domain/recipe-editor/recipe-estimate-calc.ts` |
+| Custom status-based detail view | `src/components/domain/packaging-day-view.tsx` |
+| Shared domain hooks | `src/hooks/use-packaging.ts` |
+| Batch-initiated dialog | `src/components/domain/packaging-batch-dialog.tsx` |
 
 ### Form Field Types
 Entity forms support these field types:

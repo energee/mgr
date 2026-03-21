@@ -398,7 +398,7 @@ export const batchEntity: EntityConfig<Batch> = {
       icon: "package",
       type: "button" as const,
       fromStates: ["conditioning"],
-      toState: "packaging",
+      // No toState — the PackagingBatchDialog handles the transition
     },
     {
       name: "complete",

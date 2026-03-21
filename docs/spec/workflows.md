@@ -50,9 +50,16 @@ cancelled  cancelled   (adjust only if downstream packed)
 | Transition | Trigger |
 |------------|---------|
 | planned → in_progress | Start packaging |
-| in_progress → completed | Finish, create FGs |
+| in_progress → completed | Completion review modal (sets `completed_at` via trigger, creates FGs) |
+| planned → completed | **BLOCKED** by BEFORE UPDATE trigger — must go through `in_progress` |
 | completed → revised | Adjust quantities |
-| completed → (rollback) | Only if no downstream orders packed |
+
+**Creation flow:** Sessions are created from batch detail pages. When a conditioning batch is ready:
+1. User clicks "Start Packaging" on batch detail → opens PackagingBatchDialog
+2. Dialog creates session (planned), adds first line item with batch_id, transitions batch to `packaging`
+3. User navigates to session, transitions to `in_progress` → renders PackagingDayView
+4. User enters actual quantities, clicks "Complete Session" → completion review modal
+5. On confirmation: status → completed, `completed_at` set, finished goods created
 
 ### Order States
 

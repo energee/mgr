@@ -14,11 +14,10 @@ type SessionLineItemsDisplayProps = {
 }
 
 export function SessionLineItemsDisplay({ data }: SessionLineItemsDisplayProps) {
-  // Determine if read-only based on session status
-  // Only allow editing for "planned" and "in_progress" sessions
-  const readOnly = data.status === "completed" ||
-                   data.status === "revised" ||
-                   data.status === "cancelled";
+  // All statuses except "planned" are read-only in this wrapper.
+  // "in_progress" sessions use PackagingDayView instead, but if this
+  // component is reached for in_progress, default to read-only for safety.
+  const readOnly = data.status !== "planned";
 
   return (
     <SessionLineItemsEditor

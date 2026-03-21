@@ -61,3 +61,8 @@ export function formatDate(
     return "";
   }
 }
+
+/** Parse a string to an integer, returning null for empty/whitespace strings. */
+export function parseIntOrNull(value: string): number | null {
+  return value.trim() ? parseInt(value, 10) : null;
+}
