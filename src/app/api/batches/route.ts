@@ -45,7 +45,7 @@ export const GET = withPermission("batches:read", async (request, { supabase }) 
     // to prevent filter injection via the .or() string, then escape LIKE
     // wildcards so user input like "%" or "_" matches literally.
     const sanitized = escapeLike(search.replace(/[.,()\\]/g, ""));
-    query = query.or(`batch_number.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
+    query = query.or(`batch_code.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
   }
 
   query = query
@@ -62,9 +62,13 @@ export const GET = withPermission("batches:read", async (request, { supabase }) 
 export const POST = withPermission("batches:write", async (request, { supabase }) => {
   const body = await validateBody(batchSchema, request);
 
+  // Omit batch_code if not provided — DB trigger auto-generates it
+  const { batch_code, ...rest } = body;
+  const insertPayload = batch_code ? { ...rest, batch_code } : rest;
+
   const { data, error } = await supabase
     .from("batches")
-    .insert(body)
+    .insert(insertPayload)
     .select()
     .single();
 

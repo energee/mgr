@@ -38,10 +38,10 @@ type BatchBlendHistoryProps = {
 type BlendDetailRow = {
   id: string;
   blend_batch_id: string;
-  blend_batch_number: string | null;
+  blend_batch_code: string | null;
   blend_batch_name: string | null;
   source_batch_id: string;
-  source_batch_number: string | null;
+  source_batch_code: string | null;
   source_batch_name: string | null;
   source_batch_status: string | null;
   source_recipe_name: string | null;
@@ -145,7 +145,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                         href={`/production/batches/${blend.source_batch_id}`}
                         className="font-medium text-primary hover:underline"
                       >
-                        {blend.source_batch_number}
+                        {blend.source_batch_code}
                       </Link>
                       {blend.source_batch_name && (
                         <span className="text-muted-foreground ml-2 text-sm">
@@ -255,7 +255,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                         href={`/production/batches/${blend.blend_batch_id}`}
                         className="font-medium text-primary hover:underline"
                       >
-                        {blend.blend_batch_number}
+                        {blend.blend_batch_code}
                       </Link>
                       {blend.blend_batch_name && (
                         <span className="text-muted-foreground ml-2 text-sm">

@@ -51,7 +51,7 @@ type KegTransaction = {
   keg_owner_name?: string;
   customer_name?: string;
   order_number?: string;
-  batch_number?: string;
+  batch_code?: string;
   finished_good_name?: string;
   from_location_name?: string;
   to_location_name?: string;
@@ -277,7 +277,7 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
   ],
 
   defaultSort: { column: "created_at", direction: "desc" },
-  searchableFields: ["customer_name", "batch_number", "notes"],
+  searchableFields: ["customer_name", "batch_code", "notes"],
 
   // ---------------------------------------------------------------------------
   // Detail View
@@ -391,7 +391,7 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
           name: "batch_id",
           label: "Batch",
           type: "relation",
-          relation: { entity: "batch", displayField: "batch_number" },
+          relation: { entity: "batch", displayField: "batch_code" },
           description: "Required for fill transactions",
           colSpan: 6,
         },

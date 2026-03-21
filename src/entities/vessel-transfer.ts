@@ -58,7 +58,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
   // ---------------------------------------------------------------------------
   listColumns: [
     {
-      accessorKey: "batch_number",
+      accessorKey: "batch_code",
       header: "Batch",
       sortable: true,
     },
@@ -116,7 +116,7 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
           name: "batch_id",
           label: "Batch",
           type: "relation",
-          relation: { entity: "batch", displayField: "batch_number" },
+          relation: { entity: "batch", displayField: "batch_code" },
           description: "Batch being transferred",
           required: true,
           colSpan: 12,

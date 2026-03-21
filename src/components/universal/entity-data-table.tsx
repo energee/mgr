@@ -91,6 +91,8 @@ export type EntityDataTableProps<T = Record<string, unknown>> = {
   onCreateClick?: () => void;
   /** Custom action handler - return true if handled externally */
   onAction?: (actionName: string, record: T) => boolean;
+  /** Default page size (overrides global default of 10) */
+  defaultPageSize?: number;
 }
 
 // =============================================================================
@@ -104,6 +106,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   showCreate = true,
   onCreateClick,
   onAction,
+  defaultPageSize,
 }: EntityDataTableProps<T>) {
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
@@ -233,12 +236,12 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const debouncedSetSearch = useDebouncedCallback(setDebouncedSearch, 300);
   const [rowSelection, setRowSelection] = useState({});
 
-  // Persisted page size
+  // Persisted page size (per-entity defaultPageSize overrides the global default)
   const { pageSize: persistedPageSize, setPageSize: setPersistedPageSize } =
-    usePersistedPageSize();
+    usePersistedPageSize(defaultPageSize);
   const [pagination, setPagination] = useState<PaginationState>(() => ({
     pageIndex: 0,
-    pageSize: persistedPageSize,
+    pageSize: defaultPageSize ?? persistedPageSize,
   }));
 
   // Debounce the global search

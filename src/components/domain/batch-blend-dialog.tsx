@@ -48,7 +48,7 @@ import { log } from "@/lib/client-logger";
 
 type SourceBatch = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -95,10 +95,10 @@ export function BatchBlendDialog({
     queryKey: batchKeys.list({ status: ["fermenting", "conditioning"], forBlend: true }),
     queryFn: async () => {
       const { data, error } = await dynamicFrom(supabase, "batches_with_brew_info")
-        .select("id, batch_number, name, status, volume_bbl, actual_abv, actual_og, actual_fg, recipe_id")
+        .select("id, batch_code, name, status, volume_bbl, actual_abv, actual_og, actual_fg, recipe_id")
         .in("status", ["fermenting", "conditioning"])
         .neq("id", batchId)
-        .order("batch_number");
+        .order("batch_code");
       if (error) throw error;
       return data as SourceBatch[];
     },
@@ -218,7 +218,7 @@ export function BatchBlendDialog({
         const maxVol = availableVolumeMap.get(entry.batchId) ?? sourceBatch?.volume_bbl;
         if (maxVol != null && entry.volumeBbl > maxVol) {
           throw new Error(
-            `Volume for ${sourceBatch?.batch_number} (${entry.volumeBbl} BBL) exceeds available volume (${maxVol.toFixed(2)} BBL)`
+            `Volume for ${sourceBatch?.batch_code} (${entry.volumeBbl} BBL) exceeds available volume (${maxVol.toFixed(2)} BBL)`
           );
         }
         if (entry.volumeBbl <= 0) {
@@ -325,7 +325,7 @@ export function BatchBlendDialog({
                         </TableCell>
                         <TableCell>
                           <div>
-                            <span className="font-medium">{batch.batch_number}</span>
+                            <span className="font-medium">{batch.batch_code}</span>
                             <span className="text-muted-foreground ml-2 text-sm">{batch.name}</span>
                           </div>
                         </TableCell>

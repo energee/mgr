@@ -83,9 +83,10 @@ export const containerEntity: EntityConfig<Container> = {
     },
     {
       accessorKey: "volume_bbl",
-      header: "Volume (BBL)",
+      header: "Volume",
       sortable: true,
-      render: (value) => (value != null ? String(value) : "—"),
+      format: "unit",
+      unitType: "volume",
     },
     {
       accessorKey: "deposit_amount",
@@ -159,8 +160,10 @@ export const containerEntity: EntityConfig<Container> = {
         },
         {
           name: "volume_bbl",
-          label: "Volume (BBL)",
-          type: "number",
+          label: "Volume",
+          type: "unit",
+          unitType: "volume",
+          format: "unit",
           placeholder: "e.g., 0.5, 0.1667",
           description: "Volume in barrels for TTB reporting (for keg containers)",
           colSpan: 4,

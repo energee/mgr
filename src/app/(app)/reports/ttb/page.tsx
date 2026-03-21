@@ -77,7 +77,7 @@ type TTBReportRow = {
 
 type BatchSummary = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -159,7 +159,7 @@ export default function TTBReportPage() {
       // represents the production date, not updated_at which changes on any edit)
       const { data: completedBatches, error: completedError } = await supabase
         .from("batches")
-        .select("id, batch_number, name, status, volume_bbl, planned_start_date")
+        .select("id, batch_code, name, status, volume_bbl, planned_start_date")
         .eq("status", "completed")
         .gte("planned_start_date", startDate)
         .lte("planned_start_date", endDate + "T23:59:59Z");
@@ -169,7 +169,7 @@ export default function TTBReportPage() {
       // Batches in production (fermenting, conditioning, packaging)
       const { data: inProgressBatches, error: inProgressError } = await supabase
         .from("batches")
-        .select("id, batch_number, name, status, volume_bbl")
+        .select("id, batch_code, name, status, volume_bbl")
         .in("status", ["fermenting", "conditioning", "packaging"]);
 
       if (inProgressError) throw inProgressError;
@@ -705,7 +705,7 @@ export default function TTBReportPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Batch #</TableHead>
+                  <TableHead>Batch Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Volume (BBL)</TableHead>
                 </TableRow>
@@ -713,7 +713,7 @@ export default function TTBReportPage() {
               <TableBody>
                 {batchData?.completedBatches.map((batch: BatchSummary) => (
                   <TableRow key={batch.id}>
-                    <TableCell className="font-mono">{batch.batch_number}</TableCell>
+                    <TableCell className="font-mono">{batch.batch_code}</TableCell>
                     <TableCell>{batch.name}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatTtbBbl(batch.volume_bbl)}
@@ -745,7 +745,7 @@ export default function TTBReportPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Batch #</TableHead>
+                  <TableHead>Batch Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Volume (BBL)</TableHead>
@@ -754,7 +754,7 @@ export default function TTBReportPage() {
               <TableBody>
                 {batchData.inProgressBatches.map((batch) => (
                   <TableRow key={batch.id}>
-                    <TableCell className="font-mono">{batch.batch_number}</TableCell>
+                    <TableCell className="font-mono">{batch.batch_code}</TableCell>
                     <TableCell>{batch.name}</TableCell>
                     <TableCell>{getStateLabel(batchEntity, batch.status)}</TableCell>
                     <TableCell className="text-right font-mono">

@@ -28,9 +28,20 @@ export function formatDecimal(value: number | null | undefined, decimals = 2): s
   return value.toFixed(decimals);
 }
 
-/** Format a barrel volume to two decimal places. Returns "--" for null/undefined values. */
+/**
+ * Format a number rounded to the nearest hundredth, dropping unnecessary trailing zeros.
+ * e.g. 7 → "7", 7.5 → "7.5", 7.125 → "7.13", 7.10 → "7.1"
+ * Returns "--" for null/undefined.
+ */
+export function formatSmartDecimal(value: number | null | undefined, maxDecimals = 2): string {
+  if (value == null) return "--";
+  // Round to maxDecimals, then drop trailing zeros
+  return parseFloat(value.toFixed(maxDecimals)).toString();
+}
+
+/** Format a barrel volume, showing decimals only when necessary (max 2). Returns "--" for null/undefined values. */
 export function formatBbl(value: number | null | undefined): string {
-  return formatDecimal(value);
+  return formatSmartDecimal(value);
 }
 
 export function formatDate(

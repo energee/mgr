@@ -28,7 +28,6 @@ import {
   ChevronDown,
   BarChart3,
   Target,
-  Activity,
   RefreshCw,
   TrendingUp,
   TrendingDown,
@@ -41,7 +40,7 @@ import { batchKeys } from "@/lib/query-keys";
 
 type BatchPerformanceResult = {
   batch_id: string;
-  batch_number: string;
+  batch_code: string;
   status: string;
   recipe: {
     id: string;
@@ -76,7 +75,7 @@ type BatchInsightsProps = {
   /** Entity data prop (for EntityDetail integration) */
   data?: {
     id: string | null;
-    batch_number: string | null;
+    batch_code: string | null;
     [key: string]: unknown;
   };
 }
@@ -149,8 +148,7 @@ function FermentationStatus({
 }) {
   return (
     <div className="space-y-2">
-      <h4 className="font-medium flex items-center gap-2">
-        <Activity className="h-4 w-4" />
+      <h4 className="font-medium">
         Fermentation Progress
       </h4>
       <div className="border rounded-lg p-3 space-y-2">
@@ -186,7 +184,7 @@ function FermentationStatus({
 export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumber, data }: BatchInsightsProps) {
   // Support both direct props and entity data prop
   const batchId = propBatchId || data?.id;
-  const batchNumber = propBatchNumber || data?.batch_number;
+  const batchNumber = propBatchNumber || data?.batch_code;
 
   const [isOpen, setIsOpen] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
@@ -271,7 +269,7 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
       </div>
       {hasAnalyzed && (
         <CardDescription className="pb-3">
-          {batchNumber || performance?.batch_number || "Batch"} &bull;{" "}
+          {batchNumber || performance?.batch_code || "Batch"} &bull;{" "}
           {performance?.recipe?.name || "Recipe"}
         </CardDescription>
       )}
@@ -304,8 +302,7 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
             <>
               {/* Performance Metrics */}
               <div>
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <Target className="h-4 w-4" />
+                <h4 className="font-medium mb-3">
                   Actuals vs Targets
                 </h4>
                 <div className="border rounded-lg p-3">

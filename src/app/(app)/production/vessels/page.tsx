@@ -14,6 +14,7 @@ export default function VesselsPage() {
     <EntityList
       entity={vesselEntity}
       basePath="/production/vessels"
+      defaultPageSize={50}
     />
   );
 }

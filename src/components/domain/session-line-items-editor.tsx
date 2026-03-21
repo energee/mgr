@@ -98,7 +98,7 @@ const EMPTY_NEW_ITEM: NewItemState = {
 
 type BatchOption = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -128,7 +128,7 @@ function useBatchesForBrand(brandId: string | null) {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
         .select(
-          "id, batch_number, name, status, volume_bbl, current_vessel_name, recipe_id"
+          "id, batch_code, name, status, volume_bbl, current_vessel_name, recipe_id"
         )
         .in("status", ["planned", "fermenting", "conditioning", "packaging"]);
       if (error) throw error;
@@ -178,7 +178,7 @@ function BatchCell({
 
   if (readOnly) {
     const batch = batches?.find((b) => b.id === currentBatchId);
-    return <span>{batch?.batch_number ?? "—"}</span>;
+    return <span>{batch?.batch_code ?? "—"}</span>;
   }
 
   return (
@@ -195,7 +195,7 @@ function BatchCell({
         {batches?.map((batch) => (
           <SelectItem key={batch.id} value={batch.id}>
             <span className="flex items-center gap-2">
-              {batch.batch_number}
+              {batch.batch_code}
               <StatusBadge
                 status={batch.status}
                 config={batchEntity.stateMachine?.stateDisplay}
@@ -643,7 +643,7 @@ export function SessionLineItemsEditor({
                     {newItemBatches?.map((batch) => (
                       <SelectItem key={batch.id} value={batch.id}>
                         <span className="flex items-center gap-2">
-                          {batch.batch_number}
+                          {batch.batch_code}
                           <StatusBadge
                             status={batch.status}
                             config={batchEntity.stateMachine?.stateDisplay}

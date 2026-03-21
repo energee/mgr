@@ -66,7 +66,7 @@ type ProjectedIngredient = {
 /** A batch within the projection horizon */
 type BatchSource = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   recipe_id: string | null;
   status: string;
@@ -161,7 +161,7 @@ export default function IngredientProjectionsPage() {
       const [batchResult, orderResult] = await Promise.all([
         supabase
           .from("batches")
-          .select("id, batch_number, name, status, volume_bbl, planned_start_date, recipe_id, recipes(id, name)")
+          .select("id, batch_code, name, status, volume_bbl, planned_start_date, recipe_id, recipes(id, name)")
           .in("status", ["planned", "fermenting"])
           .or(`planned_start_date.lte.${cutoffDate},planned_start_date.is.null`),
         supabase
@@ -183,7 +183,7 @@ export default function IngredientProjectionsPage() {
         if (b.recipe_id) recipeIdSet.add(b.recipe_id);
         return {
           id: b.id,
-          batch_number: b.batch_number,
+          batch_code: b.batch_code,
           name: b.name,
           recipe_id: b.recipe_id,
           status: b.status,
@@ -335,7 +335,7 @@ export default function IngredientProjectionsPage() {
           entry.sources.push({
             type: "batch",
             id: b.id,
-            label: `${b.batch_number} - ${b.name}`,
+            label: `${b.batch_code} - ${b.name}`,
             qty,
           });
         }
@@ -640,7 +640,7 @@ export default function IngredientProjectionsPage() {
                   {ingredientsByBatch.map(({ entity: batch, ingredients }) => (
                     <div key={batch.id}>
                       <h3 className="text-sm font-semibold mb-2">
-                        {batch.batch_number} - {batch.name}
+                        {batch.batch_code} - {batch.name}
                       </h3>
                       <Table>
                         <TableHeader>
