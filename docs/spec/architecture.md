@@ -59,6 +59,17 @@ interface EntityConfig<T> {
 - `sections[].headerActions` - Component rendered next to section title (e.g., action buttons)
 - `sections[].editComponent` - Separate component for edit mode when view/edit differ
 
+**Custom Page Components (bypass EntityDetailUnified entirely):**
+
+Some entities need fully custom editing experiences that go beyond entity config escape hatches. These use a status-based routing pattern on the detail page:
+
+| Entity | Custom Component | When Active | Reference |
+|--------|-----------------|-------------|-----------|
+| Recipes | `RecipeEditorPage` | Always (recipes are always-editable) | `src/components/domain/recipe-editor/` |
+| Packaging Sessions | `PackagingDayView` | When status = `in_progress` | `src/components/domain/packaging-day-view.tsx` |
+
+The detail page checks entity state and routes to either the custom component or `EntityDetailUnified`. For packaging sessions, this means `in_progress` → `PackagingDayView` (real-time data entry), all other states → `EntityDetailUnified` (standard view/edit).
+
 ### DEC-002: Schema Registry for AI Integration
 `_schema_registry` table contains self-documenting metadata:
 - Entity descriptions and purposes

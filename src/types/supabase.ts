@@ -2974,6 +2974,7 @@ export type Database = {
       }
       packaging_sessions: {
         Row: {
+          completed_at: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -2983,6 +2984,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -2992,6 +2994,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -4784,6 +4787,7 @@ export type Database = {
       session_line_items: {
         Row: {
           actual_quantity: number | null
+          batch_id: string | null
           brand_id: string
           created_at: string | null
           id: string
@@ -4795,6 +4799,7 @@ export type Database = {
         }
         Insert: {
           actual_quantity?: number | null
+          batch_id?: string | null
           brand_id: string
           created_at?: string | null
           id?: string
@@ -4806,6 +4811,7 @@ export type Database = {
         }
         Update: {
           actual_quantity?: number | null
+          batch_id?: string | null
           brand_id?: string
           created_at?: string | null
           id?: string

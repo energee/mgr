@@ -4,15 +4,16 @@
  * Batch Detail Page
  *
  * Custom batch detail that wraps EntityDetailUnified with batch-specific
- * action handling: Transfer, Pitch Yeast, Harvest Yeast, Blend, and
- * Cancel/Archive dialogs. State transitions (planned -> fermenting,
- * fermenting -> conditioning) are suggested via toast after actions
- * rather than being direct state-change buttons.
+ * action handling: Transfer, Pitch Yeast, Harvest Yeast, Blend, Start
+ * Packaging, and Cancel/Archive dialogs. State transitions (planned ->
+ * fermenting, fermenting -> conditioning) are suggested via toast after
+ * actions rather than being direct state-change buttons.
  */
 
 import { use, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
@@ -23,9 +24,13 @@ import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-
 import { BatchBlendDialog } from "@/components/domain/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/vessel-transfer-dialog";
 import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
+import { PackagingBatchDialog } from "@/components/domain/packaging-batch-dialog";
+import { AddToPackagingSessionDialog } from "@/components/domain/add-to-packaging-session-dialog";
+import { BatchPackagingHistory } from "@/components/domain/batch-packaging-history";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
 import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
-import { batchKeys, recipeKeys } from "@/lib/query-keys";
+import { Package } from "lucide-react";
+import { batchKeys, recipeKeys, packagingKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
 
 export default function BatchDetailPage({
@@ -54,6 +59,8 @@ export default function BatchDetailPage({
     prefillDialog === "transfer" || prefillDialog === "transfer_vessel"
   );
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
+  const [showStartPackaging, setShowStartPackaging] = useState(false);
+  const [showAddToSession, setShowAddToSession] = useState(false);
 
   const queryClient = useQueryClient();
   const supabase = createClient();
@@ -107,20 +114,37 @@ export default function BatchDetailPage({
     },
   });
 
-  // Fetch recipe info for StartBrewDayDialog
+  // Fetch recipe info (includes brand for packaging dialog)
   const { data: recipe } = useQuery({
     queryKey: recipeKeys.detail(batch?.recipe_id ?? ""),
     queryFn: async () => {
       if (!batch?.recipe_id) return null;
       const { data, error } = await supabase
         .from("recipes")
-        .select("id, name")
+        .select("id, name, brand_id, brands(id, name)")
         .eq("id", batch.recipe_id)
         .single();
       if (error) throw error;
       return data;
     },
     enabled: !!batch?.recipe_id,
+  });
+
+  const recipeBrand = (recipe?.brands as { id: string; name: string } | null) ?? null;
+
+  // Fetch existing packaging session for batches already in packaging state
+  const { data: existingSession } = useQuery({
+    queryKey: packagingKeys.activeSessionForBatch(id),
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("session_line_items")
+        .select("session_id")
+        .eq("batch_id", id)
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: batch?.status === "packaging",
   });
 
   // Fetch batch yeast data for the harvest dialog (which strains were pitched)
@@ -229,6 +253,10 @@ export default function BatchDetailPage({
       setShowBlend(true);
       return true;
     }
+    if (actionName === "start_packaging") {
+      setShowStartPackaging(true);
+      return true;
+    }
     return false;
   }, []);
 
@@ -277,6 +305,32 @@ export default function BatchDetailPage({
     <div className="space-y-4">
       <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
 
+      {batch?.status === "packaging" && existingSession && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+          <Package className="h-4 w-4 text-blue-600" />
+          <span>This batch has an active packaging session.</span>
+          <Link
+            href={`/production/packaging/${existingSession.session_id}`}
+            className="font-medium text-blue-600 underline"
+          >
+            View Session
+          </Link>
+        </div>
+      )}
+
+      {batch?.status === "packaging" && !existingSession && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+          <Package className="h-4 w-4 text-amber-600" />
+          <span>This batch is in packaging status but has no linked session.</span>
+          <button
+            onClick={() => setShowAddToSession(true)}
+            className="font-medium text-amber-600 underline"
+          >
+            Add to Session
+          </button>
+        </div>
+      )}
+
       {bannerConfig && (
         <NextStepBanner
           message={bannerConfig.message}
@@ -291,6 +345,8 @@ export default function BatchDetailPage({
         basePath="/production/batches"
         onAction={handleAction}
       />
+
+      <BatchPackagingHistory batchId={id} />
 
       {batch && batch.id && batch.batch_code && (
         <>
@@ -359,6 +415,28 @@ export default function BatchDetailPage({
             onOpenChange={setShowStartBrewDay}
             onSuccess={handleBrewDayCreated}
           />
+
+          {showStartPackaging && recipeBrand && (
+            <PackagingBatchDialog
+              open={showStartPackaging}
+              onOpenChange={setShowStartPackaging}
+              batchId={id}
+              batchNumber={batch.batch_code}
+              brandId={recipeBrand.id}
+              brandName={recipeBrand.name}
+            />
+          )}
+
+          {showAddToSession && recipeBrand && (
+            <AddToPackagingSessionDialog
+              open={showAddToSession}
+              onOpenChange={setShowAddToSession}
+              batchId={id}
+              batchNumber={batch.batch_code}
+              brandId={recipeBrand.id}
+              brandName={recipeBrand.name}
+            />
+          )}
         </>
       )}
     </div>

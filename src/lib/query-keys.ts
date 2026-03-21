@@ -113,6 +113,7 @@ export const batchKeys = {
   availableBrewLogs: (id: string) => ["available-brew-logs", id] as const,
   yeast: (id: string) => ["batches", id, "yeast"] as const,
   yeastSummary: (id: string) => ["batch-yeast-summary", id] as const,
+  recipeBrand: (id: string) => ["batch-recipe-brand", id] as const,
   transfers: (id: string) => ["batches", id, "transfers"] as const,
   remainingVolume: (id: string, fromVesselId?: string | null) =>
     ["batches", id, "remaining-volume", fromVesselId ?? "_initial"] as const,
@@ -531,6 +532,16 @@ export const sessionLineItemKeys = {
 export const packagingKeys = {
   batchesForBrand: (brandId: string) =>
     ["packaging", "batches-for-brand", brandId] as const,
+  historyForBatch: (batchId: string) =>
+    ["packaging", "history", batchId] as const,
+  activeSessionForBatch: (batchId: string) =>
+    ["packaging", "active-session", batchId] as const,
+  brandSummary: (brandId: string, dateRange?: { from: string; to: string }) =>
+    ["packaging", "brand-summary", brandId, dateRange] as const,
+  schedule: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["packaging", "schedule", filters] as const)
+      : (["packaging", "schedule"] as const),
 };
 
 // =============================================================================

@@ -2,8 +2,8 @@
  * Session Line Item Entity Configuration
  *
  * Line items within a packaging session. Each line item represents
- * a product (brand + selling format) being packaged, potentially from
- * multiple source batches.
+ * a product (brand + selling format) being packaged from a single
+ * source batch.
  *
  * Used as a relation from packaging-session entity.
  */
@@ -23,11 +23,7 @@ export const sessionLineItemSchema = z.object({
   brand_id: z.string().uuid({ message: "Brand is required" }),
   selling_format_id: z.string().uuid().nullable().optional(),
   keg_owner_id: z.string().uuid().nullable().optional(),
-  source_batches: z.array(z.object({
-    batch_id: z.string().uuid(),
-    planned_qty: z.number().int().nullable(),
-    actual_qty: z.number().int().nullable(),
-  })).default([]),
+  batch_id: z.string().uuid().nullable().optional(),
   planned_quantity: z.coerce.number().int().nullable().optional(),
   actual_quantity: z.coerce.number().int().nullable().optional(),
 });
@@ -190,5 +186,5 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
     "Total units packaged by brand",
   ],
 
-  keyFields: ["brand_id", "selling_format_id", "planned_quantity", "actual_quantity"],
+  keyFields: ["brand_id", "batch_id", "selling_format_id", "planned_quantity", "actual_quantity"],
 };
