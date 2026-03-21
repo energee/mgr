@@ -98,7 +98,7 @@ export type TTBReportData = {
 }
 
 export type TTBBatchData = {
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -209,7 +209,7 @@ export function exportBatchDetailsToCSV(
   type: "completed" | "in-process"
 ): void {
   const rows = batches.map((b) => ({
-    "Batch #": b.batch_number,
+    "Batch Code": b.batch_code,
     Name: b.name,
     Status: b.status,
     "Volume (BBL)": formatBbl(b.volume_bbl || 0),
@@ -218,7 +218,7 @@ export function exportBatchDetailsToCSV(
   // Add total row
   const total = batches.reduce((sum, b) => sum + (b.volume_bbl || 0), 0);
   rows.push({
-    "Batch #": "TOTAL",
+    "Batch Code": "TOTAL",
     Name: "",
     Status: "",
     "Volume (BBL)": formatBbl(total),

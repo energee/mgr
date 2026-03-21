@@ -46,7 +46,7 @@ type LinkedBatch = {
   notes: string | null;
   batch: {
     id: string;
-    batch_number: string;
+    batch_code: string;
     name: string;
     status: string;
     volume_bbl: number | null;
@@ -71,7 +71,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
           notes,
           batch:batches!brew_log_batches_batch_id_fkey (
             id,
-            batch_number,
+            batch_code,
             name,
             status,
             volume_bbl,
@@ -184,7 +184,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
                         href={`/production/batches/${batch.id}`}
                         className="truncate font-medium hover:underline"
                       >
-                        {batch.batch_number}
+                        {batch.batch_code}
                       </Link>
                     </div>
                     <p className="mt-0.5 truncate pl-[18px] text-sm text-muted-foreground">

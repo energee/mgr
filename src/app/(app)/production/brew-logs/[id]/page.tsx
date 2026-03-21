@@ -56,13 +56,13 @@ export default function BrewLogDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brew_log_batches")
-        .select("batch_id, batch:batches(batch_number, recipe_id, recipe:recipes(name))")
+        .select("batch_id, batch:batches(batch_code, recipe_id, recipe:recipes(name))")
         .eq("brew_log_id", id);
       if (error) throw error;
       return (data ?? []) as Array<{
         batch_id: string;
         batch: {
-          batch_number: string;
+          batch_code: string;
           recipe_id: string | null;
           recipe: { name: string } | null;
         } | null;
@@ -123,7 +123,7 @@ export default function BrewLogDetailPage({
     segments.push({ label: brewLog?.brew_number ?? "Brew Log" });
     if (linkedBatches?.length === 1) {
       const b = linkedBatches[0];
-      const batchNumber = b.batch?.batch_number ?? "Batch";
+      const batchNumber = b.batch?.batch_code ?? "Batch";
       segments.push({ label: batchNumber, href: `/production/batches/${b.batch_id}` });
     }
     return segments;

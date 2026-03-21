@@ -562,7 +562,7 @@ export type Database = {
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
-          batch_number: string
+          batch_code: string
           cancellation_notes: string | null
           cancellation_reason: string | null
           cancelled_at: string | null
@@ -587,7 +587,7 @@ export type Database = {
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
-          batch_number: string
+          batch_code?: string
           cancellation_notes?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
@@ -612,7 +612,7 @@ export type Database = {
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
-          batch_number?: string
+          batch_code?: string
           cancellation_notes?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
@@ -6487,7 +6487,7 @@ export type Database = {
         Row: {
           blend_batch_id: string | null
           blend_batch_name: string | null
-          blend_batch_number: string | null
+          blend_batch_code: string | null
           blended_at: string | null
           created_at: string | null
           created_by: string | null
@@ -6496,7 +6496,7 @@ export type Database = {
           source_batch_abv: number | null
           source_batch_id: string | null
           source_batch_name: string | null
-          source_batch_number: string | null
+          source_batch_code: string | null
           source_batch_status: string | null
           source_batch_volume: number | null
           source_recipe_name: string | null
@@ -6685,7 +6685,7 @@ export type Database = {
         Row: {
           batch_id: string | null
           batch_name: string | null
-          batch_number: string | null
+          batch_code: string | null
           brand_id: string | null
           conditioning_days: number | null
           estimated_ready_date: string | null
@@ -6722,7 +6722,7 @@ export type Database = {
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
-          batch_number: string | null
+          batch_code: string | null
           brew_count: number | null
           brew_date: string | null
           cancellation_notes: string | null
@@ -6798,7 +6798,7 @@ export type Database = {
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
-          batch_number: string | null
+          batch_code: string | null
           cancellation_notes: string | null
           cancellation_reason: string | null
           cancelled_at: string | null
@@ -6913,7 +6913,7 @@ export type Database = {
       brew_logs_with_batches: {
         Row: {
           batch_count: number | null
-          batch_numbers: string | null
+          batch_codes: string | null
           brew_date: string | null
           brew_number: string | null
           brewer_id: string | null
@@ -7683,7 +7683,7 @@ export type Database = {
       keg_inventory_with_details: {
         Row: {
           batch_id: string | null
-          batch_number: string | null
+          batch_code: string | null
           finished_good_id: string | null
           finished_good_name: string | null
           id: string | null
@@ -7703,7 +7703,7 @@ export type Database = {
       keg_transactions_with_details: {
         Row: {
           batch_id: string | null
-          batch_number: string | null
+          batch_code: string | null
           created_at: string | null
           created_by_name: string | null
           customer_id: string | null
@@ -8934,7 +8934,7 @@ export type Database = {
         Row: {
           batch_id: string | null
           batch_name: string | null
-          batch_number: string | null
+          batch_code: string | null
           entered_status_at: string | null
           status: string | null
           ttb_tax_class: string | null
@@ -8944,7 +8944,7 @@ export type Database = {
         Insert: {
           batch_id?: string | null
           batch_name?: string | null
-          batch_number?: string | null
+          batch_code?: string | null
           entered_status_at?: never
           status?: string | null
           ttb_tax_class?: never
@@ -8954,7 +8954,7 @@ export type Database = {
         Update: {
           batch_id?: string | null
           batch_name?: string | null
-          batch_number?: string | null
+          batch_code?: string | null
           entered_status_at?: never
           status?: string | null
           ttb_tax_class?: never
@@ -8986,11 +8986,11 @@ export type Database = {
       vessel_batch_drift_check: {
         Row: {
           expected_batch_id: string | null
-          expected_batch_number: string | null
+          expected_batch_code: string | null
           last_inbound_at: string | null
           last_outbound_at: string | null
           stored_batch_id: string | null
-          stored_batch_number: string | null
+          stored_batch_code: string | null
           vessel_id: string | null
           vessel_name: string | null
         }
@@ -9042,7 +9042,7 @@ export type Database = {
       vessel_transfers_with_details: {
         Row: {
           batch_id: string | null
-          batch_number: string | null
+          batch_code: string | null
           created_at: string | null
           from_vessel_id: string | null
           from_vessel_name: string | null
@@ -9173,7 +9173,7 @@ export type Database = {
         Row: {
           batch_id: string | null
           batch_name: string | null
-          batch_number: string | null
+          batch_code: string | null
           batch_status: string | null
           capacity_bbl: number | null
           created_at: string | null

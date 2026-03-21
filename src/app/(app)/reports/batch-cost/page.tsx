@@ -65,7 +65,7 @@ import Link from "next/link";
 /** A batch with its aggregated cost from allocations or recipe estimates */
 type BatchCostRow = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   recipe_name: string | null;
   brand_name: string | null;
@@ -109,12 +109,12 @@ export default function BatchCostAnalysisPage() {
       const { data: batches, error: batchErr } = await supabase
         .from("batches")
         .select(
-          "id, batch_number, name, status, volume_bbl, created_at, recipe:recipes(id, name, brand:brands(name))"
+          "id, batch_code, name, status, volume_bbl, created_at, recipe:recipes(id, name, brand:brands(name))"
         )
         .gte("created_at", fromDate)
         .lte("created_at", toDate + "T23:59:59Z")
         .not("status", "in", '("cancelled","archived")')
-        .order("batch_number", { ascending: true });
+        .order("batch_code", { ascending: true });
 
       if (batchErr) throw batchErr;
       if (!batches || batches.length === 0) return [];
@@ -197,7 +197,7 @@ export default function BatchCostAnalysisPage() {
 
         return {
           id: b.id,
-          batch_number: b.batch_number,
+          batch_code: b.batch_code,
           name: b.name,
           recipe_name: recipe?.name ?? null,
           brand_name: recipe?.brand?.name ?? null,
@@ -427,7 +427,7 @@ export default function BatchCostAnalysisPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8" />
-                  <TableHead>Batch #</TableHead>
+                  <TableHead>Batch Code</TableHead>
                   <TableHead>Recipe</TableHead>
                   <TableHead>Brand</TableHead>
                   <TableHead className="text-right">Volume (BBL)</TableHead>
@@ -452,7 +452,7 @@ export default function BatchCostAnalysisPage() {
                         )}
                       </TableCell>
                       <TableCell className="font-mono">
-                        {batch.batch_number}
+                        {batch.batch_code}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {batch.recipe_name ?? "--"}

@@ -52,7 +52,7 @@ type BatchStatusCounts = {
 
 type ActiveBatch = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -187,7 +187,7 @@ export default function DashboardPage() {
         .from("batches")
         .select(`
           id,
-          batch_number,
+          batch_code,
           name,
           status,
           volume_bbl,
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                   <tr key={batch.id} className="hover:bg-muted/50">
                     <td className="py-2">
                       <Link href={`/production/batches/${batch.id}`} className="hover:underline">
-                        <span className="font-mono font-medium">{batch.batch_number}</span>
+                        <span className="font-mono font-medium">{batch.batch_code}</span>
                       </Link>
                     </td>
                     <td className="py-2 text-muted-foreground truncate max-w-[200px]">

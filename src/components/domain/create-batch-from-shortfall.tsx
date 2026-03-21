@@ -15,7 +15,7 @@ import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { recipeKeys, batchKeys } from "@/lib/query-keys";
+import { recipeKeys } from "@/lib/query-keys";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,6 @@ import { log } from "@/lib/client-logger";
 // =============================================================================
 
 const createBatchSchema = z.object({
-  batch_number: z.string().min(1, "Batch number is required"),
   name: z.string().min(1, "Name is required"),
   recipe_id: z.string().uuid("Please select a recipe"),
   planned_start_date: z.string().min(1, "Planned start date is required"),
@@ -89,38 +88,10 @@ export function CreateBatchFromShortfall({
     enabled: open && !!shortfall.brand_id,
   });
 
-  // Fetch next batch number
-  const { data: nextBatchNumber } = useQuery({
-    queryKey: batchKeys.nextNumber(),
-    queryFn: async () => {
-      const year = new Date().getFullYear();
-      const { data, error } = await supabase
-        .from("batches")
-        .select("batch_number")
-        .ilike("batch_number", `${year}-%`)
-        .order("batch_number", { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const lastNumber = data[0].batch_number;
-        const match = lastNumber.match(/\d+-(\d+)/);
-        if (match) {
-          const next = parseInt(match[1]) + 1;
-          return `${year}-${next.toString().padStart(3, "0")}`;
-        }
-      }
-      return `${year}-001`;
-    },
-    enabled: open,
-  });
-
   // Form setup
   const form = useForm<CreateBatchFormValues>({
     resolver: zodResolver(createBatchSchema),
     defaultValues: {
-      batch_number: "",
       name: "",
       recipe_id: shortfall.recipe_id || "",
       planned_start_date: shortfall.recommended_brew_start,
@@ -130,12 +101,6 @@ export function CreateBatchFromShortfall({
   });
 
   // Update form when data loads
-  useEffect(() => {
-    if (nextBatchNumber) {
-      form.setValue("batch_number", nextBatchNumber);
-    }
-  }, [nextBatchNumber, form]);
-
   useEffect(() => {
     if (shortfall.recipe_id) {
       form.setValue("recipe_id", shortfall.recipe_id);
@@ -160,7 +125,6 @@ export function CreateBatchFromShortfall({
       const { data, error } = await supabase
         .from("batches")
         .insert({
-          batch_number: values.batch_number,
           name: values.name,
           recipe_id: values.recipe_id,
           planned_start_date: values.planned_start_date,
@@ -175,7 +139,7 @@ export function CreateBatchFromShortfall({
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`Batch ${data.batch_number} created`);
+      toast.success(`Batch ${data.batch_code} created`);
       onOpenChange(false);
       onSuccess?.();
     },
@@ -240,20 +204,6 @@ export function CreateBatchFromShortfall({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="batch_number">Batch Number</Label>
-              <Input
-                id="batch_number"
-                {...form.register("batch_number")}
-                placeholder="e.g., 2025-001"
-              />
-              {form.formState.errors.batch_number && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.batch_number.message}
-                </p>
-              )}
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="planned_start_date">Planned Start</Label>
               <div className="relative">

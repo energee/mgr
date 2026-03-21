@@ -70,7 +70,7 @@ export default function BatchDetailPage({
   // The view includes target_og via b.* but generated types are stale; use type extension
   type BatchDetail = {
     id: string;
-    batch_number: string;
+    batch_code: string;
     name: string;
     status: string;
     volume_bbl: number | null;
@@ -84,7 +84,7 @@ export default function BatchDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
-        .select("id, batch_number, name, status, volume_bbl, current_vessel_id, current_vessel_name, recipe_id")
+        .select("id, batch_code, name, status, volume_bbl, current_vessel_id, current_vessel_name, recipe_id")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -170,7 +170,7 @@ export default function BatchDetailPage({
       const brewNumber = primary.brew_log?.brew_number ?? "Brew Log";
       segments.push({ label: brewNumber, href: `/production/brew-logs/${primary.brew_log_id}` });
     }
-    segments.push({ label: batch?.batch_number ?? "Batch" }); // current page, no href
+    segments.push({ label: batch?.batch_code ?? "Batch" }); // current page, no href
     return segments;
   }, [recipe, linkedBrewLogs, batch]);
 
@@ -348,7 +348,7 @@ export default function BatchDetailPage({
 
       <BatchPackagingHistory batchId={id} />
 
-      {batch && batch.id && batch.batch_number && (
+      {batch && batch.id && batch.batch_code && (
         <>
           <PitchYeastDialog
             open={showPitchYeast}
@@ -373,7 +373,7 @@ export default function BatchDetailPage({
 
           <BatchCancellationDialog
             batchId={batch.id}
-            batchNumber={batch.batch_number}
+            batchNumber={batch.batch_code}
             batchName={batch.name}
             currentStatus={batch.status}
             currentVolume={batch.volume_bbl}
@@ -385,7 +385,7 @@ export default function BatchDetailPage({
 
           <BatchBlendDialog
             batchId={batch.id}
-            batchNumber={batch.batch_number}
+            batchNumber={batch.batch_code}
             batchName={batch.name}
             open={showBlend}
             onOpenChange={setShowBlend}
@@ -394,7 +394,7 @@ export default function BatchDetailPage({
 
           <VesselTransferDialog
             batchId={batch.id}
-            batchNumber={batch.batch_number}
+            batchNumber={batch.batch_code}
             batchStatus={batch.status}
             fromVesselId={batch.current_vessel_id}
             fromVesselName={batch.current_vessel_name}
@@ -407,7 +407,7 @@ export default function BatchDetailPage({
 
           <StartBrewDayDialog
             batchId={batch.id}
-            batchNumber={batch.batch_number}
+            batchNumber={batch.batch_code}
             batchName={batch.name}
             recipeName={recipe?.name ?? null}
             volumeBbl={batch.volume_bbl}
@@ -421,7 +421,7 @@ export default function BatchDetailPage({
               open={showStartPackaging}
               onOpenChange={setShowStartPackaging}
               batchId={id}
-              batchNumber={batch.batch_number}
+              batchNumber={batch.batch_code}
               brandId={recipeBrand.id}
               brandName={recipeBrand.name}
             />
@@ -432,7 +432,7 @@ export default function BatchDetailPage({
               open={showAddToSession}
               onOpenChange={setShowAddToSession}
               batchId={id}
-              batchNumber={batch.batch_number}
+              batchNumber={batch.batch_code}
               brandId={recipeBrand.id}
               brandName={recipeBrand.name}
             />

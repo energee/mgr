@@ -45,16 +45,16 @@ async function query<T>(
   return data as T;
 }
 
-/** Resolve a batch by UUID or batch number. Returns `{ id, batch_number, status }`. */
+/** Resolve a batch by UUID or batch number. Returns `{ id, batch_code, status }`. */
 async function resolveBatch(
   supabase: SupabaseClient,
   batchId?: string,
   batchNumber?: string,
-): Promise<{ id: string; batch_number: string; status: string }> {
+): Promise<{ id: string; batch_code: string; status: string }> {
   if (batchId) {
     const { data, error } = await supabase
       .from("batches")
-      .select("id, batch_number, status")
+      .select("id, batch_code, status")
       .eq("id", batchId)
       .single();
     if (error) throw new Error(`Batch not found: ${error.message}`);
@@ -63,8 +63,8 @@ async function resolveBatch(
   if (batchNumber) {
     const { data, error } = await supabase
       .from("batches")
-      .select("id, batch_number, status")
-      .ilike("batch_number", `%${escapeLike(batchNumber)}%`)
+      .select("id, batch_code, status")
+      .ilike("batch_code", `%${escapeLike(batchNumber)}%`)
       .limit(1);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0)
@@ -245,12 +245,12 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
             capacity_bbl: number;
             status: string;
             current_batch_id: string | null;
-            batch_number: string | null;
+            batch_code: string | null;
           }[]
         >(
           dynamicFrom(supabase, "vessels_with_batch")
             .select(
-              "id, name, vessel_type, capacity_bbl, status, current_batch_id, batch_number"
+              "id, name, vessel_type, capacity_bbl, status, current_batch_id, batch_code"
             )
             .eq("is_active", true)
             .order("name"),
@@ -276,7 +276,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
             name: v.name,
             type: v.vessel_type,
             capacity_bbl: v.capacity_bbl,
-            batch_number: v.batch_number,
+            batch_code: v.batch_code,
           })),
         };
       },
@@ -294,7 +294,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           supabase
             .from("batches")
             .select(
-              "id, batch_number, status, planned_start_date, recipe:recipes(name, volume_bbl, fermentation_days, conditioning_days)"
+              "id, batch_code, status, planned_start_date, recipe:recipes(name, volume_bbl, fermentation_days, conditioning_days)"
             )
             .gte("planned_start_date", startDate)
             .lte("planned_start_date", endDate)
@@ -503,18 +503,18 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         const queries: PromiseLike<Result[]>[] = [];
 
         if (should("batch")) {
-          const batchSelect = "id, batch_number, name" as const;
-          const toResult = (b: { id: string; batch_number: string; name: string | null }) => ({
+          const batchSelect = "id, batch_code, name" as const;
+          const toResult = (b: { id: string; batch_code: string; name: string | null }) => ({
             type: "batch" as const,
             id: b.id,
-            display: `${b.batch_number}${b.name ? ` — ${b.name}` : ""}`,
+            display: `${b.batch_code}${b.name ? ` — ${b.name}` : ""}`,
           });
           queries.push(
             Promise.all([
               supabase
                 .from("batches")
                 .select(batchSelect)
-                .ilike("batch_number", `%${escaped}%`)
+                .ilike("batch_code", `%${escaped}%`)
                 .limit(5),
               supabase
                 .from("batches")
@@ -653,7 +653,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           .select(
             `id, order_number, status, order_date, requested_date, scheduled_date, fulfilled_date, shipping_address, notes,
              customer:customers(id, name, customer_type, email, phone),
-             items:order_items(id, quantity, unit_price, notes, brand:brands(id, name), selling_format:selling_formats(id, name), batch:batches(id, batch_number))`
+             items:order_items(id, quantity, unit_price, notes, brand:brands(id, name), selling_format:selling_formats(id, name), batch:batches(id, batch_code))`
           )
           .eq("id", orderId)
           .single();
@@ -868,7 +868,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
       execute: async ({ status, strainName, limit }) => {
         let q = dynamicFrom(supabase, "yeast_pitches_with_details")
           .select(
-            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_number, location_name"
+            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_code, location_name"
           )
           .order("created_at", { ascending: false })
           .limit(limit);
@@ -906,7 +906,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
       execute: async ({ state, kegTypeName, locationName, limit }) => {
         let q = dynamicFrom(supabase, "keg_inventory_with_details")
           .select(
-            "id, keg_type_name, volume_bbl, keg_owner_name, state, location_name, quantity, batch_number, finished_good_name"
+            "id, keg_type_name, volume_bbl, keg_owner_name, state, location_name, quantity, batch_code, finished_good_name"
           )
           .order("keg_type_name")
           .limit(limit);
@@ -1047,7 +1047,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         const allowed = validTransitions[batch.status] || [];
         if (!allowed.includes(toState)) {
           throw new Error(
-            `Cannot transition batch #${batch.batch_number} from "${batch.status}" to "${toState}". Valid transitions: ${allowed.join(", ") || "none"}`
+            `Cannot transition batch #${batch.batch_code} from "${batch.status}" to "${toState}". Valid transitions: ${allowed.join(", ") || "none"}`
           );
         }
 
@@ -1059,8 +1059,8 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         const toLabel = formatStateLabel(toState);
 
         const description = openDialog
-          ? `Move batch #${batch.batch_number} from ${batch.status} to ${toLabel}`
-          : `Navigate to batch #${batch.batch_number} — click "${toLabel}" in the Actions menu to transition from ${batch.status}`;
+          ? `Move batch #${batch.batch_code} from ${batch.status} to ${toLabel}`
+          : `Navigate to batch #${batch.batch_code} — click "${toLabel}" in the Actions menu to transition from ${batch.status}`;
 
         return {
           action: "navigate" as const,
@@ -1087,7 +1087,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         const activeStates = ["fermenting", "conditioning", "packaging"];
         if (!activeStates.includes(batch.status)) {
           throw new Error(
-            `Batch #${batch.batch_number} is "${batch.status}" — readings can only be added to batches that are fermenting, conditioning, or packaging.`
+            `Batch Code${batch.batch_code} is "${batch.status}" — readings can only be added to batches that are fermenting, conditioning, or packaging.`
           );
         }
 
@@ -1095,7 +1095,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           action: "navigate" as const,
           url: `/production/batches/${batch.id}/readings`,
           prefillData: { autoShowForm: true },
-          description: `Add a reading to batch #${batch.batch_number}`,
+          description: `Add a reading to batch #${batch.batch_code}`,
         };
       },
     }),

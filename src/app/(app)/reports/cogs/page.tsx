@@ -92,7 +92,7 @@ import {
 /** A batch with its aggregated cost and packaging units */
 type CogsBatchRow = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   recipe_name: string | null;
   volume_bbl: number | null;
@@ -114,7 +114,7 @@ type CogsSkuRow = {
   total_cost: number;
   avg_cost_per_unit: number | null;
   avg_cost_per_bbl: number | null;
-  batches: { id: string; batch_number: string; cost: number; units: number }[];
+  batches: { id: string; batch_code: string; cost: number; units: number }[];
 }
 
 /** Cost breakdown by time period with ingredient category split */
@@ -150,7 +150,7 @@ type FinishedGoodRow = {
 /** Batch row shape returned by the shared query */
 type SharedBatchRow = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -235,12 +235,12 @@ export default function CogsReportPage() {
       const { data: batches, error: batchErr } = await supabase
         .from("batches")
         .select(
-          "id, batch_number, name, status, volume_bbl, created_at, recipe:recipes(name)"
+          "id, batch_code, name, status, volume_bbl, created_at, recipe:recipes(name)"
         )
         .gte("created_at", fromDate)
         .lte("created_at", toDate + "T23:59:59Z")
         .not("status", "in", '("cancelled","archived")')
-        .order("batch_number", { ascending: true });
+        .order("batch_code", { ascending: true });
 
       if (batchErr) throw batchErr;
       if (!batches || batches.length === 0) {
@@ -297,7 +297,7 @@ export default function CogsReportPage() {
       const unitsPackaged = unitsByBatch.get(b.id) ?? 0;
       return {
         id: b.id,
-        batch_number: b.batch_number,
+        batch_code: b.batch_code,
         name: b.name,
         recipe_name: b.recipe?.name ?? null,
         volume_bbl: volumeBbl,
@@ -361,7 +361,7 @@ export default function CogsReportPage() {
           .in("status", ["completed", "planned"]),
         supabase
           .from("batches")
-          .select("id, batch_number")
+          .select("id, batch_code")
           .in("id", batchIds),
       ]);
 
@@ -382,7 +382,7 @@ export default function CogsReportPage() {
 
       const batchNumberMap = new Map<string, string>();
       for (const b of batchInfo || []) {
-        batchNumberMap.set(b.id, b.batch_number);
+        batchNumberMap.set(b.id, b.batch_code);
       }
 
       // Group by SKU key (brand_name + format_name)
@@ -397,7 +397,7 @@ export default function CogsReportPage() {
           batchSet: Set<string>;
           batches: {
             id: string;
-            batch_number: string;
+            batch_code: string;
             cost: number;
             units: number;
           }[];
@@ -444,7 +444,7 @@ export default function CogsReportPage() {
           existing.batchSet.add(fg.batch_id);
           existing.batches.push({
             id: fg.batch_id,
-            batch_number: batchNumberMap.get(fg.batch_id) ?? "??",
+            batch_code: batchNumberMap.get(fg.batch_id) ?? "??",
             cost: proportionalCost,
             units: fgQuantity,
           });
@@ -936,7 +936,7 @@ export default function CogsReportPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-8" />
-                      <TableHead>Batch #</TableHead>
+                      <TableHead>Batch Code</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Recipe</TableHead>
                       <TableHead className="text-right">Vol (BBL)</TableHead>
@@ -965,7 +965,7 @@ export default function CogsReportPage() {
                             )}
                           </TableCell>
                           <TableCell className="font-mono">
-                            {batch.batch_number}
+                            {batch.batch_code}
                           </TableCell>
                           <TableCell>{batch.name}</TableCell>
                           <TableCell className="text-muted-foreground">
@@ -1244,7 +1244,7 @@ export default function CogsReportPage() {
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
-                                      <TableHead>Batch #</TableHead>
+                                      <TableHead>Batch Code</TableHead>
                                       <TableHead className="text-right">
                                         Units
                                       </TableHead>
@@ -1260,7 +1260,7 @@ export default function CogsReportPage() {
                                     {sku.batches.map((b) => (
                                       <TableRow key={b.id}>
                                         <TableCell className="font-mono">
-                                          {b.batch_number}
+                                          {b.batch_code}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                           {b.units.toLocaleString()}

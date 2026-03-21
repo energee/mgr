@@ -55,9 +55,9 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
     viewTable: "batches_with_brew_info",
     displayName: "Batch",
     displayNamePlural: "Batches",
-    searchableFields: ["batch_number", "name"],
+    searchableFields: ["batch_code", "name"],
     defaultSort: { column: "planned_start_date", direction: "desc" },
-    detailHeader: { title: "batch_number", subtitle: "name", badge: "status" },
+    detailHeader: { title: "batch_code", subtitle: "name", badge: "status" },
     keyFields: ["volume_bbl", "planned_start_date", "brew_date", "current_vessel_name", "recipe_name"],
   })],
   ["recipe", entry({
@@ -90,7 +90,7 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
     searchableFields: ["name"],
     defaultSort: { column: "name", direction: "asc" },
     detailHeader: { title: "name", badge: "status" },
-    keyFields: ["vessel_type", "capacity_bbl", "batch_number"],
+    keyFields: ["vessel_type", "capacity_bbl", "batch_code"],
   })],
   ["vessel_transfer", entry({
     name: "vessel_transfer",

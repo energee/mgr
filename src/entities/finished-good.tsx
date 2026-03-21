@@ -177,7 +177,7 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
           label: "Source Batch",
           type: "relation",
           colSpan: 6,
-          relation: { entity: "batch", displayField: "batch_number" },
+          relation: { entity: "batch", displayField: "batch_code" },
         },
       ],
     },

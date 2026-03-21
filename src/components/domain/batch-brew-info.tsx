@@ -22,7 +22,7 @@ type BatchBrewInfoProps = {
   data: {
     id: string;
     name: string;
-    batch_number: string;
+    batch_code: string;
     brew_date?: string | null;
     actual_og?: number | null;
     volume_from_brews_bbl?: number | null;
@@ -181,7 +181,7 @@ export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
         <div className="mt-3">
           <BrewLogLinker
             batchId={data.id}
-            batchName={`${data.batch_number} - ${data.name}`}
+            batchName={`${data.batch_code} - ${data.name}`}
           />
         </div>
       </details>

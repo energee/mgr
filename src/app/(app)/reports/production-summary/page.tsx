@@ -66,7 +66,7 @@ import { TrendChart } from "@/components/dashboard/trend-chart";
 /** Shape returned by the Supabase query for completed/packaged batches. */
 type ProductionBatchRow = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -199,7 +199,7 @@ export default function ProductionSummaryPage() {
         .select(
           `
           id,
-          batch_number,
+          batch_code,
           name,
           status,
           volume_bbl,

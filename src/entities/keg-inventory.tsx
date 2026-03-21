@@ -38,7 +38,7 @@ type KegInventory = {
   keg_owner_name?: string;
   volume_bbl?: number;
   location_name?: string;
-  batch_number?: string;
+  batch_code?: string;
   finished_good_name?: string;
 }
 
@@ -124,7 +124,7 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
       render: (value: unknown) => (value ? String(value) : "—"),
     },
     {
-      accessorKey: "batch_number",
+      accessorKey: "batch_code",
       header: "Batch",
       sortable: false,
       render: (value: unknown) => (value ? String(value) : "—"),
@@ -164,7 +164,7 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
         { name: "state", label: "State", editable: false },
         { name: "quantity", label: "Quantity", editable: false },
         { name: "location_name", label: "Location", editable: false },
-        { name: "batch_number", label: "Batch", editable: false },
+        { name: "batch_code", label: "Batch", editable: false },
         { name: "finished_good_name", label: "Finished Good", editable: false },
       ],
     },

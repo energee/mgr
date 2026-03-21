@@ -178,7 +178,7 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
           name: "batch_id",
           label: "Batch (optional)",
           type: "relation",
-          relation: { entity: "batch", displayField: "batch_number" },
+          relation: { entity: "batch", displayField: "batch_code" },
           colSpan: 4,
         },
         {

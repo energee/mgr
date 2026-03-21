@@ -65,7 +65,7 @@ type BrewLogCompletionDialogProps = {
 
 type LinkedBatch = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -167,7 +167,7 @@ export function BrewLogCompletionDialog({
 
       const { data: batches, error: batchError } = await dynamicFrom(supabase, "batches_with_brew_info")
         .select(
-          "id, batch_number, name, status, volume_bbl, current_vessel_id, current_vessel_name"
+          "id, batch_code, name, status, volume_bbl, current_vessel_id, current_vessel_name"
         )
         .in("id", batchIds);
 
@@ -180,7 +180,7 @@ export function BrewLogCompletionDialog({
         );
         return {
           id: batch?.id ?? link.batch_id,
-          batch_number: batch?.batch_number ?? "Unknown",
+          batch_code: batch?.batch_code ?? "Unknown",
           name: batch?.name ?? "Unknown",
           status: batch?.status ?? "planned",
           volume_bbl: batch?.volume_bbl ?? null,
@@ -406,9 +406,9 @@ export function BrewLogCompletionDialog({
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="font-medium text-sm">
-                      {batch.batch_number}
+                      {batch.batch_code}
                     </span>
-                    {batch.name && batch.name !== batch.batch_number && (
+                    {batch.name && batch.name !== batch.batch_code && (
                       <span className="text-muted-foreground text-sm ml-2">
                         {batch.name}
                       </span>
@@ -503,7 +503,7 @@ export function BrewLogCompletionDialog({
           return (
             <div key={batch.id} className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                {batch.batch_number}
+                {batch.batch_code}
               </span>
               <span className="font-medium">
                 &rarr; Fermenting in {vesselName}

@@ -93,8 +93,8 @@ export const batchEntity: EntityConfig<Batch> = {
   // ---------------------------------------------------------------------------
   listColumns: [
     {
-      accessorKey: "batch_number",
-      header: "Batch #",
+      accessorKey: "batch_code",
+      header: "Batch Code",
       sortable: true,
     },
     {
@@ -195,13 +195,13 @@ export const batchEntity: EntityConfig<Batch> = {
   ],
 
   defaultSort: { column: "planned_start_date", direction: "desc" },
-  searchableFields: ["batch_number", "name"],
+  searchableFields: ["batch_code", "name"],
 
   // ---------------------------------------------------------------------------
   // Detail View
   // ---------------------------------------------------------------------------
   detailHeader: {
-    title: "batch_number",
+    title: "batch_code",
     subtitle: "name",
     badge: "status",
   },
@@ -220,11 +220,11 @@ export const batchEntity: EntityConfig<Batch> = {
       title: "Overview",
       fields: [
         {
-          name: "batch_number",
-          label: "Batch Number",
+          name: "batch_code",
+          label: "Batch Code",
           type: "text",
-          placeholder: "e.g., 2024-001",
-          required: true,
+          editable: false,
+          description: "Auto-generated from planned start date and recipe",
           colSpan: 6,
         },
         {
@@ -348,7 +348,7 @@ export const batchEntity: EntityConfig<Batch> = {
   // Kanban Board
   // ---------------------------------------------------------------------------
   kanbanConfig: {
-    titleField: "batch_number",
+    titleField: "batch_code",
     subtitleField: "name",
     cardFields: [
       { field: "planned_start_date", label: "Start", format: "date" },
@@ -490,5 +490,5 @@ export const batchEntity: EntityConfig<Batch> = {
     "What's the total volume in fermentation?",
   ],
 
-  keyFields: ["batch_number", "name", "status", "planned_start_date", "current_vessel_name"],
+  keyFields: ["batch_code", "name", "status", "planned_start_date", "current_vessel_name"],
 };
