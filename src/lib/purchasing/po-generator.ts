@@ -7,6 +7,7 @@
 
 import type { IngredientShortfall } from "./demand-calculator";
 import { log } from "@/lib/client-logger";
+import { dynamicRpc } from "@/services/types";
 
 /** Lazy-import supabase client to avoid env validation at module load time. */
 async function getSupabase() {
@@ -118,39 +119,22 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
 }
 
 /**
- * Generates the next PO number by reading the highest existing number and incrementing.
+ * Generates the next PO number using the race-safe database function.
  *
- * TODO: This has a read-then-write race condition — concurrent calls can generate
- * duplicate PO numbers. Should be replaced with a database sequence or atomic
- * server-side function. See review branch findings C5.
+ * Delegates to `generate_next_po_number()` in PostgreSQL which uses
+ * pg_advisory_xact_lock to serialize concurrent callers. Returns
+ * numbers in PO-YYYY-NNN format.
  */
 export async function generateNextPONumber(): Promise<string> {
   const supabase = await getSupabase();
-  const year = new Date().getFullYear();
-  const prefix = `PO-${year}-`;
-
-  const { data, error } = await supabase
-    .from("purchase_orders")
-    .select("po_number")
-    .ilike("po_number", `${prefix}%`)
-    .order("po_number", { ascending: false })
-    .limit(1);
+  const { data, error } = await dynamicRpc(supabase, "generate_next_po_number");
 
   if (error) {
-    log.error("Error getting last PO number:", error);
+    log.error("Error generating PO number:", error);
     throw error;
   }
 
-  if (data && data.length > 0) {
-    const lastNumber = data[0].po_number;
-    const match = lastNumber.match(/PO-\d+-(\d+)/);
-    if (match) {
-      const next = parseInt(match[1]) + 1;
-      return `${prefix}${next.toString().padStart(3, "0")}`;
-    }
-  }
-
-  return `${prefix}001`;
+  return data as string;
 }
 
 /**
