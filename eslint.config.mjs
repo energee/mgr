@@ -95,6 +95,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Git worktrees (parallel development copies of the repo)
+    ".claude/worktrees/**",
+    ".worktrees/**",
   ]),
 ]);
 
