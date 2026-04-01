@@ -8,12 +8,13 @@
  * Users can either click the link or enter the code manually.
  */
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
+import { OtpCodeInput, OTP_LENGTH } from "@/components/auth/otp-code-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
@@ -32,6 +33,7 @@ export function LoginForm() {
   const redirect = searchParams.get("redirect") || "/";
   const supabase = createClient();
   const submitRef = useSubmitShortcut();
+  const otpFormRef = useRef<HTMLFormElement>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -143,26 +145,22 @@ export function LoginForm() {
 
   if (otpSent) {
     return (
-      <form onSubmit={handleVerifyOtp} className="space-y-4">
+      <form ref={otpFormRef} onSubmit={handleVerifyOtp} className="space-y-6">
         <p className="text-sm text-muted-foreground text-center">
           We sent a login link and code to <span className="font-medium text-foreground">{email}</span>.
           Click the link or enter the code below.
         </p>
-        <div className="space-y-2">
-          <Label htmlFor="otp">Code</Label>
-          <Input
+        <div className="flex flex-col items-center gap-2">
+          <Label htmlFor="otp" className="sr-only">Verification code</Label>
+          <OtpCodeInput
             id="otp"
-            type="text"
-            autoComplete="off"
-            data-1p-ignore
-            data-lpignore="true"
-            placeholder="Enter code"
             value={otpCode}
-            onChange={(e) => setOtpCode(e.target.value)}
+            onChange={setOtpCode}
+            onComplete={() => otpFormRef.current?.requestSubmit()}
             disabled={isLoading}
           />
         </div>
-        <Button ref={submitRef} type="submit" className="w-full" disabled={isLoading || !otpCode.trim()}>
+        <Button ref={submitRef} type="submit" className="w-full" disabled={isLoading || otpCode.length < OTP_LENGTH}>
           {isLoading ? "Verifying..." : <><span>Verify</span><Kbd>&#8984;&#9166;</Kbd></>}
         </Button>
         <div className="flex gap-2">

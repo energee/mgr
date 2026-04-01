@@ -7,10 +7,11 @@
  * Sends an OTP code via email, then verifies it to sign in.
  */
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import { OtpCodeInput, OTP_LENGTH } from "@/components/auth/otp-code-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,7 @@ const emailSchema = z.string().email("Please enter a valid email");
 export function PortalLoginForm() {
   const router = useRouter();
   const supabase = createClient();
+  const otpFormRef = useRef<HTMLFormElement>(null);
 
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -106,27 +108,25 @@ export function PortalLoginForm() {
   }
 
   return otpSent ? (
-    <form onSubmit={handleVerifyOtp} className="space-y-4">
+    <form ref={otpFormRef} onSubmit={handleVerifyOtp} className="space-y-6">
       <p className="text-sm text-muted-foreground text-center">
         Enter the code we sent to{" "}
         <span className="font-medium text-foreground">{email}</span>
       </p>
-      <div className="space-y-2">
-        <Label htmlFor="otp">Code</Label>
-        <Input
+      <div className="flex flex-col items-center gap-2">
+        <Label htmlFor="otp" className="sr-only">Verification code</Label>
+        <OtpCodeInput
           id="otp"
-          type="text"
-          autoComplete="one-time-code"
-          placeholder="Enter code"
           value={otpCode}
-          onChange={(e) => setOtpCode(e.target.value)}
+          onChange={setOtpCode}
+          onComplete={() => otpFormRef.current?.requestSubmit()}
           disabled={isLoading}
         />
       </div>
       <Button
         type="submit"
         className="w-full"
-        disabled={isLoading || !otpCode.trim()}
+        disabled={isLoading || otpCode.length < OTP_LENGTH}
       >
         {isLoading ? "Verifying..." : "Verify"}
       </Button>
