@@ -681,6 +681,20 @@ export const squareKeys = {
 };
 
 // =============================================================================
+// MongoDB Integration Keys
+// =============================================================================
+
+export const mongodbKeys = {
+  all: () => ["mongodb"] as const,
+  status: () => ["mongodb", "status"] as const,
+  apiKey: () => ["mongodb", "api-key"] as const,
+  syncLog: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["mongodb", "sync-log", filters] as const)
+      : (["mongodb", "sync-log"] as const),
+};
+
+// =============================================================================
 // PO Receive Keys (for accept-into-inventory workflow)
 // =============================================================================
 
