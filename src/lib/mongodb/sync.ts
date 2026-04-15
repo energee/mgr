@@ -317,7 +317,12 @@ async function syncRecipes(): Promise<SyncResult> {
 
   const docs = await db.collection<MongoRecipe>("recipes").find().toArray();
 
-  // Upsert recipes by name
+  // Delete all existing recipes and re-insert (no UNIQUE(name) constraint on recipes table)
+  await dynamicFrom(admin, "recipe_malts").delete().gte("created_at", "1970-01-01");
+  await dynamicFrom(admin, "recipe_hops").delete().gte("created_at", "1970-01-01");
+  await dynamicFrom(admin, "recipe_yeasts").delete().gte("created_at", "1970-01-01");
+  await dynamicFrom(admin, "recipes").delete().gte("created_at", "1970-01-01");
+
   const recipeRows = docs.map((d) => {
     const row = transformRecipe(d);
     // Resolve style FK
@@ -332,7 +337,7 @@ async function syncRecipes(): Promise<SyncResult> {
     }
     return row;
   });
-  const recipeResult = await upsertRows("recipes", recipeRows, "name");
+  const recipeResult = await upsertRows("recipes", recipeRows);
 
   // Build recipe name → PG UUID lookup for junction tables
   const { data: pgRecipes } = await dynamicFrom(admin, "recipes").select("id, name");
@@ -355,17 +360,6 @@ async function syncRecipes(): Promise<SyncResult> {
   const yeastNameToId = new Map((pgYeasts ?? []).map((y: { id: string; name: string }) => [y.name, y.id]));
   const mongoYeasts = await db.collection<MongoYeast>("yeasts").find().toArray();
   const mongoYeastIdToName = new Map(mongoYeasts.map((y) => [y._id.toString(), y.name]));
-
-  // Delete existing junction rows for synced recipes, then insert fresh
-  const syncedRecipeIds = docs
-    .map((d) => recipeNameToId.get(d.name) as string | undefined)
-    .filter(Boolean) as string[];
-
-  if (syncedRecipeIds.length > 0) {
-    await dynamicFrom(admin, "recipe_malts").delete().in("recipe_id", syncedRecipeIds);
-    await dynamicFrom(admin, "recipe_hops").delete().in("recipe_id", syncedRecipeIds);
-    await dynamicFrom(admin, "recipe_yeasts").delete().in("recipe_id", syncedRecipeIds);
-  }
 
   // Build direct Mongo ObjectId → PG UUID maps for ingredient FKs
   const mongoMaltIdToPgId = new Map<string, string>();
