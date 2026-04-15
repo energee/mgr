@@ -8,6 +8,7 @@
  * - Square POS (catalog/inventory sync + draft sales)
  * - Slack (notifications)
  * - QuickBooks Online (invoices/bills sync)
+ * - MongoDB (live data sync from lolev-manager)
  */
 
 import { useEffect, useState } from "react";
@@ -505,6 +506,7 @@ function MongoDBIntegrationCard() {
     queryKey: mongodbKeys.status(),
     queryFn: async () => {
       const res = await fetch("/api/integrations/mongodb/status");
+      if (!res.ok) return { connected: false };
       return (await res.json()).data;
     },
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,

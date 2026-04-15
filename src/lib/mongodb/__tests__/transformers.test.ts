@@ -163,19 +163,16 @@ describe("Phase 3 transformers", () => {
     expect(result.status).toBe("fermenting");
   });
 
-  it("transforms order with status mapping", () => {
-    const result = transformOrder(
-      {
-        _id: oid("507f1f77bcf86cd799439019"),
-        status: "completed",
-        date: new Date("2024-10-21"),
-        completedDate: new Date("2024-10-21"),
-        notes: "test order",
-      },
-      1
-    );
+  it("transforms order with status mapping and stable order number", () => {
+    const result = transformOrder({
+      _id: oid("507f1f77bcf86cd799439019"),
+      status: "completed",
+      date: new Date("2024-10-21"),
+      completedDate: new Date("2024-10-21"),
+      notes: "test order",
+    });
     expect(result.status).toBe("fulfilled");
-    expect(result.order_number).toBe("ORD-20241021-001");
+    expect(result.order_number).toBe("ORD-20241021-439019");
   });
 
   it("transforms order item with brand resolution", () => {

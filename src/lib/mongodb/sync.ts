@@ -9,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { dynamicFrom } from "@/services/types";
 import { logger } from "@/lib/logger";
 import { type Db } from "mongodb";
-import { getMongoDb, closeMongoClient } from "./client";
+import { getMongoDb } from "./client";
 import { objectIdToUuid } from "./id";
 import {
   transformSupplier,
@@ -355,7 +355,7 @@ async function syncOrders(): Promise<SyncResult> {
   const docs = await db.collection<MongoOrder>("orders").find().sort({ date: 1 }).toArray();
 
   // Sync orders
-  const orderRows = docs.map((d, i) => transformOrder(d, i + 1));
+  const orderRows = docs.map((d) => transformOrder(d));
   const orderResult = await upsertRows("orders", orderRows, "order_number");
 
   // Build order_number → PG UUID lookup for order_items FK resolution
@@ -426,7 +426,7 @@ async function syncBrewLogs(): Promise<SyncResult> {
   const docs = await db.collection<MongoBrewLog>("brew-logs").find().sort({ brewDate: 1 }).toArray();
 
   // Transform brew logs
-  const brewLogRows = docs.map((d, i) => transformBrewLog(d, i + 1));
+  const brewLogRows = docs.map((d) => transformBrewLog(d));
   const brewLogResult = await upsertRows("brew_logs", brewLogRows, "brew_number");
 
   // Build brew_number → PG brew_log UUID lookup for junction table
@@ -578,16 +578,12 @@ export async function syncEntity(entityType: SyncEntityType): Promise<SyncResult
   return fn();
 }
 
-/** Run all phases in order (1 → 2 → 3 → 4). */
+/** Run all phases in order (1 → 2 → 3 → 4). Caller owns connection lifecycle. */
 export async function syncAll(): Promise<SyncResult[]> {
-  try {
-    const results: SyncResult[] = [];
-    for (const phase of [1, 2, 3, 4] as SyncPhase[]) {
-      const phaseResults = await syncPhase(phase);
-      results.push(...phaseResults);
-    }
-    return results;
-  } finally {
-    await closeMongoClient();
+  const results: SyncResult[] = [];
+  for (const phase of [1, 2, 3, 4] as SyncPhase[]) {
+    const phaseResults = await syncPhase(phase);
+    results.push(...phaseResults);
   }
+  return results;
 }

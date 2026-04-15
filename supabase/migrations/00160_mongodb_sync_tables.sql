@@ -81,11 +81,11 @@ CREATE POLICY batch_readings_select ON batch_readings
 
 CREATE POLICY batch_readings_insert ON batch_readings
   FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = recorded_by);
+  WITH CHECK (recorded_by IS NULL OR auth.uid() = recorded_by);
 
 CREATE POLICY batch_readings_update ON batch_readings
   FOR UPDATE TO authenticated
-  USING (auth.uid() = recorded_by);
+  USING (recorded_by IS NULL OR auth.uid() = recorded_by);
 
 -- =============================================================================
 -- 4. SCHEMA REGISTRY

@@ -253,7 +253,7 @@ function SyncTab() {
 
 function SyncLogTab() {
   const { data: status, isLoading } = useQuery({
-    queryKey: mongodbKeys.status(),
+    queryKey: mongodbKeys.syncLog(),
     queryFn: async () => {
       const res = await fetch("/api/integrations/mongodb/status");
       return (await res.json()).data;

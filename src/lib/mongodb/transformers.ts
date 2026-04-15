@@ -227,10 +227,12 @@ const ORDER_STATUS_MAP: Record<string, string> = {
   "in-progress": "confirmed",
 };
 
-export function transformOrder(doc: MongoOrder, orderIndex: number) {
+export function transformOrder(doc: MongoOrder) {
   const orderDate = doc.date ? new Date(doc.date) : new Date(doc.createdAt ?? Date.now());
   const datePart = orderDate.toISOString().slice(0, 10).replace(/-/g, "");
-  const orderNumber = `ORD-${datePart}-${String(orderIndex).padStart(3, "0")}`;
+  // Derive a stable suffix from the ObjectId (last 6 hex chars) instead of array position
+  const idSuffix = doc._id.toString().slice(-6);
+  const orderNumber = `ORD-${datePart}-${idSuffix}`;
 
   return {
     order_number: orderNumber,
@@ -339,7 +341,7 @@ function buildEventsFromStructuredData(doc: MongoBrewLog): Record<string, unknow
   return events;
 }
 
-export function transformBrewLog(doc: MongoBrewLog, index: number) {
+export function transformBrewLog(doc: MongoBrewLog) {
   const brewDate = doc.brewDate instanceof Date
     ? doc.brewDate.toISOString().split("T")[0]
     : doc.brewDate ? new Date(doc.brewDate).toISOString().split("T")[0]
@@ -347,7 +349,9 @@ export function transformBrewLog(doc: MongoBrewLog, index: number) {
     : new Date().toISOString().split("T")[0];
 
   const year = brewDate.slice(0, 4);
-  const brewNumber = `BRW-${year}-${String(index).padStart(3, "0")}`;
+  // Derive a stable suffix from the ObjectId (last 6 hex chars) instead of array position
+  const idSuffix = doc._id.toString().slice(-6);
+  const brewNumber = `BRW-${year}-${idSuffix}`;
 
   // Use existing events array if present, otherwise convert structured fields
   const events = (doc.events && doc.events.length > 0)
