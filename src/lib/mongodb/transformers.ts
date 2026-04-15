@@ -386,24 +386,39 @@ export function transformBrewLog(doc: MongoBrewLog) {
 // Phase 4 — Batch readings
 // =============================================================================
 
-export function transformTest(doc: MongoTest) {
-  const measurements: Array<{ type: string; value?: number; unit?: string }> = [];
-
-  if (doc.temperature != null) {
-    measurements.push({ type: "temperature", value: doc.temperature, unit: "F" });
-  }
-  if (doc.ph != null) {
-    measurements.push({ type: "ph", value: doc.ph });
-  }
-
-  const recordedAt = doc.time instanceof Date
+/**
+ * Transform a Mongo test into batch_logs rows (one per measurement).
+ * The readings page reads from batch_logs with log_type="measurement"
+ * and data={reading_type, value, unit, timestamp, notes}.
+ */
+export function transformTest(doc: MongoTest): Array<{
+  batch_id: string;
+  log_type: string;
+  data: Record<string, unknown>;
+  created_at: string;
+}> {
+  const timestamp = doc.time instanceof Date
     ? doc.time.toISOString()
     : new Date(doc.time).toISOString();
+  const batchId = objectIdToUuid(doc.batch.toString());
+  const rows: Array<{ batch_id: string; log_type: string; data: Record<string, unknown>; created_at: string }> = [];
 
-  return {
-    batch_id: objectIdToUuid(doc.batch.toString()),
-    recorded_at: recordedAt,
-    measurements,
-    notes: doc.name ?? null,
-  };
+  if (doc.temperature != null) {
+    rows.push({
+      batch_id: batchId,
+      log_type: "measurement",
+      data: { reading_type: "temperature", value: doc.temperature, unit: "f", timestamp, notes: doc.name ?? null },
+      created_at: timestamp,
+    });
+  }
+  if (doc.ph != null) {
+    rows.push({
+      batch_id: batchId,
+      log_type: "measurement",
+      data: { reading_type: "ph", value: doc.ph, unit: "ph", timestamp, notes: doc.name ?? null },
+      created_at: timestamp,
+    });
+  }
+
+  return rows;
 }

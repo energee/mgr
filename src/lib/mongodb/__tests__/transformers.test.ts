@@ -195,8 +195,8 @@ describe("Phase 3 transformers", () => {
 });
 
 describe("Phase 4 transformers", () => {
-  it("transforms test to batch reading with measurements JSONB", () => {
-    const result = transformTest({
+  it("transforms test to batch_logs measurement rows", () => {
+    const rows = transformTest({
       _id: oid("507f1f77bcf86cd79943901a"),
       batch: oid("507f1f77bcf86cd799439017"),
       time: new Date("2024-10-23T13:14:30Z"),
@@ -205,10 +205,9 @@ describe("Phase 4 transformers", () => {
       ph: 5.2,
       name: "Oct 23 Mash-in",
     });
-    expect(result.measurements).toEqual([
-      { type: "temperature", value: 140, unit: "F" },
-      { type: "ph", value: 5.2 },
-    ]);
-    expect(result.notes).toBe("Oct 23 Mash-in");
+    expect(rows).toHaveLength(2);
+    expect(rows[0].log_type).toBe("measurement");
+    expect(rows[0].data).toMatchObject({ reading_type: "temperature", value: 140, unit: "f" });
+    expect(rows[1].data).toMatchObject({ reading_type: "ph", value: 5.2, unit: "ph" });
   });
 });

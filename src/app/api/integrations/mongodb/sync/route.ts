@@ -48,7 +48,7 @@ export const POST = withPermission("integrations:manage", async (req) => {
     // Clean synced data before re-syncing (delete in FK-safe order)
     if (clean) {
       const admin = await createAdminClient();
-      await dynamicFrom(admin, "batch_readings").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await dynamicFrom(admin, "batch_logs").delete().eq("log_type", "measurement");
       await dynamicFrom(admin, "brew_log_batches").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       await dynamicFrom(admin, "order_items").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       await dynamicFrom(admin, "orders").delete().neq("id", "00000000-0000-0000-0000-000000000000");

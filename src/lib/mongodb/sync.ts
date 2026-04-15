@@ -488,6 +488,7 @@ async function syncBatchReadings(): Promise<SyncResult> {
   if (!db) throw new Error("MongoDB not connected");
 
   const { batchCodeToId, mongoBatchIdToCode } = await buildBatchLookups(db);
+  const admin = await createAdminClient();
 
   const docs = await db.collection<MongoTest>("tests").find().sort({ time: 1 }).toArray();
   const rows: Record<string, unknown>[] = [];
@@ -495,26 +496,43 @@ async function syncBatchReadings(): Promise<SyncResult> {
 
   for (const doc of docs) {
     try {
-      const row = transformTest(doc);
-      // Resolve batch FK
+      if (!doc.batch) {
+        errors.push({ mongoId: doc._id.toString(), error: "no batch reference" });
+        continue;
+      }
       const batchCode = mongoBatchIdToCode.get(doc.batch.toString());
       const pgBatchId = batchCode ? batchCodeToId.get(batchCode) as string | undefined : null;
       if (!pgBatchId) {
         errors.push({ mongoId: doc._id.toString(), error: "batch not found in PG" });
         continue;
       }
-      row.batch_id = pgBatchId;
-      rows.push(row);
+      // transformTest returns multiple rows (one per measurement type)
+      const logRows = transformTest(doc);
+      for (const row of logRows) {
+        row.batch_id = pgBatchId;
+        rows.push(row);
+      }
     } catch (err) {
       errors.push({ mongoId: doc._id.toString(), error: err instanceof Error ? err.message : String(err) });
     }
   }
 
-  const upsertResult = await upsertRows("batch_readings", rows);
+  // Delete existing synced measurement logs before inserting fresh.
+  // Only delete logs that look like sync-created ones (measurement type with mongo-style timestamps).
+  // We use a broad delete of all measurement logs for the synced batches.
+  const syncedBatchIds = [...new Set(rows.map((r) => r.batch_id as string))];
+  if (syncedBatchIds.length > 0) {
+    await dynamicFrom(admin, "batch_logs")
+      .delete()
+      .in("batch_id", syncedBatchIds)
+      .eq("log_type", "measurement");
+  }
+
+  const insertResult = await upsertRows("batch_logs", rows);
   const combined = {
-    synced: upsertResult.synced,
-    failed: upsertResult.failed + errors.length,
-    errors: [...upsertResult.errors, ...errors.slice(0, 10)],
+    synced: insertResult.synced,
+    failed: insertResult.failed + errors.length,
+    errors: [...insertResult.errors, ...errors.slice(0, 10)],
   };
 
   await completeSyncLog(logId, combined);
