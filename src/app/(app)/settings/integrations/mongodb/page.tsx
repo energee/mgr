@@ -158,7 +158,7 @@ type PhaseConfig = {
 
 const PHASES: PhaseConfig[] = [
   { phase: 1, title: "Catalog", entities: "suppliers, malts, hops, yeasts, styles", description: "Standalone ingredients and styles" },
-  { phase: 2, title: "Brands & Vessels", entities: "beers→brands, vessels", description: "Depends on Phase 1 catalog data" },
+  { phase: 2, title: "Brands, Vessels & Recipes", entities: "beers→brands, vessels, recipes + ingredients", description: "Depends on Phase 1 catalog data" },
   { phase: 3, title: "Production", entities: "batches, transfers, orders", description: "Depends on Phase 2 brands and vessels" },
   { phase: 4, title: "Readings", entities: "tests→batch_logs", description: "Depends on Phase 3 batches" },
 ];

@@ -106,6 +106,42 @@ export type MongoVessel = {
   updatedAt?: Date;
 }
 
+export type MongoRecipeMalt = {
+  weight: number;
+  malt: ObjectId;
+  id?: string;
+}
+
+export type MongoRecipeHop = {
+  weight: number;
+  hop: ObjectId;
+  boilTime?: number;
+  hopTiming?: string;
+  id?: string;
+}
+
+export type MongoRecipe = {
+  _id: ObjectId;
+  name: string;
+  beer?: ObjectId;
+  yeast?: ObjectId;
+  style?: ObjectId;
+  volume?: number;
+  batchSize?: number;
+  preboilBatchSize?: number;
+  boilTime?: number;
+  mashTemp?: number;
+  targetAttenuation?: number;
+  malts?: MongoRecipeMalt[];
+  hops?: MongoRecipeHop[];
+  cogs?: number;
+  conditioningTime?: number;
+  fermentationTime?: number;
+  notes?: Record<string, unknown> | string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 // =============================================================================
 // Phase 3 — Production chain
 // =============================================================================
@@ -214,6 +250,10 @@ export type SyncEntityType =
   | "beer_styles"
   | "brands"
   | "vessels"
+  | "recipes"
+  | "recipe_malts"
+  | "recipe_hops"
+  | "recipe_yeasts"
   | "batches"
   | "vessel_transfers"
   | "orders"

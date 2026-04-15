@@ -34,7 +34,7 @@ export const POST = withPermission("integrations:manage", async (req) => {
     const VALID_PHASES = [1, 2, 3, 4];
     const VALID_ENTITIES = [
       "suppliers", "malts", "hops", "yeasts", "beer_styles",
-      "brands", "vessels", "batches", "vessel_transfers",
+      "brands", "vessels", "recipes", "batches", "vessel_transfers",
       "orders", "brew_logs", "batch_logs",
     ];
 
@@ -54,6 +54,9 @@ export const POST = withPermission("integrations:manage", async (req) => {
       await dynamicFrom(admin, "orders").delete().gte("created_at", "1970-01-01");
       await dynamicFrom(admin, "brew_logs").delete().gte("created_at", "1970-01-01");
       await dynamicFrom(admin, "vessel_transfers").delete().gte("created_at", "1970-01-01");
+      await dynamicFrom(admin, "recipe_malts").delete().gte("created_at", "1970-01-01");
+      await dynamicFrom(admin, "recipe_hops").delete().gte("created_at", "1970-01-01");
+      await dynamicFrom(admin, "recipe_yeasts").delete().gte("created_at", "1970-01-01");
     }
 
     let results;

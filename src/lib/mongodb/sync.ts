@@ -19,6 +19,10 @@ import {
   transformStyle,
   transformBeer,
   transformVessel,
+  transformRecipe,
+  transformRecipeMalts,
+  transformRecipeHops,
+  transformRecipeYeast,
   transformBatch,
   transformTransfer,
   transformBrewLog,
@@ -35,6 +39,7 @@ import type {
   MongoHop,
   MongoMalt,
   MongoOrder,
+  MongoRecipe,
   MongoStyle,
   MongoSupplier,
   MongoTest,
@@ -286,6 +291,120 @@ async function syncVessels(): Promise<SyncResult> {
 
   await completeSyncLog(logId, result);
   return { entityType: "vessels", phase: 2, ...result };
+}
+
+async function syncRecipes(): Promise<SyncResult> {
+  const logId = await createSyncLog("recipes", 2);
+  const db = await requireMongoDb();
+  const admin = await createAdminClient();
+
+  // Build style and brand name lookups (same as syncBrands)
+  const { data: existingStyles } = await dynamicFrom(admin, "beer_styles").select("id, name");
+  const styleNameMap = new Map(
+    (existingStyles ?? []).map((s: { id: string; name: string }) => [s.name, s.id])
+  );
+  const mongoStyles = await db.collection<MongoStyle>("styles").find().toArray();
+  const mongoStyleIdToName = new Map(mongoStyles.map((s) => [s._id.toString(), s.name]));
+
+  const { data: pgBrands } = await dynamicFrom(admin, "brands").select("id, name");
+  const brandNameToId = new Map(
+    (pgBrands ?? []).map((b: { id: string; name: string }) => [b.name, b.id])
+  );
+  const mongoBeers = await db.collection<MongoBeer>("beers").find().toArray();
+  const mongoBeerIdToName = new Map(mongoBeers.map((b) => [b._id.toString(), b.name]));
+
+  const docs = await db.collection<MongoRecipe>("recipes").find().toArray();
+
+  // Upsert recipes by name
+  const recipeRows = docs.map((d) => {
+    const row = transformRecipe(d);
+    // Resolve style FK
+    if (d.style) {
+      const styleName = mongoStyleIdToName.get(d.style.toString());
+      (row as Record<string, unknown>).style_id = styleName ? (styleNameMap.get(styleName) as string ?? null) : null;
+    }
+    // Resolve brand FK
+    if (d.beer) {
+      const beerName = mongoBeerIdToName.get(d.beer.toString());
+      (row as Record<string, unknown>).brand_id = beerName ? (brandNameToId.get(beerName) as string ?? null) : null;
+    }
+    return row;
+  });
+  const recipeResult = await upsertRows("recipes", recipeRows, "name");
+
+  // Build recipe name → PG UUID lookup for junction tables
+  const { data: pgRecipes } = await dynamicFrom(admin, "recipes").select("id, name");
+  const recipeNameToId = new Map(
+    (pgRecipes ?? []).map((r: { id: string; name: string }) => [r.name, r.id])
+  );
+
+  // Resolve malt/hop/yeast FKs via name lookup
+  const { data: pgMalts } = await dynamicFrom(admin, "malts").select("id, name");
+  const maltNameToId = new Map((pgMalts ?? []).map((m: { id: string; name: string }) => [m.name, m.id]));
+  const mongoMalts = await db.collection<MongoMalt>("malts").find().toArray();
+  const mongoMaltIdToName = new Map(mongoMalts.map((m) => [m._id.toString(), m.name]));
+
+  const { data: pgHops } = await dynamicFrom(admin, "hops").select("id, name");
+  const hopNameToId = new Map((pgHops ?? []).map((h: { id: string; name: string }) => [h.name, h.id]));
+  const mongoHops = await db.collection<MongoHop>("hops").find().toArray();
+  const mongoHopIdToName = new Map(mongoHops.map((h) => [h._id.toString(), h.name]));
+
+  const { data: pgYeasts } = await dynamicFrom(admin, "yeasts").select("id, name");
+  const yeastNameToId = new Map((pgYeasts ?? []).map((y: { id: string; name: string }) => [y.name, y.id]));
+  const mongoYeasts = await db.collection<MongoYeast>("yeasts").find().toArray();
+  const mongoYeastIdToName = new Map(mongoYeasts.map((y) => [y._id.toString(), y.name]));
+
+  // Delete existing junction rows for synced recipes, then insert fresh
+  const syncedRecipeIds = docs
+    .map((d) => recipeNameToId.get(d.name) as string | undefined)
+    .filter(Boolean) as string[];
+
+  if (syncedRecipeIds.length > 0) {
+    await dynamicFrom(admin, "recipe_malts").delete().in("recipe_id", syncedRecipeIds);
+    await dynamicFrom(admin, "recipe_hops").delete().in("recipe_id", syncedRecipeIds);
+    await dynamicFrom(admin, "recipe_yeasts").delete().in("recipe_id", syncedRecipeIds);
+  }
+
+  // Build junction rows with PG UUIDs
+  const maltRows: Record<string, unknown>[] = [];
+  const hopRows: Record<string, unknown>[] = [];
+  const yeastRows: Record<string, unknown>[] = [];
+
+  for (const doc of docs) {
+    const pgRecipeId = recipeNameToId.get(doc.name) as string | undefined;
+    if (!pgRecipeId) continue;
+
+    for (const rm of transformRecipeMalts(doc, pgRecipeId)) {
+      const maltName = mongoMaltIdToName.get(doc.malts?.find((m) => objectIdToUuid(m.malt.toString()) === rm.malt_id)?.malt.toString() ?? "");
+      if (maltName) rm.malt_id = (maltNameToId.get(maltName) as string) ?? rm.malt_id;
+      maltRows.push(rm);
+    }
+
+    for (const rh of transformRecipeHops(doc, pgRecipeId)) {
+      const hopName = mongoHopIdToName.get(doc.hops?.find((h) => objectIdToUuid(h.hop.toString()) === rh.hop_id)?.hop.toString() ?? "");
+      if (hopName) rh.hop_id = (hopNameToId.get(hopName) as string) ?? rh.hop_id;
+      hopRows.push(rh);
+    }
+
+    for (const ry of transformRecipeYeast(doc, pgRecipeId)) {
+      const yeastName = mongoYeastIdToName.get(doc.yeast?.toString() ?? "");
+      if (yeastName) ry.yeast_id = (yeastNameToId.get(yeastName) as string) ?? ry.yeast_id;
+      yeastRows.push(ry);
+    }
+  }
+
+  const maltResult = await upsertRows("recipe_malts", maltRows);
+  const hopResult = await upsertRows("recipe_hops", hopRows);
+  const yeastResult = await upsertRows("recipe_yeasts", yeastRows);
+
+  const combined = {
+    synced: recipeResult.synced + maltResult.synced + hopResult.synced + yeastResult.synced,
+    failed: recipeResult.failed + maltResult.failed + hopResult.failed + yeastResult.failed,
+    errors: [...recipeResult.errors, ...maltResult.errors, ...hopResult.errors, ...yeastResult.errors],
+  };
+
+  await completeSyncLog(logId, combined);
+  return { entityType: "recipes", phase: 2, ...combined };
 }
 
 // =============================================================================
@@ -542,7 +661,7 @@ async function syncBatchReadings(): Promise<SyncResult> {
 
 const PHASE_ENTITIES: Record<SyncPhase, Array<() => Promise<SyncResult>>> = {
   1: [syncSuppliers, syncMalts, syncHops, syncYeasts, syncStyles],
-  2: [syncBrands, syncVessels],
+  2: [syncBrands, syncVessels, syncRecipes],
   3: [syncBatches, syncTransfers, syncBrewLogs, syncOrders],
   4: [syncBatchReadings],
 };
@@ -551,7 +670,7 @@ const PHASE_ENTITIES: Record<SyncPhase, Array<() => Promise<SyncResult>>> = {
 const ENTITY_FN_NAMES = new Map<() => Promise<SyncResult>, string>([
   [syncSuppliers, "suppliers"], [syncMalts, "malts"], [syncHops, "hops"],
   [syncYeasts, "yeasts"], [syncStyles, "beer_styles"], [syncBrands, "brands"],
-  [syncVessels, "vessels"], [syncBatches, "batches"], [syncTransfers, "vessel_transfers"],
+  [syncVessels, "vessels"], [syncRecipes, "recipes"], [syncBatches, "batches"], [syncTransfers, "vessel_transfers"],
   [syncBrewLogs, "brew_logs"], [syncOrders, "orders"], [syncBatchReadings, "batch_logs"],
 ]);
 
@@ -589,6 +708,7 @@ export async function syncEntity(entityType: SyncEntityType): Promise<SyncResult
     beer_styles: syncStyles,
     brands: syncBrands,
     vessels: syncVessels,
+    recipes: syncRecipes,
     batches: syncBatches,
     vessel_transfers: syncTransfers,
     orders: syncOrders,

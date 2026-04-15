@@ -14,6 +14,7 @@ import type {
   MongoMalt,
   MongoOrder,
   MongoOrderProduct,
+  MongoRecipe,
   MongoStyle,
   MongoSupplier,
   MongoTest,
@@ -176,6 +177,66 @@ export function transformVessel(doc: MongoVessel) {
     status: VESSEL_STATUS_MAP[doc.state ?? ""] ?? "ready_for_use",
     is_active: true,
   };
+}
+
+export function transformRecipe(doc: MongoRecipe) {
+  const createdAt = doc.createdAt instanceof Date
+    ? doc.createdAt.toISOString()
+    : doc.createdAt ? new Date(doc.createdAt).toISOString() : undefined;
+  const updatedAt = doc.updatedAt instanceof Date
+    ? doc.updatedAt.toISOString()
+    : doc.updatedAt ? new Date(doc.updatedAt).toISOString() : undefined;
+
+  return {
+    name: doc.name,
+    boil_time_min: doc.boilTime ?? 60,
+    mash_temp_f: doc.mashTemp ?? null,
+    batch_size_gallons: doc.batchSize ? Math.round(doc.batchSize * 31 * 100) / 100 : null,
+    mash_efficiency: doc.targetAttenuation ?? 75,
+    status: "complete",
+    is_active: true,
+    created_at: createdAt,
+    updated_at: updatedAt,
+  };
+}
+
+const HOP_TIMING_MAP: Record<string, string> = {
+  boil: "boil",
+  whirlpool: "whirlpool",
+  "dry-hop": "dry_hop",
+  dryHop: "dry_hop",
+  firstWort: "first_wort",
+  mash: "mash",
+};
+
+export function transformRecipeMalts(doc: MongoRecipe, recipeId: string) {
+  return (doc.malts ?? []).map((m, i) => ({
+    recipe_id: recipeId,
+    malt_id: objectIdToUuid(m.malt.toString()),
+    weight_lbs: m.weight,
+    position: i,
+  }));
+}
+
+export function transformRecipeHops(doc: MongoRecipe, recipeId: string) {
+  return (doc.hops ?? []).map((h, i) => ({
+    recipe_id: recipeId,
+    hop_id: objectIdToUuid(h.hop.toString()),
+    weight_oz: Math.round(h.weight * 16 * 100) / 100, // lbs → oz
+    timing: HOP_TIMING_MAP[h.hopTiming ?? "boil"] ?? "boil",
+    boil_time_min: h.boilTime ?? null,
+    position: i,
+  }));
+}
+
+export function transformRecipeYeast(doc: MongoRecipe, recipeId: string) {
+  if (!doc.yeast) return [];
+  return [{
+    recipe_id: recipeId,
+    yeast_id: objectIdToUuid(doc.yeast.toString()),
+    is_primary: true,
+    position: 0,
+  }];
 }
 
 // =============================================================================
