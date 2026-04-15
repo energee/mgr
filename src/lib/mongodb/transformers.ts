@@ -191,7 +191,7 @@ export function transformRecipe(doc: MongoRecipe) {
     name: doc.name,
     boil_time_min: doc.boilTime ?? 60,
     mash_temp_f: doc.mashTemp ?? null,
-    batch_size_gallons: doc.batchSize ? Math.round(doc.batchSize * 31 * 100) / 100 : null, // batchSize is BBL, convert to gallons (1 BBL = 31 gal)
+    batch_size_bbl: doc.batchSize ?? null,
     mash_efficiency: doc.targetAttenuation ?? 75,
     status: "complete",
     is_active: true,
