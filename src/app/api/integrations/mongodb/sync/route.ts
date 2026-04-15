@@ -35,7 +35,7 @@ export const POST = withPermission("integrations:manage", async (req) => {
     const VALID_ENTITIES = [
       "suppliers", "malts", "hops", "yeasts", "beer_styles",
       "brands", "vessels", "batches", "vessel_transfers",
-      "orders", "brew_logs", "batch_readings",
+      "orders", "brew_logs", "batch_logs",
     ];
 
     if (phase && !VALID_PHASES.includes(phase)) {

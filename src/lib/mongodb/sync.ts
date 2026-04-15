@@ -483,7 +483,7 @@ async function syncBrewLogs(): Promise<SyncResult> {
 // =============================================================================
 
 async function syncBatchReadings(): Promise<SyncResult> {
-  const logId = await createSyncLog("batch_readings", 4);
+  const logId = await createSyncLog("batch_logs", 4);
   const db = await getMongoDb();
   if (!db) throw new Error("MongoDB not connected");
 
@@ -536,7 +536,7 @@ async function syncBatchReadings(): Promise<SyncResult> {
   };
 
   await completeSyncLog(logId, combined);
-  return { entityType: "batch_readings", phase: 4, ...combined };
+  return { entityType: "batch_logs", phase: 4, ...combined };
 }
 
 // =============================================================================
@@ -588,7 +588,7 @@ export async function syncEntity(entityType: SyncEntityType): Promise<SyncResult
     vessel_transfers: syncTransfers,
     orders: syncOrders,
     brew_logs: syncBrewLogs,
-    batch_readings: syncBatchReadings,
+    batch_logs: syncBatchReadings,
   };
 
   const fn = entityFnMap[entityType];

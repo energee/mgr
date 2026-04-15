@@ -220,7 +220,7 @@ export type SyncEntityType =
   | "order_items"
   | "brew_logs"
   | "brew_log_batches"
-  | "batch_readings";
+  | "batch_logs";
 
 export type SyncResult = {
   entityType: SyncEntityType;
