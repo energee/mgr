@@ -49,11 +49,11 @@ export const POST = withPermission("integrations:manage", async (req) => {
     if (clean) {
       const admin = await createAdminClient();
       await dynamicFrom(admin, "batch_logs").delete().eq("log_type", "measurement");
-      await dynamicFrom(admin, "brew_log_batches").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await dynamicFrom(admin, "order_items").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await dynamicFrom(admin, "orders").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await dynamicFrom(admin, "brew_logs").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await dynamicFrom(admin, "vessel_transfers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await dynamicFrom(admin, "brew_log_batches").delete().gte("created_at", "1970-01-01");
+      await dynamicFrom(admin, "order_items").delete().gte("created_at", "1970-01-01");
+      await dynamicFrom(admin, "orders").delete().gte("created_at", "1970-01-01");
+      await dynamicFrom(admin, "brew_logs").delete().gte("created_at", "1970-01-01");
+      await dynamicFrom(admin, "vessel_transfers").delete().gte("created_at", "1970-01-01");
     }
 
     let results;

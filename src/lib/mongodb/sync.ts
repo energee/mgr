@@ -46,6 +46,9 @@ import type {
   SyncResult,
 } from "./types";
 
+/** Typical brew volume when knockout volume wasn't recorded in Mongo. */
+const DEFAULT_BREW_VOLUME_BBL = 22;
+
 // =============================================================================
 // Sync log helpers
 // =============================================================================
@@ -113,6 +116,12 @@ async function upsertRows(
   return { synced, failed, errors };
 }
 
+async function requireMongoDb(): Promise<Db> {
+  const db = await getMongoDb();
+  if (!db) throw new Error("MongoDB not connected");
+  return db;
+}
+
 // =============================================================================
 // Shared lookup builders (avoid duplicating across sync functions)
 // =============================================================================
@@ -158,8 +167,7 @@ async function buildVesselLookups(db: Db) {
 
 async function syncSuppliers(): Promise<SyncResult> {
   const logId = await createSyncLog("suppliers", 1);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const docs = await db.collection<MongoSupplier>("suppliers").find().toArray();
   const rows = docs.map(transformSupplier);
@@ -171,8 +179,7 @@ async function syncSuppliers(): Promise<SyncResult> {
 
 async function syncMalts(): Promise<SyncResult> {
   const logId = await createSyncLog("malts", 1);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const supplierNameMap = await buildSupplierNameMap(db);
   const docs = await db.collection<MongoMalt>("malts").find().toArray();
@@ -185,8 +192,7 @@ async function syncMalts(): Promise<SyncResult> {
 
 async function syncHops(): Promise<SyncResult> {
   const logId = await createSyncLog("hops", 1);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const docs = await db.collection<MongoHop>("hops").find().toArray();
   const rows = docs.map(transformHop);
@@ -198,8 +204,7 @@ async function syncHops(): Promise<SyncResult> {
 
 async function syncYeasts(): Promise<SyncResult> {
   const logId = await createSyncLog("yeasts", 1);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const supplierNameMap = await buildSupplierNameMap(db);
   const docs = await db.collection<MongoYeast>("yeasts").find().toArray();
@@ -212,8 +217,7 @@ async function syncYeasts(): Promise<SyncResult> {
 
 async function syncStyles(): Promise<SyncResult> {
   const logId = await createSyncLog("beer_styles", 1);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const docs = await db.collection<MongoStyle>("styles").find().toArray();
   const rows = docs.map(transformStyle);
@@ -230,8 +234,7 @@ async function syncStyles(): Promise<SyncResult> {
 
 async function syncBrands(): Promise<SyncResult> {
   const logId = await createSyncLog("brands", 2);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   // Build hop lookup for brand.hops JSONB
   const hops = await db.collection<MongoHop>("hops").find().toArray();
@@ -275,8 +278,7 @@ async function syncBrands(): Promise<SyncResult> {
 
 async function syncVessels(): Promise<SyncResult> {
   const logId = await createSyncLog("vessels", 2);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const docs = await db.collection<MongoVessel>("vessels").find().toArray();
   const rows = docs.map(transformVessel);
@@ -292,8 +294,7 @@ async function syncVessels(): Promise<SyncResult> {
 
 async function syncBatches(): Promise<SyncResult> {
   const logId = await createSyncLog("batches", 3);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const docs = await db.collection<MongoBatch>("batches").find().toArray();
   const rows = docs.map(transformBatch);
@@ -317,8 +318,7 @@ async function syncBatches(): Promise<SyncResult> {
 
 async function syncTransfers(): Promise<SyncResult> {
   const logId = await createSyncLog("vessel_transfers", 3);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const { vesselNameToId, mongoVesselIdToName } = await buildVesselLookups(db);
   const { batchCodeToId, mongoBatchIdToCode } = await buildBatchLookups(db);
@@ -349,8 +349,7 @@ async function syncTransfers(): Promise<SyncResult> {
 
 async function syncOrders(): Promise<SyncResult> {
   const logId = await createSyncLog("orders", 3);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const docs = await db.collection<MongoOrder>("orders").find().sort({ date: 1 }).toArray();
 
@@ -417,8 +416,7 @@ async function syncOrders(): Promise<SyncResult> {
 
 async function syncBrewLogs(): Promise<SyncResult> {
   const logId = await createSyncLog("brew_logs", 3);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const admin = await createAdminClient();
   const { batchCodeToId, mongoBatchIdToCode } = await buildBatchLookups(db);
@@ -455,7 +453,7 @@ async function syncBrewLogs(): Promise<SyncResult> {
     junctionRows.push({
       brew_log_id: pgBrewLogId,
       batch_id: pgBatchId,
-      volume_bbl: volume || 22, // default to ~22 BBL if not recorded
+      volume_bbl: volume || DEFAULT_BREW_VOLUME_BBL,
     });
   }
 
@@ -484,8 +482,7 @@ async function syncBrewLogs(): Promise<SyncResult> {
 
 async function syncBatchReadings(): Promise<SyncResult> {
   const logId = await createSyncLog("batch_logs", 4);
-  const db = await getMongoDb();
-  if (!db) throw new Error("MongoDB not connected");
+  const db = await requireMongoDb();
 
   const { batchCodeToId, mongoBatchIdToCode } = await buildBatchLookups(db);
   const admin = await createAdminClient();
@@ -550,6 +547,14 @@ const PHASE_ENTITIES: Record<SyncPhase, Array<() => Promise<SyncResult>>> = {
   4: [syncBatchReadings],
 };
 
+/** Reverse lookup: function → entity name (used in error reporting). */
+const ENTITY_FN_NAMES = new Map<() => Promise<SyncResult>, string>([
+  [syncSuppliers, "suppliers"], [syncMalts, "malts"], [syncHops, "hops"],
+  [syncYeasts, "yeasts"], [syncStyles, "beer_styles"], [syncBrands, "brands"],
+  [syncVessels, "vessels"], [syncBatches, "batches"], [syncTransfers, "vessel_transfers"],
+  [syncBrewLogs, "brew_logs"], [syncOrders, "orders"], [syncBatchReadings, "batch_logs"],
+]);
+
 /** Run all entities for a given phase. Continues on error so one entity failure doesn't block others. */
 export async function syncPhase(phase: SyncPhase): Promise<SyncResult[]> {
   const fns = PHASE_ENTITIES[phase];
@@ -563,7 +568,7 @@ export async function syncPhase(phase: SyncPhase): Promise<SyncResult[]> {
       const message = err instanceof Error ? err.message : String(err);
       logger.error("Sync error in phase %d: %s", phase, message);
       results.push({
-        entityType: fn.name.replace("sync", "").toLowerCase() as SyncEntityType,
+        entityType: (ENTITY_FN_NAMES.get(fn) ?? "unknown") as SyncEntityType,
         phase,
         synced: 0,
         failed: 0,

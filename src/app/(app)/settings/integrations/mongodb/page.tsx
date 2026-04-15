@@ -75,7 +75,6 @@ function ConnectionTab() {
     onSuccess: () => {
       toast.success("MongoDB URI saved");
       queryClient.invalidateQueries({ queryKey: mongodbKeys.all() });
-      queryClient.invalidateQueries({ queryKey: mongodbKeys.apiKey() });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -92,7 +91,6 @@ function ConnectionTab() {
     onSuccess: () => {
       toast.success("MongoDB URI removed");
       queryClient.invalidateQueries({ queryKey: mongodbKeys.all() });
-      queryClient.invalidateQueries({ queryKey: mongodbKeys.apiKey() });
     },
   });
 
