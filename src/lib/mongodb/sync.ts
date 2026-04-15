@@ -48,6 +48,15 @@ import type {
   SyncResult,
 } from "./types";
 
+/** Merge multiple partial sync results into one. */
+function mergeResults(...parts: Array<{ synced: number; failed: number; errors: Array<{ mongoId: string; error: string }> }>) {
+  return {
+    synced: parts.reduce((s, p) => s + p.synced, 0),
+    failed: parts.reduce((s, p) => s + p.failed, 0),
+    errors: parts.flatMap((p) => p.errors),
+  };
+}
+
 /** Typical brew volume when knockout volume wasn't recorded in Mongo. */
 const DEFAULT_BREW_VOLUME_BBL = 22;
 
@@ -387,6 +396,7 @@ async function syncRecipes(): Promise<SyncResult> {
     const pgRecipeId = recipeNameToId.get(doc.name) as string | undefined;
     if (!pgRecipeId) continue;
 
+    let maltPos = 0;
     for (const m of doc.malts ?? []) {
       const pgMaltId = mongoMaltIdToPgId.get(m.malt.toString());
       if (!pgMaltId) continue;
@@ -394,10 +404,11 @@ async function syncRecipes(): Promise<SyncResult> {
         recipe_id: pgRecipeId,
         malt_id: pgMaltId,
         weight_lbs: m.weight,
-        position: maltRows.filter((r) => r.recipe_id === pgRecipeId).length,
+        position: maltPos++,
       });
     }
 
+    let hopPos = 0;
     for (const h of doc.hops ?? []) {
       const pgHopId = mongoHopIdToPgId.get(h.hop.toString());
       if (!pgHopId) continue;
@@ -407,7 +418,7 @@ async function syncRecipes(): Promise<SyncResult> {
         weight_oz: Math.round(h.weight * 16 * 100) / 100,
         timing: HOP_TIMING_MAP[h.hopTiming ?? "boil"] ?? "boil",
         boil_time_min: h.boilTime ?? null,
-        position: hopRows.filter((r) => r.recipe_id === pgRecipeId).length,
+        position: hopPos++,
       });
     }
 
@@ -429,12 +440,7 @@ async function syncRecipes(): Promise<SyncResult> {
   const hopResult = await upsertRows("recipe_hops", hopRows);
   const yeastResult = await upsertRows("recipe_yeasts", yeastRows);
 
-  const combined = {
-    synced: recipeResult.synced + maltResult.synced + hopResult.synced + yeastResult.synced,
-    failed: recipeResult.failed + maltResult.failed + hopResult.failed + yeastResult.failed,
-    errors: [...recipeResult.errors, ...maltResult.errors, ...hopResult.errors, ...yeastResult.errors],
-  };
-
+  const combined = mergeResults(recipeResult, maltResult, hopResult, yeastResult);
   await completeSyncLog(logId, combined);
   return { entityType: "recipes", phase: 2, ...combined };
 }
@@ -555,12 +561,7 @@ async function syncOrders(): Promise<SyncResult> {
     itemResult = await upsertRows("order_items", itemRows);
   }
 
-  const combined = {
-    synced: orderResult.synced + itemResult.synced,
-    failed: orderResult.failed + itemResult.failed,
-    errors: [...orderResult.errors, ...itemResult.errors],
-  };
-
+  const combined = mergeResults(orderResult, itemResult);
   await completeSyncLog(logId, combined);
   return { entityType: "orders", phase: 3, ...combined };
 }
@@ -617,12 +618,7 @@ async function syncBrewLogs(): Promise<SyncResult> {
   }
   const junctionResult = await upsertRows("brew_log_batches", junctionRows);
 
-  const combined = {
-    synced: brewLogResult.synced + junctionResult.synced,
-    failed: brewLogResult.failed + junctionResult.failed,
-    errors: [...brewLogResult.errors, ...junctionResult.errors],
-  };
-
+  const combined = mergeResults(brewLogResult, junctionResult);
   await completeSyncLog(logId, combined);
   return { entityType: "brew_logs", phase: 3, ...combined };
 }
