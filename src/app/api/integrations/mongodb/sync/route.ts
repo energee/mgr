@@ -9,6 +9,8 @@ export const maxDuration = 60;
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
+import { createAdminClient } from "@/lib/supabase/server";
+import { dynamicFrom } from "@/services/types";
 import { getMongoDb, closeMongoClient } from "@/lib/mongodb/client";
 import { syncAll, syncPhase, syncEntity } from "@/lib/mongodb/sync";
 import type { SyncEntityType, SyncPhase } from "@/lib/mongodb/types";
@@ -27,7 +29,7 @@ export const POST = withPermission("integrations:manage", async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { phase, entity } = body as { phase?: number; entity?: string };
+    const { phase, entity, clean } = body as { phase?: number; entity?: string; clean?: boolean };
 
     const VALID_PHASES = [1, 2, 3, 4];
     const VALID_ENTITIES = [
@@ -41,6 +43,17 @@ export const POST = withPermission("integrations:manage", async (req) => {
     }
     if (entity && !VALID_ENTITIES.includes(entity)) {
       return errorResponse("INVALID_ENTITY", `Invalid entity: ${entity}`, undefined, 400);
+    }
+
+    // Clean synced data before re-syncing (delete in FK-safe order)
+    if (clean) {
+      const admin = await createAdminClient();
+      await dynamicFrom(admin, "batch_readings").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await dynamicFrom(admin, "brew_log_batches").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await dynamicFrom(admin, "order_items").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await dynamicFrom(admin, "orders").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await dynamicFrom(admin, "brew_logs").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await dynamicFrom(admin, "vessel_transfers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     }
 
     let results;

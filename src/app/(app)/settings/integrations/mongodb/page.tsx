@@ -177,7 +177,7 @@ function SyncTab() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: async (opts: { phase?: number }) => {
+    mutationFn: async (opts: { phase?: number; clean?: boolean }) => {
       const res = await fetch("/api/integrations/mongodb/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -232,17 +232,31 @@ function SyncTab() {
         ))}
       </div>
 
-      <Button
-        className="w-full"
-        disabled={!isConnected || syncMutation.isPending}
-        onClick={() => syncMutation.mutate({})}
-      >
-        {syncMutation.isPending && !syncMutation.variables?.phase ? (
-          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing All Phases...</>
-        ) : (
-          <><RefreshCw className="mr-2 h-4 w-4" /> Sync All</>
-        )}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          className="flex-1"
+          disabled={!isConnected || syncMutation.isPending}
+          onClick={() => syncMutation.mutate({})}
+        >
+          {syncMutation.isPending && !syncMutation.variables?.clean && !syncMutation.variables?.phase ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing All...</>
+          ) : (
+            <><RefreshCw className="mr-2 h-4 w-4" /> Sync All</>
+          )}
+        </Button>
+        <Button
+          className="flex-1"
+          variant="outline"
+          disabled={!isConnected || syncMutation.isPending}
+          onClick={() => syncMutation.mutate({ clean: true })}
+        >
+          {syncMutation.isPending && syncMutation.variables?.clean ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cleaning + Syncing...</>
+          ) : (
+            <><RefreshCw className="mr-2 h-4 w-4" /> Clean + Sync All</>
+          )}
+        </Button>
+      </div>
     </div>
   );
 }
