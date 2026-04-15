@@ -20,9 +20,6 @@ import {
   transformBeer,
   transformVessel,
   transformRecipe,
-  transformRecipeMalts,
-  transformRecipeHops,
-  transformRecipeYeast,
   transformBatch,
   transformTransfer,
   transformBrewLog,
@@ -53,6 +50,11 @@ import type {
 
 /** Typical brew volume when knockout volume wasn't recorded in Mongo. */
 const DEFAULT_BREW_VOLUME_BBL = 22;
+
+const HOP_TIMING_MAP: Record<string, string> = {
+  boil: "boil", whirlpool: "whirlpool", "dry-hop": "dry_hop",
+  dryHop: "dry_hop", firstWort: "first_wort", mash: "mash",
+};
 
 // =============================================================================
 // Sync log helpers
@@ -365,7 +367,24 @@ async function syncRecipes(): Promise<SyncResult> {
     await dynamicFrom(admin, "recipe_yeasts").delete().in("recipe_id", syncedRecipeIds);
   }
 
-  // Build junction rows with PG UUIDs
+  // Build direct Mongo ObjectId → PG UUID maps for ingredient FKs
+  const mongoMaltIdToPgId = new Map<string, string>();
+  for (const [mongoId, name] of mongoMaltIdToName) {
+    const pgId = maltNameToId.get(name) as string | undefined;
+    if (pgId) mongoMaltIdToPgId.set(mongoId, pgId);
+  }
+  const mongoHopIdToPgId = new Map<string, string>();
+  for (const [mongoId, name] of mongoHopIdToName) {
+    const pgId = hopNameToId.get(name) as string | undefined;
+    if (pgId) mongoHopIdToPgId.set(mongoId, pgId);
+  }
+  const mongoYeastIdToPgId = new Map<string, string>();
+  for (const [mongoId, name] of mongoYeastIdToName) {
+    const pgId = yeastNameToId.get(name) as string | undefined;
+    if (pgId) mongoYeastIdToPgId.set(mongoId, pgId);
+  }
+
+  // Build junction rows with resolved PG UUIDs
   const maltRows: Record<string, unknown>[] = [];
   const hopRows: Record<string, unknown>[] = [];
   const yeastRows: Record<string, unknown>[] = [];
@@ -374,25 +393,44 @@ async function syncRecipes(): Promise<SyncResult> {
     const pgRecipeId = recipeNameToId.get(doc.name) as string | undefined;
     if (!pgRecipeId) continue;
 
-    for (const rm of transformRecipeMalts(doc, pgRecipeId)) {
-      const maltName = mongoMaltIdToName.get(doc.malts?.find((m) => objectIdToUuid(m.malt.toString()) === rm.malt_id)?.malt.toString() ?? "");
-      if (maltName) rm.malt_id = (maltNameToId.get(maltName) as string) ?? rm.malt_id;
-      maltRows.push(rm);
+    for (const m of doc.malts ?? []) {
+      const pgMaltId = mongoMaltIdToPgId.get(m.malt.toString());
+      if (!pgMaltId) continue;
+      maltRows.push({
+        recipe_id: pgRecipeId,
+        malt_id: pgMaltId,
+        weight_lbs: m.weight,
+        position: maltRows.filter((r) => r.recipe_id === pgRecipeId).length,
+      });
     }
 
-    for (const rh of transformRecipeHops(doc, pgRecipeId)) {
-      const hopName = mongoHopIdToName.get(doc.hops?.find((h) => objectIdToUuid(h.hop.toString()) === rh.hop_id)?.hop.toString() ?? "");
-      if (hopName) rh.hop_id = (hopNameToId.get(hopName) as string) ?? rh.hop_id;
-      hopRows.push(rh);
+    for (const h of doc.hops ?? []) {
+      const pgHopId = mongoHopIdToPgId.get(h.hop.toString());
+      if (!pgHopId) continue;
+      hopRows.push({
+        recipe_id: pgRecipeId,
+        hop_id: pgHopId,
+        weight_oz: Math.round(h.weight * 16 * 100) / 100,
+        timing: HOP_TIMING_MAP[h.hopTiming ?? "boil"] ?? "boil",
+        boil_time_min: h.boilTime ?? null,
+        position: hopRows.filter((r) => r.recipe_id === pgRecipeId).length,
+      });
     }
 
-    for (const ry of transformRecipeYeast(doc, pgRecipeId)) {
-      const yeastName = mongoYeastIdToName.get(doc.yeast?.toString() ?? "");
-      if (yeastName) ry.yeast_id = (yeastNameToId.get(yeastName) as string) ?? ry.yeast_id;
-      yeastRows.push(ry);
+    if (doc.yeast) {
+      const pgYeastId = mongoYeastIdToPgId.get(doc.yeast.toString());
+      if (pgYeastId) {
+        yeastRows.push({
+          recipe_id: pgRecipeId,
+          yeast_id: pgYeastId,
+          is_primary: true,
+          position: 0,
+        });
+      }
     }
   }
 
+  // Junction tables were already deleted above — plain insert, not upsert
   const maltResult = await upsertRows("recipe_malts", maltRows);
   const hopResult = await upsertRows("recipe_hops", hopRows);
   const yeastResult = await upsertRows("recipe_yeasts", yeastRows);
