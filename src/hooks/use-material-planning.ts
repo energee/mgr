@@ -47,10 +47,10 @@ export type OrderMaterial = {
   id: string;
   order_id: string;
   inventory_item_id: string;
-  quantity_required: number;
-  quantity_on_hand: number | null;
-  unit_of_measure: string | null;
-  notes: string | null;
+  /** Auto-calculated estimated quantity based on BOM x order items. */
+  estimated_qty: number;
+  /** User-overridable actual quantity; null means "use estimated_qty". */
+  actual_qty: number | null;
   inventory_item: {
     id: string;
     name: string;
@@ -144,7 +144,7 @@ export function useOrderMaterials(orderId: string | null) {
     queryFn: async (): Promise<OrderMaterial[]> => {
       const { data, error } = await dynamicFrom(supabase, "order_materials")
         .select(
-          `id, order_id, inventory_item_id, quantity_required, quantity_on_hand, unit_of_measure, notes,
+          `id, order_id, inventory_item_id, estimated_qty, actual_qty,
            inventory_item:inventory_items(id, name, sku, category, unit_of_measure)`
         )
         .eq("order_id", orderId!);
