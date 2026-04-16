@@ -148,6 +148,7 @@ const navigation: NavSection[] = [
     label: "Purchasing",
     icon: AnimatedTruck,
     items: [
+      { label: "Material Planning", href: "/purchasing/material-planning", icon: AnimatedChartColumn },
       { label: "Ingredient Demand", href: "/purchasing/demand", icon: AnimatedTrendingUp },
       { label: "Suppliers", href: "/purchasing/suppliers", icon: AnimatedBuilding2 },
       { label: "Purchase Orders", href: "/purchasing/pos", icon: AnimatedShoppingCart },

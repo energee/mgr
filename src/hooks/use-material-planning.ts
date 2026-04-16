@@ -31,15 +31,27 @@ export type SellingFormatMaterial = {
   } | null;
 };
 
-/** A material shortfall — demand exceeds on-hand inventory. */
+/**
+ * A material shortfall row from calculate_material_shortfalls().
+ * Covers brewing ingredients, packaging materials, and shipping materials.
+ */
 export type MaterialShortfall = {
   inventory_item_id: string;
   inventory_item_name: string;
-  demand_quantity: number;
-  on_hand_quantity: number;
-  shortfall_quantity: number;
-  unit_of_measure: string | null;
+  category: string | null;
   demand_source: string | null;
+  needed_by_date: string | null;
+  quantity_needed: number;
+  on_hand: number;
+  incoming_po: number;
+  shortfall: number;
+  unit: string | null;
+  best_supplier_id: string | null;
+  best_supplier_name: string | null;
+  lead_time_days: number | null;
+  drop_dead_date: string | null;
+  is_past_due: boolean;
+  source_count: number;
 };
 
 /** Material requirement for a specific order. */
