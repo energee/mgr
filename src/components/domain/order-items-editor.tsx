@@ -47,7 +47,7 @@ import {
 import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { orderKeys, finishedGoodKeys } from "@/lib/query-keys";
-import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
+import { useBrands, usePackagingFormats, useKegOwners, formatVolumeLabel } from "@/hooks/use-catalog";
 import { useCalculateOrderMaterials } from "@/hooks/use-material-planning";
 import { log } from "@/lib/client-logger";
 
@@ -569,6 +569,9 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                           <ComboboxItem key={f.id} value={f.id} label={f.name}>
                             <span className="flex items-center gap-2">
                               {f.name}
+                              {formatVolumeLabel(f) != null && (
+                                <span className="text-xs text-muted-foreground">{formatVolumeLabel(f)}</span>
+                              )}
                               {f.container_type === "keg" && (
                                 <Badge variant="outline" className="text-xs">keg</Badge>
                               )}
@@ -751,6 +754,9 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                         <ComboboxItem key={f.id} value={f.id} label={f.name}>
                           <span className="flex items-center gap-2">
                             {f.name}
+                            {formatVolumeLabel(f) != null && (
+                              <span className="text-xs text-muted-foreground">{formatVolumeLabel(f)}</span>
+                            )}
                             {f.container_type === "keg" && (
                               <Badge variant="outline" className="text-xs">keg</Badge>
                             )}

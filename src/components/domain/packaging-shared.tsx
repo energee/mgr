@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/combobox";
 import { Plus, Loader2 } from "lucide-react";
 import { useBatchesForBrand, useKegFormatIds } from "@/hooks/use-packaging";
-import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
+import { useBrands, usePackagingFormats, useKegOwners, formatVolumeLabel } from "@/hooks/use-catalog";
 import { createNameFilter } from "@/lib/combobox-filter";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { parseIntOrNull } from "@/lib/format";
@@ -153,6 +153,11 @@ export function FormatCell({
             <ComboboxItem key={f.id} value={f.id} label={f.name}>
               <span className="flex items-center gap-2">
                 {f.name}
+                {formatVolumeLabel(f) != null && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatVolumeLabel(f)}
+                  </span>
+                )}
                 {f.container_type === "keg" && (
                   <Badge variant="outline" className="text-xs">
                     keg

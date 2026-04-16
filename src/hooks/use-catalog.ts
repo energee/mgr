@@ -65,6 +65,9 @@ export function useKegOwners(): UseQueryResult<IdNamePair[]> {
 /**
  * A packaging format from the packaging_formats view (selling_formats + containers).
  * Used by the pricing matrix and format selectors.
+ *
+ * `volume_oz` is set for package formats (cans, bottles); null for kegs.
+ * `volume_bbl` is set for keg formats; null for packages.
  */
 export type PackagingFormat = {
   id: string;
@@ -72,6 +75,24 @@ export type PackagingFormat = {
   container_type: string;
   container_name: string;
   unit_count: number;
+  volume_oz: number | null;
+  volume_bbl: number | null;
+}
+
+/**
+ * Returns a concise volume label for a packaging format:
+ * - Package: "{volume_oz}oz x {unit_count}" (e.g., "16oz x 24")
+ * - Keg: "{volume_bbl} BBL" (e.g., "1/2 BBL")
+ * - Unknown: null
+ */
+export function formatVolumeLabel(format: Pick<PackagingFormat, "container_type" | "volume_oz" | "volume_bbl" | "unit_count">): string | null {
+  if (format.container_type !== "keg" && format.volume_oz != null) {
+    return `${format.volume_oz}oz x ${format.unit_count}`;
+  }
+  if (format.container_type === "keg" && format.volume_bbl != null) {
+    return `${format.volume_bbl} BBL`;
+  }
+  return null;
 }
 
 /** Fetch packaging formats (view over selling_formats + containers) */
@@ -83,7 +104,7 @@ export function usePackagingFormats(): UseQueryResult<PackagingFormat[]> {
     queryFn: async (): Promise<PackagingFormat[]> => {
       const { data, error } = await supabase
         .from("packaging_formats")
-        .select("id, name, container_type, container_name, unit_count")
+        .select("id, name, container_type, container_name, unit_count, volume_oz, volume_bbl")
         .eq("is_active", true)
         .order("container_type")
         .order("name");

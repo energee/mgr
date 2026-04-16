@@ -37,7 +37,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { entityKeys, batchKeys } from "@/lib/query-keys";
-import { usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
+import { usePackagingFormats, useKegOwners, formatVolumeLabel } from "@/hooks/use-catalog";
 import { useKegFormatIds } from "@/hooks/use-packaging";
 import { createNameFilter } from "@/lib/combobox-filter";
 
@@ -179,7 +179,7 @@ export function PackagingBatchDialog({
                     <span className="flex items-center gap-2">
                       {f.name}
                       <span className="text-xs text-muted-foreground">
-                        {f.container_name}
+                        {formatVolumeLabel(f) ?? f.container_name}
                       </span>
                     </span>
                   </ComboboxItem>
