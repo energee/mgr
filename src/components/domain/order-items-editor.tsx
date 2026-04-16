@@ -48,6 +48,7 @@ import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { orderKeys, finishedGoodKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
+import { useCalculateOrderMaterials } from "@/hooks/use-material-planning";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -208,6 +209,12 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   // Use passed customerId or fetch from order
   const effectiveCustomerId = customerId ?? order?.customer_id;
 
+  // Shipping material auto-calculation — triggered after line item changes
+  const calculateMaterials = useCalculateOrderMaterials(
+    orderId,
+    effectiveCustomerId ?? ""
+  );
+
   // Fetch order items
   const { data: items, isLoading: itemsLoading } = useQuery({
     queryKey: orderKeys.items(orderId),
@@ -330,6 +337,8 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       setNewItem({ ...EMPTY_NEW_ITEM });
       setShowAddRow(false);
       toast.success("Item added");
+      // Recalculate shipping materials now that line items changed
+      if (effectiveCustomerId) calculateMaterials.mutate();
     },
     onError: () => {
       toast.error("Failed to add item");
@@ -360,8 +369,12 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, { field }) => {
       queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
+      // Recalculate when quantity or selling format changes (pallet count may change)
+      if (effectiveCustomerId && (field === "quantity" || field === "selling_format_id")) {
+        calculateMaterials.mutate();
+      }
     },
     onError: () => {
       toast.error("Failed to update item");
@@ -388,6 +401,8 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       return;
     }
     queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
+    // Recalculate materials — new format may have different pallet config
+    if (effectiveCustomerId) calculateMaterials.mutate();
   };
 
   // Delete item mutation
@@ -399,6 +414,8 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
       toast.success("Item removed");
+      // Recalculate materials — fewer line items means fewer pallets
+      if (effectiveCustomerId) calculateMaterials.mutate();
     },
     onError: () => {
       toast.error("Failed to remove item");

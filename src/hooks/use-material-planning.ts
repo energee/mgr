@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { materialPlanningKeys } from "@/lib/query-keys";
@@ -296,5 +296,154 @@ export function useSessionMaterialPreview(sessionId: string | null) {
       return result.sort((a, b) => b.shortfall - a.shortfall);
     },
     enabled: !!sessionId,
+  });
+}
+
+// =============================================================================
+// Auto-Calculation Hook
+// =============================================================================
+
+/**
+ * Mutation hook that auto-calculates and upserts shipping materials for an
+ * order. Called after order line items are created or modified.
+ *
+ * Logic:
+ * 1. Fetch order_items joined with selling_formats pallet data.
+ * 2. Fetch customer_pallet_configs to check for per-format layer overrides.
+ * 3. Compute total pallet count: for each line item with pallet data, use
+ *    customer config (layers × units_per_layer) or selling format pallet_quantity,
+ *    then ceil(quantity / effective).
+ * 4. Build a material role → inventory_item_id map from customer_shipping_materials
+ *    and brewery_shipping_defaults (customer overrides brewery defaults).
+ * 5. Upsert one order_materials row per resolved material, with
+ *    estimated_qty = actual_qty = total pallets.
+ *
+ * @param orderId - The order to calculate materials for.
+ * @param customerId - The customer associated with the order.
+ * @returns A `useMutation` result. On success, invalidates orderMaterials cache.
+ */
+export function useCalculateOrderMaterials(orderId: string, customerId: string) {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      // Step 1: Fetch order items with selling format pallet data
+      const { data: orderItems, error: itemsErr } = await dynamicFrom(supabase, "order_items")
+        .select(
+          `quantity, selling_format_id,
+           selling_format:selling_formats(id, units_per_layer, pallet_quantity)`
+        )
+        .eq("order_id", orderId);
+      if (itemsErr) throw itemsErr;
+
+      type OrderItemWithFormat = {
+        quantity: number;
+        selling_format_id: string | null;
+        selling_format: {
+          id: string;
+          units_per_layer: number | null;
+          pallet_quantity: number | null;
+        } | null;
+      };
+
+      const typedItems = (orderItems ?? []) as unknown as OrderItemWithFormat[];
+
+      // Step 2: Fetch customer pallet config overrides
+      const { data: palletConfigs, error: palletErr } = await dynamicFrom(
+        supabase,
+        "customer_pallet_configs"
+      )
+        .select("selling_format_id, layers")
+        .eq("customer_id", customerId);
+      if (palletErr) throw palletErr;
+
+      type PalletConfig = { selling_format_id: string; layers: number };
+      const palletConfigMap = new Map<string, number>();
+      for (const cfg of (palletConfigs ?? []) as unknown as PalletConfig[]) {
+        palletConfigMap.set(cfg.selling_format_id, cfg.layers);
+      }
+
+      // Step 3: Calculate total pallets
+      let totalPallets = 0;
+      for (const item of typedItems) {
+        const sf = item.selling_format;
+        if (!sf || !item.selling_format_id) continue;
+        if (!sf.units_per_layer && !sf.pallet_quantity) continue;
+
+        let effective: number | null = null;
+        const customerLayers = palletConfigMap.get(item.selling_format_id);
+        if (customerLayers != null && sf.units_per_layer != null) {
+          effective = customerLayers * sf.units_per_layer;
+        } else if (sf.pallet_quantity != null) {
+          effective = sf.pallet_quantity;
+        }
+
+        if (effective && effective > 0) {
+          totalPallets += Math.ceil(item.quantity / effective);
+        }
+      }
+
+      // Step 4: Build role → inventory_item_id map
+      // Fetch brewery defaults first, then overlay customer overrides
+      const { data: breweryDefaults, error: breweryErr } = await dynamicFrom(
+        supabase,
+        "brewery_shipping_defaults"
+      )
+        .select("inventory_item_id, material_role");
+      if (breweryErr) throw breweryErr;
+
+      const { data: customerMaterials, error: customerErr } = await dynamicFrom(
+        supabase,
+        "customer_shipping_materials"
+      )
+        .select("inventory_item_id, material_role")
+        .eq("customer_id", customerId);
+      if (customerErr) throw customerErr;
+
+      type ShippingMaterial = { inventory_item_id: string; material_role: string };
+
+      // Start with brewery defaults; customer overrides by role
+      const roleMap = new Map<string, string>();
+      for (const row of (breweryDefaults ?? []) as unknown as ShippingMaterial[]) {
+        if (row.material_role && row.inventory_item_id) {
+          roleMap.set(row.material_role, row.inventory_item_id);
+        }
+      }
+      for (const row of (customerMaterials ?? []) as unknown as ShippingMaterial[]) {
+        if (row.material_role && row.inventory_item_id) {
+          roleMap.set(row.material_role, row.inventory_item_id);
+        }
+      }
+
+      if (roleMap.size === 0) return; // No materials configured — nothing to upsert
+
+      // Step 5: Upsert order_materials — one row per resolved material
+      type OrderMaterialUpsert = {
+        order_id: string;
+        inventory_item_id: string;
+        estimated_qty: number;
+        actual_qty: number;
+      };
+
+      const upserts: OrderMaterialUpsert[] = [];
+      for (const [, inventoryItemId] of roleMap) {
+        upserts.push({
+          order_id: orderId,
+          inventory_item_id: inventoryItemId,
+          estimated_qty: totalPallets,
+          actual_qty: totalPallets,
+        });
+      }
+
+      const { error: upsertErr } = await dynamicFrom(supabase, "order_materials")
+        .upsert(upserts, { onConflict: "order_id,inventory_item_id" });
+      if (upsertErr) throw upsertErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: materialPlanningKeys.orderMaterials(orderId),
+      });
+    },
   });
 }
