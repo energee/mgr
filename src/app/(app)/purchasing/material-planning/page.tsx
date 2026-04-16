@@ -93,6 +93,7 @@ export default function MaterialPlanningPage() {
   });
 
   const filtered = shortfallsOnly ? rows.filter((r) => r.shortfall > 0 || r.is_past_due) : rows;
+  const pastDueCount = rows.filter((r) => r.is_past_due).length;
 
   return (
     <div className="space-y-6">
@@ -165,9 +166,9 @@ export default function MaterialPlanningPage() {
         {!isLoading && (
           <span className="text-xs text-muted-foreground ml-auto">
             {filtered.length} item{filtered.length !== 1 ? "s" : ""}
-            {rows.filter((r) => r.is_past_due).length > 0 && (
+            {pastDueCount > 0 && (
               <span className="text-destructive font-medium ml-2">
-                {rows.filter((r) => r.is_past_due).length} past due
+                {pastDueCount} past due
               </span>
             )}
           </span>

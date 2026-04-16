@@ -171,6 +171,19 @@ BEGIN
   RETURN QUERY
   WITH
   -- ─────────────────────────────────────────────────────────────────────────
+  -- Shared: catalog items union (used by PO and supplier CTEs)
+  -- ─────────────────────────────────────────────────────────────────────────
+  catalog_items AS (
+    SELECT id, name, 'malt'    AS ct FROM malts
+    UNION ALL SELECT id, name, 'hop'     FROM hops
+    UNION ALL SELECT id, name, 'yeast'   FROM yeasts
+    UNION ALL SELECT id, name, 'adjunct' FROM adjuncts
+    UNION ALL SELECT id, name, 'sugar'   FROM sugars
+    UNION ALL SELECT id, name, 'spice'   FROM spices
+    UNION ALL SELECT id, name, 'fruit'   FROM fruits
+  ),
+
+  -- ─────────────────────────────────────────────────────────────────────────
   -- Demand CTEs
   -- ─────────────────────────────────────────────────────────────────────────
 
@@ -273,15 +286,7 @@ BEGIN
     JOIN purchase_orders po ON po.id = pli.po_id
     LEFT JOIN po_received_summary prs ON prs.po_line_item_id = pli.id
     -- Resolve catalog item name from the appropriate catalog table
-    JOIN (
-      SELECT id, name, 'malt'    AS ct FROM malts
-      UNION ALL SELECT id, name, 'hop'     FROM hops
-      UNION ALL SELECT id, name, 'yeast'   FROM yeasts
-      UNION ALL SELECT id, name, 'adjunct' FROM adjuncts
-      UNION ALL SELECT id, name, 'sugar'   FROM sugars
-      UNION ALL SELECT id, name, 'spice'   FROM spices
-      UNION ALL SELECT id, name, 'fruit'   FROM fruits
-    ) cat ON cat.id = pli.catalog_id AND cat.ct = pli.catalog_type
+    JOIN catalog_items cat ON cat.id = pli.catalog_id AND cat.ct = pli.catalog_type
     JOIN inventory_items ii
       ON ii.name ILIKE cat.name
      AND ii.category = CASE pli.catalog_type
@@ -335,15 +340,7 @@ BEGIN
       sc.price
     FROM supplier_catalog sc
     JOIN suppliers s ON s.id = sc.supplier_id
-    JOIN (
-      SELECT id, name, 'malt'    AS ct FROM malts
-      UNION ALL SELECT id, name, 'hop'     FROM hops
-      UNION ALL SELECT id, name, 'yeast'   FROM yeasts
-      UNION ALL SELECT id, name, 'adjunct' FROM adjuncts
-      UNION ALL SELECT id, name, 'sugar'   FROM sugars
-      UNION ALL SELECT id, name, 'spice'   FROM spices
-      UNION ALL SELECT id, name, 'fruit'   FROM fruits
-    ) cat ON cat.id = sc.catalog_id AND cat.ct = sc.catalog_type
+    JOIN catalog_items cat ON cat.id = sc.catalog_id AND cat.ct = sc.catalog_type
     JOIN inventory_items ii
       ON ii.name ILIKE cat.name
      AND ii.category = CASE sc.catalog_type

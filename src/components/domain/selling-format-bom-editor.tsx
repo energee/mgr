@@ -8,11 +8,12 @@
  * direct Supabase mutations (not on form submit). Deletions are immediate.
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { entityKeys, materialPlanningKeys } from "@/lib/query-keys";
+import { groupByCategory } from "./shipping-material-roles-editor";
 import {
   useSellingFormatBOM,
   type SellingFormatMaterial,
@@ -199,13 +200,8 @@ export function SellingFormatBOMEditor({
   const addedIds = new Set(bomItems.map((b) => b.inventory_item_id));
   const availableItems = inventoryItems.filter((item) => !addedIds.has(item.id));
 
-  // Group by category
-  const grouped: Record<string, InventoryItem[]> = {};
-  for (const item of availableItems) {
-    const cat = item.category ?? "Other";
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(item);
-  }
+  // Group by category (uses shared utility)
+  const grouped = useMemo(() => groupByCategory(availableItems), [availableItems]);
 
   // ---------------------------------------------------------------------------
   // Render

@@ -127,8 +127,10 @@ export function useMaterialShortfalls(options?: {
 }) {
   const supabase = createClient();
   const { horizonWeeks, demandSource } = options ?? {};
+  // Cache key excludes demandSource — all source variants share one RPC response
+  // per horizon. Client-side filtering via `select` avoids redundant fetches.
   return useQuery({
-    queryKey: materialPlanningKeys.shortfalls(options),
+    queryKey: materialPlanningKeys.shortfalls({ horizonWeeks }),
     queryFn: async (): Promise<MaterialShortfall[]> => {
       const { data, error } = await dynamicRpc(
         supabase,
@@ -136,11 +138,13 @@ export function useMaterialShortfalls(options?: {
         { horizon_weeks: horizonWeeks ?? 4 }
       );
       if (error) throw error;
-      const rows = (data ?? []) as MaterialShortfall[];
-      if (demandSource) {
-        return rows.filter((r) => r.demand_source === demandSource);
+      return (data ?? []) as MaterialShortfall[];
+    },
+    select: (data) => {
+      if (demandSource && demandSource !== "all") {
+        return data.filter((r) => r.demand_source === demandSource);
       }
-      return rows;
+      return data;
     },
   });
 }
@@ -239,11 +243,20 @@ export function useSessionMaterialPreview(sessionId: string | null) {
       };
       const aggregated = new Map<string, AggEntry>();
 
+      // Pre-index BOM by selling_format_id for O(1) lookup (avoids O(N×M) filter)
+      const bomByFormat = new Map<string, typeof typedBOM>();
+      for (const bom of typedBOM) {
+        const existing = bomByFormat.get(bom.selling_format_id);
+        if (existing) {
+          existing.push(bom);
+        } else {
+          bomByFormat.set(bom.selling_format_id, [bom]);
+        }
+      }
+
       for (const li of typedLineItems) {
-        if (!li.selling_format_id || !li.planned_quantity) continue;
-        const bomForFormat = typedBOM.filter(
-          (b) => b.selling_format_id === li.selling_format_id
-        );
+        if (!li.selling_format_id || li.planned_quantity == null) continue;
+        const bomForFormat = bomByFormat.get(li.selling_format_id) ?? [];
         for (const bom of bomForFormat) {
           const required = bom.quantity_per_unit * li.planned_quantity;
           const existing = aggregated.get(bom.inventory_item_id);
@@ -328,15 +341,7 @@ export function useCalculateOrderMaterials(orderId: string, customerId: string) 
 
   return useMutation({
     mutationFn: async () => {
-      // Step 1: Fetch order items with selling format pallet data
-      const { data: orderItems, error: itemsErr } = await dynamicFrom(supabase, "order_items")
-        .select(
-          `quantity, selling_format_id,
-           selling_format:selling_formats(id, units_per_layer, pallet_quantity)`
-        )
-        .eq("order_id", orderId);
-      if (itemsErr) throw itemsErr;
-
+      // Steps 1+2 are independent — fetch in parallel
       type OrderItemWithFormat = {
         quantity: number;
         selling_format_id: string | null;
@@ -346,19 +351,25 @@ export function useCalculateOrderMaterials(orderId: string, customerId: string) 
           pallet_quantity: number | null;
         } | null;
       };
-
-      const typedItems = (orderItems ?? []) as unknown as OrderItemWithFormat[];
-
-      // Step 2: Fetch customer pallet config overrides
-      const { data: palletConfigs, error: palletErr } = await dynamicFrom(
-        supabase,
-        "customer_pallet_configs"
-      )
-        .select("selling_format_id, layers")
-        .eq("customer_id", customerId);
-      if (palletErr) throw palletErr;
-
       type PalletConfig = { selling_format_id: string; layers: number };
+
+      const [itemsResult, palletResult] = await Promise.all([
+        dynamicFrom(supabase, "order_items")
+          .select(
+            `quantity, selling_format_id,
+             selling_format:selling_formats(id, units_per_layer, pallet_quantity)`
+          )
+          .eq("order_id", orderId),
+        dynamicFrom(supabase, "customer_pallet_configs")
+          .select("selling_format_id, layers")
+          .eq("customer_id", customerId),
+      ]);
+      if (itemsResult.error) throw itemsResult.error;
+      if (palletResult.error) throw palletResult.error;
+
+      const typedItems = (itemsResult.data ?? []) as unknown as OrderItemWithFormat[];
+      const palletConfigs = palletResult.data;
+
       const palletConfigMap = new Map<string, number>();
       for (const cfg of (palletConfigs ?? []) as unknown as PalletConfig[]) {
         palletConfigMap.set(cfg.selling_format_id, cfg.layers);
@@ -384,22 +395,19 @@ export function useCalculateOrderMaterials(orderId: string, customerId: string) 
         }
       }
 
-      // Step 4: Build role → inventory_item_id map
-      // Fetch brewery defaults first, then overlay customer overrides
-      const { data: breweryDefaults, error: breweryErr } = await dynamicFrom(
-        supabase,
-        "brewery_shipping_defaults"
-      )
-        .select("inventory_item_id, material_role");
-      if (breweryErr) throw breweryErr;
+      // Step 4: Build role → inventory_item_id map (parallel fetch)
+      const [breweryResult, customerResult] = await Promise.all([
+        dynamicFrom(supabase, "brewery_shipping_defaults")
+          .select("inventory_item_id, material_role"),
+        dynamicFrom(supabase, "customer_shipping_materials")
+          .select("inventory_item_id, material_role")
+          .eq("customer_id", customerId),
+      ]);
+      if (breweryResult.error) throw breweryResult.error;
+      if (customerResult.error) throw customerResult.error;
 
-      const { data: customerMaterials, error: customerErr } = await dynamicFrom(
-        supabase,
-        "customer_shipping_materials"
-      )
-        .select("inventory_item_id, material_role")
-        .eq("customer_id", customerId);
-      if (customerErr) throw customerErr;
+      const breweryDefaults = breweryResult.data;
+      const customerMaterials = customerResult.data;
 
       type ShippingMaterial = { inventory_item_id: string; material_role: string };
 
