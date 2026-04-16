@@ -27,7 +27,7 @@ The brewery currently has no way to:
 | Past due handling | Visual flagging only (red highlight) | Alerting/notification system with Slack deferred to separate feature |
 | Pallet planning | Simple estimate with manual override | Full pallet capacity visualization and hybrid stacking deferred to Phase 2 |
 | Customer material preferences | Junction table (`customer_shipping_materials`) | Flexible, supports any number of material types, same pattern as selling format BOM |
-| Pallet quantity overrides | Per customer per selling format | Different customers have different stacking configurations |
+| Pallet quantity overrides | Per customer per selling format via layer count | Different customers have different stacking configurations; `units_per_layer` on selling format x customer `layers` = effective pallet quantity |
 
 ## Deferred
 
@@ -102,19 +102,21 @@ Constraints: `UNIQUE(customer_id, material_role)` — one material per role per 
 
 #### `customer_pallet_configs`
 
-Customer-specific override for how many units of a selling format fit on a pallet.
+Customer-specific override for pallet layer count per selling format. Combined with `selling_formats.units_per_layer`, this determines how many units fit per pallet for this customer.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
 | customer_id | UUID FK | References `customers.id` (NOT NULL) |
 | selling_format_id | UUID FK | References `selling_formats.id` (NOT NULL) |
-| pallet_quantity | INTEGER | Units per pallet for this customer (NOT NULL) |
-| notes | TEXT | E.g., "2 rows of cases, 1 row sixtels" |
+| layers | INTEGER | Number of layers of this format for this customer (NOT NULL) |
+| notes | TEXT | E.g., "2 rows cases + 1 row sixtels on shared pallet" |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
 Constraints: `UNIQUE(customer_id, selling_format_id)`
+
+Effective pallet quantity = `layers x selling_formats.units_per_layer`
 
 #### `brewery_shipping_defaults`
 
@@ -133,10 +135,12 @@ Brewery-wide default shipping materials applied when no customer preference exis
 
 #### `selling_formats`
 
-Add column:
+Add columns:
 | Column | Type | Description |
 |--------|------|-------------|
-| pallet_quantity | INTEGER | Units of this selling format that fit on one pallet (nullable) |
+| units_per_layer | INTEGER | Units of this selling format that fit in one pallet layer (nullable) |
+| default_layers | INTEGER | Default number of layers per pallet (nullable) |
+| pallet_quantity | INTEGER | Computed default: `units_per_layer x default_layers`. Stored for convenience, updated when either field changes (nullable) |
 
 #### `inventory_items`
 
@@ -164,7 +168,7 @@ Replaces `calculate_ingredient_shortfalls`. Returns unified shortfall data acros
 
 2. **Packaging** — packaging sessions with status `planned` within the horizon. For each session line item: `planned_quantity x selling_format_materials.quantity_per_unit` per material.
 
-3. **Shipping** — orders with status `confirmed` or `scheduled` within the horizon. For each order: pallet count calculated from line item quantities and `pallet_quantity` (customer override via `customer_pallet_configs`, falling back to `selling_formats.pallet_quantity`). Shipping materials resolved from `customer_shipping_materials`, falling back to `brewery_shipping_defaults`.
+3. **Shipping** — orders with status `confirmed` or `scheduled` within the horizon. For each order: pallet count calculated from line item quantities and effective pallet quantity. Effective pallet quantity = `customer_pallet_configs.layers x selling_formats.units_per_layer` if customer config exists, otherwise `selling_formats.pallet_quantity`. Shipping materials resolved from `customer_shipping_materials`, falling back to `brewery_shipping_defaults`, matched by `material_role`.
 
 **Supply calculation:**
 ```
@@ -211,7 +215,7 @@ Best supplier = supplier from `supplier_catalog` with shortest lead time that ca
 Triggered application-side (not a database trigger) when an order is created or its line items are modified. This keeps the logic in TypeScript where it can access the resolution cascade cleanly and avoids complex trigger chains.
 
 Steps:
-1. Calculate pallet count per selling format: `ceil(line_item_quantity / pallet_quantity)` using customer override (`customer_pallet_configs`) or selling format default
+1. Calculate pallet count per selling format: `ceil(line_item_quantity / effective_pallet_quantity)` where effective = `customer_pallet_configs.layers x units_per_layer` if customer config exists, otherwise `selling_formats.pallet_quantity`
 2. Sum total pallets across all line items
 3. Resolve shipping materials per role: customer preference (`customer_shipping_materials`) -> brewery default (`brewery_shipping_defaults`), matched by `material_role`
 4. Upsert `order_materials` with `estimated_qty` = total pallets x 1 per material
