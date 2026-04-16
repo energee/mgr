@@ -187,7 +187,7 @@ export function useSessionMaterialPreview(sessionId: string | null) {
     queryKey: materialPlanningKeys.sessionMaterials(sessionId ?? ""),
     queryFn: async (): Promise<SessionMaterialPreview[]> => {
       // Step 1: Get line items for session
-      const { data: lineItems, error: lineErr } = await dynamicFrom(supabase, "packaging_session_line_items")
+      const { data: lineItems, error: lineErr } = await dynamicFrom(supabase, "session_line_items")
         .select("selling_format_id, planned_quantity")
         .eq("session_id", sessionId!);
       if (lineErr) throw lineErr;
