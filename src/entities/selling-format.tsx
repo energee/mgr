@@ -21,22 +21,19 @@ function BOMRelation({ parentId }: { parentId: string }) {
 // Zod Schema
 // =============================================================================
 
+/** Coerce empty/null/undefined to null, otherwise to Number — for optional integer fields. */
+const optionalInt = z.preprocess(
+  (v) => (v === "" || v == null ? null : Number(v)),
+  z.number().int().positive("Must be positive").nullable().optional()
+);
+
 export const sellingFormatSchema = z.object({
   name: z.string().min(1, "Name is required"),
   container_id: z.string().uuid("Container is required"),
   unit_count: z.coerce.number().int().positive("Unit count must be positive").default(1),
-  units_per_layer: z.preprocess(
-    (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
-    z.number().int().positive("Must be positive").nullable().optional()
-  ),
-  default_layers: z.preprocess(
-    (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
-    z.number().int().positive("Must be positive").nullable().optional()
-  ),
-  pallet_quantity: z.preprocess(
-    (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
-    z.number().int().positive("Must be positive").nullable().optional()
-  ),
+  units_per_layer: optionalInt,
+  default_layers: optionalInt,
+  pallet_quantity: optionalInt,
   is_active: z.boolean().default(true),
   position: z.coerce.number().int().min(0).default(0),
 });
