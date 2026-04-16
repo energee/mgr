@@ -53,6 +53,7 @@ const settingsNav = [
       { label: "Package Formats", href: "/settings/selling-formats" },
       { label: "Kegs", href: "/settings/containers" },
       { label: "Pricing", href: "/settings/pricing" },
+      { label: "Shipping Defaults", href: "/settings/shipping-defaults" },
     ],
   },
   {
