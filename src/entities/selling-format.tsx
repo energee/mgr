@@ -8,8 +8,14 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { SellingFormatBOMEditor } from "@/components/domain/selling-format-bom-editor";
 
 type SellingFormat = Database["public"]["Tables"]["selling_formats"]["Row"];
+
+// Wrapper to adapt SellingFormatBOMEditor to the relation component interface
+function BOMRelation({ parentId }: { parentId: string }) {
+  return <SellingFormatBOMEditor sellingFormatId={parentId} />;
+}
 
 // =============================================================================
 // Zod Schema
@@ -222,6 +228,7 @@ export const sellingFormatEntity: EntityConfig<SellingFormat> = {
       foreignKey: "selling_format_id",
       showInDetail: true,
       detailTab: "Bill of Materials",
+      component: BOMRelation,
     },
   ],
 
