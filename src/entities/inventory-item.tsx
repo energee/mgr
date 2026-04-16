@@ -24,7 +24,6 @@ export const inventoryItemSchema = z.object({
   unit: z.string().min(1, "Unit is required"),
   reorder_point: z.coerce.number().nullable().optional(),
   reorder_qty: z.coerce.number().nullable().optional(),
-  supplier: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
 });
@@ -100,11 +99,6 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       sortable: true,
     },
     {
-      accessorKey: "supplier",
-      header: "Supplier",
-      sortable: true,
-    },
-    {
       accessorKey: "is_active",
       header: "Active",
       sortable: true,
@@ -127,7 +121,7 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   ],
 
   defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name", "sku", "supplier"],
+  searchableFields: ["name", "sku"],
 
   // ---------------------------------------------------------------------------
   // Detail View
@@ -212,14 +206,7 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
           type: "number",
           placeholder: "e.g., 500",
           description: "Standard quantity to reorder",
-          colSpan: 4,
-        },
-        {
-          name: "supplier",
-          label: "Preferred Supplier",
-          type: "text",
-          placeholder: "e.g., Midwest Malting",
-          colSpan: 4,
+          colSpan: 6,
         },
       ],
     },
