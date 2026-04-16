@@ -23,7 +23,7 @@ export type LineItemRow = {
   brand_id: string;
   brand_name: string;
   batch_id: string | null;
-  batch_number: string | null;
+  batch_code: string | null;
   selling_format_id: string | null;
   selling_format_name: string | null;
   keg_owner_id: string | null;
@@ -74,7 +74,7 @@ export function useSessionLineItems(sessionId: string) {
       const { data, error } = await supabase
         .from("session_line_items")
         .select(
-          "*, brands(name), selling_formats(name), keg_owners(name), batches(batch_number)"
+          "*, brands(name), selling_formats(name), keg_owners(name), batches(batch_code)"
         )
         .eq("session_id", sessionId)
         .order("created_at", { ascending: true });
@@ -91,8 +91,8 @@ export function useSessionLineItems(sessionId: string) {
           batch_id: (item as Record<string, unknown>).batch_id as
             | string
             | null,
-          batch_number:
-            (batchObj as { batch_number: string } | null)?.batch_number || null,
+          batch_code:
+            (batchObj as { batch_code: string } | null)?.batch_code || null,
           selling_format_id: item.selling_format_id,
           selling_format_name:
             (item.selling_formats as { name: string } | null)?.name || null,

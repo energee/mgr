@@ -66,7 +66,7 @@ export function BatchCell({
 
   if (readOnly) {
     const batch = batches?.find((b) => b.id === currentBatchId);
-    return <span>{batch?.batch_number ?? "—"}</span>;
+    return <span>{batch?.batch_code ?? "—"}</span>;
   }
 
   return (
@@ -83,7 +83,7 @@ export function BatchCell({
         {batches?.map((batch) => (
           <SelectItem key={batch.id} value={batch.id}>
             <span className="flex items-center gap-2">
-              {batch.batch_number}
+              {batch.batch_code}
               <StatusBadge
                 status={batch.status}
                 config={batchEntity.stateMachine?.stateDisplay}

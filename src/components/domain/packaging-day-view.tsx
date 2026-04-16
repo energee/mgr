@@ -339,7 +339,7 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
           items={(items ?? []).map((item) => ({
             id: item.id,
             brand_name: item.brand_name,
-            batch_number: item.batch_number,
+            batch_code: item.batch_code,
             format_name: item.selling_format_name,
             planned_quantity: item.planned_quantity,
             actual_quantity: item.actual_quantity,
