@@ -25,9 +25,18 @@ export const sellingFormatSchema = z.object({
   name: z.string().min(1, "Name is required"),
   container_id: z.string().uuid("Container is required"),
   unit_count: z.coerce.number().int().positive("Unit count must be positive").default(1),
-  units_per_layer: z.coerce.number().int().positive("Must be positive").nullable().optional(),
-  default_layers: z.coerce.number().int().positive("Must be positive").nullable().optional(),
-  pallet_quantity: z.coerce.number().int().positive("Must be positive").nullable().optional(),
+  units_per_layer: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+    z.number().int().positive("Must be positive").nullable().optional()
+  ),
+  default_layers: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+    z.number().int().positive("Must be positive").nullable().optional()
+  ),
+  pallet_quantity: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+    z.number().int().positive("Must be positive").nullable().optional()
+  ),
   is_active: z.boolean().default(true),
   position: z.coerce.number().int().min(0).default(0),
 });
