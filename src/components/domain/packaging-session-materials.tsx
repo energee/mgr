@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSessionMaterialPreview } from "@/hooks/use-material-planning";
+import { EmptyStateHint } from "@/components/universal/empty-state-hint";
 
 // =============================================================================
 // Types
@@ -55,10 +56,11 @@ export function PackagingSessionMaterials({ sessionId }: PackagingSessionMateria
 
   if (!materials || materials.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-4">
-        No material requirements. Add line items with selling formats that have a bill of
-        materials configured.
-      </p>
+      <EmptyStateHint
+        message="No material requirements. Add line items with selling formats that have a bill of materials (BOM) configured."
+        href="/settings/selling-formats"
+        linkLabel="Set up BOMs in Settings > Selling Formats"
+      />
     );
   }
 

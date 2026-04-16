@@ -18,6 +18,7 @@ import {
   useOrderMaterials,
   type OrderMaterial,
 } from "@/hooks/use-material-planning";
+import { EmptyStateHint } from "@/components/universal/empty-state-hint";
 import {
   Table,
   TableBody,
@@ -94,12 +95,11 @@ export function OrderShippingMaterialsEditor({
 
   if (materials.length === 0) {
     return (
-      <div className="border rounded-md p-8 text-center text-muted-foreground">
-        <p>No shipping materials calculated for this order.</p>
-        <p className="text-sm mt-1">
-          Materials are auto-calculated from the order&apos;s line items and selling format BOMs.
-        </p>
-      </div>
+      <EmptyStateHint
+        message="No shipping materials calculated. Materials are auto-calculated from order line items when selling formats have BOMs and pallet quantities configured."
+        href="/settings/selling-formats"
+        linkLabel="Configure in Settings > Selling Formats"
+      />
     );
   }
 
