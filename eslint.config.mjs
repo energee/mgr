@@ -83,7 +83,7 @@ const eslintConfig = defineConfig([
   },
   // Scripts and Supabase edge functions use console directly (no logger available)
   {
-    files: ["scripts/**", "supabase/**"],
+    files: ["scripts/**", "supabase/**", ".github/scripts/**"],
     rules: {
       "no-console": "off",
     },
