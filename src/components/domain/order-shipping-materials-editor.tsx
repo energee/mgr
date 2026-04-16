@@ -150,7 +150,7 @@ function MaterialRow({ row, disabled, onActualBlur }: MaterialRowProps) {
   const [actualValue, setActualValue] = useState(String(effectiveActual));
 
   const item = row.inventory_item;
-  const uom = item?.unit_of_measure ?? "—";
+  const uom = item?.unit ?? "—";
 
   return (
     <TableRow>

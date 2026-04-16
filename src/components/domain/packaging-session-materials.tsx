@@ -82,9 +82,9 @@ export function PackagingSessionMaterials({ sessionId }: PackagingSessionMateria
             <TableRow key={m.inventory_item_id}>
               <TableCell>
                 <span className="font-medium">{m.inventory_item_name}</span>
-                {m.unit_of_measure && (
+                {m.unit && (
                   <span className="ml-1 text-xs text-muted-foreground">
-                    ({m.unit_of_measure})
+                    ({m.unit})
                   </span>
                 )}
               </TableCell>

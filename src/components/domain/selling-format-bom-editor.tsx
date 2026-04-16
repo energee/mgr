@@ -52,7 +52,7 @@ type InventoryItem = {
   id: string;
   name: string;
   category: string | null;
-  unit_of_measure: string | null;
+  unit: string | null;
 };
 
 type SellingFormatBOMEditorProps = {
@@ -88,7 +88,7 @@ export function SellingFormatBOMEditor({
     queryKey: entityKeys.list("inventory_items"),
     queryFn: async (): Promise<InventoryItem[]> => {
       const { data, error } = await dynamicFrom(supabase, "inventory_items")
-        .select("id, name, category, unit_of_measure")
+        .select("id, name, category, unit")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -113,7 +113,6 @@ export function SellingFormatBOMEditor({
           selling_format_id: sellingFormatId,
           inventory_item_id: item.id,
           quantity_per_unit: 1,
-          unit_of_measure: item.unit_of_measure ?? null,
           notes: null,
         } as never);
       if (error) throw error;
@@ -245,9 +244,9 @@ export function SellingFormatBOMEditor({
                       >
                         <div className="flex flex-col">
                           <span>{item.name}</span>
-                          {item.unit_of_measure && (
+                          {item.unit && (
                             <span className="text-xs text-muted-foreground">
-                              {item.unit_of_measure}
+                              {item.unit}
                             </span>
                           )}
                         </div>
@@ -316,7 +315,7 @@ function BOMRow({ row, disabled, onQtyBlur, onNotesBlur, onDelete }: BOMRowProps
   const [notes, setNotes] = useState(row.notes ?? "");
 
   const item = row.inventory_item;
-  const uom = item?.unit_of_measure ?? row.unit_of_measure ?? "—";
+  const uom = item?.unit ?? "—";
 
   return (
     <TableRow>

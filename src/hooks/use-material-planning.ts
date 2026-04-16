@@ -20,14 +20,13 @@ export type SellingFormatMaterial = {
   selling_format_id: string;
   inventory_item_id: string;
   quantity_per_unit: number;
-  unit_of_measure: string | null;
   notes: string | null;
   inventory_item: {
     id: string;
     name: string;
     sku: string | null;
     category: string | null;
-    unit_of_measure: string | null;
+    unit: string | null;
   } | null;
 };
 
@@ -68,7 +67,7 @@ export type OrderMaterial = {
     name: string;
     sku: string | null;
     category: string | null;
-    unit_of_measure: string | null;
+    unit: string | null;
   } | null;
 };
 
@@ -81,7 +80,7 @@ export type SessionMaterialPreview = {
   inventory_item_name: string;
   sku: string | null;
   category: string | null;
-  unit_of_measure: string | null;
+  unit: string | null;
   total_required: number;
   on_hand_quantity: number;
   shortfall: number;
@@ -102,8 +101,8 @@ export function useSellingFormatBOM(sellingFormatId: string | null) {
     queryFn: async (): Promise<SellingFormatMaterial[]> => {
       const { data, error } = await dynamicFrom(supabase, "selling_format_materials")
         .select(
-          `id, selling_format_id, inventory_item_id, quantity_per_unit, unit_of_measure, notes,
-           inventory_item:inventory_items(id, name, sku, category, unit_of_measure)`
+          `id, selling_format_id, inventory_item_id, quantity_per_unit, notes,
+           inventory_item:inventory_items(id, name, sku, category, unit)`
         )
         .eq("selling_format_id", sellingFormatId!);
       if (error) throw error;
@@ -161,7 +160,7 @@ export function useOrderMaterials(orderId: string | null) {
       const { data, error } = await dynamicFrom(supabase, "order_materials")
         .select(
           `id, order_id, inventory_item_id, estimated_qty, actual_qty,
-           inventory_item:inventory_items(id, name, sku, category, unit_of_measure)`
+           inventory_item:inventory_items(id, name, sku, category, unit)`
         )
         .eq("order_id", orderId!);
       if (error) throw error;
@@ -212,8 +211,8 @@ export function useSessionMaterialPreview(sessionId: string | null) {
       // Step 2: Fetch BOM for all relevant formats
       const { data: bomRows, error: bomErr } = await dynamicFrom(supabase, "selling_format_materials")
         .select(
-          `selling_format_id, inventory_item_id, quantity_per_unit, unit_of_measure,
-           inventory_item:inventory_items(id, name, sku, category, unit_of_measure)`
+          `selling_format_id, inventory_item_id, quantity_per_unit,
+           inventory_item:inventory_items(id, name, sku, category, unit)`
         )
         .in("selling_format_id", formatIds);
       if (bomErr) throw bomErr;
@@ -222,13 +221,12 @@ export function useSessionMaterialPreview(sessionId: string | null) {
         selling_format_id: string;
         inventory_item_id: string;
         quantity_per_unit: number;
-        unit_of_measure: string | null;
         inventory_item: {
           id: string;
           name: string;
           sku: string | null;
           category: string | null;
-          unit_of_measure: string | null;
+          unit: string | null;
         } | null;
       }>;
 
@@ -238,7 +236,7 @@ export function useSessionMaterialPreview(sessionId: string | null) {
         inventory_item_name: string;
         sku: string | null;
         category: string | null;
-        unit_of_measure: string | null;
+        unit: string | null;
         total_required: number;
       };
       const aggregated = new Map<string, AggEntry>();
@@ -268,8 +266,7 @@ export function useSessionMaterialPreview(sessionId: string | null) {
               inventory_item_name: bom.inventory_item?.name ?? bom.inventory_item_id,
               sku: bom.inventory_item?.sku ?? null,
               category: bom.inventory_item?.category ?? null,
-              unit_of_measure:
-                bom.inventory_item?.unit_of_measure ?? bom.unit_of_measure ?? null,
+              unit: bom.inventory_item?.unit ?? null,
               total_required: required,
             });
           }
@@ -281,7 +278,7 @@ export function useSessionMaterialPreview(sessionId: string | null) {
       // Step 4: Fetch on-hand quantities
       const itemIds = [...aggregated.keys()];
       const { data: onHand, error: onHandErr } = await dynamicFrom(supabase, "inventory_lots_with_quantities")
-        .select("inventory_item_id, quantity_on_hand")
+        .select("inventory_item_id, remaining_quantity")
         .in("inventory_item_id", itemIds);
       if (onHandErr) throw onHandErr;
 
@@ -289,10 +286,10 @@ export function useSessionMaterialPreview(sessionId: string | null) {
       const onHandMap = new Map<string, number>();
       for (const row of (onHand ?? []) as unknown as Array<{
         inventory_item_id: string;
-        quantity_on_hand: number;
+        remaining_quantity: number;
       }>) {
         const prev = onHandMap.get(row.inventory_item_id) ?? 0;
-        onHandMap.set(row.inventory_item_id, prev + (row.quantity_on_hand ?? 0));
+        onHandMap.set(row.inventory_item_id, prev + (row.remaining_quantity ?? 0));
       }
 
       // Step 5: Build result sorted by shortfall descending

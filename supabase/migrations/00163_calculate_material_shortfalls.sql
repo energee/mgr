@@ -208,7 +208,7 @@ BEGIN
       ON ii.name ILIKE d.catalog_name
      AND ii.category = CASE d.catalog_type
            WHEN 'malt'    THEN 'grain'
-           WHEN 'hop'     THEN 'hops'
+           WHEN 'hop'     THEN 'hop'
            WHEN 'yeast'   THEN 'yeast'
            WHEN 'adjunct' THEN 'adjunct'
            ELSE d.catalog_type
@@ -291,7 +291,7 @@ BEGIN
       ON ii.name ILIKE cat.name
      AND ii.category = CASE pli.catalog_type
            WHEN 'malt'    THEN 'grain'
-           WHEN 'hop'     THEN 'hops'
+           WHEN 'hop'     THEN 'hop'
            WHEN 'yeast'   THEN 'yeast'
            WHEN 'adjunct' THEN 'adjunct'
            ELSE pli.catalog_type
@@ -345,7 +345,7 @@ BEGIN
       ON ii.name ILIKE cat.name
      AND ii.category = CASE sc.catalog_type
            WHEN 'malt'    THEN 'grain'
-           WHEN 'hop'     THEN 'hops'
+           WHEN 'hop'     THEN 'hop'
            WHEN 'yeast'   THEN 'yeast'
            WHEN 'adjunct' THEN 'adjunct'
            ELSE sc.catalog_type

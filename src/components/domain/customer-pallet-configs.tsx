@@ -138,7 +138,7 @@ export function CustomerPalletConfigs({
         .insert({
           customer_id: customerId,
           selling_format_id: format.id,
-          layers: null,
+          layers: 1,
           notes: null,
         } as never);
       if (error) throw error;

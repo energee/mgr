@@ -47,7 +47,7 @@ type InventoryItem = {
   id: string;
   name: string;
   category: string | null;
-  unit_of_measure: string | null;
+  unit: string | null;
 };
 
 type ShippingMaterialRow = {
@@ -59,7 +59,7 @@ type ShippingMaterialRow = {
     id: string;
     name: string;
     category: string | null;
-    unit_of_measure: string | null;
+    unit: string | null;
   } | null;
 };
 
@@ -112,7 +112,7 @@ export function ShippingMaterialRolesEditor({
     queryFn: async (): Promise<ShippingMaterialRow[]> => {
       let query = dynamicFrom(supabase, table).select(
         `id, inventory_item_id, material_role, notes,
-         inventory_item:inventory_items(id, name, category, unit_of_measure)`
+         inventory_item:inventory_items(id, name, category, unit)`
       );
       if (customerId) {
         query = query.eq("customer_id", customerId);
@@ -128,7 +128,7 @@ export function ShippingMaterialRolesEditor({
     queryKey: entityKeys.list("inventory_items"),
     queryFn: async (): Promise<InventoryItem[]> => {
       const { data, error } = await dynamicFrom(supabase, "inventory_items")
-        .select("id, name, category, unit_of_measure")
+        .select("id, name, category, unit")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
