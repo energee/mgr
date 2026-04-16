@@ -6,9 +6,10 @@
  * Browsable, searchable user guide rendered from the shared help-content module.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 import {
   Collapsible,
   CollapsibleContent,
@@ -49,6 +50,30 @@ export default function HelpPage() {
   const collapseAll = () => {
     setOpenSections(new Set());
   };
+
+  /**
+   * Converts text content into React nodes, turning paths like (/some/path)
+   * into clickable Next.js Links.
+   */
+  function linkifyContent(text: string): ReactNode[] {
+    const parts = text.split(/(\(\/[a-z0-9/-]+\))/g);
+    return parts.map((part, i) => {
+      const match = part.match(/^\((\/[a-z0-9/-]+)\)$/);
+      if (match) {
+        const path = match[1];
+        return (
+          <Link
+            key={i}
+            href={path}
+            className="text-primary underline underline-offset-2 hover:text-primary/80"
+          >
+            ({path})
+          </Link>
+        );
+      }
+      return part;
+    });
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -112,7 +137,7 @@ export default function HelpPage() {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="px-4 pb-4 pt-1 text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                  {section.content}
+                  {linkifyContent(section.content)}
                 </div>
               </CollapsibleContent>
             </div>
