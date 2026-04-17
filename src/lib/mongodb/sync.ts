@@ -25,17 +25,19 @@ import {
   transformBrewLog,
   transformOrder,
   transformOrderItem,
+  transformPackagingSession,
   transformTest,
-  deriveBatchCode,
   type HopLookup,
 } from "./transformers";
 import type {
   MongoBatch,
   MongoBeer,
   MongoBrewLog,
+  MongoFormat,
   MongoHop,
   MongoMalt,
   MongoOrder,
+  MongoPackagingSession,
   MongoRecipe,
   MongoStyle,
   MongoSupplier,
@@ -147,19 +149,35 @@ async function buildSupplierNameMap(db: Db): Promise<Map<string, string>> {
   return new Map(suppliers.map((s) => [s._id.toString(), s.name]));
 }
 
-async function buildBatchLookups(db: Db) {
+/** Resolve MongoDB style ObjectIds → PG beer_styles UUIDs (case-insensitive name match). */
+async function buildStyleLookup(db: Db): Promise<Map<string, string>> {
   const admin = await createAdminClient();
-  const mongoBatches = await db.collection<MongoBatch>("batches").find().toArray();
-  const { data: pgBatches } = await dynamicFrom(admin, "batches").select("id, batch_code");
+  const { data: existingStyles } = await dynamicFrom(admin, "beer_styles").select("id, name");
 
-  const batchCodeToId = new Map(
-    (pgBatches ?? []).map((b: { id: string; batch_code: string }) => [b.batch_code, b.id])
+  const byExact = new Map(
+    (existingStyles ?? []).map((s: { id: string; name: string }) => [s.name, s.id])
   );
-  const mongoBatchIdToCode = new Map(
-    mongoBatches.map((b) => [b._id.toString(), deriveBatchCode(b.name, b._id.toString())])
+  const byLower = new Map(
+    (existingStyles ?? []).map((s: { id: string; name: string }) => [s.name.toLowerCase(), s.id])
   );
 
-  return { batchCodeToId, mongoBatchIdToCode };
+  const mongoStyles = await db.collection<MongoStyle>("styles").find().toArray();
+  const result = new Map<string, string>();
+  const unmatched: string[] = [];
+
+  for (const ms of mongoStyles) {
+    const pgId = (byExact.get(ms.name) ?? byLower.get(ms.name.toLowerCase())) as string | undefined;
+    if (pgId) {
+      result.set(ms._id.toString(), pgId);
+    } else {
+      unmatched.push(ms.name);
+    }
+  }
+  if (unmatched.length > 0) {
+    logger.warn("Unmatched MongoDB styles: %s", unmatched.join(", "));
+  }
+
+  return result;
 }
 
 async function buildVesselLookups(db: Db) {
@@ -261,28 +279,14 @@ async function syncBrands(): Promise<SyncResult> {
     ])
   );
 
-  // Build style name→UUID lookup so brands reference existing BJCP styles
-  const admin = await createAdminClient();
-  const { data: existingStyles } = await dynamicFrom(admin, "beer_styles")
-    .select("id, name");
-  const styleNameMap = new Map(
-    (existingStyles ?? []).map((s: { id: string; name: string }) => [s.name, s.id])
-  );
+  const mongoStyleIdToPgId = await buildStyleLookup(db);
 
   const docs = await db.collection<MongoBeer>("beers").find().toArray();
 
-  // Resolve style ObjectId → style name → existing PG UUID
-  const mongoStyles = await db.collection<MongoStyle>("styles").find().toArray();
-  const mongoStyleNameMap = new Map(
-    mongoStyles.map((s) => [s._id.toString(), s.name])
-  );
-
   const rows = docs.map((d) => {
     const row = transformBeer(d, hopLookup);
-    // Override style_id: match by name to existing BJCP style instead of deterministic UUID
     if (d.style) {
-      const styleName = mongoStyleNameMap.get(d.style.toString());
-      row.style_id = styleName ? (styleNameMap.get(styleName) as string ?? null) : null;
+      row.style_id = mongoStyleIdToPgId.get(d.style.toString()) ?? null;
     }
     return row;
   });
@@ -309,14 +313,9 @@ async function syncRecipes(): Promise<SyncResult> {
   const db = await requireMongoDb();
   const admin = await createAdminClient();
 
-  // Build style and brand name lookups (same as syncBrands)
-  const { data: existingStyles } = await dynamicFrom(admin, "beer_styles").select("id, name");
-  const styleNameMap = new Map(
-    (existingStyles ?? []).map((s: { id: string; name: string }) => [s.name, s.id])
-  );
-  const mongoStyles = await db.collection<MongoStyle>("styles").find().toArray();
-  const mongoStyleIdToName = new Map(mongoStyles.map((s) => [s._id.toString(), s.name]));
+  const mongoStyleIdToPgId = await buildStyleLookup(db);
 
+  // Build brand name lookup
   const { data: pgBrands } = await dynamicFrom(admin, "brands").select("id, name");
   const brandNameToId = new Map(
     (pgBrands ?? []).map((b: { id: string; name: string }) => [b.name, b.id])
@@ -336,8 +335,7 @@ async function syncRecipes(): Promise<SyncResult> {
     const row = transformRecipe(d);
     // Resolve style FK
     if (d.style) {
-      const styleName = mongoStyleIdToName.get(d.style.toString());
-      (row as Record<string, unknown>).style_id = styleName ? (styleNameMap.get(styleName) as string ?? null) : null;
+      (row as Record<string, unknown>).style_id = mongoStyleIdToPgId.get(d.style.toString()) ?? null;
     }
     // Resolve brand FK
     if (d.beer) {
@@ -452,11 +450,50 @@ async function syncRecipes(): Promise<SyncResult> {
 async function syncBatches(): Promise<SyncResult> {
   const logId = await createSyncLog("batches", 3);
   const db = await requireMongoDb();
+  const admin = await createAdminClient();
+
+  // Build recipe lookups: MongoDB recipe ObjectId → PG recipe UUID + volume.
+  // Recipes use auto-generated UUIDs (not deterministic), so we resolve by name.
+  const [mongoRecipes, pgRecipesResult] = await Promise.all([
+    db.collection<MongoRecipe>("recipes").find().toArray(),
+    dynamicFrom(admin, "recipes").select("id, name"),
+  ]);
+  const pgRecipeNameToId = new Map(
+    (pgRecipesResult.data ?? []).map((r: { id: string; name: string }) => [r.name, r.id])
+  );
+
+  const mongoRecipeIdToPgId = new Map<string, string>();
+  const mongoRecipeIdToVolume = new Map<string, number>();
+  const unmatchedRecipes: string[] = [];
+  for (const r of mongoRecipes) {
+    const mongoId = r._id.toString();
+    const pgId = pgRecipeNameToId.get(r.name) as string | undefined;
+    if (pgId) mongoRecipeIdToPgId.set(mongoId, pgId);
+    else unmatchedRecipes.push(r.name);
+    const volume = r.batchSize ?? r.volume;
+    if (volume != null) mongoRecipeIdToVolume.set(mongoId, volume);
+  }
+  if (unmatchedRecipes.length > 0) {
+    logger.warn("Unmatched MongoDB recipes: %s", unmatchedRecipes.join(", "));
+  }
 
   const docs = await db.collection<MongoBatch>("batches").find().toArray();
-  const rows = docs.map(transformBatch);
+  const rows = docs.map((d) => {
+    const row = transformBatch(d);
+    if (d.recipe) {
+      const mongoRecipeId = d.recipe.toString();
+      const pgRecipeId = mongoRecipeIdToPgId.get(mongoRecipeId);
+      if (pgRecipeId) (row as Record<string, unknown>).recipe_id = pgRecipeId;
+      const volume = mongoRecipeIdToVolume.get(mongoRecipeId);
+      if (volume != null) (row as Record<string, unknown>).volume_bbl = volume;
+    }
+    return row;
+  });
 
-  // Deduplicate batch_codes — append suffix for collisions
+  // Deduplicate batch_codes within this batch to avoid UNIQUE constraint
+  // violations on INSERT (same-named MongoDB batches derive the same code).
+  // The UUID `id` conflict target ensures idempotency across sync runs —
+  // batch_code can safely be rewritten by the generate_batch_code trigger.
   const codeCounts = new Map<string, number>();
   for (const row of rows) {
     const base = row.batch_code;
@@ -467,7 +504,7 @@ async function syncBatches(): Promise<SyncResult> {
     codeCounts.set(base, count + 1);
   }
 
-  const result = await upsertRows("batches", rows, "batch_code");
+  const result = await upsertRows("batches", rows, "id");
 
   await completeSyncLog(logId, result);
   return { entityType: "batches", phase: 3, ...result };
@@ -478,7 +515,6 @@ async function syncTransfers(): Promise<SyncResult> {
   const db = await requireMongoDb();
 
   const { vesselNameToId, mongoVesselIdToName } = await buildVesselLookups(db);
-  const { batchCodeToId, mongoBatchIdToCode } = await buildBatchLookups(db);
 
   const docs = await db.collection<MongoTransfer>("transfers").find().sort({ date: 1 }).toArray();
   const rows = docs.map((doc) => {
@@ -491,10 +527,7 @@ async function syncTransfers(): Promise<SyncResult> {
     const toName = mongoVesselIdToName.get(doc.transferTo.toString());
     row.to_vessel_id = toName ? (vesselNameToId.get(toName) as string ?? row.to_vessel_id) : row.to_vessel_id;
 
-    const code = mongoBatchIdToCode.get(doc.batch.toString());
-    if (code) {
-      row.batch_id = (batchCodeToId.get(code) as string) ?? row.batch_id;
-    }
+    row.batch_id = objectIdToUuid(doc.batch.toString());
 
     return row;
   });
@@ -571,7 +604,6 @@ async function syncBrewLogs(): Promise<SyncResult> {
   const db = await requireMongoDb();
 
   const admin = await createAdminClient();
-  const { batchCodeToId, mongoBatchIdToCode } = await buildBatchLookups(db);
 
   const docs = await db.collection<MongoBrewLog>("brew-logs").find().sort({ brewDate: 1 }).toArray();
 
@@ -595,9 +627,7 @@ async function syncBrewLogs(): Promise<SyncResult> {
     const pgBrewLogId = brewNumberToId.get(brewNumber) as string | undefined;
     if (!pgBrewLogId) continue;
 
-    const batchCode = mongoBatchIdToCode.get(doc.batch.toString());
-    const pgBatchId = batchCode ? (batchCodeToId.get(batchCode) as string | undefined) : null;
-    if (!pgBatchId) continue;
+    const pgBatchId = objectIdToUuid(doc.batch.toString());
 
     // Use knockOut volume if available, otherwise estimate from batch
     const volume = (doc.knockOut as Record<string, unknown>)?.volumeKO as number ?? 0;
@@ -630,8 +660,6 @@ async function syncBrewLogs(): Promise<SyncResult> {
 async function syncBatchReadings(): Promise<SyncResult> {
   const logId = await createSyncLog("batch_logs", 4);
   const db = await requireMongoDb();
-
-  const { batchCodeToId, mongoBatchIdToCode } = await buildBatchLookups(db);
   const admin = await createAdminClient();
 
   const docs = await db.collection<MongoTest>("tests").find().sort({ time: 1 }).toArray();
@@ -644,12 +672,7 @@ async function syncBatchReadings(): Promise<SyncResult> {
         errors.push({ mongoId: doc._id.toString(), error: "no batch reference" });
         continue;
       }
-      const batchCode = mongoBatchIdToCode.get(doc.batch.toString());
-      const pgBatchId = batchCode ? batchCodeToId.get(batchCode) as string | undefined : null;
-      if (!pgBatchId) {
-        errors.push({ mongoId: doc._id.toString(), error: "batch not found in PG" });
-        continue;
-      }
+      const pgBatchId = objectIdToUuid(doc.batch.toString());
       // transformTest returns multiple rows (one per measurement type)
       const logRows = transformTest(doc);
       for (const row of logRows) {
@@ -684,6 +707,185 @@ async function syncBatchReadings(): Promise<SyncResult> {
 }
 
 // =============================================================================
+// Phase 4 — Packaging sessions
+// =============================================================================
+
+async function syncPackagingSessions(): Promise<SyncResult> {
+  const logId = await createSyncLog("packaging_sessions", 4);
+  const db = await requireMongoDb();
+  const admin = await createAdminClient();
+
+  // 1. Read and transform sessions
+  const docs = await db.collection<MongoPackagingSession>("packaging-sessions")
+    .find().sort({ date: 1 }).toArray();
+  const sessionRows = docs.map(transformPackagingSession);
+  const sessionResult = await upsertRows("packaging_sessions", sessionRows);
+
+  // 2. Build lookups for line item FK resolution
+  // Batch → beer → brand chain (to derive brand_id, which is NOT NULL)
+  const mongoBatches = await db.collection<MongoBatch>("batches").find().toArray();
+  const mongoBatchIdToBeer = new Map(
+    mongoBatches.filter((b) => b.beer).map((b) => [b._id.toString(), b.beer!.toString()])
+  );
+  const mongoBeers = await db.collection<MongoBeer>("beers").find().toArray();
+  const mongoBeerIdToName = new Map(mongoBeers.map((b) => [b._id.toString(), b.name]));
+  const { data: pgBrands } = await dynamicFrom(admin, "brands").select("id, name");
+  const brandNameToId = new Map(
+    (pgBrands ?? []).map((b: { id: string; name: string }) => [b.name, b.id])
+  );
+
+  // Format lookup: MongoDB formats → PG selling_formats
+  // MongoDB "formats" collection has flat names (e.g. "16oz Cans - Case of 24")
+  // PG has a two-level model: containers ("16oz Can") + selling_formats ("Case of 24")
+  // Try multiple matching strategies to resolve the mapping.
+  const mongoFormats = await db.collection<MongoFormat>("formats").find().toArray();
+  const mongoFormatIdToName = new Map(
+    mongoFormats.map((f) => [f._id.toString(), f.name ?? f._id.toString()])
+  );
+
+  // Query selling_formats with their container names for composite matching
+  const { data: pgFormatsRaw } = await dynamicFrom(admin, "selling_formats")
+    .select("id, name, containers(name)");
+
+  type PgFormatRow = { id: string; name: string; containers: { name: string } | null };
+  const pgFormatsWithContainers = (pgFormatsRaw ?? []) as PgFormatRow[];
+
+  // Build lookup maps for cascading match strategies
+  const formatByExactName = new Map<string, string>();       // "Case of 24" → uuid
+  const formatByComposite = new Map<string, string>();       // "16oz can case of 24" → uuid (lowercase)
+  const formatByContainerName = new Map<string, string>();   // "1/2 barrel" → uuid (for "Per Keg" entries)
+
+  for (const sf of pgFormatsWithContainers) {
+    const containerName = sf.containers?.name ?? "";
+    formatByExactName.set(sf.name, sf.id);
+    // Composite: "16oz Can Case of 24", "1/2 Barrel Per Keg", etc.
+    if (containerName) {
+      formatByComposite.set(`${containerName} ${sf.name}`.toLowerCase(), sf.id);
+    }
+    // For kegs, the container name alone identifies the format
+    if (sf.name === "Per Keg" && containerName) {
+      formatByContainerName.set(containerName.toLowerCase(), sf.id);
+    }
+  }
+
+  /** Resolve a MongoDB format name to a PG selling_format UUID using cascading match strategies. */
+  function resolveSellingFormat(mongoName: string): string | null {
+    // Strategy 1: exact match on selling_format.name (e.g. "Case of 24")
+    const exact = formatByExactName.get(mongoName);
+    if (exact) return exact;
+
+    const lower = mongoName.toLowerCase();
+
+    // Strategy 2: exact match on composite "container format" (e.g. "16oz Can Case of 24")
+    const composite = formatByComposite.get(lower);
+    if (composite) return composite;
+
+    // Strategy 3: match on container name alone (e.g. "1/2 Barrel" for kegs)
+    const container = formatByContainerName.get(lower);
+    if (container) return container;
+
+    // Strategy 4: containment — find the longest composite key that overlaps
+    let bestMatch: string | null = null;
+    let bestLen = 0;
+    for (const [key, id] of formatByComposite) {
+      if ((lower.includes(key) || key.includes(lower)) && key.length > bestLen) {
+        bestMatch = id;
+        bestLen = key.length;
+      }
+    }
+    if (bestMatch) return bestMatch;
+
+    return null;
+  }
+
+  // Pre-resolve all MongoDB format ObjectIds → PG selling_format UUIDs
+  const mongoFormatIdToPgId = new Map<string, string>();
+  const unmatchedFormats: string[] = [];
+  for (const [mongoId, name] of mongoFormatIdToName) {
+    const pgId = resolveSellingFormat(name);
+    if (pgId) {
+      mongoFormatIdToPgId.set(mongoId, pgId);
+    } else {
+      unmatchedFormats.push(name);
+    }
+  }
+  if (unmatchedFormats.length > 0) {
+    logger.warn("Unmatched MongoDB formats: %s", unmatchedFormats.join(", "));
+  }
+
+  // 3. Build line item rows from each session's products array
+  const lineItems: Record<string, unknown>[] = [];
+  const lineErrors: Array<{ mongoId: string; error: string }> = [];
+
+  for (const doc of docs) {
+    const pgSessionId = objectIdToUuid(doc._id.toString());
+    const isCompleted = !!doc.completed;
+
+    for (let i = 0; i < (doc.products ?? []).length; i++) {
+      const product = doc.products![i]!;
+
+      const pgBatchId = product.batch ? objectIdToUuid(product.batch.toString()) : null;
+
+      // Resolve brand_id via batch → beer → brand chain (NOT NULL)
+      let pgBrandId: string | null = null;
+      if (product.batch) {
+        const beerId = mongoBatchIdToBeer.get(product.batch.toString());
+        if (beerId) {
+          const beerName = mongoBeerIdToName.get(beerId);
+          if (beerName) {
+            pgBrandId = brandNameToId.get(beerName) as string ?? null;
+          }
+        }
+      }
+
+      if (!pgBrandId) {
+        lineErrors.push({
+          mongoId: doc._id.toString(),
+          error: `product[${i}]: could not resolve brand_id (NOT NULL constraint)`,
+        });
+        continue;
+      }
+
+      // Resolve selling_format_id (nullable)
+      const pgFormatId = product.packagingFormat
+        ? (mongoFormatIdToPgId.get(product.packagingFormat.toString()) ?? null)
+        : null;
+
+      // Generate stable ID from session ObjectId + product index
+      const itemId = product.id
+        ? objectIdToUuid(product.id)
+        : objectIdToUuid(`${doc._id.toString()}-product-${i}`);
+
+      lineItems.push({
+        id: itemId,
+        session_id: pgSessionId,
+        brand_id: pgBrandId,
+        selling_format_id: pgFormatId,
+        batch_id: pgBatchId,
+        planned_quantity: product.quantity ?? null,
+        actual_quantity: isCompleted ? (product.quantity ?? null) : null,
+      });
+    }
+  }
+
+  // 4. Delete existing line items for synced sessions, then insert fresh
+  const syncedSessionIds = sessionRows.map((r) => r.id);
+  if (syncedSessionIds.length > 0) {
+    await dynamicFrom(admin, "session_line_items")
+      .delete()
+      .in("session_id", syncedSessionIds);
+  }
+  const lineResult = await upsertRows("session_line_items", lineItems);
+
+  const combined = mergeResults(sessionResult, lineResult);
+  combined.failed += lineErrors.length;
+  combined.errors.push(...lineErrors.slice(0, 10));
+
+  await completeSyncLog(logId, combined);
+  return { entityType: "packaging_sessions", phase: 4, ...combined };
+}
+
+// =============================================================================
 // Phase orchestration
 // =============================================================================
 
@@ -691,7 +893,7 @@ const PHASE_ENTITIES: Record<SyncPhase, Array<() => Promise<SyncResult>>> = {
   1: [syncSuppliers, syncMalts, syncHops, syncYeasts, syncStyles],
   2: [syncBrands, syncVessels, syncRecipes],
   3: [syncBatches, syncTransfers, syncBrewLogs, syncOrders],
-  4: [syncBatchReadings],
+  4: [syncBatchReadings, syncPackagingSessions],
 };
 
 /** Reverse lookup: function → entity name (used in error reporting). */
@@ -700,6 +902,7 @@ const ENTITY_FN_NAMES = new Map<() => Promise<SyncResult>, string>([
   [syncYeasts, "yeasts"], [syncStyles, "beer_styles"], [syncBrands, "brands"],
   [syncVessels, "vessels"], [syncRecipes, "recipes"], [syncBatches, "batches"], [syncTransfers, "vessel_transfers"],
   [syncBrewLogs, "brew_logs"], [syncOrders, "orders"], [syncBatchReadings, "batch_logs"],
+  [syncPackagingSessions, "packaging_sessions"],
 ]);
 
 /** Run all entities for a given phase. Continues on error so one entity failure doesn't block others. */
@@ -742,6 +945,7 @@ export async function syncEntity(entityType: SyncEntityType): Promise<SyncResult
     orders: syncOrders,
     brew_logs: syncBrewLogs,
     batch_logs: syncBatchReadings,
+    packaging_sessions: syncPackagingSessions,
   };
 
   const fn = entityFnMap[entityType];

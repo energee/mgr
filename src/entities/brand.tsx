@@ -59,6 +59,10 @@ export const brandEntity: EntityConfig<Brand> = {
       accessorKey: "style_id",
       header: "Style",
       sortable: true,
+      relation: {
+        entity: "beer_style",
+        displayField: "name",
+      },
     },
     {
       accessorKey: "abv",

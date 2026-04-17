@@ -405,7 +405,7 @@ export const batchEntity: EntityConfig<Batch> = {
       label: "Complete",
       icon: "check",
       type: "button" as const,
-      fromStates: ["packaging"],
+      fromStates: ["fermenting", "conditioning", "packaging"],
       toState: "completed",
     },
     {

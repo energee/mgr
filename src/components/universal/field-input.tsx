@@ -39,7 +39,7 @@ import {
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { UnitInput } from "@/components/ui/unit-input";
 import { X } from "lucide-react";
-import type { FC } from "react";
+import { useState, useEffect, useMemo, type FC } from "react";
 import { getColSpanClass } from "./field-utils";
 import { log } from "@/lib/client-logger";
 
@@ -269,53 +269,19 @@ export function renderFieldInput(
 
     case "relation": {
       const options = dynamicOptions || [];
-      // Build a lookup map so onFilter can match search text against labels (not UUIDs)
-      const labelMap = new Map(options.map((o) => [o.value, o.label.toLowerCase()]));
-      // Use undefined (uncontrolled) when no value so the combobox manages its own
-      // internal state for the initial selection — avoids a race condition where the
-      // controlled value="" causes the blur handler to clear the input before React
-      // re-renders with the selected UUID.
-      const comboboxValue = value != null && value !== "" ? String(value) : undefined;
       const QuickCreate = field.quickCreate;
       return (
         <div className="flex items-start gap-1.5">
-          <Combobox
-            className="flex-1"
-            value={comboboxValue}
-            onValueChange={(v) => onChange(v || null)}
+          <RelationCombobox
+            fieldName={field.name}
+            placeholder={field.placeholder}
+            required={field.required}
             disabled={disabled}
-            onFilter={(values, search) => {
-              const term = search.toLowerCase();
-              return values.filter((v) => labelMap.get(v)?.includes(term));
-            }}
-          >
-            <ComboboxAnchor>
-              <ComboboxInput
-                id={field.name}
-                placeholder={field.placeholder || "Search..."}
-                {...ariaProps}
-              />
-              {!field.required && !!value && (
-                <button
-                  type="button"
-                  onClick={() => onChange(null)}
-                  className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  aria-label="Clear selection"
-                >
-                  <X className="size-3.5" />
-                </button>
-              )}
-              <ComboboxTrigger />
-            </ComboboxAnchor>
-            <ComboboxContent>
-              <ComboboxEmpty>No results found</ComboboxEmpty>
-              {options.map((option) => (
-                <ComboboxItem key={option.value} value={option.value} label={option.label}>
-                  {option.label}
-                </ComboboxItem>
-              ))}
-            </ComboboxContent>
-          </Combobox>
+            value={value}
+            options={options}
+            onChange={onChange}
+            ariaProps={ariaProps}
+          />
           {QuickCreate && !disabled && (
             <QuickCreate onCreated={(id) => onChange(id)} />
           )}
@@ -400,4 +366,90 @@ export function renderFieldInput(
         />
       );
   }
+}
+
+// =============================================================================
+// RelationCombobox — manages inputValue state for diceui Combobox
+// =============================================================================
+
+/**
+ * Wrapper around diceui Combobox that syncs the display text with the selected
+ * value's label. The diceui Combobox doesn't auto-sync its input text when the
+ * value changes programmatically (e.g. form.reset), so we manage inputValue
+ * with local state, synced to the selected option's label.
+ */
+function RelationCombobox({
+  fieldName,
+  placeholder,
+  required,
+  disabled,
+  value,
+  options,
+  onChange,
+  ariaProps,
+}: {
+  fieldName: string;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  value: unknown;
+  options: { value: string; label: string }[];
+  onChange: (value: unknown) => void;
+  ariaProps?: Record<string, unknown>;
+}) {
+  const labelByValue = useMemo(
+    () => new Map(options.map((o) => [o.value, o.label])),
+    [options]
+  );
+
+  const comboboxValue = value != null && value !== "" ? String(value) : undefined;
+  const resolvedLabel = comboboxValue ? (labelByValue.get(comboboxValue) ?? "") : "";
+
+  const [inputText, setInputText] = useState(resolvedLabel);
+
+  // Sync display text when value or options change (e.g. form.reset, options load)
+  useEffect(() => {
+    setInputText(resolvedLabel);
+  }, [resolvedLabel]);
+
+  return (
+    <Combobox
+      className="flex-1"
+      value={comboboxValue}
+      inputValue={inputText}
+      onInputValueChange={setInputText}
+      onValueChange={(v) => onChange(v || null)}
+      disabled={disabled}
+    >
+      <ComboboxAnchor>
+        <ComboboxInput
+          id={fieldName}
+          placeholder={placeholder || "Search..."}
+          {...ariaProps}
+        />
+        {!required && !!value && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange(null);
+              setInputText("");
+            }}
+            className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            aria-label="Clear selection"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+        <ComboboxTrigger />
+      </ComboboxAnchor>
+      <ComboboxContent>
+        <ComboboxEmpty>No results found</ComboboxEmpty>
+        {options.map((option) => (
+          <ComboboxItem key={option.value} value={option.value} label={option.label}>
+            {option.label}
+          </ComboboxItem>
+        ))}
+      </ComboboxContent>
+    </Combobox>
+  );
 }

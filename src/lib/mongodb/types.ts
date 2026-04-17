@@ -196,6 +196,37 @@ export type MongoOrder = {
   updatedAt?: Date;
 }
 
+export type MongoPackagingProduct = {
+  id?: string;
+  quantity?: number;
+  packagingFormat?: ObjectId;
+  batch?: ObjectId;
+  startingLevel?: number;
+  endingLevel?: number;
+  primingKegFill?: boolean;
+}
+
+export type MongoPackagingSession = {
+  _id: ObjectId;
+  name?: string;
+  date: Date;
+  Notes?: string;
+  packagingTypes?: string[];
+  products?: MongoPackagingProduct[];
+  completed?: boolean;
+  completedAt?: Date;
+  startTime?: Date;
+  finishTime?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** Minimal type for the MongoDB `formats` collection (used for selling_format FK resolution). */
+export type MongoFormat = {
+  _id: ObjectId;
+  name?: string;
+}
+
 export type MongoBrewLog = {
   _id: ObjectId;
   batch?: ObjectId;
@@ -260,7 +291,9 @@ export type SyncEntityType =
   | "order_items"
   | "brew_logs"
   | "brew_log_batches"
-  | "batch_logs";
+  | "batch_logs"
+  | "packaging_sessions"
+  | "session_line_items";
 
 export type SyncResult = {
   entityType: SyncEntityType;

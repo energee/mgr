@@ -14,6 +14,7 @@ import type {
   MongoMalt,
   MongoOrder,
   MongoOrderProduct,
+  MongoPackagingSession,
   MongoRecipe,
   MongoStyle,
   MongoSupplier,
@@ -220,6 +221,7 @@ export function transformBatch(doc: MongoBatch) {
   const batchCode = deriveBatchCode(doc.name, doc._id.toString());
 
   return {
+    id: objectIdToUuid(doc._id.toString()),
     batch_code: batchCode,
     name: doc.name ?? null,
     status,
@@ -401,6 +403,39 @@ export function transformBrewLog(doc: MongoBrewLog) {
     events,
     legacy_data: Object.keys(legacyData).length > 0 ? legacyData : null,
     notes: doc.notes ?? null,
+  };
+}
+
+/**
+ * Derive packaging session status from MongoDB boolean/timestamp fields.
+ * MongoDB uses a `completed` checkbox + `startTime`/`finishTime` timestamps,
+ * while PG uses the state machine: planned → in_progress → completed.
+ */
+export function transformPackagingSession(doc: MongoPackagingSession) {
+  let status = "planned";
+  if (doc.completed) {
+    status = "completed";
+  } else if (doc.startTime) {
+    status = "in_progress";
+  }
+
+  const sessionDate = doc.date instanceof Date
+    ? doc.date.toISOString().split("T")[0]
+    : doc.date ? new Date(doc.date).toISOString().split("T")[0]
+    : new Date().toISOString().split("T")[0];
+
+  const completedAt = doc.completedAt
+    ? (doc.completedAt instanceof Date ? doc.completedAt.toISOString() : new Date(doc.completedAt).toISOString())
+    : null;
+
+  return {
+    id: objectIdToUuid(doc._id.toString()),
+    session_date: sessionDate,
+    status,
+    notes: doc.Notes ?? null,
+    completed_at: completedAt,
+    created_at: doc.createdAt instanceof Date ? doc.createdAt.toISOString() : new Date().toISOString(),
+    updated_at: doc.updatedAt instanceof Date ? doc.updatedAt.toISOString() : new Date().toISOString(),
   };
 }
 
