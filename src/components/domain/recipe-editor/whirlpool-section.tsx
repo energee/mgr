@@ -25,7 +25,7 @@ type WhirlpoolFormValues = {
 }
 
 export function WhirlpoolSection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -53,7 +53,7 @@ export function WhirlpoolSection() {
           whirlpool_temp_f: values.whirlpool_temp_f,
           whirlpool_rest_min: values.whirlpool_rest_min,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {

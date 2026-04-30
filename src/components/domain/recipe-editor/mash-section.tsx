@@ -27,7 +27,7 @@ type MashFormValues = {
 }
 
 export function MashSection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -63,7 +63,7 @@ export function MashSection() {
           mash_efficiency: values.mash_efficiency,
           mash_schedule: values.mash_schedule,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {

@@ -56,7 +56,7 @@ const WATER_PROFILE_FIELDS = [
 ];
 
 export function WaterChemistrySection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -109,7 +109,7 @@ export function WaterChemistrySection() {
           sparge_water_volume_gal: values.sparge_water_volume_gal,
           preboil_volume_bbl: values.preboil_volume_bbl,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {

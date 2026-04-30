@@ -119,6 +119,13 @@ type RecipeEditorContextValue = {
   anyDirty: boolean;
   /** Save all dirty sections sequentially. */
   saveAll: () => Promise<void>;
+  /**
+   * Read the latest recipe.version synchronously. Sections must call this
+   * inside their mutationFn (rather than reading recipe.version from closure)
+   * so saveAll can chain multiple section saves without each subsequent
+   * save fighting an out-of-date version captured at render time.
+   */
+  getVersion: () => number;
 };
 
 // =============================================================================
@@ -148,9 +155,27 @@ export function RecipeEditorProvider({
   const [hopItems, setHopItems] = useState<HopScheduleItem[]>([]);
   const [savingCount, setSavingCount] = useState(0);
 
+  // Tracks the latest recipe.version synchronously, independent of React's
+  // render cycle. Section mutations must read from here so chained saveAll
+  // calls don't collide on stale closure state.
+  const versionRef = useRef<number>(initialRecipe.version);
+
   const updateRecipe = useCallback((partial: Partial<RecipeData>) => {
+    if (typeof partial.version === "number") {
+      versionRef.current = partial.version;
+    }
     setRecipe((prev) => ({ ...prev, ...partial }));
   }, []);
+
+  const getVersion = useCallback(() => versionRef.current, []);
+
+  // Keep versionRef in sync if the parent reloads with a newer recipe
+  // (e.g., after a conflict-driven refetch).
+  useEffect(() => {
+    if (initialRecipe.version !== versionRef.current) {
+      versionRef.current = initialRecipe.version;
+    }
+  }, [initialRecipe.version]);
 
   /**
    * Mark a section save as started. Returns a cleanup callback
@@ -268,6 +293,7 @@ export function RecipeEditorProvider({
       setSectionDirty,
       anyDirty,
       saveAll,
+      getVersion,
     }),
     [
       recipe,
@@ -282,6 +308,7 @@ export function RecipeEditorProvider({
       setSectionDirty,
       anyDirty,
       saveAll,
+      getVersion,
     ]
   );
 

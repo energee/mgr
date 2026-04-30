@@ -59,7 +59,7 @@ const DYNAMIC_FIELDS = [
 ];
 
 export function RecipeBasicsSection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -121,7 +121,7 @@ export function RecipeBasicsSection() {
           brand_id: values.brand_id,
           volume_bbl: values.volume_bbl,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {

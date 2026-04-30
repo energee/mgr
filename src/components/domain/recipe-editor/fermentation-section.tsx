@@ -26,7 +26,7 @@ type FermentationFormValues = {
 }
 
 export function FermentationSection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -55,7 +55,7 @@ export function FermentationSection() {
           conditioning_days: values.conditioning_days,
           fermentation_schedule: values.fermentation_schedule,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {

@@ -53,7 +53,7 @@ const YEAST_FIELDS = [
 ];
 
 export function FermentablesSection() {
-  const { recipe, updateRecipe, setGrainItems, setHopItems, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, setGrainItems, setHopItems, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -113,7 +113,7 @@ export function FermentablesSection() {
           target_attenuation: values.target_attenuation,
           target_pitching_rate: values.target_pitching_rate,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {

@@ -24,7 +24,7 @@ type KnockoutFormValues = {
 }
 
 export function KnockoutSection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -50,7 +50,7 @@ export function KnockoutSection() {
           target_ko_temp_f: values.target_ko_temp_f,
           target_ko_volume_bbl: values.target_ko_volume_bbl,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {
