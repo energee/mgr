@@ -6,16 +6,20 @@
 --   It could refer to either a PL/pgSQL variable or a table column.
 --
 -- The function declares `inventory_item_id` as an OUT column in its
--- RETURNS TABLE clause and several inner CTEs (po_agg, USING-clauses on the
--- final SELECT) reference unqualified `inventory_item_id` columns.  Postgres
--- cannot disambiguate the OUT parameter from CTE columns and aborts.
+-- RETURNS TABLE clause, and inner CTEs reference unqualified
+-- `inventory_item_id` columns. Postgres cannot disambiguate the OUT
+-- parameter from CTE columns and aborts.
 --
--- Fix: add `#variable_conflict use_column` to the PL/pgSQL body so unqualified
--- identifiers are resolved as columns, leaving the OUT parameter accessible
--- only via assignment (which we don't do — we RETURN QUERY directly).
+-- Primary fix: add `#variable_conflict use_column` to the PL/pgSQL body so
+-- unqualified identifiers resolve to columns. The OUT parameters remain
+-- accessible only via assignment, which we don't use (RETURN QUERY).
 --
--- This preserves the public function signature and rewrites no SQL, so it is
--- safe and minimal.
+-- Secondary clarity change: replace `LEFT JOIN ... USING (inventory_item_id)`
+-- with explicit `ON x.col = y.col`. Not strictly required for the bug fix,
+-- but makes the join sides explicit and easier to reason about given the
+-- OUT-parameter shadowing context.
+--
+-- Function signature is unchanged; this is a safe in-place CREATE OR REPLACE.
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION calculate_material_shortfalls(
@@ -43,6 +47,7 @@ LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = public
 AS $$
+-- Resolve unqualified identifiers as columns, not OUT parameters.
 #variable_conflict use_column
 BEGIN
   RETURN QUERY

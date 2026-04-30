@@ -4,6 +4,12 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { brandKeys, packagingFormatKeys, entityKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
+import { formatSmartDecimal } from "@/lib/format";
+
+// Smallest plausible per-unit container volume (oz). When a packaging format's
+// volume_oz divided by unit_count is below this, treat volume_oz as already
+// per-unit; at or above, treat it as a rolled-up case total and divide.
+const MIN_PER_UNIT_OZ = 8;
 
 /**
  * Generic hook for fetching active catalog items from a Supabase table.
@@ -86,20 +92,19 @@ export type PackagingFormat = {
  * - Keg: "{volume_bbl} BBL" (e.g., "1/2 BBL")
  * - Unknown: null
  *
- * `volume_oz` on the underlying container is inconsistent: for some rows it
- * is the per-unit volume (e.g. 11.25oz Glass with unit_count=12); for others
- * it is the rolled-up case volume (e.g. "384oz Can" with unit_count=24,
- * representing 24×16oz cans). When the container's volume divided by unit
- * count yields a sensible single-container size (≥ 8oz) we treat it as
- * rolled-up and divide; otherwise we use volume_oz as-is.
+ * `containers.volume_oz` is inconsistent in the data: some rows are per-unit
+ * (e.g. 11.25oz Glass with unit_count=12) and some are rolled-up case totals
+ * (e.g. "384oz Can" with unit_count=24, representing 24×16oz cans). The
+ * MIN_PER_UNIT_OZ threshold disambiguates: if dividing yields a value at or
+ * above the smallest plausible single-container size, the row is rolled-up.
+ * TODO: normalize containers.volume_oz to per-unit and drop this heuristic.
  */
 export function formatVolumeLabel(format: Pick<PackagingFormat, "container_type" | "volume_oz" | "volume_bbl" | "unit_count">): string | null {
   if (format.container_type !== "keg" && format.volume_oz != null) {
-    const count = format.unit_count ?? 1;
-    const perUnitCandidate = format.volume_oz / count;
-    const isRolledUp = count > 1 && perUnitCandidate >= 8;
-    const perUnit = isRolledUp ? Math.round(perUnitCandidate * 100) / 100 : format.volume_oz;
-    return `${perUnit}oz x ${count}`;
+    const { unit_count: count, volume_oz } = format;
+    const isRolledUp = count > 1 && volume_oz / count >= MIN_PER_UNIT_OZ;
+    const perUnit = isRolledUp ? volume_oz / count : volume_oz;
+    return `${formatSmartDecimal(perUnit)}oz x ${count}`;
   }
   if (format.container_type === "keg" && format.volume_bbl != null) {
     return `${format.volume_bbl} BBL`;
