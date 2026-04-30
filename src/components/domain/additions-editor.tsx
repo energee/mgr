@@ -42,6 +42,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sortable,
+  SortableContent,
+  SortableItem,
+  SortableItemHandle,
+  SortableOverlay,
+} from "@/components/ui/sortable";
+import {
+  SortableDragPreview,
+  reorderWithPositions,
+} from "@/components/ui/sortable-drag-preview";
 import { Plus, Trash2, GripVertical, ChevronsUpDown } from "lucide-react";
 import { catalogKeys } from "@/lib/query-keys";
 
@@ -188,20 +199,9 @@ export function AdditionsEditor({
     [items, onChange]
   );
 
-  const handleMove = useCallback(
-    (index: number, direction: "up" | "down") => {
-      if (direction === "up" && index === 0) return;
-      if (direction === "down" && index === items.length - 1) return;
-
-      const updated = [...items];
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
-      updated.forEach((item, i) => {
-        item.position = i;
-      });
-      onChange(updated);
-    },
-    [items, onChange]
+  const handleReorder = useCallback(
+    (reordered: typeof items) => onChange(reorderWithPositions(reordered)),
+    [onChange]
   );
 
   /** Available (not-yet-added) additives grouped by type for the selector */
@@ -278,6 +278,11 @@ export function AdditionsEditor({
           </p>
         </div>
       ) : (
+        <Sortable
+          value={items}
+          onValueChange={handleReorder}
+          getItemValue={(item) => item.additive_id}
+        >
         <Table>
           <TableHeader>
             <TableRow>
@@ -290,6 +295,7 @@ export function AdditionsEditor({
               <TableHead className="w-16"></TableHead>
             </TableRow>
           </TableHeader>
+          <SortableContent asChild>
           <TableBody>
             {items.map((item, index) => {
               const additive =
@@ -297,26 +303,12 @@ export function AdditionsEditor({
               const showTarget = additive && WATER_CHEMISTRY_TYPES.includes(additive.type);
 
               return (
-                <TableRow key={item.additive_id}>
+                <SortableItem key={item.additive_id} value={item.additive_id} asChild disabled={disabled}>
+                <TableRow>
                   <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => handleMove(index, "up")}
-                        disabled={disabled || index === 0}
-                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                      >
-                        <GripVertical className="h-3 w-3 rotate-180" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMove(index, "down")}
-                        disabled={disabled || index === items.length - 1}
-                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                      >
-                        <GripVertical className="h-3 w-3" />
-                      </button>
-                    </div>
+                    <SortableItemHandle className="p-1 hover:bg-muted rounded touch-none">
+                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    </SortableItemHandle>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -417,9 +409,11 @@ export function AdditionsEditor({
                     </Button>
                   </TableCell>
                 </TableRow>
+                </SortableItem>
               );
             })}
           </TableBody>
+          </SortableContent>
           <TableFooter>
             <TableRow>
               <TableCell colSpan={7} className="text-sm text-muted-foreground">
@@ -428,6 +422,19 @@ export function AdditionsEditor({
             </TableRow>
           </TableFooter>
         </Table>
+        <SortableOverlay>
+          {({ value }) => {
+            const item = items.find((i) => i.additive_id === value);
+            const additive = item?.additive || additiveCatalog.find((a) => a.id === item?.additive_id);
+            return (
+              <SortableDragPreview
+                title={additive?.name || "Addition"}
+                subtitle={item ? `${item.amount} ${item.unit}` : undefined}
+              />
+            );
+          }}
+        </SortableOverlay>
+        </Sortable>
       )}
     </div>
   );

@@ -11,7 +11,7 @@
  * - Dry hop timing notes
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +34,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Sortable,
+  SortableContent,
+  SortableItem,
+  SortableItemHandle,
+  SortableOverlay,
+} from "@/components/ui/sortable";
+import {
+  SortableDragPreview,
+  reorderWithPositions,
+} from "@/components/ui/sortable-drag-preview";
 import { Plus, Trash2, GripVertical, ChevronDown, FlaskConical, ChevronRight } from "lucide-react";
 
 // Types for fermentation stages
@@ -52,6 +63,8 @@ type FermentationScheduleEditorProps = {
   onChange: (stages: FermentationStage[]) => void;
   disabled?: boolean;
 }
+
+const generateId = () => `stage-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
 // Stage types with defaults
 const STAGE_TYPES = [
@@ -138,10 +151,18 @@ export function FermentationScheduleEditor({
   onChange,
   disabled = false,
 }: FermentationScheduleEditorProps) {
-  // Generate unique ID
-  const generateId = () => `stage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Backfill IDs once if legacy data lacks them — required for stable drag-and-drop.
+  // One-shot guard prevents re-running on parent re-renders (which can happen when
+  // onChange has an unstable identity).
+  const backfilledRef = useRef(false);
+  useEffect(() => {
+    if (backfilledRef.current) return;
+    backfilledRef.current = true;
+    if (stages.some((s) => !s.id)) {
+      onChange(stages.map((s) => (s.id ? s : { ...s, id: generateId() })));
+    }
+  }, [stages, onChange]);
 
-  // Add a new stage
   const handleAddStage = useCallback(() => {
     const newStage: FermentationStage = {
       id: generateId(),
@@ -154,7 +175,6 @@ export function FermentationScheduleEditor({
     onChange([...stages, newStage]);
   }, [stages, onChange]);
 
-  // Apply a preset
   const handleApplyPreset = useCallback(
     (presetKey: keyof typeof FERMENTATION_PRESETS) => {
       const preset = FERMENTATION_PRESETS[presetKey];
@@ -168,7 +188,6 @@ export function FermentationScheduleEditor({
     [onChange]
   );
 
-  // Update a stage field
   const handleUpdateStage = useCallback(
     (index: number, field: keyof FermentationStage, value: string | number) => {
       const updated = [...stages];
@@ -178,7 +197,6 @@ export function FermentationScheduleEditor({
     [stages, onChange]
   );
 
-  // Handle stage type change (update defaults)
   const handleStageTypeChange = useCallback(
     (index: number, stageType: FermentationStage["stage"]) => {
       const typeConfig = STAGE_TYPES.find((t) => t.value === stageType);
@@ -193,36 +211,18 @@ export function FermentationScheduleEditor({
     [stages, onChange]
   );
 
-  // Remove a stage
   const handleRemove = useCallback(
     (index: number) => {
-      const updated = stages.filter((_, i) => i !== index);
-      updated.forEach((stage, i) => {
-        stage.position = i;
-      });
-      onChange(updated);
+      onChange(reorderWithPositions(stages.filter((_, i) => i !== index)));
     },
     [stages, onChange]
   );
 
-  // Move stage up/down
-  const handleMove = useCallback(
-    (index: number, direction: "up" | "down") => {
-      if (direction === "up" && index === 0) return;
-      if (direction === "down" && index === stages.length - 1) return;
-
-      const updated = [...stages];
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
-      updated.forEach((stage, i) => {
-        stage.position = i;
-      });
-      onChange(updated);
-    },
-    [stages, onChange]
+  const handleReorder = useCallback(
+    (reordered: FermentationStage[]) => onChange(reorderWithPositions(reordered)),
+    [onChange]
   );
 
-  // Calculate total fermentation time
   const totalDays = stages.reduce((sum, stage) => sum + (stage.duration_days || 0), 0);
 
   return (
@@ -281,33 +281,21 @@ export function FermentationScheduleEditor({
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {stages.map((stage, index) => {
-            const stageId = stage.id || `stage-${index}`;
-
-            return (
-            <Collapsible key={stageId}>
+        <Sortable
+          value={stages}
+          onValueChange={handleReorder}
+          getItemValue={(item) => item.id!}
+        >
+          <SortableContent asChild>
+          <div className="space-y-2">
+          {stages.map((stage, index) => (
+            <SortableItem key={stage.id} value={stage.id!} asChild disabled={disabled}>
+            <Collapsible>
               <div className="border rounded-lg">
                 <div className="flex items-center gap-2 p-3">
-                  {/* Reorder buttons */}
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => handleMove(index, "up")}
-                      disabled={disabled || index === 0}
-                      className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                    >
-                      <GripVertical className="h-3 w-3 rotate-180" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMove(index, "down")}
-                      disabled={disabled || index === stages.length - 1}
-                      className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                    >
-                      <GripVertical className="h-3 w-3" />
-                    </button>
-                  </div>
+                  <SortableItemHandle className="p-1 hover:bg-muted rounded touch-none">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  </SortableItemHandle>
 
                   {/* Stage Type */}
                   <Select
@@ -405,11 +393,12 @@ export function FermentationScheduleEditor({
                 </CollapsibleContent>
               </div>
             </Collapsible>
-            );
-          })}
+            </SortableItem>
+          ))}
+          </div>
+          </SortableContent>
 
-          {/* Summary */}
-          <div className="flex justify-between items-center border-t pt-3 text-sm">
+          <div className="flex justify-between items-center border-t pt-3 text-sm mt-2">
             <span className="text-muted-foreground">
               {stages.length} stage{stages.length !== 1 ? "s" : ""}
             </span>
@@ -417,7 +406,19 @@ export function FermentationScheduleEditor({
               Total: {totalDays} days ({Math.round(totalDays / 7)} weeks)
             </span>
           </div>
-        </div>
+
+          <SortableOverlay>
+            {({ value }) => {
+              const stage = stages.find((s) => s.id === value);
+              return (
+                <SortableDragPreview
+                  title={stage?.name || "Stage"}
+                  subtitle={stage ? `${stage.temp_f}°F · ${stage.duration_days}d` : undefined}
+                />
+              );
+            }}
+          </SortableOverlay>
+        </Sortable>
       )}
     </div>
   );

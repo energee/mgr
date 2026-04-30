@@ -15,4 +15,8 @@ Sentry.init({
   integrations: [Sentry.replayIntegration()],
 });
 
+if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+  Object.assign(window, { Sentry });
+}
+
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

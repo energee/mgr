@@ -11,7 +11,7 @@
  * - Temperature and time validation
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Table,
   TableBody,
@@ -37,6 +37,17 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sortable,
+  SortableContent,
+  SortableItem,
+  SortableItemHandle,
+  SortableOverlay,
+} from "@/components/ui/sortable";
+import {
+  SortableDragPreview,
+  reorderWithPositions,
+} from "@/components/ui/sortable-drag-preview";
 import { Plus, Trash2, GripVertical, ChevronDown, Thermometer } from "lucide-react";
 
 // Types for mash steps
@@ -55,6 +66,8 @@ type MashScheduleEditorProps = {
   onChange: (steps: MashStep[]) => void;
   disabled?: boolean;
 }
+
+const generateId = () => `step-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
 // Common step types with defaults
 const STEP_TYPES = [
@@ -123,10 +136,19 @@ export function MashScheduleEditor({
   disabled = false,
 }: MashScheduleEditorProps) {
   const [, setEditingId] = useState<string | null>(null);
-  // Generate unique ID
-  const generateId = () => `step-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  // Add a new step
+  // Backfill IDs once if legacy data lacks them — required for stable drag-and-drop.
+  // One-shot guard prevents re-running on parent re-renders (which can happen when
+  // onChange has an unstable identity).
+  const backfilledRef = useRef(false);
+  useEffect(() => {
+    if (backfilledRef.current) return;
+    backfilledRef.current = true;
+    if (steps.some((s) => !s.id)) {
+      onChange(steps.map((s) => (s.id ? s : { ...s, id: generateId() })));
+    }
+  }, [steps, onChange]);
+
   const handleAddStep = useCallback(() => {
     const newStep: MashStep = {
       id: generateId(),
@@ -140,7 +162,6 @@ export function MashScheduleEditor({
     setEditingId(newStep.id || null);
   }, [steps, onChange]);
 
-  // Apply a preset
   const handleApplyPreset = useCallback(
     (presetKey: keyof typeof MASH_PRESETS) => {
       const preset = MASH_PRESETS[presetKey];
@@ -154,7 +175,6 @@ export function MashScheduleEditor({
     [onChange]
   );
 
-  // Update a step field
   const handleUpdateStep = useCallback(
     (index: number, field: keyof MashStep, value: string | number) => {
       const updated = [...steps];
@@ -164,36 +184,18 @@ export function MashScheduleEditor({
     [steps, onChange]
   );
 
-  // Remove a step
   const handleRemove = useCallback(
     (index: number) => {
-      const updated = steps.filter((_, i) => i !== index);
-      updated.forEach((step, i) => {
-        step.position = i;
-      });
-      onChange(updated);
+      onChange(reorderWithPositions(steps.filter((_, i) => i !== index)));
     },
     [steps, onChange]
   );
 
-  // Move step up/down
-  const handleMove = useCallback(
-    (index: number, direction: "up" | "down") => {
-      if (direction === "up" && index === 0) return;
-      if (direction === "down" && index === steps.length - 1) return;
-
-      const updated = [...steps];
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
-      updated.forEach((step, i) => {
-        step.position = i;
-      });
-      onChange(updated);
-    },
-    [steps, onChange]
+  const handleReorder = useCallback(
+    (reordered: MashStep[]) => onChange(reorderWithPositions(reordered)),
+    [onChange]
   );
 
-  // Calculate total mash time
   const totalTime = steps.reduce((sum, step) => sum + (step.duration_min || 0), 0);
 
   return (
@@ -252,126 +254,131 @@ export function MashScheduleEditor({
           </p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8"></TableHead>
-              <TableHead className="w-28">Type</TableHead>
-              <TableHead>Step Name</TableHead>
-              <TableHead className="w-24 text-right">Temp (°F)</TableHead>
-              <TableHead className="w-24 text-right">Time (min)</TableHead>
-              <TableHead className="w-16"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {steps.map((step, index) => (
-              <TableRow key={step.id || index}>
-                <TableCell>
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => handleMove(index, "up")}
-                      disabled={disabled || index === 0}
-                      className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                    >
-                      <GripVertical className="h-3 w-3 rotate-180" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMove(index, "down")}
-                      disabled={disabled || index === steps.length - 1}
-                      className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                    >
-                      <GripVertical className="h-3 w-3" />
-                    </button>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Select
-                    value={step.step_type}
-                    onValueChange={(value) =>
-                      handleUpdateStep(index, "step_type", value)
-                    }
-                    disabled={disabled}
-                  >
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STEP_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  <Input
-                    value={step.name}
-                    onChange={(e) => handleUpdateStep(index, "name", e.target.value)}
-                    disabled={disabled}
-                    className="min-w-[150px]"
-                    placeholder="Step name"
-                  />
-                </TableCell>
-                <TableCell className="text-right">
-                  <Input
-                    type="number"
-                    step="1"
-                    min="32"
-                    max="212"
-                    value={step.temp_f || ""}
-                    onChange={(e) =>
-                      handleUpdateStep(index, "temp_f", parseInt(e.target.value) || 0)
-                    }
-                    disabled={disabled}
-                    className="w-20 text-right ml-auto"
-                  />
-                </TableCell>
-                <TableCell className="text-right">
-                  <Input
-                    type="number"
-                    step="5"
-                    min="0"
-                    value={step.duration_min || ""}
-                    onChange={(e) =>
-                      handleUpdateStep(index, "duration_min", parseInt(e.target.value) || 0)
-                    }
-                    disabled={disabled}
-                    className="w-20 text-right ml-auto"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemove(index)}
-                    disabled={disabled}
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
+        <Sortable
+          value={steps}
+          onValueChange={handleReorder}
+          getItemValue={(item) => item.id!}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8"></TableHead>
+                <TableHead className="w-28">Type</TableHead>
+                <TableHead>Step Name</TableHead>
+                <TableHead className="w-24 text-right">Temp (°F)</TableHead>
+                <TableHead className="w-24 text-right">Time (min)</TableHead>
+                <TableHead className="w-16"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={4} className="font-medium">
-                Total Mash Time
-              </TableCell>
-              <TableCell className="text-right font-medium">
-                {totalTime} min
-              </TableCell>
-              <TableCell></TableCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
+            </TableHeader>
+            <SortableContent asChild>
+              <TableBody>
+                {steps.map((step, index) => (
+                  <SortableItem key={step.id} value={step.id!} asChild disabled={disabled}>
+                    <TableRow>
+                      <TableCell>
+                        <SortableItemHandle className="p-1 hover:bg-muted rounded touch-none">
+                          <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        </SortableItemHandle>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={step.step_type}
+                          onValueChange={(value) =>
+                            handleUpdateStep(index, "step_type", value)
+                          }
+                          disabled={disabled}
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STEP_TYPES.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={step.name}
+                          onChange={(e) => handleUpdateStep(index, "name", e.target.value)}
+                          disabled={disabled}
+                          className="min-w-[150px]"
+                          placeholder="Step name"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          step="1"
+                          min="32"
+                          max="212"
+                          value={step.temp_f || ""}
+                          onChange={(e) =>
+                            handleUpdateStep(index, "temp_f", parseInt(e.target.value) || 0)
+                          }
+                          disabled={disabled}
+                          className="w-20 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          step="5"
+                          min="0"
+                          value={step.duration_min || ""}
+                          onChange={(e) =>
+                            handleUpdateStep(index, "duration_min", parseInt(e.target.value) || 0)
+                          }
+                          disabled={disabled}
+                          className="w-20 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemove(index)}
+                          disabled={disabled}
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </SortableItem>
+                ))}
+              </TableBody>
+            </SortableContent>
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={4} className="font-medium">
+                  Total Mash Time
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {totalTime} min
+                </TableCell>
+                <TableCell></TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+          <SortableOverlay>
+            {({ value }) => {
+              const step = steps.find((s) => s.id === value);
+              return (
+                <SortableDragPreview
+                  title={step?.name || "Step"}
+                  subtitle={step ? `${step.temp_f}°F · ${step.duration_min} min` : undefined}
+                />
+              );
+            }}
+          </SortableOverlay>
+        </Sortable>
       )}
 
-      {/* Temperature Guide */}
       {steps.length > 0 && (
         <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
           <p className="font-medium">Temperature Reference:</p>
