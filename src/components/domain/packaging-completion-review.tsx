@@ -37,7 +37,7 @@ import { entityKeys, sessionLineItemKeys } from "@/lib/query-keys";
 type ReviewLineItem = {
   id: string;
   brand_name: string;
-  batch_number: string | null;
+  batch_code: string | null;
   format_name: string | null;
   planned_quantity: number | null;
   actual_quantity: number | null;
@@ -164,7 +164,7 @@ export function PackagingCompletionReview({
                     <TableCell className="font-medium">
                       {item.brand_name}
                     </TableCell>
-                    <TableCell>{item.batch_number ?? "—"}</TableCell>
+                    <TableCell>{item.batch_code ?? "—"}</TableCell>
                     <TableCell>{item.format_name ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       {item.planned_quantity ?? "—"}

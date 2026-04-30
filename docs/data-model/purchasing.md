@@ -23,14 +23,14 @@ Ingredient and material suppliers.
 
 ## `supplier_catalog`
 
-What each supplier offers (links suppliers to catalog items).
+What each supplier offers (links suppliers to catalog items and inventory items).
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
 | supplier_id | UUID | FK to suppliers |
-| catalog_type | TEXT | Catalog type: malt, hop, yeast, adjunct, sugar, spice, fruit, additive |
-| catalog_id | UUID | FK to catalog item (polymorphic) |
+| catalog_type | TEXT | Catalog type: malt, hop, yeast, adjunct, sugar, spice, fruit, additive, **inventory_item** |
+| catalog_id | UUID | FK to catalog item (polymorphic; when catalog_type = 'inventory_item', references inventory_items.id) |
 | supplier_sku | TEXT | Supplier's SKU/product code |
 | price | DECIMAL(10,4) | Current price |
 | unit | TEXT | Price unit |
@@ -42,6 +42,14 @@ What each supplier offers (links suppliers to catalog items).
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
 **Unique constraint:** (supplier_id, catalog_type, catalog_id)
+
+**Extension — `inventory_item` catalog_type (migration `00161`):** The `catalog_type` column now accepts `'inventory_item'` in addition to the brewing ingredient catalog types. When `catalog_type = 'inventory_item'`, `catalog_id` is a direct FK to `inventory_items.id`, enabling structured supplier relationships for raw packaging materials and other non-catalog inventory (e.g., cans, trays, pallets, stretch wrap). This replaces the legacy free-text `inventory_items.supplier` column.
+
+```sql
+-- Link a supplier to an inventory item (e.g., can supplier)
+INSERT INTO supplier_catalog (supplier_id, catalog_type, catalog_id, price, unit, is_preferred)
+VALUES (:supplier_id, 'inventory_item', :inventory_item_id, 0.05, 'each', true);
+```
 
 ---
 
@@ -208,13 +216,78 @@ cancelled  cancelled   cancelled   cancelled
 
 ---
 
+## `order_materials`
+
+Shipping materials (estimated and actual quantities) associated with a specific order. Rows are auto-populated from customer/brewery shipping defaults when an order is created, and can be adjusted through fulfillment.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| order_id | UUID | FK to [orders](./sales.md#orders) |
+| inventory_item_id | UUID | FK to [inventory_items](./inventory.md#inventory_items) |
+| estimated_qty | DECIMAL(10,4) | System-calculated quantity estimate (pallets, wrap, etc.) |
+| actual_qty | DECIMAL(10,4) | Override quantity confirmed at fulfillment (nullable) |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Unique constraint:** `(order_id, inventory_item_id)`
+
+**Quantity resolution:** `calculate_shipping_material_demand()` uses `actual_qty` when set, otherwise falls back to `estimated_qty`. See [calculate_material_shortfalls](#calculate_material_shortfalls) for the full shortfall calculation.
+
+---
+
 ## RPC Functions
 
 ### `calculate_ingredient_shortfalls(p_horizon_weeks)`
 
-Calculates ingredient shortfalls over a given horizon. Uses lead time cascade: `supplier_catalog.lead_time_days` -> `suppliers.default_lead_time_days` -> 7-day fallback.
+Calculates brewing ingredient shortfalls over a given horizon. Uses lead time cascade: `supplier_catalog.lead_time_days` -> `suppliers.default_lead_time_days` -> 7-day fallback.
+
+**Deprecated in favour of `calculate_material_shortfalls` for new callers.** Retained for backwards compatibility.
 
 Returns: `catalog_type, catalog_id, catalog_name, total_required, available_qty, on_order_qty, shortfall_qty, unit, required_by_date, order_by_date, lead_time_days, preferred_supplier_id, preferred_supplier_name, min_order_qty, unit_price, is_urgent, batch_count`
+
+### `calculate_material_shortfalls(p_horizon_weeks DEFAULT 8)`
+
+Unified material shortfalls report replacing `calculate_ingredient_shortfalls`. Combines demand from three sources and compares against on-hand inventory and open POs to produce per-item shortfall rows with lead-time and drop-dead-date.
+
+**Three demand sources:**
+
+| demand_source | Source | How demand is measured |
+|---------------|--------|------------------------|
+| `brewing` | Scheduled batches (via `calculate_ingredient_demand`) | Ingredient quantities from recipe grain bill, hop schedule, and yeast |
+| `packaging` | Planned packaging sessions (via `calculate_packaging_material_demand`) | `session_line_items.planned_quantity × selling_format_materials.quantity_per_unit` |
+| `shipping` | Open orders with `order_materials` rows (via `calculate_shipping_material_demand`) | `actual_qty` if set, else `estimated_qty` |
+
+**Returns:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| inventory_item_id | UUID | Inventory item with demand |
+| inventory_item_name | TEXT | Item name |
+| category | TEXT | Item category (grain, hops, packaging, etc.) |
+| demand_source | TEXT | `brewing`, `packaging`, or `shipping` |
+| needed_by_date | DATE | Earliest date the item is needed |
+| quantity_needed | DECIMAL(12,4) | Total demand quantity |
+| on_hand | DECIMAL(12,4) | Current available quantity from inventory lots |
+| incoming_po | DECIMAL(12,4) | Outstanding quantity on open POs (submitted, confirmed, partial) |
+| shortfall | DECIMAL(12,4) | `MAX(quantity_needed - on_hand - incoming_po, 0)` |
+| unit | TEXT | Unit of measure |
+| best_supplier_id | UUID | Preferred supplier (is_preferred DESC, lead_time ASC, price ASC) |
+| best_supplier_name | TEXT | Preferred supplier name |
+| lead_time_days | INTEGER | Lead time for best supplier (falls back to 7 days) |
+| drop_dead_date | DATE | `needed_by_date - lead_time_days` — must order by this date |
+| is_past_due | BOOLEAN | True when drop_dead_date is in the past |
+| source_count | INTEGER | Number of sessions/orders/batches contributing to demand |
+
+```sql
+-- Get all shortfalls over the next 8 weeks
+SELECT * FROM calculate_material_shortfalls(8);
+
+-- Filter to only items with actual shortfalls
+SELECT * FROM calculate_material_shortfalls(8)
+WHERE shortfall > 0
+ORDER BY is_past_due DESC, drop_dead_date ASC;
+```
 
 ### `cogs_by_period(p_start_date, p_end_date)`
 

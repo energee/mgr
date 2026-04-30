@@ -4747,31 +4747,40 @@ export type Database = {
         Row: {
           container_id: string
           created_at: string
+          default_layers: number | null
           id: string
           is_active: boolean
           name: string
+          pallet_quantity: number | null
           position: number
           unit_count: number
+          units_per_layer: number | null
           updated_at: string
         }
         Insert: {
           container_id: string
           created_at?: string
+          default_layers?: number | null
           id?: string
           is_active?: boolean
           name: string
+          pallet_quantity?: number | null
           position?: number
           unit_count?: number
+          units_per_layer?: number | null
           updated_at?: string
         }
         Update: {
           container_id?: string
           created_at?: string
+          default_layers?: number | null
           id?: string
           is_active?: boolean
           name?: string
+          pallet_quantity?: number | null
           position?: number
           unit_count?: number
+          units_per_layer?: number | null
           updated_at?: string
         }
         Relationships: [

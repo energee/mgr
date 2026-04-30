@@ -671,9 +671,11 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         setEditing(false);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "An unexpected error occurred";
+      // Supabase PostgrestError has .message, .code, .details, .hint but isn't an Error instance
+      const pgErr = err as { message?: string; code?: string; details?: string; hint?: string };
+      const message = pgErr?.message || (err instanceof Error ? err.message : "An unexpected error occurred");
       toast.error(message);
-      log.error("Form submission error:", err);
+      log.error("Form submission error:", JSON.stringify(err, null, 2));
     } finally {
       toast.dismiss(loadingId);
       setIsSubmitting(false);

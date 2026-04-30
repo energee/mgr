@@ -10,7 +10,7 @@ import { packagingKeys } from "@/lib/query-keys";
 
 export type BatchOption = {
   id: string;
-  batch_number: string;
+  batch_code: string;
   name: string;
   status: string;
   volume_bbl: number | null;
@@ -60,7 +60,7 @@ export function useBatchesForBrand(brandId: string | null) {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
         .select(
-          "id, batch_number, name, status, volume_bbl, current_vessel_name, recipe_id, recipes!inner(brand_id)"
+          "id, batch_code, name, status, volume_bbl, current_vessel_name, recipe_id, recipes!inner(brand_id)"
         )
         .in("status", ["planned", "fermenting", "conditioning", "packaging"])
         .eq("recipes.brand_id" as string, brandId);

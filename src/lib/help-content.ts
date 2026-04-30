@@ -37,7 +37,7 @@ Quick start:
 - Production: Planning, Backward Planning, Batches, Recipes, Vessels, Transfers, Brew Logs, Yeast Pitches
 - Packaging: Packaging Sessions
 - Inventory: Raw Materials, Finished Goods, Lots, Allocations, Kegs, Bins, Transfers, Deliveries
-- Purchasing: Ingredient Demand, Suppliers, Purchase Orders
+- Purchasing: Material Planning, Ingredient Demand, Suppliers, Purchase Orders
 - Sales: Orders, Pick Lists, Customers
 - Reports: TTB Report, Production Summary, Inventory Valuation, Batch Cost, Projections, COGS
 - Settings: Brewery config, locations, users, integrations, catalog data
@@ -106,9 +106,16 @@ Deliveries (/inventory/deliveries): Record incoming deliveries from suppliers. L
   {
     id: "purchasing",
     title: "Purchasing",
-    content: `Ingredient Demand (/purchasing/demand): See what ingredients are needed based on planned batches vs. current stock.
+    content: `Material Planning (/purchasing/material-planning): Unified view of all material needs across brewing, packaging, and shipping. Shows what you need, what's in stock, what's on order, shortfalls, and "order by" dates based on supplier lead times. Filter by horizon (2-12 weeks), demand source (brewing/packaging/shipping), or shortfalls only. Past-due items are highlighted in red, items needing orders in amber.
 
-Suppliers (/purchasing/suppliers): Manage your supplier contacts and catalogs.
+The system calculates demand from three sources:
+- Brewing: planned batches and their recipe ingredients
+- Packaging: planned sessions and their selling format bills of materials (BOMs)
+- Shipping: confirmed orders and their pallet/wrap requirements
+
+Ingredient Demand (/purchasing/demand): See what ingredients are needed based on planned batches vs. current stock.
+
+Suppliers (/purchasing/suppliers): Manage your supplier contacts and catalogs. Suppliers can now be linked to packaging materials and shipping supplies (not just brewing ingredients) via the supplier catalog.
 
 Purchase Orders (/purchasing/pos): Create and track purchase orders. POs move through states: Draft → Submitted → Partially Received → Received.`,
   },
@@ -119,7 +126,7 @@ Purchase Orders (/purchasing/pos): Create and track purchase orders. POs move th
 
 Pick Lists (/sales/pick-lists): Generate pick lists from orders for warehouse staff to fulfill.
 
-Customers (/sales/customers): Manage customer accounts, contacts, and pricing tiers.`,
+Customers (/sales/customers): Manage customer accounts, contacts, and pricing tiers. Each customer can have shipping preferences (preferred pallet type, wrap type) and pallet layer overrides per selling format for custom stacking configurations.`,
   },
   {
     id: "reports",
@@ -150,7 +157,8 @@ Brands (/settings/brands): Manage your beer brands used across recipes, batches,
 
 COMMERCE:
 Package Formats (/settings/containers): Manage physical containers (cans, bottles, kegs) and their selling formats.
-Selling Formats (/settings/selling-formats): Define how containers are sold (singles, 4-packs, cases, per keg).
+Selling Formats (/settings/selling-formats): Define how containers are sold (singles, 4-packs, cases, per keg). Each format can have a Bill of Materials (BOM) defining required packaging materials (cans, lids, PakTechs, trays, keg caps) and pallet configuration (units per layer, default layers).
+Shipping Defaults (/settings/shipping-defaults): Set brewery-wide default shipping materials (pallet type, wrap type) used when calculating order shipping needs.
 Sales Channels (/settings/sales-channels): Categorize customers by channel (taproom, distribution, online) for pricing rules.
 Pricing (/settings/pricing): Spreadsheet-style pricing matrix -- set prices by tier and selling format per sales channel.
 

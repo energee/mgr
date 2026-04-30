@@ -15,6 +15,7 @@ import { OrderQuickLinks } from "@/components/domain/order-quick-links";
 import { OrderItemsEditor } from "@/components/domain/order-items-editor";
 import { ChangeRequestReview } from "@/components/domain/change-request-review";
 import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
+import { OrderShippingMaterialsEditor } from "@/components/domain/order-shipping-materials-editor";
 
 // Wrapper component to adapt OrderItemsEditor to relation component interface
 function OrderItemsRelation({ parentId, data }: { parentId: string; data?: Record<string, unknown> }) {
@@ -24,6 +25,12 @@ function OrderItemsRelation({ parentId, data }: { parentId: string; data?: Recor
       customerId={data?.customer_id as string | null | undefined}
     />
   );
+}
+
+// Wrapper component to adapt OrderShippingMaterialsEditor to section component interface.
+// The section component receives the full order `data` row; we extract `id` to pass as orderId.
+function OrderShippingMaterialsSection({ data }: { data: Order }) {
+  return <OrderShippingMaterialsEditor orderId={data.id} />;
 }
 
 type Order = Database["public"]["Tables"]["orders"]["Row"];
@@ -231,6 +238,12 @@ export const orderEntity: EntityConfig<Order> = {
           colSpan: 12,
         },
       ],
+    },
+    {
+      id: "shipping-materials",
+      title: "Shipping Materials",
+      component: OrderShippingMaterialsSection,
+      collapsible: true,
     },
     {
       id: "change-requests",

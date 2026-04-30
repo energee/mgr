@@ -59,6 +59,7 @@ import { pricingTierEntity } from "@/entities/pricing-tier";
 import { salesChannelEntity } from "@/entities/sales-channel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { log } from "@/lib/client-logger";
+import { formatVolumeLabel } from "@/hooks/use-catalog";
 
 // =============================================================================
 // Types
@@ -86,6 +87,8 @@ type SellingFormatWithContainer = {
   container_name: string;
   container_type: string;
   unit_count: number;
+  volume_oz: number | null;
+  volume_bbl: number | null;
 }
 
 type PricingTierPrice = {
@@ -256,7 +259,7 @@ function FormatManagement({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("packaging_formats")
-        .select("id, name, container_name, container_type, container_id, unit_count")
+        .select("id, name, container_name, container_type, container_id, unit_count, volume_oz, volume_bbl")
         .eq("is_active", true)
         .order("container_type")
         .order("name");
@@ -370,7 +373,7 @@ function FormatManagement({
               {containerFormats.map((f) => (
                 <TableRow key={f.id}>
                   <TableCell className="font-medium">{f.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{f.unit_count}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatVolumeLabel(f) ?? f.unit_count}</TableCell>
                   {channels?.map((ch) => {
                     const isEnabled = cfMap.has(`${f.id}:${ch.id}`);
                     return (
@@ -540,7 +543,7 @@ export default function PricingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("packaging_formats")
-        .select("id, name, container_name, container_type, container_id, unit_count")
+        .select("id, name, container_name, container_type, container_id, unit_count, volume_oz, volume_bbl")
         .eq("is_active", true)
         .order("container_type")
         .order("container_id")

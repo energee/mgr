@@ -36,6 +36,9 @@ How a container is grouped for sale — single, 4-pack, case of 24, per keg.
 | container_id | UUID | FK to [containers](#containers) |
 | name | TEXT | Format name (e.g., "Case of 24", "4-Pack", "Per Keg") |
 | unit_count | INTEGER | Units per selling format (e.g., 24 for a case, 1 for single/keg) |
+| units_per_layer | INTEGER | How many units of this format fit on one pallet layer (nullable) |
+| default_layers | INTEGER | Default number of layers per pallet (nullable) |
+| pallet_quantity | INTEGER | Total units per pallet — auto-computed as `units_per_layer × default_layers` when both layer fields are set; can be set manually when only one field is provided (nullable) |
 | is_active | BOOLEAN | Active flag |
 | position | INTEGER | Display order |
 | created_at | TIMESTAMPTZ | Created timestamp |
@@ -43,16 +46,23 @@ How a container is grouped for sale — single, 4-pack, case of 24, per keg.
 
 **Unique constraint:** `(container_id, name)`
 
+**Pallet quantity trigger (`trg_selling_formats_pallet_quantity`):** Fires `BEFORE INSERT OR UPDATE` of `units_per_layer` or `default_layers`. Behaviour:
+- Both fields set → `pallet_quantity` is computed as `units_per_layer × default_layers`
+- Both fields NULL → `pallet_quantity` is cleared to NULL
+- Exactly one field set → `pallet_quantity` is left unchanged (allows manual override)
+
 **Examples:**
 
-| Container | Selling Format | unit_count |
-|-----------|---------------|------------|
-| 16oz Can | Case of 24 | 24 |
-| 16oz Can | 4-Pack | 4 |
-| 16oz Can | Single | 1 |
-| 12oz Bottle | Case of 24 | 24 |
-| 1/2 Barrel | Per Keg | 1 |
-| 1/6 Barrel | Per Keg | 1 |
+| Container | Selling Format | unit_count | units_per_layer | default_layers | pallet_quantity |
+|-----------|---------------|------------|-----------------|----------------|-----------------|
+| 16oz Can | Case of 24 | 24 | 20 | 5 | 100 |
+| 16oz Can | 4-Pack | 4 | 50 | 5 | 250 |
+| 16oz Can | Single | 1 | — | — | — |
+| 12oz Bottle | Case of 24 | 24 | 20 | 5 | 100 |
+| 1/2 Barrel | Per Keg | 1 | — | — | — |
+| 1/6 Barrel | Per Keg | 1 | — | — | — |
+
+**Related table:** `selling_format_materials` in [inventory.md](./inventory.md#selling_format_materials) defines the packaging BOM (cans, lids, trays, etc.) for each format.
 
 ---
 

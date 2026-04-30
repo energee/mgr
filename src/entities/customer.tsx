@@ -11,6 +11,24 @@ import { valuesAsOptions, getValueDisplay } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
+import { CustomerShippingPreferences } from "@/components/domain/customer-shipping-preferences";
+import { CustomerPalletConfigs } from "@/components/domain/customer-pallet-configs";
+
+// =============================================================================
+// Section Component Wrappers
+// =============================================================================
+
+// Adapter: extracts customerId from section data for CustomerShippingPreferences
+function CustomerShippingPreferencesSection({ data }: { data: { id: string } }) {
+  if (!data?.id) return null;
+  return <CustomerShippingPreferences customerId={data.id} />;
+}
+
+// Adapter: extracts customerId from section data for CustomerPalletConfigs
+function CustomerPalletConfigsSection({ data }: { data: { id: string } }) {
+  if (!data?.id) return null;
+  return <CustomerPalletConfigs customerId={data.id} />;
+}
 
 // Base type from customers table
 type CustomerBase = Database["public"]["Tables"]["customers"]["Row"];
@@ -269,6 +287,18 @@ export const customerEntity: EntityConfig<Customer> = {
           colSpan: 6,
         },
       ],
+    },
+    {
+      id: "shipping-preferences",
+      title: "Shipping Preferences",
+      component: CustomerShippingPreferencesSection,
+      collapsible: true,
+    },
+    {
+      id: "pallet-configs",
+      title: "Pallet Configurations",
+      component: CustomerPalletConfigsSection,
+      collapsible: true,
     },
     {
       id: "order_summary",

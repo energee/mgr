@@ -448,6 +448,30 @@ export const purchasingKeys = {
 };
 
 // =============================================================================
+// Material Planning Keys
+// =============================================================================
+
+export const materialPlanningKeys = {
+  all: () => ["material-planning"] as const,
+  shortfalls: (options?: { horizonWeeks?: number; demandSource?: string }) =>
+    options
+      ? (["material-planning", "shortfalls", options] as const)
+      : (["material-planning", "shortfalls"] as const),
+  bom: (sellingFormatId: string) =>
+    ["material-planning", "bom", sellingFormatId] as const,
+  orderMaterials: (orderId: string) =>
+    ["material-planning", "order-materials", orderId] as const,
+  customerShippingMaterials: (customerId: string) =>
+    ["material-planning", "customer-shipping", customerId] as const,
+  customerPalletConfigs: (customerId: string) =>
+    ["material-planning", "customer-pallets", customerId] as const,
+  breweryShippingDefaults: () =>
+    ["material-planning", "brewery-defaults"] as const,
+  sessionMaterials: (sessionId: string) =>
+    ["material-planning", "session-materials", sessionId] as const,
+};
+
+// =============================================================================
 // Landed Cost Keys
 // =============================================================================
 
