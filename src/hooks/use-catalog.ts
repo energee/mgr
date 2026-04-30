@@ -80,14 +80,26 @@ export type PackagingFormat = {
 }
 
 /**
- * Returns a concise volume label for a packaging format:
- * - Package: "{volume_oz}oz x {unit_count}" (e.g., "16oz x 24")
+ * Returns a concise volume label for a packaging format showing per-unit
+ * volume × count:
+ * - Package: "{per-unit oz}oz x {unit_count}" (e.g., "16oz x 24")
  * - Keg: "{volume_bbl} BBL" (e.g., "1/2 BBL")
  * - Unknown: null
+ *
+ * `volume_oz` on the underlying container is inconsistent: for some rows it
+ * is the per-unit volume (e.g. 11.25oz Glass with unit_count=12); for others
+ * it is the rolled-up case volume (e.g. "384oz Can" with unit_count=24,
+ * representing 24×16oz cans). When the container's volume divided by unit
+ * count yields a sensible single-container size (≥ 8oz) we treat it as
+ * rolled-up and divide; otherwise we use volume_oz as-is.
  */
 export function formatVolumeLabel(format: Pick<PackagingFormat, "container_type" | "volume_oz" | "volume_bbl" | "unit_count">): string | null {
   if (format.container_type !== "keg" && format.volume_oz != null) {
-    return `${format.volume_oz}oz x ${format.unit_count}`;
+    const count = format.unit_count ?? 1;
+    const perUnitCandidate = format.volume_oz / count;
+    const isRolledUp = count > 1 && perUnitCandidate >= 8;
+    const perUnit = isRolledUp ? Math.round(perUnitCandidate * 100) / 100 : format.volume_oz;
+    return `${perUnit}oz x ${count}`;
   }
   if (format.container_type === "keg" && format.volume_bbl != null) {
     return `${format.volume_bbl} BBL`;

@@ -134,7 +134,7 @@ export function useMaterialShortfalls(options?: {
       const { data, error } = await dynamicRpc(
         supabase,
         "calculate_material_shortfalls",
-        { horizon_weeks: horizonWeeks ?? 4 }
+        { p_horizon_weeks: horizonWeeks ?? 4 }
       );
       if (error) throw error;
       return (data ?? []) as MaterialShortfall[];
