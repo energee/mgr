@@ -8,6 +8,9 @@
 /** Column IDs reserved for non-navigable columns (checkboxes, action menus). */
 export const NON_NAVIGABLE_COLUMN_IDS = ["select", "actions"] as const;
 
+/** Prefix for resolved FK relation display values stored on row data by entity-data-table queryFn. */
+export const REL_KEY_PREFIX = "__rel_";
+
 import type { ColumnDef } from "@tanstack/react-table";
 import type {
   EntityConfig,
@@ -74,6 +77,16 @@ const CellRenderer = memo(function CellRenderer<T>({
 }) {
   if (col.render) {
     return col.render(value, original);
+  }
+
+  // Resolve FK relation columns via pre-fetched lookup (see entity-data-table queryFn)
+  if (col.relation) {
+    const accessorKey = col.accessorKey as string | undefined;
+    if (accessorKey) {
+      const resolved = (original as Record<string, unknown>)[`${REL_KEY_PREFIX}${accessorKey}`];
+      if (resolved != null) return String(resolved);
+    }
+    return value ? "—" : null;
   }
 
   if (col.format === "unit" && col.unitType) {

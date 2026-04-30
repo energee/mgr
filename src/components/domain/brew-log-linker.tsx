@@ -265,9 +265,9 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
           </p>
         ) : (
           <div className="space-y-3">
-            {linkedBrewLogs.map((link) => (
+            {linkedBrewLogs.map((link, idx) => (
               <div
-                key={link.id}
+                key={link.id ?? `link-${idx}`}
                 className="flex items-center justify-between p-3 rounded-md border"
               >
                 <Link

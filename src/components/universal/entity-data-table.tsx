@@ -34,7 +34,8 @@ import { dynamicFrom } from "@/services/types";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
-import { getStateLabel } from "@/types/entity";
+import { getStateLabel, entityRegistry } from "@/types/entity";
+import type { EntityColumnDef } from "@/types/entity";
 import type { ExtendedColumnFilter } from "@/types/data-table";
 import { getFiltersStateParser } from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
@@ -47,6 +48,7 @@ import {
   buildActionsColumn,
   buildSupabaseFiltersFromUrl,
   escapePostgrestOrValue,
+  REL_KEY_PREFIX,
 } from "@/lib/data-table-adapter";
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
@@ -465,7 +467,39 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as T[];
+      const rows = (data ?? []) as Record<string, unknown>[];
+
+      // Batch-resolve FK relation columns (parallel, one query per relation table)
+      const relationCols = entity.listColumns.filter(
+        (c: EntityColumnDef<T>) => c.relation && c.accessorKey
+      );
+      await Promise.allSettled(relationCols.map(async (col) => {
+        const key = col.accessorKey as string;
+        const uniqueIds = [...new Set(rows.map((r) => r[key]).filter(Boolean))] as string[];
+        if (uniqueIds.length === 0) return;
+
+        const relEntity = entityRegistry.get(col.relation!.entity);
+        const table = relEntity?.table ?? `${col.relation!.entity}s`;
+        const displayField = col.relation!.displayField;
+
+        const { data: relData } = await dynamicFrom(supabase, table)
+          .select(`id, ${displayField}`)
+          .in("id", uniqueIds);
+
+        if (relData) {
+          const lookup = new Map(
+            relData.map((r: Record<string, unknown>) => [r.id as string, r[displayField] as string])
+          );
+          for (const row of rows) {
+            const fkVal = row[key] as string | null;
+            if (fkVal && lookup.has(fkVal)) {
+              row[`${REL_KEY_PREFIX}${key}`] = lookup.get(fkVal);
+            }
+          }
+        }
+      }));
+
+      return rows as T[];
     },
   });
 

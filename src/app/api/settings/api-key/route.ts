@@ -15,7 +15,7 @@ function maskKey(key: string | null | undefined): string | null {
   return `...${key.slice(-4)}`;
 }
 
-const VALID_INTEGRATION_IDS = ["square", "square-webhook", "slack", "quickbooks"];
+const VALID_INTEGRATION_IDS = ["square", "square-webhook", "slack", "quickbooks", "mongodb"];
 
 /**
  * GET /api/settings/api-key?scope=global|user|integration&id=<integration_id>

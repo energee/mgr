@@ -13,23 +13,23 @@ export function ChatToggle() {
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
           aria-label={isOpen ? "Close Claude" : "Ask Claude"}
           onClick={toggle}
-          className={`group fixed bottom-4 right-4 z-50 h-10 w-10 rounded-full shadow-lg transition-colors ${
+          className={`group relative transition-colors ${
             isOpen
-              ? "bg-[#D97757] text-white border-[#D97757] hover:bg-[#c56847] hover:text-white"
-              : "hover:border-[#D97757]/50"
+              ? "bg-[#D97757] text-white hover:bg-[#c56847] hover:text-white"
+              : "hover:text-[#D97757]"
           }`}
         >
           {isWorking && !isOpen && (
-            <span className="absolute inset-0 rounded-full animate-ping bg-[#D97757]/30" />
+            <span className="absolute inset-0 rounded-md animate-ping bg-[#D97757]/30" />
           )}
           <ClaudeIcon className={`h-5 w-5 transition-transform duration-300 group-hover:scale-75 ${isOpen ? "" : "text-[#D97757]"}`} />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="left">
+      <TooltipContent side="bottom">
         {isOpen ? "Close Claude" : "Ask Claude"} (⌘.)
       </TooltipContent>
     </Tooltip>
