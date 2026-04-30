@@ -22,9 +22,9 @@ describe("buildIssuesUrl", () => {
     expect(url).toContain("limit=20");
   });
 
-  it("defaults to 7d statsPeriod and 20 limit", () => {
+  it("defaults to 14d statsPeriod and 20 limit", () => {
     const url = buildIssuesUrl({ org: "o", project: "p", environment: "development" });
-    expect(url).toContain("statsPeriod=7d");
+    expect(url).toContain("statsPeriod=14d");
     expect(url).toContain("limit=20");
   });
 
