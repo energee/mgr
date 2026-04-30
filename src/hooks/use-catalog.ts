@@ -4,6 +4,12 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { brandKeys, packagingFormatKeys, entityKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
+import { formatSmartDecimal } from "@/lib/format";
+
+// Smallest plausible per-unit container volume (oz). When a packaging format's
+// volume_oz divided by unit_count is below this, treat volume_oz as already
+// per-unit; at or above, treat it as a rolled-up case total and divide.
+const MIN_PER_UNIT_OZ = 8;
 
 /**
  * Generic hook for fetching active catalog items from a Supabase table.
@@ -65,6 +71,9 @@ export function useKegOwners(): UseQueryResult<IdNamePair[]> {
 /**
  * A packaging format from the packaging_formats view (selling_formats + containers).
  * Used by the pricing matrix and format selectors.
+ *
+ * `volume_oz` is set for package formats (cans, bottles); null for kegs.
+ * `volume_bbl` is set for keg formats; null for packages.
  */
 export type PackagingFormat = {
   id: string;
@@ -72,6 +81,35 @@ export type PackagingFormat = {
   container_type: string;
   container_name: string;
   unit_count: number;
+  volume_oz: number | null;
+  volume_bbl: number | null;
+}
+
+/**
+ * Returns a concise volume label for a packaging format showing per-unit
+ * volume × count:
+ * - Package: "{per-unit oz}oz x {unit_count}" (e.g., "16oz x 24")
+ * - Keg: "{volume_bbl} BBL" (e.g., "1/2 BBL")
+ * - Unknown: null
+ *
+ * `containers.volume_oz` is inconsistent in the data: some rows are per-unit
+ * (e.g. 11.25oz Glass with unit_count=12) and some are rolled-up case totals
+ * (e.g. "384oz Can" with unit_count=24, representing 24×16oz cans). The
+ * MIN_PER_UNIT_OZ threshold disambiguates: if dividing yields a value at or
+ * above the smallest plausible single-container size, the row is rolled-up.
+ * TODO: normalize containers.volume_oz to per-unit and drop this heuristic.
+ */
+export function formatVolumeLabel(format: Pick<PackagingFormat, "container_type" | "volume_oz" | "volume_bbl" | "unit_count">): string | null {
+  if (format.container_type !== "keg" && format.volume_oz != null) {
+    const { unit_count: count, volume_oz } = format;
+    const isRolledUp = count > 1 && volume_oz / count >= MIN_PER_UNIT_OZ;
+    const perUnit = isRolledUp ? volume_oz / count : volume_oz;
+    return `${formatSmartDecimal(perUnit)}oz x ${count}`;
+  }
+  if (format.container_type === "keg" && format.volume_bbl != null) {
+    return `${format.volume_bbl} BBL`;
+  }
+  return null;
 }
 
 /** Fetch packaging formats (view over selling_formats + containers) */
@@ -83,7 +121,7 @@ export function usePackagingFormats(): UseQueryResult<PackagingFormat[]> {
     queryFn: async (): Promise<PackagingFormat[]> => {
       const { data, error } = await supabase
         .from("packaging_formats")
-        .select("id, name, container_type, container_name, unit_count")
+        .select("id, name, container_type, container_name, unit_count, volume_oz, volume_bbl")
         .eq("is_active", true)
         .order("container_type")
         .order("name");

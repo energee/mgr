@@ -315,6 +315,72 @@ CREATE INDEX idx_customers_name ON customers(name) WHERE is_active = true;
 
 ---
 
+## `brewery_shipping_defaults`
+
+Brewery-wide default shipping materials per role. One row per `material_role`. Used as the fallback when no customer-specific override exists.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| inventory_item_id | UUID | FK to [inventory_items](./inventory.md#inventory_items) |
+| material_role | TEXT | Role: `pallet`, `wrap`, `other` |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Unique constraint:** `(material_role)` — one default material per role brewery-wide.
+
+**Material roles:**
+
+| material_role | Description |
+|---------------|-------------|
+| `pallet` | Standard shipping pallet |
+| `wrap` | Stretch wrap / shrink film |
+| `other` | Additional shipping material |
+
+---
+
+## `customer_shipping_materials`
+
+Per-customer shipping material preferences, keyed by customer and `material_role`. Overrides `brewery_shipping_defaults` for a specific customer.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| customer_id | UUID | FK to [customers](#customers) |
+| inventory_item_id | UUID | FK to [inventory_items](./inventory.md#inventory_items) |
+| material_role | TEXT | Role: `pallet`, `wrap`, `other` |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Unique constraint:** `(customer_id, material_role)` — one material per role per customer.
+
+---
+
+## `customer_pallet_configs`
+
+Per-customer, per-selling-format pallet layer count overrides. When set, this overrides `selling_formats.default_layers` when calculating how many pallets an order requires for a specific customer.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| customer_id | UUID | FK to [customers](#customers) |
+| selling_format_id | UUID | FK to [selling_formats](./packaging.md#selling_formats) |
+| layers | INTEGER | Number of pallet layers for this format for this customer (must be > 0) |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Unique constraint:** `(customer_id, selling_format_id)`
+
+**Pallet quantity resolution order** (for a given order line):
+1. `customer_pallet_configs.layers × selling_formats.units_per_layer` (customer override)
+2. `selling_formats.pallet_quantity` (format default)
+3. No pallet estimate (pallet fields not set)
+
+---
+
 ## `order_change_requests`
 
 Customer-submitted change requests for orders. Requires admin approval.

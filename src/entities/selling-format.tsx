@@ -8,17 +8,32 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { SellingFormatBOMEditor } from "@/components/domain/selling-format-bom-editor";
 
 type SellingFormat = Database["public"]["Tables"]["selling_formats"]["Row"];
+
+// Wrapper to adapt SellingFormatBOMEditor to the relation component interface
+function BOMRelation({ parentId }: { parentId: string }) {
+  return <SellingFormatBOMEditor sellingFormatId={parentId} />;
+}
 
 // =============================================================================
 // Zod Schema
 // =============================================================================
 
+/** Coerce empty/null/undefined to null, otherwise to Number — for optional integer fields. */
+const optionalInt = z.preprocess(
+  (v) => (v === "" || v == null ? null : Number(v)),
+  z.number().int().positive("Must be positive").nullable().optional()
+);
+
 export const sellingFormatSchema = z.object({
   name: z.string().min(1, "Name is required"),
   container_id: z.string().uuid("Container is required"),
   unit_count: z.coerce.number().int().positive("Unit count must be positive").default(1),
+  units_per_layer: optionalInt,
+  default_layers: optionalInt,
+  pallet_quantity: optionalInt,
   is_active: z.boolean().default(true),
   position: z.coerce.number().int().min(0).default(0),
 });
@@ -157,6 +172,36 @@ export const sellingFormatEntity: EntityConfig<SellingFormat> = {
         },
       ],
     },
+    {
+      id: "pallet",
+      title: "Pallet Configuration",
+      fields: [
+        {
+          name: "units_per_layer",
+          label: "Units Per Layer",
+          type: "number",
+          placeholder: "e.g., 25",
+          description: "How many of this format fit in one pallet layer",
+          colSpan: 4,
+        },
+        {
+          name: "default_layers",
+          label: "Default Layers",
+          type: "number",
+          placeholder: "e.g., 4",
+          description: "Default number of layers per pallet",
+          colSpan: 4,
+        },
+        {
+          name: "pallet_quantity",
+          label: "Pallet Quantity",
+          type: "number",
+          description: "Auto-calculated: units_per_layer × default_layers",
+          editable: false,
+          colSpan: 4,
+        },
+      ],
+    },
   ],
 
   // ---------------------------------------------------------------------------
@@ -175,6 +220,21 @@ export const sellingFormatEntity: EntityConfig<SellingFormat> = {
       type: "dropdown",
       variant: "destructive",
       deleteMode: "hard",
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Relations
+  // ---------------------------------------------------------------------------
+  relations: [
+    {
+      name: "bill_of_materials",
+      entity: "selling_format_material",
+      type: "hasMany" as const,
+      foreignKey: "selling_format_id",
+      showInDetail: true,
+      detailTab: "Bill of Materials",
+      component: BOMRelation,
     },
   ],
 

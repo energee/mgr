@@ -74,11 +74,41 @@ Inventory item catalog (links to catalog items for stock tracking).
 | catalog_id | UUID | FK to catalog item (polymorphic) |
 | reorder_point | DECIMAL(10,2) | Reorder threshold |
 | reorder_qty | DECIMAL(10,2) | Reorder quantity |
-| supplier | TEXT | Primary supplier |
 | notes | TEXT | Notes |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Note:** The `supplier` free-text column was removed in migration `00161`. Supplier relationships are now managed via `supplier_catalog` using `catalog_type = 'inventory_item'`.
+
+---
+
+## `selling_format_materials`
+
+Bill-of-materials (BOM) for selling formats. Each row defines how much of a given inventory item (cans, lids, PakTechs, trays, keg caps, etc.) is required per unit of that selling format.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| selling_format_id | UUID | FK to [selling_formats](./packaging.md#selling_formats) |
+| inventory_item_id | UUID | FK to [inventory_items](#inventory_items) |
+| quantity_per_unit | DECIMAL(10,4) | Amount of the inventory item consumed per unit sold (must be > 0) |
+| notes | TEXT | Notes |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |
+
+**Unique constraint:** `(selling_format_id, inventory_item_id)`
+
+**Example: Case of 24 (16oz Cans)**
+
+| selling_format | inventory_item | quantity_per_unit |
+|----------------|----------------|-------------------|
+| Case of 24 | 16oz Can | 24 |
+| Case of 24 | Can Lid | 24 |
+| Case of 24 | Tray | 1 |
+| Case of 24 | Cardboard Case | 1 |
+
+**Usage:** Used by `calculate_packaging_material_demand()` and `calculate_material_shortfalls()` to project how much packaging material will be consumed by planned packaging sessions.
 
 ---
 

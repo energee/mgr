@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/combobox";
 import { Plus, Loader2 } from "lucide-react";
 import { useBatchesForBrand, useKegFormatIds } from "@/hooks/use-packaging";
-import { useBrands, usePackagingFormats, useKegOwners } from "@/hooks/use-catalog";
+import { useBrands, usePackagingFormats, useKegOwners, formatVolumeLabel } from "@/hooks/use-catalog";
 import { createNameFilter } from "@/lib/combobox-filter";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { parseIntOrNull } from "@/lib/format";
@@ -66,7 +66,7 @@ export function BatchCell({
 
   if (readOnly) {
     const batch = batches?.find((b) => b.id === currentBatchId);
-    return <span>{batch?.batch_number ?? "—"}</span>;
+    return <span>{batch?.batch_code ?? "—"}</span>;
   }
 
   return (
@@ -83,7 +83,7 @@ export function BatchCell({
         {batches?.map((batch) => (
           <SelectItem key={batch.id} value={batch.id}>
             <span className="flex items-center gap-2">
-              {batch.batch_number}
+              {batch.batch_code}
               <StatusBadge
                 status={batch.status}
                 config={batchEntity.stateMachine?.stateDisplay}
@@ -153,6 +153,11 @@ export function FormatCell({
             <ComboboxItem key={f.id} value={f.id} label={f.name}>
               <span className="flex items-center gap-2">
                 {f.name}
+                {formatVolumeLabel(f) != null && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatVolumeLabel(f)}
+                  </span>
+                )}
                 {f.container_type === "keg" && (
                   <Badge variant="outline" className="text-xs">
                     keg

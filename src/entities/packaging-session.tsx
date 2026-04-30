@@ -17,6 +17,7 @@ import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { SessionLineItemsDisplay } from "@/components/domain/session-line-items-display";
+import { PackagingSessionMaterialsSection } from "@/components/domain/packaging-session-materials";
 
 type PackagingSessionTable = Database["public"]["Tables"]["packaging_sessions"]["Row"];
 
@@ -237,6 +238,12 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
       id: "line_items",
       title: "Line Items",
       component: SessionLineItemsDisplay,
+    },
+    {
+      id: "materials",
+      title: "Materials Required",
+      component: PackagingSessionMaterialsSection,
+      collapsible: true,
     },
   ],
 
