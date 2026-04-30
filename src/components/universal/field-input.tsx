@@ -412,6 +412,17 @@ function RelationCombobox({
     setInputText(resolvedLabel);
   }, [resolvedLabel]);
 
+  const onFilter = useMemo(
+    () => (values: string[], inputValue: string) => {
+      const q = inputValue.trim().toLowerCase();
+      if (!q) return values;
+      return values.filter((v) =>
+        (labelByValue.get(v) ?? "").toLowerCase().includes(q)
+      );
+    },
+    [labelByValue]
+  );
+
   return (
     <Combobox
       className="flex-1"
@@ -419,6 +430,7 @@ function RelationCombobox({
       inputValue={inputText}
       onInputValueChange={setInputText}
       onValueChange={(v) => onChange(v || null)}
+      onFilter={onFilter}
       disabled={disabled}
     >
       <ComboboxAnchor>

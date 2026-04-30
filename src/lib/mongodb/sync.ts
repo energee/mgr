@@ -185,7 +185,7 @@ async function buildVesselLookups(db: Db) {
   const mongoVessels = await db.collection<MongoVessel>("vessels").find().toArray();
   const { data: pgVessels } = await dynamicFrom(admin, "vessels").select("id, name");
 
-  const vesselNameToId = new Map(
+  const vesselNameToId = new Map<string, string>(
     (pgVessels ?? []).map((v: { id: string; name: string }) => [v.name, v.id])
   );
   const mongoVesselIdToName = new Map(
@@ -517,19 +517,24 @@ async function syncTransfers(): Promise<SyncResult> {
   const { vesselNameToId, mongoVesselIdToName } = await buildVesselLookups(db);
 
   const docs = await db.collection<MongoTransfer>("transfers").find().sort({ date: 1 }).toArray();
-  const rows = docs.map((doc) => {
+  const rows = docs.flatMap((doc) => {
     const row = transformTransfer(doc);
 
     if (doc.transferFrom) {
       const fromName = mongoVesselIdToName.get(doc.transferFrom.toString());
-      row.from_vessel_id = fromName ? (vesselNameToId.get(fromName) as string ?? null) : null;
+      row.from_vessel_id = fromName ? (vesselNameToId.get(fromName) ?? null) : null;
     }
     const toName = mongoVesselIdToName.get(doc.transferTo.toString());
-    row.to_vessel_id = toName ? (vesselNameToId.get(toName) as string ?? row.to_vessel_id) : row.to_vessel_id;
+    const resolvedTo = toName ? vesselNameToId.get(toName) : undefined;
+    if (!resolvedTo) {
+      // to_vessel_id is NOT NULL — skip rows we can't resolve to a real vessel
+      return [];
+    }
+    row.to_vessel_id = resolvedTo;
 
     row.batch_id = objectIdToUuid(doc.batch.toString());
 
-    return row;
+    return [row];
   });
   const result = await upsertRows("vessel_transfers", rows);
 
