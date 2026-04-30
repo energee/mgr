@@ -57,7 +57,7 @@ export function buildIssuesUrl(opts: {
     : "is:unresolved";
   const params = new URLSearchParams({
     query,
-    statsPeriod: opts.statsPeriod ?? "7d",
+    statsPeriod: opts.statsPeriod ?? "14d",
     limit: String(opts.limit ?? 20),
     sort: "freq",
   });
