@@ -8,6 +8,7 @@
  * - Square POS (catalog/inventory sync + draft sales)
  * - Slack (notifications)
  * - QuickBooks Online (invoices/bills sync)
+ * - MongoDB (live data sync from lolev-manager)
  */
 
 import { useEffect, useState } from "react";
@@ -19,13 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/integration-badge";
 import { Switch } from "@/components/ui/switch";
-import { Check, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { Check, Database, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { SecretKeyInput } from "@/components/domain/secret-key-input";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { SquareIcon } from "@/components/ui/square-icon";
 import { QuickBooksIcon } from "@/components/ui/quickbooks-icon";
 import { SlackIntegrationCard } from "@/components/domain/slack-integration-card";
-import { qboKeys, squareKeys } from "@/lib/query-keys";
+import { mongodbKeys, qboKeys, squareKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 
 // =============================================================================
@@ -496,6 +497,56 @@ function QuickBooksIntegrationCard() {
   );
 }
 
+// =============================================================================
+// MongoDB Integration Card
+// =============================================================================
+
+function MongoDBIntegrationCard() {
+  const { data: status } = useQuery({
+    queryKey: mongodbKeys.status(),
+    queryFn: async () => {
+      const res = await fetch("/api/integrations/mongodb/status");
+      if (!res.ok) return { connected: false };
+      return (await res.json()).data;
+    },
+    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
+  });
+
+  const integrationStatus: IntegrationStatus = status?.connected ? "connected" : "not_connected";
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Database className="h-6 w-6" />
+            <div>
+              <CardTitle className="text-base">MongoDB Sync</CardTitle>
+              <CardDescription>
+                Sync data from lolev-manager
+              </CardDescription>
+            </div>
+          </div>
+          <IntegrationBadge status={integrationStatus} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <ul className="text-sm text-muted-foreground space-y-1">
+          <li>Suppliers, malts, hops, yeasts, beer styles</li>
+          <li>Brands, vessels, batches, transfers</li>
+          <li>Orders, order items, batch readings</li>
+        </ul>
+        <Link href="/settings/integrations/mongodb">
+          <Button variant="outline" size="sm">
+            Settings
+            <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function IntegrationsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
@@ -517,6 +568,9 @@ export default function IntegrationsPage() {
 
       {/* QuickBooks */}
       <QuickBooksIntegrationCard />
+
+      {/* MongoDB Sync */}
+      <MongoDBIntegrationCard />
 
       {/* Custom Integration Section */}
       <Card>

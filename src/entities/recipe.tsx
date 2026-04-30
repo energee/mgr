@@ -109,6 +109,12 @@ export const recipeEntity: EntityConfig<Recipe> = {
       sortable: true,
       render: (value) => value ? "Yes" : "No",
     },
+    {
+      accessorKey: "created_at",
+      header: "Created",
+      sortable: true,
+      format: "datetime",
+    },
   ],
 
   listFilters: [
@@ -136,7 +142,7 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
   ],
 
-  defaultSort: { column: "name", direction: "asc" },
+  defaultSort: { column: "created_at", direction: "desc" },
   searchableFields: ["name", "brew_day_notes", "development_notes"],
 
   detailHeader: { title: "name" },
