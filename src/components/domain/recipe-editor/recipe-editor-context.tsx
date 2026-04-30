@@ -15,9 +15,11 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useState,
   useMemo,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
@@ -108,6 +110,15 @@ type RecipeEditorContextValue = {
   startSaving: () => () => void;
   /** Handle save errors with version conflict detection and auto-reload */
   handleSaveError: (error: Error) => void;
+
+  /** Register a section's save callback. Returns an unregister function. */
+  registerSaver: (id: string, save: () => Promise<void>) => () => void;
+  /** Update a section's dirty state. */
+  setSectionDirty: (id: string, isDirty: boolean) => void;
+  /** True if any registered section is dirty. */
+  anyDirty: boolean;
+  /** Save all dirty sections sequentially. */
+  saveAll: () => Promise<void>;
 };
 
 // =============================================================================
@@ -158,15 +169,67 @@ export function RecipeEditorProvider({
 
   /** Shared error handler for section save mutations with version conflict detection */
   const handleSaveError = useCallback((error: Error) => {
-    if (error.message?.includes("version") || error.message?.includes("conflict")) {
+    const msg = error.message ?? "";
+    const isConflict =
+      error.name === "ConcurrentModificationError" ||
+      msg.includes("version") ||
+      msg.includes("conflict") ||
+      msg.includes("modified by another user");
+    if (isConflict) {
       toast.error("Someone else edited this recipe. Reloading...", {
         description: "Your changes were not saved.",
       });
       onRefresh?.();
     } else {
-      toast.error(error.message);
+      toast.error(msg || "Save failed");
     }
   }, [onRefresh]);
+
+  // Saver registry — sections register their save callback so the page-level
+  // Save button can run them sequentially. Sequential execution avoids the
+  // optimistic-lock race that occurred when each section had its own button.
+  const saversRef = useRef(new Map<string, () => Promise<void>>());
+  const [dirtyIds, setDirtyIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  const registerSaver = useCallback(
+    (id: string, save: () => Promise<void>) => {
+      saversRef.current.set(id, save);
+      return () => {
+        saversRef.current.delete(id);
+        setDirtyIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      };
+    },
+    []
+  );
+
+  const setSectionDirty = useCallback((id: string, isDirty: boolean) => {
+    setDirtyIds((prev) => {
+      if (prev.has(id) === isDirty) return prev;
+      const next = new Set(prev);
+      if (isDirty) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const anyDirty = dirtyIds.size > 0;
+
+  const saveAll = useCallback(async () => {
+    const ids = Array.from(saversRef.current.keys());
+    for (const id of ids) {
+      const save = saversRef.current.get(id);
+      if (!save) continue;
+      await save();
+      // Yield so React can commit pending state updates (notably the recipe
+      // version bump) before the next section's save closure is re-read.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }, []);
 
   // Compute estimates reactively from current editor state
   const estimates = useMemo<RecipeEstimates>(() => {
@@ -201,8 +264,25 @@ export function RecipeEditorProvider({
       isSaving,
       startSaving,
       handleSaveError,
+      registerSaver,
+      setSectionDirty,
+      anyDirty,
+      saveAll,
     }),
-    [recipe, updateRecipe, grainItems, hopItems, estimates, isSaving, startSaving, handleSaveError]
+    [
+      recipe,
+      updateRecipe,
+      grainItems,
+      hopItems,
+      estimates,
+      isSaving,
+      startSaving,
+      handleSaveError,
+      registerSaver,
+      setSectionDirty,
+      anyDirty,
+      saveAll,
+    ]
   );
 
   return (
@@ -226,4 +306,30 @@ export function useRecipeEditor(): RecipeEditorContextValue {
     throw new Error("useRecipeEditor must be used within a RecipeEditorProvider");
   }
   return ctx;
+}
+
+/**
+ * Register a section with the saver registry. The save callback is invoked
+ * sequentially by the page-level Save button. The save closure is read at
+ * call time via a ref so it always sees the latest state.
+ */
+export function useRegisterSaver(
+  id: string,
+  isDirty: boolean,
+  save: () => Promise<void>
+) {
+  const { registerSaver, setSectionDirty } = useRecipeEditor();
+  const saveRef = useRef(save);
+
+  useEffect(() => {
+    saveRef.current = save;
+  });
+
+  useEffect(() => {
+    return registerSaver(id, () => saveRef.current());
+  }, [id, registerSaver]);
+
+  useEffect(() => {
+    setSectionDirty(id, isDirty);
+  }, [id, isDirty, setSectionDirty]);
 }

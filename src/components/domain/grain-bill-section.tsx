@@ -8,7 +8,7 @@
  * View mode = read-only editor; Edit mode = interactive editor with save button.
  */
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys } from "@/lib/query-keys";
@@ -16,9 +16,8 @@ import {
   GrainBillEditor,
   type GrainBillItem,
 } from "@/components/domain/grain-bill-editor";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Save, Loader2 } from "lucide-react";
+import { useRegisterSaver } from "@/components/domain/recipe-editor/recipe-editor-context";
 import { toast } from "sonner";
 
 type GrainBillSectionProps = {
@@ -128,12 +127,16 @@ export function GrainBillSection({ data, editing, onDataChange }: GrainBillSecti
         queryKey: recipeKeys.detail(recipeId),
       });
       setGrainDirty(false);
-      toast.success("Grain bill saved");
     },
     onError: (error) => {
       toast.error("Failed to save grain bill: " + error.message);
     },
   });
+
+  useRegisterSaver("grain-bill", Boolean(editing && grainDirty), useCallback(async () => {
+    if (!grainDirty) return;
+    await saveMutation.mutateAsync();
+  }, [grainDirty, saveMutation]));
 
   if (isLoading) {
     return (
@@ -152,23 +155,6 @@ export function GrainBillSection({ data, editing, onDataChange }: GrainBillSecti
         onChange={handleChange}
         disabled={!editing || saveMutation.isPending}
       />
-      {editing && grainDirty && (
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Save Grain Bill
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

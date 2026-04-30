@@ -45,7 +45,8 @@ import {
 } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Save, Loader2, ChevronsUpDown } from "lucide-react";
+import { useRegisterSaver } from "@/components/domain/recipe-editor/recipe-editor-context";
+import { Plus, Trash2, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 
 // =============================================================================
@@ -305,10 +306,14 @@ function AdjunctsTab({
       queryClient.invalidateQueries({ queryKey: recipeKeys.adjuncts(recipeId) });
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipeId) });
       setDirty(false);
-      toast.success("Adjuncts saved");
     },
     onError: (e) => toast.error("Failed to save adjuncts: " + e.message),
   });
+
+  useRegisterSaver("adjuncts", Boolean(editing && dirty), useCallback(async () => {
+    if (!dirty) return;
+    await save.mutateAsync();
+  }, [dirty, save]));
 
   const addItem = useCallback(
     (cat: CatalogItem) => {
@@ -437,11 +442,6 @@ function AdjunctsTab({
         </Table>
       )}
 
-      {editing && dirty && (
-        <div className="flex justify-end">
-          <SaveButton saving={save.isPending} onClick={() => save.mutate()} label="Adjuncts" />
-        </div>
-      )}
     </div>
   );
 }
@@ -526,10 +526,14 @@ function SugarsTab({
       queryClient.invalidateQueries({ queryKey: recipeKeys.sugars(recipeId) });
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipeId) });
       setDirty(false);
-      toast.success("Sugars saved");
     },
     onError: (e) => toast.error("Failed to save sugars: " + e.message),
   });
+
+  useRegisterSaver("sugars", Boolean(editing && dirty), useCallback(async () => {
+    if (!dirty) return;
+    await save.mutateAsync();
+  }, [dirty, save]));
 
   const addItem = useCallback(
     (cat: CatalogItem) => {
@@ -658,11 +662,6 @@ function SugarsTab({
         </Table>
       )}
 
-      {editing && dirty && (
-        <div className="flex justify-end">
-          <SaveButton saving={save.isPending} onClick={() => save.mutate()} label="Sugars" />
-        </div>
-      )}
     </div>
   );
 }
@@ -751,10 +750,14 @@ function SpicesTab({
       queryClient.invalidateQueries({ queryKey: recipeKeys.spices(recipeId) });
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipeId) });
       setDirty(false);
-      toast.success("Spices saved");
     },
     onError: (e) => toast.error("Failed to save spices: " + e.message),
   });
+
+  useRegisterSaver("spices", Boolean(editing && dirty), useCallback(async () => {
+    if (!dirty) return;
+    await save.mutateAsync();
+  }, [dirty, save]));
 
   const addItem = useCallback(
     (cat: CatalogItem) => {
@@ -916,11 +919,6 @@ function SpicesTab({
         </Table>
       )}
 
-      {editing && dirty && (
-        <div className="flex justify-end">
-          <SaveButton saving={save.isPending} onClick={() => save.mutate()} label="Spices" />
-        </div>
-      )}
     </div>
   );
 }
@@ -1007,10 +1005,14 @@ function FruitsTab({
       queryClient.invalidateQueries({ queryKey: recipeKeys.fruits(recipeId) });
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipeId) });
       setDirty(false);
-      toast.success("Fruits saved");
     },
     onError: (e) => toast.error("Failed to save fruits: " + e.message),
   });
+
+  useRegisterSaver("fruits", Boolean(editing && dirty), useCallback(async () => {
+    if (!dirty) return;
+    await save.mutateAsync();
+  }, [dirty, save]));
 
   const addItem = useCallback(
     (cat: CatalogItem) => {
@@ -1158,11 +1160,6 @@ function FruitsTab({
         </Table>
       )}
 
-      {editing && dirty && (
-        <div className="flex justify-end">
-          <SaveButton saving={save.isPending} onClick={() => save.mutate()} label="Fruits" />
-        </div>
-      )}
     </div>
   );
 }
@@ -1219,23 +1216,3 @@ function UnitSelect({
   );
 }
 
-function SaveButton({
-  saving,
-  onClick,
-  label,
-}: {
-  saving: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <Button type="button" size="sm" onClick={onClick} disabled={saving}>
-      {saving ? (
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-      ) : (
-        <Save className="h-4 w-4 mr-2" />
-      )}
-      Save {label}
-    </Button>
-  );
-}

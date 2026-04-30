@@ -13,13 +13,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
-import { useRecipeEditor } from "./recipe-editor-context";
+import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Save, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 type KnockoutFormValues = {
   target_ko_temp_f: number | null;
@@ -27,7 +24,7 @@ type KnockoutFormValues = {
 }
 
 export function KnockoutSection() {
-  const { recipe, updateRecipe, isSaving, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -61,7 +58,6 @@ export function KnockoutSection() {
       form.reset(form.getValues());
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-      toast.success("Knock-out parameters saved");
     },
     onError: handleSaveError,
     onSettled: () => {
@@ -70,31 +66,17 @@ export function KnockoutSection() {
     },
   });
 
-  const onSubmit = useCallback(
-    (values: KnockoutFormValues) => saveMutation.mutate(values),
-    [saveMutation]
-  );
+  useRegisterSaver("knockout", isDirty, useCallback(async () => {
+    if (!form.formState.isDirty) return;
+    await form.handleSubmit(async (values) => {
+      await saveMutation.mutateAsync(values);
+    })();
+  }, [form, saveMutation]));
 
   return (
     <RecipeSectionCard
       title="Knock-Out"
       isDirty={isDirty}
-      headerActions={
-        isDirty ? (
-          <Button
-            size="sm"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={saveMutation.isPending || isSaving}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-1" />
-            )}
-            Save
-          </Button>
-        ) : null
-      }
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

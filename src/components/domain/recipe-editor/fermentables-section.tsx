@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
-import { useRecipeEditor } from "./recipe-editor-context";
+import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { GrainBillSection } from "@/components/domain/grain-bill-section";
 import { HopScheduleSection } from "@/components/domain/hop-schedule-section";
@@ -32,9 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Save, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 type YeastFormValues = {
   yeast_id: string | null;
@@ -56,7 +53,7 @@ const YEAST_FIELDS = [
 ];
 
 export function FermentablesSection() {
-  const { recipe, updateRecipe, setGrainItems, setHopItems, isSaving, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, setGrainItems, setHopItems, startSaving, handleSaveError } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -124,7 +121,6 @@ export function FermentablesSection() {
       form.reset(form.getValues());
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-      toast.success("Yeast settings saved");
     },
     onError: handleSaveError,
     onSettled: () => {
@@ -133,10 +129,12 @@ export function FermentablesSection() {
     },
   });
 
-  const onSubmit = useCallback(
-    (values: YeastFormValues) => saveMutation.mutate(values),
-    [saveMutation]
-  );
+  useRegisterSaver("yeast", isDirty, useCallback(async () => {
+    if (!form.formState.isDirty) return;
+    await form.handleSubmit(async (values) => {
+      await saveMutation.mutateAsync(values);
+    })();
+  }, [form, saveMutation]));
 
   return (
     <RecipeSectionCard title="Fermentables & Ingredients" isDirty={isDirty}>
@@ -173,23 +171,7 @@ export function FermentablesSection() {
 
         {/* Yeast + Attenuation + Pitch Rate */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium">Yeast</h4>
-            {isDirty && (
-              <Button
-                size="sm"
-                onClick={form.handleSubmit(onSubmit)}
-                disabled={saveMutation.isPending || isSaving}
-              >
-                {saveMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-1" />
-                )}
-                Save Yeast
-              </Button>
-            )}
-          </div>
+          <h4 className="text-sm font-medium mb-2">Yeast</h4>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="yeast" className="text-xs">

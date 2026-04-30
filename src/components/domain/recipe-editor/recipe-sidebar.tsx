@@ -14,7 +14,6 @@ import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
 import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
-import { Package } from "lucide-react";
 
 /** SRM-to-hex color lookup table for continuous beer color display */
 const SRM_COLORS: [number, string][] = [
@@ -165,8 +164,7 @@ export function RecipeSidebar() {
             Grain Bill
           </h4>
           {grainCalc.totalBags > 0 && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Package className="h-3 w-3" />
+            <span className="text-xs text-muted-foreground">
               {grainCalc.totalBags} {bagLabel(grainCalc.totalBags)}
             </span>
           )}
@@ -218,8 +216,7 @@ export function RecipeSidebar() {
             Hops
           </h4>
           {hopCalc.totalBags > 0 && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Package className="h-3 w-3" />
+            <span className="text-xs text-muted-foreground">
               {hopCalc.totalBags} {bagLabel(hopCalc.totalBags)}
             </span>
           )}
@@ -239,7 +236,7 @@ export function RecipeSidebar() {
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="tabular-nums">
-                    {formatNum(h.weightOz)} oz
+                    {formatHopWeight(h.weightOz)}
                   </span>
                   {h.bags !== null && h.bagWeightLbs ? (
                     <span className="tabular-nums">
@@ -253,7 +250,7 @@ export function RecipeSidebar() {
             ))}
             {/* Totals row */}
             <div className="border-t pt-1.5 mt-1.5 flex justify-between text-sm font-medium">
-              <span>{formatNum(hopCalc.totalOz)} oz total</span>
+              <span>{formatHopWeight(hopCalc.totalOz)} total</span>
               {hopCalc.totalBags > 0 && (
                 <span className="tabular-nums">
                   {hopCalc.totalBags} {bagLabel(hopCalc.totalBags)}
@@ -336,6 +333,12 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 /** Format a number: show decimals only if needed */
 function formatNum(n: number): string {
   return n % 1 === 0 ? n.toString() : n.toFixed(1);
+}
+
+/** Format a hop weight: lbs when >= 1 lb (16 oz), otherwise oz. */
+function formatHopWeight(oz: number): string {
+  if (oz >= 16) return `${formatNum(oz / 16)} lbs`;
+  return `${formatNum(oz)} oz`;
 }
 
 function bagLabel(count: number): string {

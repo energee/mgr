@@ -13,13 +13,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
-import { useRecipeEditor } from "./recipe-editor-context";
+import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Save, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 type WhirlpoolFormValues = {
   whirlpool_time_min: number | null;
@@ -28,7 +25,7 @@ type WhirlpoolFormValues = {
 }
 
 export function WhirlpoolSection() {
-  const { recipe, updateRecipe, isSaving, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -64,7 +61,6 @@ export function WhirlpoolSection() {
       form.reset(form.getValues());
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-      toast.success("Whirlpool parameters saved");
     },
     onError: handleSaveError,
     onSettled: () => {
@@ -73,31 +69,17 @@ export function WhirlpoolSection() {
     },
   });
 
-  const onSubmit = useCallback(
-    (values: WhirlpoolFormValues) => saveMutation.mutate(values),
-    [saveMutation]
-  );
+  useRegisterSaver("whirlpool", isDirty, useCallback(async () => {
+    if (!form.formState.isDirty) return;
+    await form.handleSubmit(async (values) => {
+      await saveMutation.mutateAsync(values);
+    })();
+  }, [form, saveMutation]));
 
   return (
     <RecipeSectionCard
       title="Whirlpool"
       isDirty={isDirty}
-      headerActions={
-        isDirty ? (
-          <Button
-            size="sm"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={saveMutation.isPending || isSaving}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-1" />
-            )}
-            Save
-          </Button>
-        ) : null
-      }
     >
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>

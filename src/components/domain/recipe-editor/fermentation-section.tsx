@@ -13,14 +13,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
-import { useRecipeEditor } from "./recipe-editor-context";
+import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { FermentationScheduleEditor, type FermentationStage } from "@/components/domain/fermentation-schedule-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Save, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 type FermentationFormValues = {
   fermentation_days: number | null;
@@ -29,7 +26,7 @@ type FermentationFormValues = {
 }
 
 export function FermentationSection() {
-  const { recipe, updateRecipe, isSaving, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -66,7 +63,6 @@ export function FermentationSection() {
       form.reset(form.getValues());
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-      toast.success("Fermentation parameters saved");
     },
     onError: handleSaveError,
     onSettled: () => {
@@ -75,31 +71,17 @@ export function FermentationSection() {
     },
   });
 
-  const onSubmit = useCallback(
-    (values: FermentationFormValues) => saveMutation.mutate(values),
-    [saveMutation]
-  );
+  useRegisterSaver("fermentation", isDirty, useCallback(async () => {
+    if (!form.formState.isDirty) return;
+    await form.handleSubmit(async (values) => {
+      await saveMutation.mutateAsync(values);
+    })();
+  }, [form, saveMutation]));
 
   return (
     <RecipeSectionCard
       title="Fermentation"
       isDirty={isDirty}
-      headerActions={
-        isDirty ? (
-          <Button
-            size="sm"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={saveMutation.isPending || isSaving}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-1" />
-            )}
-            Save
-          </Button>
-        ) : null
-      }
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -30,7 +30,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft, Copy, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -123,6 +123,7 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <SaveAllButton />
             <Button
               variant="outline"
               size="sm"
@@ -173,6 +174,36 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
         onSuccess={handleCloneSuccess}
       />
     </RecipeEditorProvider>
+  );
+}
+
+/** Page-level Save button — saves all dirty sections in sequence. */
+function SaveAllButton() {
+  const { anyDirty, saveAll, isSaving } = useRecipeEditor();
+  const [pending, setPending] = useState(false);
+
+  const onClick = async () => {
+    setPending(true);
+    try {
+      await saveAll();
+      toast.success("Recipe saved");
+    } catch {
+      // Errors are surfaced via per-section handleSaveError already.
+    } finally {
+      setPending(false);
+    }
+  };
+
+  if (!anyDirty && !pending) return null;
+  return (
+    <Button size="sm" onClick={onClick} disabled={pending || isSaving}>
+      {pending || isSaving ? (
+        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+      ) : (
+        <Save className="h-4 w-4 mr-1" />
+      )}
+      Save
+    </Button>
   );
 }
 
