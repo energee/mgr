@@ -50,8 +50,8 @@ export type BatchState = (typeof batchStates)[number];
  * Cancel/archive are available as escape hatches from active production states. */
 export const batchTransitions: Record<string, string[]> = {
   planned: ["fermenting", "cancelled"],
-  fermenting: ["conditioning", "completed", "archived"],
-  conditioning: ["packaging", "completed", "archived"],
+  fermenting: ["conditioning", "archived"],
+  conditioning: ["packaging", "archived"],
   packaging: ["completed", "archived"],
   completed: [],
   cancelled: [],
