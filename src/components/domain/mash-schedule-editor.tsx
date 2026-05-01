@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/sortable-drag-preview";
 import { UnitInput } from "@/components/ui/unit-input";
 import { useTemperatureUnit } from "@/hooks/useUnitPreferences";
-import { formatTemperature, convertTemperature } from "@/lib/units";
+import { formatTemperature, formatTemperatureRange } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronDown, Thermometer } from "lucide-react";
 
 // Types for mash steps
@@ -71,13 +71,6 @@ type MashScheduleEditorProps = {
 }
 
 const generateId = () => `step-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-
-function formatTempRange(lowF: number, highF: number, unit: "f" | "c"): string {
-  const low = Math.round(convertTemperature(lowF, "f", unit));
-  const high = Math.round(convertTemperature(highF, "f", unit));
-  const label = unit === "c" ? "°C" : "°F";
-  return `${low}-${high}${label}`;
-}
 
 // Common step types with defaults
 const STEP_TYPES = [
@@ -393,10 +386,10 @@ export function MashScheduleEditor({
         <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
           <p className="font-medium">Temperature Reference:</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <span>Acid Rest: {formatTempRange(95, 113, tempUnit)}</span>
-            <span>Protein Rest: {formatTempRange(113, 131, tempUnit)}</span>
-            <span>Beta Amylase: {formatTempRange(131, 150, tempUnit)}</span>
-            <span>Alpha Amylase: {formatTempRange(154, 162, tempUnit)}</span>
+            <span>Acid Rest: {formatTemperatureRange(95, 113, tempUnit)}</span>
+            <span>Protein Rest: {formatTemperatureRange(113, 131, tempUnit)}</span>
+            <span>Beta Amylase: {formatTemperatureRange(131, 150, tempUnit)}</span>
+            <span>Alpha Amylase: {formatTemperatureRange(154, 162, tempUnit)}</span>
           </div>
         </div>
       )}

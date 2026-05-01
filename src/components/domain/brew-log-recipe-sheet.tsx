@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { useGravityUnit } from "@/hooks/useUnitPreferences";
-import { sgToPlato } from "@/lib/units";
+import { convertVolume, formatGravityFromSg } from "@/lib/units";
 
 // =============================================================================
 // Types
@@ -124,10 +124,6 @@ export function BrewLogRecipeSheet({
 }: BrewLogRecipeSheetProps) {
   const supabase = createClient();
   const gravityUnit = useGravityUnit();
-  const formatSg = (sg: number | null | undefined): string | undefined => {
-    if (sg == null) return undefined;
-    return gravityUnit === "sg" ? sg.toFixed(3) : `${sgToPlato(sg).toFixed(1)}°P`;
-  };
 
   // Recipe details + estimates + schedules
   const { data: recipe, isLoading: recipeLoading } = useQuery({
@@ -234,8 +230,8 @@ export function BrewLogRecipeSheet({
             {/* Targets */}
             <Section title="Targets">
               <div className="grid grid-cols-5 gap-2 text-center">
-                <StatBox label="OG" value={formatSg(recipe.est_og)} />
-                <StatBox label="FG" value={formatSg(recipe.est_fg)} />
+                <StatBox label="OG" value={formatGravityFromSg(recipe.est_og, gravityUnit)} />
+                <StatBox label="FG" value={formatGravityFromSg(recipe.est_fg, gravityUnit)} />
                 <StatBox label="ABV" value={recipe.est_abv ? `${recipe.est_abv.toFixed(1)}%` : undefined} />
                 <StatBox label="IBU" value={recipe.est_ibu?.toFixed(0)} />
                 <StatBox label="SRM" value={recipe.est_srm?.toFixed(1)} />
@@ -250,13 +246,13 @@ export function BrewLogRecipeSheet({
                 {recipe.mash_water_volume_gal != null && (
                   <DataRow
                     label="Mash Water"
-                    value={<UnitDisplay value={recipe.mash_water_volume_gal / 31} unitType="volume" decimals={1} />}
+                    value={<UnitDisplay value={convertVolume(recipe.mash_water_volume_gal, "gal", "bbl")} unitType="volume" decimals={1} />}
                   />
                 )}
                 {recipe.sparge_water_volume_gal != null && (
                   <DataRow
                     label="Sparge Water"
-                    value={<UnitDisplay value={recipe.sparge_water_volume_gal / 31} unitType="volume" decimals={1} />}
+                    value={<UnitDisplay value={convertVolume(recipe.sparge_water_volume_gal, "gal", "bbl")} unitType="volume" decimals={1} />}
                   />
                 )}
               </div>

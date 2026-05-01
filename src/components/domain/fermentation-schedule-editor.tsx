@@ -84,7 +84,7 @@ const STAGE_TYPES = [
 const FERMENTATION_PRESETS = {
   ale_standard: {
     name: "Standard Ale",
-    description: "Simple ale fermentation at standard temp",
+    description: "Simple ale fermentation",
     stages: [
       { stage: "primary" as const, name: "Primary Fermentation", temp_f: 68, duration_days: 10 },
       { stage: "cold_crash" as const, name: "Cold Crash", temp_f: 34, duration_days: 3 },

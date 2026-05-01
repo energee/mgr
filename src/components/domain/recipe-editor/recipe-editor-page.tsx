@@ -34,7 +34,7 @@ import { ArrowLeft, Copy, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useGravityUnit } from "@/hooks/useUnitPreferences";
-import { sgToPlato } from "@/lib/units";
+import { formatGravityFromSg } from "@/lib/units";
 
 type RecipeEditorPageProps = {
   id: string;
@@ -215,18 +215,8 @@ function SaveAllButton() {
 function MobileEstimatesBar() {
   const { estimates } = useRecipeEditor();
   const gravityUnit = useGravityUnit();
-  const og =
-    estimates.og === null
-      ? "\u2014"
-      : gravityUnit === "sg"
-        ? estimates.og.toFixed(3)
-        : `${sgToPlato(estimates.og).toFixed(1)}\u00b0P`;
-  const fg =
-    estimates.fg === null
-      ? "\u2014"
-      : gravityUnit === "sg"
-        ? estimates.fg.toFixed(3)
-        : `${sgToPlato(estimates.fg).toFixed(1)}\u00b0P`;
+  const og = formatGravityFromSg(estimates.og, gravityUnit);
+  const fg = formatGravityFromSg(estimates.fg, gravityUnit);
   return (
     <div className="flex items-center justify-between text-sm">
       <div className="flex gap-4">

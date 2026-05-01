@@ -20,6 +20,7 @@ import { RecipeSectionCard } from "./recipe-section-card";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
 import { Label } from "@/components/ui/label";
 import { UnitInput } from "@/components/ui/unit-input";
+import { convertVolume } from "@/lib/units";
 import {
   Select,
   SelectContent,
@@ -211,8 +212,8 @@ export function WaterChemistrySection() {
                   id="mash-water"
                   // Stored canonical for this column is gallons; UnitInput's
                   // volume canonical is BBL, so convert at the boundary.
-                  value={field.value == null ? null : field.value / 31}
-                  onChange={(bbl) => field.onChange(bbl == null ? null : bbl * 31)}
+                  value={field.value == null ? null : convertVolume(field.value, "gal", "bbl")}
+                  onChange={(bbl) => field.onChange(bbl == null ? null : convertVolume(bbl, "bbl", "gal"))}
                   unitType="volume"
                   decimals={1}
                 />
@@ -229,8 +230,8 @@ export function WaterChemistrySection() {
               render={({ field }) => (
                 <UnitInput
                   id="sparge-water"
-                  value={field.value == null ? null : field.value / 31}
-                  onChange={(bbl) => field.onChange(bbl == null ? null : bbl * 31)}
+                  value={field.value == null ? null : convertVolume(field.value, "gal", "bbl")}
+                  onChange={(bbl) => field.onChange(bbl == null ? null : convertVolume(bbl, "bbl", "gal"))}
                   unitType="volume"
                   decimals={1}
                 />

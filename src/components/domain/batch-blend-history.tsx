@@ -26,7 +26,7 @@ import { getStateLabel } from "@/types/entity";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { useGravityUnit } from "@/hooks/useUnitPreferences";
-import { sgToPlato } from "@/lib/units";
+import { formatGravityFromSg } from "@/lib/units";
 
 // =============================================================================
 // Types
@@ -59,8 +59,6 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const supabase = createClient();
   const batchId = data.id;
   const gravityUnit = useGravityUnit();
-  const formatSg = (sg: number): string =>
-    gravityUnit === "sg" ? sg.toFixed(3) : `${sgToPlato(sg).toFixed(1)}°P`;
 
   const { data: blends, isLoading } = useQuery({
     queryKey: entityKeys.related("batch_blends", "blend_batch_id", batchId),
@@ -193,13 +191,13 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
             {blendInfo.blended_og != null && (
               <div>
                 <span className="text-muted-foreground">OG:</span>{" "}
-                <span className="font-medium">{formatSg(Number(blendInfo.blended_og))}</span>
+                <span className="font-medium">{formatGravityFromSg(Number(blendInfo.blended_og), gravityUnit)}</span>
               </div>
             )}
             {blendInfo.blended_fg != null && (
               <div>
                 <span className="text-muted-foreground">FG:</span>{" "}
-                <span className="font-medium">{formatSg(Number(blendInfo.blended_fg))}</span>
+                <span className="font-medium">{formatGravityFromSg(Number(blendInfo.blended_fg), gravityUnit)}</span>
               </div>
             )}
             {blendInfo.blended_abv != null && (

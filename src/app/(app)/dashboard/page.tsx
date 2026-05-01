@@ -24,7 +24,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { CheckCircle2, Circle, FlaskConical } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import {
   StatsStrip,
   DashboardSection,
@@ -454,12 +454,24 @@ function ProductionTrends() {
     refetchIntervalInBackground: false,
   });
 
+  const currentPeriodData = useMemo(() => productionTrends.slice(period), [productionTrends, period]);
+  const previousPeriodData = useMemo(
+    () => productionTrends.slice(0, period),
+    [productionTrends, period],
+  );
+
+  const volumeChartData = useMemo(
+    () =>
+      currentPeriodData.map((d) => ({
+        ...d,
+        volume_display: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
+      })),
+    [currentPeriodData, volumeUnit],
+  );
+
   if (isLoading) {
     return <ProductionTrendsSkeleton />;
   }
-
-  const currentPeriodData = productionTrends.slice(period);
-  const previousPeriodData = productionTrends.slice(0, period);
 
   const currentBatchesStarted = currentPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
   const previousBatchesStarted = previousPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
@@ -508,10 +520,7 @@ function ProductionTrends() {
         </DashboardSection>
         <DashboardSection title="Volume Brewed">
           <TrendChart
-            data={currentPeriodData.map((d) => ({
-              ...d,
-              volume_display: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
-            }))}
+            data={volumeChartData}
             xKey="date"
             series={[{ key: "volume_display", label: volumeLabel }]}
             formatValue={(v) => `${Number(v).toFixed(1)} ${volumeLabel}`}

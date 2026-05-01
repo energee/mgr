@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useVolumeUnit } from "@/hooks/useUnitPreferences";
-import { formatVolume } from "@/lib/units";
+import { convertVolume, formatVolume } from "@/lib/units";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FlaskConical, Pencil, Loader2, Check } from "lucide-react";
@@ -548,7 +548,7 @@ function CalculatedAdditionsSection({
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
           Calculated Salt Additions
           <span className="text-xs font-normal normal-case ml-2">
-            ({formatVolume(totalVolumeGal / 31, volumeUnit, 1)} total water)
+            ({formatVolume(convertVolume(totalVolumeGal, "gal", "bbl"), volumeUnit, 1)} total water)
           </span>
         </h4>
         <Button

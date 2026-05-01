@@ -15,7 +15,7 @@ import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
 import { useGravityUnit, useWeightUnit } from "@/hooks/useUnitPreferences";
-import { sgToPlato, convertWeight, UNIT_LABELS, type WeightUnit } from "@/lib/units";
+import { formatGravityFromSg, convertWeight, UNIT_LABELS, type WeightUnit } from "@/lib/units";
 
 /** SRM-to-hex color lookup table for continuous beer color display */
 const SRM_COLORS: [number, string][] = [
@@ -143,8 +143,8 @@ export function RecipeSidebar() {
 
         {/* OG / FG / IBU / SRM grid */}
         <div className="grid grid-cols-2 gap-3">
-          <EstimateCard label="OG" value={formatSg(estimates.og, gravityUnit)} />
-          <EstimateCard label="FG" value={formatSg(estimates.fg, gravityUnit)} />
+          <EstimateCard label="OG" value={formatGravityFromSg(estimates.og, gravityUnit)} />
+          <EstimateCard label="FG" value={formatGravityFromSg(estimates.fg, gravityUnit)} />
           <EstimateCard label="IBU" value={estimates.ibu?.toString() ?? "\u2014"} />
           <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
             <div
@@ -346,21 +346,16 @@ function formatGrainWeight(lbs: number, unit: WeightUnit): string {
 
 /**
  * Format a hop weight (canonical oz). For lbs preference: shows lbs when ≥1 lb,
- * otherwise oz. For kg preference: always shows kg.
+ * otherwise oz. For kg preference: always shows kg, with extra precision for
+ * sub-pound amounts so dry-hop charges aren't rounded to "0 kg".
  */
 function formatHopWeight(oz: number, unit: WeightUnit): string {
   if (unit === "kg") {
-    return `${formatNum(convertWeight(oz / 16, "lbs", "kg"))} kg`;
+    const kg = convertWeight(oz / 16, "lbs", "kg");
+    return `${kg.toFixed(kg < 1 ? 3 : 2)} kg`;
   }
   if (oz >= 16) return `${formatNum(oz / 16)} lbs`;
   return `${formatNum(oz)} oz`;
-}
-
-/** Format an SG estimate using the user's gravity unit preference. */
-function formatSg(sg: number | null, unit: "plato" | "sg"): string {
-  if (sg === null) return "—";
-  if (unit === "sg") return sg.toFixed(3);
-  return `${sgToPlato(sg).toFixed(1)}°P`;
 }
 
 function bagLabel(count: number): string {

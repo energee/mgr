@@ -102,6 +102,15 @@ export function BatchReadingsChart({
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
 
+    const isSg = activeMetric === "gravity" && gravityUnit === "sg";
+    const factor = isSg ? 1000 : 10;
+    const unitLabel =
+      activeMetric === "gravity"
+        ? isSg
+          ? ""
+          : UNIT_LABELS.plato
+        : UNIT_LABELS[tempUnit];
+
     return filteredReadings.map((log) => {
       let value = typeof log.data.value === "number" ? log.data.value : parseFloat(String(log.data.value));
 
@@ -114,21 +123,13 @@ export function BatchReadingsChart({
         value = convertTemperature(f, "f", tempUnit);
       }
 
-      const decimals = activeMetric === "gravity" && gravityUnit === "sg" ? 3 : 1;
-      const factor = Math.pow(10, decimals);
-
       return {
         timestamp: new Date(log.created_at).getTime(),
         date: format(new Date(log.created_at), "MMM d"),
         time: format(new Date(log.created_at), "h:mm a"),
         fullDate: format(new Date(log.created_at), "MMM d, h:mm a"),
         value: Math.round(value * factor) / factor,
-        unit:
-          activeMetric === "gravity"
-            ? gravityUnit === "sg"
-              ? ""
-              : UNIT_LABELS.plato
-            : UNIT_LABELS[tempUnit],
+        unit: unitLabel,
       };
     });
   }, [readings, activeMetric, gravityUnit, tempUnit]);
@@ -155,8 +156,15 @@ export function BatchReadingsChart({
     const padding = (max - min) * CHART_PADDING_PERCENT || CHART_MIN_PADDING;
 
     if (activeMetric === "gravity") {
-      // For gravity, also consider target FG
-      const effectiveMin = targetFG ? Math.min(min, targetFG) : min;
+      // targetFG is canonical Plato; convert to whichever unit chartData is in.
+      const targetInDisplayUnit =
+        targetFG == null
+          ? null
+          : gravityUnit === "sg"
+            ? platoToSg(targetFG)
+            : targetFG;
+      const effectiveMin =
+        targetInDisplayUnit !== null ? Math.min(min, targetInDisplayUnit) : min;
       return [
         Math.floor(effectiveMin - padding),
         Math.ceil(max + padding),
@@ -164,7 +172,7 @@ export function BatchReadingsChart({
     }
 
     return [Math.floor(min - padding), Math.ceil(max + padding)];
-  }, [chartData, activeMetric, targetFG]);
+  }, [chartData, activeMetric, targetFG, gravityUnit]);
 
   const hasGravityReadings = (readingCounts["gravity"] || 0) > 0;
   const hasTemperatureReadings = (readingCounts["temperature"] || 0) > 0;

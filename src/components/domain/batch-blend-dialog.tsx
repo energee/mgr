@@ -39,7 +39,7 @@ import { Loader2, GitMerge } from "lucide-react";
 import { toast } from "sonner";
 import { getStateLabel } from "@/types/entity";
 import { useGravityUnit, useVolumeUnit } from "@/hooks/useUnitPreferences";
-import { sgToPlato, formatVolume } from "@/lib/units";
+import { formatGravityFromSg, formatVolume } from "@/lib/units";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
@@ -91,8 +91,6 @@ export function BatchBlendDialog({
   const queryClient = useQueryClient();
   const gravityUnit = useGravityUnit();
   const volumeUnit = useVolumeUnit();
-  const formatSg = (sg: number | null | undefined): string =>
-    sg == null ? "—" : gravityUnit === "sg" ? sg.toFixed(3) : `${sgToPlato(sg).toFixed(1)}°P`;
   const [selections, setSelections] = useState<Map<string, SourceBatchSelection>>(new Map());
   const [globalNotes, setGlobalNotes] = useState("");
 
@@ -391,13 +389,13 @@ export function BatchBlendDialog({
                 {blendTotals.weightedOg != null && (
                   <div>
                     <span className="text-muted-foreground">Weighted OG:</span>{" "}
-                    <span className="font-medium">{formatSg(blendTotals.weightedOg)}</span>
+                    <span className="font-medium">{formatGravityFromSg(blendTotals.weightedOg, gravityUnit)}</span>
                   </div>
                 )}
                 {blendTotals.weightedFg != null && (
                   <div>
                     <span className="text-muted-foreground">Weighted FG:</span>{" "}
-                    <span className="font-medium">{formatSg(blendTotals.weightedFg)}</span>
+                    <span className="font-medium">{formatGravityFromSg(blendTotals.weightedFg, gravityUnit)}</span>
                   </div>
                 )}
               </div>

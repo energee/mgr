@@ -259,8 +259,7 @@ export function formatReadingValue(
     }
     case "temperature": {
       const target = (displayUnit ?? unit) as "f" | "c";
-      const fahrenheit = unit === "f" ? numValue : (numValue * 9) / 5 + 32;
-      const out = target === "f" ? fahrenheit : ((fahrenheit - 32) * 5) / 9;
+      const out = unit === target ? numValue : convertTemperature(numValue, unit as "f" | "c", target);
       return `${out.toFixed(1)}°${target.toUpperCase()}`;
     }
     case "ph":
