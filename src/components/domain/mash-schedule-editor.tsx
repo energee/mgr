@@ -48,6 +48,8 @@ import {
   SortableDragPreview,
   reorderWithPositions,
 } from "@/components/ui/sortable-drag-preview";
+import { useTemperatureUnit } from "@/hooks/useUnitPreferences";
+import { formatTemperature, convertTemperature } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronDown, Thermometer } from "lucide-react";
 
 // Types for mash steps
@@ -68,6 +70,13 @@ type MashScheduleEditorProps = {
 }
 
 const generateId = () => `step-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+function formatTempRange(lowF: number, highF: number, unit: "f" | "c"): string {
+  const low = Math.round(convertTemperature(lowF, "f", unit));
+  const high = Math.round(convertTemperature(highF, "f", unit));
+  const label = unit === "c" ? "°C" : "°F";
+  return `${low}-${high}${label}`;
+}
 
 // Common step types with defaults
 const STEP_TYPES = [
@@ -135,6 +144,7 @@ export function MashScheduleEditor({
   onChange,
   disabled = false,
 }: MashScheduleEditorProps) {
+  const tempUnit = useTemperatureUnit();
   const [, setEditingId] = useState<string | null>(null);
 
   // Backfill IDs once if legacy data lacks them — required for stable drag-and-drop.
@@ -371,7 +381,7 @@ export function MashScheduleEditor({
               return (
                 <SortableDragPreview
                   title={step?.name || "Step"}
-                  subtitle={step ? `${step.temp_f}°F · ${step.duration_min} min` : undefined}
+                  subtitle={step ? `${formatTemperature(step.temp_f, tempUnit, 0)} · ${step.duration_min} min` : undefined}
                 />
               );
             }}
@@ -383,10 +393,10 @@ export function MashScheduleEditor({
         <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
           <p className="font-medium">Temperature Reference:</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <span>Acid Rest: 95-113°F</span>
-            <span>Protein Rest: 113-131°F</span>
-            <span>Beta Amylase: 131-150°F</span>
-            <span>Alpha Amylase: 154-162°F</span>
+            <span>Acid Rest: {formatTempRange(95, 113, tempUnit)}</span>
+            <span>Protein Rest: {formatTempRange(113, 131, tempUnit)}</span>
+            <span>Beta Amylase: {formatTempRange(131, 150, tempUnit)}</span>
+            <span>Alpha Amylase: {formatTempRange(154, 162, tempUnit)}</span>
           </div>
         </div>
       )}

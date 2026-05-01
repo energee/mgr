@@ -26,6 +26,8 @@ import {
   daysUntilViabilityThreshold,
   type YeastForm,
 } from "@/lib/yeast-calculations";
+import { useWeightUnit } from "@/hooks/useUnitPreferences";
+import { formatWeight } from "@/lib/units";
 
 // =============================================================================
 // Types
@@ -148,6 +150,7 @@ function BrinkCard({
   vessel: BrinkVessel;
   pitch: ActivePitch | null;
 }) {
+  const weightUnit = useWeightUnit();
   if (!pitch) {
     return (
       <Card className="opacity-50">
@@ -188,7 +191,7 @@ function BrinkCard({
             <span className="text-muted-foreground">Remaining</span>
             <span className="font-medium">
               {pitch.quantity_remaining_lbs != null
-                ? `${Number(pitch.quantity_remaining_lbs).toFixed(1)} lbs`
+                ? formatWeight(Number(pitch.quantity_remaining_lbs), weightUnit, 1)
                 : "\u2014"}
             </span>
           </div>

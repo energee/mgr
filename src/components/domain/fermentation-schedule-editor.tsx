@@ -45,6 +45,8 @@ import {
   SortableDragPreview,
   reorderWithPositions,
 } from "@/components/ui/sortable-drag-preview";
+import { useTemperatureUnit } from "@/hooks/useUnitPreferences";
+import { formatTemperature } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronDown, FlaskConical, ChevronRight } from "lucide-react";
 
 // Types for fermentation stages
@@ -151,6 +153,7 @@ export function FermentationScheduleEditor({
   onChange,
   disabled = false,
 }: FermentationScheduleEditorProps) {
+  const tempUnit = useTemperatureUnit();
   // Backfill IDs once if legacy data lacks them — required for stable drag-and-drop.
   // One-shot guard prevents re-running on parent re-renders (which can happen when
   // onChange has an unstable identity).
@@ -413,7 +416,7 @@ export function FermentationScheduleEditor({
               return (
                 <SortableDragPreview
                   title={stage?.name || "Stage"}
-                  subtitle={stage ? `${stage.temp_f}°F · ${stage.duration_days}d` : undefined}
+                  subtitle={stage ? `${formatTemperature(stage.temp_f, tempUnit, 0)} · ${stage.duration_days}d` : undefined}
                 />
               );
             }}

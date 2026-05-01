@@ -41,6 +41,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { useWeightUnit } from "@/hooks/useUnitPreferences";
+import { formatWeight } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";
@@ -93,6 +95,7 @@ export function GrainBillEditor({
   onChange,
   disabled = false,
 }: GrainBillEditorProps) {
+  const weightUnit = useWeightUnit();
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
@@ -335,7 +338,7 @@ export function GrainBillEditor({
                   Total
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {totalWeight.toFixed(2)} lbs
+                  {formatWeight(totalWeight, weightUnit)}
                 </TableCell>
                 <TableCell></TableCell>
                 <TableCell className="text-right font-medium">100%</TableCell>

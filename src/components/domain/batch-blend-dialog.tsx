@@ -38,6 +38,8 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, GitMerge } from "lucide-react";
 import { toast } from "sonner";
 import { getStateLabel } from "@/types/entity";
+import { useGravityUnit, useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { sgToPlato, formatVolume } from "@/lib/units";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
@@ -87,6 +89,10 @@ export function BatchBlendDialog({
 }: BatchBlendDialogProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
+  const gravityUnit = useGravityUnit();
+  const volumeUnit = useVolumeUnit();
+  const formatSg = (sg: number | null | undefined): string =>
+    sg == null ? "—" : gravityUnit === "sg" ? sg.toFixed(3) : `${sgToPlato(sg).toFixed(1)}°P`;
   const [selections, setSelections] = useState<Map<string, SourceBatchSelection>>(new Map());
   const [globalNotes, setGlobalNotes] = useState("");
 
@@ -218,7 +224,7 @@ export function BatchBlendDialog({
         const maxVol = availableVolumeMap.get(entry.batchId) ?? sourceBatch?.volume_bbl;
         if (maxVol != null && entry.volumeBbl > maxVol) {
           throw new Error(
-            `Volume for ${sourceBatch?.batch_code} (${entry.volumeBbl} BBL) exceeds available volume (${maxVol.toFixed(2)} BBL)`
+            `Volume for ${sourceBatch?.batch_code} (${formatVolume(entry.volumeBbl, volumeUnit)}) exceeds available volume (${formatVolume(maxVol, volumeUnit)})`
           );
         }
         if (entry.volumeBbl <= 0) {
@@ -288,9 +294,9 @@ export function BatchBlendDialog({
                   <TableHead className="w-10"></TableHead>
                   <TableHead>Batch</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Available (BBL)</TableHead>
+                  <TableHead>Available</TableHead>
                   <TableHead>ABV %</TableHead>
-                  <TableHead>Blend Volume (BBL)</TableHead>
+                  <TableHead>Blend Volume</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -385,13 +391,13 @@ export function BatchBlendDialog({
                 {blendTotals.weightedOg != null && (
                   <div>
                     <span className="text-muted-foreground">Weighted OG:</span>{" "}
-                    <span className="font-medium">{blendTotals.weightedOg.toFixed(3)}</span>
+                    <span className="font-medium">{formatSg(blendTotals.weightedOg)}</span>
                   </div>
                 )}
                 {blendTotals.weightedFg != null && (
                   <div>
                     <span className="text-muted-foreground">Weighted FG:</span>{" "}
-                    <span className="font-medium">{blendTotals.weightedFg.toFixed(3)}</span>
+                    <span className="font-medium">{formatSg(blendTotals.weightedFg)}</span>
                   </div>
                 )}
               </div>
