@@ -48,6 +48,11 @@ import {
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { extractBrewMeasurements } from "@/lib/brew-events";
+import {
+  useGravityUnit,
+  useTemperatureUnit,
+  useVolumeUnit,
+} from "@/hooks/useUnitPreferences";
 import type { BrewEvent } from "@/types/domain";
 import { log } from "@/lib/client-logger";
 
@@ -107,6 +112,14 @@ export function BrewLogCompletionDialog({
 }: BrewLogCompletionDialogProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
+  const temperatureUnit = useTemperatureUnit();
+  const gravityUnit = useGravityUnit();
+  const volumeUnit = useVolumeUnit();
+  const measurementUnits = {
+    temperature: temperatureUnit,
+    gravity: gravityUnit,
+    volume: volumeUnit,
+  };
 
   const [step, setStep] = useState(1);
   const [vesselAssignments, setVesselAssignments] = useState<
@@ -353,7 +366,7 @@ export function BrewLogCompletionDialog({
 
   const renderStep1 = () => {
     const events = (brewLogFull?.events as BrewEvent[]) || [];
-    const keyMeasurements = extractBrewMeasurements(events);
+    const keyMeasurements = extractBrewMeasurements(events, measurementUnits);
 
     return (
       <div className="space-y-4">

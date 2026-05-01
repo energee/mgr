@@ -15,6 +15,11 @@ import { BrewLogLinker } from "./brew-log-linker";
 import { Badge } from "@/components/ui/badge";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { extractBrewMeasurements } from "@/lib/brew-events";
+import {
+  useGravityUnit,
+  useTemperatureUnit,
+  useVolumeUnit,
+} from "@/hooks/useUnitPreferences";
 import type { BrewEvent } from "@/types/domain";
 import Link from "next/link";
 
@@ -47,6 +52,14 @@ type BrewSummaryLink = {
 
 export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
   const supabase = createClient();
+  const temperatureUnit = useTemperatureUnit();
+  const gravityUnit = useGravityUnit();
+  const volumeUnit = useVolumeUnit();
+  const measurementUnits = {
+    temperature: temperatureUnit,
+    gravity: gravityUnit,
+    volume: volumeUnit,
+  };
 
   // Fetch linked brew logs with events data
   const { data: linkedBrews = [], isLoading } = useQuery({
@@ -119,7 +132,7 @@ export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
             const brew = link.brew_log;
             if (!brew) return null;
             const highlights = Array.isArray(brew.events)
-              ? extractBrewMeasurements(brew.events as BrewEvent[])
+              ? extractBrewMeasurements(brew.events as BrewEvent[], measurementUnits)
               : [];
 
             return (

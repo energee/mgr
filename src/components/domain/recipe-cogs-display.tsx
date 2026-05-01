@@ -23,6 +23,8 @@ import { DollarSign, TrendingUp } from "lucide-react";
 import { recipeKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { formatCurrency } from "@/lib/format";
+import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { convertVolume, UNIT_LABELS } from "@/lib/units";
 
 // =============================================================================
 // Types
@@ -87,6 +89,8 @@ function CostRow({
 
 export function RecipeCOGSDisplay({ recipeId }: RecipeCOGSDisplayProps) {
   const supabase = createClient();
+  const volumeUnit = useVolumeUnit();
+  const volumeLabel = UNIT_LABELS[volumeUnit];
 
   const { data: cogs, isLoading, error } = useQuery({
     queryKey: recipeKeys.cogs(recipeId),
@@ -191,9 +195,14 @@ export function RecipeCOGSDisplay({ recipeId }: RecipeCOGSDisplayProps) {
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground flex items-center gap-1">
                 <TrendingUp className="h-3 w-3" />
-                Per BBL
+                Per {volumeLabel}
               </span>
-              <Badge variant="secondary">{formatCurrency(cogs.cogs_per_bbl)}/BBL</Badge>
+              <Badge variant="secondary">
+                {formatCurrency(
+                  cogs.cogs_per_bbl / convertVolume(1, "bbl", volumeUnit)
+                )}
+                /{volumeLabel}
+              </Badge>
             </div>
           )}
         </div>

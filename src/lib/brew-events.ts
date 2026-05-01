@@ -6,11 +6,31 @@
  */
 
 import type { BrewEvent } from "@/types/domain";
+import {
+  formatTemperature,
+  formatGravity,
+  formatVolume,
+  type GravityUnit,
+  type TemperatureUnit,
+  type VolumeUnit,
+} from "@/lib/units";
 
 export type BrewMeasurementHighlight = {
   label: string;
   value: string;
 }
+
+export type BrewMeasurementUnits = {
+  temperature: TemperatureUnit;
+  gravity: GravityUnit;
+  volume: VolumeUnit;
+};
+
+const DEFAULT_UNITS: BrewMeasurementUnits = {
+  temperature: "f",
+  gravity: "plato",
+  volume: "bbl",
+};
 
 function findMeasurement(
   events: BrewEvent[],
@@ -31,13 +51,14 @@ function findMeasurement(
  */
 export function extractBrewMeasurements(
   events: BrewEvent[],
+  units: BrewMeasurementUnits = DEFAULT_UNITS,
 ): BrewMeasurementHighlight[] {
   const typedEvents = events;
   const highlights: BrewMeasurementHighlight[] = [];
 
   const mashTemp = findMeasurement(typedEvents, ["mash_in", "mash_rest"], "temp_f");
   if (mashTemp) {
-    highlights.push({ label: "Mash Temp", value: `${mashTemp.value}\u00B0F` });
+    highlights.push({ label: "Mash Temp", value: formatTemperature(Number(mashTemp.value), units.temperature, 0) });
   }
 
   const preBoilGravity = findMeasurement(
@@ -46,7 +67,7 @@ export function extractBrewMeasurements(
     "gravity_plato",
   );
   if (preBoilGravity) {
-    highlights.push({ label: "Pre-Boil Gravity", value: `${preBoilGravity.value}\u00B0P` });
+    highlights.push({ label: "Pre-Boil Gravity", value: formatGravity(Number(preBoilGravity.value), units.gravity) });
   }
 
   const postBoilOG = findMeasurement(
@@ -55,7 +76,7 @@ export function extractBrewMeasurements(
     "gravity_plato",
   );
   if (postBoilOG) {
-    highlights.push({ label: "Post-Boil OG", value: `${postBoilOG.value}\u00B0P` });
+    highlights.push({ label: "Post-Boil OG", value: formatGravity(Number(postBoilOG.value), units.gravity) });
   }
 
   const postBoilVol = findMeasurement(
@@ -64,12 +85,12 @@ export function extractBrewMeasurements(
     "volume_bbl",
   );
   if (postBoilVol) {
-    highlights.push({ label: "Post-Boil Vol", value: `${postBoilVol.value} BBL` });
+    highlights.push({ label: "Post-Boil Vol", value: formatVolume(Number(postBoilVol.value), units.volume) });
   }
 
   const koTemp = findMeasurement(typedEvents, ["ko_end"], "temp_f");
   if (koTemp) {
-    highlights.push({ label: "Knockout Temp", value: `${koTemp.value}\u00B0F` });
+    highlights.push({ label: "Knockout Temp", value: formatTemperature(Number(koTemp.value), units.temperature, 0) });
   }
 
   return highlights;
