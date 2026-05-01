@@ -33,6 +33,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Copy, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useGravityUnit } from "@/hooks/useUnitPreferences";
+import { sgToPlato } from "@/lib/units";
 
 type RecipeEditorPageProps = {
   id: string;
@@ -212,11 +214,24 @@ function SaveAllButton() {
 /** Compact estimates bar shown on mobile viewports */
 function MobileEstimatesBar() {
   const { estimates } = useRecipeEditor();
+  const gravityUnit = useGravityUnit();
+  const og =
+    estimates.og === null
+      ? "\u2014"
+      : gravityUnit === "sg"
+        ? estimates.og.toFixed(3)
+        : `${sgToPlato(estimates.og).toFixed(1)}\u00b0P`;
+  const fg =
+    estimates.fg === null
+      ? "\u2014"
+      : gravityUnit === "sg"
+        ? estimates.fg.toFixed(3)
+        : `${sgToPlato(estimates.fg).toFixed(1)}\u00b0P`;
   return (
     <div className="flex items-center justify-between text-sm">
       <div className="flex gap-4">
-        <span><span className="text-muted-foreground">OG</span>{" "}<span className="font-mono font-medium">{estimates.og?.toFixed(3) ?? "\u2014"}</span></span>
-        <span><span className="text-muted-foreground">FG</span>{" "}<span className="font-mono font-medium">{estimates.fg?.toFixed(3) ?? "\u2014"}</span></span>
+        <span><span className="text-muted-foreground">OG</span>{" "}<span className="font-mono font-medium">{og}</span></span>
+        <span><span className="text-muted-foreground">FG</span>{" "}<span className="font-mono font-medium">{fg}</span></span>
         <span><span className="text-muted-foreground">ABV</span>{" "}<span className="font-mono font-medium">{estimates.abv !== null ? `${estimates.abv}%` : "\u2014"}</span></span>
         <span><span className="text-muted-foreground">IBU</span>{" "}<span className="font-mono font-medium">{estimates.ibu?.toString() ?? "\u2014"}</span></span>
         <span><span className="text-muted-foreground">SRM</span>{" "}<span className="font-mono font-medium">{estimates.srm?.toString() ?? "\u2014"}</span></span>

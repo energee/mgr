@@ -177,7 +177,7 @@ export function RecipeBasicsSection() {
 
         <div>
           <Label htmlFor="volume-bbl" className="text-xs">
-            Recipe Volume (BBL)
+            Volume (BBL)
           </Label>
           <Input
             id="volume-bbl"

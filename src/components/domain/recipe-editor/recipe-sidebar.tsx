@@ -14,6 +14,8 @@ import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
 import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
+import { useGravityUnit } from "@/hooks/useUnitPreferences";
+import { sgToPlato } from "@/lib/units";
 
 /** SRM-to-hex color lookup table for continuous beer color display */
 const SRM_COLORS: [number, string][] = [
@@ -102,6 +104,7 @@ function calcHopBags(items: HopScheduleItem[]): {
 
 export function RecipeSidebar() {
   const { recipe, estimates, grainItems, hopItems } = useRecipeEditor();
+  const gravityUnit = useGravityUnit();
 
   const grainCalc = useMemo(() => calcGrainBags(grainItems), [grainItems]);
   const hopCalc = useMemo(() => calcHopBags(hopItems), [hopItems]);
@@ -139,8 +142,8 @@ export function RecipeSidebar() {
 
         {/* OG / FG / IBU / SRM grid */}
         <div className="grid grid-cols-2 gap-3">
-          <EstimateCard label="OG" value={estimates.og?.toFixed(3) ?? "\u2014"} />
-          <EstimateCard label="FG" value={estimates.fg?.toFixed(3) ?? "\u2014"} />
+          <EstimateCard label="OG" value={formatSg(estimates.og, gravityUnit)} />
+          <EstimateCard label="FG" value={formatSg(estimates.fg, gravityUnit)} />
           <EstimateCard label="IBU" value={estimates.ibu?.toString() ?? "\u2014"} />
           <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
             <div
@@ -339,6 +342,13 @@ function formatNum(n: number): string {
 function formatHopWeight(oz: number): string {
   if (oz >= 16) return `${formatNum(oz / 16)} lbs`;
   return `${formatNum(oz)} oz`;
+}
+
+/** Format an SG estimate using the user's gravity unit preference. */
+function formatSg(sg: number | null, unit: "plato" | "sg"): string {
+  if (sg === null) return "—";
+  if (unit === "sg") return sg.toFixed(3);
+  return `${sgToPlato(sg).toFixed(1)}°P`;
 }
 
 function bagLabel(count: number): string {
