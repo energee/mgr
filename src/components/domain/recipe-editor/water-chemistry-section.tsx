@@ -9,7 +9,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
@@ -18,8 +18,8 @@ import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UnitInput } from "@/components/ui/unit-input";
 import {
   Select,
   SelectContent,
@@ -201,41 +201,58 @@ export function WaterChemistrySection() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <Label htmlFor="mash-water" className="text-xs">
-              Mash Water (gal)
+              Mash Water
             </Label>
-            <Input
-              id="mash-water"
-              type="number"
-              step="0.5"
-              min="0"
-              {...form.register("mash_water_volume_gal", { valueAsNumber: true })}
-              placeholder="e.g., 100"
+            <Controller
+              control={form.control}
+              name="mash_water_volume_gal"
+              render={({ field }) => (
+                <UnitInput
+                  id="mash-water"
+                  // Stored canonical for this column is gallons; UnitInput's
+                  // volume canonical is BBL, so convert at the boundary.
+                  value={field.value == null ? null : field.value / 31}
+                  onChange={(bbl) => field.onChange(bbl == null ? null : bbl * 31)}
+                  unitType="volume"
+                  decimals={1}
+                />
+              )}
             />
           </div>
           <div>
             <Label htmlFor="sparge-water" className="text-xs">
-              Sparge Water (gal)
+              Sparge Water
             </Label>
-            <Input
-              id="sparge-water"
-              type="number"
-              step="0.5"
-              min="0"
-              {...form.register("sparge_water_volume_gal", { valueAsNumber: true })}
-              placeholder="e.g., 120"
+            <Controller
+              control={form.control}
+              name="sparge_water_volume_gal"
+              render={({ field }) => (
+                <UnitInput
+                  id="sparge-water"
+                  value={field.value == null ? null : field.value / 31}
+                  onChange={(bbl) => field.onChange(bbl == null ? null : bbl * 31)}
+                  unitType="volume"
+                  decimals={1}
+                />
+              )}
             />
           </div>
           <div>
             <Label htmlFor="preboil-vol" className="text-xs">
-              Pre-Boil Volume (BBL)
+              Pre-Boil Volume
             </Label>
-            <Input
-              id="preboil-vol"
-              type="number"
-              step="0.1"
-              min="0"
-              {...form.register("preboil_volume_bbl", { valueAsNumber: true })}
-              placeholder="e.g., 8.5"
+            <Controller
+              control={form.control}
+              name="preboil_volume_bbl"
+              render={({ field }) => (
+                <UnitInput
+                  id="preboil-vol"
+                  value={field.value}
+                  onChange={field.onChange}
+                  unitType="volume"
+                  decimals={1}
+                />
+              )}
             />
           </div>
         </div>

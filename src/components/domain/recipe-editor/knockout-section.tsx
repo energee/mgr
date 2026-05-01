@@ -8,15 +8,15 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UnitInput } from "@/components/ui/unit-input";
 
 type KnockoutFormValues = {
   target_ko_temp_f: number | null;
@@ -81,29 +81,38 @@ export function KnockoutSection() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="ko-temp" className="text-xs">
-            Target KO Temp (°F)
+            Target KO Temp
           </Label>
-          <Input
-            id="ko-temp"
-            type="number"
-            min="30"
-            max="212"
-            step="1"
-            {...form.register("target_ko_temp_f", { valueAsNumber: true })}
-            placeholder="e.g., 66"
+          <Controller
+            control={form.control}
+            name="target_ko_temp_f"
+            render={({ field }) => (
+              <UnitInput
+                id="ko-temp"
+                value={field.value}
+                onChange={field.onChange}
+                unitType="temperature"
+                decimals={0}
+              />
+            )}
           />
         </div>
         <div>
           <Label htmlFor="ko-volume" className="text-xs">
-            Target KO Volume (BBL)
+            Target KO Volume
           </Label>
-          <Input
-            id="ko-volume"
-            type="number"
-            min="0"
-            step="0.1"
-            {...form.register("target_ko_volume_bbl", { valueAsNumber: true })}
-            placeholder="e.g., 7.0"
+          <Controller
+            control={form.control}
+            name="target_ko_volume_bbl"
+            render={({ field }) => (
+              <UnitInput
+                id="ko-volume"
+                value={field.value}
+                onChange={field.onChange}
+                unitType="volume"
+                decimals={1}
+              />
+            )}
           />
         </div>
       </div>

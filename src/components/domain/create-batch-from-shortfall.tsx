@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UnitDisplay } from "@/components/ui/unit-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -244,7 +245,7 @@ export function CreateBatchFromShortfall({
                       <span className="font-medium">{recipe.name}</span>
                       {recipe.batch_size_bbl && (
                         <span className="text-muted-foreground ml-2">
-                          ({recipe.batch_size_bbl} BBL)
+                          (<UnitDisplay value={recipe.batch_size_bbl} unitType="volume" decimals={1} />)
                         </span>
                       )}
                     </SelectItem>

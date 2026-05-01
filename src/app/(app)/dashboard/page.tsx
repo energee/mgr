@@ -36,6 +36,8 @@ import {
   TrendChart,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
+import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { convertVolume, UNIT_LABELS } from "@/lib/units";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -428,6 +430,8 @@ function ProductionTrendsSkeleton() {
 function ProductionTrends() {
   const supabase = createClient();
   const period = usePeriod();
+  const volumeUnit = useVolumeUnit();
+  const volumeLabel = UNIT_LABELS[volumeUnit];
 
   const { data: productionTrends = [], isLoading } = useQuery({
     queryKey: dashboardKeys.trends.production(period),
@@ -504,10 +508,13 @@ function ProductionTrends() {
         </DashboardSection>
         <DashboardSection title="Volume Brewed">
           <TrendChart
-            data={currentPeriodData}
+            data={currentPeriodData.map((d) => ({
+              ...d,
+              volume_display: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
+            }))}
             xKey="date"
-            series={[{ key: "volume_bbl", label: "BBL" }]}
-            formatValue={(v) => `${v} BBL`}
+            series={[{ key: "volume_display", label: volumeLabel }]}
+            formatValue={(v) => `${Number(v).toFixed(1)} ${volumeLabel}`}
           />
         </DashboardSection>
       </div>

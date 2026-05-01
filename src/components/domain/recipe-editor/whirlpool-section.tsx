@@ -8,7 +8,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
@@ -17,6 +17,7 @@ import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UnitInput } from "@/components/ui/unit-input";
 
 type WhirlpoolFormValues = {
   whirlpool_time_min: number | null;
@@ -96,15 +97,20 @@ export function WhirlpoolSection() {
         </div>
         <div>
           <Label htmlFor="wp-temp" className="text-xs">
-            Temperature (°F)
+            Temperature
           </Label>
-          <Input
-            id="wp-temp"
-            type="number"
-            min="100"
-            max="212"
-            {...form.register("whirlpool_temp_f", { valueAsNumber: true })}
-            placeholder="e.g., 170"
+          <Controller
+            control={form.control}
+            name="whirlpool_temp_f"
+            render={({ field }) => (
+              <UnitInput
+                id="wp-temp"
+                value={field.value}
+                onChange={field.onChange}
+                unitType="temperature"
+                decimals={0}
+              />
+            )}
           />
         </div>
         <div>

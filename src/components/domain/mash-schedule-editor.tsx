@@ -48,6 +48,7 @@ import {
   SortableDragPreview,
   reorderWithPositions,
 } from "@/components/ui/sortable-drag-preview";
+import { UnitInput } from "@/components/ui/unit-input";
 import { useTemperatureUnit } from "@/hooks/useUnitPreferences";
 import { formatTemperature, convertTemperature } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronDown, Thermometer } from "lucide-react";
@@ -275,7 +276,7 @@ export function MashScheduleEditor({
                 <TableHead className="w-8"></TableHead>
                 <TableHead className="w-28">Type</TableHead>
                 <TableHead>Step Name</TableHead>
-                <TableHead className="w-24 text-right">Temp (°F)</TableHead>
+                <TableHead className="w-32 text-right">Temp</TableHead>
                 <TableHead className="w-24 text-right">Time (min)</TableHead>
                 <TableHead className="w-16"></TableHead>
               </TableRow>
@@ -320,17 +321,16 @@ export function MashScheduleEditor({
                         />
                       </TableCell>
                       <TableCell className="text-right">
-                        <Input
-                          type="number"
-                          step="1"
-                          min="32"
-                          max="212"
-                          value={step.temp_f || ""}
-                          onChange={(e) =>
-                            handleUpdateStep(index, "temp_f", parseInt(e.target.value) || 0)
+                        <UnitInput
+                          value={step.temp_f}
+                          onChange={(value) =>
+                            handleUpdateStep(index, "temp_f", value ?? 0)
                           }
+                          unitType="temperature"
+                          decimals={0}
                           disabled={disabled}
-                          className="w-20 text-right ml-auto"
+                          wrapperClassName="ml-auto"
+                          className="text-right"
                         />
                       </TableCell>
                       <TableCell className="text-right">

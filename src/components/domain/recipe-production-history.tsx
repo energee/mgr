@@ -151,7 +151,7 @@ export function RecipeProductionHistory({
             <TableHead>Variant</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Actual OG</TableHead>
-            <TableHead>Volume (BBL)</TableHead>
+            <TableHead>Volume</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

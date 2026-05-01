@@ -8,7 +8,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
@@ -18,6 +18,7 @@ import { RecipeSectionCard } from "./recipe-section-card";
 import { MashScheduleEditor, type MashStep } from "@/components/domain/mash-schedule-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UnitInput } from "@/components/ui/unit-input";
 
 type MashFormValues = {
   mash_temp_f: number | null;
@@ -95,15 +96,20 @@ export function MashSection() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <Label htmlFor="mash-temp" className="text-xs">
-              Mash Temp (°F)
+              Mash Temp
             </Label>
-            <Input
-              id="mash-temp"
-              type="number"
-              min="100"
-              max="180"
-              {...form.register("mash_temp_f", { valueAsNumber: true })}
-              placeholder="e.g., 152"
+            <Controller
+              control={form.control}
+              name="mash_temp_f"
+              render={({ field }) => (
+                <UnitInput
+                  id="mash-temp"
+                  value={field.value}
+                  onChange={field.onChange}
+                  unitType="temperature"
+                  decimals={0}
+                />
+              )}
             />
           </div>
           <div>

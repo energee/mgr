@@ -45,6 +45,7 @@ import {
   SortableDragPreview,
   reorderWithPositions,
 } from "@/components/ui/sortable-drag-preview";
+import { UnitInput } from "@/components/ui/unit-input";
 import { useTemperatureUnit } from "@/hooks/useUnitPreferences";
 import { formatTemperature } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronDown, FlaskConical, ChevronRight } from "lucide-react";
@@ -83,7 +84,7 @@ const STAGE_TYPES = [
 const FERMENTATION_PRESETS = {
   ale_standard: {
     name: "Standard Ale",
-    description: "Simple ale fermentation at 68°F",
+    description: "Simple ale fermentation at standard temp",
     stages: [
       { stage: "primary" as const, name: "Primary Fermentation", temp_f: 68, duration_days: 10 },
       { stage: "cold_crash" as const, name: "Cold Crash", temp_f: 34, duration_days: 3 },
@@ -113,7 +114,7 @@ const FERMENTATION_PRESETS = {
     description: "Belgian saison with temp ramp",
     stages: [
       { stage: "primary" as const, name: "Initial Fermentation", temp_f: 68, duration_days: 3 },
-      { stage: "primary" as const, name: "Temperature Ramp", temp_f: 78, duration_days: 4, notes: "Raise temp 2°F/day" },
+      { stage: "primary" as const, name: "Temperature Ramp", temp_f: 78, duration_days: 4, notes: "Raise temp gradually each day" },
       { stage: "primary" as const, name: "Final Attenuation", temp_f: 85, duration_days: 7, notes: "Hold warm until FG stable" },
       { stage: "conditioning" as const, name: "Conditioning", temp_f: 68, duration_days: 14 },
     ],
@@ -330,21 +331,16 @@ export function FermentationScheduleEditor({
                   />
 
                   {/* Temperature */}
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      step="1"
-                      min="32"
-                      max="100"
-                      value={stage.temp_f || ""}
-                      onChange={(e) =>
-                        handleUpdateStage(index, "temp_f", parseInt(e.target.value) || 0)
-                      }
-                      disabled={disabled}
-                      className="w-16 text-right"
-                    />
-                    <span className="text-sm text-muted-foreground">°F</span>
-                  </div>
+                  <UnitInput
+                    value={stage.temp_f}
+                    onChange={(value) =>
+                      handleUpdateStage(index, "temp_f", value ?? 0)
+                    }
+                    unitType="temperature"
+                    decimals={0}
+                    disabled={disabled}
+                    wrapperClassName="w-28"
+                  />
 
                   {/* Duration */}
                   <div className="flex items-center gap-1">

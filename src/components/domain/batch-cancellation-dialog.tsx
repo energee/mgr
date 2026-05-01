@@ -13,7 +13,7 @@
  */
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -29,7 +29,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -46,7 +45,7 @@ import {
 } from "@/components/ui/alert";
 import { Loader2, XCircle, Archive, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { UnitDisplay } from "@/components/ui/unit-input";
+import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -261,15 +260,19 @@ export function BatchCancellationDialog({
           {/* Loss volume - only for archive mode */}
           {isArchive && (
             <div className="space-y-2">
-              <Label htmlFor="loss_volume_bbl">Loss Volume (BBL)</Label>
-              <Input
-                id="loss_volume_bbl"
-                type="number"
-                step="0.1"
-                min="0"
-                {...form.register("loss_volume_bbl")}
-                placeholder="e.g., 7"
-                className="min-h-[44px]"
+              <Label htmlFor="loss_volume_bbl">Loss Volume</Label>
+              <Controller
+                control={form.control}
+                name="loss_volume_bbl"
+                render={({ field }) => (
+                  <UnitInput
+                    id="loss_volume_bbl"
+                    value={typeof field.value === "number" ? field.value : null}
+                    onChange={field.onChange}
+                    unitType="volume"
+                    decimals={1}
+                  />
+                )}
               />
               {form.formState.errors.loss_volume_bbl && (
                 <p className="text-sm text-destructive">

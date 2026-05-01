@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { UnitInput } from "@/components/ui/unit-input";
 import {
   Command,
   CommandEmpty,
@@ -287,25 +288,16 @@ export function YeastSelector({
                   />
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      step="1"
-                      min={item.yeast?.temp_min_f || 50}
-                      max={item.yeast?.temp_max_f || 90}
-                      value={item.fermentation_temp_f || ""}
-                      onChange={(e) =>
-                        handleUpdate(
-                          index,
-                          "fermentation_temp_f",
-                          e.target.value ? parseInt(e.target.value) : null
-                        )
-                      }
-                      disabled={disabled}
-                      className="w-16"
-                    />
-                    <span className="text-sm text-muted-foreground">°F</span>
-                  </div>
+                  <UnitInput
+                    value={item.fermentation_temp_f ?? null}
+                    onChange={(value) =>
+                      handleUpdate(index, "fermentation_temp_f", value)
+                    }
+                    unitType="temperature"
+                    decimals={0}
+                    disabled={disabled}
+                    wrapperClassName="w-28"
+                  />
                 </TableCell>
                 <TableCell>
                   <Switch

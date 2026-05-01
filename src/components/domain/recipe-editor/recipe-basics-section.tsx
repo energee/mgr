@@ -9,7 +9,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
@@ -19,6 +19,7 @@ import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UnitInput } from "@/components/ui/unit-input";
 import {
   Select,
   SelectContent,
@@ -163,29 +164,39 @@ export function RecipeBasicsSection() {
 
         <div>
           <Label htmlFor="batch-size" className="text-xs">
-            Batch Size (BBL)
+            Batch Size
           </Label>
-          <Input
-            id="batch-size"
-            type="number"
-            step="0.5"
-            min="0"
-            {...form.register("batch_size_bbl", { valueAsNumber: true })}
-            placeholder="e.g., 7"
+          <Controller
+            control={form.control}
+            name="batch_size_bbl"
+            render={({ field }) => (
+              <UnitInput
+                id="batch-size"
+                value={field.value}
+                onChange={field.onChange}
+                unitType="volume"
+                decimals={1}
+              />
+            )}
           />
         </div>
 
         <div>
           <Label htmlFor="volume-bbl" className="text-xs">
-            Volume (BBL)
+            Volume
           </Label>
-          <Input
-            id="volume-bbl"
-            type="number"
-            step="0.5"
-            min="0"
-            {...form.register("volume_bbl", { valueAsNumber: true })}
-            placeholder="e.g., 7"
+          <Controller
+            control={form.control}
+            name="volume_bbl"
+            render={({ field }) => (
+              <UnitInput
+                id="volume-bbl"
+                value={field.value}
+                onChange={field.onChange}
+                unitType="volume"
+                decimals={1}
+              />
+            )}
           />
         </div>
 
