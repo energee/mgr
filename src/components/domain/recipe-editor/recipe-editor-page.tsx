@@ -46,13 +46,15 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
   const { data: recipe, isLoading, error, refetch } = useQuery({
     queryKey: recipeKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipes_with_estimates")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data as unknown as RecipeData;
+      // recipes_with_estimates does not surface `version`, so fetch it
+      // alongside the view in parallel and merge.
+      const [viewRes, versionRes] = await Promise.all([
+        supabase.from("recipes_with_estimates").select("*").eq("id", id).single(),
+        supabase.from("recipes").select("version").eq("id", id).single(),
+      ]);
+      if (viewRes.error) throw viewRes.error;
+      if (versionRes.error) throw versionRes.error;
+      return { ...viewRes.data, version: versionRes.data.version } as unknown as RecipeData;
     },
   });
 
