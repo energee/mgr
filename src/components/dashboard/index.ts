@@ -9,3 +9,4 @@ export { DashboardSection, DashboardEmpty } from "./dashboard-section";
 export { PeriodSelector, usePeriod } from "./period-selector";
 export { StatCardWithDelta, calculateDelta } from "./stat-card-with-delta";
 export { TrendChart } from "./trend-chart";
+export { BatchActivityHeatmap } from "./batch-activity-heatmap";
