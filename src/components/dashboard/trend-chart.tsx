@@ -60,6 +60,8 @@ type TrendChartProps = {
   height?: number;
   /** Custom value formatter for tooltip and y-axis */
   formatValue?: (value: number) => string;
+  /** Custom formatter for the tooltip's date label. Receives the ISO date string. */
+  formatTooltipDate?: (isoDate: string) => string;
   /** Additional className for the container */
   className?: string;
 }
@@ -86,6 +88,7 @@ export function TrendChart({
   type: chartType = "area",
   height = 200,
   formatValue,
+  formatTooltipDate,
   className,
 }: TrendChartProps) {
   // Build ChartConfig from series
@@ -127,10 +130,12 @@ export function TrendChart({
   const tooltipLabelFormatter = (_: ReactNode, payload: ReadonlyArray<TooltipPayload<ValueType, NameType>>) => {
     const firstPayload = payload?.[0]?.payload;
     if (firstPayload?.[xKey]) {
+      const iso = String(firstPayload[xKey]);
+      if (formatTooltipDate) return formatTooltipDate(iso);
       try {
-        return format(parseISO(String(firstPayload[xKey])), "EEE, MMM d");
+        return format(parseISO(iso), "EEE, MMM d");
       } catch {
-        return String(firstPayload[xKey]);
+        return iso;
       }
     }
     return "";

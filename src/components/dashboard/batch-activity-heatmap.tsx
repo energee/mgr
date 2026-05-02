@@ -124,7 +124,12 @@ export function BatchActivityHeatmap() {
         { p_days: DAYS },
       );
       if (error) {
-        log.error("Failed to fetch planned batches by day:", error);
+        log.error("Failed to fetch planned batches by day:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
         return [];
       }
       return ((data || []) as PlannedByDayRow[]).map((r) => ({

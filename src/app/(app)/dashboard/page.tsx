@@ -12,6 +12,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { format, parseISO } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys, onboardingKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
@@ -535,13 +536,14 @@ function ProductionTrends() {
         <DashboardSection title="Batches Scheduled">
           <BatchActivityHeatmap />
         </DashboardSection>
-        <DashboardSection title="Volume Brewed">
+        <DashboardSection title="Volume Brewed (weekly)">
           <TrendChart
             data={weeklyVolumeData}
             xKey="date"
             type="bar"
             series={[{ key: "volume_display", label: volumeLabel }]}
             formatValue={(v) => `${Number(v).toFixed(1)} ${volumeLabel}`}
+            formatTooltipDate={(iso) => `Week of ${format(parseISO(iso), "MMM d, yyyy")}`}
           />
         </DashboardSection>
       </div>
