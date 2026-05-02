@@ -34,8 +34,10 @@ import {
   StatCardWithDelta,
   calculateDelta,
   TrendChart,
+  BatchActivityHeatmap,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
+import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
 import { useVolumeUnit } from "@/hooks/useUnitPreferences";
 import { convertVolume, UNIT_LABELS } from "@/lib/units";
 import { log } from "@/lib/client-logger";
@@ -454,20 +456,40 @@ function ProductionTrends() {
     refetchIntervalInBackground: false,
   });
 
+  const { data: yearTrends = [] } = useQuery({
+    queryKey: dashboardKeys.trends.weeklyVolume(),
+    queryFn: async () => {
+      const { data, error } = await dynamicRpc(supabase, "get_production_trends", {
+        p_days: 365,
+      });
+      if (error) {
+        log.error("Failed to fetch year trends:", error);
+        return [];
+      }
+      return (data || []) as Array<{
+        date: string;
+        batches_started: number;
+        volume_bbl: number;
+        batches_completed: number;
+      }>;
+    },
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+  });
+
   const currentPeriodData = useMemo(() => productionTrends.slice(period), [productionTrends, period]);
   const previousPeriodData = useMemo(
     () => productionTrends.slice(0, period),
     [productionTrends, period],
   );
 
-  const volumeChartData = useMemo(
-    () =>
-      currentPeriodData.map((d) => ({
-        ...d,
-        volume_display: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
-      })),
-    [currentPeriodData, volumeUnit],
-  );
+  const weeklyVolumeData = useMemo(() => {
+    const inUnit = yearTrends.map((d) => ({
+      date: d.date,
+      volume_display: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
+    }));
+    return bucketWeekly(inUnit, "date", "volume_display");
+  }, [yearTrends, volumeUnit]);
 
   if (isLoading) {
     return <ProductionTrendsSkeleton />;
@@ -511,17 +533,13 @@ function ProductionTrends() {
       {/* Trend Charts */}
       <div className="grid gap-6 md:grid-cols-2">
         <DashboardSection title="Batches Scheduled">
-          <TrendChart
-            data={currentPeriodData}
-            xKey="date"
-            type="bar"
-            series={[{ key: "batches_started", label: "Batches" }]}
-          />
+          <BatchActivityHeatmap />
         </DashboardSection>
         <DashboardSection title="Volume Brewed">
           <TrendChart
-            data={volumeChartData}
+            data={weeklyVolumeData}
             xKey="date"
+            type="bar"
             series={[{ key: "volume_display", label: volumeLabel }]}
             formatValue={(v) => `${Number(v).toFixed(1)} ${volumeLabel}`}
           />
