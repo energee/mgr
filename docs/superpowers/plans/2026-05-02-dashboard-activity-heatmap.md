@@ -68,11 +68,12 @@ Path: `supabase/migrations/00170_get_planned_batches_by_day.sql`
 -- the trailing window with two counts:
 --
 --   planned_count    Count of batches whose planned_start_date == day.
---   completed_count  Count of batches that completed (status changed to
---                    'completed') on that day. Approximated via
---                    actual_end_date when available, falling back to
---                    updated_at::date for completed batches without a
---                    recorded end date.
+--   completed_count  Count of batches whose planned_start_date == day AND
+--                    that subsequently reached status = 'completed'. This
+--                    is a "we hit our plan" signal: how many of the brews
+--                    scheduled for this day actually got finished. Anchored
+--                    to planned_start_date so the count never shifts when
+--                    a completed batch is later edited.
 --
 -- The window is dense (one row per day) via generate_series so the client
 -- can render a heatmap without holes.
@@ -108,14 +109,18 @@ BEGIN
     GROUP BY planned_start_date::DATE
   ),
   completed AS (
-    SELECT
-      COALESCE(actual_end_date::DATE, updated_at::DATE) AS day,
-      COUNT(*)::INTEGER AS n
+    -- Count batches whose PLANNED start day is in the window AND that
+    -- subsequently reached status='completed'. The dot is a "we hit our
+    -- plan" indicator: did the brews scheduled for this day actually get
+    -- finished? It is anchored to planned_start_date, NOT to a completion
+    -- event date — so the dot never moves once placed.
+    SELECT planned_start_date::DATE AS day, COUNT(*)::INTEGER AS n
     FROM batches
-    WHERE status = 'completed'
-      AND COALESCE(actual_end_date::DATE, updated_at::DATE)
-            BETWEEN (CURRENT_DATE - (p_days - 1)) AND CURRENT_DATE
-    GROUP BY COALESCE(actual_end_date::DATE, updated_at::DATE)
+    WHERE planned_start_date IS NOT NULL
+      AND status = 'completed'
+      AND planned_start_date::DATE >= (CURRENT_DATE - (p_days - 1))
+      AND planned_start_date::DATE <= CURRENT_DATE
+    GROUP BY planned_start_date::DATE
   )
   SELECT
     d.day,
@@ -135,23 +140,11 @@ COMMENT ON FUNCTION get_planned_batches_by_day(INTEGER) IS
 NOTIFY pgrst, 'reload schema';
 ```
 
-**Note:** If the `batches` table does not have an `actual_end_date` column, drop it from the COALESCE and use `updated_at::DATE` alone. Verify with: `grep -n "actual_end_date\|updated_at" supabase/migrations/*batches*.sql | head -5` before applying.
+- [ ] **Step 3: (skipped — no local DB)**
 
-- [ ] **Step 3: Apply the migration locally**
+This project's local app reads from the remote Supabase project; there is no local Postgres to apply against. Skip `supabase migration up`. The migration will be applied to remote when the user runs `supabase db push`.
 
-```bash
-bunx supabase migration up
-```
-
-Expected output: includes `Applying migration 00170_get_planned_batches_by_day.sql...` followed by no error. If `supabase` CLI is not started, run `bunx supabase start` first.
-
-- [ ] **Step 4: Smoke-test the RPC against local DB**
-
-```bash
-bunx supabase db query "SELECT * FROM get_planned_batches_by_day(7) ORDER BY day;"
-```
-
-Expected: 7 rows, one per day for the last week, with `planned_count` and `completed_count` columns (likely zeros on a fresh DB; that's fine — we're verifying shape and that the function executes without error).
+- [ ] **Step 4: (skipped — no local DB)**
 
 - [ ] **Step 5: Commit**
 

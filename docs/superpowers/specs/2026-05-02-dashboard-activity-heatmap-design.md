@@ -35,7 +35,7 @@ Replaces the existing `<TrendChart type="bar" />` at `src/app/(app)/dashboard/pa
   - 2 → `bg-amber-400 dark:bg-amber-700`
   - 3 → `bg-amber-600 dark:bg-amber-500`
   - 4+ → `bg-amber-800 dark:bg-amber-300`
-- **Completion dot** — small `~3px` filled circle centered in the cell when ≥1 batch was completed on this day. Color: `bg-emerald-500`. A single dot regardless of completion count; tooltip shows the actual number.
+- **Completion dot** — small `~3px` filled circle centered in the cell when ≥1 of the batches *planned for this day* reached `status = 'completed'`. Color: `bg-emerald-500`. A single dot regardless of count; tooltip shows the actual completed count. The dot is a "we hit our plan" indicator, not an "any completion event happened today" indicator. Cells with no planned batches never show a dot.
 
 **Interaction:**
 - Hover (or focus): tooltip shows `Mar 12, 2026 · 3 planned · 1 completed`. Use existing tooltip primitives from `src/components/ui/tooltip.tsx`.
