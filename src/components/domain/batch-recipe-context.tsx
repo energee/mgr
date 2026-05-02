@@ -13,6 +13,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
 import { recipeKeys, recipeVariantKeys } from "@/lib/query-keys";
+import { useGravityUnit } from "@/hooks/useUnitPreferences";
+import { formatGravityFromSg } from "@/lib/units";
 
 // =============================================================================
 // Types
@@ -52,6 +54,7 @@ export function BatchRecipeContext({ data }: BatchRecipeContextProps) {
   const supabase = createClient();
   const recipeId = data.recipe_id;
   const variantId = data.recipe_variant_id;
+  const gravityUnit = useGravityUnit();
 
   // Fetch recipe estimates
   const { data: recipe, isLoading: recipeLoading } = useQuery({
@@ -138,7 +141,7 @@ export function BatchRecipeContext({ data }: BatchRecipeContextProps) {
             <div className="text-sm font-medium text-muted-foreground">
               Est OG
             </div>
-            <div className="text-lg">{recipe.est_og.toFixed(1)}&deg;P</div>
+            <div className="text-lg">{formatGravityFromSg(recipe.est_og, gravityUnit)}</div>
           </div>
         )}
         {recipe.est_fg != null && (
@@ -146,7 +149,7 @@ export function BatchRecipeContext({ data }: BatchRecipeContextProps) {
             <div className="text-sm font-medium text-muted-foreground">
               Est FG
             </div>
-            <div className="text-lg">{recipe.est_fg.toFixed(1)}&deg;P</div>
+            <div className="text-lg">{formatGravityFromSg(recipe.est_fg, gravityUnit)}</div>
           </div>
         )}
         {recipe.est_abv != null && (

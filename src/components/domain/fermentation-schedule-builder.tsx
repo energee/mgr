@@ -13,6 +13,7 @@
 import { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UnitInput } from "@/components/ui/unit-input";
 import {
   Select,
   SelectContent,
@@ -196,18 +197,16 @@ export function FermentationScheduleBuilder({
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        value={stage.temp_f}
-                        onChange={(e) =>
-                          handleUpdate(stage.id, "temp_f", parseInt(e.target.value) || 0)
-                        }
-                        disabled={disabled}
-                        className="h-8 w-16"
-                      />
-                      <span className="text-sm text-muted-foreground">°F</span>
-                    </div>
+                    <UnitInput
+                      value={stage.temp_f}
+                      onChange={(value) =>
+                        handleUpdate(stage.id, "temp_f", value ?? 0)
+                      }
+                      unitType="temperature"
+                      decimals={0}
+                      disabled={disabled}
+                      wrapperClassName="w-28"
+                    />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">

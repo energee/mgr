@@ -219,25 +219,28 @@ export function convertTemperature(value: number, from: "f" | "c", to: "f" | "c"
 }
 
 /**
- * Format a reading value for display with appropriate precision and units
+ * Format a reading value for display with appropriate precision and units.
+ *
+ * Converts to the user's preferred display unit when `displayUnit` is
+ * provided. When omitted, the stored unit is used as-is (legacy behavior).
  *
  * @param type - The type of reading
  * @param value - The reading value (numeric or string)
- * @param unit - The unit of measurement
+ * @param unit - The unit of measurement the value is *stored* in
+ * @param displayUnit - Optional user-preferred display unit
  * @returns A formatted string with proper precision and unit display
  * @example
  * ```ts
- * formatReadingValue("temperature", 68, "f")
- * // Returns: "68.0°F"
- *
- * formatReadingValue("gravity", 1.050, "sg")
- * // Returns: "1.050"
+ * formatReadingValue("temperature", 68, "f")            // → "68.0°F"
+ * formatReadingValue("temperature", 68, "f", "c")       // → "20.0°C"
+ * formatReadingValue("gravity", 1.050, "sg", "plato")   // → "12.4°P"
  * ```
  */
 export function formatReadingValue(
   type: ReadingType,
   value: number | string,
-  unit: string
+  unit: string,
+  displayUnit?: string,
 ): string {
   const config = READING_TYPES[type];
 
@@ -249,10 +252,16 @@ export function formatReadingValue(
 
   // Format based on type
   switch (type) {
-    case "gravity":
-      return unit === "sg" ? numValue.toFixed(3) : numValue.toFixed(1);
-    case "temperature":
-      return `${numValue.toFixed(1)}°${unit.toUpperCase()}`;
+    case "gravity": {
+      const target = (displayUnit ?? unit) as "sg" | "plato";
+      const converted = unit === target ? numValue : convertGravity(numValue, unit as "sg" | "plato", target);
+      return target === "sg" ? converted.toFixed(3) : `${converted.toFixed(1)}°P`;
+    }
+    case "temperature": {
+      const target = (displayUnit ?? unit) as "f" | "c";
+      const out = unit === target ? numValue : convertTemperature(numValue, unit as "f" | "c", target);
+      return `${out.toFixed(1)}°${target.toUpperCase()}`;
+    }
     case "ph":
       return numValue.toFixed(2);
     case "pressure":

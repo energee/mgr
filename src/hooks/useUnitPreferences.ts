@@ -223,3 +223,19 @@ export function useRetailVolumeUnit(): RetailVolumeUnit {
   const { data } = useUnitPreferences();
   return data?.retail_volume_unit ?? "oz";
 }
+
+/**
+ * Composite preferences for `extractBrewMeasurements` and other helpers
+ * that highlight a brew day's mash temp / gravity / volume in one go.
+ */
+export function useBrewMeasurementUnits(): {
+  temperature: TemperatureUnit;
+  gravity: GravityUnit;
+  volume: VolumeUnit;
+} {
+  return {
+    temperature: useTemperatureUnit(),
+    gravity: useGravityUnit(),
+    volume: useVolumeUnit(),
+  };
+}

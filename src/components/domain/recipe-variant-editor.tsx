@@ -52,6 +52,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
+import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { convertVolume, UNIT_LABELS } from "@/lib/units";
 import { toast } from "sonner";
 import {
   Plus,
@@ -217,6 +220,8 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
   const recipeId = data.id;
   const supabase = createClient();
   const queryClient = useQueryClient();
+  const volumeUnit = useVolumeUnit();
+  const volumeLabel = UNIT_LABELS[volumeUnit];
 
   const [variants, setVariants] = useState<VariantItem[]>([]);
   const [isDirty, setIsDirty] = useState(false);
@@ -709,14 +714,14 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                   />
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     {variant.planned_volume_bbl != null && (
-                      <span>{variant.planned_volume_bbl} BBL</span>
+                      <span><UnitDisplay value={variant.planned_volume_bbl} unitType="volume" decimals={1} /></span>
                     )}
                     {cost?.est_total_cost != null && (
                       <span>${cost.est_total_cost.toFixed(2)}</span>
                     )}
                     {cost?.est_cost_per_bbl != null && (
                       <span className="text-xs">
-                        (${cost.est_cost_per_bbl.toFixed(2)}/BBL)
+                        (${(cost.est_cost_per_bbl / convertVolume(1, "bbl", volumeUnit)).toFixed(2)}/{volumeLabel})
                       </span>
                     )}
                   </div>
@@ -737,24 +742,16 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label htmlFor={`variant-${vIndex}-volume`} className="text-sm font-medium">
-                        Planned Volume (BBL)
+                        Planned Volume
                       </label>
-                      <Input
+                      <UnitInput
                         id={`variant-${vIndex}-volume`}
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        value={variant.planned_volume_bbl ?? ""}
-                        onChange={(e) =>
-                          updateVariantField(
-                            vIndex,
-                            "planned_volume_bbl",
-                            e.target.value
-                              ? parseFloat(e.target.value)
-                              : null
-                          )
+                        value={variant.planned_volume_bbl ?? null}
+                        onChange={(value) =>
+                          updateVariantField(vIndex, "planned_volume_bbl", value)
                         }
-                        placeholder="e.g. 7"
+                        unitType="volume"
+                        decimals={1}
                       />
                     </div>
                     <div className="space-y-1.5">

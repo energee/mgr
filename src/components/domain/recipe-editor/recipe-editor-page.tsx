@@ -30,9 +30,11 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft, Copy, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useGravityUnit } from "@/hooks/useUnitPreferences";
+import { formatGravityFromSg } from "@/lib/units";
 
 type RecipeEditorPageProps = {
   id: string;
@@ -46,13 +48,15 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
   const { data: recipe, isLoading, error, refetch } = useQuery({
     queryKey: recipeKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipes_with_estimates")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data as unknown as RecipeData;
+      // recipes_with_estimates does not surface `version`, so fetch it
+      // alongside the view in parallel and merge.
+      const [viewRes, versionRes] = await Promise.all([
+        supabase.from("recipes_with_estimates").select("*").eq("id", id).single(),
+        supabase.from("recipes").select("version").eq("id", id).single(),
+      ]);
+      if (viewRes.error) throw viewRes.error;
+      if (versionRes.error) throw versionRes.error;
+      return { ...viewRes.data, version: versionRes.data.version } as unknown as RecipeData;
     },
   });
 
@@ -123,6 +127,7 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <SaveAllButton />
             <Button
               variant="outline"
               size="sm"
@@ -176,14 +181,47 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
   );
 }
 
+/** Page-level Save button — saves all dirty sections in sequence. */
+function SaveAllButton() {
+  const { anyDirty, saveAll, isSaving } = useRecipeEditor();
+  const [pending, setPending] = useState(false);
+
+  const onClick = async () => {
+    setPending(true);
+    try {
+      await saveAll();
+      toast.success("Recipe saved");
+    } catch {
+      // Errors are surfaced via per-section handleSaveError already.
+    } finally {
+      setPending(false);
+    }
+  };
+
+  if (!anyDirty && !pending) return null;
+  return (
+    <Button size="sm" onClick={onClick} disabled={pending || isSaving}>
+      {pending || isSaving ? (
+        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+      ) : (
+        <Save className="h-4 w-4 mr-1" />
+      )}
+      Save
+    </Button>
+  );
+}
+
 /** Compact estimates bar shown on mobile viewports */
 function MobileEstimatesBar() {
   const { estimates } = useRecipeEditor();
+  const gravityUnit = useGravityUnit();
+  const og = formatGravityFromSg(estimates.og, gravityUnit);
+  const fg = formatGravityFromSg(estimates.fg, gravityUnit);
   return (
     <div className="flex items-center justify-between text-sm">
       <div className="flex gap-4">
-        <span><span className="text-muted-foreground">OG</span>{" "}<span className="font-mono font-medium">{estimates.og?.toFixed(3) ?? "\u2014"}</span></span>
-        <span><span className="text-muted-foreground">FG</span>{" "}<span className="font-mono font-medium">{estimates.fg?.toFixed(3) ?? "\u2014"}</span></span>
+        <span><span className="text-muted-foreground">OG</span>{" "}<span className="font-mono font-medium">{og}</span></span>
+        <span><span className="text-muted-foreground">FG</span>{" "}<span className="font-mono font-medium">{fg}</span></span>
         <span><span className="text-muted-foreground">ABV</span>{" "}<span className="font-mono font-medium">{estimates.abv !== null ? `${estimates.abv}%` : "\u2014"}</span></span>
         <span><span className="text-muted-foreground">IBU</span>{" "}<span className="font-mono font-medium">{estimates.ibu?.toString() ?? "\u2014"}</span></span>
         <span><span className="text-muted-foreground">SRM</span>{" "}<span className="font-mono font-medium">{estimates.srm?.toString() ?? "\u2014"}</span></span>

@@ -25,6 +25,8 @@ import Link from "next/link";
 import { getStateLabel } from "@/types/entity";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { useGravityUnit } from "@/hooks/useUnitPreferences";
+import { formatGravityFromSg } from "@/lib/units";
 
 // =============================================================================
 // Types
@@ -56,6 +58,7 @@ type BlendDetailRow = {
 export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const supabase = createClient();
   const batchId = data.id;
+  const gravityUnit = useGravityUnit();
 
   const { data: blends, isLoading } = useQuery({
     queryKey: entityKeys.related("batch_blends", "blend_batch_id", batchId),
@@ -133,7 +136,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                   <TableHead>Source Batch</TableHead>
                   <TableHead>Recipe</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Volume (BBL)</TableHead>
+                  <TableHead>Volume</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>
               </TableHeader>
@@ -188,13 +191,13 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
             {blendInfo.blended_og != null && (
               <div>
                 <span className="text-muted-foreground">OG:</span>{" "}
-                <span className="font-medium">{Number(blendInfo.blended_og).toFixed(3)}</span>
+                <span className="font-medium">{formatGravityFromSg(Number(blendInfo.blended_og), gravityUnit)}</span>
               </div>
             )}
             {blendInfo.blended_fg != null && (
               <div>
                 <span className="text-muted-foreground">FG:</span>{" "}
-                <span className="font-medium">{Number(blendInfo.blended_fg).toFixed(3)}</span>
+                <span className="font-medium">{formatGravityFromSg(Number(blendInfo.blended_fg), gravityUnit)}</span>
               </div>
             )}
             {blendInfo.blended_abv != null && (
@@ -243,7 +246,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Blend Batch</TableHead>
-                  <TableHead>Volume (BBL)</TableHead>
+                  <TableHead>Volume</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>
               </TableHeader>

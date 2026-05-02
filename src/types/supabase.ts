@@ -4545,6 +4545,7 @@ export type Database = {
           target_water_profile_id: string | null
           tasting_notes: string | null
           updated_at: string | null
+          version: number
           volume_bbl: number | null
           water_profile_id: string | null
           water_to_grain_ratio: number | null
@@ -4597,6 +4598,7 @@ export type Database = {
           target_water_profile_id?: string | null
           tasting_notes?: string | null
           updated_at?: string | null
+          version?: number
           volume_bbl?: number | null
           water_profile_id?: string | null
           water_to_grain_ratio?: number | null
@@ -4649,6 +4651,7 @@ export type Database = {
           target_water_profile_id?: string | null
           tasting_notes?: string | null
           updated_at?: string | null
+          version?: number
           volume_bbl?: number | null
           water_profile_id?: string | null
           water_to_grain_ratio?: number | null
