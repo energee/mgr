@@ -305,6 +305,10 @@ export const dashboardKeys = {
     production: (days: number) => ["dashboard", "trends", "production", days] as const,
     inventory: (days: number) => ["dashboard", "trends", "inventory", days] as const,
     sales: (days: number) => ["dashboard", "trends", "sales", days] as const,
+    weeklyVolume: () => ["dashboard", "trends", "weekly-volume"] as const,
+  },
+  heatmap: {
+    year: () => ["dashboard", "heatmap", "year"] as const,
   },
 };
 
