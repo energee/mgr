@@ -223,6 +223,17 @@ export function parseTemperatureInput(
   return convertTemperature(value, inputUnit, "f");
 }
 
+/** Format a temperature range (canonical °F bounds) in the user's display unit. */
+export function formatTemperatureRange(
+  lowF: number,
+  highF: number,
+  displayUnit: TemperatureUnit,
+): string {
+  const low = Math.round(convertTemperature(lowF, "f", displayUnit));
+  const high = Math.round(convertTemperature(highF, "f", displayUnit));
+  return `${low}-${high}${UNIT_LABELS[displayUnit]}`;
+}
+
 // =============================================================================
 // Gravity Conversions
 // =============================================================================
@@ -275,6 +286,24 @@ export function formatGravity(
     const sg = platoToSg(plato);
     return `${sg.toFixed(decimals ?? 3)}`;
   }
+}
+
+/**
+ * Format a Specific Gravity value in the user's preferred gravity unit.
+ *
+ * Recipe estimates and `actual_og` / `actual_fg` are stored as SG (1.0xx),
+ * unlike batch readings which canonicalise to Plato. This sibling lets
+ * SG-input call sites get the same unit-preference behaviour without
+ * round-tripping through Plato manually.
+ */
+export function formatGravityFromSg(
+  sg: number | null | undefined,
+  displayUnit: GravityUnit,
+  decimals?: number,
+): string {
+  if (sg == null) return "—";
+  if (displayUnit === "sg") return sg.toFixed(decimals ?? 3);
+  return `${sgToPlato(sg).toFixed(decimals ?? 1)}${UNIT_LABELS.plato}`;
 }
 
 export function parseGravityInput(

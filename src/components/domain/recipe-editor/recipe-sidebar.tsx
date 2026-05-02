@@ -14,7 +14,8 @@ import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
 import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
-import { Package } from "lucide-react";
+import { useGravityUnit, useWeightUnit } from "@/hooks/useUnitPreferences";
+import { formatGravityFromSg, convertWeight, UNIT_LABELS, type WeightUnit } from "@/lib/units";
 
 /** SRM-to-hex color lookup table for continuous beer color display */
 const SRM_COLORS: [number, string][] = [
@@ -103,6 +104,8 @@ function calcHopBags(items: HopScheduleItem[]): {
 
 export function RecipeSidebar() {
   const { recipe, estimates, grainItems, hopItems } = useRecipeEditor();
+  const gravityUnit = useGravityUnit();
+  const weightUnit = useWeightUnit();
 
   const grainCalc = useMemo(() => calcGrainBags(grainItems), [grainItems]);
   const hopCalc = useMemo(() => calcHopBags(hopItems), [hopItems]);
@@ -140,8 +143,8 @@ export function RecipeSidebar() {
 
         {/* OG / FG / IBU / SRM grid */}
         <div className="grid grid-cols-2 gap-3">
-          <EstimateCard label="OG" value={estimates.og?.toFixed(3) ?? "\u2014"} />
-          <EstimateCard label="FG" value={estimates.fg?.toFixed(3) ?? "\u2014"} />
+          <EstimateCard label="OG" value={formatGravityFromSg(estimates.og, gravityUnit)} />
+          <EstimateCard label="FG" value={formatGravityFromSg(estimates.fg, gravityUnit)} />
           <EstimateCard label="IBU" value={estimates.ibu?.toString() ?? "\u2014"} />
           <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
             <div
@@ -165,8 +168,7 @@ export function RecipeSidebar() {
             Grain Bill
           </h4>
           {grainCalc.totalBags > 0 && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Package className="h-3 w-3" />
+            <span className="text-xs text-muted-foreground">
               {grainCalc.totalBags} {bagLabel(grainCalc.totalBags)}
             </span>
           )}
@@ -186,11 +188,11 @@ export function RecipeSidebar() {
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="tabular-nums">
-                    {formatNum(g.weightLbs)} lbs
+                    {formatGrainWeight(g.weightLbs, weightUnit)}
                   </span>
                   {g.bags !== null && g.bagWeightLbs ? (
                     <span className="tabular-nums">
-                      {g.bags} x {formatNum(g.bagWeightLbs)} lb {bagLabel(g.bags)}
+                      {g.bags} x {formatGrainWeight(g.bagWeightLbs, weightUnit)} {bagLabel(g.bags)}
                     </span>
                   ) : (
                     <span className="italic">no bag size</span>
@@ -200,7 +202,7 @@ export function RecipeSidebar() {
             ))}
             {/* Totals row */}
             <div className="border-t pt-1.5 mt-1.5 flex justify-between text-sm font-medium">
-              <span>{formatNum(grainCalc.totalLbs)} lbs total</span>
+              <span>{formatGrainWeight(grainCalc.totalLbs, weightUnit)} total</span>
               {grainCalc.totalBags > 0 && (
                 <span className="tabular-nums">
                   {grainCalc.totalBags} {bagLabel(grainCalc.totalBags)}
@@ -218,8 +220,7 @@ export function RecipeSidebar() {
             Hops
           </h4>
           {hopCalc.totalBags > 0 && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Package className="h-3 w-3" />
+            <span className="text-xs text-muted-foreground">
               {hopCalc.totalBags} {bagLabel(hopCalc.totalBags)}
             </span>
           )}
@@ -239,11 +240,11 @@ export function RecipeSidebar() {
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="tabular-nums">
-                    {formatNum(h.weightOz)} oz
+                    {formatHopWeight(h.weightOz, weightUnit)}
                   </span>
                   {h.bags !== null && h.bagWeightLbs ? (
                     <span className="tabular-nums">
-                      {h.bags} x {formatNum(h.bagWeightLbs)} lb {bagLabel(h.bags)}
+                      {h.bags} x {formatGrainWeight(h.bagWeightLbs, weightUnit)} {bagLabel(h.bags)}
                     </span>
                   ) : (
                     <span className="italic">no bag size</span>
@@ -253,7 +254,7 @@ export function RecipeSidebar() {
             ))}
             {/* Totals row */}
             <div className="border-t pt-1.5 mt-1.5 flex justify-between text-sm font-medium">
-              <span>{formatNum(hopCalc.totalOz)} oz total</span>
+              <span>{formatHopWeight(hopCalc.totalOz, weightUnit)} total</span>
               {hopCalc.totalBags > 0 && (
                 <span className="tabular-nums">
                   {hopCalc.totalBags} {bagLabel(hopCalc.totalBags)}
@@ -336,6 +337,25 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 /** Format a number: show decimals only if needed */
 function formatNum(n: number): string {
   return n % 1 === 0 ? n.toString() : n.toFixed(1);
+}
+
+/** Format a grain weight (canonical lbs) using the user's preferred weight unit. */
+function formatGrainWeight(lbs: number, unit: WeightUnit): string {
+  return `${formatNum(convertWeight(lbs, "lbs", unit))} ${UNIT_LABELS[unit]}`;
+}
+
+/**
+ * Format a hop weight (canonical oz). For lbs preference: shows lbs when ≥1 lb,
+ * otherwise oz. For kg preference: always shows kg, with extra precision for
+ * sub-pound amounts so dry-hop charges aren't rounded to "0 kg".
+ */
+function formatHopWeight(oz: number, unit: WeightUnit): string {
+  if (unit === "kg") {
+    const kg = convertWeight(oz / 16, "lbs", "kg");
+    return `${kg.toFixed(kg < 1 ? 3 : 2)} kg`;
+  }
+  if (oz >= 16) return `${formatNum(oz / 16)} lbs`;
+  return `${formatNum(oz)} oz`;
 }
 
 function bagLabel(count: number): string {

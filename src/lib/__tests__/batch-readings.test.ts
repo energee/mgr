@@ -118,8 +118,8 @@ describe("formatReadingValue", () => {
     expect(formatReadingValue("gravity", 1.050, "sg")).toBe("1.050");
   });
 
-  it("formats gravity in Plato with 1 decimal", () => {
-    expect(formatReadingValue("gravity", 12.5, "plato")).toBe("12.5");
+  it("formats gravity in Plato with 1 decimal and °P suffix", () => {
+    expect(formatReadingValue("gravity", 12.5, "plato")).toBe("12.5°P");
   });
 
   it("formats temperature with degree symbol", () => {

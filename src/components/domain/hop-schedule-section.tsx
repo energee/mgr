@@ -8,7 +8,7 @@
  * Passes batchSizeGal and estimatedOG to the editor for IBU calculations.
  */
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys } from "@/lib/query-keys";
@@ -16,9 +16,8 @@ import {
   HopScheduleEditor,
   type HopScheduleItem,
 } from "@/components/domain/hop-schedule-editor";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Save, Loader2 } from "lucide-react";
+import { useRegisterSaver } from "@/components/domain/recipe-editor/recipe-editor-context";
 import { toast } from "sonner";
 
 /** Barrels to gallons conversion factor */
@@ -144,12 +143,16 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
         queryKey: recipeKeys.detail(recipeId),
       });
       setHopDirty(false);
-      toast.success("Hop schedule saved");
     },
     onError: (error) => {
       toast.error("Failed to save hop schedule: " + error.message);
     },
   });
+
+  useRegisterSaver("hop-schedule", Boolean(editing && hopDirty), useCallback(async () => {
+    if (!hopDirty) return;
+    await saveMutation.mutateAsync();
+  }, [hopDirty, saveMutation]));
 
   if (isLoading) {
     return (
@@ -170,23 +173,6 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
         batchSizeGal={batchSizeGal}
         estimatedOG={estimatedOG}
       />
-      {editing && hopDirty && (
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Save Hop Schedule
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

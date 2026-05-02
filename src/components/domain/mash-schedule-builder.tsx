@@ -37,6 +37,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useTemperatureUnit } from "@/hooks/useUnitPreferences";
+import { formatTemperature } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronDown } from "lucide-react";
 
 export type MashStep = {
@@ -79,6 +81,7 @@ export function MashScheduleBuilder({
   onChange,
   disabled = false,
 }: MashScheduleBuilderProps) {
+  const tempUnit = useTemperatureUnit();
   // Generate unique ID
   const idCounter = useRef(0);
   const generateId = useCallback(() => `step_${++idCounter.current}_${crypto.randomUUID().slice(0, 7)}`, []);
@@ -140,7 +143,7 @@ export function MashScheduleBuilder({
                 key={preset.name}
                 onClick={() => handleAddPreset(preset)}
               >
-                {preset.name} ({preset.temp_f}°F)
+                {preset.name} ({formatTemperature(preset.temp_f, tempUnit, 0)})
               </DropdownMenuItem>
             ))}
             <DropdownMenuItem onClick={handleAddBlank}>

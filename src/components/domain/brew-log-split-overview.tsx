@@ -20,6 +20,8 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
 import { Beer, FlaskConical } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { formatVolume } from "@/lib/units";
 
 // Segment colors for the volume bar
 const SEGMENT_COLORS = [
@@ -57,6 +59,7 @@ type LinkedBatch = {
 export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
   const brewLogId = data.id;
   const supabase = createClient();
+  const volumeUnit = useVolumeUnit();
 
   // Fetch linked batches
   const { data: linkedBatches, isLoading: batchesLoading } = useQuery({
@@ -152,7 +155,7 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
                 key={lb.id}
                 className={`${color} relative flex items-center justify-center text-[10px] font-medium text-white transition-all`}
                 style={{ width: `${pct}%` }}
-                title={`${lb.batch.name}: ${volume.toFixed(2)} BBL (${pct.toFixed(0)}%)`}
+                title={`${lb.batch.name}: ${formatVolume(volume, volumeUnit)} (${pct.toFixed(0)}%)`}
               >
                 {pct > 15 && (
                   <span className="truncate px-1">{lb.batch.name}</span>

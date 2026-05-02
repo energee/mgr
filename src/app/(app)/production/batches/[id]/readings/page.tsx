@@ -30,6 +30,7 @@ import {
 import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch-readings-chart-lazy";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
+import { useGravityUnit, useTemperatureUnit } from "@/hooks/useUnitPreferences";
 import { batchKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
 
@@ -50,6 +51,14 @@ export default function BatchReadingsPage({
   const { id } = use(params);
   const supabase = createClient();
   const queryClient = useQueryClient();
+  const gravityUnit = useGravityUnit();
+  const temperatureUnit = useTemperatureUnit();
+  const displayUnitFor = (readingType: string) =>
+    readingType === "gravity"
+      ? gravityUnit
+      : readingType === "temperature"
+        ? temperatureUnit
+        : undefined;
 
   // Consume prefill store once on initial render to auto-show form from AI
   const [showForm, setShowForm] = useState(() => {
@@ -208,7 +217,7 @@ export default function BatchReadingsPage({
                           {config.label}
                         </p>
                         <p className="text-lg font-semibold">
-                          {formatReadingValue(type, log.data.value, log.data.unit)}
+                          {formatReadingValue(type, log.data.value, log.data.unit, displayUnitFor(type))}
                         </p>
                       </div>
                     </div>
@@ -259,7 +268,8 @@ export default function BatchReadingsPage({
                           {formatReadingValue(
                             log.data.reading_type,
                             log.data.value,
-                            log.data.unit
+                            log.data.unit,
+                            displayUnitFor(log.data.reading_type)
                           )}
                         </span>
                       </div>

@@ -9,17 +9,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
-import { useRecipeEditor } from "./recipe-editor-context";
+import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UnitInput } from "@/components/ui/unit-input";
+import { convertVolume } from "@/lib/units";
 import {
   Select,
   SelectContent,
@@ -27,9 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Save, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 type WaterFormValues = {
   water_profile_id: string | null;
@@ -59,7 +57,7 @@ const WATER_PROFILE_FIELDS = [
 ];
 
 export function WaterChemistrySection() {
-  const { recipe, updateRecipe, isSaving, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -112,7 +110,7 @@ export function WaterChemistrySection() {
           sparge_water_volume_gal: values.sparge_water_volume_gal,
           preboil_volume_bbl: values.preboil_volume_bbl,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {
@@ -120,7 +118,6 @@ export function WaterChemistrySection() {
       form.reset(form.getValues());
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-      toast.success("Water chemistry saved");
     },
     onError: handleSaveError,
     onSettled: () => {
@@ -129,31 +126,17 @@ export function WaterChemistrySection() {
     },
   });
 
-  const onSubmit = useCallback(
-    (values: WaterFormValues) => saveMutation.mutate(values),
-    [saveMutation]
-  );
+  useRegisterSaver("water-chemistry", isDirty, useCallback(async () => {
+    if (!form.formState.isDirty) return;
+    await form.handleSubmit(async (values) => {
+      await saveMutation.mutateAsync(values);
+    })();
+  }, [form, saveMutation]));
 
   return (
     <RecipeSectionCard
       title="Water Chemistry"
       isDirty={isDirty}
-      headerActions={
-        isDirty ? (
-          <Button
-            size="sm"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={saveMutation.isPending || isSaving}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-1" />
-            )}
-            Save
-          </Button>
-        ) : null
-      }
     >
       <div className="space-y-6">
         {/* Water profile dropdowns */}
@@ -219,41 +202,58 @@ export function WaterChemistrySection() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <Label htmlFor="mash-water" className="text-xs">
-              Mash Water (gal)
+              Mash Water
             </Label>
-            <Input
-              id="mash-water"
-              type="number"
-              step="0.5"
-              min="0"
-              {...form.register("mash_water_volume_gal", { valueAsNumber: true })}
-              placeholder="e.g., 100"
+            <Controller
+              control={form.control}
+              name="mash_water_volume_gal"
+              render={({ field }) => (
+                <UnitInput
+                  id="mash-water"
+                  // Stored canonical for this column is gallons; UnitInput's
+                  // volume canonical is BBL, so convert at the boundary.
+                  value={field.value == null ? null : convertVolume(field.value, "gal", "bbl")}
+                  onChange={(bbl) => field.onChange(bbl == null ? null : convertVolume(bbl, "bbl", "gal"))}
+                  unitType="volume"
+                  decimals={1}
+                />
+              )}
             />
           </div>
           <div>
             <Label htmlFor="sparge-water" className="text-xs">
-              Sparge Water (gal)
+              Sparge Water
             </Label>
-            <Input
-              id="sparge-water"
-              type="number"
-              step="0.5"
-              min="0"
-              {...form.register("sparge_water_volume_gal", { valueAsNumber: true })}
-              placeholder="e.g., 120"
+            <Controller
+              control={form.control}
+              name="sparge_water_volume_gal"
+              render={({ field }) => (
+                <UnitInput
+                  id="sparge-water"
+                  value={field.value == null ? null : convertVolume(field.value, "gal", "bbl")}
+                  onChange={(bbl) => field.onChange(bbl == null ? null : convertVolume(bbl, "bbl", "gal"))}
+                  unitType="volume"
+                  decimals={1}
+                />
+              )}
             />
           </div>
           <div>
             <Label htmlFor="preboil-vol" className="text-xs">
-              Pre-Boil Volume (BBL)
+              Pre-Boil Volume
             </Label>
-            <Input
-              id="preboil-vol"
-              type="number"
-              step="0.1"
-              min="0"
-              {...form.register("preboil_volume_bbl", { valueAsNumber: true })}
-              placeholder="e.g., 8.5"
+            <Controller
+              control={form.control}
+              name="preboil_volume_bbl"
+              render={({ field }) => (
+                <UnitInput
+                  id="preboil-vol"
+                  value={field.value}
+                  onChange={field.onChange}
+                  unitType="volume"
+                  decimals={1}
+                />
+              )}
             />
           </div>
         </div>

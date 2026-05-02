@@ -104,7 +104,7 @@ describe("extractBrewMeasurements — pre-boil gravity", () => {
     const result = extractBrewMeasurements([
       makeEvent("boil_start", "gravity_plato", 12),
     ]);
-    expect(result).toEqual([{ label: "Pre-Boil Gravity", value: "12\u00B0P" }]);
+    expect(result).toEqual([{ label: "Pre-Boil Gravity", value: "12.0\u00B0P" }]);
   });
 });
 
@@ -134,14 +134,14 @@ describe("extractBrewMeasurements — post-boil volume", () => {
       makeEvent("boil_end", "volume_bbl", 7.5),
     ]);
     // boil_end also matches post-boil OG (gravity_plato), but we only have volume_bbl here
-    expect(result).toEqual([{ label: "Post-Boil Vol", value: "7.5 BBL" }]);
+    expect(result).toEqual([{ label: "Post-Boil Vol", value: "7.50 BBL" }]);
   });
 
   it("extracts post-boil volume from ko_start phase", () => {
     const result = extractBrewMeasurements([
       makeEvent("ko_start", "volume_bbl", 7),
     ]);
-    expect(result).toEqual([{ label: "Post-Boil Vol", value: "7 BBL" }]);
+    expect(result).toEqual([{ label: "Post-Boil Vol", value: "7.00 BBL" }]);
   });
 
   it("extracts post-boil volume from ko_end phase", () => {
@@ -149,7 +149,7 @@ describe("extractBrewMeasurements — post-boil volume", () => {
       makeEvent("ko_end", "volume_bbl", 6.8),
     ]);
     // ko_end also matches knockout temp (temp_f), but we only have volume_bbl here
-    expect(result).toEqual([{ label: "Post-Boil Vol", value: "6.8 BBL" }]);
+    expect(result).toEqual([{ label: "Post-Boil Vol", value: "6.80 BBL" }]);
   });
 });
 
@@ -191,7 +191,7 @@ describe("extractBrewMeasurements — full brew day", () => {
     expect(result[0]).toEqual({ label: "Mash Temp", value: "152\u00B0F" });
     expect(result[1]).toEqual({ label: "Pre-Boil Gravity", value: "11.5\u00B0P" });
     expect(result[2]).toEqual({ label: "Post-Boil OG", value: "13.2\u00B0P" });
-    expect(result[3]).toEqual({ label: "Post-Boil Vol", value: "7.5 BBL" });
+    expect(result[3]).toEqual({ label: "Post-Boil Vol", value: "7.50 BBL" });
     expect(result[4]).toEqual({ label: "Knockout Temp", value: "65\u00B0F" });
   });
 
@@ -268,7 +268,7 @@ describe("extractBrewMeasurements — events with multiple measurements", () => 
     const result = extractBrewMeasurements(events);
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({ label: "Post-Boil OG", value: "13.2\u00B0P" });
-    expect(result[1]).toEqual({ label: "Post-Boil Vol", value: "7.5 BBL" });
+    expect(result[1]).toEqual({ label: "Post-Boil Vol", value: "7.50 BBL" });
   });
 
   it("extracts both volume and temp from ko_end event with multiple measurements", () => {
@@ -280,7 +280,7 @@ describe("extractBrewMeasurements — events with multiple measurements", () => 
     ];
     const result = extractBrewMeasurements(events);
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ label: "Post-Boil Vol", value: "6.8 BBL" });
+    expect(result[0]).toEqual({ label: "Post-Boil Vol", value: "6.80 BBL" });
     expect(result[1]).toEqual({ label: "Knockout Temp", value: "64\u00B0F" });
   });
 });
@@ -305,7 +305,7 @@ describe("extractBrewMeasurements — edge cases with values", () => {
       makeEvent("kettle_full", "gravity_plato", 11.567),
     ]);
     expect(result).toEqual([
-      { label: "Pre-Boil Gravity", value: "11.567\u00B0P" },
+      { label: "Pre-Boil Gravity", value: "11.6\u00B0P" },
     ]);
   });
 
@@ -388,7 +388,7 @@ describe("extractBrewMeasurements — findMeasurement picks first matching phase
     const result = extractBrewMeasurements(events);
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({ label: "Post-Boil OG", value: "13.2\u00B0P" });
-    expect(result[1]).toEqual({ label: "Post-Boil Vol", value: "7.5 BBL" });
+    expect(result[1]).toEqual({ label: "Post-Boil Vol", value: "7.50 BBL" });
   });
 });
 
@@ -430,6 +430,6 @@ describe("extractBrewMeasurements — output format", () => {
   it("formats volume values with BBL suffix", () => {
     const events = [makeEvent("boil_end", "volume_bbl", 7.5)];
     const result = extractBrewMeasurements(events);
-    expect(result[0].value).toBe("7.5 BBL");
+    expect(result[0].value).toBe("7.50 BBL");
   });
 });

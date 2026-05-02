@@ -20,8 +20,9 @@ const cspDirectives = [
   // App Router). See: https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy
   `script-src 'self'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} 'unsafe-inline'`,
   "style-src 'self' 'unsafe-inline'",
-  `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} wss://*.supabase.co https://*.supabase.co https://*.ingest.sentry.io`,
+  `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} wss://*.supabase.co https://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io`,
   "img-src 'self' data: blob:",
+  "worker-src 'self' blob:",
   "font-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",

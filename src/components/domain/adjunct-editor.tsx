@@ -45,6 +45,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sortable,
+  SortableContent,
+  SortableItem,
+  SortableItemHandle,
+  SortableOverlay,
+} from "@/components/ui/sortable";
+import {
+  SortableDragPreview,
+  reorderWithPositions,
+} from "@/components/ui/sortable-drag-preview";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
 import { catalogKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
@@ -167,21 +178,9 @@ export function AdjunctEditor({
     [items, onChange]
   );
 
-  // Move item
-  const handleMove = useCallback(
-    (index: number, direction: "up" | "down") => {
-      if (direction === "up" && index === 0) return;
-      if (direction === "down" && index === items.length - 1) return;
-
-      const updated = [...items];
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
-      updated.forEach((item, i) => {
-        item.position = i;
-      });
-      onChange(updated);
-    },
-    [items, onChange]
+  const handleReorder = useCallback(
+    (reordered: typeof items) => onChange(reorderWithPositions(reordered)),
+    [onChange]
   );
 
   // Group by type
@@ -270,6 +269,11 @@ export function AdjunctEditor({
           <p className="text-sm mt-1">Click &quot;Add Adjunct&quot; to add unmalted grains, extracts, etc.</p>
         </div>
       ) : (
+        <Sortable
+          value={items}
+          onValueChange={handleReorder}
+          getItemValue={(item) => item.adjunct_id}
+        >
         <Table>
           <TableHeader>
             <TableRow>
@@ -280,31 +284,18 @@ export function AdjunctEditor({
               <TableHead className="w-16"></TableHead>
             </TableRow>
           </TableHeader>
+          <SortableContent asChild>
           <TableBody>
             {items.map((item, index) => {
               const adjunct = item.adjunct || adjunctCatalog.find((a) => a.id === item.adjunct_id);
 
               return (
-                <TableRow key={item.adjunct_id}>
+                <SortableItem key={item.adjunct_id} value={item.adjunct_id} asChild disabled={disabled}>
+                <TableRow>
                   <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => handleMove(index, "up")}
-                        disabled={disabled || index === 0}
-                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                      >
-                        <GripVertical className="h-3 w-3 rotate-180" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMove(index, "down")}
-                        disabled={disabled || index === items.length - 1}
-                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                      >
-                        <GripVertical className="h-3 w-3" />
-                      </button>
-                    </div>
+                    <SortableItemHandle className="p-1 hover:bg-muted rounded touch-none">
+                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    </SortableItemHandle>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -366,9 +357,11 @@ export function AdjunctEditor({
                     </Button>
                   </TableCell>
                 </TableRow>
+                </SortableItem>
               );
             })}
           </TableBody>
+          </SortableContent>
           <TableFooter>
             <TableRow>
               <TableCell colSpan={2} className="font-medium">
@@ -381,6 +374,19 @@ export function AdjunctEditor({
             </TableRow>
           </TableFooter>
         </Table>
+        <SortableOverlay>
+          {({ value }) => {
+            const item = items.find((i) => i.adjunct_id === value);
+            const adjunct = item?.adjunct || adjunctCatalog.find((a) => a.id === item?.adjunct_id);
+            return (
+              <SortableDragPreview
+                title={adjunct?.name || "Adjunct"}
+                subtitle={item ? `${item.weight_lbs} lbs` : undefined}
+              />
+            );
+          }}
+        </SortableOverlay>
+        </Sortable>
       )}
     </div>
   );

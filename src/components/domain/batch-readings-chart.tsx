@@ -31,6 +31,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import type { BatchReading } from "@/lib/batch-readings";
 import { convertGravity } from "@/lib/batch-readings";
+import { useGravityUnit, useTemperatureUnit } from "@/hooks/useUnitPreferences";
+import {
+  platoToSg,
+  convertTemperature,
+  UNIT_LABELS,
+} from "@/lib/units";
 
 // =============================================================================
 // Types
@@ -84,6 +90,8 @@ export function BatchReadingsChart({
   className,
 }: BatchReadingsChartProps) {
   const [activeMetric, setActiveMetric] = useState<ChartMetric>("gravity");
+  const gravityUnit = useGravityUnit();
+  const tempUnit = useTemperatureUnit();
 
   // Filter and transform readings for the chart
   const chartData = useMemo(() => {
@@ -94,12 +102,25 @@ export function BatchReadingsChart({
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
 
+    const isSg = activeMetric === "gravity" && gravityUnit === "sg";
+    const factor = isSg ? 1000 : 10;
+    const unitLabel =
+      activeMetric === "gravity"
+        ? isSg
+          ? ""
+          : UNIT_LABELS.plato
+        : UNIT_LABELS[tempUnit];
+
     return filteredReadings.map((log) => {
       let value = typeof log.data.value === "number" ? log.data.value : parseFloat(String(log.data.value));
 
-      // Convert SG to Plato for consistency in gravity readings
-      if (activeMetric === "gravity" && log.data.unit === "sg") {
-        value = convertGravity(value, "sg", "plato");
+      if (activeMetric === "gravity") {
+        // Normalize to Plato first, then to user's preferred unit.
+        const plato = log.data.unit === "sg" ? convertGravity(value, "sg", "plato") : value;
+        value = gravityUnit === "sg" ? platoToSg(plato) : plato;
+      } else if (activeMetric === "temperature") {
+        const f = log.data.unit === "c" ? convertTemperature(value, "c", "f") : value;
+        value = convertTemperature(f, "f", tempUnit);
       }
 
       return {
@@ -107,11 +128,11 @@ export function BatchReadingsChart({
         date: format(new Date(log.created_at), "MMM d"),
         time: format(new Date(log.created_at), "h:mm a"),
         fullDate: format(new Date(log.created_at), "MMM d, h:mm a"),
-        value: Math.round(value * 10) / 10, // Round to 1 decimal
-        unit: activeMetric === "gravity" ? "°P" : log.data.unit === "c" ? "°C" : "°F",
+        value: Math.round(value * factor) / factor,
+        unit: unitLabel,
       };
     });
-  }, [readings, activeMetric]);
+  }, [readings, activeMetric, gravityUnit, tempUnit]);
 
   // Count readings by type
   const readingCounts = useMemo(() => {
@@ -135,8 +156,15 @@ export function BatchReadingsChart({
     const padding = (max - min) * CHART_PADDING_PERCENT || CHART_MIN_PADDING;
 
     if (activeMetric === "gravity") {
-      // For gravity, also consider target FG
-      const effectiveMin = targetFG ? Math.min(min, targetFG) : min;
+      // targetFG is canonical Plato; convert to whichever unit chartData is in.
+      const targetInDisplayUnit =
+        targetFG == null
+          ? null
+          : gravityUnit === "sg"
+            ? platoToSg(targetFG)
+            : targetFG;
+      const effectiveMin =
+        targetInDisplayUnit !== null ? Math.min(min, targetInDisplayUnit) : min;
       return [
         Math.floor(effectiveMin - padding),
         Math.ceil(max + padding),
@@ -144,7 +172,7 @@ export function BatchReadingsChart({
     }
 
     return [Math.floor(min - padding), Math.ceil(max + padding)];
-  }, [chartData, activeMetric, targetFG]);
+  }, [chartData, activeMetric, targetFG, gravityUnit]);
 
   const hasGravityReadings = (readingCounts["gravity"] || 0) > 0;
   const hasTemperatureReadings = (readingCounts["temperature"] || 0) > 0;
@@ -204,8 +232,10 @@ export function BatchReadingsChart({
                   tickMargin={8}
                   tickFormatter={(value) =>
                     activeMetric === "gravity"
-                      ? `${value}°P`
-                      : `${value}°`
+                      ? gravityUnit === "sg"
+                        ? Number(value).toFixed(3)
+                        : `${value}${UNIT_LABELS.plato}`
+                      : `${value}${UNIT_LABELS[tempUnit]}`
                   }
                 />
                 <ChartTooltip
@@ -218,7 +248,12 @@ export function BatchReadingsChart({
                         return "";
                       }}
                       formatter={(value) => {
-                        const unit = activeMetric === "gravity" ? "°P" : "°F";
+                        const unit =
+                          activeMetric === "gravity"
+                            ? gravityUnit === "sg"
+                              ? ""
+                              : UNIT_LABELS.plato
+                            : UNIT_LABELS[tempUnit];
                         return [`${value}${unit}`, chartConfig[activeMetric].label];
                       }}
                     />
@@ -234,11 +269,18 @@ export function BatchReadingsChart({
                 />
                 {activeMetric === "gravity" && targetFG && (
                   <ReferenceLine
-                    y={targetFG}
+                    y={
+                      gravityUnit === "sg"
+                        ? Number(platoToSg(targetFG).toFixed(3))
+                        : Math.round(targetFG * 10) / 10
+                    }
                     stroke="hsl(var(--muted-foreground))"
                     strokeDasharray="5 5"
                     label={{
-                      value: `Target FG: ${targetFG}°P`,
+                      value:
+                        gravityUnit === "sg"
+                          ? `Target FG: ${platoToSg(targetFG).toFixed(3)}`
+                          : `Target FG: ${targetFG.toFixed(1)}${UNIT_LABELS.plato}`,
                       position: "right",
                       fill: "hsl(var(--muted-foreground))",
                       fontSize: 12,

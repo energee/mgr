@@ -8,18 +8,16 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
-import { useRecipeEditor } from "./recipe-editor-context";
+import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Save, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { UnitInput } from "@/components/ui/unit-input";
 
 type WhirlpoolFormValues = {
   whirlpool_time_min: number | null;
@@ -28,7 +26,7 @@ type WhirlpoolFormValues = {
 }
 
 export function WhirlpoolSection() {
-  const { recipe, updateRecipe, isSaving, startSaving, handleSaveError } = useRecipeEditor();
+  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
   const supabase = createClient();
   const queryClient = useQueryClient();
 
@@ -56,7 +54,7 @@ export function WhirlpoolSection() {
           whirlpool_temp_f: values.whirlpool_temp_f,
           whirlpool_rest_min: values.whirlpool_rest_min,
         },
-        recipe.version
+        getVersion()
       );
     },
     onSuccess: (data) => {
@@ -64,7 +62,6 @@ export function WhirlpoolSection() {
       form.reset(form.getValues());
       queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
       queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-      toast.success("Whirlpool parameters saved");
     },
     onError: handleSaveError,
     onSettled: () => {
@@ -73,31 +70,17 @@ export function WhirlpoolSection() {
     },
   });
 
-  const onSubmit = useCallback(
-    (values: WhirlpoolFormValues) => saveMutation.mutate(values),
-    [saveMutation]
-  );
+  useRegisterSaver("whirlpool", isDirty, useCallback(async () => {
+    if (!form.formState.isDirty) return;
+    await form.handleSubmit(async (values) => {
+      await saveMutation.mutateAsync(values);
+    })();
+  }, [form, saveMutation]));
 
   return (
     <RecipeSectionCard
       title="Whirlpool"
       isDirty={isDirty}
-      headerActions={
-        isDirty ? (
-          <Button
-            size="sm"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={saveMutation.isPending || isSaving}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-1" />
-            )}
-            Save
-          </Button>
-        ) : null
-      }
     >
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
@@ -114,15 +97,20 @@ export function WhirlpoolSection() {
         </div>
         <div>
           <Label htmlFor="wp-temp" className="text-xs">
-            Temperature (°F)
+            Temperature
           </Label>
-          <Input
-            id="wp-temp"
-            type="number"
-            min="100"
-            max="212"
-            {...form.register("whirlpool_temp_f", { valueAsNumber: true })}
-            placeholder="e.g., 170"
+          <Controller
+            control={form.control}
+            name="whirlpool_temp_f"
+            render={({ field }) => (
+              <UnitInput
+                id="wp-temp"
+                value={field.value}
+                onChange={field.onChange}
+                unitType="temperature"
+                decimals={0}
+              />
+            )}
           />
         </div>
         <div>

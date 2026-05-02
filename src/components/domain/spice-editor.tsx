@@ -45,6 +45,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sortable,
+  SortableContent,
+  SortableItem,
+  SortableItemHandle,
+  SortableOverlay,
+} from "@/components/ui/sortable";
+import {
+  SortableDragPreview,
+  reorderWithPositions,
+} from "@/components/ui/sortable-drag-preview";
 import { Plus, Trash2, GripVertical, Check, ChevronsUpDown } from "lucide-react";
 import { catalogKeys } from "@/lib/query-keys";
 
@@ -198,21 +209,9 @@ export function SpiceEditor({
     [items, onChange]
   );
 
-  // Move item
-  const handleMove = useCallback(
-    (index: number, direction: "up" | "down") => {
-      if (direction === "up" && index === 0) return;
-      if (direction === "down" && index === items.length - 1) return;
-
-      const updated = [...items];
-      const targetIndex = direction === "up" ? index - 1 : index + 1;
-      [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
-      updated.forEach((item, i) => {
-        item.position = i;
-      });
-      onChange(updated);
-    },
-    [items, onChange]
+  const handleReorder = useCallback(
+    (reordered: typeof items) => onChange(reorderWithPositions(reordered)),
+    [onChange]
   );
 
   // Group by type
@@ -301,6 +300,11 @@ export function SpiceEditor({
           <p className="text-sm mt-1">Click &quot;Add Spice&quot; to add coriander, orange peel, etc.</p>
         </div>
       ) : (
+        <Sortable
+          value={items}
+          onValueChange={handleReorder}
+          getItemValue={(item) => item.spice_id}
+        >
         <Table>
           <TableHeader>
             <TableRow>
@@ -313,31 +317,18 @@ export function SpiceEditor({
               <TableHead className="w-16"></TableHead>
             </TableRow>
           </TableHeader>
+          <SortableContent asChild>
           <TableBody>
             {items.map((item, index) => {
               const spice = item.spice || spiceCatalog.find((s) => s.id === item.spice_id);
 
               return (
-                <TableRow key={item.spice_id}>
+                <SortableItem key={item.spice_id} value={item.spice_id} asChild disabled={disabled}>
+                <TableRow>
                   <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => handleMove(index, "up")}
-                        disabled={disabled || index === 0}
-                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                      >
-                        <GripVertical className="h-3 w-3 rotate-180" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMove(index, "down")}
-                        disabled={disabled || index === items.length - 1}
-                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
-                      >
-                        <GripVertical className="h-3 w-3" />
-                      </button>
-                    </div>
+                    <SortableItemHandle className="p-1 hover:bg-muted rounded touch-none">
+                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    </SortableItemHandle>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -433,10 +424,25 @@ export function SpiceEditor({
                     </Button>
                   </TableCell>
                 </TableRow>
+                </SortableItem>
               );
             })}
           </TableBody>
+          </SortableContent>
         </Table>
+        <SortableOverlay>
+          {({ value }) => {
+            const item = items.find((i) => i.spice_id === value);
+            const spice = item?.spice || spiceCatalog.find((s) => s.id === item?.spice_id);
+            return (
+              <SortableDragPreview
+                title={spice?.name || "Spice"}
+                subtitle={item ? `${item.amount} ${item.unit}` : undefined}
+              />
+            );
+          }}
+        </SortableOverlay>
+        </Sortable>
       )}
     </div>
   );
