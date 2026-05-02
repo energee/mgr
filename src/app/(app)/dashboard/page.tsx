@@ -436,11 +436,14 @@ function ProductionTrends() {
   const volumeUnit = useVolumeUnit();
   const volumeLabel = UNIT_LABELS[volumeUnit];
 
+  // Single 365-day fetch covers both the period-scoped delta cards (sliced
+  // client-side) and the year weekly volume chart. Fetching twice would double
+  // RPC traffic for no benefit.
   const { data: productionTrends = [], isLoading } = useQuery({
-    queryKey: dashboardKeys.trends.production(period),
+    queryKey: dashboardKeys.trends.production(365),
     queryFn: async () => {
       const { data, error } = await dynamicRpc(supabase, "get_production_trends", {
-        p_days: period,
+        p_days: 365,
       });
       if (error) {
         log.error("Failed to fetch production trends:", error);
@@ -457,40 +460,25 @@ function ProductionTrends() {
     refetchIntervalInBackground: false,
   });
 
-  const { data: yearTrends = [] } = useQuery({
-    queryKey: dashboardKeys.trends.weeklyVolume(),
-    queryFn: async () => {
-      const { data, error } = await dynamicRpc(supabase, "get_production_trends", {
-        p_days: 365,
-      });
-      if (error) {
-        log.error("Failed to fetch year trends:", error);
-        return [];
-      }
-      return (data || []) as Array<{
-        date: string;
-        batches_started: number;
-        volume_bbl: number;
-        batches_completed: number;
-      }>;
-    },
-    refetchInterval: 60000,
-    refetchIntervalInBackground: false,
-  });
-
-  const currentPeriodData = useMemo(() => productionTrends.slice(period), [productionTrends, period]);
+  const currentPeriodData = useMemo(
+    () => productionTrends.slice(-period),
+    [productionTrends, period],
+  );
   const previousPeriodData = useMemo(
-    () => productionTrends.slice(0, period),
+    () => productionTrends.slice(-2 * period, -period),
     [productionTrends, period],
   );
 
-  const weeklyVolumeData = useMemo(() => {
-    const inUnit = yearTrends.map((d) => ({
-      date: d.date,
-      volume_display: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
-    }));
-    return bucketWeekly(inUnit, "date", "volume_display");
-  }, [yearTrends, volumeUnit]);
+  const weeklyVolumeData = useMemo(
+    () =>
+      bucketWeekly(
+        productionTrends.map((d) => ({
+          date: d.date,
+          value: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
+        })),
+      ),
+    [productionTrends, volumeUnit],
+  );
 
   if (isLoading) {
     return <ProductionTrendsSkeleton />;
@@ -541,7 +529,7 @@ function ProductionTrends() {
             data={weeklyVolumeData}
             xKey="date"
             type="bar"
-            series={[{ key: "volume_display", label: volumeLabel }]}
+            series={[{ key: "value", label: volumeLabel }]}
             formatValue={(v) => `${Number(v).toFixed(1)} ${volumeLabel}`}
             formatTooltipDate={(iso) => `Week of ${format(parseISO(iso), "MMM d, yyyy")}`}
           />

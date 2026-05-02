@@ -36,35 +36,33 @@ describe("bucketWeekly", () => {
     // 14 days starting Mon 2026-04-20
     const rows = Array.from({ length: 14 }, (_, i) => ({
       date: new Date(2026, 3, 20 + i).toISOString().slice(0, 10),
-      volume: 1,
+      value: 1,
     }));
-    const out = bucketWeekly(rows, "date", "volume");
+    const out = bucketWeekly(rows);
     expect(out).toHaveLength(2);
-    expect(out[0].volume).toBe(7);
-    expect(out[1].volume).toBe(7);
+    expect(out[0].value).toBe(7);
+    expect(out[1].value).toBe(7);
   });
 
   it("zero-fills weeks with no data within the bounds", () => {
-    const rows = [
-      { date: "2026-04-20", volume: 5 },
+    const out = bucketWeekly([
+      { date: "2026-04-20", value: 5 },
       // skip a week
-      { date: "2026-05-04", volume: 3 },
-    ];
-    const out = bucketWeekly(rows, "date", "volume");
+      { date: "2026-05-04", value: 3 },
+    ]);
     expect(out).toHaveLength(3);
-    expect(out[0].volume).toBe(5);
-    expect(out[1].volume).toBe(0);
-    expect(out[2].volume).toBe(3);
+    expect(out[0].value).toBe(5);
+    expect(out[1].value).toBe(0);
+    expect(out[2].value).toBe(3);
   });
 
   it("returns the ISO week's Monday as the bucket date", () => {
-    const out = bucketWeekly([{ date: "2026-04-22", volume: 1 }], "date", "volume");
-    expect(out[0].date).toBe("2026-04-20"); // Monday of that week
+    const out = bucketWeekly([{ date: "2026-04-22", value: 1 }]);
+    expect(out[0].date).toBe("2026-04-20");
   });
 
   it("returns empty array for empty input", () => {
-    const out = bucketWeekly([] as Array<{ date: string; volume: number }>, "date", "volume");
-    expect(out).toEqual([]);
+    expect(bucketWeekly([])).toEqual([]);
   });
 });
 

@@ -13,7 +13,7 @@
  * Data source: get_planned_batches_by_day(p_days := 365) RPC.
  */
 
-import { cloneElement, useMemo, type ReactElement } from "react";
+import { cloneElement, type ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -23,13 +23,15 @@ import {
   type BlockElement,
 } from "react-activity-calendar";
 import "react-activity-calendar/tooltips.css";
-import { format, parseISO, subDays } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys } from "@/lib/query-keys";
 import { dynamicRpc } from "@/services/types";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { Skeleton } from "@/components/ui/skeleton";
 import { log } from "@/lib/client-logger";
+import { DashboardEmpty } from "./dashboard-section";
 import {
   bucketForCount,
   buildPlannedDateFilterHref,
@@ -73,36 +75,7 @@ type PlannedByDayRow = {
   completed_count: number;
 };
 
-type ActivityWithCompleted = Activity & { completed: number };
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-/**
- * Ensure the activity series spans a full year by padding the start and end
- * with zero-count entries. The library renders dates that exist in the data
- * (zero-level cells are still drawn), so we anchor the calendar to the full
- * 365-day window even when the RPC returns sparse rows.
- */
-function padToYearWindow(
-  rows: ActivityWithCompleted[],
-): ActivityWithCompleted[] {
-  const today = new Date();
-  const start = format(subDays(today, DAYS - 1), "yyyy-MM-dd");
-  const end = format(today, "yyyy-MM-dd");
-
-  const byDate = new Map(rows.map((r) => [r.date, r]));
-  if (!byDate.has(start)) {
-    byDate.set(start, { date: start, count: 0, level: 0, completed: 0 });
-  }
-  if (!byDate.has(end)) {
-    byDate.set(end, { date: end, count: 0, level: 0, completed: 0 });
-  }
-  return Array.from(byDate.values()).sort((a, b) =>
-    a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
-  );
-}
+type ActivityWithCompleted = Activity & { completed: number; tooltip: string };
 
 // =============================================================================
 // Component
@@ -115,7 +88,7 @@ export function BatchActivityHeatmap() {
   const colorScheme: "light" | "dark" =
     resolvedTheme === "dark" ? "dark" : "light";
 
-  const { data: rows = [], isLoading } = useQuery({
+  const { data = [], isLoading } = useQuery({
     queryKey: dashboardKeys.heatmap.year(),
     queryFn: async (): Promise<ActivityWithCompleted[]> => {
       const { data, error } = await dynamicRpc(
@@ -137,6 +110,7 @@ export function BatchActivityHeatmap() {
         count: r.planned_count,
         level: bucketForCount(r.planned_count),
         completed: r.completed_count,
+        tooltip: `${formatTooltipDate(r.day)} · ${r.planned_count} planned · ${r.completed_count} completed`,
       }));
     },
     refetchInterval: POLLING_INTERVALS.NORMAL,
@@ -144,20 +118,13 @@ export function BatchActivityHeatmap() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  const data = useMemo(() => padToYearWindow(rows), [rows]);
-  const hasAnyActivity = useMemo(
-    () => rows.some((r) => r.count > 0 || r.completed > 0),
-    [rows],
-  );
-
-  if (isLoading && rows.length === 0) {
-    return <Skeleton className="h-[140px] w-full" />;
+  if (isLoading && data.length === 0) {
+    return <Skeleton className="h-[248px] w-full rounded-lg" />;
   }
 
+  const hasAnyActivity = data.some((r) => r.count > 0 || r.completed > 0);
   if (!hasAnyActivity) {
-    return (
-      <div className="text-sm text-muted-foreground">No activity yet</div>
-    );
+    return <DashboardEmpty message="No batch activity yet" icon={CalendarDays} />;
   }
 
   return (
@@ -179,13 +146,7 @@ export function BatchActivityHeatmap() {
           totalCount: "{{count}} batches planned in the last year",
         }}
         tooltips={{
-          activity: {
-            text: (activity) => {
-              const a = activity as ActivityWithCompleted;
-              const dateLabel = formatTooltipDate(a.date);
-              return `${dateLabel} · ${a.count} planned · ${a.completed} completed`;
-            },
-          },
+          activity: { text: (activity) => (activity as ActivityWithCompleted).tooltip },
         }}
       />
     </div>
