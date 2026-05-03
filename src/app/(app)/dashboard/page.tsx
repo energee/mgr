@@ -469,10 +469,13 @@ function ProductionTrends() {
     [productionTrends, period],
   );
 
+  // get_production_trends(p_days) returns 2 * p_days rows (current + comparison
+  // period). Slice to the trailing year before bucketing so the chart shows ~52
+  // weeks, not ~104.
   const weeklyVolumeData = useMemo(
     () =>
       bucketWeekly(
-        productionTrends.map((d) => ({
+        productionTrends.slice(-365).map((d) => ({
           date: d.date,
           value: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
         })),
