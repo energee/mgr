@@ -1,0 +1,13 @@
+# scripts/check-schema-registry.allowlist.txt
+#
+# Migration files (basename) listed here are exempt from the
+# _schema_registry presence check. These predate the rule
+# (introduced 2026-05-03 with the harness rollout).
+#
+# Going forward, NEW migrations that CREATE TABLE must INSERT a matching
+# _schema_registry row in the same migration. Do NOT add new entries
+# here — the allowlist is for one-time grandfathering only.
+#
+# Lines beginning with `#` and blank lines are ignored.
+
+00011_catalog_and_recipe_junction.sql

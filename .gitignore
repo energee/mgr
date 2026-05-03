@@ -46,8 +46,11 @@ bun-debug.log*
 # worktrees
 .worktrees/
 
-# Claude agent working directory
-.claude/
+# Claude agent working directory — ignore everything under .claude/ except the
+# project-level settings.json (Stop hook, etc.) which travels with the repo.
+# Per-developer overrides go in .claude/settings.local.json (still ignored).
+/.claude/*
+!/.claude/settings.json
 
 # legacy lockfiles
 package-lock.json

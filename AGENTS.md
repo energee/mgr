@@ -46,6 +46,7 @@ Agent-facing quick-references (must-follow rules, code examples):
 | [`docs/agents/db-security.md`](docs/agents/db-security.md) | Writing SQL migrations |
 | [`docs/agents/ui-rules.md`](docs/agents/ui-rules.md) | Building or reviewing UI components |
 | [`docs/agents/debugging.md`](docs/agents/debugging.md) | Investigating any bug |
+| [`docs/agents/dispatching-agents.md`](docs/agents/dispatching-agents.md) | Deciding when to spawn subagents and how to brief them |
 | [`PROGRESS.md`](PROGRESS.md) | **Session start** — current state, next steps |
 | [`DECISIONS.md`](DECISIONS.md) | Before non-trivial design choices |
 | [`docs/agents/session-handoff.md`](docs/agents/session-handoff.md) | Session end — handoff template |
@@ -87,7 +88,7 @@ Full reference (deep architecture, decisions, data model):
 2. **MUST** prefer TypeScript over JavaScript for new files.
 3. **MUST** use `type` aliases — never `interface` (except inside `declare module` for declaration merging).
 4. **MUST** use centralized query keys from `src/lib/query-keys.ts` ([`query-keys.md`](docs/agents/query-keys.md)).
-5. **MUST** use `EntityDetailUnified` — `EntityDetail` and `EntityForm` are deprecated.
+5. **MUST** use `EntityDetailUnified` — `EntityDetail` and `EntityForm` were removed; ESLint blocks re-introduction.
 6. **MUST** set `security_invoker = true` on every public-schema view.
 7. **MUST** enable RLS on every table that has policies.
 8. **MUST** set `search_path = public` on every SQL function.

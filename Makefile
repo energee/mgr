@@ -7,7 +7,7 @@
 #   make help          list every target
 #   make setup         install deps and run bootstrap script
 #   make dev           start Next.js dev server
-#   make check         pre-commit gate (lint + typecheck + test + build)
+#   make check         pre-commit gate (lint + typecheck + test + check-db + check-wip + build)
 #   make check-all     full gate plus Playwright E2E
 
 SHELL := /bin/bash
@@ -15,8 +15,9 @@ SHELL := /bin/bash
 
 .PHONY: help setup dev build \
         lint typecheck test e2e \
-        check-fast check check-all check-db verify-feature \
-        db-generate db-generate-local db-migrate db-seed \
+        check-fast check check-all check-db check-wip check-coverage \
+        verify-feature feature-mark \
+        db-generate db-generate-local db-migrate db-seed db-dry-run \
         clean
 
 help: ## List available targets
@@ -52,24 +53,36 @@ e2e: ## Playwright E2E
 
 check-fast: lint typecheck ## Layer 1: static checks only (fast feedback)
 
-check-db: ## DB rule checks (security_invoker / RLS / auth.users leaks)
+check-db: ## DB rule checks (security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / schema_registry / data-model docs / permissive RLS)
 	@bun run scripts/check-security-invoker.ts
 	@bun run scripts/check-rls.ts
 	@bun run scripts/check-auth-users-leak.ts
+	@bun run scripts/check-search-path.ts
+	@bun run scripts/check-security-definer.ts
+	@bun run scripts/check-permissive-rls.ts
+	@bun run scripts/check-schema-registry.ts
+	@bun run scripts/check-data-model-docs.ts
 
-check: lint typecheck test check-db build ## Layers 1+2: pre-commit gate (lint + typecheck + test + check-db + build)
+check-wip: ## Verify WIP=1 per branch in feature_list.json
+	@bun run scripts/check-wip.ts
+
+check-coverage: ## Vitest with coverage (thresholds enforced via vitest.config.ts)
+	@bun run test:coverage
+
+check: lint typecheck test check-db check-wip build ## Layers 1+2: pre-commit gate
 	@echo "OK: check passed"
 
 check-all: check e2e ## Layers 1+2+3: full gate including Playwright E2E
 	@echo "OK: check-all passed"
 
-verify-feature: ## Run a single feature's verification (usage: make verify-feature ID=F03)
-	@if [ -z "$(ID)" ]; then echo "Usage: make verify-feature ID=F03" >&2; exit 1; fi
-	@if [ ! -f docs/feature_list.json ]; then \
-		echo "docs/feature_list.json not yet created (Step 2 of harness rollout)." >&2; \
-		exit 1; \
-	fi
+verify-feature: ## Run a single feature's verification (usage: make verify-feature ID=F003)
+	@if [ -z "$(ID)" ]; then echo "Usage: make verify-feature ID=F003" >&2; exit 1; fi
 	@bash scripts/verify-feature.sh $(ID)
+
+feature-mark: ## Mark a feature's state (usage: make feature-mark ID=F003 STATE=passing)
+	@if [ -z "$(ID)" ] || [ -z "$(STATE)" ]; then \
+		echo "Usage: make feature-mark ID=F003 STATE=in_progress [EVIDENCE=...]" >&2; exit 1; fi
+	@bun run scripts/feature-mark.ts $(ID) $(STATE) $(if $(EVIDENCE),--evidence="$(EVIDENCE)")
 
 # Database
 
@@ -84,6 +97,9 @@ db-migrate: ## Push migrations (supabase db push)
 
 db-seed: ## Apply seed data
 	@bun run db:seed
+
+db-dry-run: ## Boot fresh local Supabase, replay all migrations from scratch
+	@bash scripts/migration-dry-run.sh
 
 # Hygiene
 

@@ -6,7 +6,12 @@
     "description": "At most one feature may be in `in_progress` per git branch. Multiple worktrees can each have one in-flight feature.",
     "enforcement": "Soft — agents check at session start; not yet a CI gate."
   },
-  "states": ["not_started", "in_progress", "blocked", "passing"],
+  "states": [
+    "not_started",
+    "in_progress",
+    "blocked",
+    "passing"
+  ],
   "verification_conventions": {
     "executable": "Shell command that exits 0 on pass and non-zero on fail.",
     "manual": "Verification not yet automated — requires a human or agent to walk a UI flow.",
@@ -103,7 +108,6 @@
       "evidence": "commit:67bf68c (PR #244), .github/workflows/sentry-error-harness.yml",
       "notes": "Pre-existing harness verified during Step 1 rollout."
     },
-
     {
       "id": "F100",
       "area": "ai",
@@ -249,10 +253,10 @@
       "area": "sales",
       "title": "Customer order portal",
       "user_visible_behavior": "External-facing portal for customers to place orders.",
-      "verification": "manual",
+      "verification": "bun e2e ./e2e/customer-order.spec.ts",
       "state": "passing",
-      "evidence": "docs/plans/2026-02-08-customer-order-portal-{design,plan}.md",
-      "notes": null
+      "evidence": "docs/plans/2026-02-08-customer-order-portal-{design,plan}.md, e2e/customer-order.spec.ts",
+      "notes": "Smoke-level E2E covers internal + portal entry; full flow scaffolded as test.skip pending seed data."
     },
     {
       "id": "F115",
@@ -389,10 +393,10 @@
       "area": "ui",
       "title": "Dashboard trends",
       "user_visible_behavior": "Dashboard trend charts for production / inventory / sales.",
-      "verification": "manual",
+      "verification": "bun e2e ./e2e/dashboard.spec.ts",
       "state": "passing",
-      "evidence": "docs/plans/2026-02-26-dashboard-trends-{design,plan}.md",
-      "notes": null
+      "evidence": "docs/plans/2026-02-26-dashboard-trends-{design,plan}.md, e2e/dashboard.spec.ts",
+      "notes": "Smoke-level E2E covers all three dashboard routes; chart-content assertions scaffolded as test.skip."
     },
     {
       "id": "F129",
@@ -449,30 +453,30 @@
       "area": "production",
       "title": "Recipe editor fixes",
       "user_visible_behavior": "Bug fixes for the recipe editor (drag-drop, calculations, save).",
-      "verification": "manual",
+      "verification": "bun e2e ./e2e/recipe-editor.spec.ts",
       "state": "passing",
-      "evidence": "docs/superpowers/plans/2026-03-13-recipe-editor-fixes.md, commit:73c49c7 (#246)",
-      "notes": "Drag-and-drop reordering merged in commit 73c49c7."
+      "evidence": "docs/superpowers/plans/2026-03-13-recipe-editor-fixes.md, commit:73c49c7 (#246), e2e/recipe-editor.spec.ts",
+      "notes": "Drag-and-drop reordering merged in commit 73c49c7. Smoke-level E2E covers list and detail routes."
     },
     {
       "id": "F135",
       "area": "production",
       "title": "Batch / vessel transfer fixes",
       "user_visible_behavior": "Bug fixes for batch and vessel transfer workflow.",
-      "verification": "manual",
+      "verification": "bun e2e ./e2e/batch-transfer.spec.ts",
       "state": "passing",
-      "evidence": "docs/superpowers/plans/2026-03-14-batch-vessel-transfer-fixes.md",
-      "notes": null
+      "evidence": "docs/superpowers/plans/2026-03-14-batch-vessel-transfer-fixes.md, e2e/batch-transfer.spec.ts",
+      "notes": "Smoke-level E2E covers list and new-transfer routes; full transfer flow scaffolded as test.skip."
     },
     {
       "id": "F136",
       "area": "packaging",
       "title": "Packaging sessions redesign",
       "user_visible_behavior": "Packaging session UI redesign (PackagingDayView, in-progress flow).",
-      "verification": "manual",
+      "verification": "bun e2e ./e2e/packaging-session.spec.ts",
       "state": "passing",
-      "evidence": "docs/superpowers/plans/2026-03-14-packaging-sessions-redesign.md",
-      "notes": null
+      "evidence": "docs/superpowers/plans/2026-03-14-packaging-sessions-redesign.md, e2e/packaging-session.spec.ts",
+      "notes": "Smoke-level E2E covers list and new routes; full session flow scaffolded as test.skip."
     },
     {
       "id": "F137",
@@ -484,7 +488,6 @@
       "evidence": "docs/superpowers/plans/2026-04-15-material-planning.md, commit:a2704f7 (#243)",
       "notes": null
     },
-
     {
       "id": "F200",
       "area": "ui",

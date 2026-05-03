@@ -41,7 +41,12 @@ ${issue.stackTrace || "(unavailable)"}
 9. **Code review** — invoke \`/code-review:code-review\` on the diff. Surface bugs, logic errors, security issues, convention violations.
 10. **Apply review fixes** — address each finding from step 9.
 11. **Re-validate** — if step 10 changed anything, run \`bun run typecheck\`, \`bun run test\`, \`bun lint\` again.
-12. **Open the PR** — create branch \`sentry-fix/SENTRY-${issue.issueId}\`, push, and open a PR with the template below. Apply labels \`sentry-fix\` and \`automated\`.
+12. **Update harness state** — three short writes:
+    - Append a feature entry to \`docs/feature_list.json\` with \`id: "SENTRY-${issue.issueId}"\`, \`area: "infra"\`, the issue title, \`verification: "<test command>"\`, \`state: "passing"\`, and \`evidence: "commit:<sha>"\`. Set \`branch: "sentry-fix/SENTRY-${issue.issueId}"\`.
+    - Append a one-paragraph entry to \`PROGRESS.md\` under "Completed" describing the fix.
+    - Write a session trace to \`.harness/sessions/<YYYY-MM-DD>-SENTRY-${issue.issueId}.md\` using the template in \`docs/agents/observability.md\`.
+13. **Run \`make check\`** — final layered gate including \`check-db\` and \`check-wip\`. Must exit 0.
+14. **Open the PR** — create branch \`sentry-fix/SENTRY-${issue.issueId}\`, push, and open a PR with the template below. Apply labels \`sentry-fix\` and \`automated\`.
 
 ## Guardrails
 
@@ -83,6 +88,10 @@ If after 3 attempts you cannot produce a working fix, OR the root cause is outsi
 - [x] Lint clean
 - [x] /simplify pass completed
 - [x] /code-review pass completed
+- [x] feature_list.json updated with SENTRY-${issue.issueId} entry
+- [x] PROGRESS.md updated
+- [x] .harness/sessions/<date>-SENTRY-${issue.issueId}.md trace written
+- [x] make check passes (incl. check-db and check-wip)
 \`\`\`
 
 Begin with step 1.`;

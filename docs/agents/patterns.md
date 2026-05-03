@@ -121,8 +121,10 @@ export const transferSchema = z.object({
 ## Universal components (`src/components/universal/`)
 
 - `EntityList` — renders any entity list from config
-- `EntityDetailUnified` — entity detail with in-place edit toggle (**use this**)
-- `EntityDetail` / `EntityForm` — **deprecated**, do not use
+- `EntityDetailUnified` — entity detail with in-place edit toggle
+- `StatusBadge` — status display from `stateMachine.stateDisplay` config
+
+ESLint blocks `EntityDetail` and `EntityForm` imports — they were removed during the unified-detail-edit migration. If you copy in legacy code, the lint gate will flag it.
 
 ## State machines, allocations, calculated fields
 

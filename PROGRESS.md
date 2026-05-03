@@ -64,6 +64,30 @@
 
 _(none — harness rollout complete; awaiting user review and commit)_
 
+## Round 2 — harness hardening (2026-05-03)
+
+Twelve refinements landed on top of the initial rollout (PR #249).
+
+- [x] **#1 Custom ESLint rules** — DEC-008 (`{ value: "", label: ... }` empty-string in option arrays, scoped via `:has()`), centralized query keys (`useQuery({ queryKey: [...] })` literal arrays), and `no-restricted-imports` blocking re-introduction of `EntityDetail` / `EntityForm`.
+- [x] **#2 Schema registry + data-model doc checks** — `scripts/check-schema-registry.ts` and `scripts/check-data-model-docs.ts` (file-level allowlists for grandfathered pre-harness migrations).
+- [x] **#3 WIP=1 enforcement** — `scripts/check-wip.ts` reads `feature_list.json`, fails if more than one `in_progress` per branch. Wired into `make check`.
+- [x] **#4 Bootstrap contract validation** — `scripts/init.sh` now runs each of the four conditions (can start / can test / can see progress / can pick up next) and exits non-zero on failure. `BOOTSTRAP_SKIP=1` for CI.
+- [x] **#5 `scripts/feature-mark.ts`** — safe CLI for state transitions with WIP=1 enforcement.
+- [x] **#6 Stop hook for PROGRESS.md drift** — `scripts/check-progress-drift.sh` + `.claude/settings.json` Stop hook emit a `systemMessage` if code changed but PROGRESS.md didn't.
+- [x] **#7 `docs/agents/dispatching-agents.md`** — when to spawn subagents and how to brief them, with three worked examples.
+- [x] **#8 E2E scaffolds for 5 flows** — `recipe-editor.spec.ts`, `batch-transfer.spec.ts`, `packaging-session.spec.ts`, `dashboard.spec.ts`, `customer-order.spec.ts`. Smoke-level routes pass; deeper flow scaffolded as `test.skip` pending seed data. F114, F128, F134, F135, F136 in `feature_list.json` flipped from `manual` to executable verification commands.
+- [x] **#9 More DB checks** — `check-permissive-rls.ts` (USING/WITH CHECK true), `check-search-path.ts`, `check-security-definer.ts` (justification required). Three allowlist files grandfather ~30 pre-existing legitimate uses; new violations fail.
+- [x] **#10 Sentry harness writes harness state** — `prompt.ts` now requires updating `feature_list.json`, `PROGRESS.md`, and writing a `.harness/sessions/` trace per fix. Test plan template extended.
+- [x] **#11 `scripts/migration-dry-run.sh`** + `make db-dry-run` — boots fresh local Supabase, replays every migration in order.
+- [x] **#12 Coverage thresholds** — `vitest.config.ts` enforces 50% on `src/lib/**` (raise gradually). `make check-coverage` runs the gated report.
+
+### Verification (2026-05-03)
+- `make check-fast` — clean
+- `bun run test` — 1018 / 1018
+- `make check-db` — all 8 checks green (security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / permissive RLS / schema_registry / data-model docs)
+- `make check-wip` — clean
+- `BOOTSTRAP_SKIP=0 bash scripts/init.sh` — all 4 contract conditions PASS
+
 ## Blocked / needs decision
 
 _(none)_
