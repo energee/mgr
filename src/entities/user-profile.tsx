@@ -2,7 +2,7 @@
  * User Profile Entity Configuration
  *
  * User management with role assignment and activity tracking.
- * Caches auth.users info per CLAUDE.md security guidelines.
+ * Caches auth.users info per docs/agents/db-security.md.
  */
 
 import type { ReactNode } from "react";

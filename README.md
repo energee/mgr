@@ -164,4 +164,4 @@ export const batchEntity: EntityConfig<Batch> = {
 - [`docs/data-model/`](docs/data-model/) — schema documentation by domain
 - [`docs/spec/architecture.md`](docs/spec/architecture.md) — architecture and security rules
 - [`docs/spec/decisions.md`](docs/spec/decisions.md) — schema decisions log
-- [`CLAUDE.md`](CLAUDE.md) — AI assistant instructions and codebase conventions
+- [`AGENTS.md`](AGENTS.md) — agent instructions, verification gate, and routing index for [`docs/agents/`](docs/agents/) topic docs

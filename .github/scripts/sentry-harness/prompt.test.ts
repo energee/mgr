@@ -54,8 +54,8 @@ describe("buildFixPrompt", () => {
     expect(prompt).toContain("diagnostic");
   });
 
-  it("references CLAUDE.md conventions", () => {
+  it("references AGENTS.md conventions", () => {
     const prompt = buildFixPrompt(issue);
-    expect(prompt).toContain("CLAUDE.md");
+    expect(prompt).toContain("AGENTS.md");
   });
 });
