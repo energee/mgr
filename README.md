@@ -20,8 +20,8 @@ A full-stack brewery management system covering production, inventory, purchasin
 
 ### Prerequisites
 
-- Node.js 20+
-- [Bun](https://bun.sh/) (`curl -fsSL https://bun.sh/install | bash`)
+- Node.js 24+
+- [Bun](https://bun.sh/) 1.3+ (`curl -fsSL https://bun.sh/install | bash`)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 
 ### Setup

@@ -3,14 +3,18 @@
  * scripts/check-rls.ts
  *
  * Fails (exit 1) if any `CREATE TABLE` in `supabase/migrations/` is not
- * paired with `ENABLE ROW LEVEL SECURITY` in the same migration file.
+ * paired with `ENABLE ROW LEVEL SECURITY` somewhere across the migration
+ * history. Migration-history-aware: a `CREATE TABLE` in 00100 satisfied
+ * by an `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` in 00150 passes.
+ *
+ * Files are processed in lexical order, which matches Supabase's apply
+ * order (`00XXX_…`).
  *
  * Rationale: docs/agents/db-security.md. A table without RLS enabled is
  * world-readable through PostgREST.
  *
- * Whitelist: tables that are intentionally public (e.g. lookup / catalog
- * tables seeded only by migrations) must add a comment of the form
- * `-- check-rls: skip <reason>` on the line above the CREATE TABLE.
+ * Whitelist: tables that are intentionally public must add a comment of
+ * the form `-- check-rls: skip <reason>` on the line above CREATE TABLE.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -21,18 +25,32 @@ const MIGRATIONS_DIR = "supabase/migrations";
 type Hit = { file: string; line: number; tableName: string };
 
 function* walk(dir: string): Generator<string> {
-  for (const entry of readdirSync(dir)) {
+  for (const entry of readdirSync(dir).sort()) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) yield* walk(full);
     else if (full.endsWith(".sql")) yield full;
   }
 }
 
-const hits: Hit[] = [];
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
+const hits: Hit[] = [];
+const allContent: string[] = [];
+
+// First pass: build the full-history content blob.
+const files: string[] = [];
 for (const file of walk(MIGRATIONS_DIR)) {
-  const content = readFileSync(file, "utf8");
-  const lines = content.split("\n");
+  files.push(file);
+  allContent.push(readFileSync(file, "utf8"));
+}
+const fullText = allContent.join("\n");
+
+// Second pass: per-table CREATE detection + history-wide ENABLE search.
+for (let f = 0; f < files.length; f++) {
+  const file = files[f];
+  const lines = allContent[f].split("\n");
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -42,18 +60,17 @@ for (const file of walk(MIGRATIONS_DIR)) {
     if (!match) continue;
 
     const tableName = match[1].replace(/^public\./, "").replace(/"/g, "");
-    if (tableName.startsWith("_")) continue; // internal: _schema_registry etc. — caller's call
+    if (tableName.startsWith("_")) continue;
 
     const prevLine = lines[i - 1] ?? "";
     if (/check-rls:\s*skip/i.test(prevLine)) continue;
 
-    // Look across the whole migration for an ENABLE ROW LEVEL SECURITY on this table.
     const enablePattern = new RegExp(
-      `ALTER\\s+TABLE\\s+(?:public\\.)?${tableName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`,
+      `ALTER\\s+TABLE\\s+(?:public\\.)?${escapeRe(tableName)}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`,
       "i",
     );
 
-    if (!enablePattern.test(content)) {
+    if (!enablePattern.test(fullText)) {
       hits.push({ file, line: i + 1, tableName });
     }
   }
@@ -69,6 +86,7 @@ for (const hit of hits) {
   console.error(`  ${hit.file}:${hit.line}  ${hit.tableName}`);
 }
 console.error("\nFix: add `ALTER TABLE <name> ENABLE ROW LEVEL SECURITY;` plus at least one policy.");
+console.error("     Either in the same migration as CREATE TABLE, or in a later corrective migration.");
 console.error("     See docs/agents/db-security.md.");
 console.error("     Or whitelist with `-- check-rls: skip <reason>` above the line.");
 process.exit(1);

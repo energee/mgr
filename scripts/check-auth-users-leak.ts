@@ -69,8 +69,10 @@ for (const file of walk(MIGRATIONS_DIR)) {
           name: viewMatch[1],
           file,
           startLine: i + 1,
-          body: [line],
+          body: [],
         };
+        // fall through so line N also gets pushed and inspected — single-line
+        // `CREATE VIEW v AS SELECT ...;` must not be skipped.
       } else if (fnMatch) {
         state = "in_function";
         dollarTagBalance = 0;
@@ -79,15 +81,18 @@ for (const file of walk(MIGRATIONS_DIR)) {
           name: fnMatch[1],
           file,
           startLine: i + 1,
-          body: [line],
+          body: [],
         };
+        // fall through for the same reason — single-line `CREATE FUNCTION ...
+        // AS $$ ... $$ LANGUAGE sql;` would otherwise have its $$ pair on the
+        // CREATE line skipped.
+      } else {
+        continue;
       }
-      continue;
     }
 
     if (state === "in_view" && current) {
       current.body.push(line);
-      // View ends at first top-level ;
       if (/;\s*(--.*)?$/.test(line)) {
         latestDef.set(`view:${current.name}`, current);
         state = "idle";
@@ -98,14 +103,11 @@ for (const file of walk(MIGRATIONS_DIR)) {
 
     if (state === "in_function" && current) {
       current.body.push(line);
-      // Track $$ pairs. A function body is wrapped in $$ ... $$.
       const dollars = (line.match(/\$\$/g) ?? []).length;
       dollarTagBalance += dollars;
-      // Function definition ends after the closing $$ followed by `LANGUAGE` and ;,
-      // or after a CREATE FUNCTION ... LANGUAGE ... ; without $$.
       if (
         (dollarTagBalance >= 2 && /\$\$\s*(LANGUAGE|;)/i.test(line)) ||
-        /;\s*$/.test(line.replace(/--.*$/, "")) && dollarTagBalance === 0 && current.body.length > 1
+        (/;\s*$/.test(line.replace(/--.*$/, "")) && dollarTagBalance === 0 && current.body.length > 1)
       ) {
         latestDef.set(`function:${current.name}`, current);
         state = "idle";

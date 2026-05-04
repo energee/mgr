@@ -1,6 +1,6 @@
 {
   "$schema": "harness/feature-list-v1",
-  "$comment": "Machine-readable feature tracker. See docs/agents/feature-list.md for usage.",
+  "$comment": "Machine-readable feature tracker. See AGENTS.md \"Work-in-progress rule\" for usage; verify entries with `make verify-feature ID=Fxxx` and mutate state via `make feature-mark`.",
   "wip_rule": {
     "rule": "WIP=1 per branch",
     "description": "At most one feature may be in `in_progress` per git branch. Multiple worktrees can each have one in-flight feature.",
@@ -105,7 +105,7 @@
       "user_visible_behavior": "Autonomous fix-loop fetches Sentry issues, opens fix PRs, applies labels.",
       "verification": "bun run test .github/scripts/sentry-harness/prompt.test.ts",
       "state": "passing",
-      "evidence": "commit:67bf68c (PR #244), .github/workflows/sentry-error-harness.yml",
+      "evidence": "commit:67bf68c (PR #244), .github/workflows/sentry-harness.yml",
       "notes": "Pre-existing harness verified during Step 1 rollout."
     },
     {

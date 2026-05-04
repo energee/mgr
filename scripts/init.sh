@@ -95,7 +95,10 @@ fi
 if [ ! -f PROGRESS.md ]; then
   fail_contract "PROGRESS.md missing — create it from the template in docs/agents/"
 else
-  PROGRESS_AGE_DAYS=$(( ( $(date +%s) - $(stat -f %m PROGRESS.md 2>/dev/null || stat -c %Y PROGRESS.md) ) / 86400 ))
+  # GNU coreutils (Linux) uses `-c %Y`; BSD/macOS uses `-f %m`. Probe Linux
+  # first since it's the documented CI platform.
+  PROGRESS_MTIME=$(stat -c %Y PROGRESS.md 2>/dev/null || stat -f %m PROGRESS.md 2>/dev/null || echo 0)
+  PROGRESS_AGE_DAYS=$(( ( $(date +%s) - PROGRESS_MTIME ) / 86400 ))
   if [ "$PROGRESS_AGE_DAYS" -gt 14 ]; then
     fail_contract "PROGRESS.md is $PROGRESS_AGE_DAYS days old — refresh before resuming work"
   else

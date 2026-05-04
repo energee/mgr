@@ -31,31 +31,26 @@ const list = JSON.parse(readFileSync("docs/feature_list.json", "utf8")) as {
   features: Feature[];
 };
 
-const inProgressOnThisBranch = list.features.filter(
+// Single union semantic: a feature counts toward the current branch's WIP
+// iff its effective branch (`f.branch ?? "main"`) equals the current branch.
+// Unscoped features fold into `main` — they count there, not on feature
+// branches. Same semantic as scripts/feature-mark.ts.
+const effectiveOnBranch = list.features.filter(
   (f) => f.state === "in_progress" && (f.branch ?? "main") === branch,
 );
 
-const inProgressUnscoped = list.features.filter(
-  (f) => f.state === "in_progress" && f.branch === undefined,
-);
-
-if (inProgressOnThisBranch.length <= 1 && inProgressUnscoped.length <= 1) {
-  const total = inProgressOnThisBranch.length + (branch === "main" ? 0 : inProgressUnscoped.length);
-  console.log(`OK: ${total} in-progress feature(s) on branch \`${branch}\` (WIP=1 satisfied)`);
+if (effectiveOnBranch.length <= 1) {
+  console.log(
+    `OK: ${effectiveOnBranch.length} in-progress feature(s) on branch \`${branch}\` (WIP=1 satisfied)`,
+  );
   process.exit(0);
 }
 
 console.error(`FAIL: WIP=1 violated on branch \`${branch}\`:\n`);
-for (const f of inProgressOnThisBranch) {
+for (const f of effectiveOnBranch) {
   console.error(`  ${f.id}  [branch: ${f.branch ?? "main"}]  ${f.title}`);
 }
-for (const f of inProgressUnscoped) {
-  if (!inProgressOnThisBranch.includes(f)) {
-    console.error(`  ${f.id}  [unscoped]      ${f.title}`);
-  }
-}
 console.error("\nFix: pause one of the in-progress features (set state to `blocked` or");
-console.error("     `not_started`) before starting another, or add a `branch` field to");
-console.error("     each feature so they tracked per-branch instead of globally.");
+console.error("     `not_started`) before starting another. Run via `make feature-mark`.");
 console.error("     See AGENTS.md \"Work-in-progress rule\".");
 process.exit(1);

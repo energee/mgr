@@ -61,7 +61,8 @@ for (const file of walk(MIGRATIONS_DIR)) {
       inPolicy = true;
       policyName = policyStart[1].replace(/"/g, "");
       policySkipped = /check-permissive-rls:\s*skip/i.test(lines[i - 1] ?? "");
-      continue;
+      // fall through — a single-line `CREATE POLICY foo ON t FOR SELECT
+      // USING (true);` must have the same line inspected.
     }
     if (!inPolicy) continue;
 

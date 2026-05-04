@@ -113,7 +113,7 @@ Add a `_schema_registry` entry in the migration whenever you create a new table.
 ## Migrations
 
 - Pattern: `00XXX_description.sql` in `supabase/migrations/`
-- Current highest: `00155` → next available: `00156`
+- Pick the next number: ``ls supabase/migrations/ | tail -1`` shows the highest existing; use highest + 1.
 - Follow [`db-security.md`](docs/agents/db-security.md) for every new view, function, and policy.
 - After applying: verify success before continuing with dependent code changes.
 

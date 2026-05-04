@@ -59,30 +59,30 @@ for (const file of walk(MIGRATIONS_DIR)) {
 
     if (state === "idle") {
       const m = line.match(/^\s*CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([\w."]+)/i);
-      if (m) {
-        state = "in_function";
-        dollarBalance = 0;
-        current = {
-          name: m[1],
-          file,
-          startLine: i + 1,
-          body: [line],
-          startLineContextPrev: lines[i - 1] ?? "",
-        };
-      }
-      continue;
+      if (!m) continue;
+      state = "in_function";
+      dollarBalance = 0;
+      current = {
+        name: m[1],
+        file,
+        startLine: i + 1,
+        body: [],
+        startLineContextPrev: lines[i - 1] ?? "",
+      };
+      // fall through to push line and check end-of-function on the SAME line
     }
 
-    if (current) current.body.push(line);
+    if (!current) continue;
+    current.body.push(line);
 
     const dollars = (line.match(/\$\$/g) ?? []).length;
     dollarBalance += dollars;
 
     if (
       (dollarBalance >= 2 && /\$\$\s*(LANGUAGE|;)/i.test(line)) ||
-      (/;\s*$/.test(line.replace(/--.*$/, "")) && dollarBalance === 0 && current && current.body.length > 1)
+      (/;\s*$/.test(line.replace(/--.*$/, "")) && dollarBalance === 0 && current.body.length > 1)
     ) {
-      if (current) latest.set(current.name, current);
+      latest.set(current.name, current);
       state = "idle";
       current = null;
     }

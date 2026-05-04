@@ -69,10 +69,14 @@ for (const file of walk(MIGRATIONS_DIR)) {
 const fullText = allContent.join("\n");
 const violations: CreatedTable[] = [];
 
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 for (const t of created) {
   // Look for the table name as a quoted string in any INSERT INTO _schema_registry block.
   const re = new RegExp(
-    `INSERT\\s+INTO\\s+_schema_registry[\\s\\S]*?VALUES[\\s\\S]*?\\(\\s*'${t.name.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}'`,
+    `INSERT\\s+INTO\\s+_schema_registry[\\s\\S]*?VALUES[\\s\\S]*?\\(\\s*'${escapeRe(t.name)}'`,
     "i",
   );
   if (!re.test(fullText)) violations.push(t);

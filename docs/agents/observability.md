@@ -18,7 +18,7 @@ Sentry is wired in via `@sentry/nextjs`:
 
 **To enable locally**: set `NEXT_PUBLIC_SENTRY_DSN` in `.env`. Without the DSN, Sentry is a no-op — safe for dev.
 
-**The Sentry Error Harness** (`.github/workflows/sentry-error-harness.yml`) is an autonomous fix loop that runs twice a day, scores open issues, and opens fix PRs. See [`docs/sentry-harness-setup.md`](../sentry-harness-setup.md) for first-run setup. Required GitHub secrets: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`.
+**The Sentry Error Harness** (`.github/workflows/sentry-harness.yml`) is an autonomous fix loop that runs twice a day, scores open issues, and opens fix PRs. See [`docs/sentry-harness-setup.md`](../sentry-harness-setup.md) for first-run setup. Required GitHub secrets: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`.
 
 **When investigating a production error**:
 

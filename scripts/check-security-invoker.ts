@@ -68,19 +68,17 @@ for (const file of walk(MIGRATIONS_DIR)) {
       const skipped = /check-security-invoker:\s*skip/i.test(prevLine);
       const secured = hasInvokerWithClause(lookahead);
 
+      // CREATE [OR REPLACE]: latest declaration wins for `secured`. PG 16
+      // empirically clears reloptions on un-WITH'd CREATE OR REPLACE, so an
+      // earlier secured definition can be silently downgraded by a later
+      // CREATE that omits the WITH clause. Use replacement, not OR.
       const existing = views.get(name);
-      if (!existing) {
-        views.set(name, {
-          firstSeenFile: file,
-          firstSeenLine: i + 1,
-          secured: secured || skipped,
-          skipped,
-        });
-      } else {
-        // CREATE OR REPLACE: latest declaration wins for `secured`.
-        existing.secured = existing.secured || secured || skipped;
-        if (skipped) existing.skipped = true;
-      }
+      views.set(name, {
+        firstSeenFile: existing?.firstSeenFile ?? file,
+        firstSeenLine: existing?.firstSeenLine ?? i + 1,
+        secured: secured || skipped,
+        skipped: skipped || (existing?.skipped ?? false),
+      });
       continue;
     }
 

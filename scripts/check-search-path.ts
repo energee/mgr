@@ -48,27 +48,28 @@ for (const file of walk(MIGRATIONS_DIR)) {
 
     if (state === "idle") {
       const m = line.match(/^\s*CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([\w."]+)/i);
-      if (m) {
-        state = "in_function";
-        dollarBalance = 0;
-        current = { name: m[1], file, startLine: i + 1, body: [line] };
-        if (/check-search-path:\s*skip/i.test(lines[i - 1] ?? "")) {
-          skipped.add(m[1]);
-        }
+      if (!m) continue;
+      state = "in_function";
+      dollarBalance = 0;
+      current = { name: m[1], file, startLine: i + 1, body: [] };
+      if (/check-search-path:\s*skip/i.test(lines[i - 1] ?? "")) {
+        skipped.add(m[1]);
       }
-      continue;
+      // fall through to push line and check end-of-function on the SAME line
+      // (single-line `CREATE FUNCTION ... AS $$ ... $$ LANGUAGE sql;`).
     }
 
-    if (current) current.body.push(line);
+    if (!current) continue;
+    current.body.push(line);
 
     const dollars = (line.match(/\$\$/g) ?? []).length;
     dollarBalance += dollars;
 
     if (
       (dollarBalance >= 2 && /\$\$\s*(LANGUAGE|;)/i.test(line)) ||
-      (/;\s*$/.test(line.replace(/--.*$/, "")) && dollarBalance === 0 && current && current.body.length > 1)
+      (/;\s*$/.test(line.replace(/--.*$/, "")) && dollarBalance === 0 && current.body.length > 1)
     ) {
-      if (current) latest.set(current.name, current);
+      latest.set(current.name, current);
       state = "idle";
       current = null;
     }
@@ -80,9 +81,25 @@ const violations: Definition[] = [];
 for (const def of latest.values()) {
   if (skipped.has(def.name)) continue;
 
-  const fullBody = def.body.join("\n");
-  // Look for SET search_path anywhere in the function definition (before AS).
-  if (!/SET\s+search_path\s*(?:=|TO)/i.test(fullBody)) {
+  // Per DEC-SEC-003 only the proc-level attribute is enforced by Postgres.
+  // Postgres accepts `SET search_path = ...` either in the header (before
+  // `AS $$`) OR in the trailing attributes (after the closing `$$`). The
+  // ONLY place that doesn't count is inside the body itself — a body-level
+  // `EXECUTE 'SET search_path = ...'` does not configure the proc. Mask the
+  // body between the first and last `$$` and check the remaining string.
+  const fullText = def.body.join("\n");
+  const noLineComments = fullText.replace(/--.*$/gm, "");
+  const firstDollar = noLineComments.indexOf("$$");
+  const lastDollar = noLineComments.lastIndexOf("$$");
+
+  const attrText =
+    firstDollar !== -1 && lastDollar > firstDollar
+      ? noLineComments.slice(0, firstDollar) +
+        " " +
+        noLineComments.slice(lastDollar + 2)
+      : noLineComments; // SQL-language single-line functions with no $$
+
+  if (!/SET\s+search_path\s*(?:=|TO)/i.test(attrText)) {
     violations.push(def);
   }
 }

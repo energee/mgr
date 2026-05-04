@@ -73,9 +73,13 @@ for (const file of walk(DOCS_DIR)) {
   docsBlob += readFileSync(file, "utf8") + "\n";
 }
 
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 const violations: CreatedTable[] = [];
 for (const t of created) {
-  const re = new RegExp(`\\b${t.name.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\b`);
+  const re = new RegExp(`\\b${escapeRe(t.name)}\\b`);
   if (!re.test(docsBlob)) violations.push(t);
 }
 

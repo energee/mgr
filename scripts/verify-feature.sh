@@ -27,12 +27,16 @@ fi
 
 # Extract the feature entry. Use bun (jq is optional for users) — bun ships
 # with the harness, jq does not.
-FEATURE_JSON=$(bun -e "
-const list = require('$LIST');
-const f = list.features.find(x => x.id === '$ID');
+#
+# IDs and the list path are passed via environment variables, not interpolated
+# into the JS source, so a feature ID containing a single quote can't break
+# parsing or inject code. Mirror of scripts/feature-mark.ts.
+FEATURE_JSON=$(FEATURE_ID="$ID" FEATURE_LIST="$LIST" bun -e '
+const list = JSON.parse(require("fs").readFileSync(process.env.FEATURE_LIST, "utf8"));
+const f = list.features.find(x => x.id === process.env.FEATURE_ID);
 if (!f) { process.exit(2); }
 console.log(JSON.stringify(f, null, 2));
-")
+')
 
 if [ -z "$FEATURE_JSON" ]; then
   echo "ERROR: feature '$ID' not found in docs/feature_list.json" >&2
