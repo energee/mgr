@@ -52,6 +52,11 @@ bun-debug.log*
 /.claude/*
 !/.claude/settings.json
 
+# Supabase CLI auto-touches this on every invocation; keep it untracked.
+# Other files in supabase/.temp/ (project-ref, version stamps) are tracked
+# intentionally so the team shares the same supabase context.
+supabase/.temp/cli-latest
+
 # legacy lockfiles
 package-lock.json
 pnpm-lock.yaml
