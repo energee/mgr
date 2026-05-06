@@ -27,7 +27,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      issues: read
       id-token: write
       actions: read
     steps:
@@ -40,39 +39,50 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.10"
+          cache: true
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Pre-compute the lookback date once so the prompt has a stable value
+      # and we don't depend on GNU `date -d` being available everywhere.
+      - name: Compute lookback window
+        id: window
+        run: |
+          since="$(date -u -d '8 days ago' +%Y-%m-%d)"
+          echo "since=$since" >> "$GITHUB_OUTPUT"
+          count=$(git log --since="$since" --oneline | wc -l | tr -d ' ')
+          echo "commit_count=$count" >> "$GITHUB_OUTPUT"
+
+      # Skip the LLM call on weeks with zero new commits — manual dispatch
+      # always proceeds so you can force a regrade after non-code events.
       - name: Run Claude Code Action
+        if: steps.window.outputs.commit_count != '0' || github.event_name == 'workflow_dispatch'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          additional_permissions: |
-            actions: read
           prompt: |
-            Task: Re-grade `docs/agents/quality.md` against the rubric in the doc and append a new trend-log line. Open a PR.
+            Task: Re-grade `docs/agents/quality.md` against the rubric in the doc and append a new trend-log line. Open a PR. The "How to update" section at the bottom of the doc is binding — read it first and follow it; do not restate or override its rules from this prompt.
 
-            Steps:
-            1. Read `docs/agents/quality.md` start-to-finish. The "How to update" section at the bottom is binding. Read the existing trend-log to understand history.
-            2. Gather evidence for each domain/layer:
-               - `git log --since="$(date -u -d '8 days ago' +%Y-%m-%d)" --pretty=format:"%h %s" -- supabase/migrations/ src/entities/ src/components/ src/hooks/ src/lib/`
-               - `ls supabase/migrations/ | tail -10`
-               - `make check-db` — note any new violations or grandfather-list shrinkage
-               - `bun run test 2>&1 | tail -5` — note pass count delta vs the previous baseline
-               - `grep -c "manual" docs/feature_list.json` — fewer manuals = better verification coverage
-               - `gh pr list --state merged --search "merged:>$(date -u -d '8 days ago' +%Y-%m-%d)" --limit 50`
-               - `wc -l scripts/check-*.allowlist.txt` — allowlist size is grandfathered debt
-            3. Move a grade only when evidence has changed. Bug fix delivered, refactor merged, new pattern adopted, audit surfaced debt, allowlist shrunk. No vibes-based moves.
-            4. For each grade you change: update the cell value AND its `As of` date AND its notes line.
-            5. Append a single trend-log line dated today summarizing what shifted. If nothing shifted, say so explicitly — that is a valid outcome.
-            6. Run `make check-fast`. If green, optionally run `make check`.
-            7. Create a branch named `quality-regrade-$(date -u +%Y-%m-%d)`, commit with message `docs: quality re-grade $(date -u +%Y-%m-%d)`, push, and open a PR with the same title. PR body should list grades moved + why, cite evidence (commit SHAs, PR numbers, allowlist deltas), and link the most recent prior re-grade PR.
-            8. Apply labels `quality-regrade` and `automated`.
-            9. Do not change the rubric definitions, the "How to update" rules, or any prior trend-log entries.
+            Lookback window: ${{ steps.window.outputs.since }} to today. ${{ steps.window.outputs.commit_count }} commit(s) in that window.
+
+            Evidence to gather (run all; report what you find):
+              - `git log --since="${{ steps.window.outputs.since }}" --pretty=format:"%h %s" -- supabase/migrations/ src/entities/ src/components/ src/hooks/ src/lib/`
+              - `ls supabase/migrations/ | tail -10`
+              - `make check-db` — note any new violations or grandfather-list shrinkage
+              - `bun run test 2>&1 | tail -5` — note pass count delta
+              - `grep -c "manual" docs/feature_list.json` — fewer manuals = better verification coverage
+              - `gh pr list --state merged --search "merged:>${{ steps.window.outputs.since }}" --limit 50`
+              - `wc -l scripts/check-*.allowlist.txt` — allowlist size is grandfathered debt
+
+            Output:
+              1. For each grade you change: update the cell value AND its `As of` date AND its notes line.
+              2. Append a single trend-log line dated today summarizing what shifted. If nothing shifted, say so explicitly.
+              3. Run `make check-fast`. If green, optionally run `make check`.
+              4. Create a branch `quality-regrade-$(date -u +%Y-%m-%d)`, commit with message `docs: quality re-grade $(date -u +%Y-%m-%d)`, push, open a PR with the same title.
+              5. Apply labels `quality-regrade` and `automated`.
 
             Constraints:
-            - One commit, one PR. No unrelated refactors.
-            - No new tickets.
-            - If `make check-fast` fails because of your edits, fix it. If pre-existing, note in PR body and proceed.
-            - If no grades moved AND no notable evidence accumulated, the PR is still valid — it documents the "nothing shifted" data point.
+              - One commit, one PR. No unrelated refactors. No new tickets.
+              - Do not change the rubric definitions or any prior trend-log entries.
+              - If `make check-fast` fails because of your edits, fix it. If pre-existing, note in PR body and proceed.

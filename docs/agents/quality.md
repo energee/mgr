@@ -15,7 +15,7 @@ previous snapshots in `git log -- docs/agents/quality.md`.
 
 | Domain | Grade | As of | Notes |
 |---|---|---|---|
-| production | A− | 2026-05-04 | 11 entities (recipe, batch, brew-log, vessel, vessel-transfer, yeast pitches, beer-style, water-profile, packaging-session). Most active domain — F134 (recipe editor fixes, #246), F136 (packaging redesign), F112 (recipe/batch/brew-log cohesion) all recent. Universal entity pattern carries it. |
+| production | A− | 2026-05-04 | 12 entities (batch, brand, brew-log, beer-style, packaging-session, recipe, session-line-item, vessel, vessel-transfer, yeast-pitch, yeast-pitch-event, yeast-strain). Most active domain — F134 (recipe editor fixes, #246), F136 (packaging redesign), F112 (recipe/batch/brew-log cohesion) all recent. Universal entity pattern carries it. |
 | inventory  | B  | 2026-05-04 | 12 entities (largest surface). F137 unified material planning landed in commit a2704f7 — load-bearing. Allocations pattern is robust. Some legacy: keg-inventory and keg-transactions migrations (00029–00032) are in the permissive-RLS allowlist. |
 | sales      | B  | 2026-05-04 | 7 entities + customer portal (F114). Single-tenant permissive RLS on order_materials family (00162) — documented but coarse. Pricing tiers (F110, F117) and selling formats (F124, F130) work. Less recent attention than production. |
 | purchasing | B− | 2026-05-04 | 4 entities (purchase-order, po-line-item, po-receive, supplier). Smaller surface, demand-planning view (F105) is shared with inventory. F132 (COGS projections) recent. Few dedicated tests. |
@@ -35,7 +35,7 @@ previous snapshots in `git log -- docs/agents/quality.md`.
 | DB schema (`supabase/migrations/`)            | B  | 2026-05-04 | 147 migrations. Eight executable checks now in place (security_invoker, RLS, auth.users, search_path, SECURITY DEFINER, permissive RLS, schema_registry, data-model docs). Corrective migration 00156 applied to production 2026-05-04. Allowlists hold ~30 grandfathered entries to be tightened over time. |
 | Tests (vitest + Playwright)                   | B− | 2026-05-04 | 1019 vitest passing across 34 files, but most live in `src/lib/__tests__/` (21 of 40). Hooks, entity configs, and most components have no dedicated tests. Coverage threshold set at 50% on `src/lib/**` (raise gradually). E2E smoke covers 5 flows; deeper flows are `test.skip` pending seed data. |
 | AI integration (`src/lib/ai/`, DB functions)  | A− | 2026-05-04 | Mature library + DB functions + spec doc + AGENTS.md routing. Recipe style compliance / brewing science / write-actions all wired. AI chat panel (F100) works in the app. |
-| Harness (this folder + `Makefile` + scripts/) | A− | 2026-05-04 | Rolled out 2026-05-02 to 2026-05-04 across PRs and #249. 16 ultrareview findings addressed. Eight executable DB checks, ESLint custom rules, WIP=1 enforcement, bootstrap contract validation, Sentry harness writes harness state. Not yet battle-tested across multiple agent sessions — drop to A+ after a 2-week soak. |
+| Harness (this folder + `Makefile` + scripts/) | A− | 2026-05-04 | Rolled out 2026-05-02 to 2026-05-04 across PRs and #249. 16 ultrareview findings addressed. Eight executable DB checks, ESLint custom rules, WIP=1 enforcement, bootstrap contract validation, Sentry harness writes harness state. Not yet battle-tested across multiple agent sessions — promote to A after a 2-week soak proves drift detection works in practice. |
 
 ## Trend log
 
