@@ -12,6 +12,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { format, parseISO } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys, onboardingKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
@@ -34,8 +35,10 @@ import {
   StatCardWithDelta,
   calculateDelta,
   TrendChart,
+  BatchActivityHeatmap,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
+import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
 import { useVolumeUnit } from "@/hooks/useUnitPreferences";
 import { convertVolume, UNIT_LABELS } from "@/lib/units";
 import { log } from "@/lib/client-logger";
@@ -433,11 +436,14 @@ function ProductionTrends() {
   const volumeUnit = useVolumeUnit();
   const volumeLabel = UNIT_LABELS[volumeUnit];
 
+  // Single 365-day fetch covers both the period-scoped delta cards (sliced
+  // client-side) and the year weekly volume chart. Fetching twice would double
+  // RPC traffic for no benefit.
   const { data: productionTrends = [], isLoading } = useQuery({
-    queryKey: dashboardKeys.trends.production(period),
+    queryKey: dashboardKeys.trends.production(365),
     queryFn: async () => {
       const { data, error } = await dynamicRpc(supabase, "get_production_trends", {
-        p_days: period,
+        p_days: 365,
       });
       if (error) {
         log.error("Failed to fetch production trends:", error);
@@ -454,19 +460,27 @@ function ProductionTrends() {
     refetchIntervalInBackground: false,
   });
 
-  const currentPeriodData = useMemo(() => productionTrends.slice(period), [productionTrends, period]);
+  const currentPeriodData = useMemo(
+    () => productionTrends.slice(-period),
+    [productionTrends, period],
+  );
   const previousPeriodData = useMemo(
-    () => productionTrends.slice(0, period),
+    () => productionTrends.slice(-2 * period, -period),
     [productionTrends, period],
   );
 
-  const volumeChartData = useMemo(
+  // get_production_trends(p_days) returns 2 * p_days rows (current + comparison
+  // period). Slice to the trailing year before bucketing so the chart shows ~52
+  // weeks, not ~104.
+  const weeklyVolumeData = useMemo(
     () =>
-      currentPeriodData.map((d) => ({
-        ...d,
-        volume_display: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
-      })),
-    [currentPeriodData, volumeUnit],
+      bucketWeekly(
+        productionTrends.slice(-365).map((d) => ({
+          date: d.date,
+          value: convertVolume(Number(d.volume_bbl), "bbl", volumeUnit),
+        })),
+      ),
+    [productionTrends, volumeUnit],
   );
 
   if (isLoading) {
@@ -511,19 +525,16 @@ function ProductionTrends() {
       {/* Trend Charts */}
       <div className="grid gap-6 md:grid-cols-2">
         <DashboardSection title="Batches Scheduled">
+          <BatchActivityHeatmap />
+        </DashboardSection>
+        <DashboardSection title="Volume Brewed (weekly)">
           <TrendChart
-            data={currentPeriodData}
+            data={weeklyVolumeData}
             xKey="date"
             type="bar"
-            series={[{ key: "batches_started", label: "Batches" }]}
-          />
-        </DashboardSection>
-        <DashboardSection title="Volume Brewed">
-          <TrendChart
-            data={volumeChartData}
-            xKey="date"
-            series={[{ key: "volume_display", label: volumeLabel }]}
+            series={[{ key: "value", label: volumeLabel }]}
             formatValue={(v) => `${Number(v).toFixed(1)} ${volumeLabel}`}
+            formatTooltipDate={(iso) => `Week of ${format(parseISO(iso), "MMM d, yyyy")}`}
           />
         </DashboardSection>
       </div>
