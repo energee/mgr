@@ -25,6 +25,7 @@ COMMENT ON TABLE mongodb_sync_log IS
 ALTER TABLE mongodb_sync_log ENABLE ROW LEVEL SECURITY;
 
 -- Read-only for authenticated users; writes via admin/service role only
+-- check-permissive-rls: skip read-only sync log; SELECT-only policy gated by `TO authenticated`; writes happen via service role
 CREATE POLICY mongodb_sync_log_select ON mongodb_sync_log
   FOR SELECT TO authenticated
   USING (true);
@@ -48,6 +49,7 @@ COMMENT ON TABLE mongodb_sync_mappings IS
 ALTER TABLE mongodb_sync_mappings ENABLE ROW LEVEL SECURITY;
 
 -- Read-only for authenticated users; writes via admin/service role only
+-- check-permissive-rls: skip read-only sync mappings; SELECT-only policy gated by `TO authenticated`; writes happen via service role
 CREATE POLICY mongodb_sync_mappings_select ON mongodb_sync_mappings
   FOR SELECT TO authenticated
   USING (true);

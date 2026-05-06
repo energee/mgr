@@ -28,11 +28,19 @@ describe("buildFixPrompt", () => {
     expect(prompt).toContain("342");
   });
 
-  it("enumerates the 12-step pipeline", () => {
+  it("enumerates the 14-step pipeline", () => {
     const prompt = buildFixPrompt(issue);
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 1; i <= 14; i++) {
       expect(prompt).toContain(`${i}.`);
     }
+  });
+
+  it("requires the harness-state writes (feature_list, PROGRESS, session trace) and final make check gate", () => {
+    const prompt = buildFixPrompt(issue);
+    expect(prompt).toContain("docs/feature_list.json");
+    expect(prompt).toContain("PROGRESS.md");
+    expect(prompt).toContain(".harness/sessions/");
+    expect(prompt).toContain("make check");
   });
 
   it("mentions required quality gates (simplify, code-review)", () => {
@@ -54,8 +62,8 @@ describe("buildFixPrompt", () => {
     expect(prompt).toContain("diagnostic");
   });
 
-  it("references CLAUDE.md conventions", () => {
+  it("references AGENTS.md conventions", () => {
     const prompt = buildFixPrompt(issue);
-    expect(prompt).toContain("CLAUDE.md");
+    expect(prompt).toContain("AGENTS.md");
   });
 });

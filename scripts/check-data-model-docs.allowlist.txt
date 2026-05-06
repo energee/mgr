@@ -1,0 +1,22 @@
+# scripts/check-data-model-docs.allowlist.txt
+#
+# Migration files (basename) listed here are exempt from the
+# data-model-docs mention check. These predate the rule
+# (introduced 2026-05-03 with the harness rollout).
+#
+# Going forward, NEW tables created in NEW migrations must be mentioned
+# in docs/data-model/. Do NOT add new entries here — the allowlist is
+# for one-time grandfathering only.
+#
+# Lines beginning with `#` and blank lines are ignored.
+
+00001_initial_schema.sql
+00016_recipe_yeasts.sql
+00029_keg_types.sql
+00030_system_settings.sql
+00055_batch_blending.sql
+00057_pick_list_tables.sql
+00077_pricing_tiers_redesign.sql
+00091_square_integration.sql
+00099_quickbooks_integration.sql
+00165_mongodb_sync_tables.sql

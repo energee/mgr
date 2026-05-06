@@ -1,0 +1,28 @@
+# scripts/check-permissive-rls.allowlist.txt
+#
+# Migration files (basename) listed here are exempt from the permissive
+# RLS check. These predate the rule (introduced 2026-05-03) and use
+# `USING (true)` / `WITH CHECK (true)` for legitimate single-tenant
+# patterns: shared brewery config, read-only sync logs, audit-trail
+# inserts, integration scratch tables.
+#
+# Going forward, NEW migrations must add inline `-- check-permissive-rls:
+# skip <reason>` above the offending CREATE POLICY (or the specific
+# USING / WITH CHECK line). Do NOT add new entries here — the allowlist
+# is for one-time grandfathering only.
+#
+# Lines beginning with `#` and blank lines are ignored.
+
+00009_user_preferences_and_units.sql
+00019_entity_revisions.sql
+00020_notifications.sql
+00029_keg_types.sql
+00030_system_settings.sql
+00031_keg_inventory.sql
+00032_keg_transactions.sql
+00079_keg_owners.sql
+00083_recipe_variants.sql
+00084_batch_additions.sql
+00090_slack_integration.sql
+00099_quickbooks_integration.sql
+00160_selling_format_materials.sql

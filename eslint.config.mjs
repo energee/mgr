@@ -57,6 +57,48 @@ const eslintConfig = defineConfig([
       "no-console": "error",
     },
   },
+  // Harness conventions promoted from prose to executable checks.
+  // See docs/agents/{ui-rules,query-keys,patterns}.md for rationale.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/components/universal/entity-detail",
+              message:
+                "EntityDetail is deprecated and removed. Use EntityDetailUnified from @/components/universal.",
+            },
+            {
+              name: "@/components/universal/entity-form",
+              message:
+                "EntityForm is deprecated and removed. Use EntityDetailUnified from @/components/universal.",
+            },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          // DEC-008: { value: "", label: "..." } in option arrays.
+          // Scoped to objects that ALSO have a `label` sibling — the Select option shape.
+          selector:
+            "ObjectExpression:has(Property[key.name='label']) > Property[key.name='value'] > Literal[value='']",
+          message:
+            "DEC-008: empty string is reserved by Radix Select for 'no selection'. Use the '_none' sentinel for None, or omit the option entirely (entity-list.tsx adds 'All' automatically).",
+        },
+        {
+          // Centralized query keys: flag inline ArrayExpression as queryKey.
+          selector:
+            "CallExpression[callee.name=/^use(Query|InfiniteQuery|SuspenseQuery|MutationState)$/] ObjectExpression > Property[key.name='queryKey'] > ArrayExpression",
+          message:
+            "Use centralized query key factories from @/lib/query-keys instead of inline arrays. See docs/agents/query-keys.md.",
+        },
+      ],
+    },
+  },
   // Vendored UI components (diceui kanban/sortable/data-table, shadcn timeline/file-upload/alert)
   // These are third-party code with patterns incompatible with React Compiler
   // and intentional a11y overrides. Relax specific rules rather than inline-disabling.

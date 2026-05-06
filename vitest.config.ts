@@ -17,6 +17,15 @@ export default defineConfig({
       provider: "v8",
       include: ["src/lib/**"],
       exclude: ["src/lib/supabase/**"],
+      // Harness gate: thresholds start permissive so the rule can be
+      // committed without first writing tests. Raise them as `src/lib`
+      // coverage grows. See docs/agents/quality.md for the trend log.
+      thresholds: {
+        lines: 50,
+        functions: 50,
+        branches: 50,
+        statements: 50,
+      },
     },
   },
   resolve: {

@@ -137,6 +137,7 @@ DECLARE
 BEGIN
   -- Get all users who have logged in (have a session/are active)
   FOR v_user IN
+    -- check-auth-users-leak: skip server-side admin broadcast (SECURITY DEFINER, IDs only, not via PostgREST)
     SELECT DISTINCT id FROM auth.users
   LOOP
     PERFORM create_notification(

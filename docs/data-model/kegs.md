@@ -342,7 +342,7 @@ receive -> empty -> filled -> shipped -> returned_dirty -> cleaning -> empty (cy
 
 ### Why Calculated Inventory?
 
-Following the allocations pattern from CLAUDE.md:
+Following the allocations pattern (see [`docs/spec/workflows.md`](../spec/workflows.md)):
 > "All inventory movements via unified allocations table. Quantities calculated via views, never stored as mutable balances."
 
 Benefits:

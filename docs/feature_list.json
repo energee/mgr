@@ -1,0 +1,502 @@
+{
+  "$schema": "harness/feature-list-v1",
+  "$comment": "Machine-readable feature tracker. See AGENTS.md \"Work-in-progress rule\" for usage; verify entries with `make verify-feature ID=Fxxx` and mutate state via `make feature-mark`.",
+  "wip_rule": {
+    "rule": "WIP=1 per branch",
+    "description": "At most one feature may be in `in_progress` per git branch. Multiple worktrees can each have one in-flight feature.",
+    "enforcement": "Soft — agents check at session start; not yet a CI gate."
+  },
+  "states": [
+    "not_started",
+    "in_progress",
+    "blocked",
+    "passing"
+  ],
+  "verification_conventions": {
+    "executable": "Shell command that exits 0 on pass and non-zero on fail.",
+    "manual": "Verification not yet automated — requires a human or agent to walk a UI flow.",
+    "null": "No verification defined yet. Treat as a gap to fix."
+  },
+  "features": [
+    {
+      "id": "F001",
+      "area": "harness",
+      "title": "Layered verification gate",
+      "user_visible_behavior": "`make check` runs lint + typecheck + vitest + build; `make check-all` adds Playwright; both exit 0 on success.",
+      "verification": "make check",
+      "state": "passing",
+      "evidence": "Makefile",
+      "notes": "Lecture 09 — three-layer validation hierarchy."
+    },
+    {
+      "id": "F002",
+      "area": "harness",
+      "title": "AGENTS.md router + topic docs",
+      "user_visible_behavior": "Single 50–200 line entry file (AGENTS.md) links to focused topic docs in docs/agents/.",
+      "verification": "test -f AGENTS.md && ! test -f CLAUDE.md && test -d docs/agents && grep -q 'docs/agents/patterns.md' AGENTS.md",
+      "state": "passing",
+      "evidence": "AGENTS.md, docs/agents/",
+      "notes": "Lecture 04 — split monolithic instruction file."
+    },
+    {
+      "id": "F003",
+      "area": "harness",
+      "title": "feature_list.json + WIP=1 per branch",
+      "user_visible_behavior": "Machine-readable feature tracker enforces one in-flight feature per branch.",
+      "verification": "bash scripts/verify-feature.sh F003",
+      "state": "passing",
+      "evidence": "docs/feature_list.json",
+      "notes": "Lecture 08 — feature lists as harness primitives."
+    },
+    {
+      "id": "F004",
+      "area": "harness",
+      "title": "Executable DB security checks",
+      "user_visible_behavior": "`make check-db` (and by extension `make check`) fails if any migration violates security_invoker, RLS, or auth.users-leak rules.",
+      "verification": "make check-db",
+      "state": "passing",
+      "evidence": "scripts/check-rls.ts, scripts/check-security-invoker.ts, scripts/check-auth-users-leak.ts",
+      "notes": "Lecture 10 — promote prose rules to executable checks."
+    },
+    {
+      "id": "F005",
+      "area": "harness",
+      "title": "PROGRESS.md / DECISIONS.md / session-handoff",
+      "user_visible_behavior": "Cross-session continuity: each session reads PROGRESS.md at start and updates it at end.",
+      "verification": "test -f PROGRESS.md && test -f DECISIONS.md && test -f docs/agents/session-handoff.md",
+      "state": "passing",
+      "evidence": "PROGRESS.md, DECISIONS.md, docs/agents/session-handoff.md",
+      "notes": "Lecture 05 — agents are engineers with amnesia."
+    },
+    {
+      "id": "F006",
+      "area": "harness",
+      "title": "Clean-state checklist + idempotent cleanup",
+      "user_visible_behavior": "End-of-session: `bash scripts/cleanup-session.sh` removes session artifacts; checklist verifies clean handoff.",
+      "verification": "bash scripts/cleanup-session.sh && test -f docs/agents/clean-state-checklist.md",
+      "state": "passing",
+      "evidence": "scripts/cleanup-session.sh, docs/agents/clean-state-checklist.md",
+      "notes": "Lecture 12 — idempotent cleanup operations."
+    },
+    {
+      "id": "F007",
+      "area": "harness",
+      "title": "Evaluator rubric",
+      "user_visible_behavior": "Six-dimension 0–2 rubric used at session end and code review.",
+      "verification": "test -f docs/agents/evaluator-rubric.md",
+      "state": "passing",
+      "evidence": "docs/agents/evaluator-rubric.md",
+      "notes": "Lecture 11 — quality scoring via structured rubric."
+    },
+    {
+      "id": "F008",
+      "area": "harness",
+      "title": "Observability — task traces + Sentry guidance + quality doc",
+      "user_visible_behavior": "Per-session decision trail in .harness/sessions/; Sentry covers runtime; weekly A–D quality grades.",
+      "verification": "test -d .harness/sessions && test -f docs/agents/observability.md && test -f docs/agents/quality.md",
+      "state": "passing",
+      "evidence": "docs/agents/observability.md, docs/agents/quality.md, .harness/sessions/",
+      "notes": "Lecture 11 — observability inside the harness."
+    },
+    {
+      "id": "F009",
+      "area": "harness",
+      "title": "Sentry error harness end-to-end",
+      "user_visible_behavior": "Autonomous fix-loop fetches Sentry issues, opens fix PRs, applies labels.",
+      "verification": "bun run test .github/scripts/sentry-harness/prompt.test.ts",
+      "state": "passing",
+      "evidence": "commit:67bf68c (PR #244), .github/workflows/sentry-harness.yml",
+      "notes": "Pre-existing harness verified during Step 1 rollout."
+    },
+    {
+      "id": "F100",
+      "area": "ai",
+      "title": "AI chat panel",
+      "user_visible_behavior": "In-app AI chat panel with streaming.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-02-ai-chat-panel.md",
+      "notes": null
+    },
+    {
+      "id": "F101",
+      "area": "infra",
+      "title": "Code review cleanup pass",
+      "user_visible_behavior": "Codebase cleanup driven by review findings.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-02-code-review-cleanup.md",
+      "notes": null
+    },
+    {
+      "id": "F102",
+      "area": "ui",
+      "title": "Dice data table fixes",
+      "user_visible_behavior": "Fixes to the Dice data table component.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-02-dice-data-table-fixes.md",
+      "notes": null
+    },
+    {
+      "id": "F103",
+      "area": "ui",
+      "title": "Minimalist UI redesign",
+      "user_visible_behavior": "Project-wide minimalist UI overhaul.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-02-minimalist-ui-{implementation-plan,redesign}.md",
+      "notes": null
+    },
+    {
+      "id": "F104",
+      "area": "catalog",
+      "title": "Brands and styles",
+      "user_visible_behavior": "Brand and style catalog entities and views.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-03-brands-and-styles-design.md",
+      "notes": null
+    },
+    {
+      "id": "F105",
+      "area": "inventory",
+      "title": "Demand planning and inventory",
+      "user_visible_behavior": "Demand-planning view tied to inventory levels.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-03-demand-planning-and-inventory.md",
+      "notes": null
+    },
+    {
+      "id": "F106",
+      "area": "ai",
+      "title": "AI tools expansion",
+      "user_visible_behavior": "Expanded AI tool surface (analysis, suggestions, write actions).",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-04-ai-tools-expansion-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F107",
+      "area": "ui",
+      "title": "Combobox relation fields",
+      "user_visible_behavior": "Combobox-based relation field type for entity forms.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-04-combobox-relation-fields.md",
+      "notes": null
+    },
+    {
+      "id": "F108",
+      "area": "infra",
+      "title": "Data enhancements",
+      "user_visible_behavior": "Schema and data-shape enhancements across domains.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-04-data-enhancements-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F109",
+      "area": "packaging",
+      "title": "Packaging batch context",
+      "user_visible_behavior": "Packaging UI shows batch context inline.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-04-packaging-batch-context-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F110",
+      "area": "sales",
+      "title": "Pricing tiers redesign",
+      "user_visible_behavior": "Tiered pricing model and UI.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-04-pricing-tiers-redesign.md",
+      "notes": null
+    },
+    {
+      "id": "F111",
+      "area": "ai",
+      "title": "AI write actions v2",
+      "user_visible_behavior": "Improved AI write actions with confirmation flow.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-05-ai-write-actions-v2.md",
+      "notes": null
+    },
+    {
+      "id": "F112",
+      "area": "production",
+      "title": "Recipe / batch / brew-log cohesion",
+      "user_visible_behavior": "Tighter linkage between recipe, batch, and brew-log entities.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-05-recipe-batch-brewlog-cohesion{,-plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F113",
+      "area": "ui",
+      "title": "Unified entity detail / edit view",
+      "user_visible_behavior": "Single EntityDetailUnified component replaces EntityDetail + EntityForm.",
+      "verification": "bun run test src/components/universal/",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-05-unified-entity-detail-edit-{design,plan}.md",
+      "notes": "Deprecates EntityDetail and EntityForm (still in repo for compat)."
+    },
+    {
+      "id": "F114",
+      "area": "sales",
+      "title": "Customer order portal",
+      "user_visible_behavior": "External-facing portal for customers to place orders.",
+      "verification": "bun e2e ./e2e/customer-order.spec.ts",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-08-customer-order-portal-{design,plan}.md, e2e/customer-order.spec.ts",
+      "notes": "Smoke-level E2E covers internal + portal entry; full flow scaffolded as test.skip pending seed data."
+    },
+    {
+      "id": "F115",
+      "area": "production",
+      "title": "Brew day UX",
+      "user_visible_behavior": "Streamlined brew-day workflow UI.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-12-brew-day-ux-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F116",
+      "area": "auth",
+      "title": "Permission-based roles",
+      "user_visible_behavior": "Role-based access control with granular permissions.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-12-permission-based-roles-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F117",
+      "area": "sales",
+      "title": "Pricing & kegs polish",
+      "user_visible_behavior": "Polish pass on pricing and keg sales flows.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-12-pricing-kegs-polish-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F118",
+      "area": "ui",
+      "title": "Universal entity delete",
+      "user_visible_behavior": "Delete action on every entity via universal pattern.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-12-universal-entity-delete-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F119",
+      "area": "ui",
+      "title": "WCAG accessibility",
+      "user_visible_behavior": "Project-wide WCAG conformance pass.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-12-wcag-accessibility-{design,plan}.md",
+      "notes": "No automated axe-core gate yet — gap candidate."
+    },
+    {
+      "id": "F120",
+      "area": "production",
+      "title": "Batch-centric brew logs",
+      "user_visible_behavior": "Brew logs anchored on the batch detail page.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-17-batch-centric-brew-logs-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F121",
+      "area": "production",
+      "title": "Start brew day from batch",
+      "user_visible_behavior": "Batch detail page exposes 'Start Brew Day' action.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-18-batch-centric-start-brew-day-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F122",
+      "area": "production",
+      "title": "Water additions redesign",
+      "user_visible_behavior": "Updated water-addition UI in recipe editor.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-18-water-additions-redesign-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F123",
+      "area": "sales",
+      "title": "Keg pricing integration",
+      "user_visible_behavior": "Keg pricing exposed through selling-format pricing tiers.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-19-keg-pricing-integration.md",
+      "notes": null
+    },
+    {
+      "id": "F124",
+      "area": "sales",
+      "title": "Per-channel format visibility",
+      "user_visible_behavior": "Selling formats visible per sales channel (retail / wholesale / etc.).",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-19-per-channel-format-visibility-design.md",
+      "notes": null
+    },
+    {
+      "id": "F125",
+      "area": "ui",
+      "title": "Service layer UX improvements",
+      "user_visible_behavior": "UX polish across service-layer interactions.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-19-service-layer-ux-improvements-design.md",
+      "notes": null
+    },
+    {
+      "id": "F126",
+      "area": "production",
+      "title": "Water chemistry calculator",
+      "user_visible_behavior": "Recipe editor shows live water-chemistry calculations.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-19-water-chemistry-calculator-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F127",
+      "area": "production",
+      "title": "Yeast workflow",
+      "user_visible_behavior": "Dedicated yeast-management workflow tied to batches.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-19-yeast-workflow-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F128",
+      "area": "ui",
+      "title": "Dashboard trends",
+      "user_visible_behavior": "Dashboard trend charts for production / inventory / sales.",
+      "verification": "bun e2e ./e2e/dashboard.spec.ts",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-26-dashboard-trends-{design,plan}.md, e2e/dashboard.spec.ts",
+      "notes": "Smoke-level E2E covers all three dashboard routes; chart-content assertions scaffolded as test.skip."
+    },
+    {
+      "id": "F129",
+      "area": "infra",
+      "title": "Performance optimizations",
+      "user_visible_behavior": "Cross-stack perf pass (queries, bundles, render).",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-02-26-performance-optimizations-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F130",
+      "area": "sales",
+      "title": "Container selling format",
+      "user_visible_behavior": "Container-based selling formats (kegs, cases, etc.).",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-03-01-container-selling-format-{plan,redesign-design}.md",
+      "notes": null
+    },
+    {
+      "id": "F131",
+      "area": "auth",
+      "title": "Login screen redesign",
+      "user_visible_behavior": "Updated login UI.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-03-02-login-screen-redesign-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F132",
+      "area": "sales",
+      "title": "COGS projections",
+      "user_visible_behavior": "Cost-of-goods projections in dashboard / reports.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-03-05-cogs-projections-{design,plan}.md",
+      "notes": null
+    },
+    {
+      "id": "F133",
+      "area": "ui",
+      "title": "Linear UI overhaul",
+      "user_visible_behavior": "Linear-inspired UI overhaul (denser layouts, keyboard-first).",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/plans/2026-03-06-linear-ui-overhaul-{design,impl}.md",
+      "notes": null
+    },
+    {
+      "id": "F134",
+      "area": "production",
+      "title": "Recipe editor fixes",
+      "user_visible_behavior": "Bug fixes for the recipe editor (drag-drop, calculations, save).",
+      "verification": "bun e2e ./e2e/recipe-editor.spec.ts",
+      "state": "passing",
+      "evidence": "docs/superpowers/plans/2026-03-13-recipe-editor-fixes.md, commit:73c49c7 (#246), e2e/recipe-editor.spec.ts",
+      "notes": "Drag-and-drop reordering merged in commit 73c49c7. Smoke-level E2E covers list and detail routes."
+    },
+    {
+      "id": "F135",
+      "area": "production",
+      "title": "Batch / vessel transfer fixes",
+      "user_visible_behavior": "Bug fixes for batch and vessel transfer workflow.",
+      "verification": "bun e2e ./e2e/batch-transfer.spec.ts",
+      "state": "passing",
+      "evidence": "docs/superpowers/plans/2026-03-14-batch-vessel-transfer-fixes.md, e2e/batch-transfer.spec.ts",
+      "notes": "Smoke-level E2E covers list and new-transfer routes; full transfer flow scaffolded as test.skip."
+    },
+    {
+      "id": "F136",
+      "area": "packaging",
+      "title": "Packaging sessions redesign",
+      "user_visible_behavior": "Packaging session UI redesign (PackagingDayView, in-progress flow).",
+      "verification": "bun e2e ./e2e/packaging-session.spec.ts",
+      "state": "passing",
+      "evidence": "docs/superpowers/plans/2026-03-14-packaging-sessions-redesign.md, e2e/packaging-session.spec.ts",
+      "notes": "Smoke-level E2E covers list and new routes; full session flow scaffolded as test.skip."
+    },
+    {
+      "id": "F137",
+      "area": "inventory",
+      "title": "Unified material planning",
+      "user_visible_behavior": "Unified material-planning system across recipes / batches / inventory.",
+      "verification": "manual",
+      "state": "passing",
+      "evidence": "docs/superpowers/plans/2026-04-15-material-planning.md, commit:a2704f7 (#243)",
+      "notes": null
+    },
+    {
+      "id": "F200",
+      "area": "ui",
+      "title": "Dashboard activity heatmap",
+      "user_visible_behavior": "Calendar-style heatmap on the dashboard showing brew / package / sales activity per day.",
+      "verification": "manual",
+      "state": "in_progress",
+      "evidence": "docs/superpowers/plans/2026-05-02-dashboard-activity-heatmap.md, docs/superpowers/specs/2026-05-02-dashboard-activity-heatmap-design.md",
+      "notes": "Plan + spec written; implementation not yet started. Currently the only WIP feature on `main`."
+    }
+  ]
+}
