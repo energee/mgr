@@ -169,6 +169,11 @@ export const batchEntity: EntityConfig<Batch> = {
         return (data ?? []).map((v) => ({ value: v.name, label: v.name }));
       },
     },
+    {
+      field: "planned_start_date",
+      type: "daterange",
+      label: "Planned start date",
+    },
   ],
 
   quickFilters: [
