@@ -1,0 +1,5 @@
+# Per-session agent task traces live here.
+# See docs/agents/observability.md (Layer 2).
+#
+# Filename: <YYYY-MM-DD>-<feature-id>-<short-slug>.md
+# Example:  2026-05-02-F003-feature-list.md

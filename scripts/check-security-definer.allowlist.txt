@@ -1,0 +1,31 @@
+# scripts/check-security-definer.allowlist.txt
+#
+# One function name per line. Functions listed here are grandfathered into
+# the SECURITY DEFINER check — they pre-date the justification rule
+# (introduced 2026-05-03 with the harness rollout) and are kept as-is.
+#
+# Going forward, NEW SECURITY DEFINER functions must add an inline
+# `-- security-definer: justified <reason>` comment instead of being
+# added here. The allowlist is for one-time grandfathering only.
+#
+# Lines beginning with `#` and blank lines are ignored.
+
+notify_all_users
+trigger_batch_status_notification
+trigger_order_status_notification
+trigger_new_order_notification
+trigger_po_status_notification
+check_low_inventory
+trigger_packaging_completion_notification
+trigger_packaging_session_completion
+create_user_profile
+sync_user_profile_email
+notify_batch_cancelled
+notify_batch_terminated
+trigger_order_fulfillment_keg_transactions
+is_admin_rls
+user_has_brewery_access
+create_user_preferences
+log_entity_revision
+create_notification
+cleanup_old_notifications

@@ -20,6 +20,7 @@ CREATE TABLE brewery_shipping_defaults (
 
 ALTER TABLE brewery_shipping_defaults ENABLE ROW LEVEL SECURITY;
 
+-- check-permissive-rls: skip single-tenant brewery defaults; any authenticated user is part of the brewery
 CREATE POLICY "Authenticated users can manage brewery_shipping_defaults"
   ON brewery_shipping_defaults
   FOR ALL
@@ -51,6 +52,7 @@ CREATE INDEX idx_customer_shipping_materials_customer_id
 
 ALTER TABLE customer_shipping_materials ENABLE ROW LEVEL SECURITY;
 
+-- check-permissive-rls: skip single-tenant customer shipping; any authenticated user manages all customers
 CREATE POLICY "Authenticated users can manage customer_shipping_materials"
   ON customer_shipping_materials
   FOR ALL
@@ -82,6 +84,7 @@ CREATE INDEX idx_customer_pallet_configs_customer_id
 
 ALTER TABLE customer_pallet_configs ENABLE ROW LEVEL SECURITY;
 
+-- check-permissive-rls: skip single-tenant pallet configs; any authenticated user manages all customers
 CREATE POLICY "Authenticated users can manage customer_pallet_configs"
   ON customer_pallet_configs
   FOR ALL
@@ -113,6 +116,7 @@ CREATE INDEX idx_order_materials_order_id
 
 ALTER TABLE order_materials ENABLE ROW LEVEL SECURITY;
 
+-- check-permissive-rls: skip single-tenant order materials; any authenticated user manages all orders
 CREATE POLICY "Authenticated users can manage order_materials"
   ON order_materials
   FOR ALL

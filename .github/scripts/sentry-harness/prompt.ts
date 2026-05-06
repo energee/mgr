@@ -33,7 +33,7 @@ ${issue.stackTrace || "(unavailable)"}
 1. **Trace stack trace** — resolve each frame to a source file. Read the code around each frame.
 2. **Root cause analysis** — determine *why* the error occurs. Null safety? Race condition? Stale state? Missing error boundary? Write the analysis out before fixing.
 3. **Pattern scan** — use Grep to find similar vulnerabilities elsewhere in the codebase. If found, include them in the fix scope.
-4. **Implement the fix** — minimal and targeted. Follow the conventions in CLAUDE.md: entity configs, universal components, centralized query keys from \`src/lib/query-keys.ts\`, no hardcoded status maps (DEC-007), no empty-string Select values (DEC-008), security_invoker on views, RLS on new tables.
+4. **Implement the fix** — minimal and targeted. Follow the conventions in AGENTS.md and the topic docs under \`docs/agents/\`: entity configs, universal components, centralized query keys from \`src/lib/query-keys.ts\`, no hardcoded status maps (DEC-007), no empty-string Select values (DEC-008), security_invoker on views, RLS on new tables.
 5. **Add tests** — write a Vitest test that reproduces the error condition. Confirm it fails on the original code, then passes on the fix.
 6. **Validate** — run \`bun run typecheck\`, \`bun run test\`, \`bun lint\`. All three must pass.
 7. **Simplify** — invoke \`/simplify\` to review the changed code for reuse, quality, and efficiency. Apply fixes.
@@ -41,11 +41,16 @@ ${issue.stackTrace || "(unavailable)"}
 9. **Code review** — invoke \`/code-review:code-review\` on the diff. Surface bugs, logic errors, security issues, convention violations.
 10. **Apply review fixes** — address each finding from step 9.
 11. **Re-validate** — if step 10 changed anything, run \`bun run typecheck\`, \`bun run test\`, \`bun lint\` again.
-12. **Open the PR** — create branch \`sentry-fix/SENTRY-${issue.issueId}\`, push, and open a PR with the template below. Apply labels \`sentry-fix\` and \`automated\`.
+12. **Update harness state** — three short writes:
+    - Append a feature entry to \`docs/feature_list.json\` with \`id: "SENTRY-${issue.issueId}"\`, \`area: "infra"\`, the issue title, \`verification: "<test command>"\`, \`state: "passing"\`, and \`evidence: "commit:<sha>"\`. Set \`branch: "sentry-fix/SENTRY-${issue.issueId}"\`.
+    - Append a one-paragraph entry to \`PROGRESS.md\` under "Completed" describing the fix.
+    - Write a session trace to \`.harness/sessions/<YYYY-MM-DD>-SENTRY-${issue.issueId}.md\` using the template in \`docs/agents/observability.md\`.
+13. **Run \`make check\`** — final layered gate including \`check-db\` and \`check-wip\`. Must exit 0.
+14. **Open the PR** — create branch \`sentry-fix/SENTRY-${issue.issueId}\`, push, and open a PR with the template below. Apply labels \`sentry-fix\` and \`automated\`.
 
 ## Guardrails
 
-- Follow CLAUDE.md conventions strictly. Do not invent new patterns.
+- Follow AGENTS.md conventions strictly. Do not invent new patterns.
 - Do not modify unrelated code. No opportunistic refactors.
 - Do not skip hooks (\`--no-verify\`) or bypass validation.
 - If validation fails 3 times in a row, do NOT force a bad fix. Stop and open a **diagnostic PR** instead (see below).
@@ -83,6 +88,10 @@ If after 3 attempts you cannot produce a working fix, OR the root cause is outsi
 - [x] Lint clean
 - [x] /simplify pass completed
 - [x] /code-review pass completed
+- [x] feature_list.json updated with SENTRY-${issue.issueId} entry
+- [x] PROGRESS.md updated
+- [x] .harness/sessions/<date>-SENTRY-${issue.issueId}.md trace written
+- [x] make check passes (incl. check-db and check-wip)
 \`\`\`
 
 Begin with step 1.`;
