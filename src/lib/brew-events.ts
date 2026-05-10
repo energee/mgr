@@ -53,16 +53,15 @@ export function extractBrewMeasurements(
   events: BrewEvent[],
   units: BrewMeasurementUnits = DEFAULT_UNITS,
 ): BrewMeasurementHighlight[] {
-  const typedEvents = events;
   const highlights: BrewMeasurementHighlight[] = [];
 
-  const mashTemp = findMeasurement(typedEvents, ["mash_in", "mash_rest"], "temp_f");
+  const mashTemp = findMeasurement(events, ["mash_in", "mash_rest"], "temp_f");
   if (mashTemp) {
     highlights.push({ label: "Mash Temp", value: formatTemperature(Number(mashTemp.value), units.temperature, 0) });
   }
 
   const preBoilGravity = findMeasurement(
-    typedEvents,
+    events,
     ["kettle_full", "boil_start"],
     "gravity_plato",
   );
@@ -71,7 +70,7 @@ export function extractBrewMeasurements(
   }
 
   const postBoilOG = findMeasurement(
-    typedEvents,
+    events,
     ["boil_end", "ko_start"],
     "gravity_plato",
   );
@@ -80,7 +79,7 @@ export function extractBrewMeasurements(
   }
 
   const postBoilVol = findMeasurement(
-    typedEvents,
+    events,
     ["boil_end", "ko_start", "ko_end"],
     "volume_bbl",
   );
@@ -88,7 +87,7 @@ export function extractBrewMeasurements(
     highlights.push({ label: "Post-Boil Vol", value: formatVolume(Number(postBoilVol.value), units.volume) });
   }
 
-  const koTemp = findMeasurement(typedEvents, ["ko_end"], "temp_f");
+  const koTemp = findMeasurement(events, ["ko_end"], "temp_f");
   if (koTemp) {
     highlights.push({ label: "Knockout Temp", value: formatTemperature(Number(koTemp.value), units.temperature, 0) });
   }
