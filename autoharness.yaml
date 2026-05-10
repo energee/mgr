@@ -1,0 +1,63 @@
+format_version: autoharness.project.v1
+target_root: .
+workspace:
+  id: mgr
+  root: .autoharness/workspaces
+  track_id: main
+  objective: Refactor src/lib for clarity and simplicity without regressions to typecheck or vitest
+  benchmark: mgr-screening
+  domain: general
+benchmark:
+  adapter: generic_command
+  config: benchmarks/screening.yaml
+  preset: null
+  stage: screening
+generator:
+  id: local_command
+  intervention_class: source
+  options:
+    command_path: /Users/tedslesinski/Repos/mgr/scripts/autoharness-claude-shim.py
+    command_cwd: /Users/tedslesinski/Repos/mgr
+    timeout_seconds: "900"
+campaign:
+  stage: screening
+  generator: local_command
+  intervention_classes:
+  - source
+  max_iterations: 10
+autonomy:
+  mode: bounded
+  settings_path: .autoharness/settings.yaml
+  editable_surfaces:
+  - src/lib
+  protected_surfaces:
+  # Anti-gaming: the benchmark itself must be untouchable
+  - "src/**/__tests__/**"
+  - "src/**/*.test.ts"
+  - "src/**/*.test.tsx"
+  - "src/**/__mocks__/**"
+  - "src/test-utils/**"
+  - "vitest.config.ts"
+  - "playwright.config.ts"
+  - "e2e/**"
+  # Toolchain & deps — large blast radius
+  - "package.json"
+  - "bun.lock"
+  - "tsconfig.json"
+  - "tsconfig.tsbuildinfo"
+  - "next.config.ts"
+  - "eslint.config.mjs"
+  - "postcss.config.mjs"
+  - "components.json"
+  - "Makefile"
+  # DB irreversibility
+  - "supabase/migrations/**"
+  # CI / harness / project metadata
+  - ".github/**"
+  - "scripts/**"
+  - "feature_list.json"
+  - "autoharness.yaml"
+  - "autoharness.*.md"
+  - "autoharness.onboarding.json"
+  - "benchmarks/**"
+  - "docs/**"

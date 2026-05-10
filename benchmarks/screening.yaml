@@ -1,0 +1,9 @@
+benchmark_name: mgr-screening
+workdir: /Users/tedslesinski/Repos/mgr
+command:
+  - bash
+  - -lc
+  - "bun run typecheck && bun run test"
+timeout_seconds: 600
+expected_exit_codes:
+  - 0
