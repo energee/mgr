@@ -194,10 +194,7 @@ export function convertTemperature(
   if (from === to) return value;
 
   // Convert to Fahrenheit first (canonical)
-  let fahrenheit = value;
-  if (from === "c") {
-    fahrenheit = (value * 9) / 5 + 32;
-  }
+  const fahrenheit = from === "c" ? (value * 9) / 5 + 32 : value;
 
   // Convert to target
   if (to === "c") {
@@ -268,9 +265,8 @@ export function convertGravity(
 
   if (from === "plato" && to === "sg") {
     return platoToSg(value);
-  } else {
-    return sgToPlato(value);
   }
+  return sgToPlato(value);
 }
 
 export function formatGravity(
@@ -282,10 +278,9 @@ export function formatGravity(
 
   if (displayUnit === "plato") {
     return `${plato.toFixed(decimals ?? 1)}${UNIT_LABELS.plato}`;
-  } else {
-    const sg = platoToSg(plato);
-    return `${sg.toFixed(decimals ?? 3)}`;
   }
+  const sg = platoToSg(plato);
+  return sg.toFixed(decimals ?? 3);
 }
 
 /**

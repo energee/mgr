@@ -36,20 +36,30 @@ export type CellCountEstimate = {
 // =============================================================================
 
 /**
+ * Daily viability decay rate by yeast form.
+ *
+ * Liquid yeast: ~2% per day (decayRate = 0.98)
+ * Dry yeast: ~0.5% per day (decayRate = 0.995)
+ */
+const VIABILITY_DECAY_RATES: Record<YeastForm, number> = {
+  liquid: 0.98,
+  dry: 0.995,
+};
+
+/**
  * Calculate viability decay over time.
  *
  * Liquid yeast: ~2-4% per day (we use 2% as conservative estimate)
  * Dry yeast: ~0.5% per day when stored properly
  *
  * Formula: viability = initialViability * (decayRate ^ daysOld)
- * Where decayRate = 0.98 for liquid, 0.995 for dry
  */
 export function calculateViabilityDecay(
   initialViability: number,
   daysOld: number,
   form: YeastForm = "liquid"
 ): ViabilityResult {
-  const decayRate = form === "liquid" ? 0.98 : 0.995;
+  const decayRate = VIABILITY_DECAY_RATES[form];
   const viability = Math.max(0, initialViability * Math.pow(decayRate, daysOld));
 
   return {
@@ -81,7 +91,7 @@ export function daysUntilViabilityThreshold(
   form: YeastForm = "liquid"
 ): number {
   if (currentViability <= threshold) return 0;
-  const decayRate = form === "liquid" ? 0.98 : 0.995;
+  const decayRate = VIABILITY_DECAY_RATES[form];
   // viability = initial * rate^days
   // threshold = current * rate^days
   // log(threshold/current) = days * log(rate)
@@ -123,6 +133,12 @@ export function estimateCellsFromPackage(
   };
 }
 
+const SLURRY_CELLS_BILLION_PER_ML: Record<"dense" | "medium" | "thin", number> = {
+  dense: 1.0,
+  medium: 0.5,
+  thin: 0.25,
+};
+
 /**
  * Estimate cell count from harvested slurry.
  *
@@ -138,8 +154,7 @@ export function estimateCellsFromSlurry(
   viability: number = 85
 ): CellCountEstimate {
   // Cells per mL in billions, then convert result to thousands (* 1,000,000)
-  const cellsPerMlBillion =
-    density === "dense" ? 1.0 : density === "medium" ? 0.5 : 0.25;
+  const cellsPerMlBillion = SLURRY_CELLS_BILLION_PER_ML[density];
   const viableCellsBillion =
     volumeMl * cellsPerMlBillion * (viability / 100);
   const viableCellsThousand = viableCellsBillion * 1_000_000;

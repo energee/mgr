@@ -254,12 +254,12 @@ export function formatReadingValue(
   switch (type) {
     case "gravity": {
       const target = (displayUnit ?? unit) as "sg" | "plato";
-      const converted = unit === target ? numValue : convertGravity(numValue, unit as "sg" | "plato", target);
+      const converted = convertGravity(numValue, unit as "sg" | "plato", target);
       return target === "sg" ? converted.toFixed(3) : `${converted.toFixed(1)}°P`;
     }
     case "temperature": {
       const target = (displayUnit ?? unit) as "f" | "c";
-      const out = unit === target ? numValue : convertTemperature(numValue, unit as "f" | "c", target);
+      const out = convertTemperature(numValue, unit as "f" | "c", target);
       return `${out.toFixed(1)}°${target.toUpperCase()}`;
     }
     case "ph":
