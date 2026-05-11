@@ -493,10 +493,10 @@
       "area": "ui",
       "title": "Dashboard activity heatmap",
       "user_visible_behavior": "Calendar-style heatmap on the dashboard showing brew / package / sales activity per day.",
-      "verification": "manual",
-      "state": "in_progress",
-      "evidence": "docs/superpowers/plans/2026-05-02-dashboard-activity-heatmap.md, docs/superpowers/specs/2026-05-02-dashboard-activity-heatmap-design.md",
-      "notes": "Plan + spec written; implementation not yet started. Currently the only WIP feature on `main`."
+      "verification": "bun e2e ./e2e/dashboard.spec.ts",
+      "state": "passing",
+      "evidence": "PR #248, commit e3c1af3. Implementation in src/components/dashboard/batch-activity-heatmap.tsx + heatmap-utils.ts, server RPC in supabase/migrations/00170_get_planned_batches_by_day.sql. Unit tests in src/components/dashboard/__tests__/heatmap-utils.test.ts.",
+      "notes": "Year-view heatmap shipped 2026-05-06. Plan + spec at docs/superpowers/{plans,specs}/2026-05-02-dashboard-activity-heatmap*.md."
     }
   ]
 }
