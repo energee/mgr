@@ -18,6 +18,7 @@ import {
   useSellingFormatBOM,
   type SellingFormatMaterial,
 } from "@/hooks/use-material-planning";
+import { isWholeUnit, ratioFromDecimal } from "@/lib/inventory-units";
 import {
   Table,
   TableBody,
@@ -178,9 +179,8 @@ export function SellingFormatBOMEditor({
     setSearchValue("");
   }
 
-  function handleQtyBlur(row: SellingFormatMaterial, rawValue: string) {
-    const qty = parseFloat(rawValue);
-    if (!isNaN(qty) && qty !== row.quantity_per_unit) {
+  function handleQtyCommit(row: SellingFormatMaterial, qty: number) {
+    if (Number.isFinite(qty) && qty > 0 && qty !== row.quantity_per_unit) {
       updateMutation.mutate({ id: row.id, updates: { quantity_per_unit: qty } });
     }
   }
@@ -285,7 +285,7 @@ export function SellingFormatBOMEditor({
                 key={row.id}
                 row={row}
                 disabled={isDisabled}
-                onQtyBlur={(val) => handleQtyBlur(row, val)}
+                onQtyCommit={(qty) => handleQtyCommit(row, qty)}
                 onNotesBlur={(val) => handleNotesBlur(row, val)}
                 onDelete={() => deleteMutation.mutate(row.id)}
               />
@@ -304,18 +304,18 @@ export function SellingFormatBOMEditor({
 type BOMRowProps = {
   row: SellingFormatMaterial;
   disabled: boolean;
-  onQtyBlur: (value: string) => void;
+  onQtyCommit: (qty: number) => void;
   onNotesBlur: (value: string) => void;
   onDelete: () => void;
 };
 
 /** A single editable row in the BOM table. Local state tracks field values. */
-function BOMRow({ row, disabled, onQtyBlur, onNotesBlur, onDelete }: BOMRowProps) {
-  const [qty, setQty] = useState(String(row.quantity_per_unit ?? "1"));
+function BOMRow({ row, disabled, onQtyCommit, onNotesBlur, onDelete }: BOMRowProps) {
   const [notes, setNotes] = useState(row.notes ?? "");
 
   const item = row.inventory_item;
   const uom = item?.unit ?? "—";
+  const whole = isWholeUnit(item?.unit);
 
   return (
     <TableRow>
@@ -326,15 +326,11 @@ function BOMRow({ row, disabled, onQtyBlur, onNotesBlur, onDelete }: BOMRowProps
         )}
       </TableCell>
       <TableCell>
-        <Input
-          type="number"
-          step="0.001"
-          min="0"
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-          onBlur={() => onQtyBlur(qty)}
+        <QtyEditor
+          value={row.quantity_per_unit ?? 1}
+          whole={whole}
           disabled={disabled}
-          className="w-24 text-right"
+          onCommit={onQtyCommit}
         />
       </TableCell>
       <TableCell className="text-muted-foreground text-sm">{uom}</TableCell>
@@ -362,5 +358,101 @@ function BOMRow({ row, disabled, onQtyBlur, onNotesBlur, onDelete }: BOMRowProps
         </Button>
       </TableCell>
     </TableRow>
+  );
+}
+
+// =============================================================================
+// QtyEditor — decimal field for bulk; "X per Y" pair for whole-unit materials
+// =============================================================================
+
+type QtyEditorProps = {
+  /** Current stored quantity_per_unit. */
+  value: number;
+  /** Whether the underlying inventory item is a whole/discrete unit. */
+  whole: boolean;
+  disabled?: boolean;
+  /** Commits a new decimal value. Called on blur of either subfield. */
+  onCommit: (qty: number) => void;
+};
+
+/**
+ * Renders the BOM quantity editor.
+ *
+ * Whole-unit materials (each, case): two compact integer inputs styled as
+ * "N per M". The stored decimal is recovered into the nearest clean ratio
+ * on mount; if no clean ratio fits, falls back to a single decimal input.
+ *
+ * Bulk materials: a single decimal input matching the legacy behavior.
+ */
+function QtyEditor({ value, whole, disabled, onCommit }: QtyEditorProps) {
+  const initialRatio = useMemo(
+    () => (whole ? ratioFromDecimal(value) : null),
+    [whole, value],
+  );
+
+  // When whole-unit and we recovered a clean ratio, render the X-per-Y form.
+  // Otherwise fall back to the single decimal field (also used by bulk items).
+  const useRatio = whole && initialRatio !== null;
+
+  const [num, setNum] = useState<string>(String(initialRatio?.numerator ?? 1));
+  const [den, setDen] = useState<string>(String(initialRatio?.denominator ?? 1));
+  const [decimal, setDecimal] = useState<string>(String(value));
+
+  function commitRatio() {
+    const n = parseInt(num, 10);
+    const d = parseInt(den, 10);
+    if (!Number.isFinite(n) || !Number.isFinite(d) || n <= 0 || d <= 0) return;
+    onCommit(n / d);
+  }
+
+  function commitDecimal() {
+    const v = parseFloat(decimal);
+    if (Number.isFinite(v) && v > 0) onCommit(v);
+  }
+
+  if (useRatio) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="number"
+          inputMode="numeric"
+          min="1"
+          step="1"
+          value={num}
+          onChange={(e) => setNum(e.target.value)}
+          onBlur={commitRatio}
+          disabled={disabled}
+          className="w-14 text-right"
+          aria-label="Quantity per pack"
+        />
+        <span className="text-xs text-muted-foreground">per</span>
+        <Input
+          type="number"
+          inputMode="numeric"
+          min="1"
+          step="1"
+          value={den}
+          onChange={(e) => setDen(e.target.value)}
+          onBlur={commitRatio}
+          disabled={disabled}
+          className="w-14 text-right"
+          aria-label="Pack size"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <Input
+      type="number"
+      step="0.001"
+      min="0"
+      value={decimal}
+      onChange={(e) => setDecimal(e.target.value)}
+      onBlur={commitDecimal}
+      disabled={disabled}
+      className="w-24 text-right"
+      aria-label="Quantity per unit"
+    />
   );
 }

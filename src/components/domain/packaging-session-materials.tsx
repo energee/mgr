@@ -78,33 +78,44 @@ export function PackagingSessionMaterials({ sessionId }: PackagingSessionMateria
           </TableRow>
         </TableHeader>
         <TableBody>
-          {materials.map((m) => (
-            <TableRow key={m.inventory_item_id}>
-              <TableCell>
-                <span className="font-medium">{m.inventory_item_name}</span>
-                {m.unit && (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    ({m.unit})
-                  </span>
-                )}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {m.total_required.toLocaleString()}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {m.on_hand_quantity.toLocaleString()}
-              </TableCell>
-              <TableCell className="text-right">
-                {m.shortfall > 0 ? (
-                  <Badge variant="destructive">
-                    {m.shortfall.toLocaleString()}
-                  </Badge>
-                ) : (
-                  <span className="text-muted-foreground">--</span>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
+          {materials.map((m) => {
+            // Whole-unit materials (each, case) display as integers — fractional
+            // consumption is meaningless for trays, lids, etc. Bulk materials
+            // keep their decimal precision.
+            const needed = m.is_whole_unit
+              ? Math.ceil(m.total_required)
+              : m.total_required;
+            const onHand = m.is_whole_unit
+              ? Math.floor(m.on_hand_quantity)
+              : m.on_hand_quantity;
+            return (
+              <TableRow key={m.inventory_item_id}>
+                <TableCell>
+                  <span className="font-medium">{m.inventory_item_name}</span>
+                  {m.unit && (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      ({m.unit})
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {needed.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {onHand.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right">
+                  {m.shortfall > 0 ? (
+                    <Badge variant="destructive">
+                      {m.shortfall.toLocaleString()}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">--</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
 
