@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { poReceiveSchema, type POReceiveFormValues } from "@/entities/po-receive";
 import { entityKeys } from "@/lib/query-keys";
+import { parsePositiveNumber } from "@/lib/format";
 import {
   Dialog,
   DialogContent,
@@ -51,7 +52,7 @@ export function POReceiveDialog({
 
   // Bundle-entry helper: lets the user type "10 stacks × 250 per stack" and
   // have the Quantity field auto-fill with 2,500. Pack size is not persisted —
-  // we only store the resulting single-unit quantity on `po_receives`.
+  // only the computed single-unit quantity goes to `po_receives`.
   const [bundlesMode, setBundlesMode] = useState(false);
   const [bundles, setBundles] = useState("");
   const [perBundle, setPerBundle] = useState("");
@@ -68,16 +69,18 @@ export function POReceiveDialog({
     },
   });
 
-  // When in bundles mode, derive Quantity = bundles × perBundle and push it
-  // into the form. Switching off restores the user-editable Quantity field.
-  useEffect(() => {
-    if (!bundlesMode) return;
-    const b = parseFloat(bundles);
-    const p = parseFloat(perBundle);
-    if (Number.isFinite(b) && Number.isFinite(p) && b > 0 && p > 0) {
-      form.setValue("quantity", b * p, { shouldValidate: true });
+  function syncBundleQuantity(b: string, p: string) {
+    const bn = parsePositiveNumber(b);
+    const pn = parsePositiveNumber(p);
+    if (bn !== null && pn !== null) {
+      form.setValue("quantity", bn * pn, { shouldValidate: true });
     }
-  }, [bundlesMode, bundles, perBundle, form]);
+  }
+
+  const bundleTotal =
+    bundlesMode && parsePositiveNumber(bundles) !== null && parsePositiveNumber(perBundle) !== null
+      ? parsePositiveNumber(bundles)! * parsePositiveNumber(perBundle)!
+      : null;
 
   const mutation = useMutation({
     mutationFn: async (values: POReceiveFormValues) => {
@@ -116,7 +119,11 @@ export function POReceiveDialog({
                 <Checkbox
                   id="bundles-mode"
                   checked={bundlesMode}
-                  onCheckedChange={(c) => setBundlesMode(!!c)}
+                  onCheckedChange={(c) => {
+                    const on = !!c;
+                    setBundlesMode(on);
+                    if (on) syncBundleQuantity(bundles, perBundle);
+                  }}
                 />
                 <Label htmlFor="bundles-mode" className="text-sm font-normal">
                   Received in bundles
@@ -131,7 +138,10 @@ export function POReceiveDialog({
                     step="1"
                     placeholder="Bundles"
                     value={bundles}
-                    onChange={(e) => setBundles(e.target.value)}
+                    onChange={(e) => {
+                      setBundles(e.target.value);
+                      syncBundleQuantity(e.target.value, perBundle);
+                    }}
                     className="w-24"
                     aria-label="Number of bundles"
                   />
@@ -143,18 +153,15 @@ export function POReceiveDialog({
                     step="1"
                     placeholder="Per bundle"
                     value={perBundle}
-                    onChange={(e) => setPerBundle(e.target.value)}
+                    onChange={(e) => {
+                      setPerBundle(e.target.value);
+                      syncBundleQuantity(bundles, e.target.value);
+                    }}
                     className="w-24"
                     aria-label="Units per bundle"
                   />
                   <span className="ml-auto text-sm tabular-nums">
-                    = {(() => {
-                      const b = parseFloat(bundles);
-                      const p = parseFloat(perBundle);
-                      return Number.isFinite(b) && Number.isFinite(p) && b > 0 && p > 0
-                        ? (b * p).toLocaleString()
-                        : "—";
-                    })()} {unit}
+                    = {bundleTotal !== null ? bundleTotal.toLocaleString() : "—"} {unit}
                   </span>
                 </div>
               )}

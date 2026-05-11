@@ -54,23 +54,3 @@ export function ratioFromDecimal(
   return null;
 }
 
-/**
- * Per-line-item integer requirement for a whole-unit material.
- *
- * - When the BOM ratio is >= 1 (e.g., "2 lids per can"), we treat the stored
- *   value as a count and multiply by planned quantity.
- * - When the BOM ratio is < 1 (e.g., "1 tray per 24 cans"), we multiply
- *   straight through and ceil — sufficient at the per-line level. Aggregate
- *   precision drift across many lines is handled at render time by ceiling
- *   the summed total again.
- *
- * Note: callers aggregating across multiple BOM rows should sum the raw
- * decimal `quantity_per_unit * planned_quantity` first, then `Math.ceil`
- * the total. This function is for single-line previews only.
- */
-export function computeWholeUnitRequired(qpu: number, planned: number): number {
-  if (!Number.isFinite(qpu) || !Number.isFinite(planned)) return 0;
-  if (qpu <= 0 || planned <= 0) return 0;
-  if (qpu >= 1) return Math.round(qpu) * planned;
-  return Math.ceil(planned * qpu);
-}

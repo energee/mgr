@@ -73,12 +73,11 @@ export type OrderMaterial = {
 };
 
 /**
- * Aggregated material preview for a packaging session.
- * Shows total material need vs on-hand, sorted by shortfall descending.
+ * Aggregated material preview for a packaging session, display-ready.
  *
- * `is_whole_unit` is derived from the inventory item's unit code (e.g. `each`,
- * `case`). Whole-unit rows are aggregated using exact integer arithmetic where
- * a clean BOM ratio can be recovered, and the display layer ceilings the total.
+ * Whole-unit rows (each, case) have `total_required` ceiled and
+ * `on_hand_quantity` floored — fractional consumption is meaningless for
+ * trays/lids/etc. Bulk rows retain decimal precision.
  */
 export type SessionMaterialPreview = {
   inventory_item_id: string;
@@ -238,11 +237,10 @@ export function useSessionMaterialPreview(sessionId: string | null) {
 
       // Step 3: Aggregate required quantities per inventory_item.
       //
-      // For whole-unit materials (each, case), we recover the exact integer
-      // ratio from the stored decimal where possible (`1/24` from `0.0417`)
-      // and use integer arithmetic to avoid precision drift across many
-      // line items. Bulk materials multiply as decimals. The display layer
-      // ceilings whole-unit totals; bulk totals render as-is.
+      // For whole-unit materials (each, case) where we can recover a clean
+      // integer ratio from the stored decimal (`1/24` from `0.0417`), use
+      // integer arithmetic to avoid precision drift across many line items —
+      // otherwise 4800 cans × 0.0417 sums to 200.16 and ceil → 201 trays.
       type AggEntry = {
         inventory_item_id: string;
         inventory_item_name: string;
@@ -254,14 +252,25 @@ export function useSessionMaterialPreview(sessionId: string | null) {
       };
       const aggregated = new Map<string, AggEntry>();
 
-      // Pre-index BOM by selling_format_id for O(1) lookup (avoids O(N×M) filter)
-      const bomByFormat = new Map<string, typeof typedBOM>();
+      // Pre-index BOM by selling_format_id for O(1) lookup. Whole/ratio are
+      // loop-invariant per BOM row, so precompute alongside the index.
+      type BomEntry = typeof typedBOM[number] & {
+        _whole: boolean;
+        _ratio: { numerator: number; denominator: number } | null;
+      };
+      const bomByFormat = new Map<string, BomEntry[]>();
       for (const bom of typedBOM) {
+        const _whole = isWholeUnit(bom.inventory_item?.unit ?? null);
+        const enriched: BomEntry = {
+          ...bom,
+          _whole,
+          _ratio: _whole ? ratioFromDecimal(bom.quantity_per_unit) : null,
+        };
         const existing = bomByFormat.get(bom.selling_format_id);
         if (existing) {
-          existing.push(bom);
+          existing.push(enriched);
         } else {
-          bomByFormat.set(bom.selling_format_id, [bom]);
+          bomByFormat.set(bom.selling_format_id, [enriched]);
         }
       }
 
@@ -269,17 +278,9 @@ export function useSessionMaterialPreview(sessionId: string | null) {
         if (!li.selling_format_id || li.planned_quantity == null) continue;
         const bomForFormat = bomByFormat.get(li.selling_format_id) ?? [];
         for (const bom of bomForFormat) {
-          const unit = bom.inventory_item?.unit ?? null;
-          const whole = isWholeUnit(unit);
-          let required: number;
-          if (whole) {
-            const ratio = ratioFromDecimal(bom.quantity_per_unit);
-            required = ratio
-              ? (li.planned_quantity * ratio.numerator) / ratio.denominator
-              : bom.quantity_per_unit * li.planned_quantity;
-          } else {
-            required = bom.quantity_per_unit * li.planned_quantity;
-          }
+          const required = bom._ratio
+            ? (li.planned_quantity * bom._ratio.numerator) / bom._ratio.denominator
+            : bom.quantity_per_unit * li.planned_quantity;
           const existing = aggregated.get(bom.inventory_item_id);
           if (existing) {
             existing.total_required += required;
@@ -289,9 +290,9 @@ export function useSessionMaterialPreview(sessionId: string | null) {
               inventory_item_name: bom.inventory_item?.name ?? bom.inventory_item_id,
               sku: bom.inventory_item?.sku ?? null,
               category: bom.inventory_item?.category ?? null,
-              unit,
+              unit: bom.inventory_item?.unit ?? null,
               total_required: required,
-              is_whole_unit: whole,
+              is_whole_unit: bom._whole,
             });
           }
         }
@@ -317,21 +318,22 @@ export function useSessionMaterialPreview(sessionId: string | null) {
       }
 
       // Step 5: Build result sorted by shortfall descending.
-      // Whole-unit shortfalls use ceiled need vs. floored on-hand so the
-      // sort order matches what the user sees in the table.
+      // Whole-unit values are ceiled/floored once here so consumers render
+      // directly without rounding logic of their own.
       const result: SessionMaterialPreview[] = [];
       for (const entry of aggregated.values()) {
-        const on_hand_quantity = onHandMap.get(entry.inventory_item_id) ?? 0;
-        const need = entry.is_whole_unit
+        const onHandRaw = onHandMap.get(entry.inventory_item_id) ?? 0;
+        const total_required = entry.is_whole_unit
           ? Math.ceil(entry.total_required)
           : entry.total_required;
-        const have = entry.is_whole_unit
-          ? Math.floor(on_hand_quantity)
-          : on_hand_quantity;
+        const on_hand_quantity = entry.is_whole_unit
+          ? Math.floor(onHandRaw)
+          : onHandRaw;
         result.push({
           ...entry,
+          total_required,
           on_hand_quantity,
-          shortfall: Math.max(0, need - have),
+          shortfall: Math.max(0, total_required - on_hand_quantity),
         });
       }
 

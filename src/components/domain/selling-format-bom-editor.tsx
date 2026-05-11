@@ -19,6 +19,7 @@ import {
   type SellingFormatMaterial,
 } from "@/hooks/use-material-planning";
 import { isWholeUnit, ratioFromDecimal } from "@/lib/inventory-units";
+import { parsePositiveNumber } from "@/lib/format";
 import {
   Table,
   TableBody,
@@ -376,22 +377,14 @@ type QtyEditorProps = {
 };
 
 /**
- * Renders the BOM quantity editor.
- *
- * Whole-unit materials (each, case): two compact integer inputs styled as
- * "N per M". The stored decimal is recovered into the nearest clean ratio
- * on mount; if no clean ratio fits, falls back to a single decimal input.
- *
- * Bulk materials: a single decimal input matching the legacy behavior.
+ * Whole-unit materials (each, case): "N per M" pair of integer inputs.
+ * Stored decimal is recovered into the nearest clean ratio on mount; if no
+ * clean ratio fits, falls back to a single decimal input — same field used
+ * by bulk materials.
  */
 function QtyEditor({ value, whole, disabled, onCommit }: QtyEditorProps) {
-  const initialRatio = useMemo(
-    () => (whole ? ratioFromDecimal(value) : null),
-    [whole, value],
-  );
-
-  // When whole-unit and we recovered a clean ratio, render the X-per-Y form.
-  // Otherwise fall back to the single decimal field (also used by bulk items).
+  // Computed once on mount (only consumed by useState initializers below).
+  const initialRatio = whole ? ratioFromDecimal(value) : null;
   const useRatio = whole && initialRatio !== null;
 
   const [num, setNum] = useState<string>(String(initialRatio?.numerator ?? 1));
@@ -399,15 +392,14 @@ function QtyEditor({ value, whole, disabled, onCommit }: QtyEditorProps) {
   const [decimal, setDecimal] = useState<string>(String(value));
 
   function commitRatio() {
-    const n = parseInt(num, 10);
-    const d = parseInt(den, 10);
-    if (!Number.isFinite(n) || !Number.isFinite(d) || n <= 0 || d <= 0) return;
-    onCommit(n / d);
+    const n = parsePositiveNumber(num);
+    const d = parsePositiveNumber(den);
+    if (n !== null && d !== null) onCommit(n / d);
   }
 
   function commitDecimal() {
-    const v = parseFloat(decimal);
-    if (Number.isFinite(v) && v > 0) onCommit(v);
+    const v = parsePositiveNumber(decimal);
+    if (v !== null) onCommit(v);
   }
 
   if (useRatio) {

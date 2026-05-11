@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   isWholeUnit,
   ratioFromDecimal,
-  computeWholeUnitRequired,
   WHOLE_UNIT_VALUES,
 } from "../inventory-units";
 
@@ -76,30 +75,3 @@ describe("ratioFromDecimal", () => {
   });
 });
 
-describe("computeWholeUnitRequired", () => {
-  it("1 lid per can: 4800 cans → 4800 lids", () => {
-    expect(computeWholeUnitRequired(1, 4800)).toBe(4800);
-  });
-
-  it("1 quadpack per 4 cans: 4800 cans → 1200 quadpacks", () => {
-    expect(computeWholeUnitRequired(0.25, 4800)).toBe(1200);
-  });
-
-  it("1 tray per 24 cans: 4800 cans → 200 trays (rounded)", () => {
-    // 4800 * 0.0417 = 200.16 → ceil = 201
-    // Note: per-line ceil is intentionally conservative; aggregate
-    // precision is handled at render time.
-    expect(computeWholeUnitRequired(0.0417, 4800)).toBe(201);
-  });
-
-  it("2 lids per can (high-ratio): 100 cans → 200 lids", () => {
-    expect(computeWholeUnitRequired(2, 100)).toBe(200);
-  });
-
-  it("returns 0 for invalid inputs", () => {
-    expect(computeWholeUnitRequired(0, 100)).toBe(0);
-    expect(computeWholeUnitRequired(1, 0)).toBe(0);
-    expect(computeWholeUnitRequired(NaN, 100)).toBe(0);
-    expect(computeWholeUnitRequired(1, NaN)).toBe(0);
-  });
-});
