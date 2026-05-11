@@ -360,10 +360,13 @@ Every `process.env.NEXT_PUBLIC_SUPABASE_URL!` uses `!` assertion. Missing env va
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `test.yml` | PR + push to main | Typecheck, lint, test, build |
-| `deploy.yml` | After test succeeds on main | Vercel production deploy |
 | `db-lint.yml` | PRs touching migrations | Postgres security lint |
 | `claude-code-review.yml` | PR events | AI code review |
 | `claude.yml` | Issue/PR @claude mentions | AI issue assistant |
+
+Vercel production + preview deploys are handled by Vercel's native GitHub
+integration (Vercel dashboard → Project → Git), not a GitHub Actions
+workflow.
 
 ### 8.2 Bundle Size Concerns (MEDIUM)
 
