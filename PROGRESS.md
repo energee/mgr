@@ -18,7 +18,7 @@
 ## Completed (this branch)
 
 - [x] **SENTRY-7465830666 — MGR-4: Module not found: react-activity-calendar** (sentry-fix/SENTRY-7465830666)
-  Root cause: `react-activity-calendar` was removed from `package.json` by a knip dependency audit in commit `33c0793` (April 1, 2026). The `batch-activity-heatmap.tsx` component was then added in PR #248 (commit `e3c1af3`, May 6, 2026) which correctly re-added the package. The Sentry error (MGR-4) fired the next day when a developer loaded the dashboard without running `bun install` after pulling. The fix was already in place; this PR closes the Sentry issue, adds the SENTRY entry to `feature_list.json`, and documents that regression coverage is provided by `bun run typecheck` (which fails to resolve the import if the package is missing).
+  Root cause: `react-activity-calendar` was removed from `package.json` by a knip dependency audit in commit `33c0793` (April 1, 2026). The `batch-activity-heatmap.tsx` component was then added in PR #248 (commit `e3c1af3`, May 6, 2026) which correctly re-added the package. The Sentry error (MGR-4) fired the next day when a developer loaded the dashboard without running `bun install` after pulling. The first harness pass (PR #258) closed the Sentry issue and added harness tracking files. This pass adds a Vitest regression test at `src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts` that verifies `ActivityCalendar` is exported as a valid React element type — if the package is removed, the test file fails to load immediately.
 
 - [x] **Audit MGR against walkinglabs harness framework** (12 lectures + resource library) — produced gap checklist
 - [x] **Step 1 — Feedback subsystem** (F001)
