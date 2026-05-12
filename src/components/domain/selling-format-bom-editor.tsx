@@ -3,9 +3,15 @@
 /**
  * SellingFormatBOMEditor — Bill of Materials editor for a selling format.
  *
- * Manages `selling_format_materials` rows: lets users add inventory items to the
- * BOM with a per-unit quantity and optional notes. Each field saves on blur via
- * direct Supabase mutations (not on form submit). Deletions are immediate.
+ * Manages `selling_format_materials` rows: lets users add inventory items to
+ * the BOM with a per-unit quantity and optional notes. Whole-unit materials
+ * (each, case) render an "X per Y" pair of integer inputs; bulk materials
+ * render a single decimal field. The stored value is always a decimal in
+ * `quantity_per_unit` (DECIMAL(10,4)); the X-per-Y form is purely a UI
+ * affordance, recovered on load via `ratioFromDecimal`.
+ *
+ * Each field saves on blur via direct Supabase mutations (not on form
+ * submit). Deletions are immediate.
  */
 
 import { useState, useMemo } from "react";

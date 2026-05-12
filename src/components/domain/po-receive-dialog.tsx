@@ -1,5 +1,18 @@
 "use client";
 
+/**
+ * POReceiveDialog — Records a partial or full receipt against a PO line item.
+ *
+ * Writes a `po_receives` row with the received quantity, lot number, dates,
+ * and notes. Inventory lots are created downstream by the accept-inventory
+ * flow (see `po-accept-inventory-dialog.tsx`).
+ *
+ * Bundles helper: when the supplier ships in bundles (e.g., 10 stacks × 250
+ * trays), checking "Received in bundles" reveals an inline multiplier that
+ * auto-fills the Quantity field with the single-unit total. The bundle size
+ * is not persisted — only the resulting quantity is stored on `po_receives`.
+ */
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";

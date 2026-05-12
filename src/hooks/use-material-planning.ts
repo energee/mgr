@@ -182,8 +182,11 @@ export function useOrderMaterials(orderId: string | null) {
  * 1. Fetch all session_line_items for the session with their planned_quantity and selling_format_id.
  * 2. Fetch selling_format_materials for those format IDs to get per-unit BOM.
  * 3. Aggregate total required quantity per inventory_item across all line items.
+ *    Whole-unit rows use exact integer math from the recovered BOM ratio
+ *    when possible (avoids precision drift from the 4-decimal storage).
  * 4. Fetch on-hand quantities from inventory_lots_with_quantities.
- * 5. Return items sorted by shortfall descending (most urgent first).
+ * 5. Ceil whole-unit need / floor whole-unit on-hand once here so consumers
+ *    render directly. Return items sorted by shortfall descending.
  */
 export function useSessionMaterialPreview(sessionId: string | null) {
   const supabase = createClient();
