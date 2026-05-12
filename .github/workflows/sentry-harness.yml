@@ -78,5 +78,10 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
           prompt: ${{ matrix.error.prompt }}
+          # Stream Claude's SDK output to the job log so a long-running fix
+          # is observable in real time. GitHub Actions still redacts known
+          # secrets in the stream, so the safety net the action's default
+          # masking provides is largely preserved.
+          show_full_output: "true"
           additional_permissions: |
             actions: read
