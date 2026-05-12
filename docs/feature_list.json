@@ -497,6 +497,16 @@
       "state": "passing",
       "evidence": "PR #248, commit e3c1af3. Implementation in src/components/dashboard/batch-activity-heatmap.tsx + heatmap-utils.ts, server RPC in supabase/migrations/00170_get_planned_batches_by_day.sql. Unit tests in src/components/dashboard/__tests__/heatmap-utils.test.ts.",
       "notes": "Year-view heatmap shipped 2026-05-06. Plan + spec at docs/superpowers/{plans,specs}/2026-05-02-dashboard-activity-heatmap*.md."
+    },
+    {
+      "id": "SENTRY-7465830666",
+      "area": "infra",
+      "title": "Error: ./src/components/dashboard/batch-activity-heatmap.tsx:20:1 — Module not found: Can't resolve 'react-activity-calendar'",
+      "verification": "bun run typecheck",
+      "state": "passing",
+      "evidence": "commit:91e35af",
+      "branch": "sentry-fix/SENTRY-7465830666",
+      "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Package is correctly declared in package.json. Regression coverage: bun run typecheck fails if the import in batch-activity-heatmap.tsx cannot be resolved."
     }
   ]
 }
