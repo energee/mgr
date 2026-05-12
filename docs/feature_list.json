@@ -504,7 +504,7 @@
       "title": "Error: ./src/components/dashboard/batch-activity-heatmap.tsx:20:1 — Module not found: Can't resolve 'react-activity-calendar'",
       "verification": "bun run typecheck",
       "state": "passing",
-      "evidence": "commit:<sha>",
+      "evidence": "commit:91e35af",
       "branch": "sentry-fix/SENTRY-7465830666",
       "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Package is correctly declared in package.json. Regression coverage: bun run typecheck fails if the import in batch-activity-heatmap.tsx cannot be resolved."
     }
