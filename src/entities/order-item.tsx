@@ -98,7 +98,6 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
     },
   ],
 
-  defaultSort: { column: "created_at", direction: "desc" },
   searchableFields: ["notes"],
 
   // ---------------------------------------------------------------------------

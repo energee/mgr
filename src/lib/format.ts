@@ -66,3 +66,13 @@ export function formatDate(
 export function parseIntOrNull(value: string): number | null {
   return value.trim() ? parseInt(value, 10) : null;
 }
+
+/**
+ * Parse a string to a finite positive number, returning null when the value
+ * is empty, non-numeric, zero, negative, or non-finite. Useful for form
+ * fields that only accept strictly positive quantities.
+ */
+export function parsePositiveNumber(value: string): number | null {
+  const n = parseFloat(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
