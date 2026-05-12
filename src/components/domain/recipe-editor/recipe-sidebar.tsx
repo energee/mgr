@@ -99,6 +99,60 @@ function calcHopBags(items: HopScheduleItem[]): {
 }
 
 // =============================================================================
+// Helper Components
+// =============================================================================
+
+function EstimateCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-muted/50 px-3 py-2">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-sm font-mono font-medium">{value}</div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/** Format a number: show decimals only if needed */
+function formatNum(n: number): string {
+  return n % 1 === 0 ? n.toString() : n.toFixed(1);
+}
+
+/** Format a grain weight (canonical lbs) using the user's preferred weight unit. */
+function formatGrainWeight(lbs: number, unit: WeightUnit): string {
+  return `${formatNum(convertWeight(lbs, "lbs", unit))} ${UNIT_LABELS[unit]}`;
+}
+
+/**
+ * Format a hop weight (canonical oz). For lbs preference: shows lbs when ≥1 lb,
+ * otherwise oz. For kg preference: always shows kg, with extra precision for
+ * sub-pound amounts so dry-hop charges aren't rounded to "0 kg".
+ */
+function formatHopWeight(oz: number, unit: WeightUnit): string {
+  if (unit === "kg") {
+    const kg = convertWeight(oz / 16, "lbs", "kg");
+    return `${kg.toFixed(kg < 1 ? 3 : 2)} kg`;
+  }
+  if (oz >= 16) return `${formatNum(oz / 16)} lbs`;
+  return `${formatNum(oz)} oz`;
+}
+
+function bagLabel(count: number): string {
+  return count === 1 ? "bag" : "bags";
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -306,58 +360,4 @@ export function RecipeSidebar() {
       )}
     </div>
   );
-}
-
-// =============================================================================
-// Helper Components
-// =============================================================================
-
-function EstimateCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-muted/50 px-3 py-2">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-sm font-mono font-medium">{value}</div>
-    </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  );
-}
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-/** Format a number: show decimals only if needed */
-function formatNum(n: number): string {
-  return n % 1 === 0 ? n.toString() : n.toFixed(1);
-}
-
-/** Format a grain weight (canonical lbs) using the user's preferred weight unit. */
-function formatGrainWeight(lbs: number, unit: WeightUnit): string {
-  return `${formatNum(convertWeight(lbs, "lbs", unit))} ${UNIT_LABELS[unit]}`;
-}
-
-/**
- * Format a hop weight (canonical oz). For lbs preference: shows lbs when ≥1 lb,
- * otherwise oz. For kg preference: always shows kg, with extra precision for
- * sub-pound amounts so dry-hop charges aren't rounded to "0 kg".
- */
-function formatHopWeight(oz: number, unit: WeightUnit): string {
-  if (unit === "kg") {
-    const kg = convertWeight(oz / 16, "lbs", "kg");
-    return `${kg.toFixed(kg < 1 ? 3 : 2)} kg`;
-  }
-  if (oz >= 16) return `${formatNum(oz / 16)} lbs`;
-  return `${formatNum(oz)} oz`;
-}
-
-function bagLabel(count: number): string {
-  return count === 1 ? "bag" : "bags";
 }
