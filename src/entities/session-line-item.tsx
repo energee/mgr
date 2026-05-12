@@ -83,7 +83,6 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
 
   listFilters: [],
 
-  defaultSort: { column: "created_at", direction: "asc" },
   searchableFields: [],
 
   // ---------------------------------------------------------------------------
