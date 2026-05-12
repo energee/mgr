@@ -34,11 +34,18 @@ jobs:
 
       - name: Score Sentry issues
         id: score
+        # SENTRY_ORG and SENTRY_PROJECT come from repo *variables*, not
+        # secrets. Sentry permalinks ("https://sentry.io/organizations/<org>/
+        # issues/...?project=<project>") embed both slugs verbatim, so the
+        # JSON written to step outputs contains them. If either is stored
+        # as a secret, GitHub Actions redacts the entire `errors` output
+        # ("Skip output 'errors' since it may contain secret."), which then
+        # breaks `fromJSON(...)` in the matrix strategy of the fix-error job.
         run: bun run .github/scripts/sentry-harness.ts
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_ENVIRONMENT: development
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
