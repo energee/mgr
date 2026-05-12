@@ -83,5 +83,16 @@ jobs:
           # secrets in the stream, so the safety net the action's default
           # masking provides is largely preserved.
           show_full_output: "true"
+          # Grant the toolset the prompt's pipeline actually needs:
+          #  - Bash: validation (bun run typecheck/test/lint, make check),
+          #    package install (bun add), and git/gh for branch/push/PR.
+          #  - Edit/Write/MultiEdit: implement the fix and add tests.
+          #  - Task: invoke /simplify and /code-review:code-review subagents.
+          #  - WebFetch: occasional docs lookup (e.g. nextjs.org/docs).
+          # Read/Grep/Glob are already on by default. Previous runs failed
+          # silently with 9–19 permission_denials each because none of the
+          # write/exec tools were allowed — Claude completed turns without
+          # being able to apply, validate, or push the fix.
+          claude_args: '--allowed-tools "Bash,Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task,WebFetch"'
           additional_permissions: |
             actions: read
