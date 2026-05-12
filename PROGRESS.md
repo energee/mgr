@@ -17,6 +17,9 @@
 
 ## Completed (this branch)
 
+- [x] **SENTRY-7454377645 — ReferenceError: sgToPlato is not defined** (Sentry fix)
+  Sentry issue MGR-3 fired on 2026-05-01 when `RecipeSidebar` rendered the OG/FG estimates with `displayUnit = "plato"`. A local `formatSg` helper had been added inline to `recipe-sidebar.tsx` that called `sgToPlato` directly without importing it, causing a `ReferenceError` at runtime. The structural fix had already landed in commit `73c49c7` (added `formatGravityFromSg` to `@/lib/units` where `sgToPlato` is in scope, then updated `recipe-sidebar.tsx` to import and use it). This session closed the gap by adding six Vitest tests for `formatGravityFromSg` — covering null/undefined guards, SG passthrough, Plato conversion, and custom decimal places — which would have caught the missing-import bug before it reached the development environment. All 1036 tests pass; lint and typecheck clean.
+
 - [x] **Audit MGR against walkinglabs harness framework** (12 lectures + resource library) — produced gap checklist
 - [x] **Step 1 — Feedback subsystem** (F001)
   - `Makefile` with layered gate (`check-fast` / `check` / `check-all` / `check-db`)
