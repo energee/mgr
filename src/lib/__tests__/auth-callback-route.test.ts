@@ -127,7 +127,7 @@ describe("/api/auth/callback GET", () => {
     const location = new URL(response.headers.get("location")!);
 
     expect(location.pathname).toBe("/login");
-    expect(location.searchParams.get("error")).toBe("auth_callback_error");
+    expect(location.searchParams.get("error")).toBe("missing_code");
     expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
   });
 
@@ -136,7 +136,7 @@ describe("/api/auth/callback GET", () => {
     const location = new URL(response.headers.get("location")!);
 
     expect(location.pathname).toBe("/login");
-    expect(location.searchParams.get("error")).toBe("auth_callback_error");
+    expect(location.searchParams.get("error")).toBe("missing_code");
     expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
   });
 
