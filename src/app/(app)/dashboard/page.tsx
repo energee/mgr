@@ -40,7 +40,7 @@ import {
 import type { StatItem } from "@/components/dashboard";
 import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
 import { useVolumeUnit } from "@/hooks/useUnitPreferences";
-import { convertVolume, UNIT_LABELS } from "@/lib/units";
+import { convertVolume, formatVolume, UNIT_LABELS } from "@/lib/units";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -161,6 +161,7 @@ function GettingStartedChecklist() {
 
 export default function DashboardPage() {
   const supabase = createClient();
+  const volumeUnit = useVolumeUnit();
 
   const { data: batchCounts = DEFAULT_BATCH_COUNTS } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
@@ -215,22 +216,14 @@ export default function DashboardPage() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  // Fetch vessel status
+  // Fetch vessel status — throws on error; a silent fallback to the base table would hide regressions in vessels_with_batch.
   const { data: vessels = [] } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
       const { data, error } = await dynamicFrom(supabase, "vessels_with_batch")
         .select("*")
         .order("name");
-
-      if (error) {
-        const { data: fallback } = await supabase
-          .from("vessels")
-          .select("*")
-          .order("name");
-        return fallback || [];
-      }
-
+      if (error) throw error;
       return data as VesselStatus[];
     },
     refetchInterval: POLLING_INTERVALS.NORMAL,
@@ -352,7 +345,7 @@ export default function DashboardPage() {
                       {batch.recipe_name || batch.name}
                     </td>
                     <td className="py-2 text-right font-mono">
-                      {batch.volume_bbl ? `${batch.volume_bbl} BBL` : "—"}
+                      {formatVolume(batch.volume_bbl, volumeUnit, 1)}
                     </td>
                     <td className="py-2 text-right">
                       <StatusBadge
@@ -490,8 +483,11 @@ function ProductionTrends() {
   const currentBatchesStarted = currentPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
   const previousBatchesStarted = previousPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
 
-  const currentVolume = currentPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
-  const previousVolume = previousPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+  // RPC returns BBL; convert so the headline agrees with the chart below.
+  const currentVolumeBbl = currentPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+  const previousVolumeBbl = previousPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+  const currentVolumeDisplay = convertVolume(currentVolumeBbl, "bbl", volumeUnit);
+  const previousVolumeDisplay = convertVolume(previousVolumeBbl, "bbl", volumeUnit);
 
   const currentCompleted = currentPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
   const previousCompleted = previousPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
@@ -509,9 +505,9 @@ function ProductionTrends() {
           deltaLabel={deltaLabel}
         />
         <StatCardWithDelta
-          value={`${Math.round(currentVolume * 10) / 10} BBL`}
+          value={formatVolume(currentVolumeBbl, volumeUnit, 1)}
           label="volume brewed"
-          delta={calculateDelta(currentVolume, previousVolume)}
+          delta={calculateDelta(currentVolumeDisplay, previousVolumeDisplay)}
           deltaLabel={deltaLabel}
         />
         <StatCardWithDelta
