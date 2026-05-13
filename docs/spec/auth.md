@@ -4,7 +4,41 @@
 
 - Supabase Auth with email/password
 - Magic link option for passwordless login (used by customer portal)
+- Password recovery via emailed reset link (see [Password Recovery](#password-recovery))
 - Session management via Supabase
+
+## Password Recovery
+
+Staff users who forget their password reset it through a Supabase recovery email rather than direct admin intervention.
+
+### Flow
+
+1. User clicks "Forgot password?" on `/login` and enters their email at `/forgot-password`
+2. The form calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: "/api/auth/callback?type=recovery" })`
+3. Supabase emails a one-time recovery link
+4. Clicking the link hits `/api/auth/callback?type=recovery&code=...`, which exchanges the code for a recovery session and forwards to `/update-password`
+5. `/update-password` is a server component that confirms a session exists and renders a password-set form; submission calls `supabase.auth.updateUser({ password })` and redirects home
+
+### Routing
+
+- `/forgot-password` lives in the `(auth)` route group (same split-screen shell as login/signup, redirects already-authenticated users away)
+- `/update-password` is **outside** the `(auth)` group on purpose — recovery callbacks land with a fresh session and must NOT be bounced. It uses its own layout that reuses the shared `AuthShell` component but skips the redirect.
+- `/api/auth/callback` distinguishes recovery from magic-link/OAuth via the `type` query param (`AUTH_CALLBACK_TYPE_RECOVERY` constant in `src/lib/auth-utils.ts`). The `type=recovery` branch forwards to `/update-password`; absent or other `type` values follow the existing `redirect` param logic (allow-list-validated by `isValidRedirect`).
+
+### Deliverability prerequisites
+
+For the recovery email to actually deliver, the Supabase project must have:
+
+- The active origin (e.g., `https://app.example.com/**`, `http://localhost:3000/**`) listed under **Authentication → URL Configuration → Redirect URLs** — otherwise Supabase silently strips the `redirectTo`
+- A custom SMTP provider configured under **Project Settings → Auth → SMTP Settings** — the built-in service is rate-limited (~2 emails/hour) and unreliable
+
+### Files
+
+- `src/app/(auth)/forgot-password/page.tsx` + `forgot-password-form.tsx`
+- `src/app/update-password/layout.tsx` + `page.tsx` + `update-password-form.tsx`
+- `src/app/api/auth/callback/route.ts` — recovery branch
+- `src/components/auth/auth-shell.tsx` — shared split-screen wrapper
+- `src/lib/auth-utils.ts` — `AUTH_CALLBACK_TYPE_RECOVERY`, `rememberEmail`, `readRememberedEmail`
 
 ## Roles
 
