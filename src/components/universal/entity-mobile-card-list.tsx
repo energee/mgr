@@ -8,13 +8,14 @@
  */
 
 import Link from "next/link";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { EntityConfig, EntityColumnDef } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { formatValue } from "@/lib/utils";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { Button } from "@/components/ui/button";
-import { Search, Inbox } from "lucide-react";
+import { Search, Inbox, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type EntityMobileCardListProps = {
   /** Entity configuration */
@@ -68,20 +69,22 @@ export function EntityMobileCardList({
   // ---- Determine the status field if entity has a state machine ----
   const statusField = entity.stateMachine?.stateField as string | undefined;
 
-  // ---- Pick the first 3 columns for subtitle rows, excluding title and status ----
-  const subtitleColumns = useMemo(
+  // ---- Pick subtitle columns ----
+  // First 3 columns rendered always; remaining columns are revealed by the
+  // per-card "More" toggle (audit F-085).
+  const allSubtitleColumns = useMemo(
     () =>
-      entity.listColumns
-        .filter((col) => {
-          const key = col.accessorKey as string | undefined;
-          if (!key) return false;
-          if (key === titleField) return false;
-          if (key === statusField) return false;
-          return true;
-        })
-        .slice(0, 3),
+      entity.listColumns.filter((col) => {
+        const key = col.accessorKey as string | undefined;
+        if (!key) return false;
+        if (key === titleField) return false;
+        if (key === statusField) return false;
+        return true;
+      }),
     [entity.listColumns, titleField, statusField],
   );
+  const subtitleColumns = allSubtitleColumns.slice(0, 3);
+  const extraColumns = allSubtitleColumns.slice(3);
 
   // ---- Empty state ----
   if (data.length === 0) {
@@ -136,51 +139,123 @@ export function EntityMobileCardList({
   // ---- Card list ----
   return (
     <div className="flex flex-col gap-2">
-      {data.map((row) => {
-        const id = row.id as string;
-        const title = row[titleField] ?? "Untitled";
-        const statusValue = statusField
-          ? (row[statusField] as string | undefined)
-          : undefined;
+      {data.map((row) => (
+        <EntityMobileCard
+          key={row.id as string}
+          row={row}
+          entity={entity}
+          basePath={basePath}
+          titleField={titleField}
+          statusField={statusField}
+          subtitleColumns={subtitleColumns}
+          extraColumns={extraColumns}
+        />
+      ))}
+    </div>
+  );
+}
 
-        return (
-          <Link
-            key={id}
-            href={`${basePath}/${id}`}
-            className="block rounded-lg border bg-card p-3 active:bg-accent/50 transition-colors"
-          >
-            {/* Header row: title + status badge */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-medium text-sm truncate">
-                {String(title)}
-              </span>
-              {statusValue && (
-                <StatusBadge
-                  status={statusValue}
-                  config={entity.stateMachine?.stateDisplay}
-                />
-              )}
-            </div>
+/**
+ * Single mobile card. Splits into:
+ * - Link region (tap anywhere on the title/subtitle navigates to the detail page).
+ * - Optional "More" toggle that expands inline to show the remaining columns
+ *   (audit F-085). The toggle is rendered as a button to stop propagation,
+ *   so tapping it doesn't navigate.
+ */
+function EntityMobileCard({
+  row,
+  entity,
+  basePath,
+  titleField,
+  statusField,
+  subtitleColumns,
+  extraColumns,
+}: {
+  row: Record<string, unknown>;
+  entity: EntityConfig<Record<string, unknown>>;
+  basePath: string;
+  titleField: string;
+  statusField: string | undefined;
+  subtitleColumns: EntityColumnDef<Record<string, unknown>>[];
+  extraColumns: EntityColumnDef<Record<string, unknown>>[];
+}) {
+  const id = row.id as string;
+  const title = row[titleField] ?? "Untitled";
+  const statusValue = statusField ? (row[statusField] as string | undefined) : undefined;
+  const [expanded, setExpanded] = useState(false);
+  const hasExtras = extraColumns.length > 0;
 
-            {/* Subtitle rows */}
-            {subtitleColumns.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-                {subtitleColumns.map((col) => {
-                  const key = col.accessorKey as string;
-                  return (
-                    <span key={key} className="truncate">
-                      <span className="text-muted-foreground/60">
-                        {typeof col.header === "string" ? col.header : key}:
-                      </span>{" "}
-                      {renderColumnValue(col, row)}
-                    </span>
-                  );
-                })}
-              </div>
+  return (
+    <div className="rounded-lg border bg-card transition-colors active:bg-accent/50">
+      <Link href={`${basePath}/${id}`} className="block p-3">
+        {/* Header row: title + status badge */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-medium text-sm truncate">{String(title)}</span>
+          {statusValue && (
+            <StatusBadge
+              status={statusValue}
+              config={entity.stateMachine?.stateDisplay}
+            />
+          )}
+        </div>
+
+        {/* Always-visible subtitle rows */}
+        {subtitleColumns.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+            {subtitleColumns.map((col) => {
+              const key = col.accessorKey as string;
+              return (
+                <span key={key} className="truncate">
+                  <span className="text-muted-foreground/60">
+                    {typeof col.header === "string" ? col.header : key}:
+                  </span>{" "}
+                  {renderColumnValue(col, row)}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Expanded extras */}
+        {expanded && hasExtras && (
+          <div className="mt-2 pt-2 border-t flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+            {extraColumns.map((col) => {
+              const key = col.accessorKey as string;
+              return (
+                <span key={key} className="truncate">
+                  <span className="text-muted-foreground/60">
+                    {typeof col.header === "string" ? col.header : key}:
+                  </span>{" "}
+                  {renderColumnValue(col, row)}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </Link>
+
+      {/* "More" toggle — outside the Link so taps don't trigger navigation. */}
+      {hasExtras && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
+          aria-expanded={expanded}
+          aria-controls={`card-extras-${id}`}
+          className="w-full px-3 py-2 border-t text-xs text-muted-foreground hover:bg-muted/50 flex items-center justify-center gap-1"
+        >
+          {expanded ? "Show less" : `Show ${extraColumns.length} more field${extraColumns.length === 1 ? "" : "s"}`}
+          <ChevronDown
+            className={cn(
+              "h-3 w-3 transition-transform duration-150",
+              expanded && "rotate-180",
             )}
-          </Link>
-        );
-      })}
+          />
+        </button>
+      )}
     </div>
   );
 }
