@@ -36,21 +36,17 @@ export class ApiError extends Error {
   }
 }
 
+const DEFAULT_STATUS_BY_CODE: Record<ApiErrorCode, number> = {
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  VALIDATION_ERROR: 422,
+  CONFLICT: 409,
+  INTERNAL_ERROR: 500,
+};
+
 function defaultStatusForCode(code: ApiErrorCode): number {
-  switch (code) {
-    case "UNAUTHORIZED":
-      return 401;
-    case "FORBIDDEN":
-      return 403;
-    case "NOT_FOUND":
-      return 404;
-    case "VALIDATION_ERROR":
-      return 422;
-    case "CONFLICT":
-      return 409;
-    case "INTERNAL_ERROR":
-      return 500;
-  }
+  return DEFAULT_STATUS_BY_CODE[code];
 }
 
 /**
