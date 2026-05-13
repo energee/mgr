@@ -218,7 +218,7 @@ export default function InventoryDashboardPage() {
                   <div>
                     <div className="font-medium text-sm">{lot.item_name}</div>
                     <div className="text-xs text-muted-foreground">
-                      Lot: {lot.lot_number} · <span className="font-mono">{lot.quantity}</span> {lot.unit}
+                      Lot: {lot.lot_number} · <span className="font-mono">{lot.remaining_quantity}</span> {lot.unit}
                     </div>
                   </div>
                   <StatusBadge

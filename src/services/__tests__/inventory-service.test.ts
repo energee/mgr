@@ -121,7 +121,7 @@ describe("inventoryService.getExpiringLots", () => {
     expect(lteCall?.args[1]).toBe("2026-08-11");
   });
 
-  it("maps view rows into ExpiringLot using remaining_quantity as quantity", async () => {
+  it("maps view rows into ExpiringLot with correct field shapes", async () => {
     const { client } = createMockSupabase({
       data: [
         {
@@ -146,7 +146,7 @@ describe("inventoryService.getExpiringLots", () => {
         id: "lot-1",
         item_name: "Cascade Hops",
         lot_number: "LOT-001",
-        quantity: 42,
+        remaining_quantity: 42,
         unit: "lb",
         expiration_date: "2026-05-20",
         location_name: "Cooler A",
@@ -163,5 +163,29 @@ describe("inventoryService.getExpiringLots", () => {
 
     const result = await inventoryService.getExpiringLots(client, 30);
     expect(result.success).toBe(false);
+  });
+
+  it("falls back to 'Unknown' when item join returns null", async () => {
+    const { client } = createMockSupabase({
+      data: [
+        {
+          id: "lot-2",
+          lot_number: "LOT-002",
+          remaining_quantity: 10,
+          unit: "oz",
+          expiration_date: "2026-05-20",
+          location: null,
+          item: null,
+        },
+      ],
+      error: null,
+    });
+
+    const result = await inventoryService.getExpiringLots(client, 90);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data[0].item_name).toBe("Unknown");
+    }
   });
 });

@@ -38,7 +38,7 @@ export type ExpiringLot = {
   id: string;
   item_name: string;
   lot_number: string;
-  quantity: number;
+  remaining_quantity: number;
   unit: string;
   expiration_date: string;
   days_until_expiry: number;
@@ -111,10 +111,11 @@ export const inventoryService = {
       const { data, error } = await query;
 
       if (error) {
-        return err(parseSupabaseError(error, { table: "inventory_lots" }));
+        return err(parseSupabaseError(error, { table: "inventory_lots_with_quantities" }));
       }
 
       const now = new Date();
+      now.setUTCHours(0, 0, 0, 0);
       const lots: ExpiringLot[] = (data ?? []).map((lot: Record<string, unknown>) => {
         const expDate = new Date(lot.expiration_date as string);
         const diffTime = expDate.getTime() - now.getTime();
@@ -125,7 +126,7 @@ export const inventoryService = {
           id: lot.id as string,
           item_name: item?.name ?? "Unknown",
           lot_number: lot.lot_number as string,
-          quantity: lot.remaining_quantity as number,
+          remaining_quantity: lot.remaining_quantity as number,
           unit: lot.unit as string,
           expiration_date: lot.expiration_date as string,
           days_until_expiry: diffDays,
