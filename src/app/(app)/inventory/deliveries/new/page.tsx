@@ -1,8 +1,8 @@
 "use client";
 
-import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { deliveryEntity } from "@/entities/delivery";
 
 export default function NewDeliveryPage() {
-  return <EntityDetailUnified entity={deliveryEntity} basePath="/inventory/deliveries" />;
+  return <EntityDetailPage entity={deliveryEntity} basePath="/inventory/deliveries" />;
 }

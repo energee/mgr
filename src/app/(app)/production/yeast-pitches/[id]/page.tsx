@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
 import type { EntityConfig } from "@/types/entity";
 import { YeastLineageDisplay } from "@/components/domain/yeast-lineage-display";
@@ -206,7 +207,12 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
   const chartInitialViability = pitchDetail?.initial_viability ?? 95;
 
   return (
-    <>
+    <div className="space-y-4">
+      <EntityBreadcrumb
+        entity={yeastPitchEntity as unknown as EntityConfig<Record<string, unknown>>}
+        basePath="/production/yeast-pitches"
+        id={id}
+      />
       <EntityDetailUnifiedWithErrorBoundary
         entity={yeastPitchEntity as unknown as EntityConfig<Record<string, unknown>>}
         id={id}
@@ -260,7 +266,7 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 

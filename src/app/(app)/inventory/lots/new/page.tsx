@@ -1,11 +1,11 @@
 "use client";
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { inventoryLotEntity } from "@/entities/inventory-lot";
 
 export default function NewInventoryLotPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={inventoryLotEntity}
       basePath="/inventory/lots"
     />

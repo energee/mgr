@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { inventoryItemEntity } from "@/entities/inventory-item";
 
 export default function InventoryItemDetailPage({
@@ -10,5 +10,5 @@ export default function InventoryItemDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetailUnifiedWithErrorBoundary entity={inventoryItemEntity} id={id} basePath="/inventory/items" />;
+  return <EntityDetailPage entity={inventoryItemEntity} id={id} basePath="/inventory/items" />;
 }

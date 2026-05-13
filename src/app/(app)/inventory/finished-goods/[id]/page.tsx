@@ -7,7 +7,7 @@
  */
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { finishedGoodEntity } from "@/entities/finished-good";
 
 export default function FinishedGoodDetailPage({
@@ -18,7 +18,7 @@ export default function FinishedGoodDetailPage({
   const { id } = use(params);
 
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={finishedGoodEntity}
       id={id}
       basePath="/inventory/finished-goods"

@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { yeastStrainEntity } from "@/entities/yeast-strain";
 
 export default function YeastStrainDetailPage({
@@ -10,5 +10,5 @@ export default function YeastStrainDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetailUnifiedWithErrorBoundary entity={yeastStrainEntity} id={id} basePath="/settings/yeasts" />;
+  return <EntityDetailPage entity={yeastStrainEntity} id={id} basePath="/settings/yeasts" />;
 }

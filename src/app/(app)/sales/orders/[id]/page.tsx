@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { orderEntity } from "@/entities/order";
 
 export default function OrderDetailPage({
@@ -11,7 +11,7 @@ export default function OrderDetailPage({
 }) {
   const { id } = use(params);
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={orderEntity}
       id={id}
       basePath="/sales/orders"

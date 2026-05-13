@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { enumValueEntity } from "@/entities/enum-value";
 
 export default function EnumValueDetailPage({
@@ -10,5 +10,5 @@ export default function EnumValueDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetailUnifiedWithErrorBoundary entity={enumValueEntity} id={id} basePath="/settings/status-options" />;
+  return <EntityDetailPage entity={enumValueEntity} id={id} basePath="/settings/status-options" />;
 }

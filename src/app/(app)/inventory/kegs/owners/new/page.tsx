@@ -1,11 +1,11 @@
 "use client";
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { kegOwnerEntity } from "@/entities/keg-owner";
 
 export default function NewKegOwnerPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={kegOwnerEntity}
       basePath="/inventory/kegs/owners"
     />
