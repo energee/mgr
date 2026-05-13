@@ -20,7 +20,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
 import { Beer, FlaskConical } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { useVolumeUnit } from "@/hooks/use-unit-preferences";
 import { formatVolume } from "@/lib/units";
 
 // Segment colors for the volume bar

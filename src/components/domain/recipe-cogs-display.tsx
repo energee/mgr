@@ -23,7 +23,7 @@ import { DollarSign, TrendingUp } from "lucide-react";
 import { recipeKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { formatCurrency } from "@/lib/format";
-import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { useVolumeUnit } from "@/hooks/use-unit-preferences";
 import { convertVolume, UNIT_LABELS } from "@/lib/units";
 
 // =============================================================================

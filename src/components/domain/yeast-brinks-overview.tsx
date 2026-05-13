@@ -26,7 +26,7 @@ import {
   daysUntilViabilityThreshold,
   type YeastForm,
 } from "@/lib/yeast-calculations";
-import { useWeightUnit } from "@/hooks/useUnitPreferences";
+import { useWeightUnit } from "@/hooks/use-unit-preferences";
 import { formatWeight } from "@/lib/units";
 
 // =============================================================================

@@ -83,7 +83,7 @@ export const recipeKeys = {
 // =============================================================================
 
 export const recipeVariantKeys = {
-  all: ["recipe-variants"] as const,
+  all: () => ["recipe-variants"] as const,
   byRecipe: (recipeId: string) => ["recipe-variants", "by-recipe", recipeId] as const,
   detail: (id: string) => ["recipe-variants", "detail", id] as const,
   costDetail: (id: string) => ["recipe-variants", "cost-detail", id] as const,
@@ -124,7 +124,7 @@ export const batchKeys = {
 // =============================================================================
 
 export const batchAdditionKeys = {
-  all: ["batch-additions"] as const,
+  all: () => ["batch-additions"] as const,
   byBatch: (batchId: string) => ["batch-additions", "by-batch", batchId] as const,
   withCosts: (batchId: string) => ["batch-additions", "with-costs", batchId] as const,
 };

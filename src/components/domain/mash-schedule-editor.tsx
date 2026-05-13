@@ -49,7 +49,7 @@ import {
   reorderWithPositions,
 } from "@/components/ui/sortable-drag-preview";
 import { UnitInput } from "@/components/ui/unit-input";
-import { useTemperatureUnit } from "@/hooks/useUnitPreferences";
+import { useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import { formatTemperature, formatTemperatureRange } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronDown, Thermometer } from "lucide-react";
 

@@ -32,7 +32,7 @@ import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   useUnitPreferences,
   useUpdateUnitPreferences,
-} from "@/hooks/useUnitPreferences";
+} from "@/hooks/use-unit-preferences";
 import { log } from "@/lib/client-logger";
 // =============================================================================
 // Schema
