@@ -40,7 +40,7 @@ import {
 import type { StatItem } from "@/components/dashboard";
 import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
 import { useVolumeUnit } from "@/hooks/useUnitPreferences";
-import { convertVolume, UNIT_LABELS } from "@/lib/units";
+import { convertVolume, formatVolume, UNIT_LABELS } from "@/lib/units";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -162,7 +162,6 @@ function GettingStartedChecklist() {
 export default function DashboardPage() {
   const supabase = createClient();
   const volumeUnit = useVolumeUnit();
-  const volumeLabel = UNIT_LABELS[volumeUnit];
 
   const { data: batchCounts = DEFAULT_BATCH_COUNTS } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
@@ -217,8 +216,7 @@ export default function DashboardPage() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  // Fetch vessel status (audit finding F-008: drop the silent fallback to the
-  // base table — it hid real regressions in the `vessels_with_batch` view).
+  // Fetch vessel status — throws on error; a silent fallback to the base table would hide regressions in vessels_with_batch.
   const { data: vessels = [] } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
@@ -347,9 +345,7 @@ export default function DashboardPage() {
                       {batch.recipe_name || batch.name}
                     </td>
                     <td className="py-2 text-right font-mono">
-                      {batch.volume_bbl != null
-                        ? `${(Math.round(convertVolume(batch.volume_bbl, "bbl", volumeUnit) * 10) / 10).toLocaleString()} ${volumeLabel}`
-                        : "—"}
+                      {formatVolume(batch.volume_bbl, volumeUnit, 1)}
                     </td>
                     <td className="py-2 text-right">
                       <StatusBadge
@@ -487,8 +483,7 @@ function ProductionTrends() {
   const currentBatchesStarted = currentPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
   const previousBatchesStarted = previousPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
 
-  // Volume sums come back in BBL from the RPC. Convert to the user's chosen
-  // unit so the headline number agrees with the chart below it (audit F-001).
+  // RPC returns BBL; convert so the headline agrees with the chart below.
   const currentVolumeBbl = currentPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
   const previousVolumeBbl = previousPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
   const currentVolumeDisplay = convertVolume(currentVolumeBbl, "bbl", volumeUnit);
@@ -510,7 +505,7 @@ function ProductionTrends() {
           deltaLabel={deltaLabel}
         />
         <StatCardWithDelta
-          value={`${(Math.round(currentVolumeDisplay * 10) / 10).toLocaleString()} ${volumeLabel}`}
+          value={formatVolume(currentVolumeBbl, volumeUnit, 1)}
           label="volume brewed"
           delta={calculateDelta(currentVolumeDisplay, previousVolumeDisplay)}
           deltaLabel={deltaLabel}

@@ -14,7 +14,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
   useCallback,
   type ReactNode,
 } from "react";
@@ -79,7 +78,6 @@ type NotificationsProviderProps = {
 export function NotificationsProvider({ children }: NotificationsProviderProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const [_channel, setChannel] = useState<RealtimeChannel | null>(null);
 
   // Fetch unread notifications
   const {
@@ -161,7 +159,6 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         .subscribe();
 
       activeChannel = newChannel;
-      setChannel(newChannel);
     };
 
     setupRealtime();

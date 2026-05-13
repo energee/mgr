@@ -40,11 +40,8 @@ export default function BatchDetailPage({
 }) {
   const { id } = use(params);
 
-  // Consume the prefill store exactly once per component instance (audit F-027).
-  // useState's lazy initializer can fire twice under React strict mode, which
-  // would double-consume the store. The lazy-ref pattern below guarantees the
-  // consume() call runs once across all renders and strict-mode invocations,
-  // because subsequent renders see a non-undefined `prefillRef.current`.
+  // useRef instead of useState lazy-init: React strict mode fires initializers twice,
+  // which would double-consume the store. This ref-guard runs exactly once.
   const prefillRef = useRef<string | null | undefined>(undefined);
   if (prefillRef.current === undefined) {
     prefillRef.current = usePrefillStore.getState().consume().openDialog ?? null;
