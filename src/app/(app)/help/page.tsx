@@ -6,7 +6,7 @@
  * Browsable, searchable user guide rendered from the shared help-content module.
  */
 
-import { useState, useMemo, type ReactNode } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,25 @@ export default function HelpPage() {
   const [search, setSearch] = useState("");
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
+  // Audit F-051: open the section that matches `#section-id` on mount so
+  // help topics are shareable. Mirrors clicked-section state back to the
+  // hash so a user can copy the URL of whatever they expand.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace(/^#/, "");
+    if (hash && helpSections.some((s) => s.id === hash)) {
+      // Defer setState to a rAF callback — calling setState synchronously in an
+      // effect body triggers the react-hooks/set-state-in-effect lint rule.
+      requestAnimationFrame(() => {
+        setOpenSections((prev) => new Set(prev).add(hash));
+        // Scroll after a second frame so the Collapsible has expanded first.
+        requestAnimationFrame(() => {
+          document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+  }, []);
+
   const filtered = useMemo(() => {
     if (!search.trim()) return helpSections;
     const q = search.toLowerCase();
@@ -61,8 +80,16 @@ export default function HelpPage() {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
+        // Clear the hash if we're collapsing the currently-anchored section.
+        if (typeof window !== "undefined" && window.location.hash === `#${id}`) {
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
       } else {
         next.add(id);
+        // Sync the hash so the user can copy the URL of the section they just opened.
+        if (typeof window !== "undefined") {
+          history.replaceState(null, "", `#${id}`);
+        }
       }
       return next;
     });
@@ -133,7 +160,7 @@ export default function HelpPage() {
             open={openSections.has(section.id)}
             onOpenChange={() => toggleSection(section.id)}
           >
-            <div className="border rounded-lg">
+            <div id={section.id} className="border rounded-lg scroll-mt-4">
               <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors rounded-lg">
                 <span className="font-medium">{section.title}</span>
                 <ChevronDown
