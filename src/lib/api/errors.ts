@@ -12,6 +12,7 @@ export type ApiErrorCode =
   | "NOT_FOUND"
   | "VALIDATION_ERROR"
   | "CONFLICT"
+  | "RATE_LIMITED"
   | "INTERNAL_ERROR";
 
 /**
@@ -48,6 +49,8 @@ function defaultStatusForCode(code: ApiErrorCode): number {
       return 422;
     case "CONFLICT":
       return 409;
+    case "RATE_LIMITED":
+      return 429;
     case "INTERNAL_ERROR":
       return 500;
   }

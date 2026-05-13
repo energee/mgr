@@ -21,6 +21,8 @@ import { resolveTaproomPrices } from "@/lib/square/pricing";
 import type { SquareSyncProduct, SquareSyncVariation } from "@/lib/square/types";
 import { logger } from "@/lib/logger";
 
+const log = logger.child({ route: "/api/square/sync/catalog" });
+
 // Supabase nested join shapes (not reflected in generated types)
 type BrandJoin = {
   id: string;
@@ -58,7 +60,10 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       .not("pos_bin_id", "is", null);
 
     if (locError) {
-      throw new Error(`Failed to query locations: ${locError.message}`);
+      // Audit F-065: log the upstream PG error but return a generic message
+      // so internal details (column names, RLS hints) don't reach the client.
+      log.error({ err: locError }, "Failed to query locations");
+      throw new Error("Failed to query locations for Square sync");
     }
 
     if (!locations || locations.length === 0) {
@@ -92,7 +97,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       .gt("quantity", 0);
 
     if (invError) {
-      throw new Error(`Failed to query bin inventory: ${invError.message}`);
+      log.error({ err: invError }, "Failed to query bin inventory");
+      throw new Error("Failed to query bin inventory for Square sync");
     }
 
     // 3. Get draft kegs at POS locations (filled kegs)

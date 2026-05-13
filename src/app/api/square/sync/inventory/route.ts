@@ -17,6 +17,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, updateSquareSettings } from "@/lib/square/client";
 import { pushInventoryCounts } from "@/lib/square/inventory";
 import type { SquareSyncInventory, SquareSyncResult } from "@/lib/square/types";
+import { logger } from "@/lib/logger";
 
 // Supabase nested join shapes (not reflected in generated types)
 type SellingFormatJoin = {
@@ -58,7 +59,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       .not("pos_bin_id", "is", null);
 
     if (locError) {
-      throw new Error(`Failed to query locations: ${locError.message}`);
+      // Audit F-065: log upstream details; return a generic client message.
+      logger.error({ err: locError, route: "/api/square/sync/inventory" }, "Failed to query locations");
+      throw new Error("Failed to query locations for Square sync");
     }
 
     if (!locations || locations.length === 0) {
@@ -78,7 +81,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       .eq("object_type", "ITEM_VARIATION");
 
     if (mapError) {
-      throw new Error(`Failed to query catalog mappings: ${mapError.message}`);
+      logger.error({ err: mapError, route: "/api/square/sync/inventory" }, "Failed to query catalog mappings");
+      throw new Error("Failed to query catalog mappings for Square sync");
     }
 
     // Build lookup: "brand-{brandId}-fmt-{formatId}" -> squareVariationId

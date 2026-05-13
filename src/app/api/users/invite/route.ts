@@ -18,6 +18,7 @@ import {
   successResponse,
   ApiError,
 } from "@/lib/api";
+import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
 import { ALL_ROLES } from "@/lib/permissions";
 import { logger } from "@/lib/logger";
@@ -36,6 +37,21 @@ const inviteSchema = z.object({
 export const POST = withPermission(
   "users:manage",
   async (request, { user }) => {
+    // Rate-limit per admin (audit F-064): 5 invites per minute mirrors the
+    // /api/customers/[id]/invite policy. Prevents accidental email bombing
+    // from a script-driven UI workflow.
+    const ip = getClientIp(request);
+    const limiter = rateLimit(`users-invite:${user.id}:${ip}`, {
+      windowMs: 60_000,
+      maxRequests: 5,
+    });
+    if (!limiter.success) {
+      throw new ApiError(
+        "RATE_LIMITED",
+        "Too many invitations. Try again in a minute.",
+      );
+    }
+
     const { email, roles, display_name } = await validateBody(
       inviteSchema,
       request,

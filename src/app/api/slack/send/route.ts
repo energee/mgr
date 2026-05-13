@@ -1,11 +1,27 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/server";
 import { sendSlackNotification } from "@/lib/slack";
 import type { SlackSettings, SlackNotification } from "@/lib/slack";
 import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/slack/send" });
+
+/**
+ * Body shape from pg_net (notify_all_users). Audit F-066: previously parsed
+ * with a raw `as` cast; now validated by Zod so a schema drift on the DB
+ * side fails loudly instead of silently sending malformed Slack messages.
+ */
+const slackSendBodySchema = z.object({
+  log_id: z.string().uuid(),
+  type: z.string().min(1),
+  title: z.string().min(1),
+  message: z.string().nullable(),
+  priority: z.string(),
+  action_url: z.string().nullable(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
 
 /**
  * Constant-time string comparison to prevent timing attacks.
@@ -56,16 +72,13 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ skipped: true });
   }
 
-  const body = await req.json();
-  const { log_id, type, title, message, priority, action_url, metadata } = body as {
-    log_id: string;
-    type: string;
-    title: string;
-    message: string | null;
-    priority: string;
-    action_url: string | null;
-    metadata: Record<string, unknown>;
-  };
+  const rawBody = await req.json();
+  const parsed = slackSendBodySchema.safeParse(rawBody);
+  if (!parsed.success) {
+    log.error({ issues: parsed.error.issues }, "Slack send payload failed validation");
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+  const { log_id, type, title, message, priority, action_url, metadata } = parsed.data;
 
   // Derive app URL from the incoming request
   const host = req.headers.get("host") ?? req.headers.get("x-forwarded-host");
