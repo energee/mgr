@@ -12,7 +12,7 @@ import { use, useCallback, useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { calculateLandedCost } from "@/lib/purchasing/landed-cost";
 import { POAcceptInventoryDialog } from "@/components/domain/po-accept-inventory-dialog";
@@ -90,13 +90,17 @@ export default function PurchaseOrderDetailPage({
 
   return (
     <>
-      <EntityDetailUnifiedWithErrorBoundary
+      <EntityDetailPage
         entity={purchaseOrderEntity}
         id={id}
         basePath="/purchasing/pos"
         onAction={handleAction}
       />
-      {showLandedCost && <PoLandedCostBreakdown poId={id} />}
+      {showLandedCost && (
+        <div className="mt-4">
+          <PoLandedCostBreakdown poId={id} />
+        </div>
+      )}
       <POAcceptInventoryDialog
         poId={id}
         open={acceptDialogOpen}

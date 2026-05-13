@@ -1,11 +1,11 @@
 "use client";
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { recipeEntity } from "@/entities/recipe";
 
 export default function NewRecipePage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={recipeEntity}
       basePath="/production/recipes"
     />

@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { kegOwnerEntity } from "@/entities/keg-owner";
 
 export default function KegOwnerDetailPage({
@@ -11,7 +11,7 @@ export default function KegOwnerDetailPage({
 }) {
   const { id } = use(params);
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={kegOwnerEntity}
       id={id}
       basePath="/inventory/kegs/owners"

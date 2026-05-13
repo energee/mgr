@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { locationEntity } from "@/entities/location";
 
 export default function LocationDetailPage({
@@ -10,5 +10,5 @@ export default function LocationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetailUnifiedWithErrorBoundary entity={locationEntity} id={id} basePath="/settings/locations" />;
+  return <EntityDetailPage entity={locationEntity} id={id} basePath="/settings/locations" />;
 }

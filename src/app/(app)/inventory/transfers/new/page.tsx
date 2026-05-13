@@ -1,11 +1,11 @@
 "use client";
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { locationTransferEntity } from "@/entities/location-transfer";
 
 export default function NewTransferPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={locationTransferEntity}
       basePath="/inventory/transfers"
     />

@@ -1,11 +1,11 @@
 "use client";
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { salesChannelEntity } from "@/entities/sales-channel";
 
 export default function NewSalesChannelPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={salesChannelEntity}
       basePath="/settings/sales-channels"
     />

@@ -4,12 +4,12 @@
  * New Water Profile Page
  */
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { waterProfileEntity } from "@/entities/water-profile";
 
 export default function NewWaterProfilePage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={waterProfileEntity}
       basePath="/settings/water-profiles"
     />

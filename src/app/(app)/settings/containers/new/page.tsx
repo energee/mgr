@@ -6,12 +6,12 @@
  * Create a new container (can, bottle, keg).
  */
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { containerEntity } from "@/entities/container";
 
 export default function NewContainerPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={containerEntity}
       basePath="/settings/containers"
     />
