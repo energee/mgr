@@ -97,8 +97,6 @@ export function formatVolume(
   displayUnit: VolumeUnit,
   decimals = 2
 ): string {
-  // Audit F-132: render the em-dash for non-finite (NaN / Infinity) input so a
-  // bad upstream value never reaches the screen as "NaN BBL".
   if (bbl == null || !Number.isFinite(bbl)) return "—";
   const converted = convertVolume(bbl, "bbl", displayUnit);
   return `${converted.toFixed(decimals)} ${UNIT_LABELS[displayUnit]}`;
@@ -228,6 +226,7 @@ export function formatTemperatureRange(
   highF: number,
   displayUnit: TemperatureUnit,
 ): string {
+  if (!Number.isFinite(lowF) || !Number.isFinite(highF)) return "—";
   const low = Math.round(convertTemperature(lowF, "f", displayUnit));
   const high = Math.round(convertTemperature(highF, "f", displayUnit));
   return `${low}-${high}${UNIT_LABELS[displayUnit]}`;

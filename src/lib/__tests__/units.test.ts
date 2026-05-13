@@ -10,7 +10,9 @@ import {
   formatVolume,
   formatWeight,
   formatTemperature,
+  formatTemperatureRange,
   formatGravity,
+  formatGravityFromSg,
   formatRetailVolume,
   parseVolumeInput,
   parseWeightInput,
@@ -319,6 +321,81 @@ describe("Format Functions", () => {
 
     it("returns dash for null", () => {
       expect(formatRetailVolume(null, "oz")).toBe("\u2014");
+    });
+  });
+
+  describe("formatTemperatureRange", () => {
+    it("formats a range in \u00b0F", () => {
+      expect(formatTemperatureRange(60, 72, "f")).toBe("60-72\u00b0F");
+    });
+
+    it("formats a range converted to \u00b0C", () => {
+      expect(formatTemperatureRange(32, 212, "c")).toBe("0-100\u00b0C");
+    });
+
+    it("returns dash when lowF is NaN", () => {
+      expect(formatTemperatureRange(NaN, 72, "f")).toBe("\u2014");
+    });
+
+    it("returns dash when highF is NaN", () => {
+      expect(formatTemperatureRange(60, NaN, "f")).toBe("\u2014");
+    });
+
+    it("returns dash for Infinity", () => {
+      expect(formatTemperatureRange(Infinity, 72, "f")).toBe("\u2014");
+    });
+  });
+
+  describe("formatGravityFromSg", () => {
+    it("formats SG in sg display unit", () => {
+      expect(formatGravityFromSg(1.048, "sg")).toBe("1.048");
+    });
+
+    it("formats SG converted to Plato", () => {
+      const result = formatGravityFromSg(1.048, "plato");
+      expect(result).toContain("\u00b0P");
+    });
+
+    it("returns dash for null", () => {
+      expect(formatGravityFromSg(null, "sg")).toBe("\u2014");
+    });
+  });
+
+  describe("non-finite input guards", () => {
+    it("formatVolume returns dash for NaN and Infinity", () => {
+      expect(formatVolume(NaN, "bbl")).toBe("\u2014");
+      expect(formatVolume(Infinity, "bbl")).toBe("\u2014");
+      expect(formatVolume(-Infinity, "gal")).toBe("\u2014");
+    });
+
+    it("formatWeight returns dash for NaN and Infinity", () => {
+      expect(formatWeight(NaN, "lbs")).toBe("\u2014");
+      expect(formatWeight(Infinity, "lbs")).toBe("\u2014");
+    });
+
+    it("formatTemperature returns dash for NaN and Infinity", () => {
+      expect(formatTemperature(NaN, "f")).toBe("\u2014");
+      expect(formatTemperature(Infinity, "c")).toBe("\u2014");
+    });
+
+    it("formatGravity returns dash for NaN and Infinity", () => {
+      expect(formatGravity(NaN, "plato")).toBe("\u2014");
+      expect(formatGravity(Infinity, "sg")).toBe("\u2014");
+    });
+
+    it("formatRetailVolume returns dash for NaN and Infinity", () => {
+      expect(formatRetailVolume(NaN, "oz")).toBe("\u2014");
+      expect(formatRetailVolume(Infinity, "ml")).toBe("\u2014");
+    });
+
+    it("formatGravityFromSg returns dash for NaN and Infinity", () => {
+      expect(formatGravityFromSg(NaN, "sg")).toBe("\u2014");
+      expect(formatGravityFromSg(Infinity, "plato")).toBe("\u2014");
+    });
+
+    it("formatTemperatureRange returns dash for NaN and Infinity", () => {
+      expect(formatTemperatureRange(NaN, 72, "f")).toBe("\u2014");
+      expect(formatTemperatureRange(60, Infinity, "f")).toBe("\u2014");
     });
   });
 });
