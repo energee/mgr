@@ -512,10 +512,11 @@
       "id": "SENTRY-7452842898",
       "area": "infra",
       "title": "ReferenceError: SaveAllButton is not defined",
-      "verification": "bun run test --run src/components/domain/recipe-editor/__tests__/recipe-editor-page-definition-order.test.ts",
+      "verification": "bun run test src/components/domain/recipe-editor/__tests__/recipe-editor-page-definition-order.test.ts",
       "state": "passing",
-      "evidence": "commit:4f1dc73",
-      "branch": "sentry-fix/SENTRY-7452842898"
+      "evidence": "commit:e8e8a79",
+      "branch": "sentry-fix/SENTRY-7452842898",
+      "notes": "Root cause: Turbopack Fast Refresh re-evaluates modules top-to-bottom without JavaScript hoisting. SaveAllButton, MobileEstimatesBar, and RecipeEditorSkeleton were defined after RecipeEditorPage; EstimateCard, SummaryRow, formatNum, formatGrainWeight, formatHopWeight, and bagLabel after RecipeSidebar. Moving all helpers before the component that uses them fixes the HMR race. Regression coverage: file-read test asserts textual ordering in both source files."
     },
     {
       "id": "SENTRY-7454377645",
