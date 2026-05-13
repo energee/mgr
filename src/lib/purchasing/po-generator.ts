@@ -67,16 +67,16 @@ export function groupShortfallsBySupplier(shortfalls: IngredientShortfall[]): PO
 
     const supplierId = shortfall.preferred_supplier_id;
 
-    if (!supplierMap.has(supplierId)) {
-      supplierMap.set(supplierId, {
+    let group = supplierMap.get(supplierId);
+    if (!group) {
+      group = {
         supplier_id: supplierId,
         supplier_name: shortfall.preferred_supplier_name || "Unknown Supplier",
         order_by_dates: [],
         items: [],
-      });
+      };
+      supplierMap.set(supplierId, group);
     }
-
-    const group = supplierMap.get(supplierId)!;
     group.order_by_dates.push(shortfall.order_by_date);
 
     // Calculate quantity respecting MOQ
