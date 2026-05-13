@@ -421,6 +421,26 @@ export const batchEntity: EntityConfig<Batch> = {
       fromStates: ["fermenting", "conditioning"],
     },
     {
+      // Audit F-111: recipes can be duplicated; batches couldn't. Brewing
+      // the same recipe weekly (or splitting a planned batch into two
+      // tanks) is a daily workflow — surfacing it as a row action saves
+      // re-entering all the same fields manually.
+      name: "duplicate",
+      label: "Duplicate batch",
+      icon: "copy",
+      type: "dropdown" as const,
+      // Available from any non-cancelled state; the dialog only copies
+      // metadata + recipe, not the original's brew history.
+      fromStates: [
+        "planned",
+        "fermenting",
+        "conditioning",
+        "packaging",
+        "completed",
+        "archived",
+      ],
+    },
+    {
       name: "cancel",
       label: "Cancel Batch",
       icon: "x",

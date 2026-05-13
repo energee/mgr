@@ -16,6 +16,7 @@ import { batchEntity } from "@/entities/batch";
 import { batchKeys } from "@/lib/query-keys";
 import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
 import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
+import { BatchDuplicateDialog } from "@/components/domain/batch-duplicate-dialog";
 
 type BatchRecord = {
   id: string;
@@ -24,6 +25,8 @@ type BatchRecord = {
   status: string | null;
   volume_bbl: number | null;
   current_vessel_name: string | null;
+  recipe_id: string | null;
+  planned_start_date: string | null;
 }
 
 export default function BatchesPage() {
@@ -32,6 +35,7 @@ export default function BatchesPage() {
   const [selectedBatch, setSelectedBatch] = useState<BatchRecord | null>(null);
   const [showTerminationDialog, setShowTerminationDialog] = useState(false);
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
+  const [showDuplicate, setShowDuplicate] = useState(false);
 
   // Custom action handler for batch-specific actions
   const handleAction = useCallback((actionName: string, record: Record<string, unknown>) => {
@@ -43,6 +47,11 @@ export default function BatchesPage() {
     if (actionName === "start_brew_day") {
       setSelectedBatch(record as unknown as BatchRecord);
       setShowStartBrewDay(true);
+      return true;
+    }
+    if (actionName === "duplicate") {
+      setSelectedBatch(record as unknown as BatchRecord);
+      setShowDuplicate(true);
       return true;
     }
     return false;
@@ -85,6 +94,23 @@ export default function BatchesPage() {
             onSuccess={(brewLogId) => {
               handleDialogSuccess();
               router.push(`/production/brew-logs/${brewLogId}`);
+            }}
+          />
+
+          <BatchDuplicateDialog
+            source={{
+              id: selectedBatch.id,
+              batch_code: selectedBatch.batch_code,
+              name: selectedBatch.name,
+              recipe_id: selectedBatch.recipe_id,
+              volume_bbl: selectedBatch.volume_bbl,
+              planned_start_date: selectedBatch.planned_start_date,
+            }}
+            open={showDuplicate}
+            onOpenChange={setShowDuplicate}
+            onSuccess={(newId) => {
+              handleDialogSuccess();
+              router.push(`/production/batches/${newId}`);
             }}
           />
         </>
