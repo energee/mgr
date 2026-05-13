@@ -97,7 +97,9 @@ export function formatVolume(
   displayUnit: VolumeUnit,
   decimals = 2
 ): string {
-  if (bbl == null) return "—";
+  // Audit F-132: render the em-dash for non-finite (NaN / Infinity) input so a
+  // bad upstream value never reaches the screen as "NaN BBL".
+  if (bbl == null || !Number.isFinite(bbl)) return "—";
   const converted = convertVolume(bbl, "bbl", displayUnit);
   return `${converted.toFixed(decimals)} ${UNIT_LABELS[displayUnit]}`;
 }
@@ -138,7 +140,7 @@ export function formatRetailVolume(
   displayUnit: RetailVolumeUnit,
   decimals = 1
 ): string {
-  if (oz == null) return "—";
+  if (oz == null || !Number.isFinite(oz)) return "—";
   const converted = convertRetailVolume(oz, "oz", displayUnit);
   return `${converted.toFixed(decimals)} ${UNIT_LABELS[displayUnit]}`;
 }
@@ -169,7 +171,7 @@ export function formatWeight(
   displayUnit: WeightUnit,
   decimals = 2
 ): string {
-  if (lbs == null) return "—";
+  if (lbs == null || !Number.isFinite(lbs)) return "—";
   const converted = convertWeight(lbs, "lbs", displayUnit);
   return `${converted.toFixed(decimals)} ${UNIT_LABELS[displayUnit]}`;
 }
@@ -208,7 +210,7 @@ export function formatTemperature(
   displayUnit: TemperatureUnit,
   decimals = 1
 ): string {
-  if (f == null) return "—";
+  if (f == null || !Number.isFinite(f)) return "—";
   const converted = convertTemperature(f, "f", displayUnit);
   return `${converted.toFixed(decimals)}${UNIT_LABELS[displayUnit]}`;
 }
@@ -274,7 +276,7 @@ export function formatGravity(
   displayUnit: GravityUnit,
   decimals?: number
 ): string {
-  if (plato == null) return "—";
+  if (plato == null || !Number.isFinite(plato)) return "—";
 
   if (displayUnit === "plato") {
     return `${plato.toFixed(decimals ?? 1)}${UNIT_LABELS.plato}`;
@@ -296,7 +298,7 @@ export function formatGravityFromSg(
   displayUnit: GravityUnit,
   decimals?: number,
 ): string {
-  if (sg == null) return "—";
+  if (sg == null || !Number.isFinite(sg)) return "—";
   if (displayUnit === "sg") return sg.toFixed(decimals ?? 3);
   return `${sgToPlato(sg).toFixed(decimals ?? 1)}${UNIT_LABELS.plato}`;
 }

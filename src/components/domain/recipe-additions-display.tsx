@@ -39,7 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { useVolumeUnit } from "@/hooks/use-unit-preferences";
 import { convertVolume, formatVolume } from "@/lib/units";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";

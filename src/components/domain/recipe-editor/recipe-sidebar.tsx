@@ -14,7 +14,7 @@ import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
 import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
-import { useGravityUnit, useWeightUnit } from "@/hooks/useUnitPreferences";
+import { useGravityUnit, useWeightUnit } from "@/hooks/use-unit-preferences";
 import { formatGravityFromSg, convertWeight, UNIT_LABELS, type WeightUnit } from "@/lib/units";
 
 /** SRM-to-hex color lookup table for continuous beer color display */

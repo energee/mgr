@@ -30,7 +30,7 @@ import {
 import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch-readings-chart-lazy";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
-import { useGravityUnit, useTemperatureUnit } from "@/hooks/useUnitPreferences";
+import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import { batchKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
 

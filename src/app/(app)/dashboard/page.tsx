@@ -39,7 +39,7 @@ import {
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
-import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { useVolumeUnit } from "@/hooks/use-unit-preferences";
 import { convertVolume, UNIT_LABELS } from "@/lib/units";
 import { log } from "@/lib/client-logger";
 
