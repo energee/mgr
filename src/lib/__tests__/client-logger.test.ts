@@ -8,12 +8,17 @@ vi.mock("@sentry/nextjs", () => ({
 }));
 
 describe("client-logger", () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+  let debugSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    vi.spyOn(console, "debug").mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -44,7 +49,7 @@ describe("client-logger", () => {
 
   it("log.error still calls console.error", () => {
     log.error("test");
-    expect(console.error).toHaveBeenCalledWith("test");
+    expect(errorSpy).toHaveBeenCalledWith("test");
   });
 
   // ---------------------------------------------------------------------------
@@ -70,7 +75,7 @@ describe("client-logger", () => {
 
   it("log.warn still calls console.warn", () => {
     log.warn("test");
-    expect(console.warn).toHaveBeenCalledWith("test");
+    expect(warnSpy).toHaveBeenCalledWith("test");
   });
 
   // ---------------------------------------------------------------------------
@@ -91,11 +96,11 @@ describe("client-logger", () => {
 
   it("log.info still calls console.info", () => {
     log.info("test");
-    expect(console.info).toHaveBeenCalledWith("test");
+    expect(infoSpy).toHaveBeenCalledWith("test");
   });
 
   it("log.debug still calls console.debug", () => {
     log.debug("test");
-    expect(console.debug).toHaveBeenCalledWith("test");
+    expect(debugSpy).toHaveBeenCalledWith("test");
   });
 });
