@@ -39,6 +39,9 @@ const PINO_FATAL = 60;
  *
  * Best-effort — wrapped in a try/catch by the caller so a Sentry failure
  * can never break the logger pipeline.
+ *
+ * NOTE: The context object is forwarded verbatim to Sentry's `extra` field.
+ * Do not include raw PII (userId, email, tokens, etc.) in log context objects.
  */
 function forwardToSentry(args: readonly unknown[], level: number): void {
   const sentryLevel: Sentry.SeverityLevel =
@@ -51,13 +54,14 @@ function forwardToSentry(args: readonly unknown[], level: number): void {
   }
   if (first && typeof first === "object") {
     const obj = first as Record<string, unknown>;
+    // Note: non-native Error-likes (e.g. custom hierarchies, cross-realm throws) fail instanceof
     const err = obj.err instanceof Error ? (obj.err as Error) : undefined;
     if (err) {
-      const { err: _omit, ...extra } = obj;
+      const { err: _err, ...extra } = obj;
       Sentry.captureException(err, { level: sentryLevel, extra });
       return;
     }
-    const message = typeof second === "string" ? second : "logger.error";
+    const message = typeof second === "string" ? second : "(no message)";
     Sentry.captureMessage(message, { level: sentryLevel, extra: obj });
     return;
   }
