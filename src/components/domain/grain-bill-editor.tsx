@@ -41,7 +41,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { useWeightUnit } from "@/hooks/useUnitPreferences";
+import { useWeightUnit } from "@/hooks/use-unit-preferences";
 import { formatWeight } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";

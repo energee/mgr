@@ -48,7 +48,7 @@ import {
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { extractBrewMeasurements } from "@/lib/brew-events";
-import { useBrewMeasurementUnits } from "@/hooks/useUnitPreferences";
+import { useBrewMeasurementUnits } from "@/hooks/use-unit-preferences";
 import type { BrewEvent } from "@/types/domain";
 import { log } from "@/lib/client-logger";
 

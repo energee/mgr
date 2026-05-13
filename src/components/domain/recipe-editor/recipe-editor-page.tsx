@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Copy, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useGravityUnit } from "@/hooks/useUnitPreferences";
+import { useGravityUnit } from "@/hooks/use-unit-preferences";
 import { formatGravityFromSg } from "@/lib/units";
 
 type RecipeEditorPageProps = {

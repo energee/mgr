@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
-import { useVolumeUnit } from "@/hooks/useUnitPreferences";
+import { useVolumeUnit } from "@/hooks/use-unit-preferences";
 import { convertVolume, UNIT_LABELS } from "@/lib/units";
 import { toast } from "sonner";
 import {

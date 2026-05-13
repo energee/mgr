@@ -31,7 +31,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import type { BatchReading } from "@/lib/batch-readings";
 import { convertGravity } from "@/lib/batch-readings";
-import { useGravityUnit, useTemperatureUnit } from "@/hooks/useUnitPreferences";
+import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import {
   platoToSg,
   convertTemperature,

@@ -46,7 +46,7 @@ import {
   reorderWithPositions,
 } from "@/components/ui/sortable-drag-preview";
 import { UnitInput } from "@/components/ui/unit-input";
-import { useTemperatureUnit } from "@/hooks/useUnitPreferences";
+import { useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import { formatTemperature } from "@/lib/units";
 import { Plus, Trash2, GripVertical, ChevronDown, FlaskConical, ChevronRight } from "lucide-react";
 

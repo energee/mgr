@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { formatSmartDecimal } from "@/lib/format";
-import { useUnitPreferences } from "@/hooks/useUnitPreferences";
+import { useUnitPreferences } from "@/hooks/use-unit-preferences";
 import {
   getUnitOptions,
   getUnitLabel,
