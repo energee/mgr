@@ -97,6 +97,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // 6.5 Replay protection (audit F-127): reject events whose `created_at` is
+  // more than 5 minutes from now. The HMAC signature alone doesn't bound the
+  // replay window — a recorded request could be replayed indefinitely.
+  if (event.created_at) {
+    const eventTime = Date.parse(event.created_at);
+    if (
+      Number.isFinite(eventTime) &&
+      Math.abs(Date.now() - eventTime) > 5 * 60 * 1000
+    ) {
+      logger.warn(
+        { event_id: event.event_id, created_at: event.created_at },
+        "[Square Webhook] Rejected stale event outside the 5-minute replay window"
+      );
+      return NextResponse.json({ error: "stale_event" }, { status: 400 });
+    }
+  }
+
   // 7. Route by event type — always return 200 quickly to avoid Square retries
   try {
     switch (event.type) {
@@ -310,22 +327,29 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
     }
   }
 
-  // Log the sync operation
-  await admin.from("square_sync_log").insert({
-    sync_type: "sale_ingest",
-    location_id: locationId,
-    items_synced: itemsSynced,
-    items_failed: itemsFailed,
-    details: {
-      order_id: orderId,
-      payment_id: paymentId,
-      square_location_id: squareLocationId,
-      event_id: event.event_id,
-      line_item_count: order.lineItems.length,
-      ...(errors.length > 0 ? { errors } : {}),
+  // Log the sync operation. Use upsert+ignoreDuplicates on event_id so two
+  // concurrent retries of the same Square webhook can't both produce
+  // downstream side effects (audit F-135). The pre-check at the top is the
+  // fast path; this is the race-safe backstop.
+  await admin.from("square_sync_log").upsert(
+    {
+      sync_type: "sale_ingest",
+      event_id: event.event_id ?? null,
+      location_id: locationId,
+      items_synced: itemsSynced,
+      items_failed: itemsFailed,
+      details: {
+        order_id: orderId,
+        payment_id: paymentId,
+        square_location_id: squareLocationId,
+        event_id: event.event_id,
+        line_item_count: order.lineItems.length,
+        ...(errors.length > 0 ? { errors } : {}),
+      },
+      completed_at: new Date().toISOString(),
     },
-    completed_at: new Date().toISOString(),
-  });
+    { onConflict: "event_id", ignoreDuplicates: true }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -337,16 +361,20 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
   // but do not update any MGR inventory data.
   const admin = await createAdminClient();
 
-  await admin.from("square_sync_log").insert({
-    sync_type: "inventory_push",
-    items_synced: 0,
-    items_failed: 0,
-    details: {
-      event_type: "inventory.count.updated",
-      event_id: event.event_id,
-      note: "Logged for informational purposes only. MGR is source of truth for inventory.",
-      raw_data: (event.data ?? null) as import("@/types/supabase").Json,
+  await admin.from("square_sync_log").upsert(
+    {
+      sync_type: "inventory_push",
+      event_id: event.event_id ?? null,
+      items_synced: 0,
+      items_failed: 0,
+      details: {
+        event_type: "inventory.count.updated",
+        event_id: event.event_id,
+        note: "Logged for informational purposes only. MGR is source of truth for inventory.",
+        raw_data: (event.data ?? null) as import("@/types/supabase").Json,
+      },
+      completed_at: new Date().toISOString(),
     },
-    completed_at: new Date().toISOString(),
-  });
+    { onConflict: "event_id", ignoreDuplicates: true }
+  );
 }
