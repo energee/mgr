@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import { cn, escapeLike } from "@/lib/utils";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
+import { RelativeTime } from "@/components/universal/relative-time";
 
 // =============================================================================
 // Types
@@ -445,9 +446,12 @@ export default function NotificationsPage() {
                           {TYPE_LABELS[notification.type] || notification.type}
                         </Badge>
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
-                        {formatDate(notification.created_at)}
-                      </span>
+                      {/* Audit F-091: render relative time on the client to avoid SSR mismatch. */}
+                      <RelativeTime
+                        value={notification.created_at}
+                        format={(d) => formatDate(d.toISOString())}
+                        className="text-xs text-muted-foreground whitespace-nowrap"
+                      />
                     </div>
                     {notification.message && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">

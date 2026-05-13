@@ -18,6 +18,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { planningKeys, batchKeys, entityKeys, recipeKeys } from "@/lib/query-keys";
 import Link from "next/link";
+import { RelativeTime } from "@/components/universal/relative-time";
 import {
   addDays,
   startOfWeek,
@@ -851,9 +852,9 @@ export default function ProductionTimelinePage() {
           </div>
         </div>
 
-        {/* Today indicator */}
-        <div className="absolute bottom-4 right-4 bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg" suppressHydrationWarning>
-          {format(new Date(), "EEEE, MMM d")}
+        {/* Today indicator (audit F-091: render after hydration via RelativeTime) */}
+        <div className="absolute bottom-4 right-4 bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+          <RelativeTime value="now" format={(d) => format(d, "EEEE, MMM d")} />
         </div>
       </div>
 

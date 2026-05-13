@@ -28,6 +28,7 @@ import { QuickBooksIcon } from "@/components/ui/quickbooks-icon";
 import { SlackIntegrationCard } from "@/components/domain/slack-integration-card";
 import { mongodbKeys, qboKeys, squareKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
+import { RelativeTime } from "@/components/universal/relative-time";
 
 // =============================================================================
 // Global API Key Section (write-only — key is never read back to the client)
@@ -335,14 +336,16 @@ function SquareIntegrationCard() {
                 <p className="text-sm font-medium">Catalog & Inventory Sync</p>
                 <div className="flex gap-4 text-xs text-muted-foreground mt-1">
                   {status?.lastCatalogSync && (
-                    <span suppressHydrationWarning>
-                      Catalog: {new Date(status.lastCatalogSync).toLocaleString()}
-                    </span>
+                    <RelativeTime
+                      value={status.lastCatalogSync}
+                      format={(d) => `Catalog: ${d.toLocaleString()}`}
+                    />
                   )}
                   {status?.lastInventorySync && (
-                    <span suppressHydrationWarning>
-                      Inventory: {new Date(status.lastInventorySync).toLocaleString()}
-                    </span>
+                    <RelativeTime
+                      value={status.lastInventorySync}
+                      format={(d) => `Inventory: ${d.toLocaleString()}`}
+                    />
                   )}
                 </div>
               </div>
@@ -379,9 +382,13 @@ function SquareIntegrationCard() {
                 <div className="space-y-1">
                   {status.recentSyncs.slice(0, 5).map((sync: { id: string; syncType: string; itemsSynced: number; itemsFailed: number; startedAt: string }) => (
                     <div key={sync.id} className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground" suppressHydrationWarning>
-                        {sync.syncType.replace("_", " ")} — {new Date(sync.startedAt).toLocaleString()}
-                      </span>
+                      <RelativeTime
+                        value={sync.startedAt}
+                        format={(d) =>
+                          `${sync.syncType.replace("_", " ")} — ${d.toLocaleString()}`
+                        }
+                        className="text-muted-foreground"
+                      />
                       <span>
                         {sync.itemsSynced} synced
                         {sync.itemsFailed > 0 && (
