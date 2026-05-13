@@ -8,6 +8,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+}));
+
 /** Capture pino JSON output by intercepting process.stdout.write */
 function captureStdout() {
   const lines: string[] = [];
@@ -222,5 +227,80 @@ describe("logger", () => {
     const parsed = capture.lastJson();
     expect(parsed.service).toBe("api");
     expect(parsed.handler).toBe("chat");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Sentry forwarding
+  // ---------------------------------------------------------------------------
+
+  describe("Sentry forwarding", () => {
+    async function setup() {
+      const sentry = await import("@sentry/nextjs");
+      vi.clearAllMocks();
+      const { logger } = await import("../logger");
+      return { sentry, logger };
+    }
+
+    it("calls captureException when first arg is an Error", async () => {
+      const { sentry, logger } = await setup();
+      const err = new Error("boom");
+      logger.error(err);
+      expect(sentry.captureException).toHaveBeenCalledWith(err, { level: "error" });
+      expect(sentry.captureMessage).not.toHaveBeenCalled();
+    });
+
+    it("calls captureException with extra when { err, ...ctx } + message", async () => {
+      const { sentry, logger } = await setup();
+      const err = new Error("db down");
+      logger.error({ err, service: "postgres" }, "Database unreachable");
+      expect(sentry.captureException).toHaveBeenCalledWith(err, {
+        level: "error",
+        extra: { service: "postgres" },
+      });
+    });
+
+    it("calls captureMessage with ctx when { ...ctx } + message (no err key)", async () => {
+      const { sentry, logger } = await setup();
+      logger.error({ service: "postgres" }, "Database unreachable");
+      expect(sentry.captureMessage).toHaveBeenCalledWith("Database unreachable", {
+        level: "error",
+        extra: { service: "postgres" },
+      });
+    });
+
+    it("calls captureMessage when first arg is a string", async () => {
+      const { sentry, logger } = await setup();
+      logger.error("Something went wrong");
+      expect(sentry.captureMessage).toHaveBeenCalledWith("Something went wrong", {
+        level: "error",
+      });
+    });
+
+    it("uses '(no message)' fallback when obj has no string message arg", async () => {
+      const { sentry, logger } = await setup();
+      logger.error({ service: "postgres" });
+      expect(sentry.captureMessage).toHaveBeenCalledWith("(no message)", {
+        level: "error",
+        extra: { service: "postgres" },
+      });
+    });
+
+    it("uses 'fatal' severity for logger.fatal calls", async () => {
+      const { sentry, logger } = await setup();
+      logger.fatal("Critical failure");
+      expect(sentry.captureMessage).toHaveBeenCalledWith("Critical failure", {
+        level: "fatal",
+      });
+    });
+
+    it("does not forward info, debug, or warn to Sentry", async () => {
+      vi.stubEnv("LOG_LEVEL", "debug");
+      const { sentry, logger } = await setup();
+      logger.info("Info message");
+      logger.debug("Debug message");
+      logger.warn("Warn message");
+      expect(sentry.captureException).not.toHaveBeenCalled();
+      expect(sentry.captureMessage).not.toHaveBeenCalled();
+    });
   });
 });
