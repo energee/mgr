@@ -161,6 +161,8 @@ function GettingStartedChecklist() {
 
 export default function DashboardPage() {
   const supabase = createClient();
+  const volumeUnit = useVolumeUnit();
+  const volumeLabel = UNIT_LABELS[volumeUnit];
 
   const { data: batchCounts = DEFAULT_BATCH_COUNTS } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
@@ -345,7 +347,9 @@ export default function DashboardPage() {
                       {batch.recipe_name || batch.name}
                     </td>
                     <td className="py-2 text-right font-mono">
-                      {batch.volume_bbl ? `${batch.volume_bbl} BBL` : "—"}
+                      {batch.volume_bbl != null
+                        ? `${(Math.round(convertVolume(batch.volume_bbl, "bbl", volumeUnit) * 10) / 10).toLocaleString()} ${volumeLabel}`
+                        : "—"}
                     </td>
                     <td className="py-2 text-right">
                       <StatusBadge
