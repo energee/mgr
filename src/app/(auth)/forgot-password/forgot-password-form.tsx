@@ -11,6 +11,11 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import {
+  AUTH_CALLBACK_TYPE_RECOVERY,
+  rememberEmail,
+  readRememberedEmail,
+} from "@/lib/auth-utils";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,12 +33,7 @@ export function ForgotPasswordForm() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  const [email, setEmail] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("mgr:login-email") ?? "";
-    }
-    return "";
-  });
+  const [email, setEmail] = useState(() => readRememberedEmail());
   const [error, setError] = useState<string | undefined>();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -49,7 +49,7 @@ export function ForgotPasswordForm() {
     setIsLoading(true);
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/api/auth/callback?type=recovery`,
+        redirectTo: `${window.location.origin}/api/auth/callback?type=${AUTH_CALLBACK_TYPE_RECOVERY}`,
       });
 
       if (resetError) {
@@ -57,7 +57,7 @@ export function ForgotPasswordForm() {
         return;
       }
 
-      localStorage.setItem("mgr:login-email", email);
+      rememberEmail(email);
       setSent(true);
     } catch {
       toast.error("An unexpected error occurred");

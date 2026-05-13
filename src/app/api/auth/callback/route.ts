@@ -19,7 +19,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isValidRedirect } from "@/lib/auth-utils";
+import { AUTH_CALLBACK_TYPE_RECOVERY, isValidRedirect } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
@@ -64,6 +64,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
   }
 
-  const destination = type === "recovery" ? "/update-password" : safeRedirect;
+  const destination = type === AUTH_CALLBACK_TYPE_RECOVERY ? "/update-password" : safeRedirect;
   return NextResponse.redirect(`${origin}${destination}`);
 }
