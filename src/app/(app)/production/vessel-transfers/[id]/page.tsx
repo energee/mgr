@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { vesselTransferEntity } from "@/entities/vessel-transfer";
 
 export default function VesselTransferDetailPage({
@@ -11,7 +11,7 @@ export default function VesselTransferDetailPage({
 }) {
   const { id } = use(params);
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={vesselTransferEntity}
       id={id}
       basePath="/production/vessel-transfers"

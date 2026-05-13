@@ -7,7 +7,7 @@
  */
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { sellingFormatEntity } from "@/entities/selling-format";
 
 export default function SellingFormatDetailPage({
@@ -17,7 +17,7 @@ export default function SellingFormatDetailPage({
 }) {
   const { id } = use(params);
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={sellingFormatEntity}
       id={id}
       basePath="/settings/selling-formats"

@@ -14,12 +14,6 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
-import {
-  Thermometer,
-  FlaskConical,
-  ArrowRight,
-  Beer,
-} from "lucide-react";
 
 type BatchQuickLinksProps = {
   data: {
@@ -49,7 +43,6 @@ export function BatchQuickLinks({ data }: BatchQuickLinksProps) {
     href: string;
     label: string;
     description: string;
-    icon: typeof Thermometer;
   }[] = [];
 
   if (primaryBrewLog?.brew_log_id) {
@@ -60,7 +53,6 @@ export function BatchQuickLinks({ data }: BatchQuickLinksProps) {
       href: `/production/brew-logs/${primaryBrewLog.brew_log_id}`,
       label: "Brew Log",
       description: brewLog?.brew_number ?? "View hot-side brewing details",
-      icon: Beer,
     });
   }
 
@@ -69,13 +61,11 @@ export function BatchQuickLinks({ data }: BatchQuickLinksProps) {
       href: `/production/batches/${data.id}/readings`,
       label: "Fermentation Readings",
       description: "Record gravity, temp, pH, and more",
-      icon: Thermometer,
     },
     {
       href: `/production/batches/${data.id}/additions`,
       label: "Additions",
       description: "Dry hops, fruit, finings, and adjuncts",
-      icon: FlaskConical,
     },
   );
 
@@ -91,10 +81,6 @@ export function BatchQuickLinks({ data }: BatchQuickLinksProps) {
           asChild
         >
           <Link href={link.href}>
-            <div className="flex w-full items-center justify-between">
-              <link.icon className="h-5 w-5 text-primary" />
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </div>
             <div className="text-left">
               <div className="font-medium">{link.label}</div>
               <div className="text-xs text-muted-foreground font-normal">

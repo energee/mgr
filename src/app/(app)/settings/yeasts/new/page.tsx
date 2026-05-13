@@ -1,11 +1,11 @@
 "use client";
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { yeastStrainEntity } from "@/entities/yeast-strain";
 
 export default function NewYeastStrainPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={yeastStrainEntity}
       basePath="/settings/yeasts"
     />

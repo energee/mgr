@@ -7,7 +7,7 @@
  */
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { containerEntity } from "@/entities/container";
 
 export default function ContainerDetailPage({
@@ -17,7 +17,7 @@ export default function ContainerDetailPage({
 }) {
   const { id } = use(params);
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={containerEntity}
       id={id}
       basePath="/settings/containers"

@@ -10,7 +10,7 @@
 
 import { useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { vesselTransferEntity } from "@/entities/vessel-transfer";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -48,7 +48,7 @@ export default function NewVesselTransferPage() {
   );
 
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={vesselTransferEntity}
       basePath="/production/vessel-transfers"
       onFieldChange={handleFieldChange}

@@ -6,12 +6,12 @@
  * Create a new selling format (single, 4-pack, case, per keg).
  */
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { sellingFormatEntity } from "@/entities/selling-format";
 
 export default function NewSellingFormatPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={sellingFormatEntity}
       basePath="/settings/selling-formats"
     />

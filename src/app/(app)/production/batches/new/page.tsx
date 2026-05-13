@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { batchEntity } from "@/entities/batch";
 import { usePrefillStore } from "@/stores/prefill-store";
 
@@ -12,7 +12,7 @@ export default function NewBatchPage() {
   });
 
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={batchEntity}
       basePath="/production/batches"
       defaultValues={defaultValues}

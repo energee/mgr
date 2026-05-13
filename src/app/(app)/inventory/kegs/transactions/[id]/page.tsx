@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { kegTransactionEntity } from "@/entities/keg-transaction";
 
 export default function KegTransactionDetailPage({
@@ -11,7 +11,7 @@ export default function KegTransactionDetailPage({
 }) {
   const { id } = use(params);
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={kegTransactionEntity}
       id={id}
       basePath="/inventory/kegs/transactions"

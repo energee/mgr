@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { beerStyleEntity } from "@/entities/beer-style";
 
 export default function BeerStyleDetailPage({
@@ -10,5 +10,5 @@ export default function BeerStyleDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  return <EntityDetailUnifiedWithErrorBoundary entity={beerStyleEntity} id={id} basePath="/settings/beer-styles" />;
+  return <EntityDetailPage entity={beerStyleEntity} id={id} basePath="/settings/beer-styles" />;
 }

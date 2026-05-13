@@ -28,8 +28,7 @@ import { PackagingBatchDialog } from "@/components/domain/packaging-batch-dialog
 import { AddToPackagingSessionDialog } from "@/components/domain/add-to-packaging-session-dialog";
 import { BatchPackagingHistory } from "@/components/domain/batch-packaging-history";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
-import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
-import { Package } from "lucide-react";
+import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { batchKeys, recipeKeys, packagingKeys } from "@/lib/query-keys";
 import { usePrefillStore } from "@/stores/prefill-store";
 
@@ -303,11 +302,10 @@ export default function BatchDetailPage({
 
   return (
     <div className="space-y-4">
-      <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+      <EntityBreadcrumb segments={breadcrumbSegments} />
 
       {batch?.status === "packaging" && existingSession && (
         <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
-          <Package className="h-4 w-4 text-blue-600" />
           <span>This batch has an active packaging session.</span>
           <Link
             href={`/production/packaging/${existingSession.session_id}`}
@@ -320,7 +318,6 @@ export default function BatchDetailPage({
 
       {batch?.status === "packaging" && !existingSession && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
-          <Package className="h-4 w-4 text-amber-600" />
           <span>This batch is in packaging status but has no linked session.</span>
           <button
             onClick={() => setShowAddToSession(true)}

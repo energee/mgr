@@ -5,7 +5,7 @@
  */
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { vesselEntity } from "@/entities/vessel";
 
 export default function VesselDetailPage({
@@ -16,7 +16,7 @@ export default function VesselDetailPage({
   const { id } = use(params);
 
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={vesselEntity}
       id={id}
       basePath="/production/vessels"

@@ -738,6 +738,17 @@ export function getEntitiesByDomain(domain: EntityDomain): EntityConfig<Record<s
 }
 
 /**
+ * Resolve the list/back route for an entity. Uses an explicit override when
+ * provided, otherwise derives `/{domain}/{name}s` from the entity config.
+ */
+export function resolveEntityBasePath<T>(
+  entity: EntityConfig<T>,
+  override?: string,
+): string {
+  return override || `/${entity.domain}/${entity.name}s`;
+}
+
+/**
  * Helper to generate select options from a state machine config.
  * This eliminates the need to duplicate status options in filters and form fields.
  */
