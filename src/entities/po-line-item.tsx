@@ -174,7 +174,6 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
     },
   ],
 
-  defaultSort: { column: "created_at", direction: "desc" },
   searchableFields: [],
 
   // ---------------------------------------------------------------------------

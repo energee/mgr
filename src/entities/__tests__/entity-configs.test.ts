@@ -141,6 +141,24 @@ describe("Entity configs: listColumns", () => {
       }
     }
   });
+
+  it("every entity's defaultSort references a column in listColumns", () => {
+    const violations: string[] = [];
+    for (const entity of Array.from(entityRegistry.values())) {
+      if (!entity.defaultSort) continue;
+      const accessors = new Set(
+        entity.listColumns
+          .map((col) => col.accessorKey)
+          .filter((k): k is string => typeof k === "string")
+      );
+      if (!accessors.has(entity.defaultSort.column as string)) {
+        violations.push(
+          `${entity.name}: defaultSort.column '${String(entity.defaultSort.column)}' is not in listColumns`
+        );
+      }
+    }
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
 });
 
 // =============================================================================

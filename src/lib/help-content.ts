@@ -80,7 +80,27 @@ Yeast Pitches (/production/yeast-pitches): Track yeast usage and harvesting acro
   {
     id: "packaging",
     title: "Packaging",
-    content: `Packaging Sessions (/production/packaging): Record when beer is packaged into cans, bottles, or kegs. Link to a batch and specify quantities per format.`,
+    content: `Packaging Sessions (/production/packaging): Record when beer is packaged into cans, bottles, or kegs. Link to a batch and specify quantities per format.
+
+Each session's detail page has a Bill of Materials preview tab that shows the packaging materials needed (lids, trays, PakTechs, labels, etc.) based on the line items' selling formats. The preview compares required quantity against on-hand inventory and highlights any shortfalls in red, with a link to /purchasing/material-planning for ordering. See "Bills of Materials" below for how the math works.`,
+  },
+  {
+    id: "bills-of-materials",
+    title: "Bills of Materials (BOMs)",
+    content: `A Bill of Materials (BOM) defines what packaging materials are needed per unit of a given selling format. Edit a format's BOM at Settings > Selling Formats > [format] > Bill of Materials.
+
+Two kinds of materials, distinguished by the inventory item's Unit:
+
+Whole-unit materials (Unit = "each" or "case"): trays, lids, PakTechs, carriers, keg caps — anything you count in discrete pieces. The BOM editor shows two inputs: "[X] per [Y]". To say "1 tray per 24 cans," type 1 and 24. To say "2 lids per can," type 2 and 1. The system rounds material need up to whole numbers and ignores fractions of an item.
+
+Bulk materials (Unit = "lb", "oz", "kg", "g", "gal"): adhesive, ink, CO2 — anything measured by mass or volume. The BOM editor shows a single decimal field for the quantity used per unit; the preview keeps decimal precision.
+
+How material demand is computed: for each line item in a packaging session, the system multiplies the planned quantity by each BOM row's ratio. Whole-unit results are ceiled (you can't use half a tray); bulk results stay as decimals. The aggregated total appears in the session's Bill of Materials tab and in Material Planning (/purchasing/material-planning).
+
+Notes:
+- BOMs live on the selling format, not the brand or batch — every batch packaged into "Case of 12" uses the same materials.
+- Materials are derived through the BOM chain (session line item → selling format BOM → inventory item). There is no direct way to "assign" a material to a session outside the BOM.
+- If you change a BOM, future sessions reflect the new ratios; completed sessions are unaffected.`,
   },
   {
     id: "inventory",
@@ -117,7 +137,9 @@ Ingredient Demand (/purchasing/demand): See what ingredients are needed based on
 
 Suppliers (/purchasing/suppliers): Manage your supplier contacts and catalogs. Suppliers can now be linked to packaging materials and shipping supplies (not just brewing ingredients) via the supplier catalog.
 
-Purchase Orders (/purchasing/pos): Create and track purchase orders. POs move through states: Draft → Submitted → Partially Received → Received.`,
+Purchase Orders (/purchasing/pos): Create and track purchase orders. POs move through states: Draft → Submitted → Partially Received → Received.
+
+Recording a receipt: open a PO, find the line item, and click Receive. The receive dialog records what physically arrived. If the supplier ships in bundles (e.g., 10 stacks of 250 trays), check "Received in bundles" — it reveals a "bundles × per-bundle" calculator that fills in the total Quantity for you. Bundle size is not saved; the system only stores the single-unit quantity (2,500 trays in the example).`,
   },
   {
     id: "sales",
@@ -157,7 +179,7 @@ Brands (/settings/brands): Manage your beer brands used across recipes, batches,
 
 COMMERCE:
 Package Formats (/settings/containers): Manage physical containers (cans, bottles, kegs) and their selling formats.
-Selling Formats (/settings/selling-formats): Define how containers are sold (singles, 4-packs, cases, per keg). Each format can have a Bill of Materials (BOM) defining required packaging materials (cans, lids, PakTechs, trays, keg caps) and pallet configuration (units per layer, default layers).
+Selling Formats (/settings/selling-formats): Define how containers are sold (singles, 4-packs, cases, per keg). Each format can have a Bill of Materials (BOM) defining required packaging materials (cans, lids, PakTechs, trays, keg caps) and pallet configuration (units per layer, default layers). Whole-unit materials use a "[X] per [Y]" entry pattern (e.g., "1 tray per 24 cans"); bulk materials use a single decimal field. See "Bills of Materials" for details.
 Shipping Defaults (/settings/shipping-defaults): Set brewery-wide default shipping materials (pallet type, wrap type) used when calculating order shipping needs.
 Sales Channels (/settings/sales-channels): Categorize customers by channel (taproom, distribution, online) for pricing rules.
 Pricing (/settings/pricing): Spreadsheet-style pricing matrix -- set prices by tier and selling format per sales channel.

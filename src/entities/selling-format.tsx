@@ -94,7 +94,7 @@ export const sellingFormatEntity: EntityConfig<SellingFormat> = {
     },
   ],
 
-  defaultSort: { column: "position", direction: "asc" },
+  defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name"],
 
   // ---------------------------------------------------------------------------

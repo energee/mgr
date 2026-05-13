@@ -116,7 +116,7 @@ export const containerEntity: EntityConfig<Container> = {
     },
   ],
 
-  defaultSort: { column: "position", direction: "asc" },
+  defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name"],
 
   // ---------------------------------------------------------------------------
