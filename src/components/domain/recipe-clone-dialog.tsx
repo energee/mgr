@@ -23,7 +23,15 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Select,
   SelectContent,
@@ -195,41 +203,59 @@ export function RecipeCloneDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Audit F-078: use the canonical Form/FormField/FormMessage primitives
+            instead of the legacy Label + register + inline error pattern. */}
+        <Form {...form}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">New Recipe Name</Label>
-            <Input
-              id="name"
-              {...form.register("name")}
-              placeholder="Enter recipe name..."
-              className="min-h-[44px]"
-            />
-            {form.formState.errors.name && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.name.message}
-              </p>
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>New Recipe Name</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder="Enter recipe name..."
+                    className="min-h-[44px]"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="brand_id">Brand (optional)</Label>
-            <Select
-              value={form.watch("brand_id") || "_keep_original"}
-              onValueChange={(v) => form.setValue("brand_id", v === "_keep_original" ? null : v)}
-            >
-              <SelectTrigger className="min-h-[44px]">
-                <SelectValue placeholder="Keep original brand" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_keep_original">Keep original brand</SelectItem>
-                {brands?.map((brand) => (
-                  <SelectItem key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <FormField
+            control={form.control}
+            name="brand_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Brand</FormLabel>
+                <Select
+                  value={field.value || "_keep_original"}
+                  onValueChange={(v) =>
+                    field.onChange(v === "_keep_original" ? null : v)
+                  }
+                >
+                  <FormControl>
+                    <SelectTrigger className="min-h-[44px]">
+                      <SelectValue placeholder="Keep original brand" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="_keep_original">Keep original brand</SelectItem>
+                    {brands?.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>Optional. Leave default to keep the source recipe&apos;s brand.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <DialogFooter>
             <Button
@@ -259,6 +285,7 @@ export function RecipeCloneDialog({
             </Button>
           </DialogFooter>
         </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
