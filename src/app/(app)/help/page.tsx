@@ -8,6 +8,7 @@
 
 import { useState, useMemo, type ReactNode } from "react";
 import { ChevronDown, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import {
@@ -98,18 +99,24 @@ export default function HelpPage() {
             className="pl-9"
           />
         </div>
-        <button
+        {/* Audit F-052: use the shared Button primitive so focus ring + sizing
+            tokens are consistent with the rest of the app. */}
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={expandAll}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="text-muted-foreground hover:text-foreground"
         >
           Expand all
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={collapseAll}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="text-muted-foreground hover:text-foreground"
         >
           Collapse all
-        </button>
+        </Button>
       </div>
 
       {/* Sections */}
