@@ -4,7 +4,7 @@ import type { ForwardRefExoticComponent, RefAttributes } from "react";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 
 import { LayoutPanelTopIcon } from "@/components/ui/layout-panel-top";
-import { FlaskIcon } from "@/components/ui/flask";
+import { FlaskIcon } from "@/components/icons/flask";
 import { DollarSignIcon } from "@/components/ui/dollar-sign";
 import { SettingsIcon } from "@/components/ui/settings";
 import { CircleHelpIcon } from "@/components/ui/circle-help";
@@ -43,7 +43,7 @@ import { FileStackIcon } from "@/components/ui/file-stack";
 import { WaypointsIcon } from "@/components/ui/waypoints";
 import { DrumIcon } from "@/components/ui/drum";
 import { RouteIcon } from "@/components/ui/route";
-import { ShipIcon } from "@/components/ui/ship";
+import { ShipIcon } from "@/components/icons/ship";
 import { FileCheckIcon } from "@/components/ui/file-check";
 import { CheckCheckIcon } from "@/components/ui/check-check";
 import { FolderOpenIcon } from "@/components/ui/folder-open";
