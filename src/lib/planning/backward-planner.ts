@@ -150,15 +150,17 @@ export async function getOrderDemand(horizonWeeks = 8): Promise<OrderDemand[]> {
   // Map items by order
   const itemsByOrder = new Map<string, OrderItemDemand[]>();
   for (const item of items || []) {
-    if (!itemsByOrder.has(item.order_id)) {
-      itemsByOrder.set(item.order_id, []);
+    let orderItems = itemsByOrder.get(item.order_id);
+    if (!orderItems) {
+      orderItems = [];
+      itemsByOrder.set(item.order_id, orderItems);
     }
 
     const brand = item.brands as { name: string } | null;
     const sellingFormat = item.selling_formats as { name: string } | null;
     const style = item.beer_styles as { name: string } | null;
 
-    itemsByOrder.get(item.order_id)!.push({
+    orderItems.push({
       item_id: item.id,
       brand_id: item.brand_id,
       brand_name: brand?.name ?? null,
@@ -209,8 +211,9 @@ export async function getProductionRequirements(
         ? `tbd:${item.style_id}:${item.selling_format_id}`
         : `brand:${item.brand_id}:${item.selling_format_id}`;
 
-      if (!requirementMap.has(key)) {
-        requirementMap.set(key, {
+      let req = requirementMap.get(key);
+      if (!req) {
+        req = {
           brand_id: item.brand_id,
           brand_name: item.brand_name,
           selling_format_id: item.selling_format_id,
@@ -226,10 +229,9 @@ export async function getProductionRequirements(
           latest_requested_date: null,
           order_count: 0,
           order_numbers: [],
-        });
+        };
+        requirementMap.set(key, req);
       }
-
-      const req = requirementMap.get(key)!;
       req.total_demand += item.quantity;
 
       // Track order info
