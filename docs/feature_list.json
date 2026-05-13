@@ -516,6 +516,17 @@
       "state": "passing",
       "evidence": "commit:4f1dc73",
       "branch": "sentry-fix/SENTRY-7452842898"
+    },
+    {
+      "id": "SENTRY-7454377645",
+      "area": "infra",
+      "title": "ReferenceError: sgToPlato is not defined",
+      "user_visible_behavior": "RecipeSidebar crashed on /production/recipes/:id when displayUnit was plato, because a local formatSg helper called sgToPlato without importing it.",
+      "verification": "bun run test src/lib/__tests__/units.test.ts",
+      "state": "passing",
+      "evidence": "commit:e8f94af",
+      "branch": "sentry-fix/SENTRY-7454377645",
+      "notes": "Fix was already present in main (commit 73c49c7). This entry adds the missing formatGravityFromSg test coverage that proves sgToPlato is properly in scope."
     }
   ]
 }
