@@ -21,6 +21,7 @@ import type { Database } from "@/types/supabase";
 import { formatStateLabel } from "@/types/entity";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 import { entityService } from "@/services/entity-service";
+import { inventoryService } from "@/services/inventory-service";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
 import { CHAT_ENTITY_MAP } from "./entity-map";
 import { escapeLike } from "@/lib/utils";
@@ -442,17 +443,9 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           .describe("Number of days to look ahead for expiring lots"),
       }),
       execute: async ({ daysAhead }) => {
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() + daysAhead);
-        const { data, error } = await supabase
-          .from("inventory_lots_with_quantities")
-          .select("*")
-          .not("expiration_date", "is", null)
-          .lte("expiration_date", cutoff.toISOString().split("T")[0])
-          .gt("available_quantity", 0)
-          .order("expiration_date", { ascending: true });
-        if (error) throw new Error(error.message);
-        return data;
+        const result = await inventoryService.getExpiringLots(supabase, daysAhead);
+        if (!result.success) throw new Error(formatServiceError(result.error));
+        return result.data;
       },
     }),
 

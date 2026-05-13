@@ -20,7 +20,8 @@ import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
-import { dynamicFrom, dynamicRpc } from "@/services/types";
+import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
+import { inventoryService, type ExpiringLot } from "@/services/inventory-service";
 import { Skeleton } from "@/components/ui/skeleton";
 import { log } from "@/lib/client-logger";
 
@@ -35,16 +36,6 @@ type LowStockItem = {
   current_qty: number;
   reorder_point: number;
   unit: string;
-}
-
-type ExpiringLot = {
-  id: string;
-  item_name: string;
-  lot_number: string;
-  expiration_date: string;
-  quantity: number;
-  unit: string;
-  days_until_expiry: number;
 }
 
 type InventorySummary = {
@@ -103,54 +94,16 @@ export default function InventoryDashboardPage() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  // Fetch expiring lots (lots expiring within 90 days)
-  const { data: expiringLots = [] } = useQuery({
+  // Lots expiring in the next 90 days, excluding fully-allocated ones.
+  // Filtering happens server-side on the inventory_lots_with_quantities view —
+  // see inventoryService.getExpiringLots and migration 00172 for why filtering
+  // on the base table's `quantity` column would silently include depleted lots.
+  const { data: expiringLots = [] } = useQuery<ExpiringLot[]>({
     queryKey: dashboardKeys.expiringLots(),
     queryFn: async () => {
-      const ninetyDaysFromNow = new Date();
-      ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
-
-      const { data, error } = await supabase
-        .from("inventory_lots")
-        .select(`
-          id,
-          lot_number,
-          expiration_date,
-          quantity,
-          unit,
-          inventory_items:inventory_item_id(name)
-        `)
-        .not("expiration_date", "is", null)
-        .lte("expiration_date", ninetyDaysFromNow.toISOString().split("T")[0])
-        .gt("quantity", 0)
-        .order("expiration_date", { ascending: true })
-        .limit(20);
-
-      if (error) throw error;
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      return (data || [])
-        .filter((lot) => lot.expiration_date !== null)
-        .map((lot) => {
-          const expDate = new Date(lot.expiration_date as string);
-          expDate.setHours(0, 0, 0, 0);
-          const diffTime = expDate.getTime() - today.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          const itemInfo = lot.inventory_items as { name: string } | null;
-
-          return {
-            id: lot.id,
-            item_name: itemInfo?.name || "Unknown",
-            lot_number: lot.lot_number || "N/A",
-            expiration_date: lot.expiration_date as string,
-            quantity: lot.quantity,
-            unit: lot.unit || "units",
-            days_until_expiry: diffDays,
-          };
-        }) as ExpiringLot[];
+      const result = await inventoryService.getExpiringLots(supabase, 90, 20);
+      if (!result.success) throw new Error(formatServiceError(result.error));
+      return result.data;
     },
     refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,
