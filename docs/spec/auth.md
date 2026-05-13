@@ -14,7 +14,7 @@ Staff users who forget their password reset it through a Supabase recovery email
 ### Flow
 
 1. User clicks "Forgot password?" on `/login` and enters their email at `/forgot-password`
-2. The form calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: "/api/auth/callback?type=recovery" })`
+2. The form calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: \`${window.location.origin}/api/auth/callback?type=recovery\` })` — Supabase requires an absolute URL that matches the project's allow-listed Redirect URLs
 3. Supabase emails a one-time recovery link
 4. Clicking the link hits `/api/auth/callback?type=recovery&code=...`, which exchanges the code for a recovery session and forwards to `/update-password`
 5. `/update-password` is a server component that confirms a session exists and renders a password-set form; submission calls `supabase.auth.updateUser({ password })` and redirects home
