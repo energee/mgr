@@ -9,6 +9,7 @@
 
 import { use } from "react";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { customerEntity } from "@/entities/customer";
 import { CustomerKegBalances } from "@/components/domain/customer-keg-balances";
 
@@ -21,6 +22,11 @@ export default function CustomerDetailPage({
 
   return (
     <div className="space-y-6">
+      <EntityBreadcrumb
+        entity={customerEntity}
+        basePath="/sales/customers"
+        id={id}
+      />
       <EntityDetailUnifiedWithErrorBoundary
         entity={customerEntity}
         id={id}

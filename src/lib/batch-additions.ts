@@ -95,13 +95,11 @@ export const UNIT_OPTIONS = [
  * ```
  */
 export function formatAddition(addition: BatchAddition): string {
-  const quantity = `${addition.quantity} ${addition.unit}`;
-  const name = addition.ingredient_name;
-  const type = ADDITION_TYPES[addition.addition_type]?.label || addition.addition_type;
-
-  if (addition.contact_time_hours) {
-    return `${quantity} ${name} (${type}, ${addition.contact_time_hours}h contact)`;
-  }
-
-  return `${quantity} ${name} (${type})`;
+  const { quantity, unit, ingredient_name, addition_type, contact_time_hours } =
+    addition;
+  const typeLabel = ADDITION_TYPES[addition_type]?.label ?? addition_type;
+  const contactSuffix = contact_time_hours
+    ? `, ${contact_time_hours}h contact`
+    : "";
+  return `${quantity} ${unit} ${ingredient_name} (${typeLabel}${contactSuffix})`;
 }

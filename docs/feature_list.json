@@ -497,6 +497,36 @@
       "state": "passing",
       "evidence": "PR #248, commit e3c1af3. Implementation in src/components/dashboard/batch-activity-heatmap.tsx + heatmap-utils.ts, server RPC in supabase/migrations/00170_get_planned_batches_by_day.sql. Unit tests in src/components/dashboard/__tests__/heatmap-utils.test.ts.",
       "notes": "Year-view heatmap shipped 2026-05-06. Plan + spec at docs/superpowers/{plans,specs}/2026-05-02-dashboard-activity-heatmap*.md."
+    },
+    {
+      "id": "SENTRY-7465830666",
+      "area": "infra",
+      "title": "Error: ./src/components/dashboard/batch-activity-heatmap.tsx:20:1 — Module not found: Can't resolve 'react-activity-calendar'",
+      "verification": "bun run test src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts",
+      "state": "passing",
+      "evidence": "commit:eae5633",
+      "branch": "sentry-fix/SENTRY-7465830666",
+      "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Package is correctly declared in package.json. Regression coverage: bun run typecheck fails if the import in batch-activity-heatmap.tsx cannot be resolved."
+    },
+    {
+      "id": "SENTRY-7452842898",
+      "area": "infra",
+      "title": "ReferenceError: SaveAllButton is not defined",
+      "verification": "bun run test --run src/components/domain/recipe-editor/__tests__/recipe-editor-page-definition-order.test.ts",
+      "state": "passing",
+      "evidence": "commit:4f1dc73",
+      "branch": "sentry-fix/SENTRY-7452842898"
+    },
+    {
+      "id": "SENTRY-7454377645",
+      "area": "infra",
+      "title": "ReferenceError: sgToPlato is not defined",
+      "user_visible_behavior": "RecipeSidebar crashed on /production/recipes/:id when displayUnit was plato, because a local formatSg helper called sgToPlato without importing it.",
+      "verification": "bun run test src/lib/__tests__/units.test.ts",
+      "state": "passing",
+      "evidence": "commit:e8f94af",
+      "branch": "sentry-fix/SENTRY-7454377645",
+      "notes": "Fix was already present in main (commit 73c49c7). This entry adds the missing formatGravityFromSg test coverage that proves sgToPlato is properly in scope."
     }
   ]
 }

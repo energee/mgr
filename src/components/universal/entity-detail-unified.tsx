@@ -35,17 +35,19 @@ import { dynamicFrom } from "@/services/types";
 import { formatValue } from "@/lib/utils";
 import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
+import { useEntityRecord } from "@/hooks/use-entity-record";
 import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { useQBOAutoSync } from "@/hooks/use-qbo-auto-sync";
 import { toast } from "sonner";
-import type {
-  EntityConfig,
-  EntityActionDef,
-  EntityRelationDef,
-  UnifiedSectionDef,
-  UnifiedFieldDef,
+import {
+  type EntityConfig,
+  type EntityActionDef,
+  type EntityRelationDef,
+  type UnifiedSectionDef,
+  type UnifiedFieldDef,
+  resolveEntityBasePath,
 } from "@/types/entity";
 import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
@@ -110,8 +112,6 @@ export type EntityDetailUnifiedProps<T = Record<string, unknown>> = {
     value: unknown,
     form: UseFormReturn<Record<string, unknown>>,
   ) => void;
-  /** Hide the internal breadcrumb navigation (useful when a parent provides its own breadcrumb) */
-  hideBreadcrumb?: boolean;
 }
 
 // =============================================================================
@@ -333,12 +333,11 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   defaultValues,
   disabledFields,
   onFieldChange,
-  hideBreadcrumb,
 }: EntityDetailUnifiedProps<T>) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const supabase = createClient();
-  const path = basePath || `/${entity.domain}/${entity.name}s`;
+  const path = resolveEntityBasePath(entity, basePath);
 
   const isCreateMode = !id;
   const { can } = usePermissions();
@@ -381,19 +380,10 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Fetch record (skip in create mode)
   // ---------------------------------------------------------------------------
-  const { data, isLoading, error } = useQuery({
-    queryKey: entityKeys.detail(fetchTable, id || ""),
-    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
-    enabled: !!id,
-    queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, fetchTable)
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data as T;
-    },
-  });
+  const { data, isLoading, error } = useEntityRecord(
+    entity as EntityConfig<Record<string, unknown>>,
+    id,
+  ) as { data: T | undefined; isLoading: boolean; error: unknown };
 
   // ---------------------------------------------------------------------------
   // react-hook-form setup
@@ -822,22 +812,6 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          {!hideBreadcrumb && (
-            <nav className="flex items-center gap-1 text-xs">
-              <Link
-                href={backUrl || path}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {entity.displayNamePlural}
-              </Link>
-              <ChevronRight className="h-3 w-3 text-muted-foreground" />
-              <span className="text-foreground font-medium">
-                {isCreateMode
-                  ? "New"
-                  : header?.title || `${entity.displayName} ${id}`}
-              </span>
-            </nav>
-          )}
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-medium">
               {isCreateMode

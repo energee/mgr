@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { packagingSessionEntity } from "@/entities/packaging-session";
 import { usePrefillStore } from "@/stores/prefill-store";
 
@@ -12,7 +12,7 @@ export default function NewPackagingSessionPage() {
   });
 
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={packagingSessionEntity}
       basePath="/production/packaging"
       defaultValues={defaultValues}

@@ -12,7 +12,7 @@
 import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { packagingSessionEntity } from "@/entities/packaging-session";
 import { PackagingDayView } from "@/components/domain/packaging-day-view";
 import { entityKeys } from "@/lib/query-keys";
@@ -53,9 +53,8 @@ export default function PackagingSessionDetailPage({
     return <PackagingDayView sessionId={id} />;
   }
 
-  // All other states use the standard entity detail
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={packagingSessionEntity}
       id={id}
       basePath="/production/packaging"

@@ -200,7 +200,7 @@ export default function DashboardPage() {
           recipes:recipe_id(name)
         `)
         .not("status", "in", '("completed","cancelled")')
-        .order("planned_start_date", { ascending: true })
+        .order("planned_start_date", { ascending: false, nullsFirst: false })
         .limit(10);
 
       if (error) throw error;

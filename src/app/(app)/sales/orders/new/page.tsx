@@ -1,11 +1,11 @@
 "use client";
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { orderEntity } from "@/entities/order";
 
 export default function NewOrderPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={orderEntity}
       basePath="/sales/orders"
     />

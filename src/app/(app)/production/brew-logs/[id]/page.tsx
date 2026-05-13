@@ -18,9 +18,8 @@ import { brewLogEntity } from "@/entities/brew-log";
 import { BrewLogCompletionDialog } from "@/components/domain/brew-log-completion-dialog";
 import { BrewLogRecipeSheet } from "@/components/domain/brew-log-recipe-sheet";
 import { NextStepBanner } from "@/components/domain/next-step-banner";
-import { BrewJourneyBreadcrumb } from "@/components/domain/brew-journey-breadcrumb";
+import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { Button } from "@/components/ui/button";
-import { BookOpen } from "lucide-react";
 import { brewLogKeys, entityKeys } from "@/lib/query-keys";
 
 export default function BrewLogDetailPage({
@@ -183,14 +182,13 @@ export default function BrewLogDetailPage({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <BrewJourneyBreadcrumb segments={breadcrumbSegments} />
+        <EntityBreadcrumb segments={breadcrumbSegments} />
         {recipeInfo && (
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowRecipeSheet(true)}
           >
-            <BookOpen className="mr-1.5 h-4 w-4" />
             Recipe
           </Button>
         )}
@@ -209,7 +207,6 @@ export default function BrewLogDetailPage({
         id={id}
         basePath="/production/brew-logs"
         onAction={handleAction}
-        hideBreadcrumb
       />
 
       {brewLog && (

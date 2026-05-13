@@ -8,10 +8,65 @@
 - **Reflects**: `main` at `9eeb3da` (feat(bom): whole-unit math and intuitive BOM/receive UX, #254) — 2026-05-12
 - **Last verified**: 2026-05-04 (see `docs/agents/quality.md` trend log)
   - `make check-fast` — clean (lint + typecheck)
-  - `make check-db` — all 8 checks green (security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / permissive RLS / schema_registry / data-model docs)
-  - `bun run test` — 1019 / 1019 pass
-  - `BOOTSTRAP_SKIP=0 bash scripts/init.sh` — all 4 contract conditions PASS
-  - `make check` end-to-end cannot run inside the agent sandbox (Turbopack port binding); verified piecewise
+  - `make check-db` — clean (security_invoker / RLS / auth.users — all history-aware)
+  - `bun run test` — **1018 / 1018** pass
+  - `bun run test .github/scripts/sentry-harness/prompt.test.ts` — **6 / 6** pass
+  - `bun run build` — not exercised in this session (sandbox blocks Turbopack port binding); should run clean in a normal terminal
+- **Diverged from `main`**: yes (harness scaffolding)
+
+## Completed (this branch)
+
+- [x] **SENTRY-7454377645 — ReferenceError: sgToPlato is not defined** (Sentry fix)
+  Sentry issue MGR-3 fired on 2026-05-01 when `RecipeSidebar` rendered the OG/FG estimates with `displayUnit = "plato"`. A local `formatSg` helper had been added inline to `recipe-sidebar.tsx` that called `sgToPlato` directly without importing it, causing a `ReferenceError` at runtime. The structural fix had already landed in commit `73c49c7` (added `formatGravityFromSg` to `@/lib/units` where `sgToPlato` is in scope, then updated `recipe-sidebar.tsx` to import and use it). This session closed the gap by adding six Vitest tests for `formatGravityFromSg` — covering null/undefined guards, SG passthrough, Plato conversion, and custom decimal places — which would have caught the missing-import bug before it reached the development environment. All 1036 tests pass; lint and typecheck clean.
+
+- [x] **SENTRY-7452842898 — MGR-2: ReferenceError: SaveAllButton is not defined** (sentry-fix/SENTRY-7452842898)
+  Root cause: During Turbopack Fast Refresh (HMR), module code is re-evaluated top-to-bottom without the JavaScript hoisting guarantee for function declarations. `SaveAllButton`, `MobileEstimatesBar`, and `RecipeEditorSkeleton` were declared after `RecipeEditorPage` in `recipe-editor-page.tsx`, and `EstimateCard`, `SummaryRow`, `formatNum`, `formatGrainWeight`, `formatHopWeight`, and `bagLabel` were declared after `RecipeSidebar` in `recipe-sidebar.tsx`. Moving all helper functions and components before the exported component that uses them eliminates the HMR re-evaluation race. Regression coverage: `src/components/domain/recipe-editor/__tests__/recipe-editor-page-definition-order.test.ts` reads the source files and asserts that each helper is textually defined before the main component.
+
+- [x] **SENTRY-7465830666 — MGR-4: Module not found: react-activity-calendar** (sentry-fix/SENTRY-7465830666)
+  Root cause: `react-activity-calendar` was removed from `package.json` by a knip dependency audit in commit `33c0793` (April 1, 2026). The `batch-activity-heatmap.tsx` component was then added in PR #248 (commit `e3c1af3`, May 6, 2026) which correctly re-added the package. The Sentry error (MGR-4) fired the next day when a developer loaded the dashboard without running `bun install` after pulling. The first harness pass (PR #258) closed the Sentry issue and added harness tracking files. This pass adds a Vitest regression test at `src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts` that verifies `ActivityCalendar` is exported as a valid React element type — if the package is removed, the test file fails to load immediately.
+
+- [x] **Audit MGR against walkinglabs harness framework** (12 lectures + resource library) — produced gap checklist
+- [x] **Step 1 — Feedback subsystem** (F001)
+  - `Makefile` with layered gate (`check-fast` / `check` / `check-all` / `check-db`)
+  - `scripts/init.sh` bootstrap with the four-line bootstrap contract
+  - Cleanups: cut Makefile sprawl (22 → 17 targets), removed `WARNINGS` counter and `require make` from init.sh, added `OK: check passed` line, merged `init` into `setup`
+- [x] **Step 9 — AGENTS.md fixes** (F002)
+  - Reframed `AGENTS.md` as 165-line router; deleted `CLAUDE.md`
+  - Split content into `docs/agents/{patterns,query-keys,db-security,ui-rules,debugging}.md`
+  - Updated cross-references: `.github/scripts/sentry-harness/prompt.{ts,test.ts}`, `README.md`, `src/entities/user-profile.tsx`, `docs/data-model/kegs.md`
+- [x] **Step 3 — Scope subsystem** (F003)
+  - `docs/feature_list.json` — 44 features (9 harness rollout F001-F009 + 35 backfilled from `docs/plans/` and `docs/superpowers/`)
+  - `scripts/verify-feature.sh` reads feature list, runs `verification` command (or reports manual / null)
+  - WIP=1 per branch rule documented in `AGENTS.md`
+- [x] **Step 4 — Executable DB security checks** (F004) — wired into `make check`
+  - `scripts/check-security-invoker.ts` — migration-history-aware
+  - `scripts/check-rls.ts`
+  - `scripts/check-auth-users-leak.ts` — migration-history-aware
+  - All three default to fail-on-violation; whitelist via `-- check-X: skip <reason>` comments
+- [x] **Corrective migration `00156_security_invoker_corrections.sql`**
+  - 9 `ALTER VIEW … SET (security_invoker = true)` for legacy views from 00004–00011
+  - `recent_vessel_cleanings` rebuilt with `user_profiles.email` instead of `auth.users.email`
+  - `NOTIFY pgrst, 'reload schema'`
+  - **Pending**: `bun run db:migrate` against the live database
+- [x] **Skip comments** added to two `notify_all_users` SECURITY DEFINER functions (server-side admin broadcast, IDs only)
+- [x] **Step 5 — State subsystem** (F005)
+  - `PROGRESS.md` (this file)
+  - `DECISIONS.md` (project-level decision log; distinct from schema `docs/spec/decisions.md`)
+  - `docs/agents/session-handoff.md` template
+- [x] **Step 7 — Cleanup** (F006)
+  - `docs/agents/clean-state-checklist.md`
+  - `scripts/cleanup-session.sh` (idempotent)
+- [x] **Step 8 — Evaluator** (F007)
+  - `docs/agents/evaluator-rubric.md` (six dimensions, 0–2 scoring)
+- [x] **Step 6 — Observability** (F008)
+  - `docs/agents/observability.md` — Sentry / agent traces / quality snapshot
+  - `docs/agents/quality.md` — A–D grading template (most domains `_TBD_` pending baseline pass)
+  - `.harness/sessions/` directory + worked example `2026-05-02-harness-rollout.md`
+- [x] **Sentry verification** (F009)
+  - Confirmed `prompt.test.ts` 6/6 pass after CLAUDE.md → AGENTS.md rename
+  - Bumped CI workflows from `bun-version: 1.2.9` → `1.3.10` to match `engines.bun: ">=1.3"`
+- [x] **Version pins**
+  - `package.json` — `engines.node: ">=24"`, `engines.bun: ">=1.3"`, `packageManager: bun@1.3.10`
 
 ## In progress
 

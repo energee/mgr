@@ -5,7 +5,7 @@
  */
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { waterProfileEntity } from "@/entities/water-profile";
 
 export default function WaterProfileDetailPage({
@@ -15,7 +15,7 @@ export default function WaterProfileDetailPage({
 }) {
   const { id } = use(params);
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={waterProfileEntity}
       id={id}
       basePath="/settings/water-profiles"
