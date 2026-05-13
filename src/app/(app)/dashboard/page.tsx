@@ -329,7 +329,11 @@ export default function DashboardPage() {
           className="lg:col-span-3"
         >
           {activeBatches.length === 0 ? (
-            <DashboardEmpty message="No active batches" icon={FlaskConical} />
+            <DashboardEmpty
+              message="No active batches"
+              icon={FlaskConical}
+              action={{ label: "Start a batch", href: "/production/batches/new" }}
+            />
           ) : (
             <table className="w-full text-sm">
               <thead>
