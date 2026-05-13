@@ -100,18 +100,21 @@ export async function POST(request: NextRequest) {
   // 6.5 Replay protection (audit F-127): reject events whose `created_at` is
   // more than 5 minutes from now. The HMAC signature alone doesn't bound the
   // replay window — a recorded request could be replayed indefinitely.
-  if (event.created_at) {
-    const eventTime = Date.parse(event.created_at);
-    if (
-      Number.isFinite(eventTime) &&
-      Math.abs(Date.now() - eventTime) > 5 * 60 * 1000
-    ) {
-      logger.warn(
-        { event_id: event.event_id, created_at: event.created_at },
-        "[Square Webhook] Rejected stale event outside the 5-minute replay window"
-      );
-      return NextResponse.json({ error: "stale_event" }, { status: 400 });
-    }
+  // A missing or unparseable timestamp is also rejected: silently skipping the
+  // check would leave the replay window wide open on crafted payloads.
+  if (!event.created_at) {
+    return NextResponse.json({ error: "missing_created_at" }, { status: 400 });
+  }
+  const eventTime = Date.parse(event.created_at);
+  if (
+    !Number.isFinite(eventTime) ||
+    Math.abs(Date.now() - eventTime) > 5 * 60 * 1000
+  ) {
+    logger.warn(
+      { event_id: event.event_id, created_at: event.created_at },
+      "[Square Webhook] Rejected stale event outside the 5-minute replay window"
+    );
+    return NextResponse.json({ error: "stale_event" }, { status: 400 });
   }
 
   // 7. Route by event type — always return 200 quickly to avoid Square retries
@@ -163,20 +166,31 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
 
   const admin = await createAdminClient();
 
-  // Check for duplicate processing (idempotency via order_id in details JSONB)
-  const { data: existingLog } = await admin
-    .from("square_sync_log")
-    .select("id")
-    .eq("sync_type", "sale_ingest")
-    .contains("details", { order_id: orderId })
-    .limit(1)
-    .maybeSingle();
+  // Race-safe dedup (audit F-135): claim the event_id slot before any side
+  // effects. ON CONFLICT DO NOTHING returns empty data when a duplicate is
+  // detected, so both concurrent retries cannot proceed past this point.
+  let logId: string | null = null;
+  if (event.event_id) {
+    const { data: claimed } = await admin
+      .from("square_sync_log")
+      .upsert(
+        {
+          sync_type: "sale_ingest",
+          event_id: event.event_id,
+          items_synced: 0,
+          items_failed: 0,
+        },
+        { onConflict: "event_id", ignoreDuplicates: true }
+      )
+      .select("id");
 
-  if (existingLog) {
-    logger.info(
-      `[Square Webhook] Duplicate payment.completed for order ${orderId}, skipping`
-    );
-    return;
+    if (!claimed || claimed.length === 0) {
+      logger.info(
+        `[Square Webhook] Duplicate payment.completed for event ${event.event_id}, skipping`
+      );
+      return;
+    }
+    logId = claimed[0].id;
   }
 
   // Fetch full order details from Square
@@ -327,29 +341,39 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
     }
   }
 
-  // Log the sync operation. Use upsert+ignoreDuplicates on event_id so two
-  // concurrent retries of the same Square webhook can't both produce
-  // downstream side effects (audit F-135). The pre-check at the top is the
-  // fast path; this is the race-safe backstop.
-  await admin.from("square_sync_log").upsert(
-    {
+  // Finalise the sync log. If we claimed a row at the top (logId is set),
+  // update it with final stats. Otherwise (no event_id) do a plain insert.
+  const logDetails = {
+    order_id: orderId,
+    payment_id: paymentId,
+    square_location_id: squareLocationId,
+    event_id: event.event_id,
+    line_item_count: order.lineItems.length,
+    ...(errors.length > 0 ? { errors } : {}),
+  };
+
+  if (logId) {
+    await admin
+      .from("square_sync_log")
+      .update({
+        location_id: locationId,
+        items_synced: itemsSynced,
+        items_failed: itemsFailed,
+        details: logDetails,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", logId);
+  } else {
+    await admin.from("square_sync_log").insert({
       sync_type: "sale_ingest",
-      event_id: event.event_id ?? null,
+      event_id: null,
       location_id: locationId,
       items_synced: itemsSynced,
       items_failed: itemsFailed,
-      details: {
-        order_id: orderId,
-        payment_id: paymentId,
-        square_location_id: squareLocationId,
-        event_id: event.event_id,
-        line_item_count: order.lineItems.length,
-        ...(errors.length > 0 ? { errors } : {}),
-      },
+      details: logDetails,
       completed_at: new Date().toISOString(),
-    },
-    { onConflict: "event_id", ignoreDuplicates: true }
-  );
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
