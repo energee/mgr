@@ -52,10 +52,14 @@ export default function HelpPage() {
     if (typeof window === "undefined") return;
     const hash = window.location.hash.replace(/^#/, "");
     if (hash && helpSections.some((s) => s.id === hash)) {
-      setOpenSections((prev) => new Set(prev).add(hash));
-      // Defer to next paint so the Collapsible has expanded before scrolling.
+      // Defer setState to a rAF callback — calling setState synchronously in an
+      // effect body triggers the react-hooks/set-state-in-effect lint rule.
       requestAnimationFrame(() => {
-        document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setOpenSections((prev) => new Set(prev).add(hash));
+        // Scroll after a second frame so the Collapsible has expanded first.
+        requestAnimationFrame(() => {
+          document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
       });
     }
   }, []);
