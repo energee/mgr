@@ -57,7 +57,11 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   return (
     <AppProviders roles={roles}>
       <SidebarProvider>
-        <AppSidebar />
+        {/* Wrap in <aside> so screen-reader landmark navigation surfaces the
+            sidebar alongside the existing <main> from SidebarInset (audit F-099). */}
+        <aside aria-label="Primary navigation">
+          <AppSidebar />
+        </aside>
         <SidebarInset>
           <ChatLayout header={<AppHeader user={user} breweryName={breweryName} breweryLogoSvg={breweryLogoSvg} />}>
             {children}
