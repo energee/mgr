@@ -215,22 +215,15 @@ export default function DashboardPage() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  // Fetch vessel status
+  // Fetch vessel status (audit finding F-008: drop the silent fallback to the
+  // base table — it hid real regressions in the `vessels_with_batch` view).
   const { data: vessels = [] } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
       const { data, error } = await dynamicFrom(supabase, "vessels_with_batch")
         .select("*")
         .order("name");
-
-      if (error) {
-        const { data: fallback } = await supabase
-          .from("vessels")
-          .select("*")
-          .order("name");
-        return fallback || [];
-      }
-
+      if (error) throw error;
       return data as VesselStatus[];
     },
     refetchInterval: POLLING_INTERVALS.NORMAL,
@@ -490,8 +483,12 @@ function ProductionTrends() {
   const currentBatchesStarted = currentPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
   const previousBatchesStarted = previousPeriodData.reduce((sum, d) => sum + d.batches_started, 0);
 
-  const currentVolume = currentPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
-  const previousVolume = previousPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+  // Volume sums come back in BBL from the RPC. Convert to the user's chosen
+  // unit so the headline number agrees with the chart below it (audit F-001).
+  const currentVolumeBbl = currentPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+  const previousVolumeBbl = previousPeriodData.reduce((sum, d) => sum + Number(d.volume_bbl), 0);
+  const currentVolumeDisplay = convertVolume(currentVolumeBbl, "bbl", volumeUnit);
+  const previousVolumeDisplay = convertVolume(previousVolumeBbl, "bbl", volumeUnit);
 
   const currentCompleted = currentPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
   const previousCompleted = previousPeriodData.reduce((sum, d) => sum + d.batches_completed, 0);
@@ -509,9 +506,9 @@ function ProductionTrends() {
           deltaLabel={deltaLabel}
         />
         <StatCardWithDelta
-          value={`${Math.round(currentVolume * 10) / 10} BBL`}
+          value={`${(Math.round(currentVolumeDisplay * 10) / 10).toLocaleString()} ${volumeLabel}`}
           label="volume brewed"
-          delta={calculateDelta(currentVolume, previousVolume)}
+          delta={calculateDelta(currentVolumeDisplay, previousVolumeDisplay)}
           deltaLabel={deltaLabel}
         />
         <StatCardWithDelta

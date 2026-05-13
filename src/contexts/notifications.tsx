@@ -13,6 +13,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   useCallback,
   type ReactNode,
@@ -229,15 +230,22 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
     [dismissMutation]
   );
 
-  const value: NotificationsContextValue = {
-    notifications,
-    unreadCount: notifications.length,
-    isLoading,
-    markAsRead,
-    markAllAsRead,
-    dismiss,
-    refetch,
-  };
+  // Memoize the context value so consumers don't re-render on unrelated
+  // provider re-renders (audit finding F-141). Previously this object was
+  // reconstructed every render, breaking referential equality for every
+  // useContext(NotificationsContext) consumer in the tree.
+  const value = useMemo<NotificationsContextValue>(
+    () => ({
+      notifications,
+      unreadCount: notifications.length,
+      isLoading,
+      markAsRead,
+      markAllAsRead,
+      dismiss,
+      refetch,
+    }),
+    [notifications, isLoading, markAsRead, markAllAsRead, dismiss, refetch],
+  );
 
   return (
     <NotificationsContext.Provider value={value}>

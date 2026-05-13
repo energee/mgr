@@ -10,7 +10,7 @@
  * actions rather than being direct state-change buttons.
  */
 
-import { use, useState, useCallback, useMemo } from "react";
+import { use, useRef, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -40,11 +40,16 @@ export default function BatchDetailPage({
 }) {
   const { id } = use(params);
 
-  // Consume prefill store once on initial render to auto-open dialogs from AI
-  const [prefillDialog] = useState(() => {
-    const { openDialog } = usePrefillStore.getState().consume();
-    return openDialog;
-  });
+  // Consume the prefill store exactly once per component instance (audit F-027).
+  // useState's lazy initializer can fire twice under React strict mode, which
+  // would double-consume the store. The lazy-ref pattern below guarantees the
+  // consume() call runs once across all renders and strict-mode invocations,
+  // because subsequent renders see a non-undefined `prefillRef.current`.
+  const prefillRef = useRef<string | null | undefined>(undefined);
+  if (prefillRef.current === undefined) {
+    prefillRef.current = usePrefillStore.getState().consume().openDialog ?? null;
+  }
+  const prefillDialog = prefillRef.current;
   const [showPitchYeast, setShowPitchYeast] = useState(
     prefillDialog === "pitch_yeast"
   );
