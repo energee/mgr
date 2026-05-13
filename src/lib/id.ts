@@ -1,29 +1,12 @@
 import { customAlphabet } from "nanoid";
 
-const prefixes: Record<string, unknown> = {};
+const ID_ALPHABET =
+  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 type GenerateIdOptions = {
   length?: number;
-  separator?: string;
-}
+};
 
-export function generateId(
-  prefixOrOptions?: keyof typeof prefixes | GenerateIdOptions,
-  inputOptions: GenerateIdOptions = {},
-) {
-  const finalOptions =
-    typeof prefixOrOptions === "object" ? prefixOrOptions : inputOptions;
-
-  const prefix =
-    typeof prefixOrOptions === "object" ? undefined : prefixOrOptions;
-
-  const { length = 12, separator = "_" } = finalOptions;
-  const id = customAlphabet(
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-    length,
-  )();
-
-  return prefix && prefix in prefixes
-    ? `${prefixes[prefix]}${separator}${id}`
-    : id;
+export function generateId({ length = 12 }: GenerateIdOptions = {}): string {
+  return customAlphabet(ID_ALPHABET, length)();
 }
