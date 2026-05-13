@@ -11,7 +11,7 @@
  */
 
 import { useSearchParams } from "next/navigation";
-import { EntityDetailUnified } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { kegTransactionEntity, TRANSACTION_TYPES } from "@/entities/keg-transaction";
 
 export default function NewKegTransactionPage() {
@@ -50,7 +50,7 @@ export default function NewKegTransactionPage() {
   }
 
   return (
-    <EntityDetailUnified
+    <EntityDetailPage
       entity={kegTransactionEntity}
       basePath="/inventory/kegs/transactions"
       defaultValues={defaultValues}

@@ -313,6 +313,35 @@ describe("Format Functions", () => {
     });
   });
 
+  describe("formatGravityFromSg", () => {
+    it("returns dash for null", () => {
+      expect(formatGravityFromSg(null, "sg")).toBe("\u2014");
+    });
+
+    it("returns dash for undefined", () => {
+      expect(formatGravityFromSg(undefined, "sg")).toBe("\u2014");
+    });
+
+    it("formats SG value when displayUnit is sg", () => {
+      expect(formatGravityFromSg(1.048, "sg")).toBe("1.048");
+    });
+
+    it("formats as Plato when displayUnit is plato", () => {
+      const result = formatGravityFromSg(1.048, "plato");
+      expect(result).toContain("°P");
+      expect(parseFloat(result)).toBeCloseTo(12, 0);
+    });
+
+    it("respects custom decimal places in sg mode", () => {
+      expect(formatGravityFromSg(1.048, "sg", 2)).toBe("1.05");
+    });
+
+    it("respects custom decimal places in plato mode", () => {
+      const result = formatGravityFromSg(1.048, "plato", 0);
+      expect(result).toMatch(/^\d+°P$/);
+    });
+  });
+
   describe("formatRetailVolume", () => {
     it("formats oz to ml", () => {
       const result = formatRetailVolume(1, "ml");

@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { ArrowLeft, Plus, Thermometer, Droplets, Beaker } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -142,17 +142,6 @@ export default function BatchReadingsPage({
       )
     : {};
 
-  const getReadingIcon = (type: ReadingType) => {
-    switch (type) {
-      case "temperature":
-        return Thermometer;
-      case "gravity":
-        return Droplets;
-      default:
-        return Beaker;
-    }
-  };
-
   if (batchLoading) {
     return (
       <div className="container max-w-2xl py-6 space-y-6">
@@ -204,14 +193,12 @@ export default function BatchReadingsPage({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {(Object.entries(latestByType) as [ReadingType, BatchLog][]).map(
                 ([type, log]) => {
-                  const Icon = getReadingIcon(type);
                   const config = READING_TYPES[type];
                   return (
                     <div
                       key={type}
                       className="flex items-center gap-3 rounded-lg border p-3"
                     >
-                      <Icon className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <p className="text-sm text-muted-foreground">
                           {config.label}
@@ -254,13 +241,11 @@ export default function BatchReadingsPage({
             <div className="space-y-3">
               {readings?.map((log) => {
                 const config = READING_TYPES[log.data.reading_type];
-                const Icon = getReadingIcon(log.data.reading_type);
                 return (
                   <div
                     key={log.id}
                     className="flex items-center gap-4 rounded-lg border p-4"
                   >
-                    <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
                         <span className="font-medium">{config.label}</span>

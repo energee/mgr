@@ -61,18 +61,16 @@ export function formatTtbBbl(value: number | null | undefined): string {
  *   - cellar -> Column A (Cellar/In-Process)
  *   - keg -> Column C (Kegs)
  *   - bottled -> Column F (Canned/Bottled)
+ * Unknown codes pass through unchanged.
  */
+const TAX_CLASS_LABELS: Record<string, string> = {
+  cellar: "Cellar (In-Process)",
+  keg: "Kegs",
+  bottled: "Canned/Bottled",
+};
+
 export function getTaxClassLabel(taxClass: string): string {
-  switch (taxClass) {
-    case "cellar":
-      return "Cellar (In-Process)";
-    case "keg":
-      return "Kegs";
-    case "bottled":
-      return "Canned/Bottled";
-    default:
-      return taxClass;
-  }
+  return TAX_CLASS_LABELS[taxClass] ?? taxClass;
 }
 
 // =============================================================================

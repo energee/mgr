@@ -8,7 +8,7 @@
  */
 
 import { use, useCallback, useState } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { locationTransferEntity } from "@/entities/location-transfer";
 import { ShipTransferDialog } from "@/components/domain/ship-transfer-dialog";
 
@@ -24,16 +24,16 @@ export default function TransferDetailPage({
     (actionName: string): boolean => {
       if (actionName === "ship") {
         setShipDialogOpen(true);
-        return true; // Handled — prevent default state transition
+        return true;
       }
-      return false; // Let other actions use default behavior
+      return false;
     },
     []
   );
 
   return (
     <>
-      <EntityDetailUnifiedWithErrorBoundary
+      <EntityDetailPage
         entity={locationTransferEntity}
         id={id}
         basePath="/inventory/transfers"

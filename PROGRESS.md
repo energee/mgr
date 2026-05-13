@@ -5,9 +5,8 @@
 
 ## Current state
 
-- **Branch**: `harness`
-- **Latest commit**: `73c49c7` (Drag-and-drop reordering for recipe schedule editors, #246) — harness work uncommitted at session end
-- **Last verified**: 2026-05-02
+- **Reflects**: `main` at `9eeb3da` (feat(bom): whole-unit math and intuitive BOM/receive UX, #254) — 2026-05-12
+- **Last verified**: 2026-05-04 (see `docs/agents/quality.md` trend log)
   - `make check-fast` — clean (lint + typecheck)
   - `make check-db` — clean (security_invoker / RLS / auth.users — all history-aware)
   - `bun run test` — **1018 / 1018** pass
@@ -17,11 +16,14 @@
 
 ## Completed (this branch)
 
+- [x] **SENTRY-7454377645 — ReferenceError: sgToPlato is not defined** (Sentry fix)
+  Sentry issue MGR-3 fired on 2026-05-01 when `RecipeSidebar` rendered the OG/FG estimates with `displayUnit = "plato"`. A local `formatSg` helper had been added inline to `recipe-sidebar.tsx` that called `sgToPlato` directly without importing it, causing a `ReferenceError` at runtime. The structural fix had already landed in commit `73c49c7` (added `formatGravityFromSg` to `@/lib/units` where `sgToPlato` is in scope, then updated `recipe-sidebar.tsx` to import and use it). This session closed the gap by adding six Vitest tests for `formatGravityFromSg` — covering null/undefined guards, SG passthrough, Plato conversion, and custom decimal places — which would have caught the missing-import bug before it reached the development environment. All 1036 tests pass; lint and typecheck clean.
+
 - [x] **SENTRY-7452842898 — MGR-2: ReferenceError: SaveAllButton is not defined** (sentry-fix/SENTRY-7452842898)
   Root cause: During Turbopack Fast Refresh (HMR), module code is re-evaluated top-to-bottom without the JavaScript hoisting guarantee for function declarations. `SaveAllButton`, `MobileEstimatesBar`, and `RecipeEditorSkeleton` were declared after `RecipeEditorPage` in `recipe-editor-page.tsx`, and `EstimateCard`, `SummaryRow`, `formatNum`, `formatGrainWeight`, `formatHopWeight`, and `bagLabel` were declared after `RecipeSidebar` in `recipe-sidebar.tsx`. Moving all helper functions and components before the exported component that uses them eliminates the HMR re-evaluation race. Regression coverage: `src/components/domain/recipe-editor/__tests__/recipe-editor-page-definition-order.test.ts` reads the source files and asserts that each helper is textually defined before the main component.
 
 - [x] **SENTRY-7465830666 — MGR-4: Module not found: react-activity-calendar** (sentry-fix/SENTRY-7465830666)
-  Root cause: `react-activity-calendar` was removed from `package.json` by a knip dependency audit in commit `33c0793` (April 1, 2026). The `batch-activity-heatmap.tsx` component was then added in PR #248 (commit `e3c1af3`, May 6, 2026) which correctly re-added the package. The Sentry error (MGR-4) fired the next day when a developer loaded the dashboard without running `bun install` after pulling. The fix was already in place; this PR closes the Sentry issue, adds the SENTRY entry to `feature_list.json`, and documents that regression coverage is provided by `bun run typecheck` (which fails to resolve the import if the package is missing).
+  Root cause: `react-activity-calendar` was removed from `package.json` by a knip dependency audit in commit `33c0793` (April 1, 2026). The `batch-activity-heatmap.tsx` component was then added in PR #248 (commit `e3c1af3`, May 6, 2026) which correctly re-added the package. The Sentry error (MGR-4) fired the next day when a developer loaded the dashboard without running `bun install` after pulling. The first harness pass (PR #258) closed the Sentry issue and added harness tracking files. This pass adds a Vitest regression test at `src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts` that verifies `ActivityCalendar` is exported as a valid React element type — if the package is removed, the test file fails to load immediately.
 
 - [x] **Audit MGR against walkinglabs harness framework** (12 lectures + resource library) — produced gap checklist
 - [x] **Step 1 — Feedback subsystem** (F001)
@@ -68,50 +70,36 @@
 
 ## In progress
 
-_(none — harness rollout complete; awaiting user review and commit)_
-
-## Round 2 — harness hardening (2026-05-03)
-
-Twelve refinements landed on top of the initial rollout (PR #249).
-
-- [x] **#1 Custom ESLint rules** — DEC-008 (`{ value: "", label: ... }` empty-string in option arrays, scoped via `:has()`), centralized query keys (`useQuery({ queryKey: [...] })` literal arrays), and `no-restricted-imports` blocking re-introduction of `EntityDetail` / `EntityForm`.
-- [x] **#2 Schema registry + data-model doc checks** — `scripts/check-schema-registry.ts` and `scripts/check-data-model-docs.ts` (file-level allowlists for grandfathered pre-harness migrations).
-- [x] **#3 WIP=1 enforcement** — `scripts/check-wip.ts` reads `feature_list.json`, fails if more than one `in_progress` per branch. Wired into `make check`.
-- [x] **#4 Bootstrap contract validation** — `scripts/init.sh` now runs each of the four conditions (can start / can test / can see progress / can pick up next) and exits non-zero on failure. `BOOTSTRAP_SKIP=1` for CI.
-- [x] **#5 `scripts/feature-mark.ts`** — safe CLI for state transitions with WIP=1 enforcement.
-- [x] **#6 Stop hook for PROGRESS.md drift** — `scripts/check-progress-drift.sh` + `.claude/settings.json` Stop hook emit a `systemMessage` if code changed but PROGRESS.md didn't.
-- [x] **#7 `docs/agents/dispatching-agents.md`** — when to spawn subagents and how to brief them, with three worked examples.
-- [x] **#8 E2E scaffolds for 5 flows** — `recipe-editor.spec.ts`, `batch-transfer.spec.ts`, `packaging-session.spec.ts`, `dashboard.spec.ts`, `customer-order.spec.ts`. Smoke-level routes pass; deeper flow scaffolded as `test.skip` pending seed data. F114, F128, F134, F135, F136 in `feature_list.json` flipped from `manual` to executable verification commands.
-- [x] **#9 More DB checks** — `check-permissive-rls.ts` (USING/WITH CHECK true), `check-search-path.ts`, `check-security-definer.ts` (justification required). Three allowlist files grandfather ~30 pre-existing legitimate uses; new violations fail.
-- [x] **#10 Sentry harness writes harness state** — `prompt.ts` now requires updating `feature_list.json`, `PROGRESS.md`, and writing a `.harness/sessions/` trace per fix. Test plan template extended.
-- [x] **#11 `scripts/migration-dry-run.sh`** + `make db-dry-run` — boots fresh local Supabase, replays every migration in order.
-- [x] **#12 Coverage thresholds** — `vitest.config.ts` enforces 50% on `src/lib/**` (raise gradually). `make check-coverage` runs the gated report.
-
-### Verification (2026-05-03)
-- `make check-fast` — clean
-- `bun run test` — 1018 / 1018
-- `make check-db` — all 8 checks green (security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / permissive RLS / schema_registry / data-model docs)
-- `make check-wip` — clean
-- `BOOTSTRAP_SKIP=0 bash scripts/init.sh` — all 4 contract conditions PASS
-
-## Blocked / needs decision
-
-_(none)_
+_(none known)_
 
 ## Deferred
 
-- **Apply `00156_security_invoker_corrections.sql`** — needs `bun run db:migrate` against the live database when convenient. After applying, run `NOTIFY pgrst, 'reload schema';` (already in the migration).
-- **Refactor `notify_all_users` to use `user_profiles`** — currently whitelisted; low priority. Track as future feature.
-- **Fill in `docs/agents/quality.md` baselines** — most domain / layer cells are `_TBD_`. User should grade once and the harness can iterate.
+Open work that's logged but not currently being executed. Pull from this list when picking up new work.
 
-## Next steps
+- **`notify_all_users` SECURITY DEFINER refactor** — function still reads from `auth.users` (defined in `00090_slack_integration.sql:117`; callers in `00070`, `00145`, `00148`). Whitelisted via `check-auth-users-leak` skip comments. Should move to `user_profiles`. Low priority.
+- **Pick list — no bin-level detail** — `pick_list_items` lacks `bin_id`; UI shows only location name. Legacy `OrderPickList` displays bin + location, which matters for warehouse travel. Needs migration + `generate_pick_list` update + UI change. See `docs/plans/deferred-gaps.md`.
+- **Pick list — no location-based sort** — items sorted by `sort_order` (generation order). Should sort `location_name → bin_name → lot_number`. See `docs/plans/deferred-gaps.md`.
+- **Hardcoded 7-day PO lead time** — `src/lib/purchasing/po-generator.ts:215` uses `+ 7`; should use `Math.max(...leadTimes)` from shortfall data. See `docs/plans/deferred-gaps.md`.
+- **Normalize `containers.volume_oz`** — heuristic disambiguation in `src/hooks/use-catalog.ts:100` (per-unit vs rolled-up case totals). Should be normalized at the schema level so the heuristic can be dropped.
+- **Deeper E2E flows** — `test.skip` in `e2e/{batch-transfer, customer-order, dashboard, production-workflow, recipe-editor, packaging-session}.spec.ts` pending seed data. Smoke routes pass; F114/F128/F134/F135/F136 are marked `passing` on that basis.
+- **Tighten DB allowlists** — `~30` grandfathered entries across permissive-RLS / SECURITY DEFINER / search_path / data-model docs allowlists. Tighten over time.
+- **Raise `src/lib/**` coverage threshold** — currently 50% in `vitest.config.ts`; raise gradually as coverage improves.
+- **Harness soak** — promote `Harness` layer grade A− → A after a 2-week multi-session soak proves drift detection works in practice (target: 2026-05-18).
 
-1. Review the diff: `git status` / `git diff`
-2. Apply `00156_security_invoker_corrections.sql` to the live DB
-3. Commit the harness rollout (suggest a single squash-style commit so feature_list / AGENTS / docs / scripts land atomically)
-4. Open a PR and run `/ultrareview` on the branch
+## Recent history
+
+- **2026-05-12** — #254 BOM whole-unit math + intuitive BOM/receive UX
+- **2026-05-04..** — Sentry-harness hardening: #257 grants Claude Code the required toolset; #256 streams Claude Code Action output to job log; #255 reads org/project from `vars` to avoid output redaction
+- **2026-05-04** — Migration `00156_security_invoker_corrections` applied to production via `bun run db:migrate -- --include-all` (9 legacy views + `recent_vessel_cleanings` rebuild now live)
+- **2026-05-04** — `docs/agents/quality.md` baselines filled (no remaining `_TBD_` cells); F200 dashboard activity heatmap marked passing (#252); redundant Vercel deploy workflow removed (#253)
+- **2026-05-03** — #251 autoharness screening + Claude OAuth shim; #250 `src/lib` dead-code removal + dedup
+- **2026-05-02..03** — Walkinglabs harness rollout (#249, merged): `Makefile` with layered gates, `AGENTS.md` router + topic docs, `feature_list.json` (48 features), 8 executable DB checks, ESLint custom rules (DEC-008 / centralized query keys / `EntityDetail` re-introduction block), WIP=1 enforcement, bootstrap contract validation, Sentry harness writes harness state, coverage thresholds, migration dry-run
 
 ## Known issues
 
 - `make` warnings about `xcrun_db` permission errors only appear inside Claude Code's sandbox; normal terminals don't show them.
-- `make check` cannot be exercised end-to-end inside the agent sandbox because Turbopack `next build` requires port binding (sandbox blocks). Verified clean piece-by-piece: `make check-fast`, `bun run test` (1018/1018), `make check-db`.
+- `make check` cannot be exercised end-to-end inside the agent sandbox because Turbopack `next build` requires port binding. Verified piecewise: `make check-fast`, `bun run test`, `make check-db`.
+
+## Next steps
+
+Pick from **Deferred** based on priority. No active in-flight work.

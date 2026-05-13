@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { ArrowLeft, Plus, Leaf, Apple, Beaker, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -191,19 +191,6 @@ export default function BatchAdditionsPage({
     {} as Record<AdditionType, BatchAdditionRow[]>
   );
 
-  const getAdditionIcon = (type: AdditionType) => {
-    switch (type) {
-      case "dry_hop":
-        return Leaf;
-      case "fruit":
-        return Apple;
-      case "fining":
-        return Sparkles;
-      default:
-        return Beaker;
-    }
-  };
-
   if (batchLoading) {
     return (
       <div className="container max-w-2xl py-6 space-y-6">
@@ -255,7 +242,6 @@ export default function BatchAdditionsPage({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {(Object.entries(additionsByType) as [AdditionType, BatchAdditionRow[]][]).map(
                 ([type, rows]) => {
-                  const Icon = getAdditionIcon(type);
                   const config = ADDITION_TYPES[type];
                   const totalQty = rows.reduce((sum, row) => sum + Number(row.amount), 0);
                   const unit = rows[0]?.unit || config.defaultUnit;
@@ -264,7 +250,6 @@ export default function BatchAdditionsPage({
                       key={type}
                       className="flex items-center gap-3 rounded-lg border p-3"
                     >
-                      <Icon className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <p className="text-sm text-muted-foreground">
                           {config.label}
@@ -314,13 +299,11 @@ export default function BatchAdditionsPage({
               {additions?.map((row) => {
                 const displayType = mapDbTypeToDisplay(row.addition_type);
                 const config = ADDITION_TYPES[displayType];
-                const Icon = getAdditionIcon(displayType);
                 return (
                   <div
                     key={row.id}
                     className="flex items-start gap-4 rounded-lg border p-4"
                   >
-                    <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap">
                         <span className="font-medium">{row.name}</span>

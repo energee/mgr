@@ -4,12 +4,12 @@
  * New Vessel Page
  */
 
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { vesselEntity } from "@/entities/vessel";
 
 export default function NewVesselPage() {
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={vesselEntity}
       basePath="/production/vessels"
     />

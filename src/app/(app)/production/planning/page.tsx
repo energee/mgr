@@ -125,8 +125,13 @@ export default function ProductionPlanningPage() {
             <h1 className="text-2xl font-bold">Production Planning</h1>
             <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 text-sm">
               <Button variant="ghost" size="sm" className="h-7 px-3 bg-background shadow-sm">
-                List
+                Shortfalls
               </Button>
+              <Link href="/production/planning/backward">
+                <Button variant="ghost" size="sm" className="h-7 px-3 text-muted-foreground hover:text-foreground">
+                  Orders
+                </Button>
+              </Link>
               <Link href="/production/planning/timeline">
                 <Button variant="ghost" size="sm" className="h-7 px-3 text-muted-foreground hover:text-foreground">
                   Timeline

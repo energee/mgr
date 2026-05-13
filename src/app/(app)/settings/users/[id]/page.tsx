@@ -7,7 +7,7 @@
 "use client";
 
 import { use } from "react";
-import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
+import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { userProfileEntity } from "@/entities/user-profile";
 
 type UserDetailPageProps = {
@@ -18,7 +18,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   const { id } = use(params);
 
   return (
-    <EntityDetailUnifiedWithErrorBoundary
+    <EntityDetailPage
       entity={userProfileEntity}
       id={id}
       basePath="/settings/users"

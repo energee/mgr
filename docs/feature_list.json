@@ -502,9 +502,9 @@
       "id": "SENTRY-7465830666",
       "area": "infra",
       "title": "Error: ./src/components/dashboard/batch-activity-heatmap.tsx:20:1 — Module not found: Can't resolve 'react-activity-calendar'",
-      "verification": "bun run typecheck",
+      "verification": "bun run test src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts",
       "state": "passing",
-      "evidence": "commit:91e35af",
+      "evidence": "commit:eae5633",
       "branch": "sentry-fix/SENTRY-7465830666",
       "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Package is correctly declared in package.json. Regression coverage: bun run typecheck fails if the import in batch-activity-heatmap.tsx cannot be resolved."
     },
@@ -516,6 +516,17 @@
       "state": "passing",
       "evidence": "commit:4f1dc73",
       "branch": "sentry-fix/SENTRY-7452842898"
+    },
+    {
+      "id": "SENTRY-7454377645",
+      "area": "infra",
+      "title": "ReferenceError: sgToPlato is not defined",
+      "user_visible_behavior": "RecipeSidebar crashed on /production/recipes/:id when displayUnit was plato, because a local formatSg helper called sgToPlato without importing it.",
+      "verification": "bun run test src/lib/__tests__/units.test.ts",
+      "state": "passing",
+      "evidence": "commit:e8f94af",
+      "branch": "sentry-fix/SENTRY-7454377645",
+      "notes": "Fix was already present in main (commit 73c49c7). This entry adds the missing formatGravityFromSg test coverage that proves sgToPlato is properly in scope."
     }
   ]
 }
