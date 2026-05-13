@@ -40,6 +40,75 @@ type RecipeEditorPageProps = {
   id: string;
 }
 
+function SaveAllButton() {
+  const { anyDirty, saveAll, isSaving } = useRecipeEditor();
+  const [pending, setPending] = useState(false);
+
+  const onClick = async () => {
+    setPending(true);
+    try {
+      await saveAll();
+      toast.success("Recipe saved");
+    } catch {
+      // Errors are surfaced via per-section handleSaveError already.
+    } finally {
+      setPending(false);
+    }
+  };
+
+  if (!anyDirty && !pending) return null;
+  return (
+    <Button size="sm" onClick={onClick} disabled={pending || isSaving}>
+      {pending || isSaving ? (
+        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+      ) : (
+        <Save className="h-4 w-4 mr-1" />
+      )}
+      Save
+    </Button>
+  );
+}
+
+function MobileEstimatesBar() {
+  const { estimates } = useRecipeEditor();
+  const gravityUnit = useGravityUnit();
+  const og = formatGravityFromSg(estimates.og, gravityUnit);
+  const fg = formatGravityFromSg(estimates.fg, gravityUnit);
+  return (
+    <div className="flex gap-4 text-sm">
+      <span><span className="text-muted-foreground">OG</span>{" "}<span className="font-mono font-medium">{og}</span></span>
+      <span><span className="text-muted-foreground">FG</span>{" "}<span className="font-mono font-medium">{fg}</span></span>
+      <span><span className="text-muted-foreground">ABV</span>{" "}<span className="font-mono font-medium">{estimates.abv !== null ? `${estimates.abv}%` : "—"}</span></span>
+      <span><span className="text-muted-foreground">IBU</span>{" "}<span className="font-mono font-medium">{estimates.ibu?.toString() ?? "—"}</span></span>
+      <span><span className="text-muted-foreground">SRM</span>{" "}<span className="font-mono font-medium">{estimates.srm?.toString() ?? "—"}</span></span>
+    </div>
+  );
+}
+
+function RecipeEditorSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-8 w-8" />
+        <div>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-24 mt-1" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-48 w-full rounded-lg" />
+          ))}
+        </div>
+        <div className="hidden lg:block">
+          <Skeleton className="h-96 w-full rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
   const supabase = createClient();
   const router = useRouter();
@@ -178,79 +247,5 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
         onSuccess={handleCloneSuccess}
       />
     </RecipeEditorProvider>
-  );
-}
-
-/** Page-level Save button — saves all dirty sections in sequence. */
-function SaveAllButton() {
-  const { anyDirty, saveAll, isSaving } = useRecipeEditor();
-  const [pending, setPending] = useState(false);
-
-  const onClick = async () => {
-    setPending(true);
-    try {
-      await saveAll();
-      toast.success("Recipe saved");
-    } catch {
-      // Errors are surfaced via per-section handleSaveError already.
-    } finally {
-      setPending(false);
-    }
-  };
-
-  if (!anyDirty && !pending) return null;
-  return (
-    <Button size="sm" onClick={onClick} disabled={pending || isSaving}>
-      {pending || isSaving ? (
-        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-      ) : (
-        <Save className="h-4 w-4 mr-1" />
-      )}
-      Save
-    </Button>
-  );
-}
-
-/** Compact estimates bar shown on mobile viewports */
-function MobileEstimatesBar() {
-  const { estimates } = useRecipeEditor();
-  const gravityUnit = useGravityUnit();
-  const og = formatGravityFromSg(estimates.og, gravityUnit);
-  const fg = formatGravityFromSg(estimates.fg, gravityUnit);
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <div className="flex gap-4">
-        <span><span className="text-muted-foreground">OG</span>{" "}<span className="font-mono font-medium">{og}</span></span>
-        <span><span className="text-muted-foreground">FG</span>{" "}<span className="font-mono font-medium">{fg}</span></span>
-        <span><span className="text-muted-foreground">ABV</span>{" "}<span className="font-mono font-medium">{estimates.abv !== null ? `${estimates.abv}%` : "\u2014"}</span></span>
-        <span><span className="text-muted-foreground">IBU</span>{" "}<span className="font-mono font-medium">{estimates.ibu?.toString() ?? "\u2014"}</span></span>
-        <span><span className="text-muted-foreground">SRM</span>{" "}<span className="font-mono font-medium">{estimates.srm?.toString() ?? "\u2014"}</span></span>
-      </div>
-    </div>
-  );
-}
-
-/** Loading skeleton for the recipe editor */
-function RecipeEditorSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-8 w-8" />
-        <div>
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-24 mt-1" />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-        <div className="space-y-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-48 w-full rounded-lg" />
-          ))}
-        </div>
-        <div className="hidden lg:block">
-          <Skeleton className="h-96 w-full rounded-lg" />
-        </div>
-      </div>
-    </div>
   );
 }

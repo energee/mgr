@@ -506,7 +506,16 @@
       "state": "passing",
       "evidence": "commit:eae5633",
       "branch": "sentry-fix/SENTRY-7465830666",
-      "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Regression test added at src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts — verifies ActivityCalendar is exported as a valid React element type. If the package is removed, the test file fails to load."
+      "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Package is correctly declared in package.json. Regression coverage: bun run typecheck fails if the import in batch-activity-heatmap.tsx cannot be resolved."
+    },
+    {
+      "id": "SENTRY-7452842898",
+      "area": "infra",
+      "title": "ReferenceError: SaveAllButton is not defined",
+      "verification": "bun run test --run src/components/domain/recipe-editor/__tests__/recipe-editor-page-definition-order.test.ts",
+      "state": "passing",
+      "evidence": "commit:4f1dc73",
+      "branch": "sentry-fix/SENTRY-7452842898"
     }
   ]
 }
