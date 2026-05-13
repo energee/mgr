@@ -17,6 +17,9 @@
 
 ## Completed (this branch)
 
+- [x] **SENTRY-7454377645 — ReferenceError: sgToPlato is not defined** (Sentry fix)
+  Sentry issue MGR-3 fired on 2026-05-01 when `RecipeSidebar` rendered the OG/FG estimates with `displayUnit = "plato"`. A local `formatSg` helper had been added inline to `recipe-sidebar.tsx` that called `sgToPlato` directly without importing it, causing a `ReferenceError` at runtime. The structural fix had already landed in commit `73c49c7` (added `formatGravityFromSg` to `@/lib/units` where `sgToPlato` is in scope, then updated `recipe-sidebar.tsx` to import and use it). This session closed the gap by adding six Vitest tests for `formatGravityFromSg` — covering null/undefined guards, SG passthrough, Plato conversion, and custom decimal places — which would have caught the missing-import bug before it reached the development environment. All 1036 tests pass; lint and typecheck clean.
+
 - [x] **SENTRY-7452842898 — MGR-2: ReferenceError: SaveAllButton is not defined** (sentry-fix/SENTRY-7452842898)
   Root cause: During Turbopack Fast Refresh (HMR), module code is re-evaluated top-to-bottom without the JavaScript hoisting guarantee for function declarations. `SaveAllButton`, `MobileEstimatesBar`, and `RecipeEditorSkeleton` were declared after `RecipeEditorPage` in `recipe-editor-page.tsx`, and `EstimateCard`, `SummaryRow`, `formatNum`, `formatGrainWeight`, `formatHopWeight`, and `bagLabel` were declared after `RecipeSidebar` in `recipe-sidebar.tsx`. Moving all helper functions and components before the exported component that uses them eliminates the HMR re-evaluation race. Regression coverage: `src/components/domain/recipe-editor/__tests__/recipe-editor-page-definition-order.test.ts` reads the source files and asserts that each helper is textually defined before the main component.
 
