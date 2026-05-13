@@ -10,6 +10,30 @@
  *   queryClient.invalidateQueries({ queryKey: entityKeys.all("batches") })
  */
 
+/**
+ * Normalize an object so two semantically-equal objects produce the same
+ * key shape regardless of property insertion order. Useful when a filter
+ * object is built across multiple branches and React Query's structural
+ * key equality would otherwise miss the cache hit. Audit F-140.
+ *
+ * Recursively sorts keys; arrays preserve their order (semantic).
+ * Drops `undefined` properties so { foo: undefined } equals {}.
+ */
+export function stableKey<T>(value: T): T {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => stableKey(item)) as unknown as T;
+  }
+  if (typeof value !== "object") return value;
+  const obj = value as Record<string, unknown>;
+  const sorted: Record<string, unknown> = {};
+  for (const k of Object.keys(obj).sort()) {
+    if (obj[k] === undefined) continue;
+    sorted[k] = stableKey(obj[k]);
+  }
+  return sorted as T;
+}
+
 // =============================================================================
 // Entity Keys (for universal entity components)
 // =============================================================================
