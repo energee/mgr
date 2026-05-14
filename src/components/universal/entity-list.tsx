@@ -13,6 +13,5 @@
 export {
   EntityDataTableWithErrorBoundary as EntityList,
   EntityDataTable as EntityListUnsafe,
-  EntityDataTableWithErrorBoundary as EntityListWithErrorBoundary,
   type EntityDataTableProps as EntityListProps,
 } from "./entity-data-table";
