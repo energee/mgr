@@ -524,9 +524,9 @@
       "user_visible_behavior": "RecipeSidebar crashed on /production/recipes/:id when displayUnit was plato, because a local formatSg helper called sgToPlato without importing it.",
       "verification": "bun run test src/lib/__tests__/units.test.ts",
       "state": "passing",
-      "evidence": "commit:e8f94af",
+      "evidence": "commit:f22b85b",
       "branch": "sentry-fix/SENTRY-7454377645",
-      "notes": "Fix was already present in main (commit 73c49c7). This entry adds the missing formatGravityFromSg test coverage that proves sgToPlato is properly in scope."
+      "notes": "Fix was already present in main (commit 73c49c7). This entry adds the missing formatGravityFromSg test coverage that proves sgToPlato is properly in scope. PR #259 merged 2026-05-12."
     }
   ]
 }
