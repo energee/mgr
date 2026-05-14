@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, getSquareSettings } from "@/lib/square/client";
-import { verifyWebhookSignature } from "@/lib/square/webhook";
+import { checkReplayWindow, verifyWebhookSignature } from "@/lib/square/webhook";
 import { calculateVolumeOz } from "@/lib/square/utils";
 import type { SquareSyncType } from "@/lib/square/types";
 import { dynamicFrom } from "@/services/types";
@@ -26,16 +26,22 @@ import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/square/webhook" });
 
-const REPLAY_WINDOW_MS = 5 * 60 * 1000;
-
-type ReplayCheck = { ok: true } | { ok: false; reason: "missing_created_at" | "invalid_created_at" | "stale_event" };
-
-function checkReplayWindow(createdAt: string | undefined): ReplayCheck {
-  if (!createdAt) return { ok: false, reason: "missing_created_at" };
-  const t = Date.parse(createdAt);
-  if (!Number.isFinite(t)) return { ok: false, reason: "invalid_created_at" };
-  if (Math.abs(Date.now() - t) > REPLAY_WINDOW_MS) return { ok: false, reason: "stale_event" };
-  return { ok: true };
+/**
+ * Resolve the notification URL Square signs against. Either SQUARE_WEBHOOK_URL
+ * or NEXT_PUBLIC_APP_URL must be set — otherwise the URL would silently
+ * stringify to `"undefined/api/square/webhook"` and every signature would
+ * fail in confusing ways (audit PR #273 nit).
+ */
+function resolveNotificationUrl(): string {
+  const explicit = process.env.SQUARE_WEBHOOK_URL;
+  if (explicit) return explicit;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) {
+    throw new Error(
+      "Square webhook URL not configured: set SQUARE_WEBHOOK_URL or NEXT_PUBLIC_APP_URL"
+    );
+  }
+  return `${appUrl}/api/square/webhook`;
 }
 
 // Square webhook event shape (subset of fields we care about)
@@ -82,9 +88,19 @@ export async function POST(request: NextRequest) {
   }
 
   // 4. Determine notification URL
-  const notificationUrl =
-    process.env.SQUARE_WEBHOOK_URL ||
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/square/webhook`;
+  let notificationUrl: string;
+  try {
+    notificationUrl = resolveNotificationUrl();
+  } catch (err) {
+    log.error(
+      { err: err instanceof Error ? err.message : err },
+      "Square webhook URL misconfigured; rejecting webhook"
+    );
+    return NextResponse.json(
+      { error: "Webhook URL not configured" },
+      { status: 500 }
+    );
+  }
 
   // 5. Verify signature
   const isValid = verifyWebhookSignature(
@@ -95,6 +111,14 @@ export async function POST(request: NextRequest) {
   );
 
   if (!isValid) {
+    // Log so a stream of bad signatures is observable (audit PR #273 B-3).
+    // Use the forwarded-for chain if present (Vercel/most proxies), otherwise
+    // request.ip is `unknown` and we just record the absence.
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      request.headers.get("x-real-ip") ??
+      "unknown";
+    log.warn({ ip }, "Invalid Square webhook signature");
     return NextResponse.json(
       { error: "Invalid signature" },
       { status: 401 }

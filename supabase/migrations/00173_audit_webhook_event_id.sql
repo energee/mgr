@@ -22,3 +22,9 @@ ALTER TABLE square_sync_log
 
 COMMENT ON COLUMN square_sync_log.event_id IS
   'Square webhook event id; UNIQUE for race-safe dedup (audit F-135).';
+
+-- Keep _schema_registry in sync with the new dedup column so AI tooling and
+-- docs reflect that event_id is a primary identifier on this table.
+UPDATE _schema_registry
+SET key_fields = '["sync_type", "event_id", "items_synced", "items_failed"]'::jsonb
+WHERE table_name = 'square_sync_log';
