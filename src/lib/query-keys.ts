@@ -11,13 +11,24 @@
  */
 
 /**
- * Normalize an object so two semantically-equal objects produce the same
- * key shape regardless of property insertion order. Useful when a filter
- * object is built across multiple branches and React Query's structural
- * key equality would otherwise miss the cache hit. Audit F-140.
+ * Normalize a filter value so two semantically-equal inputs produce the same
+ * key shape regardless of property insertion order or explicit `undefined`
+ * properties. Audit F-140.
  *
- * Recursively sorts keys; arrays preserve their order (semantic).
- * Drops `undefined` properties so { foo: undefined } equals {}.
+ * Note: TanStack Query v5's `hashKey` already sorts plain-object keys and
+ * (via `JSON.stringify`) drops `undefined` properties during key hashing.
+ * In practice this helper is a defensive normaliser for call sites that
+ * compare query keys outside of TanStack's hashing path (e.g. structural
+ * `useMemo` deps, manual equality checks) or that want the normalised
+ * object shape itself.
+ *
+ * Behaviour:
+ *  - `null` / `undefined` / primitives pass through unchanged.
+ *  - Arrays preserve order; elements are normalised recursively.
+ *  - Plain objects have their keys sorted; `undefined` properties dropped;
+ *    nested values recursed.
+ *  - Non-plain objects (`Date`, `Map`, `Set`, class instances, etc.) pass
+ *    through unchanged so they aren't collapsed to `{}` by `Object.keys`.
  */
 export function stableKey<T>(value: T): T {
   if (value === null || value === undefined) return value;
@@ -25,6 +36,10 @@ export function stableKey<T>(value: T): T {
     return value.map((item) => stableKey(item)) as unknown as T;
   }
   if (typeof value !== "object") return value;
+  // Only normalise plain objects. Class instances (Date, Map, Set, etc.)
+  // have no enumerable own keys via Object.keys and would collapse to {}.
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== null && proto !== Object.prototype) return value;
   const obj = value as Record<string, unknown>;
   const sorted: Record<string, unknown> = {};
   for (const k of Object.keys(obj).sort()) {

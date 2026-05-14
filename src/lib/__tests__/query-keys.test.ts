@@ -27,7 +27,66 @@ import {
   sessionLineItemKeys,
   vesselKeys,
   packagingFormatKeys,
+  stableKey,
 } from "../query-keys";
+
+// =============================================================================
+// stableKey
+// =============================================================================
+
+describe("stableKey", () => {
+  it("returns null and undefined unchanged", () => {
+    expect(stableKey(null)).toBe(null);
+    expect(stableKey(undefined)).toBe(undefined);
+  });
+
+  it("returns primitives unchanged", () => {
+    expect(stableKey(1)).toBe(1);
+    expect(stableKey("x")).toBe("x");
+    expect(stableKey(true)).toBe(true);
+  });
+
+  it("sorts plain-object keys deterministically", () => {
+    const a = stableKey({ b: 2, a: 1 });
+    const b = stableKey({ a: 1, b: 2 });
+    expect(Object.keys(a)).toEqual(["a", "b"]);
+    expect(a).toEqual(b);
+  });
+
+  it("strips undefined properties", () => {
+    expect(stableKey({ a: 1, b: undefined })).toEqual({ a: 1 });
+    expect(stableKey({ a: 1 })).toEqual(stableKey({ a: 1, b: undefined }));
+  });
+
+  it("preserves array order (does not sort elements)", () => {
+    expect(stableKey([10, 2, 1, 20])).toEqual([10, 2, 1, 20]);
+    expect(stableKey(["b", "a"])).toEqual(["b", "a"]);
+  });
+
+  it("recurses into nested arrays and objects", () => {
+    expect(stableKey({ b: { y: 2, x: 1 }, a: [{ q: 1, p: 2 }] })).toEqual({
+      a: [{ p: 2, q: 1 }],
+      b: { x: 1, y: 2 },
+    });
+  });
+
+  it("does not collapse Date instances to {}", () => {
+    const d = new Date("2026-01-01T00:00:00Z");
+    const out = stableKey({ asOfDate: d });
+    expect(out.asOfDate).toBe(d);
+  });
+
+  it("preserves other class instances (Map, Set)", () => {
+    const m = new Map([["k", "v"]]);
+    const s = new Set([1, 2, 3]);
+    expect(stableKey({ m, s })).toEqual({ m, s });
+  });
+
+  it("returns a new object reference for plain inputs", () => {
+    const input = { a: 1, b: 2 };
+    expect(stableKey(input)).not.toBe(input);
+  });
+});
 
 // =============================================================================
 // entityKeys
