@@ -316,7 +316,11 @@ export default function SalesDashboardPage() {
         {/* Recent Orders */}
         <DashboardSection title="Recent Orders" viewAllHref="/sales/orders">
           {recentOrders.length === 0 ? (
-            <DashboardEmpty message="No orders yet" icon={ShoppingCart} />
+            <DashboardEmpty
+              message="No orders yet"
+              icon={ShoppingCart}
+              action={{ label: "Create an order", href: "/sales/orders/new" }}
+            />
           ) : (
             <table className="w-full text-sm">
               <thead>
