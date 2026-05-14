@@ -95,7 +95,10 @@
   --secondary-foreground: oklch(0.20 0.003 260);
 
   --muted: oklch(0.955 0.003 260);
-  --muted-foreground: oklch(0.50 0.003 260);
+  /* Audit F-100: bumped from 0.50 → 0.42 in light mode to clear the
+     WCAG AA 4.5:1 threshold for body text on muted backgrounds. Dark
+     mode (below) already exceeds the threshold and is unchanged. */
+  --muted-foreground: oklch(0.42 0.003 260);
 
   --accent: oklch(0.94 0.003 260);
   --accent-foreground: oklch(0.145 0.002 260);
