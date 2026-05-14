@@ -100,24 +100,37 @@ export async function POST(request: NextRequest) {
   // 6.5 Replay protection (audit F-127): reject events whose `created_at` is
   // more than 5 minutes from now. The HMAC signature alone doesn't bound the
   // replay window — a recorded request could be replayed indefinitely.
-  // A missing or unparseable timestamp is also rejected: silently skipping the
-  // check would leave the replay window wide open on crafted payloads.
+  // A missing or unparseable timestamp is also rejected: silently skipping
+  // the check would leave the replay window wide open on crafted payloads.
+  //
+  // Rejections return 200, not 4xx. Square retries any non-2xx on exponential
+  // backoff for up to 24h, and a stale event is stale on every retry — 4xx
+  // would create a retry storm. The warning log preserves observability while
+  // 200 acknowledges receipt and stops the retry loop.
   if (!event.created_at) {
-    return NextResponse.json({ error: "missing_created_at" }, { status: 400 });
+    logger.warn(
+      { event_id: event.event_id, type: event.type },
+      "[Square Webhook] Acknowledged but ignored: missing created_at"
+    );
+    return NextResponse.json({ received: true, ignored: "missing_created_at" });
   }
   const eventTime = Date.parse(event.created_at);
-  if (
-    !Number.isFinite(eventTime) ||
-    Math.abs(Date.now() - eventTime) > 5 * 60 * 1000
-  ) {
+  if (!Number.isFinite(eventTime)) {
     logger.warn(
       { event_id: event.event_id, created_at: event.created_at },
-      "[Square Webhook] Rejected stale event outside the 5-minute replay window"
+      "[Square Webhook] Acknowledged but ignored: invalid created_at"
     );
-    return NextResponse.json({ error: "stale_event" }, { status: 400 });
+    return NextResponse.json({ received: true, ignored: "invalid_created_at" });
+  }
+  if (Math.abs(Date.now() - eventTime) > 5 * 60 * 1000) {
+    logger.warn(
+      { event_id: event.event_id, created_at: event.created_at },
+      "[Square Webhook] Acknowledged but ignored: stale event outside the 5-minute replay window"
+    );
+    return NextResponse.json({ received: true, ignored: "stale_event" });
   }
 
-  // 7. Route by event type — always return 200 quickly to avoid Square retries
+  // 7. Route by event type.
   try {
     switch (event.type) {
       case "payment.completed":
@@ -133,12 +146,15 @@ export async function POST(request: NextRequest) {
         break;
     }
   } catch (err) {
-    // Log error but still return 200 to prevent Square retries.
-    // The error details are captured in the sync log where possible.
+    // Processing failed after the event_id slot was claimed-and-released
+    // (handlePaymentCompleted deletes the claim on error). Return 500 so
+    // Square retries delivery; the UNIQUE constraint on event_id guarantees
+    // only one retry can actually re-process.
     logger.error(
-      { err: err instanceof Error ? err.message : err },
-      `[Square Webhook] Error processing ${event.type}`
+      { err: err instanceof Error ? err.message : err, event_id: event.event_id, type: event.type },
+      `[Square Webhook] Error processing ${event.type}; Square will retry`
     );
+    return NextResponse.json({ error: "processing_failed" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });
@@ -169,6 +185,10 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
   // Race-safe dedup (audit F-135): claim the event_id slot before any side
   // effects. ON CONFLICT DO NOTHING returns empty data when a duplicate is
   // detected, so both concurrent retries cannot proceed past this point.
+  //
+  // Square reliably sends event_id; the fallback path (no event_id) proceeds
+  // without dedup. We don't synthesize a key from order_id because that would
+  // mask future Square API contract changes.
   let logId: string | null = null;
   if (event.event_id) {
     const { data: claimed } = await admin
@@ -191,188 +211,224 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       return;
     }
     logId = claimed[0].id;
-  }
-
-  // Fetch full order details from Square
-  const client = await getSquareClient();
-  if (!client) {
-    logger.error("[Square Webhook] Square client not available");
-    return;
-  }
-
-  const orderResponse = await client.orders.get({ orderId });
-  const order = orderResponse.order;
-
-  if (!order?.lineItems?.length) {
-    logger.info(
-      `[Square Webhook] Order ${orderId} has no line items, skipping`
+  } else {
+    logger.warn(
+      { order_id: orderId },
+      "[Square Webhook] payment.completed missing event_id; proceeding without race-safe dedup"
     );
-    return;
   }
 
-  // Resolve the MGR location from the Square location ID
-  let locationId: string | null = null;
-  if (squareLocationId) {
-    const { data: location } = await admin
-      .from("locations")
-      .select("id")
-      .eq("square_location_id", squareLocationId)
-      .maybeSingle();
-
-    locationId = location?.id ?? null;
-  }
-
-  let itemsSynced = 0;
-  let itemsFailed = 0;
-  const errors: Array<{ lineItemUid: string; error: string }> = [];
-
-  for (const lineItem of order.lineItems) {
-    const catalogObjectId = lineItem.catalogObjectId;
-    if (!catalogObjectId) {
-      // Non-catalog line item (custom amount), skip
-      continue;
+  try {
+    // Fetch full order details from Square. A missing client is a config
+    // failure — throw so the catch below frees the claimed slot and the outer
+    // handler returns 500; otherwise the claim sticks forever and the retry
+    // would dedup-skip the (recoverable) event.
+    const client = await getSquareClient();
+    if (!client) {
+      throw new Error("Square client not available");
     }
 
-    try {
-      // Look up the catalog mapping with selling format container type
-      const { data: mapping } = await dynamicFrom(admin, "square_catalog_map")
-        .select("id, brand_id, selling_format_id, selling_formats(containers(type))")
-        .eq("square_catalog_id", catalogObjectId)
-        .eq("object_type", "ITEM_VARIATION")
+    const orderResponse = await client.orders.get({ orderId });
+    const order = orderResponse.order;
+
+    if (!order?.lineItems?.length) {
+      // Legitimate no-op: finalize the log so the row reflects 0-item
+      // completion rather than sitting in "claimed but unfinished" forever.
+      logger.info(
+        `[Square Webhook] Order ${orderId} has no line items, skipping`
+      );
+      if (logId) {
+        await admin
+          .from("square_sync_log")
+          .update({
+            items_synced: 0,
+            items_failed: 0,
+            details: {
+              order_id: orderId,
+              payment_id: paymentId,
+              square_location_id: squareLocationId,
+              note: "Order had no line items",
+            },
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", logId);
+      }
+      return;
+    }
+
+    // Resolve the MGR location from the Square location ID
+    let locationId: string | null = null;
+    if (squareLocationId) {
+      const { data: location } = await admin
+        .from("locations")
+        .select("id")
+        .eq("square_location_id", squareLocationId)
         .maybeSingle();
 
-      if (!mapping) {
-        // No mapping found — could be a non-MGR product sold on Square
+      locationId = location?.id ?? null;
+    }
+
+    let itemsSynced = 0;
+    let itemsFailed = 0;
+    const errors: Array<{ lineItemUid: string; error: string }> = [];
+
+    for (const lineItem of order.lineItems) {
+      const catalogObjectId = lineItem.catalogObjectId;
+      if (!catalogObjectId) {
+        // Non-catalog line item (custom amount), skip
         continue;
       }
 
-      const quantity = parseInt(lineItem.quantity, 10) || 0;
-      if (quantity <= 0) continue;
+      try {
+        // Look up the catalog mapping with selling format container type
+        const { data: mapping } = await dynamicFrom(admin, "square_catalog_map")
+          .select("id, brand_id, selling_format_id, selling_formats(containers(type))")
+          .eq("square_catalog_id", catalogObjectId)
+          .eq("object_type", "ITEM_VARIATION")
+          .maybeSingle();
 
-      // Determine if this is a keg (draft) or packaged good based on container type.
-      // The join may be null if the selling format or container was deleted.
-      const containerType = mapping.selling_formats?.containers?.type ?? null;
-      const isDraft = containerType === "keg";
+        if (!mapping) {
+          // No mapping found — could be a non-MGR product sold on Square
+          continue;
+        }
 
-      if (!containerType) {
+        const quantity = parseInt(lineItem.quantity, 10) || 0;
+        if (quantity <= 0) continue;
+
+        // Determine if this is a keg (draft) or packaged good based on container type.
+        // The join may be null if the selling format or container was deleted.
+        const containerType = mapping.selling_formats?.containers?.type ?? null;
+        const isDraft = containerType === "keg";
+
+        if (!containerType) {
+          itemsFailed++;
+          errors.push({
+            lineItemUid: lineItem.uid ?? "unknown",
+            error: `Catalog mapping ${mapping.id} has no linked container type (selling_format or container may have been deleted)`,
+          });
+          continue;
+        }
+
+        if (!isDraft) {
+          // ---------------------------------------------------------------
+          // Packaged good sale: create a completed allocation
+          // ---------------------------------------------------------------
+
+          // Find the most relevant finished good for this brand + selling format
+          // (pick the one with the most available stock via FIFO by production date)
+          const { data: fg } = await dynamicFrom(admin, "finished_goods_with_availability")
+            .select("id")
+            .eq("brand_id", mapping.brand_id)
+            .eq("selling_format_id", mapping.selling_format_id)
+            .gt("available_quantity", 0)
+            .order("production_date", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (!fg) {
+            itemsFailed++;
+            errors.push({
+              lineItemUid: lineItem.uid ?? "unknown",
+              error: `No finished good with available inventory found for brand ${mapping.brand_id} / selling format ${mapping.selling_format_id}`,
+            });
+            continue;
+          }
+
+          await admin.from("allocations").insert({
+            source_type: "finished_good",
+            source_id: fg.id,
+            destination_type: "taproom_sale",
+            destination_id: null,
+            quantity,
+            status: "completed",
+            completed_at: event.created_at ?? new Date().toISOString(),
+            notes: `Square order ${orderId}`,
+          });
+
+          itemsSynced++;
+        } else {
+          // ---------------------------------------------------------------
+          // Draft sale: insert into square_draft_sales
+          // ---------------------------------------------------------------
+
+          if (!locationId) {
+            itemsFailed++;
+            errors.push({
+              lineItemUid: lineItem.uid ?? "unknown",
+              error: `Draft sale requires a mapped location but Square location ${squareLocationId} is not mapped to an MGR location`,
+            });
+            continue;
+          }
+
+          const volumeOz = calculateVolumeOz(quantity);
+
+          await admin.from("square_draft_sales").insert({
+            square_order_id: orderId,
+            square_payment_id: paymentId ?? null,
+            brand_id: mapping.brand_id,
+            selling_format_id: mapping.selling_format_id,
+            quantity,
+            volume_oz: volumeOz,
+            unit_price_cents: lineItem.basePriceMoney?.amount
+              ? Number(lineItem.basePriceMoney.amount)
+              : 0,
+            location_id: locationId,
+            sold_at: event.created_at ?? new Date().toISOString(),
+          });
+
+          itemsSynced++;
+        }
+      } catch (err) {
         itemsFailed++;
         errors.push({
           lineItemUid: lineItem.uid ?? "unknown",
-          error: `Catalog mapping ${mapping.id} has no linked container type (selling_format or container may have been deleted)`,
+          error: err instanceof Error ? err.message : String(err),
         });
-        continue;
       }
-
-      if (!isDraft) {
-        // ---------------------------------------------------------------
-        // Packaged good sale: create a completed allocation
-        // ---------------------------------------------------------------
-
-        // Find the most relevant finished good for this brand + selling format
-        // (pick the one with the most available stock via FIFO by production date)
-        const { data: fg } = await dynamicFrom(admin, "finished_goods_with_availability")
-          .select("id")
-          .eq("brand_id", mapping.brand_id)
-          .eq("selling_format_id", mapping.selling_format_id)
-          .gt("available_quantity", 0)
-          .order("production_date", { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
-        if (!fg) {
-          itemsFailed++;
-          errors.push({
-            lineItemUid: lineItem.uid ?? "unknown",
-            error: `No finished good with available inventory found for brand ${mapping.brand_id} / selling format ${mapping.selling_format_id}`,
-          });
-          continue;
-        }
-
-        await admin.from("allocations").insert({
-          source_type: "finished_good",
-          source_id: fg.id,
-          destination_type: "taproom_sale",
-          destination_id: null,
-          quantity,
-          status: "completed",
-          completed_at: event.created_at ?? new Date().toISOString(),
-          notes: `Square order ${orderId}`,
-        });
-
-        itemsSynced++;
-      } else {
-        // ---------------------------------------------------------------
-        // Draft sale: insert into square_draft_sales
-        // ---------------------------------------------------------------
-
-        if (!locationId) {
-          itemsFailed++;
-          errors.push({
-            lineItemUid: lineItem.uid ?? "unknown",
-            error: `Draft sale requires a mapped location but Square location ${squareLocationId} is not mapped to an MGR location`,
-          });
-          continue;
-        }
-
-        const volumeOz = calculateVolumeOz(quantity);
-
-        await admin.from("square_draft_sales").insert({
-          square_order_id: orderId,
-          square_payment_id: paymentId ?? null,
-          brand_id: mapping.brand_id,
-          selling_format_id: mapping.selling_format_id,
-          quantity,
-          volume_oz: volumeOz,
-          unit_price_cents: lineItem.basePriceMoney?.amount
-            ? Number(lineItem.basePriceMoney.amount)
-            : 0,
-          location_id: locationId,
-          sold_at: event.created_at ?? new Date().toISOString(),
-        });
-
-        itemsSynced++;
-      }
-    } catch (err) {
-      itemsFailed++;
-      errors.push({
-        lineItemUid: lineItem.uid ?? "unknown",
-        error: err instanceof Error ? err.message : String(err),
-      });
     }
-  }
 
-  // Finalise the sync log. If we claimed a row at the top (logId is set),
-  // update it with final stats. Otherwise (no event_id) do a plain insert.
-  const logDetails = {
-    order_id: orderId,
-    payment_id: paymentId,
-    square_location_id: squareLocationId,
-    event_id: event.event_id,
-    line_item_count: order.lineItems.length,
-    ...(errors.length > 0 ? { errors } : {}),
-  };
+    // Finalise the sync log. If we claimed a row at the top (logId is set),
+    // update it with final stats. Otherwise (no event_id) do a plain insert.
+    // `event_id` is stored as a top-level column, not duplicated in details.
+    const logDetails = {
+      order_id: orderId,
+      payment_id: paymentId,
+      square_location_id: squareLocationId,
+      line_item_count: order.lineItems.length,
+      ...(errors.length > 0 ? { errors } : {}),
+    };
 
-  if (logId) {
-    await admin
-      .from("square_sync_log")
-      .update({
+    if (logId) {
+      await admin
+        .from("square_sync_log")
+        .update({
+          location_id: locationId,
+          items_synced: itemsSynced,
+          items_failed: itemsFailed,
+          details: logDetails,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", logId);
+    } else {
+      await admin.from("square_sync_log").insert({
+        sync_type: "sale_ingest",
+        event_id: null,
         location_id: locationId,
         items_synced: itemsSynced,
         items_failed: itemsFailed,
         details: logDetails,
         completed_at: new Date().toISOString(),
-      })
-      .eq("id", logId);
-  } else {
-    await admin.from("square_sync_log").insert({
-      sync_type: "sale_ingest",
-      event_id: null,
-      location_id: locationId,
-      items_synced: itemsSynced,
-      items_failed: itemsFailed,
-      details: logDetails,
-      completed_at: new Date().toISOString(),
-    });
+      });
+    }
+  } catch (err) {
+    // Compensation: free the claimed slot so Square's retry can re-acquire
+    // the event_id and re-process from scratch. Without this, a transient
+    // failure (network blip, Square API hiccup) silently drops the order —
+    // the claim sticks and every retry hits the dedup short-circuit.
+    if (logId) {
+      await admin.from("square_sync_log").delete().eq("id", logId);
+    }
+    throw err;
   }
 }
 
@@ -393,7 +449,6 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
       items_failed: 0,
       details: {
         event_type: "inventory.count.updated",
-        event_id: event.event_id,
         note: "Logged for informational purposes only. MGR is source of truth for inventory.",
         raw_data: (event.data ?? null) as import("@/types/supabase").Json,
       },
