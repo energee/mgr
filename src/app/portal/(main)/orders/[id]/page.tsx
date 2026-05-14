@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { EmptyStateHint } from "@/components/universal/empty-state-hint";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
@@ -219,8 +220,8 @@ export default function PortalOrderDetailPage({
           Back to Orders
         </Link>
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Order not found.
+          <CardContent>
+            <EmptyStateHint message="That order isn't available. It may have been removed, or your access to it has changed." href="/portal/orders" linkLabel="View your orders" />
           </CardContent>
         </Card>
       </div>
@@ -345,9 +346,7 @@ export default function PortalOrderDetailPage({
               </div>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              No items on this order.
-            </p>
+            <EmptyStateHint message="No items on this order yet." />
           )}
         </CardContent>
       </Card>
