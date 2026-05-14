@@ -51,3 +51,6 @@ $$;
 
 COMMENT ON FUNCTION dismiss_notifications_bulk IS
   'Dismisses multiple notifications in a single statement (audit F-055).';
+
+-- Refresh PostgREST schema cache so the new RPCs are reachable from the client.
+NOTIFY pgrst, 'reload schema';

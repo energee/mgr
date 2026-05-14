@@ -9517,6 +9517,10 @@ export type Database = {
         Args: { p_notification_id: string }
         Returns: undefined
       }
+      dismiss_notifications_bulk: {
+        Args: { p_notification_ids: string[] }
+        Returns: number
+      }
       dispatch_email_notification: {
         Args: {
           p_action_url: string
@@ -9678,6 +9682,10 @@ export type Database = {
       mark_notification_read: {
         Args: { p_notification_id: string }
         Returns: undefined
+      }
+      mark_notifications_read_bulk: {
+        Args: { p_notification_ids: string[] }
+        Returns: number
       }
       notify_all_users: {
         Args: {
