@@ -37,7 +37,9 @@ export const GET = withPermission("settings:manage", async (req, { supabase, use
 
     if (error) {
       logger.error("[api-key] Failed to check global key: %s", error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
     }
 
     const value = data?.value;
@@ -57,7 +59,9 @@ export const GET = withPermission("settings:manage", async (req, { supabase, use
 
     if (error) {
       logger.error("[api-key] Failed to check user key: %s", error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
     }
 
     const key = data?.anthropic_api_key;
@@ -84,7 +88,9 @@ export const GET = withPermission("settings:manage", async (req, { supabase, use
 
     if (error) {
       logger.error(`[api-key] Failed to check ${id} key: %s`, error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
     }
 
     const value = data?.value;
@@ -117,7 +123,9 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
 
       if (error) {
         logger.error("[api-key] Failed to remove global key: %s", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
       }
     } else {
       const { error } = await admin
@@ -126,7 +134,9 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
 
       if (error) {
         logger.error("[api-key] Failed to save global key: %s", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
       }
     }
     return NextResponse.json({ success: true });
@@ -143,7 +153,9 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
 
     if (error) {
       logger.error("[api-key] Failed to save user key: %s", error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
     }
     return NextResponse.json({ success: true });
   }
@@ -173,7 +185,9 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
 
         if (error) {
           logger.error(`[api-key] Failed to remove ${id} key: %s`, error.message);
-          return NextResponse.json({ error: error.message }, { status: 500 });
+          // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
         }
       }
     } else if (existing) {
@@ -184,7 +198,9 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
 
       if (error) {
         logger.error(`[api-key] Failed to save ${id} key: %s`, error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
       }
     } else {
       const { error } = await admin
@@ -193,7 +209,9 @@ export const POST = withPermission("settings:manage", async (req, { supabase, us
 
       if (error) {
         logger.error(`[api-key] Failed to insert ${id} key: %s`, error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Throw so withPermission/handleApiError sanitizes the message before
+      // returning a structured 500. Raw Supabase error.message is logged above.
+      throw error;
       }
     }
 

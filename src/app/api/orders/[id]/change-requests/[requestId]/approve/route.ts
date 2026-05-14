@@ -16,7 +16,10 @@ export const POST = withPermission(
     });
 
     if (error) {
-      return errorResponse("INTERNAL_ERROR", error.message, error.details, 500);
+      // Let withPermission/handleApiError translate the Postgres error code
+      // and sanitize the response — error.message/details may contain raw
+      // table/column names that should not leak to the client.
+      throw error;
     }
 
     return successResponse({ approved: true });

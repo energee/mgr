@@ -5,6 +5,9 @@
  */
 
 import { PG_ERROR_CODES } from "../pg-error-codes";
+import { logger } from "../logger";
+
+const log = logger.child({ module: "api/errors" });
 
 export type ApiErrorCode =
   | "UNAUTHORIZED"
@@ -96,6 +99,11 @@ const PG_ERROR_MAP: Record<
 /**
  * Catch-all error handler that maps known error types to structured API errors.
  * Returns an ApiError suitable for building an error response.
+ *
+ * Internal `Error.message` strings are intentionally NOT forwarded to the
+ * response body — Postgres errors and other internal failures often contain
+ * table/column names or query fragments that should not leak to clients.
+ * The raw error is logged server-side so operators can debug.
  */
 export function handleApiError(error: unknown): ApiError {
   if (error instanceof ApiError) {
@@ -105,16 +113,30 @@ export function handleApiError(error: unknown): ApiError {
   if (isPostgresError(error)) {
     const mapped = PG_ERROR_MAP[error.code];
     if (mapped) {
+      // Log the raw Postgres details for operator debugging
+      log.error(
+        { pg_code: error.code, message: error.message, details: error.details },
+        "Mapped Postgres error",
+      );
       return new ApiError(mapped.code, mapped.message, mapped.status, {
         pg_code: error.code,
       });
     }
+    // Unrecognized Postgres code — fall through to generic 500 with sanitized message
+    log.error(
+      { pg_code: error.code, message: error.message, details: error.details },
+      "Unmapped Postgres error",
+    );
+    return new ApiError("INTERNAL_ERROR", "An unexpected error occurred", 500);
   }
 
   if (error instanceof Error) {
-    return new ApiError("INTERNAL_ERROR", error.message, 500);
+    // Log the real error server-side; do NOT forward error.message to client.
+    log.error({ name: error.name, message: error.message }, "Unhandled error");
+    return new ApiError("INTERNAL_ERROR", "An unexpected error occurred", 500);
   }
 
+  log.error({ error }, "Unknown error value");
   return new ApiError("INTERNAL_ERROR", "An unexpected error occurred", 500);
 }
 

@@ -1,8 +1,11 @@
 import { streamText, stepCountIs, type UIMessage, convertToModelMessages } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { withAuth } from "@/lib/api/auth";
+import { errorResponse } from "@/lib/api/response";
+import { validateBody } from "@/lib/api/validation";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/supabase";
 import { createChatTools } from "./tools";
@@ -33,6 +36,36 @@ type PageContext = {
   entityType?: string;
   entityId?: string;
 }
+
+/**
+ * Request body schema for POST /api/chat.
+ *
+ * `messages` follows the AI SDK `UIMessage` shape: id + role + parts[]. Each
+ * part has many variant shapes (text, reasoning, tool calls, files, ...), so
+ * we keep individual parts permissive (`passthrough`) while still rejecting
+ * grossly malformed payloads (missing role, non-array parts, etc.). This runs
+ * BEFORE the relatively expensive Anthropic key lookup so junk payloads are
+ * rejected cheaply.
+ */
+const chatRequestSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        role: z.enum(["system", "user", "assistant"]),
+        parts: z.array(z.record(z.string(), z.unknown())),
+      }).passthrough(),
+    )
+    .min(1)
+    .max(200),
+  pageContext: z
+    .object({
+      section: z.string().max(100).optional(),
+      entityType: z.string().max(100).optional(),
+      entityId: z.string().max(100).optional(),
+    })
+    .optional(),
+});
 
 /**
  * Map from chat context entityType strings (from URL parsing) to entity
@@ -205,19 +238,34 @@ async function resolveApiKey(
 export const POST = withAuth(async (request, { user, supabase }) => {
   const startTime = Date.now();
 
-  // Rate limit: 10 requests per minute per IP
+  // Rate limit: 10 requests per minute per IP. Use the standardized
+  // errorResponse shape with a Retry-After header so all 429s look alike.
   const ip = getClientIp(request);
   const limiter = rateLimit(`chat:${ip}`, { windowMs: 60_000, maxRequests: 10 });
   if (!limiter.success) {
     log.warn({ ip, userId: user.id }, "Rate limit exceeded");
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      {
-        status: 429,
-        headers: { "Retry-After": String(Math.ceil(limiter.resetMs / 1000)) },
-      },
+    const res = errorResponse(
+      "RATE_LIMITED",
+      "Too many requests. Please try again later.",
+      { retryAfterMs: limiter.resetMs },
+      429,
     );
+    res.headers.set("Retry-After", String(Math.ceil(limiter.resetMs / 1000)));
+    return res;
   }
+
+  // Validate the body BEFORE the (relatively expensive) API key lookup so
+  // malformed payloads are rejected cheaply. validateBody throws ApiError
+  // on failure, which withAuth converts to a 422.
+  //
+  // The schema validates the outer shape (role enum, parts is an array,
+  // pageContext fields are short strings) but treats individual parts as
+  // opaque objects to keep coupling to the AI SDK's many UIMessagePart
+  // variants loose. Cast through `unknown` because the validated shape is
+  // intentionally looser than the AI SDK's `UIMessage`.
+  const validated = await validateBody(chatRequestSchema, request);
+  const messages = validated.messages as unknown as UIMessage[];
+  const pageContext = validated.pageContext as PageContext | undefined;
 
   const apiKey = await resolveApiKey(supabase, user.id);
 
@@ -228,9 +276,6 @@ export const POST = withAuth(async (request, { user, supabase }) => {
       { status: 400 },
     );
   }
-
-  const { messages, pageContext }: { messages: UIMessage[]; pageContext?: PageContext } =
-    await request.json();
 
   log.info({
     userId: user.id,

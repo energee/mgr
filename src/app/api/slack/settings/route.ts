@@ -20,7 +20,9 @@ export const GET = withPermission("integrations:manage", async () => {
 
   if (error) {
     log.error({ error: error.message }, "GET error");
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Throw so withPermission/handleApiError sanitizes the message before
+    // returning a structured 500. Raw error.message is logged above.
+    throw error;
   }
 
   // Mask webhook URL for client display
@@ -87,7 +89,9 @@ export const PUT = withPermission("integrations:manage", async (req) => {
 
   if (error) {
     log.error({ error: error.message }, "PUT error");
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Throw so withPermission/handleApiError sanitizes the message before
+    // returning a structured 500. Raw error.message is logged above.
+    throw error;
   }
 
   return NextResponse.json({ success: true });

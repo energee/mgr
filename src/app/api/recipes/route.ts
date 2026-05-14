@@ -9,13 +9,32 @@ import { recipeSchema } from "@/lib/schemas/recipe";
 import { successResponse } from "@/lib/api/response";
 import { escapeLike } from "@/lib/utils";
 
+/**
+ * Allowlist of sortable columns on `recipes_with_estimates`. Constraining
+ * the raw `sort` string prevents PostgREST `.order()` injection / data
+ * exposure via arbitrary column references.
+ */
+const RECIPE_SORT_COLUMNS = [
+  "name",
+  "status",
+  "style",
+  "style_name",
+  "is_active",
+  "created_at",
+  "updated_at",
+  "batch_count",
+  "est_abv",
+  "est_ibu",
+  "est_og",
+] as const;
+
 const listParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(25),
   brand_id: z.string().uuid().optional(),
   style_id: z.string().uuid().optional(),
   is_active: z.enum(["true", "false"]).optional(),
-  sort: z.string().default("name"),
+  sort: z.enum(RECIPE_SORT_COLUMNS).default("name"),
   direction: z.enum(["asc", "desc"]).default("asc"),
   search: z.string().optional(),
 });

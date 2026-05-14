@@ -9,12 +9,31 @@ import { batchSchema } from "@/lib/schemas/batch";
 import { successResponse } from "@/lib/api/response";
 import { escapeLike } from "@/lib/utils";
 
+/**
+ * Allowlist of sortable columns. Limits user-supplied `sort` to known columns
+ * on `batches_with_brew_info` so the raw string can be passed safely to
+ * PostgREST `.order()`.
+ */
+const BATCH_SORT_COLUMNS = [
+  "batch_code",
+  "name",
+  "status",
+  "brew_date",
+  "planned_start_date",
+  "target_package_date",
+  "created_at",
+  "updated_at",
+  "volume_bbl",
+  "estimated_volume_bbl",
+  "actual_abv",
+] as const;
+
 const listParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(25),
   status: z.string().optional(),
   recipe_id: z.string().uuid().optional(),
-  sort: z.string().default("created_at"),
+  sort: z.enum(BATCH_SORT_COLUMNS).default("created_at"),
   direction: z.enum(["asc", "desc"]).default("desc"),
   search: z.string().optional(),
 });

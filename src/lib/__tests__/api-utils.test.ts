@@ -438,12 +438,16 @@ describe("handleApiError", () => {
     expect(result.status).toBe(403);
   });
 
-  it("maps generic Error instances to INTERNAL_ERROR 500", () => {
-    const err = new Error("Something broke");
+  it("maps generic Error instances to INTERNAL_ERROR 500 with sanitized message", () => {
+    // Internal error messages must NOT be forwarded to clients — they often
+    // contain Postgres table/column names, query fragments, or stack hints.
+    const err = new Error("duplicate key value violates unique constraint \"batches_batch_code_key\"");
     const result = handleApiError(err);
     expect(result.code).toBe("INTERNAL_ERROR");
     expect(result.status).toBe(500);
-    expect(result.message).toBe("Something broke");
+    expect(result.message).toBe("An unexpected error occurred");
+    // Raw message must not leak into the public response body
+    expect(result.message).not.toContain("batches_batch_code_key");
   });
 
   it("maps unknown non-Error values to INTERNAL_ERROR 500", () => {

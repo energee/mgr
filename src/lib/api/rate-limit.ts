@@ -5,9 +5,16 @@
  * window duration and request limits. Expired entries are automatically
  * cleaned up every 5 minutes to prevent memory leaks.
  *
- * **Known limitation (DEC-SEC-002):** State is per-instance and resets on cold
- * start. Under concurrent serverless load, different instances maintain
- * independent buckets. See docs/spec/decisions.md for upgrade path.
+ * **CRITICAL LIMITATION (DEC-SEC-002):** State is per-instance memory and
+ * does NOT survive cold starts. On Vercel Fluid Compute (and any horizontally
+ * scaled deployment), each instance maintains independent buckets, so the
+ * effective limit scales with the number of warm instances rather than
+ * applying globally. This is acceptable for low-throughput abuse mitigation
+ * but is **NOT a security boundary** for high-volume endpoints (chat, email).
+ *
+ * Upgrade path: replace with `@upstash/ratelimit` + Vercel KV (Upstash Redis)
+ * or another shared store. See docs/spec/decisions.md (DEC-SEC-002) for the
+ * recommended migration.
  *
  * Usage:
  *   const ip = getClientIp(request);
@@ -133,8 +140,10 @@ export function getClientIp(request: Request): string {
     return realIp.trim();
   }
 
-  // Fallback to x-forwarded-for (last entry is most trustworthy, added by the
-  // nearest proxy; earlier entries may be client-supplied)
+  // Fallback to x-forwarded-for. On Vercel the nearest proxy appends the real
+  // client IP to the end of the list, so the LAST entry is the most
+  // trustworthy. On other platforms the convention is reversed (first entry
+  // is the original client) — adjust if deploying elsewhere.
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
     const parts = forwarded.split(",");
