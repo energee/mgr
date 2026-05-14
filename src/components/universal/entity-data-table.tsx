@@ -918,13 +918,11 @@ function LoadingSkeleton({ columnCount }: { columnCount: number }) {
 }
 
 // =============================================================================
-// Re-exports for backward compatibility
+// Re-exports — canonical hub is entity-list.tsx
 // =============================================================================
 
 export type EntityListProps<T = Record<string, unknown>> =
   EntityDataTableProps<T>;
-
-export { EntityDataTable as EntityList };
 
 export function EntityDataTableWithErrorBoundary<
   T = Record<string, unknown>,
@@ -938,4 +936,3 @@ export function EntityDataTableWithErrorBoundary<
   );
 }
 
-export { EntityDataTableWithErrorBoundary as EntityListWithErrorBoundary };
