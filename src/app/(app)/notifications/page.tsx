@@ -94,8 +94,7 @@ const PAGE_SIZE = 20;
 // Helper Functions
 // =============================================================================
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+function formatDate(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -449,7 +448,7 @@ export default function NotificationsPage() {
                       {/* Audit F-091: render relative time on the client to avoid SSR mismatch. */}
                       <RelativeTime
                         value={notification.created_at}
-                        format={(d) => formatDate(d.toISOString())}
+                        format={formatDate}
                         className="text-xs text-muted-foreground whitespace-nowrap"
                       />
                     </div>

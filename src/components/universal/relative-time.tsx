@@ -14,9 +14,9 @@
  *   <RelativeTime value={notification.created_at} format={(d) => formatRelative(d)} />
  *   <RelativeTime value="now" format={(d) => format(d, "EEEE, MMM d")} />
  *
- * The `format` callback must be referentially stable across renders
- * (declare it at module scope or wrap in `useCallback`) — it's only
- * invoked during the client render after `useSyncExternalStore` settles.
+ * The `format` callback is invoked once per parent render after hydration.
+ * It does not need to be wrapped in `useCallback` — the component re-renders
+ * only when its parent does, same as any other prop.
  */
 
 import { useSyncExternalStore, type ReactNode } from "react";
@@ -24,11 +24,11 @@ import { useSyncExternalStore, type ReactNode } from "react";
 type RelativeTimeProps = {
   /** ISO date string, Date, or the literal "now" for the live current time. */
   value: string | Date | "now";
-  /** Stable formatter applied on the client after hydration. */
+  /** Formatter applied on the client after hydration. */
   format: (date: Date) => string;
   /** Fallback rendered during SSR + before hydration. Defaults to empty. */
   fallback?: ReactNode;
-  /** Class passed to the wrapping span. */
+  /** Class passed to the wrapping time element. */
   className?: string;
 };
 
@@ -55,7 +55,17 @@ export function RelativeTime({
 }: RelativeTimeProps) {
   const hydrated = useIsHydrated();
   if (!hydrated) {
-    return <span className={className}>{fallback}</span>;
+    const isoValue =
+      value === "now"
+        ? undefined
+        : value instanceof Date
+          ? value.toISOString()
+          : value;
+    return (
+      <time dateTime={isoValue} className={className}>
+        {fallback}
+      </time>
+    );
   }
   const date =
     value === "now"
@@ -64,7 +74,11 @@ export function RelativeTime({
         ? value
         : new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return <span className={className}>{fallback}</span>;
+    return <time className={className}>{fallback}</time>;
   }
-  return <span className={className}>{format(date)}</span>;
+  return (
+    <time dateTime={date.toISOString()} className={className}>
+      {format(date)}
+    </time>
+  );
 }
