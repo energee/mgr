@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import { rememberEmail, readRememberedEmail } from "@/lib/auth-utils";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { OtpCodeInput, OTP_LENGTH } from "@/components/auth/otp-code-input";
 import { Button } from "@/components/ui/button";
@@ -38,12 +39,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
-  const [email, setEmail] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("mgr:login-email") ?? "";
-    }
-    return "";
-  });
+  const [email, setEmail] = useState(() => readRememberedEmail());
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
@@ -75,7 +71,7 @@ export function LoginForm() {
         return;
       }
 
-      localStorage.setItem("mgr:login-email", email);
+      rememberEmail(email);
       router.push(redirect);
       router.refresh();
     } catch {
@@ -105,7 +101,7 @@ export function LoginForm() {
         return;
       }
 
-      localStorage.setItem("mgr:login-email", email);
+      rememberEmail(email);
       setOtpSent(true);
       setOtpCode("");
       toast.success("Check your email for a login link or code");
@@ -133,7 +129,7 @@ export function LoginForm() {
         return;
       }
 
-      localStorage.setItem("mgr:login-email", email);
+      rememberEmail(email);
       router.push(redirect);
       router.refresh();
     } catch {
@@ -191,7 +187,15 @@ export function LoginForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Link
+            href="/forgot-password"
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <Input
           id="password"
           type="password"
