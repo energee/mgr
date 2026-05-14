@@ -11,22 +11,9 @@ import { CHAT_ENTITY_MAP } from "./entity-map";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { logger } from "@/lib/logger";
 
-const log = logger.child({ route: "/api/chat" });
+import { BASE_SYSTEM_PROMPT, PROMPT_VERSION } from "@/lib/ai/prompts";
 
-const BASE_SYSTEM_PROMPT = `You are the MGR Brewery Assistant — concise, practical, brewery-focused.
-
-Knowledge: brewing science, BJCP styles, production planning, inventory, recipe optimization.
-
-You have tools to query live brewery data. Use searchEntity and getEntityDetail for any entity type. Use specialized tools (analyzeRecipe, analyzeBatch, etc.) for domain-specific analysis.
-
-Navigation tools open pre-filled forms for the user to review and submit:
-- createBatch, transitionBatch, addBatchReading, createPackagingSession
-
-Use lookupEntity to resolve names/numbers to UUIDs (e.g., "batch 42" → UUID).
-
-When users ask "how do I..." in MGR, use the getAppGuide tool to look up navigation instructions.
-
-Summarize tool results clearly. Use tables for multi-row data.`;
+const log = logger.child({ route: "/api/chat", promptVersion: PROMPT_VERSION });
 
 type PageContext = {
   section?: string;
