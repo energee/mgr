@@ -63,7 +63,17 @@ for (const file of walk(MIGRATIONS_DIR)) {
     );
     if (createMatch) {
       const name = createMatch[1];
-      const lookahead = lines.slice(i, i + 20).join(" ");
+      // The view's WITH (...) reloptions clause (if present) appears between
+      // the view name and the `AS <query>` keyword. Scan the header until we
+      // hit `AS` so views with long column-alias lists are handled correctly.
+      // Fall back to a 200-line cap to bound the scan on pathological input.
+      const headerLines: string[] = [];
+      const maxScan = Math.min(lines.length, i + 200);
+      for (let j = i; j < maxScan; j++) {
+        headerLines.push(lines[j]);
+        if (/\bAS\b/i.test(lines[j].replace(/--.*$/, ""))) break;
+      }
+      const lookahead = headerLines.join(" ");
       const prevLine = lines[i - 1] ?? "";
       const skipped = /check-security-invoker:\s*skip/i.test(prevLine);
       const secured = hasInvokerWithClause(lookahead);

@@ -66,7 +66,7 @@ for (let f = 0; f < files.length; f++) {
     if (/check-rls:\s*skip/i.test(prevLine)) continue;
 
     const enablePattern = new RegExp(
-      `ALTER\\s+TABLE\\s+(?:public\\.)?${escapeRe(tableName)}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`,
+      `ALTER\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?:ONLY\\s+)?(?:public\\.)?${escapeRe(tableName)}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`,
       "i",
     );
 

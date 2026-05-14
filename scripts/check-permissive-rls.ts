@@ -8,8 +8,18 @@
  * Rationale: docs/agents/db-security.md. `WITH CHECK (true)` defeats the
  * purpose of the policy — it permits every row regardless of caller.
  *
- * Migration-history-aware via per-policy block tracking. A
- * `-- check-permissive-rls: skip <reason>` comment placed:
+ * Per-policy block tracking: the scanner walks each CREATE POLICY block
+ * (delimited by the closing `;`) and inspects every `USING (true)` /
+ * `WITH CHECK (true)` line inside that block.
+ *
+ * NOTE: this scanner is NOT migration-history-aware. It does not track
+ * `DROP POLICY` statements, so a `USING (true)` in an early migration
+ * that is later dropped + recreated (e.g. the 00092 mass-policy rewrite)
+ * will still be flagged. Pre-rewrite migrations are grandfathered via
+ * the file-level allowlist
+ * (`scripts/check-permissive-rls.allowlist.txt`).
+ *
+ * A `-- check-permissive-rls: skip <reason>` comment placed:
  *   - directly above CREATE POLICY, OR
  *   - directly above any individual USING / WITH CHECK line
  * exempts that whole policy or that line.
@@ -73,7 +83,9 @@ for (const file of walk(MIGRATIONS_DIR)) {
       }
     }
 
-    if (/;\s*(--.*)?$/.test(line)) {
+    // Use codePart (line with trailing `-- comment` stripped) so semicolons
+    // inside SQL string literals or comments don't prematurely end the block.
+    if (/;\s*$/.test(codePart)) {
       inPolicy = false;
       policySkipped = false;
       policyName = "";
