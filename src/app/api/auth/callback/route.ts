@@ -1,8 +1,9 @@
 /**
  * Auth Callback Route
  *
- * Handles the callback from magic link / OAuth authentication.
- * Exchanges the auth code for a session and redirects.
+ * Handles the callback from magic-link, OAuth, and password-recovery emails.
+ * Exchanges the auth code for a session, then forwards the user to
+ * /update-password for `type=recovery`, or to the requested redirect otherwise.
  *
  * CSRF posture (audit F-128): Supabase's `exchangeCodeForSession` uses the
  * PKCE flow under the hood — the SDK stores a `code_verifier` in an
@@ -18,12 +19,13 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isValidRedirect } from "@/lib/auth-utils";
+import { AUTH_CALLBACK_TYPE_RECOVERY, isValidRedirect } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
+  const type = searchParams.get("type");
   const rawRedirect = searchParams.get("redirect") || "/";
 
   // Validate redirect parameter to prevent open redirect attacks.
@@ -62,5 +64,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
   }
 
-  return NextResponse.redirect(`${origin}${safeRedirect}`);
+  const destination = type === AUTH_CALLBACK_TYPE_RECOVERY ? "/update-password" : safeRedirect;
+  return NextResponse.redirect(`${origin}${destination}`);
 }
