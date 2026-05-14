@@ -52,10 +52,7 @@ export function DashboardSection({
 
 /**
  * Empty state for dashboard sections.
- *
- * Renders an optional icon above a centered message, with an optional CTA
- * button (audit F-088) so new tenants have a clear next step instead of
- * staring at "No active batches" with nowhere to go.
+ * Renders an optional icon above a centered message, with an optional CTA button.
  */
 export function DashboardEmpty({
   message,
@@ -76,7 +73,7 @@ export function DashboardEmpty({
       <Icon className="size-8 text-muted-foreground/30" />
       <p className="text-sm text-muted-foreground text-center">{message}</p>
       {action && (
-        <Button asChild variant="outline" size="sm" className="mt-2">
+        <Button asChild variant="outline" size="sm">
           <Link href={action.href}>{action.label}</Link>
         </Button>
       )}
