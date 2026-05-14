@@ -29,6 +29,7 @@ import { SlackIntegrationCard } from "@/components/domain/slack-integration-card
 import { mongodbKeys, qboKeys, squareKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { RelativeTime } from "@/components/universal/relative-time";
+import { formatDistanceToNow } from "date-fns";
 
 // =============================================================================
 // Global API Key Section (write-only — key is never read back to the client)
@@ -338,13 +339,17 @@ function SquareIntegrationCard() {
                   {status?.lastCatalogSync && (
                     <RelativeTime
                       value={status.lastCatalogSync}
-                      format={(d) => `Catalog: ${d.toLocaleString()}`}
+                      format={(d) =>
+                        `Catalog: ${formatDistanceToNow(d, { addSuffix: true })}`
+                      }
                     />
                   )}
                   {status?.lastInventorySync && (
                     <RelativeTime
                       value={status.lastInventorySync}
-                      format={(d) => `Inventory: ${d.toLocaleString()}`}
+                      format={(d) =>
+                        `Inventory: ${formatDistanceToNow(d, { addSuffix: true })}`
+                      }
                     />
                   )}
                 </div>
@@ -385,7 +390,7 @@ function SquareIntegrationCard() {
                       <RelativeTime
                         value={sync.startedAt}
                         format={(d) =>
-                          `${sync.syncType.replace("_", " ")} — ${d.toLocaleString()}`
+                          `${sync.syncType.replace("_", " ")} — ${formatDistanceToNow(d, { addSuffix: true })}`
                         }
                         className="text-muted-foreground"
                       />

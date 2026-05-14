@@ -26,30 +26,23 @@ import {
   TimelineConnector,
   TimelineContent,
 } from "@/components/ui/timeline";
+import { RelativeTime } from "@/components/universal/relative-time";
+import { formatDistanceToNow } from "date-fns";
 
 
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago").
+ *
+ * Delegates to `date-fns/formatDistanceToNow` so wording stays consistent
+ * with the rest of the app. For dates older than 30 days, fall back to the
+ * locale date string so the value stays compact.
  */
 function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSeconds < 60) {
-    return "just now";
-  } else if (diffMinutes < 60) {
-    return `${diffMinutes} minute${diffMinutes !== 1 ? "s" : ""} ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
-  } else if (diffDays < 30) {
-    return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
-  } else {
-    return date.toLocaleDateString();
-  }
+  const diffMs = Date.now() - date.getTime();
+  const diffDay = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDay >= 30) return date.toLocaleDateString();
+  if (diffMs < 60_000) return "just now";
+  return `${formatDistanceToNow(date)} ago`;
 }
 
 // =============================================================================
@@ -339,9 +332,12 @@ function RevisionItem({
                 <Icon className="h-3 w-3" />
                 {config.label}
               </Badge>
-              <span className="text-sm text-muted-foreground">
-                {formatTimeAgo(new Date(revision.changed_at))}
-              </span>
+              {/* Audit F-091: render relative time on the client to avoid SSR mismatch. */}
+              <RelativeTime
+                value={revision.changed_at}
+                format={formatTimeAgo}
+                className="text-sm text-muted-foreground"
+              />
               {revision.change_reason && (
                 <span className="text-sm text-muted-foreground">
                   — {revision.change_reason}
@@ -528,9 +524,12 @@ export function RevisionHistoryCompact({
           <Badge variant="outline" className="text-xs">
             {OPERATION_CONFIG[rev.operation].label}
           </Badge>
-          <span className="text-muted-foreground">
-            {formatTimeAgo(new Date(rev.changed_at))}
-          </span>
+          {/* Audit F-091: render relative time on the client to avoid SSR mismatch. */}
+          <RelativeTime
+            value={rev.changed_at}
+            format={formatTimeAgo}
+            className="text-muted-foreground"
+          />
         </div>
       ))}
     </div>

@@ -22,24 +22,26 @@ import { useNotifications, type Notification } from "@/contexts/notifications";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { log } from "@/lib/client-logger";
+import { RelativeTime } from "@/components/universal/relative-time";
+import { formatDistanceToNow } from "date-fns";
 
 // =============================================================================
 // Helper Functions
 // =============================================================================
 
+/**
+ * Format a date as a short relative-time label (e.g. "2m ago", "3h ago").
+ *
+ * Wraps `date-fns/formatDistanceToNow` with a project-specific compact suffix
+ * style. Falls back to a locale date string for older timestamps to match
+ * the prior hand-rolled behavior.
+ */
 function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
-
-  if (diffSec < 60) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHour < 24) return `${diffHour}h ago`;
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return date.toLocaleDateString();
+  const diffMs = Date.now() - date.getTime();
+  const diffDay = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDay >= 7) return date.toLocaleDateString();
+  if (diffMs < 60_000) return "just now";
+  return `${formatDistanceToNow(date)} ago`;
 }
 
 function getPriorityColor(priority: Notification["priority"]): string {
@@ -104,9 +106,12 @@ function NotificationItem({
           <h4 className="text-sm font-medium text-foreground line-clamp-1">
             {notification.title}
           </h4>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatTimeAgo(new Date(notification.created_at))}
-          </span>
+          {/* Audit F-091: render relative time on the client to avoid SSR mismatch. */}
+          <RelativeTime
+            value={notification.created_at}
+            format={formatTimeAgo}
+            className="text-xs text-muted-foreground whitespace-nowrap"
+          />
         </div>
         {notification.message && (
           <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
