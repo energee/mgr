@@ -44,17 +44,37 @@ export function toCSV(rows: CSVRow[], columns?: { key: string; header: string }[
 }
 
 /**
- * Escape a field for CSV (wrap in quotes if contains comma, quote, or newline)
+ * Escape a field for CSV.
+ *
+ * Wraps in quotes if the value contains comma, double-quote, or newline.
+ * Also defends against CSV formula injection (CVE-2014-3524 style): when a
+ * field begins with `=`, `+`, `-`, `@`, tab, or carriage return, Excel and
+ * Google Sheets treat the cell as a live formula. We prefix such values with
+ * a literal tab inside a quoted field so the spreadsheet renders them as
+ * plain text instead of executing.
  */
 function escapeCSVField(field: string): string {
-  if (field.includes(",") || field.includes('"') || field.includes("\n")) {
-    return `"${field.replace(/"/g, '""')}"`;
-  }
-  return field;
+  const dangerous = /^[=+\-@\t\r]/.test(field);
+  const needsQuoting = dangerous || /[,"\n]/.test(field);
+  const escaped = field.replace(/"/g, '""');
+  const body = dangerous ? `\t${escaped}` : escaped;
+  return needsQuoting ? `"${body}"` : body;
 }
 
 /**
- * Download CSV data as a file
+ * Strip filesystem-reserved characters from a caller-supplied filename so it
+ * can safely be used as a `download` attribute on any platform.
+ */
+function sanitizeFilename(filename: string): string {
+  // Reserved on Windows/macOS/Linux: / \ : * ? " < > | and NUL
+  return filename.replace(/[/\\:*?"<>|\0]/g, "_");
+}
+
+/**
+ * Download CSV data as a file.
+ *
+ * The object URL is revoked asynchronously because Firefox aborts the
+ * download if the URL is invalidated synchronously after `link.click()`.
  */
 export function downloadCSV(csv: string, filename: string): void {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -62,14 +82,15 @@ export function downloadCSV(csv: string, filename: string): void {
   const url = URL.createObjectURL(blob);
 
   link.setAttribute("href", url);
-  link.setAttribute("download", filename);
+  link.setAttribute("download", sanitizeFilename(filename));
   link.style.visibility = "hidden";
 
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 
-  URL.revokeObjectURL(url);
+  // Defer revocation so Firefox finishes initiating the download first.
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 // =============================================================================
@@ -233,6 +254,20 @@ export function exportBatchDetailsToCSV(
 // =============================================================================
 
 /**
+ * Escape user-supplied text for safe interpolation into the print-window HTML.
+ * Without this, a brewery name containing `<script>` or `<img onerror=...>`
+ * would execute inside the new window (same-origin XSS).
+ */
+function escapeHTML(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
  * Generate print-friendly HTML for TTB report
  */
 export function generateTTBPrintHTML(
@@ -299,7 +334,7 @@ export function generateTTBPrintHTML(
 </head>
 <body>
   <h1>TTB Form 5130.9 - Brewer's Report of Operations</h1>
-  <h2>${breweryName || "Brewery"} - ${monthName} ${year}</h2>
+  <h2>${escapeHTML(breweryName || "Brewery")} - ${monthName} ${year}</h2>
 
   <table>
     <thead>
@@ -371,6 +406,9 @@ export function openTTBPrintView(
   if (printWindow) {
     printWindow.document.write(html);
     printWindow.document.close();
+    // Close the print window after the user prints or cancels so repeated
+    // export clicks do not leave orphaned popups around.
+    printWindow.onafterprint = () => printWindow.close();
     // Trigger print dialog after a short delay
     setTimeout(() => {
       printWindow.print();
