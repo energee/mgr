@@ -534,7 +534,7 @@
       "title": "Error: No QueryClient set, use QueryClientProvider to set one",
       "verification": "bun run test src/contexts/__tests__/notifications.test.tsx",
       "state": "passing",
-      "evidence": "commit:9fad815065db6bb5fd3feb6957b80e0b0d11819c",
+      "evidence": "commit:9fad815",
       "branch": "sentry-fix/SENTRY-7479939863"
     }
   ]

@@ -17,7 +17,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { QueryClientContext, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { notificationKeys } from "@/lib/query-keys";
@@ -75,7 +75,38 @@ type NotificationsProviderProps = {
   children: ReactNode;
 }
 
+const EMPTY_NOTIFICATIONS: NotificationsContextValue = {
+  notifications: [],
+  unreadCount: 0,
+  isLoading: false,
+  markAsRead: async () => {},
+  markAllAsRead: async () => {},
+  dismiss: async () => {},
+  refetch: () => {},
+};
+
+/**
+ * Outer guard: if no QueryClientProvider is present in the tree, render
+ * children with a no-op context rather than throwing. This prevents a crash
+ * when the component is used in tests, Storybook, or an incorrectly ordered
+ * provider tree. In production the full inner implementation is always active.
+ */
 export function NotificationsProvider({ children }: NotificationsProviderProps) {
+  const hasQueryClient = Boolean(useContext(QueryClientContext));
+  if (!hasQueryClient) {
+    if (process.env.NODE_ENV === "production") {
+      log.error("NotificationsProvider: no QueryClient in tree — falling back to empty context. Check provider ordering.");
+    }
+    return (
+      <NotificationsContext.Provider value={EMPTY_NOTIFICATIONS}>
+        {children}
+      </NotificationsContext.Provider>
+    );
+  }
+  return <NotificationsProviderInner>{children}</NotificationsProviderInner>;
+}
+
+function NotificationsProviderInner({ children }: NotificationsProviderProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
 
