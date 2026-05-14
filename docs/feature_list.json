@@ -527,6 +527,15 @@
       "evidence": "commit:f22b85b",
       "branch": "sentry-fix/SENTRY-7454377645",
       "notes": "Fix was already present in main (commit 73c49c7). This entry adds the missing formatGravityFromSg test coverage that proves sgToPlato is properly in scope. PR #259 merged 2026-05-12."
+    },
+    {
+      "id": "SENTRY-7479939863",
+      "area": "infra",
+      "title": "Error: No QueryClient set, use QueryClientProvider to set one",
+      "verification": "bun run test src/contexts/__tests__/notifications.test.tsx",
+      "state": "passing",
+      "evidence": "commit:9fad815065db6bb5fd3feb6957b80e0b0d11819c",
+      "branch": "sentry-fix/SENTRY-7479939863"
     }
   ]
 }
