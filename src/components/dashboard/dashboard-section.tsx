@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { Inbox, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type DashboardSectionProps = {
   /** Section title (displayed uppercase with tracking) */
@@ -51,20 +52,31 @@ export function DashboardSection({
 
 /**
  * Empty state for dashboard sections.
- * Renders an optional icon above a centered message.
+ * Renders an optional icon above a centered message, with an optional CTA button.
  */
 export function DashboardEmpty({
   message,
   icon: Icon = Inbox,
+  action,
 }: {
   message: string;
   /** Lucide icon component to display above the message (defaults to Inbox) */
   icon?: LucideIcon;
+  /** Optional call-to-action surfaced under the empty message. */
+  action?: {
+    label: string;
+    href: string;
+  };
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-6">
       <Icon className="size-8 text-muted-foreground/30" />
       <p className="text-sm text-muted-foreground text-center">{message}</p>
+      {action && (
+        <Button asChild variant="outline" size="sm">
+          <Link href={action.href}>{action.label}</Link>
+        </Button>
+      )}
     </div>
   );
 }
