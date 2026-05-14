@@ -20,8 +20,23 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, getSquareSettings } from "@/lib/square/client";
 import { verifyWebhookSignature } from "@/lib/square/webhook";
 import { calculateVolumeOz } from "@/lib/square/utils";
+import type { SquareSyncType } from "@/lib/square/types";
 import { dynamicFrom } from "@/services/types";
 import { logger } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/square/webhook" });
+
+const REPLAY_WINDOW_MS = 5 * 60 * 1000;
+
+type ReplayCheck = { ok: true } | { ok: false; reason: "missing_created_at" | "invalid_created_at" | "stale_event" };
+
+function checkReplayWindow(createdAt: string | undefined): ReplayCheck {
+  if (!createdAt) return { ok: false, reason: "missing_created_at" };
+  const t = Date.parse(createdAt);
+  if (!Number.isFinite(t)) return { ok: false, reason: "invalid_created_at" };
+  if (Math.abs(Date.now() - t) > REPLAY_WINDOW_MS) return { ok: false, reason: "stale_event" };
+  return { ok: true };
+}
 
 // Square webhook event shape (subset of fields we care about)
 type SquareWebhookEvent = {
@@ -97,40 +112,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 6.5 Replay protection (audit F-127): reject events whose `created_at` is
-  // more than 5 minutes from now. The HMAC signature alone doesn't bound the
-  // replay window — a recorded request could be replayed indefinitely.
-  // A missing or unparseable timestamp is also rejected: silently skipping
-  // the check would leave the replay window wide open on crafted payloads.
-  //
-  // Rejections return 200, not 4xx. Square retries any non-2xx on exponential
-  // backoff for up to 24h, and a stale event is stale on every retry — 4xx
-  // would create a retry storm. The warning log preserves observability while
-  // 200 acknowledges receipt and stops the retry loop.
-  if (!event.created_at) {
-    logger.warn(
-      { event_id: event.event_id, type: event.type },
-      "[Square Webhook] Acknowledged but ignored: missing created_at"
+  // Replay protection (audit F-127). Rejections return 200 (not 4xx): Square
+  // retries any non-2xx on exponential backoff for up to 24h, and a stale
+  // event is stale on every retry — 4xx here would create a retry storm.
+  const replay = checkReplayWindow(event.created_at);
+  if (!replay.ok) {
+    log.warn(
+      { event_id: event.event_id, created_at: event.created_at, reason: replay.reason },
+      "Acknowledged but ignored replay-check failure"
     );
-    return NextResponse.json({ received: true, ignored: "missing_created_at" });
-  }
-  const eventTime = Date.parse(event.created_at);
-  if (!Number.isFinite(eventTime)) {
-    logger.warn(
-      { event_id: event.event_id, created_at: event.created_at },
-      "[Square Webhook] Acknowledged but ignored: invalid created_at"
-    );
-    return NextResponse.json({ received: true, ignored: "invalid_created_at" });
-  }
-  if (Math.abs(Date.now() - eventTime) > 5 * 60 * 1000) {
-    logger.warn(
-      { event_id: event.event_id, created_at: event.created_at },
-      "[Square Webhook] Acknowledged but ignored: stale event outside the 5-minute replay window"
-    );
-    return NextResponse.json({ received: true, ignored: "stale_event" });
+    return NextResponse.json({ received: true, ignored: replay.reason });
   }
 
-  // 7. Route by event type.
   try {
     switch (event.type) {
       case "payment.completed":
@@ -146,13 +139,11 @@ export async function POST(request: NextRequest) {
         break;
     }
   } catch (err) {
-    // Processing failed after the event_id slot was claimed-and-released
-    // (handlePaymentCompleted deletes the claim on error). Return 500 so
-    // Square retries delivery; the UNIQUE constraint on event_id guarantees
-    // only one retry can actually re-process.
-    logger.error(
+    // Return 500 so Square retries delivery; the UNIQUE constraint on
+    // event_id guarantees only one retry can actually re-process.
+    log.error(
       { err: err instanceof Error ? err.message : err, event_id: event.event_id, type: event.type },
-      `[Square Webhook] Error processing ${event.type}; Square will retry`
+      `Error processing ${event.type}; Square will retry`
     );
     return NextResponse.json({ error: "processing_failed" }, { status: 500 });
   }
@@ -167,7 +158,7 @@ export async function POST(request: NextRequest) {
 async function handlePaymentCompleted(event: SquareWebhookEvent) {
   const payment = event.data?.object?.payment;
   if (!payment) {
-    logger.warn("[Square Webhook] payment.completed event missing payment object");
+    log.warn("payment.completed event missing payment object");
     return;
   }
 
@@ -176,26 +167,24 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
   const squareLocationId = payment.location_id;
 
   if (!orderId) {
-    logger.warn("[Square Webhook] payment.completed event missing order_id");
+    log.warn("payment.completed event missing order_id");
     return;
   }
 
   const admin = await createAdminClient();
 
-  // Race-safe dedup (audit F-135): claim the event_id slot before any side
-  // effects. ON CONFLICT DO NOTHING returns empty data when a duplicate is
-  // detected, so both concurrent retries cannot proceed past this point.
-  //
-  // Square reliably sends event_id; the fallback path (no event_id) proceeds
-  // without dedup. We don't synthesize a key from order_id because that would
-  // mask future Square API contract changes.
+  // Race-safe dedup (audit F-135): claim the event_id row before any side
+  // effects. ON CONFLICT DO NOTHING returns empty data on duplicate, so
+  // concurrent retries cannot both proceed past this point. Fallback: if
+  // event_id is absent (Square contract change), proceed without dedup —
+  // don't synthesize from order_id, which would mask that contract change.
   let logId: string | null = null;
   if (event.event_id) {
     const { data: claimed } = await admin
       .from("square_sync_log")
       .upsert(
         {
-          sync_type: "sale_ingest",
+          sync_type: "sale_ingest" satisfies SquareSyncType,
           event_id: event.event_id,
           items_synced: 0,
           items_failed: 0,
@@ -205,26 +194,25 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       .select("id");
 
     if (!claimed || claimed.length === 0) {
-      logger.info(
-        `[Square Webhook] Duplicate payment.completed for event ${event.event_id}, skipping`
+      log.info(
+        { event_id: event.event_id, order_id: orderId },
+        "Duplicate payment.completed, skipping"
       );
       return;
     }
     logId = claimed[0].id;
   } else {
-    logger.warn(
+    log.warn(
       { order_id: orderId },
-      "[Square Webhook] payment.completed missing event_id; proceeding without race-safe dedup"
+      "payment.completed missing event_id; proceeding without race-safe dedup"
     );
   }
 
   try {
-    // Fetch full order details from Square. A missing client is a config
-    // failure — throw so the catch below frees the claimed slot and the outer
-    // handler returns 500; otherwise the claim sticks forever and the retry
-    // would dedup-skip the (recoverable) event.
     const client = await getSquareClient();
     if (!client) {
+      // Throw so the catch below frees the claim and the outer handler returns
+      // 500; otherwise the claim sticks forever and retries dedup-skip.
       throw new Error("Square client not available");
     }
 
@@ -232,17 +220,11 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
     const order = orderResponse.order;
 
     if (!order?.lineItems?.length) {
-      // Legitimate no-op: finalize the log so the row reflects 0-item
-      // completion rather than sitting in "claimed but unfinished" forever.
-      logger.info(
-        `[Square Webhook] Order ${orderId} has no line items, skipping`
-      );
+      log.info({ order_id: orderId }, "Order has no line items, skipping");
       if (logId) {
         await admin
           .from("square_sync_log")
           .update({
-            items_synced: 0,
-            items_failed: 0,
             details: {
               order_id: orderId,
               payment_id: paymentId,
@@ -387,9 +369,8 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       }
     }
 
-    // Finalise the sync log. If we claimed a row at the top (logId is set),
-    // update it with final stats. Otherwise (no event_id) do a plain insert.
-    // `event_id` is stored as a top-level column, not duplicated in details.
+    // Finalise the sync log: update the claimed row, or insert a fresh row
+    // for the no-event_id fallback path.
     const logDetails = {
       order_id: orderId,
       payment_id: paymentId,
@@ -411,7 +392,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
         .eq("id", logId);
     } else {
       await admin.from("square_sync_log").insert({
-        sync_type: "sale_ingest",
+        sync_type: "sale_ingest" satisfies SquareSyncType,
         event_id: null,
         location_id: locationId,
         items_synced: itemsSynced,
@@ -421,10 +402,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       });
     }
   } catch (err) {
-    // Compensation: free the claimed slot so Square's retry can re-acquire
-    // the event_id and re-process from scratch. Without this, a transient
-    // failure (network blip, Square API hiccup) silently drops the order —
-    // the claim sticks and every retry hits the dedup short-circuit.
+    // Free the claimed slot on failure so Square's retry can re-process.
     if (logId) {
       await admin.from("square_sync_log").delete().eq("id", logId);
     }
@@ -443,8 +421,8 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
 
   await admin.from("square_sync_log").upsert(
     {
-      sync_type: "inventory_push",
-      event_id: event.event_id ?? null,
+      sync_type: "inventory_push" satisfies SquareSyncType,
+      event_id: event.event_id,
       items_synced: 0,
       items_failed: 0,
       details: {
