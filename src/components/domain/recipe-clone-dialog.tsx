@@ -8,6 +8,7 @@
  * - Linking to a different brand
  */
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
@@ -90,6 +91,18 @@ export function RecipeCloneDialog({
     },
   });
 
+  // `useForm` reads `defaultValues` once on mount, so re-opening the dialog
+  // with a different `recipeName` would otherwise show stale form state.
+  // Reset whenever the dialog opens or the source recipe changes.
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        name: `${recipeName} (Copy)`,
+        brand_id: null,
+      });
+    }
+  }, [open, recipeName, form]);
+
   // Clone mutation
   const cloneMutation = useMutation({
     mutationFn: async (values: CloneFormValues) => {
@@ -138,6 +151,7 @@ export function RecipeCloneDialog({
       queryClient.invalidateQueries({ queryKey: recipeKeys.all() });
       toast.success("Recipe cloned successfully");
       onOpenChange(false);
+      form.reset();
       onSuccess?.(newId);
     },
     onError: (error) => {
