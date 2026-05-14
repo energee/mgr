@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Copy, Loader2 } from "lucide-react";
-import { batchKeys } from "@/lib/query-keys";
+import { batchKeys, dashboardKeys, entityKeys } from "@/lib/query-keys";
 
 type SourceBatch = {
   id: string;
@@ -88,7 +88,15 @@ export function BatchDuplicateDialog({
       return data.id as string;
     },
     onSuccess: (newId) => {
+      // Invalidate every cache that lists or counts batches so the new
+      // planned batch appears immediately in lists, kanban, and the
+      // dashboard counts.
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("batches_with_brew_info"),
+      });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("batches") });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.batchCounts() });
       toast.success("Batch duplicated");
       onOpenChange(false);
       onSuccess?.(newId);
