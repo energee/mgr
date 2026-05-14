@@ -1,14 +1,24 @@
+"use client";
+
 /**
  * EntityMobileCardList - Mobile card layout for entity list pages.
  *
  * Renders entity rows as tappable cards below the md breakpoint.
- * Shows the first 3 listColumns from entity config, with the
- * detailHeader.title field as the card heading and a StatusBadge
- * when the entity has a stateMachine.
+ * The card heading is the entity's detailHeader.title field with a
+ * StatusBadge when the entity has a stateMachine. The first three
+ * non-title/non-status listColumns render as the always-visible
+ * summary; any remaining listColumns are progressively disclosed
+ * by a per-card "Show more" toggle (audit F-085).
+ *
+ * Expanded state is held at the list level (Set<rowId>) so it
+ * survives parent re-renders triggered by parallel mutations or
+ * filter updates. It is intentionally not persisted across
+ * navigation — entering a detail page and returning resets the
+ * cards to their collapsed summary view.
  */
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useCallback, type ReactNode } from "react";
 import type { EntityConfig, EntityColumnDef } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { formatValue } from "@/lib/utils";
@@ -69,10 +79,10 @@ export function EntityMobileCardList({
   // ---- Determine the status field if entity has a state machine ----
   const statusField = entity.stateMachine?.stateField as string | undefined;
 
-  // ---- Pick subtitle columns ----
-  // First 3 columns rendered always; remaining columns are revealed by the
-  // per-card "More" toggle (audit F-085).
-  const allSubtitleColumns = useMemo(
+  // ---- Pick summary vs detail columns ----
+  // First 3 columns rendered always as the summary; remaining columns are
+  // revealed by the per-card "Show more" toggle (audit F-085).
+  const allColumns = useMemo(
     () =>
       entity.listColumns.filter((col) => {
         const key = col.accessorKey as string | undefined;
@@ -83,8 +93,23 @@ export function EntityMobileCardList({
       }),
     [entity.listColumns, titleField, statusField],
   );
-  const subtitleColumns = allSubtitleColumns.slice(0, 3);
-  const extraColumns = allSubtitleColumns.slice(3);
+  const summaryColumns = allColumns.slice(0, 3);
+  const detailColumns = allColumns.slice(3);
+
+  // ---- Parent-owned expand state ----
+  // Holds the set of row ids whose detail columns are currently expanded.
+  // Lifting state above the per-card component ensures it survives parent
+  // re-renders (e.g. after a filter change re-runs the query and re-keys
+  // unchanged rows).
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   // ---- Empty state ----
   if (data.length === 0) {
@@ -139,28 +164,34 @@ export function EntityMobileCardList({
   // ---- Card list ----
   return (
     <div className="flex flex-col gap-2">
-      {data.map((row) => (
-        <EntityMobileCard
-          key={row.id as string}
-          row={row}
-          entity={entity}
-          basePath={basePath}
-          titleField={titleField}
-          statusField={statusField}
-          subtitleColumns={subtitleColumns}
-          extraColumns={extraColumns}
-        />
-      ))}
+      {data.map((row) => {
+        const id = row.id as string;
+        return (
+          <EntityMobileCard
+            key={id}
+            row={row}
+            entity={entity}
+            basePath={basePath}
+            titleField={titleField}
+            statusField={statusField}
+            summaryColumns={summaryColumns}
+            detailColumns={detailColumns}
+            expanded={expandedIds.has(id)}
+            onToggle={toggleExpanded}
+          />
+        );
+      })}
     </div>
   );
 }
 
 /**
  * Single mobile card. Splits into:
- * - Link region (tap anywhere on the title/subtitle navigates to the detail page).
- * - Optional "More" toggle that expands inline to show the remaining columns
- *   (audit F-085). The toggle is rendered as a button to stop propagation,
- *   so tapping it doesn't navigate.
+ * - Link region (tap anywhere on the title/summary navigates to the detail page).
+ * - Optional "Show more" toggle rendered as a sibling button BELOW the
+ *   `<Link>` so the markup stays valid HTML (interactive content cannot
+ *   nest inside `<a>`). Expanded state is owned by the parent list so it
+ *   survives re-renders.
  */
 function EntityMobileCard({
   row,
@@ -168,22 +199,26 @@ function EntityMobileCard({
   basePath,
   titleField,
   statusField,
-  subtitleColumns,
-  extraColumns,
+  summaryColumns,
+  detailColumns,
+  expanded,
+  onToggle,
 }: {
   row: Record<string, unknown>;
   entity: EntityConfig<Record<string, unknown>>;
   basePath: string;
   titleField: string;
   statusField: string | undefined;
-  subtitleColumns: EntityColumnDef<Record<string, unknown>>[];
-  extraColumns: EntityColumnDef<Record<string, unknown>>[];
+  summaryColumns: EntityColumnDef<Record<string, unknown>>[];
+  detailColumns: EntityColumnDef<Record<string, unknown>>[];
+  expanded: boolean;
+  onToggle: (id: string) => void;
 }) {
   const id = row.id as string;
   const title = row[titleField] ?? "Untitled";
   const statusValue = statusField ? (row[statusField] as string | undefined) : undefined;
-  const [expanded, setExpanded] = useState(false);
-  const hasExtras = extraColumns.length > 0;
+  const hasExtras = detailColumns.length > 0;
+  const extrasId = `card-extras-${id}`;
 
   return (
     <div className="rounded-lg border bg-card transition-colors active:bg-accent/50">
@@ -199,10 +234,10 @@ function EntityMobileCard({
           )}
         </div>
 
-        {/* Always-visible subtitle rows */}
-        {subtitleColumns.length > 0 && (
+        {/* Always-visible summary rows */}
+        {summaryColumns.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-            {subtitleColumns.map((col) => {
+            {summaryColumns.map((col) => {
               const key = col.accessorKey as string;
               return (
                 <span key={key} className="truncate">
@@ -216,10 +251,13 @@ function EntityMobileCard({
           </div>
         )}
 
-        {/* Expanded extras */}
+        {/* Expanded detail rows */}
         {expanded && hasExtras && (
-          <div className="mt-2 pt-2 border-t flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-            {extraColumns.map((col) => {
+          <div
+            id={extrasId}
+            className="mt-2 pt-2 border-t flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground"
+          >
+            {detailColumns.map((col) => {
               const key = col.accessorKey as string;
               return (
                 <span key={key} className="truncate">
@@ -234,20 +272,18 @@ function EntityMobileCard({
         )}
       </Link>
 
-      {/* "More" toggle — outside the Link so taps don't trigger navigation. */}
+      {/* "Show more" toggle — sibling of the Link (NOT nested) so the
+          markup remains valid HTML. A ≥44×44 px tap target keeps it
+          comfortably hittable on touch devices (WCAG 2.5.5). */}
       {hasExtras && (
         <button
           type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setExpanded((v) => !v);
-          }}
+          onClick={() => onToggle(id)}
           aria-expanded={expanded}
-          aria-controls={`card-extras-${id}`}
-          className="w-full px-3 py-2 border-t text-xs text-muted-foreground hover:bg-muted/50 flex items-center justify-center gap-1"
+          aria-controls={extrasId}
+          className="w-full px-3 py-2 min-h-[44px] border-t text-xs text-muted-foreground hover:bg-muted/50 flex items-center justify-center gap-1"
         >
-          {expanded ? "Show less" : `Show ${extraColumns.length} more field${extraColumns.length === 1 ? "" : "s"}`}
+          {expanded ? "Show less" : `Show ${detailColumns.length} more field${detailColumns.length === 1 ? "" : "s"}`}
           <ChevronDown
             className={cn(
               "h-3 w-3 transition-transform duration-150",
