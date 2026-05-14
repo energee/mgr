@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyStateHint } from "@/components/universal/empty-state-hint";
 import Link from "next/link";
 import { orderEntity } from "@/entities/order";
 import { formatDate as sharedFormatDate } from "@/lib/format";
@@ -62,9 +63,7 @@ export default function PortalOrdersPage() {
               ))}
             </div>
           ) : !orders || orders.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              No orders found.
-            </div>
+            <EmptyStateHint message="You don't have any orders yet. Once your brewery places an order on your behalf, it will appear here." />
           ) : (
             <Table>
               <TableHeader>
