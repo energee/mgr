@@ -5,7 +5,11 @@
 
 import { describe, it, expect } from "vitest";
 import { createHmac } from "crypto";
-import { verifyWebhookSignature } from "../square/webhook";
+import {
+  DEFAULT_REPLAY_WINDOW_MS,
+  checkReplayWindow,
+  verifyWebhookSignature,
+} from "../square/webhook";
 import {
   dollarsToCents,
   calculateVolumeOz,
@@ -79,6 +83,66 @@ describe("verifyWebhookSignature", () => {
 
     // Verify with no-slash URL should fail
     expect(verifyWebhookSignature(body, sigWithSlash, signatureKey, notificationUrl)).toBe(false);
+  });
+});
+
+// =============================================================================
+// Replay-Window Check (audit F-127 / PR #273 B-1)
+// =============================================================================
+
+describe("checkReplayWindow", () => {
+  // Fixed "now" so the boundary cases are deterministic.
+  const now = Date.parse("2026-05-14T12:00:00.000Z");
+
+  it("accepts an event well inside the window", () => {
+    const createdAt = new Date(now - 60_000).toISOString(); // 1 min ago
+    expect(checkReplayWindow(createdAt, DEFAULT_REPLAY_WINDOW_MS, now)).toEqual({ ok: true });
+  });
+
+  it("accepts an event 4m59s in the past (just inside the 5-min window)", () => {
+    const createdAt = new Date(now - (5 * 60_000 - 1_000)).toISOString();
+    expect(checkReplayWindow(createdAt, DEFAULT_REPLAY_WINDOW_MS, now)).toEqual({ ok: true });
+  });
+
+  it("rejects an event 5m01s in the past as stale", () => {
+    const createdAt = new Date(now - (5 * 60_000 + 1_000)).toISOString();
+    expect(checkReplayWindow(createdAt, DEFAULT_REPLAY_WINDOW_MS, now)).toEqual({
+      ok: false,
+      reason: "stale_event",
+    });
+  });
+
+  it("rejects an event from the future beyond the window (clock skew)", () => {
+    const createdAt = new Date(now + (5 * 60_000 + 1_000)).toISOString();
+    expect(checkReplayWindow(createdAt, DEFAULT_REPLAY_WINDOW_MS, now)).toEqual({
+      ok: false,
+      reason: "stale_event",
+    });
+  });
+
+  it("hard-rejects a missing created_at", () => {
+    expect(checkReplayWindow(undefined, DEFAULT_REPLAY_WINDOW_MS, now)).toEqual({
+      ok: false,
+      reason: "missing_created_at",
+    });
+  });
+
+  it("hard-rejects an unparseable created_at (never silent-pass)", () => {
+    expect(checkReplayWindow("not-a-date", DEFAULT_REPLAY_WINDOW_MS, now)).toEqual({
+      ok: false,
+      reason: "invalid_created_at",
+    });
+  });
+
+  it("respects a caller-provided window", () => {
+    const createdAt = new Date(now - 30_000).toISOString(); // 30s ago
+    // 10s window: rejects.
+    expect(checkReplayWindow(createdAt, 10_000, now)).toEqual({
+      ok: false,
+      reason: "stale_event",
+    });
+    // 60s window: accepts.
+    expect(checkReplayWindow(createdAt, 60_000, now)).toEqual({ ok: true });
   });
 });
 

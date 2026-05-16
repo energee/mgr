@@ -35,3 +35,44 @@ export function verifyWebhookSignature(
 
   return timingSafeEqual(sigBuffer, expectedBuffer);
 }
+
+/**
+ * Default replay window: 5 minutes either side of `now`.
+ *
+ * Square delivers webhooks within seconds, but we allow a generous window to
+ * tolerate clock skew between Square's edge and our server. Anything older
+ * is treated as a replay and ignored. The check runs on `event.created_at`
+ * (which is HMAC-signed, so it cannot be tampered with by the caller).
+ */
+export const DEFAULT_REPLAY_WINDOW_MS = 5 * 60 * 1000;
+
+export type ReplayCheck =
+  | { ok: true }
+  | { ok: false; reason: "missing_created_at" | "invalid_created_at" | "stale_event" };
+
+/**
+ * Validate that a webhook event's signed `created_at` timestamp falls within
+ * the allowed replay window. Must be called **after** signature verification
+ * and JSON parsing — `created_at` is inside the signed body, never trust a
+ * header.
+ *
+ * Behaviour:
+ *   - missing `created_at` → `missing_created_at` (hard reject, never silent-pass)
+ *   - non-ISO / unparseable `created_at` → `invalid_created_at`
+ *   - |now - created_at| > windowMs → `stale_event`
+ *
+ * @param createdAt - The `event.created_at` field from the parsed event
+ * @param windowMs - Tolerance window in ms either side of `now` (default 5 min)
+ * @param now - Override for `Date.now()` (test seam)
+ */
+export function checkReplayWindow(
+  createdAt: string | undefined,
+  windowMs: number = DEFAULT_REPLAY_WINDOW_MS,
+  now: number = Date.now()
+): ReplayCheck {
+  if (!createdAt) return { ok: false, reason: "missing_created_at" };
+  const t = Date.parse(createdAt);
+  if (!Number.isFinite(t)) return { ok: false, reason: "invalid_created_at" };
+  if (Math.abs(now - t) > windowMs) return { ok: false, reason: "stale_event" };
+  return { ok: true };
+}
