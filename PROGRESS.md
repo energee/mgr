@@ -16,6 +16,9 @@
 
 ## Completed (this branch)
 
+- [x] **SENTRY-7479939863 — Error: No QueryClient set, use QueryClientProvider to set one** (Sentry fix, MGR-8)
+  `NotificationsProvider` called `useQueryClient()` unconditionally at render time (line 80 of `src/contexts/notifications.tsx`), which throws immediately if no `QueryClientProvider` ancestor exists. The error was captured from the `polish` git worktree at `GET /` (localhost:3002). The fix adds an outer guard component that reads `QueryClientContext` directly via `useContext` (which returns `undefined` safely instead of throwing when no provider is present). If no QueryClient is found, the guard renders children with a stable no-op `EMPTY_NOTIFICATIONS` context and logs a production error for observability; in the normal path it delegates to the original inner implementation unchanged. Three Vitest tests at `src/contexts/__tests__/notifications.test.tsx` cover the no-QueryClient render, empty context defaults, and no-op action handlers. All 41 test files (1105 tests) pass; typecheck and lint clean.
+
 - [x] **SENTRY-7454377645 — ReferenceError: sgToPlato is not defined** (Sentry fix)
   Sentry issue MGR-3 fired on 2026-05-01 when `RecipeSidebar` rendered the OG/FG estimates with `displayUnit = "plato"`. A local `formatSg` helper had been added inline to `recipe-sidebar.tsx` that called `sgToPlato` directly without importing it, causing a `ReferenceError` at runtime. The structural fix had already landed in commit `73c49c7` (added `formatGravityFromSg` to `@/lib/units` where `sgToPlato` is in scope, then updated `recipe-sidebar.tsx` to import and use it). This session closed the gap by adding six Vitest tests for `formatGravityFromSg` — covering null/undefined guards, SG passthrough, Plato conversion, and custom decimal places — which would have caught the missing-import bug before it reached the development environment. All 1036 tests pass; lint and typecheck clean.
 
