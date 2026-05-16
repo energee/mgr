@@ -6,7 +6,7 @@ export function createAppQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
-        gcTime: CACHE_DURATIONS.STATIC_DATA,
+        gcTime: 5 * 60 * 1000,
         retry: 1,
         refetchOnWindowFocus: process.env.NODE_ENV === "production",
       },

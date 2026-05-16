@@ -94,9 +94,7 @@ const EMPTY_NOTIFICATIONS: NotificationsContextValue = {
 export function NotificationsProvider({ children }: NotificationsProviderProps) {
   const hasQueryClient = Boolean(useContext(QueryClientContext));
   if (!hasQueryClient) {
-    if (process.env.NODE_ENV === "production") {
-      log.error("NotificationsProvider: no QueryClient in tree — falling back to empty context. Check provider ordering.");
-    }
+    log.error("NotificationsProvider: no QueryClient in tree — falling back to empty context. Check provider ordering.");
     return (
       <NotificationsContext.Provider value={EMPTY_NOTIFICATIONS}>
         {children}
