@@ -504,9 +504,9 @@
       "title": "Error: ./src/components/dashboard/batch-activity-heatmap.tsx:20:1 — Module not found: Can't resolve 'react-activity-calendar'",
       "verification": "bun run test src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts",
       "state": "passing",
-      "evidence": "commit:b72f09a",
+      "evidence": "commit:TBD",
       "branch": "sentry-fix/SENTRY-7465830666",
-      "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Package is correctly declared in package.json. Regression coverage: bun run typecheck fails if the import in batch-activity-heatmap.tsx cannot be resolved."
+      "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Package is correctly declared in package.json. Code fix (this pass): moved react-activity-calendar/tooltips.css import from batch-activity-heatmap.tsx to dashboard/layout.tsx so the stylesheet ships with the route CSS bundle unconditionally — prevents tooltip FOUC if the heatmap ever loads lazily. Regression test at src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts."
     },
     {
       "id": "SENTRY-7452842898",

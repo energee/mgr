@@ -22,7 +22,6 @@ import {
   type Activity,
   type BlockElement,
 } from "react-activity-calendar";
-import "react-activity-calendar/tooltips.css";
 import { format, parseISO } from "date-fns";
 import { CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
