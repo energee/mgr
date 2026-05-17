@@ -57,7 +57,8 @@ export function buildIssuesUrl(opts: {
     : "is:unresolved";
   const params = new URLSearchParams({
     query,
-    statsPeriod: opts.statsPeriod ?? "14d",
+    // Default matches the `eventCount7d` field on SentryIssue; callers can override.
+    statsPeriod: opts.statsPeriod ?? "7d",
     limit: String(opts.limit ?? 20),
     sort: "freq",
   });
