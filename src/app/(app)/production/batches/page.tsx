@@ -26,7 +26,6 @@ type BatchRecord = {
   volume_bbl: number | null;
   current_vessel_name: string | null;
   recipe_id: string | null;
-  planned_start_date: string | null;
 }
 
 export default function BatchesPage() {
@@ -104,14 +103,10 @@ export default function BatchesPage() {
               name: selectedBatch.name,
               recipe_id: selectedBatch.recipe_id,
               volume_bbl: selectedBatch.volume_bbl,
-              planned_start_date: selectedBatch.planned_start_date,
             }}
             open={showDuplicate}
             onOpenChange={setShowDuplicate}
-            onSuccess={(newId) => {
-              handleDialogSuccess();
-              router.push(`/production/batches/${newId}`);
-            }}
+            onSuccess={(newId) => router.push(`/production/batches/${newId}`)}
           />
         </>
       )}

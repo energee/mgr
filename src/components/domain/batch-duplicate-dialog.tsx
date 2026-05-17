@@ -1,15 +1,6 @@
 "use client";
 
-/**
- * BatchDuplicateDialog
- *
- * Quick-creates a new planned batch from an existing one. Copies the
- * recipe link, target volume, name, and planned start date — but NOT
- * brew history (additions, readings, logs). The user can edit before
- * the new batch is saved. Audit F-111.
- */
-
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { addDays } from "date-fns";
 import { toast } from "sonner";
@@ -34,7 +25,6 @@ type SourceBatch = {
   name: string | null;
   recipe_id: string | null;
   volume_bbl: number | null;
-  planned_start_date: string | null;
 };
 
 export function BatchDuplicateDialog({
@@ -55,22 +45,17 @@ export function BatchDuplicateDialog({
   const [volumeBbl, setVolumeBbl] = useState<string>("");
   const [plannedStartDate, setPlannedStartDate] = useState<string>("");
 
-  // Reset form when a new source comes in
-  if (source && open && name === "" && volumeBbl === "") {
+  useEffect(() => {
+    if (!open || !source) return;
     setName(`${source.name ?? source.batch_code} (copy)`);
-    if (source.volume_bbl != null) setVolumeBbl(String(source.volume_bbl));
-    // Default planned date: 7 days from now (next brew day).
-    setPlannedStartDate(
-      addDays(new Date(), 7).toISOString().slice(0, 10),
-    );
-  }
+    setVolumeBbl(source.volume_bbl != null ? String(source.volume_bbl) : "");
+    setPlannedStartDate(addDays(new Date(), 7).toISOString().slice(0, 10));
+  }, [open, source]);
 
   const duplicateMutation = useMutation({
     mutationFn: async () => {
       if (!source) throw new Error("No source batch");
 
-      // Don't copy batch_code — let the DB sequence assign a fresh one.
-      // Don't copy status — new batch starts as "planned".
       const insertPayload = {
         name,
         recipe_id: source.recipe_id,
@@ -88,9 +73,6 @@ export function BatchDuplicateDialog({
       return data.id as string;
     },
     onSuccess: (newId) => {
-      // Invalidate every cache that lists or counts batches so the new
-      // planned batch appears immediately in lists, kanban, and the
-      // dashboard counts.
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
       queryClient.invalidateQueries({
         queryKey: entityKeys.all("batches_with_brew_info"),
@@ -100,10 +82,6 @@ export function BatchDuplicateDialog({
       toast.success("Batch duplicated");
       onOpenChange(false);
       onSuccess?.(newId);
-      // Reset form state for next open
-      setName("");
-      setVolumeBbl("");
-      setPlannedStartDate("");
     },
     onError: (err: Error) => {
       toast.error(err.message);
