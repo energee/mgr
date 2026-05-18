@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { entityKeys, changeRequestKeys, portalKeys } from "@/lib/query-keys";
 import { formatCurrency, formatDate as sharedFormatDate } from "@/lib/format";
-import { usePortalCustomer } from "@/lib/portal-context";
+import { usePortalCustomer } from "@/contexts/portal";
 import {
   Card,
   CardContent,
