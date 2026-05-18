@@ -25,9 +25,9 @@ import { VIABILITY_STATUS_DISPLAY } from "@/entities/yeast-pitch";
 import {
   daysUntilViabilityThreshold,
   type YeastForm,
-} from "@/lib/yeast-calculations";
+} from "@/domain/yeast-calculations";
 import { useWeightUnit } from "@/hooks/use-unit-preferences";
-import { formatWeight } from "@/lib/units";
+import { formatWeight } from "@/domain/units";
 
 // =============================================================================
 // Types

@@ -26,7 +26,7 @@ import {
   type ReadingType,
   READING_TYPES,
   formatReadingValue,
-} from "@/lib/batch-readings";
+} from "@/domain/batch-readings";
 import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch-readings-chart-lazy";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";

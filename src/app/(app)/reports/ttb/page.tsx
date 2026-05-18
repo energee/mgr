@@ -15,7 +15,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
-import { getTaxClassLabel, formatTtbBbl } from "@/lib/ttb-utils";
+import { getTaxClassLabel, formatTtbBbl } from "@/domain/ttb-utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -88,7 +88,7 @@ type BatchSummary = {
 // Helper Functions
 // =============================================================================
 
-// getTaxClassLabel and formatTtbBbl imported from @/lib/ttb-utils
+// getTaxClassLabel and formatTtbBbl imported from @/domain/ttb-utils
 
 function getTaxClassIcon(taxClass: string) {
   switch (taxClass) {

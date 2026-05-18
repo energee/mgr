@@ -26,7 +26,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { calculateViabilityDecay, type YeastForm } from "@/lib/yeast-calculations";
+import { calculateViabilityDecay, type YeastForm } from "@/domain/yeast-calculations";
 import { differenceInDays, addDays, format } from "date-fns";
 
 // =============================================================================

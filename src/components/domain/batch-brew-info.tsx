@@ -14,7 +14,7 @@ import { batchKeys } from "@/lib/query-keys";
 import { BrewLogLinker } from "./brew-log-linker";
 import { Badge } from "@/components/ui/badge";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { extractBrewMeasurements } from "@/lib/brew-events";
+import { extractBrewMeasurements } from "@/domain/brew-events";
 import { useBrewMeasurementUnits } from "@/hooks/use-unit-preferences";
 import type { BrewEvent } from "@/types/domain";
 import Link from "next/link";

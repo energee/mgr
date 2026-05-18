@@ -45,7 +45,7 @@ import {
   getRatioDescription,
   calculateResidualAlkalinity,
   estimateMashPH,
-} from "@/lib/water-chemistry";
+} from "@/domain/water-chemistry";
 import { Droplets, FlaskConical, Calculator, Check } from "lucide-react";
 
 // =============================================================================

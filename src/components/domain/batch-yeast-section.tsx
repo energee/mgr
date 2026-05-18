@@ -14,7 +14,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys } from "@/lib/query-keys";
-import { formatCellCount } from "@/lib/yeast-calculations";
+import { formatCellCount } from "@/domain/yeast-calculations";
 import {
   Table,
   TableBody,

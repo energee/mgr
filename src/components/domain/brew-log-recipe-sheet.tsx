@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { useGravityUnit } from "@/hooks/use-unit-preferences";
-import { convertVolume, formatGravityFromSg } from "@/lib/units";
+import { convertVolume, formatGravityFromSg } from "@/domain/units";
 
 // =============================================================================
 // Types

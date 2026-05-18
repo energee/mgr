@@ -28,7 +28,7 @@ import {
   startOfQuarter,
 } from "date-fns";
 import { formatCurrency, formatBbl } from "@/lib/format";
-import { fetchBatchIngredientDetail } from "@/lib/report-utils";
+import { fetchBatchIngredientDetail } from "@/domain/report-utils";
 import {
   Card,
   CardContent,

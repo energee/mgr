@@ -10,14 +10,14 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { resolveYeastLineageRoot } from "@/lib/yeast-lineage";
+import { resolveYeastLineageRoot } from "@/domain/yeast-lineage";
 import { yeastKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { cn } from "@/lib/utils";
-import { shouldReplaceYeast } from "@/lib/yeast-calculations";
+import { shouldReplaceYeast } from "@/domain/yeast-calculations";
 import { formatCurrency } from "@/lib/format";
 import { yeastPitchEntity, VIABILITY_STATUS_DISPLAY } from "@/entities/yeast-pitch";
 

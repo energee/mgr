@@ -12,7 +12,7 @@ import type { Database } from "@/types/supabase";
 import type {
   StyleComplianceResult,
   RecipeSuggestionsResult,
-} from "@/lib/ai/recipe-analyzer";
+} from "@/domain/ai/recipe-analyzer";
 import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc } from "./types";
 
 /** Summary returned by the get_recipe_summary RPC function. */

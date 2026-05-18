@@ -20,7 +20,7 @@ import {
   sumBatchVolumes,
   EMPTY_TOTALS,
   type TTBReportRow,
-} from "@/lib/ttb-utils";
+} from "@/domain/ttb-utils";
 import { toCSV } from "@/lib/report-export";
 
 // =============================================================================
