@@ -17,10 +17,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getSquareClient, getSquareSettings } from "@/lib/square/client";
-import { checkReplayWindow, verifyWebhookSignature } from "@/lib/square/webhook";
-import { calculateVolumeOz } from "@/lib/square/utils";
-import type { SquareSyncType } from "@/lib/square/types";
+import { getSquareClient, getSquareSettings } from "@/integrations/square/client";
+import { checkReplayWindow, verifyWebhookSignature } from "@/integrations/square/webhook";
+import { calculateVolumeOz } from "@/integrations/square/utils";
+import type { SquareSyncType } from "@/integrations/square/types";
 import { dynamicFrom } from "@/services/types";
 import { logger } from "@/lib/logger";
 

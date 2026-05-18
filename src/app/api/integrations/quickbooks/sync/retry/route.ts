@@ -14,8 +14,8 @@ import {
   syncInvoice,
   syncBill,
   getTokens,
-} from "@/lib/quickbooks";
-import type { SyncEntityType } from "@/lib/quickbooks";
+} from "@/integrations/quickbooks";
+import type { SyncEntityType } from "@/integrations/quickbooks";
 
 const SYNC_FUNCTIONS: Record<
   SyncEntityType,

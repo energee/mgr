@@ -15,10 +15,10 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getSquareClient, updateSquareSettings } from "@/lib/square/client";
-import { pushCatalog, deleteStaleItems } from "@/lib/square/catalog";
-import { resolveTaproomPrices } from "@/lib/square/pricing";
-import type { SquareSyncProduct, SquareSyncVariation } from "@/lib/square/types";
+import { getSquareClient, updateSquareSettings } from "@/integrations/square/client";
+import { pushCatalog, deleteStaleItems } from "@/integrations/square/catalog";
+import { resolveTaproomPrices } from "@/integrations/square/pricing";
+import type { SquareSyncProduct, SquareSyncVariation } from "@/integrations/square/types";
 import { logger } from "@/lib/logger";
 
 // Supabase nested join shapes (not reflected in generated types)
