@@ -16,7 +16,7 @@ import {
 import {
   usePrefillStore,
   type NavigationIntent,
-} from "@/stores/prefill-store";
+} from "@/contexts/prefill-store";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { ClaudeWordmark } from "@/components/ui/claude-wordmark";
 import {

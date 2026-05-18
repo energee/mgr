@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { packagingSessionEntity } from "@/entities/packaging-session";
-import { usePrefillStore } from "@/stores/prefill-store";
+import { usePrefillStore } from "@/contexts/prefill-store";
 
 export default function NewPackagingSessionPage() {
   const [defaultValues] = useState(() => {

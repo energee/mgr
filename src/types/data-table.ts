@@ -1,5 +1,5 @@
 import type { ColumnSort, Row, RowData } from "@tanstack/react-table";
-import type { DataTableConfig } from "@/config/data-table";
+import type { DataTableConfig } from "@/lib/data-table-config";
 import type { FilterItemSchema } from "@/lib/parsers";
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- TData/TValue required for module augmentation but not used in interface body */
