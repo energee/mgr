@@ -847,7 +847,7 @@ export function getEntitiesByDomain(domain: EntityDomain): EntityConfig<Record<s
  * provided, otherwise derives `/{domain}/{name}s` from the entity config.
  */
 export function resolveEntityBasePath<T>(
-  entity: EntityCore<T>,
+  entity: EntityCoreInput<T>,
   override?: string,
 ): string {
   return override || `/${entity.domain}/${entity.name}s`;
@@ -882,7 +882,7 @@ export function formatStateLabel(state: string): string {
  * Falls back to formatted state name if not defined.
  */
 export function getStateLabel<T>(
-  entity: EntityCore<T>,
+  entity: EntityCoreInput<T>,
   state: string | null | undefined
 ): string {
   if (!state) return "";
@@ -895,7 +895,7 @@ export function getStateLabel<T>(
  * Falls back to "default" if not defined.
  */
 export function getStateColor<T>(
-  entity: EntityCore<T>,
+  entity: EntityCoreInput<T>,
   state: string | null | undefined
 ): string {
   if (!state) return "default";
@@ -925,7 +925,7 @@ export function valuesAsOptions(
  * Returns the full display object (label and color).
  */
 export function getValueDisplay<T>(
-  entity: EntityCore<T>,
+  entity: EntityCoreInput<T>,
   field: string,
   value: string | null | undefined
 ): { label: string; color?: "default" | "success" | "warning" | "error" | "info" } | undefined {
@@ -939,7 +939,7 @@ export function getValueDisplay<T>(
  * Falls back to formatted value name if not defined.
  */
 export function getValueLabel<T>(
-  entity: EntityCore<T>,
+  entity: EntityCoreInput<T>,
   field: string,
   value: string | null | undefined
 ): string {
@@ -953,7 +953,7 @@ export function getValueLabel<T>(
  * Falls back to "default" if not defined.
  */
 export function getValueColor<T>(
-  entity: EntityCore<T>,
+  entity: EntityCoreInput<T>,
   field: string,
   value: string | null | undefined
 ): "default" | "success" | "warning" | "error" | "info" {
