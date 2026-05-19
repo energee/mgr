@@ -41,6 +41,7 @@ export const salesChannelCore: EntityCoreInput<SalesChannel> = {
   name: "sales_channel",
   table: "sales_channels",
   displayName: "Sales Channel",
+  defaultSort: { column: "name", direction: "asc" },
   description: "Sales channel categories for customer pricing",
   domain: "sales",
 

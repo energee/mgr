@@ -44,6 +44,7 @@ export const sessionLineItemCore: EntityCoreInput<SessionLineItem> = {
   name: "session_line_item",
   table: "session_line_items",
   displayName: "Line Item",
+  defaultSort: { column: "created_at", direction: "desc" },
   description: "Products packaged in a session",
   domain: "production",
 

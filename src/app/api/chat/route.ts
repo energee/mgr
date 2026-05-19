@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/supabase";
 import { createChatTools } from "./tools";
 import { entityService } from "@/services/entity-service";
-import { CHAT_ENTITY_MAP } from "./entity-map";
+import { coreRegistry } from "@/entities/cores";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { logger } from "@/lib/logger";
 
@@ -22,14 +22,13 @@ type PageContext = {
 }
 
 /**
- * Map from chat context entityType strings (from URL parsing) to entity
- * registry names. The chat context uses display-friendly names like
- * "brew log" while the registry uses snake_case like "brew_log".
- */
-/**
- * Maps display-friendly entity type names (from chat-context.tsx URL parser)
- * to CHAT_ENTITY_MAP registry keys. Must stay in sync with ENTITY_MAP in
- * src/contexts/chat-context.tsx.
+ * Maps display-friendly entity type names (from the chat-context URL parser
+ * in `src/contexts/chat-context.tsx`) to `coreRegistry` keys. The chat context
+ * uses display-friendly names like "brew log"; the registry uses snake_case
+ * like "brew_log". Must stay in sync with `ENTITY_MAP` in `chat-context.tsx`
+ * — entries here whose target is missing from `coreRegistry` are harmless
+ * (`fetchEntityContext` returns `null` and the route falls back to a generic
+ * "user is viewing a {entityType} page" summary).
  */
 const ENTITY_TYPE_TO_REGISTRY: Record<string, string> = {
   // Production
@@ -61,12 +60,10 @@ const ENTITY_TYPE_TO_REGISTRY: Record<string, string> = {
   location: "location",
   brand: "brand",
   "beer style": "beer_style",
-  "keg type": "keg_type",
   "sales channel": "sales_channel",
   "pricing tier": "pricing_tier",
   "yeast strain": "yeast_strain",
   "water profile": "water_profile",
-  "package type": "package_type",
 };
 
 /**
@@ -82,7 +79,7 @@ async function fetchEntityContext(
     const registryName = ENTITY_TYPE_TO_REGISTRY[entityType];
     if (!registryName) return null;
 
-    const entity = CHAT_ENTITY_MAP.get(registryName);
+    const entity = coreRegistry.get(registryName);
     if (!entity) return null;
 
     const result = await entityService.getById(supabase, entity, entityId);
