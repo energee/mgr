@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 import { toast } from "sonner";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 /** Barrels to gallons conversion factor */
 const BBL_TO_GAL = 31.0;
@@ -48,10 +49,11 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
   const { data: fetchedHops, isLoading } = useQuery({
     queryKey: recipeKeys.hopSchedule(recipeId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_hops")
-        .select(
-          `
+      return await unwrap(
+        supabase
+          .from("recipe_hops")
+          .select(
+            `
           id,
           hop_id,
           weight_oz,
@@ -68,11 +70,10 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
             bag_weight_lbs
           )
         `
-        )
-        .eq("recipe_id", recipeId)
-        .order("position", { ascending: true });
-      if (error) throw error;
-      return data as unknown as (HopScheduleItem & {
+          )
+          .eq("recipe_id", recipeId)
+          .order("position", { ascending: true })
+      ) as unknown as (HopScheduleItem & {
         hops: HopScheduleItem["hop"];
       })[];
     },

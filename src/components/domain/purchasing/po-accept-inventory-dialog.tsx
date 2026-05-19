@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import { resolveCatalogNames } from "@/entities/po-line-item";
 import { poReceiveKeys, entityKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -120,9 +121,7 @@ export function POAcceptInventoryDialog({
   const { data: receives, isLoading: receivesLoading } = useQuery({
     queryKey: poReceiveKeys.unaccepted(poId),
     queryFn: async () => {
-      const { data, error } = await dynamicRpc(supabase, "get_unaccepted_po_receives", { p_po_id: poId });
-
-      if (error) throw error;
+      const data = await unwrap(dynamicRpc(supabase, "get_unaccepted_po_receives", { p_po_id: poId }));
       const rows = (data ?? []) as RpcReceiveRow[];
       if (rows.length === 0) return [] as UnacceptedReceive[];
 
@@ -143,14 +142,13 @@ export function POAcceptInventoryDialog({
   const { data: inventoryItems, isLoading: itemsLoading } = useQuery({
     queryKey: entityKeys.list("inventory_items"),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("inventory_items")
-        .select("id, name, category, unit")
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) throw error;
-      return data ?? [];
+      return (await unwrap(
+        supabase
+          .from("inventory_items")
+          .select("id, name, category, unit")
+          .eq("is_active", true)
+          .order("name")
+      )) ?? [];
     },
     enabled: open,
   });
@@ -230,11 +228,11 @@ export function POAcceptInventoryDialog({
         };
       });
 
-      const { error } = await supabase
-        .from("inventory_lots")
-        .insert(lotsToInsert);
-
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("inventory_lots")
+          .insert(lotsToInsert)
+      );
     },
     onSuccess: () => {
       const count = selectedReceives.length;
