@@ -83,6 +83,19 @@ Full reference (deep architecture, decisions, data model):
 3. **One pattern, many uses** — universal components adapt to context
 4. **Minimize, don't maximize** — only build what's needed
 
+## Source layout
+
+`src/` top-level directories have distinct, non-overlapping purposes:
+
+| Directory | Holds |
+|-----------|-------|
+| `src/lib/` | Cross-cutting **infrastructure** — no brewery domain knowledge. Logging, errors, env, query client/keys, formatting, parsers, ids, Supabase/API plumbing, Zod schemas. |
+| `src/domain/` | Brewery **business logic** — calculations and rules for batches, brews, yeast, water, allocation, TTB, purchasing, planning. |
+| `src/integrations/` | Third-party **service clients** — QuickBooks, Square, Slack, email, MongoDB. |
+| `src/services/` | **Entity orchestration** — CRUD/transition services layered over domain logic and Supabase. |
+
+Litmus test for a new file: does it know what a "batch" is? → `src/domain/`. Does it talk to an outside vendor? → `src/integrations/`. Neither? → `src/lib/`.
+
 ## Hard constraints (MUST FOLLOW)
 
 1. **MUST** run `make check` before committing.
@@ -123,7 +136,7 @@ Add a `_schema_registry` entry in the migration whenever you create a new table.
 MGR is built for AI assistance. Entry points:
 
 - **Database functions**: `analyze_recipe_style_compliance`, `get_recipe_summary`, `suggest_recipe_improvements`, `analyze_batch_performance`, `get_ai_schema_context`.
-- **TypeScript utilities**: `src/lib/ai/` (`analyzeStyleCompliance`, `getRecipeSuggestions`).
+- **TypeScript utilities**: `src/domain/ai/` (`analyzeStyleCompliance`, `getRecipeSuggestions`).
 - **Full reference**: [`docs/spec/ai-integration.md`](docs/spec/ai-integration.md).
 
 ## Process rules

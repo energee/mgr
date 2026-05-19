@@ -1,8 +1,10 @@
 # autoharness
 
-Automated refactor screening for `src/lib`. Claude proposes one edit per
-iteration, autoharness applies it in a sandboxed copy, runs `typecheck +
-vitest`, and keeps only the candidates that stay green.
+Automated refactor screening for `src/lib` (cross-cutting infrastructure only;
+brewery domain logic now lives in `src/domain/`, vendor clients in
+`src/integrations/`). Claude proposes one edit per iteration, autoharness
+applies it in a sandboxed copy, runs `typecheck + vitest`, and keeps only the
+candidates that stay green.
 
 Use it when you want a batch of low-risk mechanical cleanups (dead code,
 duplication, no-op aliases) without writing them yourself. Do not use it for
