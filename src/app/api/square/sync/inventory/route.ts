@@ -14,9 +14,9 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getSquareClient, updateSquareSettings } from "@/lib/square/client";
-import { pushInventoryCounts } from "@/lib/square/inventory";
-import type { SquareSyncInventory, SquareSyncResult } from "@/lib/square/types";
+import { getSquareClient, updateSquareSettings } from "@/integrations/square/client";
+import { pushInventoryCounts } from "@/integrations/square/inventory";
+import type { SquareSyncInventory, SquareSyncResult } from "@/integrations/square/types";
 
 // Supabase nested join shapes (not reflected in generated types)
 type SellingFormatJoin = {

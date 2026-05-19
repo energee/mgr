@@ -11,9 +11,9 @@ import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { dynamicFrom } from "@/services/types";
-import { getMongoDb, closeMongoClient } from "@/lib/mongodb/client";
-import { syncAll, syncPhase, syncEntity } from "@/lib/mongodb/sync";
-import type { SyncEntityType, SyncPhase } from "@/lib/mongodb/types";
+import { getMongoDb, closeMongoClient } from "@/integrations/mongodb/client";
+import { syncAll, syncPhase, syncEntity } from "@/integrations/mongodb/sync";
+import type { SyncEntityType, SyncPhase } from "@/integrations/mongodb/types";
 
 export const POST = withPermission("integrations:manage", async (req) => {
   try {

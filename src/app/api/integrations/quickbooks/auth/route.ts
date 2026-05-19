@@ -8,7 +8,7 @@
 import { cookies } from "next/headers";
 import { withAuth } from "@/lib/api/auth";
 import { errorResponse, successResponse } from "@/lib/api/response";
-import { getClientCredentials } from "@/lib/quickbooks";
+import { getClientCredentials } from "@/integrations/quickbooks";
 
 const QBO_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
 const SCOPES = "com.intuit.quickbooks.accounting";

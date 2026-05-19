@@ -8,8 +8,8 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
-import { qboClient, getTokens } from "@/lib/quickbooks";
-import type { QBOAccount, QBOQueryResponse } from "@/lib/quickbooks";
+import { qboClient, getTokens } from "@/integrations/quickbooks";
+import type { QBOAccount, QBOQueryResponse } from "@/integrations/quickbooks";
 
 export const GET = withPermission("integrations:manage", async () => {
   const tokens = await getTokens();

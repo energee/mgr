@@ -6,7 +6,7 @@
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
-import { testConnection } from "@/lib/mongodb/client";
+import { testConnection } from "@/integrations/mongodb/client";
 import { createAdminClient } from "@/lib/supabase/server";
 import { dynamicFrom } from "@/services/types";
 

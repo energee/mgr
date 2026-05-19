@@ -17,7 +17,7 @@ import {
   errorResponse,
   rateLimit,
 } from "@/lib/api";
-import { sendNotificationEmail } from "@/lib/email";
+import { sendNotificationEmail } from "@/integrations/email";
 import {
   lowInventoryAlertTemplate,
   orderStatusChangeTemplate,
@@ -26,7 +26,7 @@ import {
   type LowInventoryData,
   type OrderStatusChangeData,
   type BatchStatusChangeData,
-} from "@/lib/email-templates";
+} from "@/integrations/email-templates";
 
 // -- Validation schemas -------------------------------------------------------
 

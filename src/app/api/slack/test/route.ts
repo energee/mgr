@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { withPermission } from "@/lib/api/auth";
-import { testSlackWebhook } from "@/lib/slack";
+import { testSlackWebhook } from "@/integrations/slack";
 
 /**
  * POST /api/slack/test
