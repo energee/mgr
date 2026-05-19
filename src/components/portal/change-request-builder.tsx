@@ -10,7 +10,7 @@ import {
   changeRequestKeys,
   inventoryKeys,
 } from "@/lib/query-keys";
-import { usePortalCustomer } from "@/lib/portal-context";
+import { usePortalCustomer } from "@/contexts/portal";
 import {
   Card,
   CardContent,

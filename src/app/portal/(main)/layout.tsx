@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { PortalShell } from "@/components/portal/portal-shell";
-import type { PortalCustomer } from "@/lib/portal-context";
+import type { PortalCustomer } from "@/contexts/portal";
 import { dynamicFrom } from "@/services/types";
 
 export const metadata: Metadata = {

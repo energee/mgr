@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { PortalProvider } from "@/lib/portal-context";
+import { PortalProvider } from "@/contexts/portal";
 import { Button } from "@/components/ui/button";
 import { SafeSvg } from "@/components/ui/safe-svg";
 import { LogOut } from "lucide-react";
