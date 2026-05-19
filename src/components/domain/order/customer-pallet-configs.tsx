@@ -16,6 +16,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { dynamicFrom } from "@/services/types";
 import { materialPlanningKeys, entityKeys } from "@/lib/query-keys";
 import {
@@ -97,14 +98,13 @@ export function CustomerPalletConfigs({
   const { data: configs = [], isLoading: configsLoading } = useQuery({
     queryKey: materialPlanningKeys.customerPalletConfigs(customerId),
     queryFn: async (): Promise<CustomerPalletConfig[]> => {
-      const { data, error } = await dynamicFrom(supabase, "customer_pallet_configs")
+      const data = await unwrap(dynamicFrom(supabase, "customer_pallet_configs")
         .select(
           `id, customer_id, selling_format_id, layers, notes,
            selling_format:selling_formats(id, name, units_per_layer)`
         )
         .eq("customer_id", customerId)
-        .order("selling_format_id");
-      if (error) throw error;
+        .order("selling_format_id"));
       return (data ?? []) as unknown as CustomerPalletConfig[];
     },
     enabled: !!customerId,
@@ -113,11 +113,10 @@ export function CustomerPalletConfigs({
   const { data: sellingFormats = [], isLoading: formatsLoading } = useQuery({
     queryKey: entityKeys.list("selling_formats"),
     queryFn: async (): Promise<SellingFormat[]> => {
-      const { data, error } = await dynamicFrom(supabase, "selling_formats")
+      const data = await unwrap(dynamicFrom(supabase, "selling_formats")
         .select("id, name, units_per_layer")
         .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
+        .order("name"));
       return (data ?? []) as unknown as SellingFormat[];
     },
   });
@@ -134,14 +133,13 @@ export function CustomerPalletConfigs({
 
   const insertMutation = useMutation({
     mutationFn: async (format: SellingFormat) => {
-      const { error } = await dynamicFrom(supabase, "customer_pallet_configs")
+      await unwrap(dynamicFrom(supabase, "customer_pallet_configs")
         .insert({
           customer_id: customerId,
           selling_format_id: format.id,
           layers: 1,
           notes: null,
-        } as never);
-      if (error) throw error;
+        } as never));
     },
     onSuccess: () => {
       invalidate();
@@ -154,10 +152,9 @@ export function CustomerPalletConfigs({
 
   const updateLayersMutation = useMutation({
     mutationFn: async ({ id, layers }: { id: string; layers: number | null }) => {
-      const { error } = await dynamicFrom(supabase, "customer_pallet_configs")
+      await unwrap(dynamicFrom(supabase, "customer_pallet_configs")
         .update({ layers } as never)
-        .eq("id", id);
-      if (error) throw error;
+        .eq("id", id));
     },
     onSuccess: () => {
       invalidate();
@@ -169,10 +166,9 @@ export function CustomerPalletConfigs({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await dynamicFrom(supabase, "customer_pallet_configs")
+      await unwrap(dynamicFrom(supabase, "customer_pallet_configs")
         .delete()
-        .eq("id", id);
-      if (error) throw error;
+        .eq("id", id));
     },
     onSuccess: () => {
       invalidate();

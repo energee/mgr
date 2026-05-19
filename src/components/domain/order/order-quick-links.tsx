@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { pickListKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,16 +35,13 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
   const { data: formalPickList } = useQuery({
     queryKey: pickListKeys.forOrder(data.id),
     queryFn: async () => {
-      const { data: pickLists, error } = await supabase
+      return await unwrap(supabase
         .from("pick_lists")
         .select("id, status")
         .eq("order_id", data.id)
         .neq("status", "cancelled")
         .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      return pickLists;
+        .maybeSingle()) as { id: string; status: string } | null;
     },
   });
 
@@ -55,11 +53,8 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
   // Generate pick list mutation
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const { data: pickListId, error } = await supabase
-        .rpc("generate_pick_list", { p_order_id: data.id });
-
-      if (error) throw error;
-      return pickListId as string;
+      return await unwrap(supabase
+        .rpc("generate_pick_list", { p_order_id: data.id })) as string;
     },
     onSuccess: (pickListId) => {
       toast.success("Pick list generated");

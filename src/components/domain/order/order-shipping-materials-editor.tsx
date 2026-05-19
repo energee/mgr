@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { dynamicFrom } from "@/services/types";
 import { materialPlanningKeys } from "@/lib/query-keys";
 import {
@@ -64,10 +65,9 @@ export function OrderShippingMaterialsEditor({
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, actual_qty }: { id: string; actual_qty: number | null }) => {
-      const { error } = await dynamicFrom(supabase, "order_materials")
+      await unwrap(dynamicFrom(supabase, "order_materials")
         .update({ actual_qty } as never)
-        .eq("id", id);
-      if (error) throw error;
+        .eq("id", id));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
