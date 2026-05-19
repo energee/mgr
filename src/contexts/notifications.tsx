@@ -20,6 +20,7 @@ import {
 import { QueryClientContext, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { notificationKeys } from "@/lib/query-keys";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -204,10 +205,11 @@ function NotificationsProviderInner({ children }: NotificationsProviderProps) {
   // Mark as read mutation
   const markAsReadMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await dynamicRpc(supabase, "mark_notification_read", {
-        p_notification_id: id,
-      });
-      if (error) throw error;
+      await unwrap(
+        dynamicRpc(supabase, "mark_notification_read", {
+          p_notification_id: id,
+        })
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.unread() });
@@ -217,8 +219,7 @@ function NotificationsProviderInner({ children }: NotificationsProviderProps) {
   // Mark all as read mutation
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await dynamicRpc(supabase, "mark_all_notifications_read");
-      if (error) throw error;
+      await unwrap(dynamicRpc(supabase, "mark_all_notifications_read"));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.unread() });
@@ -228,10 +229,11 @@ function NotificationsProviderInner({ children }: NotificationsProviderProps) {
   // Dismiss mutation
   const dismissMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await dynamicRpc(supabase, "dismiss_notification", {
-        p_notification_id: id,
-      });
-      if (error) throw error;
+      await unwrap(
+        dynamicRpc(supabase, "dismiss_notification", {
+          p_notification_id: id,
+        })
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.unread() });

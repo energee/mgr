@@ -16,6 +16,7 @@ import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { packagingSessionEntity } from "@/entities/packaging-session";
 import { PackagingDayView } from "@/components/domain/packaging/packaging-day-view";
 import { entityKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { Loader2 } from "lucide-react";
 
 export default function PackagingSessionDetailPage({
@@ -30,13 +31,13 @@ export default function PackagingSessionDetailPage({
   const { data: session, isLoading } = useQuery({
     queryKey: entityKeys.detail("packaging_sessions", id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("packaging_sessions")
-        .select("id, session_date, status, notes")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("packaging_sessions")
+          .select("id, session_date, status, notes")
+          .eq("id", id)
+          .single()
+      ) as unknown as { id: string; session_date: string | null; status: string; notes: string | null };
     },
   });
 

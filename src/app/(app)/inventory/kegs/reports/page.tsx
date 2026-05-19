@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { kegKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
@@ -92,11 +93,9 @@ export default function KegReportsPage() {
   const { data: fleetSummary, isLoading: loadingFleet } = useQuery({
     queryKey: kegKeys.fleetSummary(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "keg_fleet_summary")
-        .select("*")
-        .order("keg_type_name");
-      if (error) throw error;
-      return data as FleetSummary[];
+      return await unwrap(
+        dynamicFrom(supabase, "keg_fleet_summary").select("*").order("keg_type_name")
+      ) as unknown as FleetSummary[];
     },
   });
 
@@ -104,11 +103,9 @@ export default function KegReportsPage() {
   const { data: turnoverMetrics, isLoading: loadingTurnover } = useQuery({
     queryKey: kegKeys.turnoverMetrics(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "keg_turnover_metrics")
-        .select("*")
-        .order("keg_type_name");
-      if (error) throw error;
-      return data as TurnoverMetric[];
+      return await unwrap(
+        dynamicFrom(supabase, "keg_turnover_metrics").select("*").order("keg_type_name")
+      ) as unknown as TurnoverMetric[];
     },
   });
 
@@ -116,13 +113,13 @@ export default function KegReportsPage() {
   const { data: agingKegs, isLoading: loadingAging } = useQuery({
     queryKey: kegKeys.agingReport(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "keg_aging_report")
-        .select("*")
-        .neq("aging_status", "normal")
-        .order("days_out", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data as AgingKeg[];
+      return await unwrap(
+        dynamicFrom(supabase, "keg_aging_report")
+          .select("*")
+          .neq("aging_status", "normal")
+          .order("days_out", { ascending: false })
+          .limit(20)
+      ) as unknown as AgingKeg[];
     },
   });
 
@@ -130,12 +127,12 @@ export default function KegReportsPage() {
   const { data: customerBalances, isLoading: loadingCustomers } = useQuery({
     queryKey: kegKeys.customerBalances(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "customer_keg_balances")
-        .select("*")
-        .order("kegs_out", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data as CustomerBalance[];
+      return await unwrap(
+        dynamicFrom(supabase, "customer_keg_balances")
+          .select("*")
+          .order("kegs_out", { ascending: false })
+          .limit(10)
+      ) as unknown as CustomerBalance[];
     },
   });
 

@@ -30,6 +30,7 @@ import { BatchPackagingHistory } from "@/components/domain/batch/batch-packaging
 import { NextStepBanner } from "@/components/domain/shared/next-step-banner";
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { batchKeys, recipeKeys, packagingKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { usePrefillStore } from "@/contexts/prefill-store";
 
 export default function BatchDetailPage({
@@ -83,18 +84,19 @@ export default function BatchDetailPage({
   const { data: batch } = useQuery({
     queryKey: batchKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batches_with_brew_info")
-        .select("id, batch_code, name, status, volume_bbl, current_vessel_id, current_vessel_name, recipe_id")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("batches_with_brew_info")
+          .select("id, batch_code, name, status, volume_bbl, current_vessel_id, current_vessel_name, recipe_id")
+          .eq("id", id)
+          .single()
+      ) as unknown as BatchDetail | null;
       // target_og is available in the view (via b.*) but not in generated types yet
       // Runtime-validate required fields before casting
       if (!data || typeof data.id !== "string") {
         throw new Error("Batch detail query returned invalid data");
       }
-      return data as unknown as BatchDetail;
+      return data;
     },
   });
 
@@ -103,11 +105,12 @@ export default function BatchDetailPage({
   const { data: linkedBrewLogs } = useQuery({
     queryKey: batchKeys.brewLogLinks(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brew_log_batches")
-        .select("brew_log_id, brew_log:brew_logs(brew_number)")
-        .eq("batch_id", id);
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("brew_log_batches")
+          .select("brew_log_id, brew_log:brew_logs(brew_number)")
+          .eq("batch_id", id)
+      );
       return (data ?? []) as Array<{
         brew_log_id: string;
         brew_log: { brew_number: string } | null;
@@ -120,13 +123,13 @@ export default function BatchDetailPage({
     queryKey: recipeKeys.detail(batch?.recipe_id ?? ""),
     queryFn: async () => {
       if (!batch?.recipe_id) return null;
-      const { data, error } = await supabase
-        .from("recipes")
-        .select("id, name, brand_id, brands(id, name)")
-        .eq("id", batch.recipe_id)
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("recipes")
+          .select("id, name, brand_id, brands(id, name)")
+          .eq("id", batch.recipe_id)
+          .single()
+      ) as unknown as { id: string; name: string; brand_id: string | null; brands: { id: string; name: string } | null };
     },
     enabled: !!batch?.recipe_id,
   });

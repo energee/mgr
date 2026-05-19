@@ -43,6 +43,7 @@ import { DEFAULT_PLANNING_FILTERS } from "@/types/planning";
 import { CreateBatchFromShortfall } from "@/components/domain/purchasing/create-batch-from-shortfall";
 import { StatsStrip } from "@/components/dashboard";
 import { dynamicRpc } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Component
@@ -67,13 +68,13 @@ export default function ProductionPlanningPage() {
   } = useQuery({
     queryKey: planningKeys.shortfalls(filters),
     queryFn: async () => {
-      const { data, error } = await dynamicRpc(supabase, "calculate_production_shortfalls", {
-        p_include_drafts: filters.includeDrafts,
-        p_horizon_weeks: filters.horizonWeeks,
-      });
-
-      if (error) throw error;
-      return (data || []) as ProductionShortfall[];
+      const data = await unwrap(
+        dynamicRpc(supabase, "calculate_production_shortfalls", {
+          p_include_drafts: filters.includeDrafts,
+          p_horizon_weeks: filters.horizonWeeks,
+        })
+      );
+      return (data || []) as unknown as ProductionShortfall[];
     },
     refetchInterval: 60000, // Refresh every minute
   });

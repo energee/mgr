@@ -34,6 +34,7 @@ import {
   useUpdateUnitPreferences,
 } from "@/hooks/use-unit-preferences";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 // =============================================================================
 // Schema
 // =============================================================================
@@ -242,12 +243,13 @@ function DefaultWaterProfileCard() {
   const { data: currentDefault, isLoading: settingLoading } = useQuery({
     queryKey: settingsKeys.systemSetting("default_water_profile_id"),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "default_water_profile_id")
-        .single();
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("system_settings")
+          .select("value")
+          .eq("key", "default_water_profile_id")
+          .single()
+      ) as unknown as { value: unknown } | null;
       const val = data?.value;
       return typeof val === "string" && val !== "null" ? val : null;
     },
@@ -257,13 +259,13 @@ function DefaultWaterProfileCard() {
   const { data: profiles = [], isLoading: profilesLoading } = useQuery({
     queryKey: entityKeys.list("water_profiles", { is_active: true }),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("water_profiles")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("water_profiles")
+          .select("id, name")
+          .eq("is_active", true)
+          .order("name")
+      );
     },
   });
 
@@ -278,11 +280,12 @@ function DefaultWaterProfileCard() {
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from("system_settings")
-        .update({ value: selectedId || "null" })
-        .eq("key", "default_water_profile_id");
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("system_settings")
+          .update({ value: selectedId || "null" })
+          .eq("key", "default_water_profile_id")
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
