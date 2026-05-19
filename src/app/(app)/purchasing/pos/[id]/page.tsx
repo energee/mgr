@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
-import { calculateLandedCost } from "@/lib/purchasing/landed-cost";
+import { calculateLandedCost } from "@/domain/purchasing/landed-cost";
 import { POAcceptInventoryDialog } from "@/components/domain/po-accept-inventory-dialog";
 import { PoLandedCostBreakdown } from "@/components/domain/po-landed-cost-breakdown";
 import { purchaseOrderKeys, entityKeys, landedCostKeys } from "@/lib/query-keys";

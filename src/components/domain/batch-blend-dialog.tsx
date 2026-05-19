@@ -39,7 +39,7 @@ import { Loader2, GitMerge } from "lucide-react";
 import { toast } from "sonner";
 import { getStateLabel } from "@/types/entity";
 import { useGravityUnit, useVolumeUnit } from "@/hooks/use-unit-preferences";
-import { formatGravityFromSg, formatVolume } from "@/lib/units";
+import { formatGravityFromSg, formatVolume } from "@/domain/units";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";

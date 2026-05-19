@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Circle, Leaf, Apple, Sparkles, Beaker } from "lucide-react";
-import type { AdditionType } from "@/lib/batch-additions";
+import type { AdditionType } from "@/domain/batch-additions";
 import { recipeKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
 

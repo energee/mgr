@@ -24,7 +24,7 @@ import { recipeKeys } from "@/lib/query-keys";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { formatCurrency } from "@/lib/format";
 import { useVolumeUnit } from "@/hooks/use-unit-preferences";
-import { convertVolume, UNIT_LABELS } from "@/lib/units";
+import { convertVolume, UNIT_LABELS } from "@/domain/units";
 
 // =============================================================================
 // Types

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UnitInput } from "@/components/ui/unit-input";
-import type { UnitType } from "@/lib/units";
+import type { UnitType } from "@/domain/units";
 import {
   Select,
   SelectContent,
@@ -44,7 +44,7 @@ import {
   getUnitLabel,
   type ReadingType,
   type BatchReading,
-} from "@/lib/batch-readings";
+} from "@/domain/batch-readings";
 import { getCurrentDateTimeLocal } from "@/lib/utils";
 
 const readingSchema = z.object({

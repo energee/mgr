@@ -11,7 +11,7 @@ import { CHAT_ENTITY_MAP } from "./entity-map";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { logger } from "@/lib/logger";
 
-import { BASE_SYSTEM_PROMPT, PROMPT_VERSION } from "@/lib/ai/prompts";
+import { BASE_SYSTEM_PROMPT, PROMPT_VERSION } from "@/domain/ai/prompts";
 
 const log = logger.child({ route: "/api/chat", promptVersion: PROMPT_VERSION });
 

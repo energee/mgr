@@ -24,7 +24,7 @@ import {
   useSellingFormatBOM,
   type SellingFormatMaterial,
 } from "@/hooks/use-material-planning";
-import { isWholeUnit, ratioFromDecimal } from "@/lib/inventory-units";
+import { isWholeUnit, ratioFromDecimal } from "@/domain/inventory-units";
 import { parsePositiveNumber } from "@/lib/format";
 import {
   Table,

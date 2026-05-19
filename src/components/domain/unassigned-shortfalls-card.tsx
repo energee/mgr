@@ -34,8 +34,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";
-import type { IngredientShortfall } from "@/lib/purchasing/demand-calculator";
-import { getCatalogTypeDisplay } from "@/lib/purchasing/demand-calculator";
+import type { IngredientShortfall } from "@/domain/purchasing/demand-calculator";
+import { getCatalogTypeDisplay } from "@/domain/purchasing/demand-calculator";
 
 // =============================================================================
 // Types

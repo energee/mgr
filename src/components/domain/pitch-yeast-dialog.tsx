@@ -43,7 +43,7 @@ import {
   calculatePitchWeightLbs,
   sgToPlato,
   formatCellCount,
-} from "@/lib/yeast-calculations";
+} from "@/domain/yeast-calculations";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================

@@ -30,7 +30,7 @@ import {
   type SupplyEntry,
   type DemandItem,
   type LotWithRemaining,
-} from "../allocation-calculations";
+} from "\@/domain/allocation-calculations";
 
 // =============================================================================
 // Cost Calculations

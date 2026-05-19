@@ -8,16 +8,16 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { groupShortfallsBySupplier } from "@/lib/purchasing/po-generator";
+import { groupShortfallsBySupplier } from "@/domain/purchasing/po-generator";
 import {
   getCatalogTypeDisplay,
   formatQuantityWithUnit,
-} from "@/lib/purchasing/demand-calculator";
-import type { IngredientShortfall } from "@/lib/purchasing/demand-calculator";
+} from "@/domain/purchasing/demand-calculator";
+import type { IngredientShortfall } from "@/domain/purchasing/demand-calculator";
 import {
   formatLandedCost,
   landedCostMarkup,
-} from "@/lib/purchasing/landed-cost";
+} from "@/domain/purchasing/landed-cost";
 
 // =============================================================================
 // Test Data Helpers

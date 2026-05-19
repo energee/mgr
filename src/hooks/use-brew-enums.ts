@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { settingsKeys } from "@/lib/query-keys";
 import { ENUM_TYPES } from "@/lib/enums";
 import type { Json } from "@/types/supabase";
-import type { UnitType } from "@/lib/units";
+import type { UnitType } from "@/domain/units";
 
 // =============================================================================
 // Types

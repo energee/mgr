@@ -82,7 +82,7 @@ Migration: `supabase/migrations/00008_ai_integration.sql`
 ### DEC-AI-003: TypeScript AI Utilities
 **Status**: Implemented
 
-TypeScript utilities in `src/lib/ai/`:
+TypeScript utilities in `src/domain/ai/`:
 
 ```typescript
 // Recipe analysis
@@ -93,7 +93,7 @@ import {
   BrewingCalculations,
   WaterChemistry,
   FermentationAnalysis
-} from '@/lib/ai';
+} from '@/domain/ai';
 
 // Schema context
 import {
@@ -102,10 +102,10 @@ import {
   getValidTransitions,
   QUERY_TEMPLATES,
   DOMAIN_DESCRIPTIONS
-} from '@/lib/ai';
+} from '@/domain/ai';
 
 // Query helpers
-import { AIQueryHelpers } from '@/lib/ai';
+import { AIQueryHelpers } from '@/domain/ai';
 ```
 
 ---
@@ -405,7 +405,7 @@ ORDER BY b.planned_start_date;
 
 ---
 
-## TypeScript AI Utilities (`src/lib/ai/`)
+## TypeScript AI Utilities (`src/domain/ai/`)
 
 ### Recipe Analyzer (`recipe-analyzer.ts`)
 
@@ -627,10 +627,10 @@ SRM = 1.4922 * MCU^0.6859
 - `src/contexts/prefill-store.ts` — Zustand store for NavigationIntent data (prefill + dialog auto-open)
 
 ### AI Library
-- `src/lib/ai/index.ts` — Public exports
-- `src/lib/ai/recipe-analyzer.ts` — Brewing calculations, recipe analysis, water chemistry
-- `src/lib/ai/schema-context.ts` — Schema introspection, query templates, domain summaries
-- `src/lib/ai/query-helpers.ts` — Pre-built Supabase queries (13 helpers)
+- `src/domain/ai/index.ts` — Public exports
+- `src/domain/ai/recipe-analyzer.ts` — Brewing calculations, recipe analysis, water chemistry
+- `src/domain/ai/schema-context.ts` — Schema introspection, query templates, domain summaries
+- `src/domain/ai/query-helpers.ts` — Pre-built Supabase queries (13 helpers)
 
 ### UI Components
 - `src/components/domain/chat-panel.tsx` — Chat sidebar panel

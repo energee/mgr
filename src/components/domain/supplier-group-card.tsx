@@ -36,8 +36,8 @@ import {
   Loader2,
   ShoppingCart,
 } from "lucide-react";
-import type { PODraft, POLineItemDraft } from "@/lib/purchasing/po-generator";
-import { getCatalogTypeDisplay } from "@/lib/purchasing/demand-calculator";
+import type { PODraft, POLineItemDraft } from "@/domain/purchasing/po-generator";
+import { getCatalogTypeDisplay } from "@/domain/purchasing/demand-calculator";
 
 // =============================================================================
 // Types

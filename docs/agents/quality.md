@@ -22,7 +22,7 @@ previous snapshots in `git log -- docs/agents/quality.md`.
 | catalog    | B+ | 2026-05-04 | Brands / styles / yeasts / water-profiles / containers / selling-formats. Mostly stable; brands+styles design (F104) shipped early. Schema is wide and self-documenting via `_schema_registry`. |
 | packaging  | A− | 2026-05-04 | F136 redesign (PackagingDayView, in-progress flow) shipped in commit 196cb56-era work. Custom status-based detail view pattern is one of the cleanest in the repo. New E2E smoke spec covers it. |
 | auth       | B  | 2026-05-04 | F116 (permission-based roles), `user_profiles` mirrored from `auth.users` via 00036 trigger. `is_admin_rls` and similar SECURITY DEFINER helpers grandfathered. F131 login redesign recent. RLS now checked executably. |
-| ai         | A− | 2026-05-04 | Dedicated `src/lib/ai/`, multiple DB functions (`analyze_recipe_style_compliance`, `get_recipe_summary`, etc.), separate `docs/spec/ai-integration.md`. F100, F106, F111 all shipped. AI chat panel works end-to-end. |
+| ai         | A− | 2026-05-04 | Dedicated `src/domain/ai/`, multiple DB functions (`analyze_recipe_style_compliance`, `get_recipe_summary`, etc.), separate `docs/spec/ai-integration.md`. F100, F106, F111 all shipped. AI chat panel works end-to-end. |
 
 ## Architectural layers
 
@@ -34,7 +34,7 @@ previous snapshots in `git log -- docs/agents/quality.md`.
 | Hooks (`src/hooks/`, `src/lib/queries/`)      | B  | 2026-05-04 | 19 hooks, no dedicated test files for hooks themselves. Centralized query keys (`src/lib/query-keys.ts`) now ESLint-enforced — strong invariant. |
 | DB schema (`supabase/migrations/`)            | B  | 2026-05-04 | 147 migrations. Eight executable checks now in place (security_invoker, RLS, auth.users, search_path, SECURITY DEFINER, permissive RLS, schema_registry, data-model docs). Corrective migration 00156 applied to production 2026-05-04. Allowlists hold ~30 grandfathered entries to be tightened over time. |
 | Tests (vitest + Playwright)                   | B− | 2026-05-04 | 1019 vitest passing across 34 files, but most live in `src/lib/__tests__/` (21 of 40). Hooks, entity configs, and most components have no dedicated tests. Coverage threshold set at 50% on `src/lib/**` (raise gradually). E2E smoke covers 5 flows; deeper flows are `test.skip` pending seed data. |
-| AI integration (`src/lib/ai/`, DB functions)  | A− | 2026-05-04 | Mature library + DB functions + spec doc + AGENTS.md routing. Recipe style compliance / brewing science / write-actions all wired. AI chat panel (F100) works in the app. |
+| AI integration (`src/domain/ai/`, DB functions)  | A− | 2026-05-04 | Mature library + DB functions + spec doc + AGENTS.md routing. Recipe style compliance / brewing science / write-actions all wired. AI chat panel (F100) works in the app. |
 | Harness (this folder + `Makefile` + scripts/) | A− | 2026-05-04 | Rolled out 2026-05-02 to 2026-05-04 across PRs and #249. 16 ultrareview findings addressed. Eight executable DB checks, ESLint custom rules, WIP=1 enforcement, bootstrap contract validation, Sentry harness writes harness state. Not yet battle-tested across multiple agent sessions — promote to A after a 2-week soak proves drift detection works in practice. |
 
 ## Trend log
