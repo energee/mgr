@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 type BatchQuickLinksProps = {
   data: {
@@ -27,12 +28,13 @@ export function BatchQuickLinks({ data }: BatchQuickLinksProps) {
   const { data: brewLogLinks } = useQuery({
     queryKey: batchKeys.brewLogs(data.id),
     queryFn: async () => {
-      const { data: links, error } = await supabase
-        .from("brew_log_batches")
-        .select("brew_log_id, brew_log:brew_logs(brew_number)")
-        .eq("batch_id", data.id)
-        .limit(1);
-      if (error) throw error;
+      const links = await unwrap(
+        supabase
+          .from("brew_log_batches")
+          .select("brew_log_id, brew_log:brew_logs(brew_number)")
+          .eq("batch_id", data.id)
+          .limit(1)
+      );
       return links ?? [];
     },
   });

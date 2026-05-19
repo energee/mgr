@@ -23,6 +23,7 @@ import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Dialog,
   DialogContent,
@@ -117,15 +118,15 @@ export function VesselTransferDialog({
   const { data: vessels, isLoading: vesselsLoading } = useQuery({
     queryKey: vesselKeys.available(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vessels")
-        .select("id, name, vessel_type, capacity_bbl")
-        .eq("status", "ready_for_use")
-        .eq("is_active", true)
-        .is("current_batch_id", null)
-        .order("name");
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("vessels")
+          .select("id, name, vessel_type, capacity_bbl")
+          .eq("status", "ready_for_use")
+          .eq("is_active", true)
+          .is("current_batch_id", null)
+          .order("name")
+      );
     },
     enabled: open,
   });
@@ -147,8 +148,7 @@ export function VesselTransferDialog({
         query = query.is("from_vessel_id", null);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await unwrap(query);
       const total = (data ?? []).reduce((sum, t) => sum + Number(t.volume_bbl), 0);
       return total;
     },
