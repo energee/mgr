@@ -10,5 +10,7 @@
   ],
   "project": ["src/**/*.{ts,tsx}"],
   "ignore": ["src/types/supabase.ts"],
-  "ignoreBinaries": ["supabase"]
+  "ignoreBinaries": ["supabase"],
+  "ignoreDependencies": ["tailwindcss", "tw-animate-css"],
+  "ignoreUnresolved": ["jsr:@supabase/.*"]
 }
