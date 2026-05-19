@@ -11,7 +11,7 @@ import { use } from "react";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { customerEntity } from "@/entities/customer";
-import { CustomerKegBalances } from "@/components/domain/customer-keg-balances";
+import { CustomerKegBalances } from "@/components/domain/inventory/customer-keg-balances";
 
 export default function CustomerDetailPage({
   params,

@@ -20,14 +20,14 @@ import { Badge } from "@/components/ui/badge";
 import { vesselEntity } from "./vessel";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { BatchQuickLinks } from "@/components/domain/batch-quick-links";
-import { BatchBrewInfo } from "@/components/domain/batch-brew-info";
-import { BatchCancellationInfo } from "@/components/domain/batch-cancellation-info";
-import { BatchInsights } from "@/components/domain/batch-insights";
-import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
-import { BatchBlendHistory } from "@/components/domain/batch-blend-history";
-import { BatchYeastSection } from "@/components/domain/batch-yeast-section";
-import { BatchTransferTimeline } from "@/components/domain/batch-transfer-timeline";
+import { BatchQuickLinks } from "@/components/domain/batch/batch-quick-links";
+import { BatchBrewInfo } from "@/components/domain/batch/batch-brew-info";
+import { BatchCancellationInfo } from "@/components/domain/batch/batch-cancellation-info";
+import { BatchInsights } from "@/components/domain/batch/batch-insights";
+import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
+import { BatchBlendHistory } from "@/components/domain/batch/batch-blend-history";
+import { BatchYeastSection } from "@/components/domain/batch/batch-yeast-section";
+import { BatchTransferTimeline } from "@/components/domain/batch/batch-transfer-timeline";
 import { batchSchema, batchStates, batchTransitions } from "@/lib/schemas/batch";
 
 // Re-export schema so existing client-side imports keep working

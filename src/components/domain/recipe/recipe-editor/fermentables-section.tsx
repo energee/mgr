@@ -18,11 +18,11 @@ import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
-import { GrainBillSection } from "@/components/domain/grain-bill-section";
-import { HopScheduleSection } from "@/components/domain/hop-schedule-section";
-import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
-import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
-import { OtherIngredientsSection } from "@/components/domain/other-ingredients-section";
+import { GrainBillSection } from "@/components/domain/recipe/grain-bill-section";
+import { HopScheduleSection } from "@/components/domain/recipe/hop-schedule-section";
+import type { GrainBillItem } from "@/components/domain/recipe/grain-bill-editor";
+import type { HopScheduleItem } from "@/components/domain/recipe/hop-schedule-editor";
+import { OtherIngredientsSection } from "@/components/domain/recipe/other-ingredients-section";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {

@@ -15,9 +15,9 @@ import { recipeKeys } from "@/lib/query-keys";
 import {
   HopScheduleEditor,
   type HopScheduleItem,
-} from "@/components/domain/hop-schedule-editor";
+} from "@/components/domain/recipe/hop-schedule-editor";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useRegisterSaver } from "@/components/domain/recipe-editor/recipe-editor-context";
+import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 import { toast } from "sonner";
 
 /** Barrels to gallons conversion factor */

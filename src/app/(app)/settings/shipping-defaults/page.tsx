@@ -8,7 +8,7 @@
  * override is set.
  */
 
-import { BreweryShippingDefaults } from "@/components/domain/brewery-shipping-defaults";
+import { BreweryShippingDefaults } from "@/components/domain/packaging/brewery-shipping-defaults";
 
 export default function ShippingDefaultsPage() {
   return (

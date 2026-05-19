@@ -15,7 +15,7 @@ import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
-import { FermentationScheduleEditor, type FermentationStage } from "@/components/domain/fermentation-schedule-editor";
+import { FermentationScheduleEditor, type FermentationStage } from "@/components/domain/recipe/fermentation-schedule-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 

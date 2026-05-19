@@ -22,9 +22,9 @@ import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/ent
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
 import type { EntityConfig } from "@/types/entity";
-import { YeastLineageDisplay } from "@/components/domain/yeast-lineage-display";
-import { YeastViabilityChart } from "@/components/domain/yeast-viability-chart";
-import { RecordCellCountDialog } from "@/components/domain/record-cell-count-dialog";
+import { YeastLineageDisplay } from "@/components/domain/yeast/yeast-lineage-display";
+import { YeastViabilityChart } from "@/components/domain/yeast/yeast-viability-chart";
+import { RecordCellCountDialog } from "@/components/domain/yeast/record-cell-count-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,

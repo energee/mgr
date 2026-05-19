@@ -40,7 +40,7 @@ import type {
   PlanningSummary,
 } from "@/types/planning";
 import { DEFAULT_PLANNING_FILTERS } from "@/types/planning";
-import { CreateBatchFromShortfall } from "@/components/domain/create-batch-from-shortfall";
+import { CreateBatchFromShortfall } from "@/components/domain/purchasing/create-batch-from-shortfall";
 import { StatsStrip } from "@/components/dashboard";
 import { dynamicRpc } from "@/services/types";
 

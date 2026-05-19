@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys } from "@/lib/query-keys";
 import Link from "next/link";
-import { InventoryAlerts } from "@/components/domain/inventory-alerts";
+import { InventoryAlerts } from "@/components/domain/inventory/inventory-alerts";
 import { Suspense } from "react";
 import { PackageCheck, Clock } from "lucide-react";
 import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";

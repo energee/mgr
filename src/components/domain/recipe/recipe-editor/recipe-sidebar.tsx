@@ -10,8 +10,8 @@
 
 import { useMemo } from "react";
 import { useRecipeEditor } from "./recipe-editor-context";
-import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
-import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
+import type { GrainBillItem } from "@/components/domain/recipe/grain-bill-editor";
+import type { HopScheduleItem } from "@/components/domain/recipe/hop-schedule-editor";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
 import { useGravityUnit, useWeightUnit } from "@/hooks/use-unit-preferences";

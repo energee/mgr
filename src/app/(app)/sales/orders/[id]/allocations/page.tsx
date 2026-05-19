@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Plus, Package, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { OrderAllocation } from "@/components/domain/order-allocation";
+import { OrderAllocation } from "@/components/domain/order/order-allocation";
 import { orderKeys, inventoryKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
 

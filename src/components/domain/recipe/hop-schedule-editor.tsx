@@ -8,7 +8,7 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { getHopUtilizationFactor } from "@/components/domain/recipe-editor/recipe-estimate-calc";
+import { getHopUtilizationFactor } from "@/components/domain/recipe/recipe-editor/recipe-estimate-calc";
 import { useCatalog } from "@/hooks/use-catalog";
 import {
   Table,

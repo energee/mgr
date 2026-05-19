@@ -11,7 +11,7 @@ import { use } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { OrderPickList } from "@/components/domain/order-pick-list";
+import { OrderPickList } from "@/components/domain/order/order-pick-list";
 
 export default function OrderPickListPage({
   params,

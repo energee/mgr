@@ -7,7 +7,7 @@
  * Shows viability, remaining quantity, and generation at a glance.
  */
 
-import { YeastBrinksOverview } from "@/components/domain/yeast-brinks-overview";
+import { YeastBrinksOverview } from "@/components/domain/yeast/yeast-brinks-overview";
 
 export default function BrinksPage() {
   return (

@@ -13,7 +13,7 @@
 import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { BatchReadingForm } from "@/components/domain/batch-reading-form";
+import { BatchReadingForm } from "@/components/domain/batch/batch-reading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,7 +27,7 @@ import {
   READING_TYPES,
   formatReadingValue,
 } from "@/domain/batch-readings";
-import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch-readings-chart-lazy";
+import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch/batch-readings-chart-lazy";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
 import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";

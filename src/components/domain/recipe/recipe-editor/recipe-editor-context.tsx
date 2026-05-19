@@ -22,10 +22,10 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import type { GrainBillItem } from "@/components/domain/grain-bill-editor";
-import type { HopScheduleItem } from "@/components/domain/hop-schedule-editor";
-import type { MashStep } from "@/components/domain/mash-schedule-editor";
-import type { FermentationStage } from "@/components/domain/fermentation-schedule-editor";
+import type { GrainBillItem } from "@/components/domain/recipe/grain-bill-editor";
+import type { HopScheduleItem } from "@/components/domain/recipe/hop-schedule-editor";
+import type { MashStep } from "@/components/domain/recipe/mash-schedule-editor";
+import type { FermentationStage } from "@/components/domain/recipe/fermentation-schedule-editor";
 import {
   calculateEstimates,
   type RecipeEstimates,

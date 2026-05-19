@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isDuplicateTransfer } from "../vessel-transfer-utils";
+import { isDuplicateTransfer } from "@/components/domain/batch/vessel-transfer-utils";
 
 describe("isDuplicateTransfer", () => {
   it("returns false when no previous transfer exists", () => {

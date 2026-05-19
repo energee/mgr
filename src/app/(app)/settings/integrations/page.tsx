@@ -18,14 +18,14 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/integration-badge";
+import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/shared/integration-badge";
 import { Switch } from "@/components/ui/switch";
 import { Check, Database, ExternalLink, Loader2, RefreshCw } from "lucide-react";
-import { SecretKeyInput } from "@/components/domain/secret-key-input";
+import { SecretKeyInput } from "@/components/domain/shared/secret-key-input";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { SquareIcon } from "@/components/ui/square-icon";
 import { QuickBooksIcon } from "@/components/ui/quickbooks-icon";
-import { SlackIntegrationCard } from "@/components/domain/slack-integration-card";
+import { SlackIntegrationCard } from "@/components/domain/shared/slack-integration-card";
 import { mongodbKeys, qboKeys, squareKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 
