@@ -1,61 +1,24 @@
 /**
- * Recipe Entity Configuration
+ * Recipe Entity — presentation
  *
- * Recipes define the specifications for brewing - ingredients,
- * process parameters, and target measurements.
- *
- * Ingredients are stored in junction tables (recipe_malts, recipe_hops, etc.)
- * and calculated estimates (OG, FG, ABV, IBU, SRM) come from the
- * recipes_with_estimates view.
+ * The React/UI half of the recipe entity: list columns, list filters, the
+ * unified detail/edit sections, and actions.
  */
 
-import type { EntityConfig, StateMachineConfig } from "@/types/entity";
-import { statesAsOptions } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { EntityPresentation } from "@/types/entity";
 import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe/recipe-schedule-display";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe/recipe-additions-display";
 import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
 import { RecipeAnalysis } from "@/components/domain/recipe/recipe-analysis";
 import { StatusBadge } from "@/components/universal/status-badge";
-
 import { WaterProfileQuickCreate } from "@/components/domain/recipe/water-profile-quick-create";
-import { recipeSchema } from "@/lib/schemas/recipe";
+import { recipeStateMachine, statusOptions } from "./core";
+import type { Recipe } from "./core";
 
-export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
-
-/** Base table type extended with computed view fields for list/detail display */
-type RecipeBase = Database["public"]["Tables"]["recipes"]["Row"];
-type RecipeView = Database["public"]["Views"]["recipes_with_estimates"]["Row"];
-type Recipe = RecipeBase & Partial<Pick<RecipeView, "est_og" | "est_fg" | "est_abv" | "est_ibu" | "est_srm" | "style_name" | "est_cogs" | "batch_count">>;
-
-const recipeStateMachine: StateMachineConfig<Recipe> = {
-  stateField: "status",
-  states: ["draft", "spec", "complete"],
-  initialState: "draft",
-  transitions: {
-    draft: ["spec", "complete"],
-    spec: ["complete"],
-    complete: [],
-  },
-  stateDisplay: {
-    draft: { label: "Draft", color: "default" },
-    spec: { label: "Spec", color: "warning" },
-    complete: { label: "Complete", color: "success" },
-  },
-};
-
-const statusOptions = statesAsOptions(recipeStateMachine);
-
-export const recipeEntity: EntityConfig<Recipe> = {
-  name: "recipe",
-  table: "recipes",
-  displayName: "Recipe",
-  displayNamePlural: "Recipes",
-  description: "Brewing recipes with ingredients and process parameters",
-  domain: "production",
-
-  viewTable: "recipes_with_estimates",
-
+export const recipePresentation: EntityPresentation<Recipe> = {
+  // ---------------------------------------------------------------------------
+  // List View
+  // ---------------------------------------------------------------------------
   listColumns: [
     {
       accessorKey: "name",
@@ -142,11 +105,9 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
   ],
 
-  defaultSort: { column: "created_at", direction: "desc" },
-  searchableFields: ["name", "brew_day_notes", "development_notes"],
-
-  detailHeader: { title: "name" },
-
+  // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
   sections: [
     {
       id: "overview",
@@ -443,24 +404,9 @@ export const recipeEntity: EntityConfig<Recipe> = {
     },
   ],
 
-  formSchema: recipeSchema,
-
   // ---------------------------------------------------------------------------
-  // State Machine
+  // Actions
   // ---------------------------------------------------------------------------
-  stateMachine: recipeStateMachine,
-
-  relations: [
-    {
-      name: "batches",
-      entity: "batch",
-      type: "hasMany",
-      foreignKey: "recipe_id",
-      showInDetail: true,
-      detailTab: "Batches",
-    },
-  ],
-
   actions: [
     {
       name: "clone",
@@ -479,15 +425,4 @@ export const recipeEntity: EntityConfig<Recipe> = {
         data.batch_count ? `Has ${data.batch_count} associated batch${data.batch_count === 1 ? "" : "es"}` : false,
     },
   ],
-
-  queryExamples: [
-    "Show me all IPA recipes",
-    "What recipes have estimated ABV over 7%?",
-    "List active recipes sorted by style",
-    "Find recipes with estimated IBU over 50",
-    "What recipes use Citra hops?",
-    "Show grain bill for recipe X",
-  ],
-
-  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_active", "status"],
 };

@@ -1,24 +1,15 @@
 /**
- * Batch Entity Configuration
+ * Batch Entity — presentation
  *
- * Batches represent the cold-side production process: fermentation through packaging.
- * Hot-side brewing data (brew date, OG, timeline) is captured in brew_logs and
- * linked via brew_log_batches junction table.
- *
- * This decoupling supports:
- * - Split fermentation (1 brew → multiple batches)
- * - Parti-gyle brewing
- * - Blend at knockout
- *
- * Lifecycle: planned → fermenting → conditioning → packaging → completed
+ * The React/UI half of the batch entity: list columns, list filters, quick
+ * filters, the unified detail/edit sections, kanban config, and actions.
  */
 
-import type { EntityConfig, StateMachineConfig } from "@/types/entity";
-import { statesAsOptions, getValueLabel } from "@/types/entity";
+import type { EntityPresentation } from "@/types/entity";
+import { getValueLabel } from "@/types/entity";
 import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { vesselEntity } from "./vessel";
-import type { Database } from "@/types/supabase";
+import { vesselCore } from "@/entities/vessel/core";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { BatchQuickLinks } from "@/components/domain/batch/batch-quick-links";
 import { BatchBrewInfo } from "@/components/domain/batch/batch-brew-info";
@@ -28,66 +19,10 @@ import { createRevisionHistoryDisplay } from "@/components/domain/shared/revisio
 import { BatchBlendHistory } from "@/components/domain/batch/batch-blend-history";
 import { BatchYeastSection } from "@/components/domain/batch/batch-yeast-section";
 import { BatchTransferTimeline } from "@/components/domain/batch/batch-transfer-timeline";
-import { batchSchema, batchStates, batchTransitions } from "@/lib/schemas/batch";
+import { batchStateMachine, statusOptions } from "./core";
+import type { Batch } from "./core";
 
-// Re-export schema so existing client-side imports keep working
-export { batchSchema, type BatchFormValues } from "@/lib/schemas/batch";
-
-// Base table type for form operations
-type BatchTable = Database["public"]["Tables"]["batches"]["Row"];
-
-// Combined type for entity config: table fields + view computed fields with non-null id
-// This is the type used for list/detail display where id is always present
-type Batch = BatchTable & {
-  // Computed fields from batches_with_brew_info view
-  actual_og: number | null;
-  brew_count: number | null;
-  brew_date: string | null;
-  current_vessel_id: string | null;
-  current_vessel_name: string | null;
-  current_vessel_type: string | null;
-  volume_from_brews_bbl: number | null;
-};
-
-// =============================================================================
-// State Machine (defined separately to derive options)
-// =============================================================================
-
-const batchStateMachine: StateMachineConfig<Batch> = {
-  stateField: "status",
-  states: [...batchStates],
-  initialState: "planned",
-  transitions: batchTransitions,
-  stateDisplay: {
-    planned: { label: "Planned", color: "default" },
-    fermenting: { label: "Fermenting", color: "info" },
-    conditioning: { label: "Conditioning", color: "info" },
-    packaging: { label: "Packaging", color: "warning" },
-    completed: { label: "Completed", color: "success" },
-    cancelled: { label: "Cancelled", color: "default" },
-    archived: { label: "Archived", color: "error" },
-  },
-};
-
-// Derive status options from state machine (single source of truth)
-const statusOptions = statesAsOptions(batchStateMachine);
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const batchEntity: EntityConfig<Batch> = {
-  // ---------------------------------------------------------------------------
-  // Identity
-  // ---------------------------------------------------------------------------
-  name: "batch",
-  table: "batches",
-  viewTable: "batches_with_brew_info",  // Includes brew stats (brew_date, actual_og, brew_count) + current vessel info (id, name, type)
-  displayName: "Batch",
-  displayNamePlural: "Batches",
-  description: "Production batches from brewing through packaging",
-  domain: "production",
-
+export const batchPresentation: EntityPresentation<Batch> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -109,7 +44,7 @@ export const batchEntity: EntityConfig<Batch> = {
       render: (value) => (
         <StatusBadge
           status={value as string}
-          config={batchEntity.stateMachine?.stateDisplay}
+          config={batchStateMachine.stateDisplay}
         />
       ),
     },
@@ -138,7 +73,7 @@ export const batchEntity: EntityConfig<Batch> = {
             {value as string}
             {batch.current_vessel_type && (
               <Badge variant="outline" className="text-[10px] px-1 py-0">
-                {getValueLabel(vesselEntity, "vessel_type", batch.current_vessel_type)}
+                {getValueLabel(vesselCore, "vessel_type", batch.current_vessel_type)}
               </Badge>
             )}
           </span>
@@ -198,18 +133,6 @@ export const batchEntity: EntityConfig<Batch> = {
       ],
     },
   ],
-
-  defaultSort: { column: "planned_start_date", direction: "desc" },
-  searchableFields: ["batch_code", "name"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "batch_code",
-    subtitle: "name",
-    badge: "status",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
@@ -340,16 +263,6 @@ export const batchEntity: EntityConfig<Batch> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
-  formSchema: batchSchema,
-
-  // ---------------------------------------------------------------------------
-  // State Machine
-  // ---------------------------------------------------------------------------
-  stateMachine: batchStateMachine,
-
-  // ---------------------------------------------------------------------------
   // Kanban Board
   // ---------------------------------------------------------------------------
   kanbanConfig: {
@@ -439,61 +352,4 @@ export const batchEntity: EntityConfig<Batch> = {
       toState: "archived",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "recipe",
-      entity: "recipe",
-      type: "belongsTo",
-      foreignKey: "recipe_id",
-      showInDetail: true,
-    },
-    {
-      name: "recipe_variant",
-      entity: "recipe_variant",
-      type: "belongsTo",
-      foreignKey: "recipe_variant_id",
-      showInDetail: false,
-    },
-    {
-      name: "brew_logs",
-      entity: "brew_log",
-      type: "hasManyThrough",
-      through: "brew_log_batches",
-      foreignKey: "batch_id",
-      showInDetail: true,
-      detailTab: "Brew Logs",
-    },
-    {
-      name: "vessel_transfers",
-      entity: "vessel_transfer",
-      type: "hasMany",
-      foreignKey: "batch_id",
-      showInDetail: true,
-      detailTab: "Transfers",
-      hideAdd: true,
-    },
-    {
-      name: "yeast_events",
-      entity: "yeast_pitch_event",
-      type: "hasMany",
-      foreignKey: "batch_id",
-      showInDetail: false, // shown via custom BatchYeastSection
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all batches currently fermenting",
-    "What batches are planned for this week?",
-    "Which batches are in FV-1?",
-    "What's the total volume in fermentation?",
-  ],
-
-  keyFields: ["batch_code", "name", "status", "planned_start_date", "current_vessel_name"],
 };
