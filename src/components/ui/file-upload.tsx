@@ -15,10 +15,11 @@ import Image from "next/image";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { useLazyRef } from "@/hooks/use-lazy-ref";
+import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 
 function useAsRef<T>(props: T) {
   const ref = React.useRef<T>(props);
-  React.useLayoutEffect(() => { ref.current = props; });
+  useIsomorphicLayoutEffect(() => { ref.current = props; });
   return ref;
 }
 

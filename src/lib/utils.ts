@@ -22,7 +22,3 @@ export function getCurrentDateTimeLocal(): string {
   return new Date().toISOString().slice(0, 16);
 }
 
-/**
- * Format a value for display based on its type.
- * Used by EntityList and EntityDetail for consistent formatting.
- */
