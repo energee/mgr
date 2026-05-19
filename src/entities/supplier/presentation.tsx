@@ -1,47 +1,18 @@
 /**
- * Supplier Entity Configuration
+ * Supplier Entity — presentation
  *
- * Suppliers provide ingredients and materials for brewing.
- * Includes contact info, payment terms, and lead time tracking.
+ * The React/UI half of the supplier entity: list columns, list filters, and
+ * the unified detail/edit sections (including the QuickBooks sync section).
  */
 
-import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityPresentation } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { Badge } from "@/components/ui/badge";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
 
 type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
 
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const supplierSchema = z.object({
-  name: z.string().min(1, "Supplier name is required"),
-  contact_name: z.string().nullable().optional(),
-  contact_email: z.string().email().nullable().optional().or(z.literal("")),
-  contact_phone: z.string().nullable().optional(),
-  payment_terms: z.string().nullable().optional(),
-  default_lead_time_days: z.coerce.number().nullable().optional(),
-  is_active: z.boolean().default(true),
-  notes: z.string().nullable().optional(),
-});
-
-export type SupplierFormValues = z.infer<typeof supplierSchema>;
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const supplierEntity: EntityConfig<Supplier> = {
-  name: "supplier",
-  table: "suppliers",
-  displayName: "Supplier",
-  displayNamePlural: "Suppliers",
-  description: "Ingredient and material suppliers",
-  domain: "purchasing",
-
+export const supplierPresentation: EntityPresentation<Supplier> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -86,17 +57,6 @@ export const supplierEntity: EntityConfig<Supplier> = {
       label: "Active",
     },
   ],
-
-  defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name", "contact_name", "contact_email"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "name",
-    badge: "is_active",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
@@ -194,11 +154,6 @@ export const supplierEntity: EntityConfig<Supplier> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
-  formSchema: supplierSchema,
-
-  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
   actions: [
@@ -211,30 +166,4 @@ export const supplierEntity: EntityConfig<Supplier> = {
       deleteMode: "hard",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "purchase_orders",
-      entity: "purchase_order",
-      type: "hasMany",
-      foreignKey: "supplier_id",
-      showInDetail: true,
-      detailTab: "Orders",
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all active suppliers",
-    "Find suppliers with lead time under 7 days",
-    "Show suppliers for malt ingredients",
-    "Which suppliers have Net 30 terms?",
-  ],
-
-  keyFields: ["name", "is_active", "payment_terms", "default_lead_time_days"],
 };
