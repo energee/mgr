@@ -13,6 +13,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Dialog,
   DialogContent,
@@ -84,13 +85,11 @@ export function OrderAllocation({
   const { isLoading: orderLoading } = useQuery({
     queryKey: orderKeys.detail(orderId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      return await unwrap(supabase
         .from("orders")
         .select("*")
         .eq("id", orderId)
-        .single();
-      if (error) throw error;
-      return data;
+        .single());
     },
     enabled: open,
   });
@@ -99,13 +98,10 @@ export function OrderAllocation({
   const { data: finishedGoods, isLoading: fgLoading } = useQuery({
     queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "finished_goods_with_availability")
+      return await unwrap(dynamicFrom(supabase, "finished_goods_with_availability")
         .select("id, lot_number, brand_id, selling_format_id, quantity, available_quantity, production_date")
         .gt("available_quantity", 0)
-        .order("production_date", { ascending: true });
-
-      if (error) throw error;
-      return data as FinishedGoodAvailable[];
+        .order("production_date", { ascending: true })) as unknown as FinishedGoodAvailable[];
     },
     enabled: open,
   });
@@ -125,16 +121,14 @@ export function OrderAllocation({
 
       // Check for existing allocations of the same lots to this order
       const fgIds = validEntries.map((e) => e.finished_good_id);
-      const { data: existing, error: checkError } = await supabase
+      const existing = await unwrap(supabase
         .from("allocations")
         .select("source_id")
         .eq("destination_type", "order")
         .eq("destination_id", orderId)
         .eq("source_type", "finished_good")
         .in("source_id", fgIds)
-        .in("status", ["planned", "completed"]);
-
-      if (checkError) throw checkError;
+        .in("status", ["planned", "completed"]));
 
       const alreadyAllocated = new Set((existing ?? []).map((a) => a.source_id));
       if (alreadyAllocated.size > 0) {
@@ -158,11 +152,9 @@ export function OrderAllocation({
           status: "planned" as const,
         }));
 
-        const { error } = await supabase
+        await unwrap(supabase
           .from("allocations")
-          .insert(allocationsToInsert);
-
-        if (error) throw error;
+          .insert(allocationsToInsert));
         return;
       }
 
@@ -175,11 +167,9 @@ export function OrderAllocation({
         status: "planned" as const,
       }));
 
-      const { error } = await supabase
+      await unwrap(supabase
         .from("allocations")
-        .insert(allocationsToInsert);
-
-      if (error) throw error;
+        .insert(allocationsToInsert));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderKeys.detail(orderId) });

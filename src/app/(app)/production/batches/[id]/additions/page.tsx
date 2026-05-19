@@ -29,6 +29,7 @@ import {
 import { PlannedAdditions } from "@/components/domain/batch/planned-additions";
 import { format } from "date-fns";
 import { batchKeys, batchAdditionKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 /** Row from the batch_additions table */
 type BatchAdditionRow = {
@@ -113,13 +114,13 @@ export default function BatchAdditionsPage({
   const { data: batch, isLoading: batchLoading } = useQuery({
     queryKey: batchKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batches")
-        .select("id, batch_code, name, status, recipe_id")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("batches")
+          .select("id, batch_code, name, status, recipe_id")
+          .eq("id", id)
+          .single()
+      ) as unknown as { id: string; batch_code: string; name: string; status: string; recipe_id: string | null };
     },
   });
 
@@ -127,13 +128,13 @@ export default function BatchAdditionsPage({
   const { data: additions, isLoading: additionsLoading } = useQuery({
     queryKey: batchAdditionKeys.byBatch(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batch_additions")
-        .select("*")
-        .eq("batch_id", id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as BatchAdditionRow[];
+      return await unwrap(
+        supabase
+          .from("batch_additions")
+          .select("*")
+          .eq("batch_id", id)
+          .order("created_at", { ascending: false })
+      ) as BatchAdditionRow[];
     },
   });
 
@@ -146,27 +147,27 @@ export default function BatchAdditionsPage({
         ? new Date(addition.timestamp).toISOString().split("T")[0]
         : null;
 
-      const { data, error } = await supabase
-        .from("batch_additions")
-        .insert({
-          batch_id: id,
-          addition_type: dbAdditionType,
-          catalog_id: addition.ingredient_id || null,
-          catalog_table: addition.ingredient_id ? catalogTable : null,
-          name: addition.ingredient_name,
-          amount: addition.quantity,
-          unit: addition.unit,
-          timing: addition.addition_type === "dry_hop" ? "dry_hop" : null,
-          days: addition.contact_time_hours
-            ? Math.ceil(addition.contact_time_hours / 24)
-            : null,
-          date_added: dateAdded,
-          notes: addition.notes || null,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("batch_additions")
+          .insert({
+            batch_id: id,
+            addition_type: dbAdditionType,
+            catalog_id: addition.ingredient_id || null,
+            catalog_table: addition.ingredient_id ? catalogTable : null,
+            name: addition.ingredient_name,
+            amount: addition.quantity,
+            unit: addition.unit,
+            timing: addition.addition_type === "dry_hop" ? "dry_hop" : null,
+            days: addition.contact_time_hours
+              ? Math.ceil(addition.contact_time_hours / 24)
+              : null,
+            date_added: dateAdded,
+            notes: addition.notes || null,
+          })
+          .select()
+          .single()
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({

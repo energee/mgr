@@ -16,6 +16,7 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Dialog,
   DialogContent,
@@ -114,15 +115,15 @@ export function PitchYeastDialog({
   const { data: pitches, isLoading: pitchesLoading } = useQuery({
     queryKey: yeastKeys.available(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "yeast_pitches_with_remaining")
-        .select(
-          "id, strain_id, strain_name, generation, quantity_remaining_lbs, estimated_viability, cell_density_thousand, status"
-        )
-        .eq("status", "in_stock")
-        .gt("quantity_remaining_lbs", 0)
-        .order("strain_name");
-      if (error) throw error;
-      return data as AvailablePitch[];
+      return await unwrap(
+        dynamicFrom(supabase, "yeast_pitches_with_remaining")
+          .select(
+            "id, strain_id, strain_name, generation, quantity_remaining_lbs, estimated_viability, cell_density_thousand, status"
+          )
+          .eq("status", "in_stock")
+          .gt("quantity_remaining_lbs", 0)
+          .order("strain_name"),
+      ) as unknown as AvailablePitch[];
     },
     enabled: open,
   });
@@ -229,30 +230,30 @@ export function PitchYeastDialog({
           : null;
 
       // Insert yeast_pitch_event
-      const { error: insertError } = await dynamicFrom(supabase, "yeast_pitch_events")
-        .insert({
-          pitch_id: values.pitch_id,
-          batch_id: batchId,
-          quantity_lbs: values.quantity_lbs,
-          cells_pitched_thousand: cellsPitchedThousand
-            ? Math.round(cellsPitchedThousand * 100) / 100
-            : null,
-          viability_at_pitch: values.viability,
-          pitched_at: new Date().toISOString(),
-          notes: values.notes || null,
-        });
-
-      if (insertError) throw insertError;
+      await unwrap(
+        dynamicFrom(supabase, "yeast_pitch_events")
+          .insert({
+            pitch_id: values.pitch_id,
+            batch_id: batchId,
+            quantity_lbs: values.quantity_lbs,
+            cells_pitched_thousand: cellsPitchedThousand
+              ? Math.round(cellsPitchedThousand * 100) / 100
+              : null,
+            viability_at_pitch: values.viability,
+            pitched_at: new Date().toISOString(),
+            notes: values.notes || null,
+          }),
+      );
 
       // Check if remaining would be <= 0 after this pitch
       const newRemaining =
         pitch.quantity_remaining_lbs - values.quantity_lbs;
       if (newRemaining <= 0) {
-        const { error: statusError } = await dynamicFrom(supabase, "yeast_pitches")
-          .update({ status: "depleted" })
-          .eq("id", values.pitch_id);
-
-        if (statusError) throw statusError;
+        await unwrap(
+          dynamicFrom(supabase, "yeast_pitches")
+            .update({ status: "depleted" })
+            .eq("id", values.pitch_id),
+        );
       }
 
       return { pitch, quantity: values.quantity_lbs };

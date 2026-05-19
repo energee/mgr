@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner";
 import { cn, escapeLike } from "@/lib/utils";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -172,10 +173,11 @@ export default function NotificationsPage() {
   // (audit F-055). One round trip per click regardless of selection size.
   const markAsReadMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase.rpc("mark_notifications_read_bulk", {
-        p_notification_ids: ids,
-      });
-      if (error) throw error;
+      await unwrap(
+        supabase.rpc("mark_notifications_read_bulk", {
+          p_notification_ids: ids,
+        })
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.all() });
@@ -190,10 +192,11 @@ export default function NotificationsPage() {
   // Dismiss mutation — bulk RPC from migration 00171.
   const dismissMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase.rpc("dismiss_notifications_bulk", {
-        p_notification_ids: ids,
-      });
-      if (error) throw error;
+      await unwrap(
+        supabase.rpc("dismiss_notifications_bulk", {
+          p_notification_ids: ids,
+        })
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.all() });

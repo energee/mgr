@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { OrderAllocation } from "@/components/domain/order/order-allocation";
 import { orderKeys, inventoryKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -73,13 +74,13 @@ export default function OrderAllocationsPage({
   const { data: order, isLoading: orderLoading } = useQuery({
     queryKey: orderKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, order_number, status")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("orders")
+          .select("id, order_number, status")
+          .eq("id", id)
+          .single()
+      ) as unknown as { id: string; order_number: string; status: string };
     },
   });
 
@@ -88,14 +89,14 @@ export default function OrderAllocationsPage({
     queryKey: orderKeys.allocations(id),
     queryFn: async () => {
       // Get allocations
-      const { data: allocs, error: allocError } = await supabase
-        .from("allocations")
-        .select("id, source_id, quantity, status")
-        .eq("destination_type", "order")
-        .eq("destination_id", id)
-        .in("status", ["planned", "completed"]);
-
-      if (allocError) throw allocError;
+      const allocs = await unwrap(
+        supabase
+          .from("allocations")
+          .select("id, source_id, quantity, status")
+          .eq("destination_type", "order")
+          .eq("destination_id", id)
+          .in("status", ["planned", "completed"])
+      );
       if (!allocs || allocs.length === 0) return [];
 
       // Get finished goods
@@ -142,11 +143,12 @@ export default function OrderAllocationsPage({
   // Delete allocation mutation
   const deleteMutation = useMutation({
     mutationFn: async (allocationId: string) => {
-      const { error } = await supabase
-        .from("allocations")
-        .delete()
-        .eq("id", allocationId);
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("allocations")
+          .delete()
+          .eq("id", allocationId)
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderKeys.allocations(id) });

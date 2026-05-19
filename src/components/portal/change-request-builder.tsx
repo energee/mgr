@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   entityKeys,
   changeRequestKeys,
@@ -114,13 +115,13 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
   const { data: orderItems, isLoading: orderLoading } = useQuery<OrderItem[]>({
     queryKey: entityKeys.detail("orders", orderId),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "order_items")
-        .select(
-          "id, brand_id, selling_format_id, quantity, unit_price, brands(id, name), selling_formats(id, name)"
-        )
-        .eq("order_id", orderId);
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        dynamicFrom(supabase, "order_items")
+          .select(
+            "id, brand_id, selling_format_id, quantity, unit_price, brands(id, name), selling_formats(id, name)"
+          )
+          .eq("order_id", orderId)
+      ) as unknown as OrderItem[];
     },
     enabled: !!orderId,
   });
@@ -129,13 +130,13 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
   const { data: availableGoods } = useQuery<FinishedGoodAvailability[]>({
     queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "finished_goods_with_availability")
-        .select(
-          "brand_id, selling_format_id, available_quantity, brands(id, name), selling_formats(id, name)"
-        )
-        .gt("available_quantity", 0);
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        dynamicFrom(supabase, "finished_goods_with_availability")
+          .select(
+            "brand_id, selling_format_id, available_quantity, brands(id, name), selling_formats(id, name)"
+          )
+          .gt("available_quantity", 0)
+      ) as unknown as FinishedGoodAvailability[];
     },
   });
 
@@ -305,16 +306,16 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
   const mutation = useMutation({
     mutationFn: async () => {
       // 1. Create the change request
-      const { data: request, error: reqError } = await dynamicFrom(supabase, "order_change_requests")
-        .insert({
-          order_id: orderId,
-          requested_by: (await supabase.auth.getUser()).data.user?.id,
-          notes: notes || null,
-        })
-        .select("id")
-        .single();
-
-      if (reqError) throw reqError;
+      const request = await unwrap(
+        dynamicFrom(supabase, "order_change_requests")
+          .insert({
+            order_id: orderId,
+            requested_by: (await supabase.auth.getUser()).data.user?.id,
+            notes: notes || null,
+          })
+          .select("id")
+          .single()
+      ) as unknown as { id: string };
 
       // 2. Create change request items (only for items that actually changed)
       const items = actualChanges.map((c) => ({
@@ -328,9 +329,9 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
       }));
 
       if (items.length > 0) {
-        const { error: itemsError } = await dynamicFrom(supabase, "order_change_request_items")
-          .insert(items);
-        if (itemsError) throw itemsError;
+        await unwrap(
+          dynamicFrom(supabase, "order_change_request_items").insert(items)
+        );
       }
     },
     onSuccess: () => {

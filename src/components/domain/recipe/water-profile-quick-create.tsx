@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { zodResolver } from "@/lib/form-resolver";
 import { waterProfileSchema, type WaterProfileFormValues } from "@/lib/schemas/water-profile";
 import { entityKeys } from "@/lib/query-keys";
@@ -72,13 +73,13 @@ export function WaterProfileQuickCreate({
     setSaving(true);
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("water_profiles")
-        .insert(values)
-        .select("id")
-        .single();
-
-      if (error) throw error;
+      const data = (await unwrap(
+        supabase
+          .from("water_profiles")
+          .insert(values)
+          .select("id")
+          .single()
+      )) as unknown as { id: string };
 
       await queryClient.invalidateQueries({
         queryKey: entityKeys.all("water_profiles"),

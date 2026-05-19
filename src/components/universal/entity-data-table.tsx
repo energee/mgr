@@ -31,6 +31,7 @@ import { parseAsStringEnum } from "nuqs";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
@@ -465,8 +466,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         query = query.or(searchCondition);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await unwrap(query);
       const rows = (data ?? []) as Record<string, unknown>[];
 
       // Batch-resolve FK relation columns (parallel, one query per relation table)

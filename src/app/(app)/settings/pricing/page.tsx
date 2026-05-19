@@ -60,6 +60,7 @@ import { salesChannelEntity } from "@/entities/sales-channel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { log } from "@/lib/client-logger";
 import { formatVolumeLabel } from "@/hooks/use-catalog";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -257,14 +258,14 @@ function FormatManagement({
   const { data: formats, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormatsAll(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("packaging_formats")
-        .select("id, name, container_name, container_type, container_id, unit_count, volume_oz, volume_bbl")
-        .eq("is_active", true)
-        .order("container_type")
-        .order("name");
-      if (error) throw error;
-      return data as SellingFormatWithContainer[];
+      return await unwrap(
+        supabase
+          .from("packaging_formats")
+          .select("id, name, container_name, container_type, container_id, unit_count, volume_oz, volume_bbl")
+          .eq("is_active", true)
+          .order("container_type")
+          .order("name")
+      ) as SellingFormatWithContainer[];
     },
   });
 
@@ -272,11 +273,9 @@ function FormatManagement({
   const { data: channelFormats } = useQuery({
     queryKey: channelFormatKeys.all(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("channel_formats")
-        .select("id, selling_format_id, sales_channel_id");
-      if (error) throw error;
-      return data as ChannelFormat[];
+      return await unwrap(
+        supabase.from("channel_formats").select("id, selling_format_id, sales_channel_id")
+      ) as ChannelFormat[];
     },
   });
 
@@ -300,18 +299,20 @@ function FormatManagement({
       enabled: boolean;
     }) => {
       if (enabled) {
-        const { error } = await supabase.from("channel_formats").insert({
-          selling_format_id: sellingFormatId,
-          sales_channel_id: salesChannelId,
-        });
-        if (error) throw error;
+        await unwrap(
+          supabase.from("channel_formats").insert({
+            selling_format_id: sellingFormatId,
+            sales_channel_id: salesChannelId,
+          })
+        );
       } else {
-        const { error } = await supabase
-          .from("channel_formats")
-          .delete()
-          .eq("selling_format_id", sellingFormatId)
-          .eq("sales_channel_id", salesChannelId);
-        if (error) throw error;
+        await unwrap(
+          supabase
+            .from("channel_formats")
+            .delete()
+            .eq("selling_format_id", sellingFormatId)
+            .eq("sales_channel_id", salesChannelId)
+        );
       }
     },
     onSuccess: () => {
@@ -498,13 +499,13 @@ export default function PricingPage() {
   const { data: channels, isLoading: channelsLoading } = useQuery({
     queryKey: settingsKeys.pricingChannels(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales_channels")
-        .select("id, name, code, position, is_active")
-        .eq("is_active", true)
-        .order("position");
-      if (error) throw error;
-      return data as SalesChannel[];
+      return await unwrap(
+        supabase
+          .from("sales_channels")
+          .select("id, name, code, position, is_active")
+          .eq("is_active", true)
+          .order("position")
+      ) as SalesChannel[];
     },
   });
 
@@ -513,12 +514,12 @@ export default function PricingPage() {
   const { data: tiers, isLoading: tiersLoading } = useQuery({
     queryKey: settingsKeys.pricingTiers(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pricing_tiers")
-        .select("id, name, cogs_max")
-        .order("cogs_max", { nullsFirst: false });
-      if (error) throw error;
-      return data as PricingTier[];
+      return await unwrap(
+        supabase
+          .from("pricing_tiers")
+          .select("id, name, cogs_max")
+          .order("cogs_max", { nullsFirst: false })
+      ) as PricingTier[];
     },
   });
 
@@ -527,11 +528,12 @@ export default function PricingPage() {
     queryKey: channelFormatKeys.byChannel(activeChannelId ?? ""),
     queryFn: async () => {
       if (!activeChannelId) return [];
-      const { data, error } = await supabase
-        .from("channel_formats")
-        .select("selling_format_id")
-        .eq("sales_channel_id", activeChannelId);
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("channel_formats")
+          .select("selling_format_id")
+          .eq("sales_channel_id", activeChannelId)
+      );
       return data.map((d) => d.selling_format_id);
     },
     enabled: !!activeChannelId,
@@ -541,16 +543,16 @@ export default function PricingPage() {
   const { data: allFormatsRaw, isLoading: formatsLoading } = useQuery({
     queryKey: settingsKeys.pricingFormats(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("packaging_formats")
-        .select("id, name, container_name, container_type, container_id, unit_count, volume_oz, volume_bbl")
-        .eq("is_active", true)
-        .order("container_type")
-        .order("container_id")
-        .order("position")
-        .order("name");
-      if (error) throw error;
-      return data as SellingFormatWithContainer[];
+      return await unwrap(
+        supabase
+          .from("packaging_formats")
+          .select("id, name, container_name, container_type, container_id, unit_count, volume_oz, volume_bbl")
+          .eq("is_active", true)
+          .order("container_type")
+          .order("container_id")
+          .order("position")
+          .order("name")
+      ) as SellingFormatWithContainer[];
     },
   });
 
@@ -593,12 +595,12 @@ export default function PricingPage() {
     queryKey: settingsKeys.pricingMatrix(activeChannelId ?? undefined),
     queryFn: async () => {
       if (!activeChannelId) return [];
-      const { data, error } = await supabase
-        .from("pricing_tier_prices")
-        .select("id, pricing_tier_id, format_id, sales_channel_id, price")
-        .eq("sales_channel_id", activeChannelId);
-      if (error) throw error;
-      return data as PricingTierPrice[];
+      return await unwrap(
+        supabase
+          .from("pricing_tier_prices")
+          .select("id, pricing_tier_id, format_id, sales_channel_id, price")
+          .eq("sales_channel_id", activeChannelId)
+      ) as PricingTierPrice[];
     },
     enabled: !!activeChannelId,
   });
@@ -631,25 +633,25 @@ export default function PricingPage() {
       const existing = priceMap.get(tierId)?.get(formatId);
 
       if (value === null && existing) {
-        const { error } = await supabase
-          .from("pricing_tier_prices")
-          .delete()
-          .eq("id", existing.id);
-        if (error) throw error;
+        await unwrap(
+          supabase.from("pricing_tier_prices").delete().eq("id", existing.id)
+        );
       } else if (value !== null && existing) {
-        const { error } = await supabase
-          .from("pricing_tier_prices")
-          .update({ price: value, updated_at: new Date().toISOString() })
-          .eq("id", existing.id);
-        if (error) throw error;
+        await unwrap(
+          supabase
+            .from("pricing_tier_prices")
+            .update({ price: value, updated_at: new Date().toISOString() })
+            .eq("id", existing.id)
+        );
       } else if (value !== null && !existing) {
-        const { error } = await supabase.from("pricing_tier_prices").insert({
-          pricing_tier_id: tierId,
-          format_id: formatId,
-          sales_channel_id: channelId,
-          price: value,
-        });
-        if (error) throw error;
+        await unwrap(
+          supabase.from("pricing_tier_prices").insert({
+            pricing_tier_id: tierId,
+            format_id: formatId,
+            sales_channel_id: channelId,
+            price: value,
+          })
+        );
       }
     },
     onSuccess: () => {
@@ -680,11 +682,12 @@ export default function PricingPage() {
       amount: number;
       channelId: string;
     }) => {
-      const { data: channelPrices, error: fetchError } = await supabase
-        .from("pricing_tier_prices")
-        .select("id, price")
-        .eq("sales_channel_id", channelId);
-      if (fetchError) throw fetchError;
+      const channelPrices = await unwrap(
+        supabase
+          .from("pricing_tier_prices")
+          .select("id, price")
+          .eq("sales_channel_id", channelId)
+      );
 
       for (const p of channelPrices || []) {
         const newPrice =
@@ -692,11 +695,12 @@ export default function PricingPage() {
             ? Math.round(p.price * (1 + amount / 100) * 100) / 100
             : Math.round((p.price + amount) * 100) / 100;
         if (newPrice < 0) continue;
-        const { error } = await supabase
-          .from("pricing_tier_prices")
-          .update({ price: newPrice, updated_at: new Date().toISOString() })
-          .eq("id", p.id);
-        if (error) throw error;
+        await unwrap(
+          supabase
+            .from("pricing_tier_prices")
+            .update({ price: newPrice, updated_at: new Date().toISOString() })
+            .eq("id", p.id)
+        );
       }
     },
     onSuccess: () => {
@@ -721,11 +725,12 @@ export default function PricingPage() {
       fromChannelId: string;
       toChannelId: string;
     }) => {
-      const { data: sourcePrices, error: fetchError } = await supabase
-        .from("pricing_tier_prices")
-        .select("pricing_tier_id, format_id, price")
-        .eq("sales_channel_id", fromChannelId);
-      if (fetchError) throw fetchError;
+      const sourcePrices = await unwrap(
+        supabase
+          .from("pricing_tier_prices")
+          .select("pricing_tier_id, format_id, price")
+          .eq("sales_channel_id", fromChannelId)
+      );
 
       if (!sourcePrices?.length) {
         toast.error("Source channel has no prices");
@@ -733,17 +738,18 @@ export default function PricingPage() {
       }
 
       for (const sp of sourcePrices) {
-        const { error } = await supabase.from("pricing_tier_prices").upsert(
-          {
-            pricing_tier_id: sp.pricing_tier_id,
-            format_id: sp.format_id,
-            sales_channel_id: toChannelId,
-            price: sp.price,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "pricing_tier_id,format_id,sales_channel_id" }
+        await unwrap(
+          supabase.from("pricing_tier_prices").upsert(
+            {
+              pricing_tier_id: sp.pricing_tier_id,
+              format_id: sp.format_id,
+              sales_channel_id: toChannelId,
+              price: sp.price,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "pricing_tier_id,format_id,sales_channel_id" }
+          )
         );
-        if (error) throw error;
       }
     },
     onSuccess: () => {

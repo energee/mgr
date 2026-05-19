@@ -20,7 +20,8 @@ import type {
 } from "@/types/entity";
 import type { FilterVariant, Option, ExtendedColumnFilter } from "@/types/data-table";
 import type { DynamicQueryBuilder } from "@/services/types";
-import { formatValue, escapeLike } from "@/lib/utils";
+import { formatValue } from "@/lib/format";
+import { escapeLike } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

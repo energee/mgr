@@ -11,6 +11,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { BrewLogLinker } from "@/components/domain/brew/brew-log-linker";
 import { Badge } from "@/components/ui/badge";
 import { UnitDisplay } from "@/components/ui/unit-input";
@@ -54,18 +55,19 @@ export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
   const { data: linkedBrews = [], isLoading } = useQuery({
     queryKey: batchKeys.brewSummary(data.id),
     queryFn: async () => {
-      const { data: links, error } = await supabase
-        .from("brew_log_batches")
-        .select(
-          `
+      const links = await unwrap(
+        supabase
+          .from("brew_log_batches")
+          .select(
+            `
           id, volume_bbl, notes,
           brew_log:brew_logs(
             id, brew_number, brew_date, status, events, brewer_id
           )
         `
-        )
-        .eq("batch_id", data.id);
-      if (error) throw error;
+          )
+          .eq("batch_id", data.id)
+      );
       if (!links || links.length === 0) return [];
 
       // Collect unique brewer_ids to fetch display names

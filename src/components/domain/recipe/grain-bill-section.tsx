@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 import { toast } from "sonner";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 type GrainBillSectionProps = {
   data: { id: string };
@@ -38,10 +39,11 @@ export function GrainBillSection({ data, editing, onDataChange }: GrainBillSecti
   const { data: fetchedGrains, isLoading } = useQuery({
     queryKey: recipeKeys.grainBill(recipeId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_malts")
-        .select(
-          `
+      return await unwrap(
+        supabase
+          .from("recipe_malts")
+          .select(
+            `
           id,
           malt_id,
           weight_lbs,
@@ -56,11 +58,10 @@ export function GrainBillSection({ data, editing, onDataChange }: GrainBillSecti
             bag_weight_lbs
           )
         `
-        )
-        .eq("recipe_id", recipeId)
-        .order("position", { ascending: true });
-      if (error) throw error;
-      return data as unknown as (GrainBillItem & {
+          )
+          .eq("recipe_id", recipeId)
+          .order("position", { ascending: true })
+      ) as unknown as (GrainBillItem & {
         malts: GrainBillItem["malt"];
       })[];
     },

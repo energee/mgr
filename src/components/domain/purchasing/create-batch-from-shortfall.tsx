@@ -39,6 +39,7 @@ import { Loader2, FlaskConical, Calendar, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductionShortfall } from "@/types/planning";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -77,14 +78,14 @@ export function CreateBatchFromShortfall({
   const { data: recipes, isLoading: recipesLoading } = useQuery({
     queryKey: recipeKeys.byBrand(shortfall.brand_id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipes")
-        .select("id, name, batch_size_bbl, fermentation_days, conditioning_days")
-        .eq("brand_id", shortfall.brand_id)
-        .eq("is_active", true)
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("recipes")
+          .select("id, name, batch_size_bbl, fermentation_days, conditioning_days")
+          .eq("brand_id", shortfall.brand_id)
+          .eq("is_active", true)
+          .order("updated_at", { ascending: false })
+      );
     },
     enabled: open && !!shortfall.brand_id,
   });
@@ -123,21 +124,20 @@ export function CreateBatchFromShortfall({
   // Create batch mutation
   const createMutation = useMutation({
     mutationFn: async (values: CreateBatchFormValues) => {
-      const { data, error } = await supabase
-        .from("batches")
-        .insert({
-          name: values.name,
-          recipe_id: values.recipe_id,
-          planned_start_date: values.planned_start_date,
-          volume_bbl: values.volume_bbl,
-          status: "planned",
-          notes: values.notes,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      return (await unwrap(
+        supabase
+          .from("batches")
+          .insert({
+            name: values.name,
+            recipe_id: values.recipe_id,
+            planned_start_date: values.planned_start_date,
+            volume_bbl: values.volume_bbl,
+            status: "planned",
+            notes: values.notes,
+          })
+          .select()
+          .single()
+      )) as unknown as { batch_code: string };
     },
     onSuccess: (data) => {
       toast.success(`Batch ${data.batch_code} created`);

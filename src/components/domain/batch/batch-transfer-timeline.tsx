@@ -12,6 +12,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { Badge } from "@/components/ui/badge";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import {
@@ -47,13 +48,13 @@ export function BatchTransferTimeline({ data }: BatchTransferTimelineProps) {
   const { data: transfers, isLoading } = useQuery({
     queryKey: batchKeys.transfers(batchId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vessel_transfers_with_details")
-        .select("id, from_vessel_name, to_vessel_name, volume_bbl, transferred_at, notes")
-        .eq("batch_id", batchId)
-        .order("transferred_at", { ascending: true });
-      if (error) throw error;
-      return data as TransferRecord[];
+      return await unwrap(
+        supabase
+          .from("vessel_transfers_with_details")
+          .select("id, from_vessel_name, to_vessel_name, volume_bbl, transferred_at, notes")
+          .eq("batch_id", batchId)
+          .order("transferred_at", { ascending: true })
+      ) as unknown as TransferRecord[];
     },
   });
 

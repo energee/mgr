@@ -4,6 +4,7 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { entityKeys, changeRequestKeys, portalKeys } from "@/lib/query-keys";
 import { formatCurrency, formatDate as sharedFormatDate } from "@/lib/format";
 import { usePortalCustomer } from "@/contexts/portal";
@@ -118,9 +119,10 @@ export default function PortalOrderDetailPage({
   const { data: order, isLoading: orderLoading } = useQuery<Order>({
     queryKey: entityKeys.detail("orders", id),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "orders")
-        .select(
-          `
+      return await unwrap(
+        dynamicFrom(supabase, "orders")
+          .select(
+            `
           id, order_number, status, order_date, requested_date, scheduled_date, notes,
           customer_id,
           order_items (
@@ -129,11 +131,10 @@ export default function PortalOrderDetailPage({
             selling_formats (id, name)
           )
         `
-        )
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
+          )
+          .eq("id", id)
+          .single()
+      ) as unknown as Order;
     },
     enabled: !!id,
   });
@@ -142,20 +143,20 @@ export default function PortalOrderDetailPage({
   const { data: changeRequests } = useQuery<ChangeRequest[]>({
     queryKey: changeRequestKeys.forOrder(id),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "order_change_requests")
-        .select(
-          `
+      return await unwrap(
+        dynamicFrom(supabase, "order_change_requests")
+          .select(
+            `
           id, status, notes, rejection_reason, created_at,
           order_change_request_items (
             id, change_type, order_item_id, brand_id, selling_format_id,
             quantity, original_quantity
           )
         `
-        )
-        .eq("order_id", id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+          )
+          .eq("order_id", id)
+          .order("created_at", { ascending: false })
+      ) as unknown as ChangeRequest[];
     },
     enabled: !!id,
   });

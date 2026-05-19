@@ -7,6 +7,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { materialPlanningKeys } from "@/lib/query-keys";
 import { isWholeUnit, ratioFromDecimal } from "@/domain/inventory-units";
@@ -104,13 +105,14 @@ export function useSellingFormatBOM(sellingFormatId: string | null) {
   return useQuery({
     queryKey: materialPlanningKeys.bom(sellingFormatId ?? ""),
     queryFn: async (): Promise<SellingFormatMaterial[]> => {
-      const { data, error } = await dynamicFrom(supabase, "selling_format_materials")
-        .select(
-          `id, selling_format_id, inventory_item_id, quantity_per_unit, notes,
+      const data = await unwrap(
+        dynamicFrom(supabase, "selling_format_materials")
+          .select(
+            `id, selling_format_id, inventory_item_id, quantity_per_unit, notes,
            inventory_item:inventory_items(id, name, sku, category, unit)`
-        )
-        .eq("selling_format_id", sellingFormatId!);
-      if (error) throw error;
+          )
+          .eq("selling_format_id", sellingFormatId!)
+      );
       return (data ?? []) as unknown as SellingFormatMaterial[];
     },
     enabled: !!sellingFormatId,
@@ -136,12 +138,11 @@ export function useMaterialShortfalls(options?: {
   return useQuery({
     queryKey: materialPlanningKeys.shortfalls({ horizonWeeks }),
     queryFn: async (): Promise<MaterialShortfall[]> => {
-      const { data, error } = await dynamicRpc(
-        supabase,
-        "calculate_material_shortfalls",
-        { p_horizon_weeks: horizonWeeks ?? 4 }
+      const data = await unwrap(
+        dynamicRpc(supabase, "calculate_material_shortfalls", {
+          p_horizon_weeks: horizonWeeks ?? 4,
+        })
       );
-      if (error) throw error;
       return (data ?? []) as MaterialShortfall[];
     },
     select: (data) => {
@@ -162,13 +163,14 @@ export function useOrderMaterials(orderId: string | null) {
   return useQuery({
     queryKey: materialPlanningKeys.orderMaterials(orderId ?? ""),
     queryFn: async (): Promise<OrderMaterial[]> => {
-      const { data, error } = await dynamicFrom(supabase, "order_materials")
-        .select(
-          `id, order_id, inventory_item_id, estimated_qty, actual_qty,
+      const data = await unwrap(
+        dynamicFrom(supabase, "order_materials")
+          .select(
+            `id, order_id, inventory_item_id, estimated_qty, actual_qty,
            inventory_item:inventory_items(id, name, sku, category, unit)`
-        )
-        .eq("order_id", orderId!);
-      if (error) throw error;
+          )
+          .eq("order_id", orderId!)
+      );
       return (data ?? []) as unknown as OrderMaterial[];
     },
     enabled: !!orderId,

@@ -2,6 +2,7 @@
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { brandKeys, packagingFormatKeys, entityKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
 import { formatSmartDecimal } from "@/lib/format";
@@ -37,9 +38,7 @@ export function useCatalog<T>(
         query = query.order(field);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as T[];
+      return (await unwrap(query)) as T[];
     },
   });
 }
@@ -52,14 +51,8 @@ export function useBrands(): UseQueryResult<IdNamePair[]> {
 
   return useQuery({
     queryKey: brandKeys.all(),
-    queryFn: async (): Promise<IdNamePair[]> => {
-      const { data, error } = await supabase
-        .from("brands")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async (): Promise<IdNamePair[]> =>
+      unwrap(supabase.from("brands").select("id, name").order("name")),
   });
 }
 
@@ -118,16 +111,15 @@ export function usePackagingFormats(): UseQueryResult<PackagingFormat[]> {
 
   return useQuery({
     queryKey: packagingFormatKeys.all(),
-    queryFn: async (): Promise<PackagingFormat[]> => {
-      const { data, error } = await supabase
-        .from("packaging_formats")
-        .select("id, name, container_type, container_name, unit_count, volume_oz, volume_bbl")
-        .eq("is_active", true)
-        .order("container_type")
-        .order("name");
-      if (error) throw error;
-      return data as PackagingFormat[];
-    },
+    queryFn: async (): Promise<PackagingFormat[]> =>
+      (await unwrap(
+        supabase
+          .from("packaging_formats")
+          .select("id, name, container_type, container_name, unit_count, volume_oz, volume_bbl")
+          .eq("is_active", true)
+          .order("container_type")
+          .order("name"),
+      )) as PackagingFormat[],
   });
 }
 

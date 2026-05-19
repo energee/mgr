@@ -10,6 +10,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { pickListKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,7 +82,7 @@ export function PickListItems({ data }: PickListItemsProps) {
   const { data: items = [], isLoading } = useQuery<PickListItemRow[]>({
     queryKey: pickListKeys.items(pickListId),
     queryFn: async () => {
-      const { data: pickItems, error } = await dynamicFrom(supabase, "pick_list_items")
+      const pickItems = await unwrap(dynamicFrom(supabase, "pick_list_items")
         .select(`
           id,
           pick_list_id,
@@ -95,9 +96,8 @@ export function PickListItems({ data }: PickListItemsProps) {
           sort_order
         `)
         .eq("pick_list_id", pickListId)
-        .order("sort_order", { ascending: true });
+        .order("sort_order", { ascending: true })) as unknown as PickListItemRow[];
 
-      if (error) throw error;
       if (!pickItems || pickItems.length === 0) return [];
 
       // Get finished goods details
@@ -150,14 +150,12 @@ export function PickListItems({ data }: PickListItemsProps) {
   // Mutation to update picked quantity
   const updatePickedMutation = useMutation({
     mutationFn: async ({ itemId, quantity }: { itemId: string; quantity: number }) => {
-      const { error } = await dynamicFrom(supabase, "pick_list_items")
+      await unwrap(dynamicFrom(supabase, "pick_list_items")
         .update({
           quantity_picked: quantity,
           picked_at: quantity > 0 ? new Date().toISOString() : null,
         })
-        .eq("id", itemId);
-
-      if (error) throw error;
+        .eq("id", itemId));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: pickListKeys.items(pickListId) });
@@ -203,15 +201,12 @@ export function PickListItems({ data }: PickListItemsProps) {
 
       const now = new Date().toISOString();
       const updates = Array.from(byQuantity.entries()).map(([qty, ids]) =>
-        dynamicFrom(supabase, "pick_list_items")
+        unwrap(dynamicFrom(supabase, "pick_list_items")
           .update({
             quantity_picked: qty,
             picked_at: now,
           })
-          .in("id", ids)
-          .then(({ error }: { error: Error | null }) => {
-            if (error) throw error;
-          })
+          .in("id", ids))
       );
 
       await Promise.all(updates);
