@@ -1,19 +1,13 @@
 /**
- * Water Profile Entity Configuration
+ * Water Profile Entity — presentation
  *
- * Source water chemistry profiles (e.g., "City Tap Water", "RO Water").
- * Stores mineral content in ppm. Managed under Settings domain.
- * Recipes link to a water profile via water_profile_id FK.
+ * The React/UI half of the water profile entity: list columns, list filters,
+ * and the unified detail/edit sections.
  */
 
-import type { EntityConfig } from "@/types/entity";
-import { waterProfileSchema } from "@/lib/schemas/water-profile";
-import type { Database } from "@/types/supabase";
-
-type WaterProfile = Database["public"]["Tables"]["water_profiles"]["Row"];
-
-export { waterProfileSchema };
-export type { WaterProfileFormValues } from "@/lib/schemas/water-profile";
+import type { EntityPresentation } from "@/types/entity";
+import { deleteAction } from "@/types/entity";
+import type { WaterProfile } from "./core";
 
 /** Render a numeric value or em-dash for null/undefined */
 const ppm = (value: unknown): string => (value != null ? `${value}` : "—");
@@ -29,14 +23,10 @@ const mineralFields = [
   { name: "ph", label: "pH", type: "number", placeholder: "7.0", colSpan: 1 },
 ] as const;
 
-export const waterProfileEntity: EntityConfig<WaterProfile> = {
-  name: "water_profile",
-  table: "water_profiles",
-  displayName: "Water Profile",
-  displayNamePlural: "Water Profiles",
-  description: "Source water chemistry profiles with mineral content",
-  domain: "system",
-
+export const waterProfilePresentation: EntityPresentation<WaterProfile> = {
+  // ---------------------------------------------------------------------------
+  // List View
+  // ---------------------------------------------------------------------------
   listColumns: [
     { accessorKey: "name", header: "Name", sortable: true },
     { accessorKey: "calcium_ppm", header: "Ca²⁺", sortable: true, render: ppm },
@@ -58,11 +48,9 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
     { field: "is_active", type: "boolean", label: "Active" },
   ],
 
-  defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name", "description"],
-
-  detailHeader: { title: "name" },
-
+  // ---------------------------------------------------------------------------
+  // Unified Sections (detail + edit)
+  // ---------------------------------------------------------------------------
   sections: [
     {
       id: "overview",
@@ -101,23 +89,8 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
     },
   ],
 
-  formSchema: waterProfileSchema,
-
-  actions: [
-    {
-      name: "delete",
-      label: "Delete Profile",
-      icon: "trash",
-      type: "dropdown",
-      variant: "destructive",
-      deleteMode: "hard",
-    },
-  ],
-
-  keyFields: ["name", "is_active"],
-  queryExamples: [
-    "Show all water profiles",
-    "What is the mineral content of our tap water?",
-    "Which water profiles have high sulfate?",
-  ],
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [deleteAction("Profile")],
 };
