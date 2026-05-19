@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { sendSlackNotification } from "@/lib/slack";
-import type { SlackSettings, SlackNotification } from "@/lib/slack";
+import { sendSlackNotification } from "@/integrations/slack";
+import type { SlackSettings, SlackNotification } from "@/integrations/slack";
 import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/slack/send" });

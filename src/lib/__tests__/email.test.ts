@@ -41,7 +41,7 @@ describe("sendEmail", () => {
   it("returns skipped result when RESEND_API_KEY is not set", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
 
-    const { sendEmail } = await import("../email");
+    const { sendEmail } = await import("@/integrations/email");
 
     const result = await sendEmail({
       to: "user@example.com",
@@ -63,7 +63,7 @@ describe("sendEmail", () => {
       error: null,
     });
 
-    const { sendEmail } = await import("../email");
+    const { sendEmail } = await import("@/integrations/email");
 
     const result = await sendEmail({
       to: "user@example.com",
@@ -94,7 +94,7 @@ describe("sendEmail", () => {
       error: { message: "Invalid API key" },
     });
 
-    const { sendEmail } = await import("../email");
+    const { sendEmail } = await import("@/integrations/email");
 
     const result = await sendEmail({
       to: "user@example.com",
@@ -112,7 +112,7 @@ describe("sendEmail", () => {
 
     mockSend.mockRejectedValueOnce(new Error("Network timeout"));
 
-    const { sendEmail } = await import("../email");
+    const { sendEmail } = await import("@/integrations/email");
 
     const result = await sendEmail({
       to: "user@example.com",
@@ -130,7 +130,7 @@ describe("sendEmail", () => {
 
     mockSend.mockResolvedValueOnce({ data: { id: "msg_456" }, error: null });
 
-    const { sendEmail } = await import("../email");
+    const { sendEmail } = await import("@/integrations/email");
 
     await sendEmail({
       to: "solo@example.com",
@@ -147,7 +147,7 @@ describe("sendEmail", () => {
 
     mockSend.mockResolvedValueOnce({ data: { id: "msg_789" }, error: null });
 
-    const { sendEmail } = await import("../email");
+    const { sendEmail } = await import("@/integrations/email");
 
     await sendEmail({
       to: ["a@example.com", "b@example.com"],
@@ -178,7 +178,7 @@ describe("sendNotificationEmail", () => {
 
     mockSend.mockResolvedValueOnce({ data: { id: "msg_notif" }, error: null });
 
-    const { sendNotificationEmail } = await import("../email");
+    const { sendNotificationEmail } = await import("@/integrations/email");
 
     await sendNotificationEmail(
       "admin@example.com",
