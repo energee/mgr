@@ -1,60 +1,21 @@
 /**
- * Selling Format Entity Configuration
+ * Selling Format Entity — presentation
  *
- * Selling formats define how a container is grouped for sale — single, 4-pack,
- * case of 24, per keg. Each selling format belongs to one container.
+ * The React/UI half of the selling format entity: list columns, list filters,
+ * the unified detail/edit sections, and the bill-of-materials relation component.
  */
 
-import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { EntityPresentation } from "@/types/entity";
+import { deleteAction } from "@/types/entity";
 import { SellingFormatBOMEditor } from "@/components/domain/packaging/selling-format-bom-editor";
+import type { SellingFormat } from "./core";
 
-type SellingFormat = Database["public"]["Tables"]["selling_formats"]["Row"];
-
-// Wrapper to adapt SellingFormatBOMEditor to the relation component interface
+/** Relation-tab wrapper for the per-format bill of materials editor. */
 function BOMRelation({ parentId }: { parentId: string }) {
   return <SellingFormatBOMEditor sellingFormatId={parentId} />;
 }
 
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-/** Coerce empty/null/undefined to null, otherwise to Number — for optional integer fields. */
-const optionalInt = z.preprocess(
-  (v) => (v === "" || v == null ? null : Number(v)),
-  z.number().int().positive("Must be positive").nullable().optional()
-);
-
-export const sellingFormatSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  container_id: z.string().uuid("Container is required"),
-  unit_count: z.coerce.number().int().positive("Unit count must be positive").default(1),
-  units_per_layer: optionalInt,
-  default_layers: optionalInt,
-  pallet_quantity: optionalInt,
-  is_active: z.boolean().default(true),
-  position: z.coerce.number().int().min(0).default(0),
-});
-
-export type SellingFormatFormValues = z.infer<typeof sellingFormatSchema>;
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const sellingFormatEntity: EntityConfig<SellingFormat> = {
-  // ---------------------------------------------------------------------------
-  // Identity
-  // ---------------------------------------------------------------------------
-  name: "selling_format",
-  table: "selling_formats",
-  displayName: "Selling Format",
-  displayNamePlural: "Selling Formats",
-  description: "How a container is grouped for sale — single, 4-pack, case, per keg.",
-  domain: "inventory",
-
+export const sellingFormatPresentation: EntityPresentation<SellingFormat> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -93,16 +54,6 @@ export const sellingFormatEntity: EntityConfig<SellingFormat> = {
       label: "Active",
     },
   ],
-
-  defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "name",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
@@ -205,47 +156,14 @@ export const sellingFormatEntity: EntityConfig<SellingFormat> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
-  formSchema: sellingFormatSchema,
-
-  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
-  actions: [
-    {
-      name: "delete",
-      label: "Delete Selling Format",
-      icon: "trash",
-      type: "dropdown",
-      variant: "destructive",
-      deleteMode: "hard",
-    },
-  ],
+  actions: [deleteAction("Selling Format")],
 
   // ---------------------------------------------------------------------------
-  // Relations
+  // Relation components — woven onto `core.relations` by createEntityConfig()
   // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "bill_of_materials",
-      entity: "selling_format_material",
-      type: "hasMany" as const,
-      foreignKey: "selling_format_id",
-      showInDetail: true,
-      detailTab: "Bill of Materials",
-      component: BOMRelation,
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show all selling formats",
-    "What formats are available for 12oz cans?",
-    "List active selling formats with unit counts",
-  ],
-
-  keyFields: ["name", "container_id", "unit_count", "is_active"],
+  relationComponents: {
+    bill_of_materials: BOMRelation,
+  },
 };

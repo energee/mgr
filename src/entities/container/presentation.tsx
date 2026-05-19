@@ -1,62 +1,16 @@
 /**
- * Container Entity Configuration
+ * Container Entity — presentation
  *
- * Containers represent physical vessels — cans, bottles, kegs.
- * Parent of selling_formats which define how containers are grouped for sale.
+ * The React/UI half of the container entity: list columns, list filters, the
+ * unified detail/edit sections, and actions.
  */
 
-import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { EntityPresentation } from "@/types/entity";
+import { deleteAction } from "@/types/entity";
+import { CONTAINER_TYPE_OPTIONS } from "./core";
+import type { Container } from "./core";
 
-type Container = Database["public"]["Tables"]["containers"]["Row"];
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const CONTAINER_TYPE_OPTIONS = [
-  { value: "package", label: "Package" },
-  { value: "keg", label: "Keg" },
-];
-
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const containerSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.string().min(1, "Type is required"),
-  volume_oz: z.coerce.number().positive("Volume must be positive").nullable().optional(),
-  volume_bbl: z.coerce.number().positive("Volume must be positive").nullable().optional(),
-  deposit_amount: z.coerce.number().min(0, "Deposit cannot be negative").default(0),
-  is_active: z.boolean().default(true),
-  position: z.coerce.number().int().min(0).default(0),
-}).refine(
-  (data) => data.type !== "package" || (data.volume_oz != null && data.volume_oz > 0),
-  { message: "Package containers require volume in oz", path: ["volume_oz"] }
-).refine(
-  (data) => data.type !== "keg" || (data.volume_bbl != null && data.volume_bbl > 0),
-  { message: "Keg containers require volume in BBL", path: ["volume_bbl"] }
-);
-
-export type ContainerFormValues = z.infer<typeof containerSchema>;
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const containerEntity: EntityConfig<Container> = {
-  // ---------------------------------------------------------------------------
-  // Identity
-  // ---------------------------------------------------------------------------
-  name: "container",
-  table: "containers",
-  displayName: "Container",
-  displayNamePlural: "Containers",
-  description: "Physical vessels — cans, bottles, kegs. Parent of selling formats.",
-  domain: "inventory",
-
+export const containerPresentation: EntityPresentation<Container> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -115,16 +69,6 @@ export const containerEntity: EntityConfig<Container> = {
       label: "Active",
     },
   ],
-
-  defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "name",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
@@ -212,44 +156,7 @@ export const containerEntity: EntityConfig<Container> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
-  formSchema: containerSchema,
-
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "selling_formats",
-      entity: "selling_format",
-      foreignKey: "container_id",
-      type: "hasMany",
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
-  actions: [
-    {
-      name: "delete",
-      label: "Delete Container",
-      icon: "trash",
-      type: "dropdown",
-      variant: "destructive",
-      deleteMode: "hard",
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show all containers",
-    "What keg sizes do we have?",
-    "List active can and bottle containers",
-  ],
-
-  keyFields: ["name", "type", "volume_oz", "volume_bbl", "deposit_amount", "is_active"],
+  actions: [deleteAction("Container")],
 };

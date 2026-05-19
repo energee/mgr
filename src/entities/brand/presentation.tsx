@@ -1,46 +1,14 @@
 /**
- * Brand Entity Configuration
+ * Brand Entity — presentation
  *
- * Brands represent the brewery's beer products/labels.
- * Each brand has a style, ABV, and optional Untappd integration.
+ * The React/UI half of the brand entity: list columns, list filters, and the
+ * unified detail/edit sections.
  */
 
-import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { EntityPresentation } from "@/types/entity";
+import type { Brand } from "./core";
 
-type Brand = Database["public"]["Tables"]["brands"]["Row"];
-
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const brandSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  variant: z.string().nullable().optional(),
-  style_id: z.string().uuid().nullable().optional(),
-  abv: z.coerce.number().nullable().optional(),
-  description: z.string().nullable().optional(),
-  untappd_url: z.string().url().nullable().optional().or(z.literal("")),
-});
-
-export type BrandFormValues = z.infer<typeof brandSchema>;
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const brandEntity: EntityConfig<Brand> = {
-  // ---------------------------------------------------------------------------
-  // Identity
-  // ---------------------------------------------------------------------------
-  name: "brand",
-  table: "brands",
-  displayName: "Brand",
-  displayNamePlural: "Brands",
-  description: "Beer brands and products",
-  domain: "production",
-
+export const brandPresentation: EntityPresentation<Brand> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -85,17 +53,6 @@ export const brandEntity: EntityConfig<Brand> = {
       },
     },
   ],
-
-  defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name", "variant", "description"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "name",
-    subtitle: "variant",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
@@ -174,33 +131,4 @@ export const brandEntity: EntityConfig<Brand> = {
       ],
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
-  formSchema: brandSchema,
-
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "style",
-      entity: "beer_style",
-      type: "belongsTo",
-      foreignKey: "style_id",
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all brands",
-    "What IPAs do we make?",
-    "Show brands over 7% ABV",
-    "What's the most popular brand on Untappd?",
-  ],
-
-  keyFields: ["name", "variant", "style_id", "abv"],
 };
