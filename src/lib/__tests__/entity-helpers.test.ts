@@ -102,7 +102,6 @@ const mockEntity: EntityConfig<Record<string, unknown>> = {
   domain: "production",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
   stateMachine: fullStateMachine,
   valueDisplay: [priorityDisplay, categoryDisplay],
 };
@@ -117,7 +116,6 @@ const bareEntity: EntityConfig<Record<string, unknown>> = {
   domain: "inventory",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
 };
 
 /** Entity with state machine but no stateDisplay. */
@@ -130,7 +128,6 @@ const noDisplayEntity: EntityConfig<Record<string, unknown>> = {
   domain: "production",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
   stateMachine: noDisplayStateMachine,
 };
 
@@ -417,5 +414,78 @@ describe("getValueColor", () => {
 
   it('returns "default" for entity without valueDisplay', () => {
     expect(getValueColor(bareEntity, "field", "val")).toBe("default");
+  });
+});
+
+// =============================================================================
+// resolveServerCore
+// =============================================================================
+
+import { resolveServerCore } from "@/types/entity";
+import type { EntityCoreInput } from "@/types/entity";
+import { z } from "zod";
+
+describe("resolveServerCore", () => {
+  const baseCore: EntityCoreInput<{ id: string; name: string; status: string }> = {
+    name: "widget",
+    table: "widgets",
+    displayName: "Widget",
+    description: "test fixture",
+    domain: "production",
+    formSchema: z.object({}),
+  };
+
+  it("defaults displayNamePlural to `${displayName}s` when omitted", () => {
+    const resolved = resolveServerCore(baseCore);
+    expect(resolved.displayNamePlural).toBe("Widgets");
+  });
+
+  it("preserves an explicit displayNamePlural (irregular plural)", () => {
+    const resolved = resolveServerCore({
+      ...baseCore,
+      displayName: "Batch",
+      displayNamePlural: "Batches",
+    });
+    expect(resolved.displayNamePlural).toBe("Batches");
+  });
+
+  it("passes searchableFields through unchanged (undefined stays undefined)", () => {
+    const resolved = resolveServerCore(baseCore);
+    expect(resolved.searchableFields).toBeUndefined();
+  });
+
+  it("passes an explicit searchableFields through unchanged", () => {
+    const resolved = resolveServerCore({
+      ...baseCore,
+      searchableFields: ["name"],
+    });
+    expect(resolved.searchableFields).toEqual(["name"]);
+  });
+
+  it("passes defaultSort through unchanged (undefined stays undefined)", () => {
+    const resolved = resolveServerCore(baseCore);
+    expect(resolved.defaultSort).toBeUndefined();
+  });
+
+  it("passes an explicit defaultSort through unchanged", () => {
+    const resolved = resolveServerCore({
+      ...baseCore,
+      defaultSort: { column: "name", direction: "asc" },
+    });
+    expect(resolved.defaultSort).toEqual({ column: "name", direction: "asc" });
+  });
+
+  it("passes all other fields through unchanged", () => {
+    const resolved = resolveServerCore({
+      ...baseCore,
+      viewTable: "widgets_with_extras",
+      keyFields: ["name"],
+      detailHeader: { title: "name", badge: "status" },
+    });
+    expect(resolved.viewTable).toBe("widgets_with_extras");
+    expect(resolved.keyFields).toEqual(["name"]);
+    expect(resolved.detailHeader).toEqual({ title: "name", badge: "status" });
+    expect(resolved.table).toBe("widgets");
+    expect(resolved.domain).toBe("production");
   });
 });

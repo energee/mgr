@@ -81,6 +81,7 @@ export const yeastStrainCore: EntityCoreInput<Yeast> = {
   name: "yeast_strain",
   table: "yeasts",
   displayName: "Yeast Strain",
+  defaultSort: { column: "name", direction: "asc" },
   description: "Yeast strains catalog with fermentation characteristics",
   domain: "production",
 

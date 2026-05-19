@@ -38,6 +38,7 @@ export const brandCore: EntityCoreInput<Brand> = {
   name: "brand",
   table: "brands",
   displayName: "Brand",
+  defaultSort: { column: "name", direction: "asc" },
   description: "Beer brands and products",
   domain: "production",
 

@@ -27,6 +27,7 @@ export const waterProfileCore: EntityCoreInput<WaterProfile> = {
   name: "water_profile",
   table: "water_profiles",
   displayName: "Water Profile",
+  defaultSort: { column: "name", direction: "asc" },
   description: "Source water chemistry profiles with mineral content",
   domain: "system",
 
