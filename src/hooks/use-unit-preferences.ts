@@ -11,6 +11,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { userKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type {
@@ -143,15 +144,12 @@ export function useUpdateUnitPreferences() {
 
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from("user_preferences")
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("user_preferences")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id)
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.preferences() });
@@ -176,15 +174,12 @@ export function useUpdateUserPreferences() {
 
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from("user_preferences")
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("user_preferences")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id)
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.preferences() });
