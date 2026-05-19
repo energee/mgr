@@ -1,52 +1,15 @@
 /**
- * Inventory Lot Entity Configuration
+ * Inventory Lot Entity — presentation
  *
- * Inventory lots track raw materials with lot numbers, expiration dates,
- * and FIFO costing. Quantities are derived from allocations.
+ * The React/UI half of the inventory lot entity: list columns, list filters,
+ * and the unified detail/edit sections.
  */
 
-import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { EntityPresentation } from "@/types/entity";
+import { deleteAction } from "@/types/entity";
+import type { InventoryLot } from "./core";
 
-/** Extended type including computed columns from the inventory_lots_with_quantities view */
-type InventoryLotWithQuantities =
-  Database["public"]["Views"]["inventory_lots_with_quantities"]["Row"];
-
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const inventoryLotSchema = z.object({
-  inventory_item_id: z.string().uuid("Inventory item is required"),
-  po_receive_id: z.string().uuid().nullable().optional(),
-  lot_number: z.string().nullable().optional(),
-  quantity: z.coerce.number().positive("Quantity must be greater than zero"),
-  unit: z.string().min(1, "Unit is required"),
-  unit_cost: z.coerce.number().nullable().optional(),
-  landed_cost: z.coerce.number().nullable().optional(),
-  received_date: z.string().nullable().optional(),
-  expiration_date: z.string().nullable().optional(),
-  location: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-});
-
-export type InventoryLotFormValues = z.infer<typeof inventoryLotSchema>;
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
-  name: "inventory_lot",
-  table: "inventory_lots",
-  viewTable: "inventory_lots_with_quantities",
-  displayName: "Inventory Lot",
-  displayNamePlural: "Inventory Lots",
-  description:
-    "Lot-level inventory tracking for raw materials with FIFO costing",
-  domain: "inventory",
-
+export const inventoryLotPresentation: EntityPresentation<InventoryLot> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -119,16 +82,6 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
       },
     },
   ],
-
-  defaultSort: { column: "received_date", direction: "desc" },
-  searchableFields: ["lot_number", "location", "notes"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "lot_number",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
@@ -272,44 +225,7 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
+  // Actions
   // ---------------------------------------------------------------------------
-  formSchema: inventoryLotSchema,
-
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "inventory_item",
-      entity: "inventory_item",
-      type: "belongsTo",
-      foreignKey: "inventory_item_id",
-      showInDetail: true,
-    },
-    {
-      name: "po_receive",
-      entity: "po_receive",
-      type: "belongsTo",
-      foreignKey: "po_receive_id",
-      showInDetail: true,
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show lots expiring this month",
-    "Get available lots for Cascade hops (FIFO order)",
-    "Find lots with remaining quantity",
-    "Calculate COGS for batch using FIFO",
-  ],
-
-  keyFields: [
-    "lot_number",
-    "inventory_item_id",
-    "quantity",
-    "expiration_date",
-  ],
+  actions: [deleteAction("Inventory Lot")],
 };
