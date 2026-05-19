@@ -9,10 +9,10 @@ import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { UserRole } from "@/lib/permissions";
-import { AppSidebar } from "@/components/domain/app-sidebar";
-import { AppHeader } from "@/components/domain/app-header";
-import { AppProviders } from "@/components/domain/app-providers";
-import { ChatLayout } from "@/components/domain/chat-layout";
+import { AppSidebar } from "@/components/domain/shared/app-sidebar";
+import { AppHeader } from "@/components/domain/shared/app-header";
+import { AppProviders } from "@/components/domain/shared/app-providers";
+import { ChatLayout } from "@/components/domain/shared/chat-layout";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { dynamicFrom } from "@/services/types";
 

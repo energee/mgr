@@ -17,7 +17,7 @@ import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
-import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
+import { RecipeAdditionsDisplay } from "@/components/domain/recipe/recipe-additions-display";
 import { Label } from "@/components/ui/label";
 import { UnitInput } from "@/components/ui/unit-input";
 import { convertVolume } from "@/lib/units";

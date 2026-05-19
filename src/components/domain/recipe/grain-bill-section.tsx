@@ -15,9 +15,9 @@ import { recipeKeys } from "@/lib/query-keys";
 import {
   GrainBillEditor,
   type GrainBillItem,
-} from "@/components/domain/grain-bill-editor";
+} from "@/components/domain/recipe/grain-bill-editor";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useRegisterSaver } from "@/components/domain/recipe-editor/recipe-editor-context";
+import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 import { toast } from "sonner";
 
 type GrainBillSectionProps = {

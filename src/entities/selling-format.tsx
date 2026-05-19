@@ -8,7 +8,7 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
-import { SellingFormatBOMEditor } from "@/components/domain/selling-format-bom-editor";
+import { SellingFormatBOMEditor } from "@/components/domain/packaging/selling-format-bom-editor";
 
 type SellingFormat = Database["public"]["Tables"]["selling_formats"]["Row"];
 

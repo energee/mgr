@@ -12,13 +12,13 @@
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
-import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe-schedule-display";
-import { RecipeAdditionsDisplay } from "@/components/domain/recipe-additions-display";
-import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
-import { RecipeAnalysis } from "@/components/domain/recipe-analysis";
+import { MashScheduleDisplay, FermentationScheduleDisplay } from "@/components/domain/recipe/recipe-schedule-display";
+import { RecipeAdditionsDisplay } from "@/components/domain/recipe/recipe-additions-display";
+import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
+import { RecipeAnalysis } from "@/components/domain/recipe/recipe-analysis";
 import { StatusBadge } from "@/components/universal/status-badge";
 
-import { WaterProfileQuickCreate } from "@/components/domain/water-profile-quick-create";
+import { WaterProfileQuickCreate } from "@/components/domain/recipe/water-profile-quick-create";
 import { recipeSchema } from "@/lib/schemas/recipe";
 
 export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";

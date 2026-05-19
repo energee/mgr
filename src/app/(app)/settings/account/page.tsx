@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, Loader2 } from "lucide-react";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
-import { AvatarUpload } from "@/components/domain/avatar-upload";
+import { AvatarUpload } from "@/components/domain/shared/avatar-upload";
 import { entityKeys, userKeys } from "@/lib/query-keys";
 
 // =============================================================================

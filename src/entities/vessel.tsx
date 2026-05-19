@@ -17,7 +17,7 @@ import { statesAsOptions, valuesAsOptions, getValueLabel } from "@/types/entity"
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { VesselCurrentBatch } from "@/components/domain/vessel-current-batch";
+import { VesselCurrentBatch } from "@/components/domain/batch/vessel-current-batch";
 
 // Base type from vessels table
 type Vessel = Database["public"]["Tables"]["vessels"]["Row"];

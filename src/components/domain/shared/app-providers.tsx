@@ -21,7 +21,7 @@ import { type ReactNode, useState, useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { NotificationsProvider } from "@/contexts/notifications";
 import { PermissionProvider } from "@/contexts/permissions";
-import { KeyboardShortcutsProvider } from "@/components/domain/keyboard-shortcuts-provider";
+import { KeyboardShortcutsProvider } from "@/components/domain/shared/keyboard-shortcuts-provider";
 import { ChatProvider } from "@/contexts/chat-context";
 import { createClient } from "@/lib/supabase/client";
 import type { UserRole } from "@/lib/permissions";

@@ -10,7 +10,7 @@ import { use } from "react";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { brandEntity } from "@/entities/brand";
-import { BrandPackagingSummary } from "@/components/domain/brand-packaging-summary";
+import { BrandPackagingSummary } from "@/components/domain/packaging/brand-packaging-summary";
 
 export default function BrandDetailPage({
   params,

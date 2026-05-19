@@ -24,8 +24,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { IntegrationBadge } from "@/components/domain/integration-badge";
-import { SecretKeyInput } from "@/components/domain/secret-key-input";
+import { IntegrationBadge } from "@/components/domain/shared/integration-badge";
+import { SecretKeyInput } from "@/components/domain/shared/secret-key-input";
 import {
   ArrowLeft,
   RefreshCw,

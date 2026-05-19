@@ -34,8 +34,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { settingsKeys } from "@/lib/query-keys";
-import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/integration-badge";
-import { SecretKeyInput } from "@/components/domain/secret-key-input";
+import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/shared/integration-badge";
+import { SecretKeyInput } from "@/components/domain/shared/secret-key-input";
 import { SlackIcon } from "@/components/ui/slack-icon";
 import {
   Loader2,

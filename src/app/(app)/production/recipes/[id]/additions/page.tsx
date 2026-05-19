@@ -10,7 +10,7 @@
 import { use, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { AdditionsEditor, type AdditionItem } from "@/components/domain/additions-editor";
+import { AdditionsEditor, type AdditionItem } from "@/components/domain/batch/additions-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";

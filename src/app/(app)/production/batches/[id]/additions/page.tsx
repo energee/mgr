@@ -13,7 +13,7 @@
 import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { BatchAdditionForm } from "@/components/domain/batch-addition-form";
+import { BatchAdditionForm } from "@/components/domain/batch/batch-addition-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +26,7 @@ import {
   type AdditionType,
   ADDITION_TYPES,
 } from "@/lib/batch-additions";
-import { PlannedAdditions } from "@/components/domain/planned-additions";
+import { PlannedAdditions } from "@/components/domain/batch/planned-additions";
 import { format } from "date-fns";
 import { batchKeys, batchAdditionKeys } from "@/lib/query-keys";
 

@@ -12,8 +12,8 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
-import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
-import { FGInventorySection } from "@/components/domain/fg-inventory-section";
+import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
+import { FGInventorySection } from "@/components/domain/inventory/fg-inventory-section";
 
 // Use the view type for availability calculations
 type FinishedGoodView = Database["public"]["Views"]["finished_goods_with_availability"]["Row"];

@@ -20,7 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { MGRIcon } from "@/components/icons/mgr-logo";
-import { KeyboardShortcutsContext } from "@/components/domain/keyboard-shortcuts-provider";
+import { KeyboardShortcutsContext } from "@/components/domain/shared/keyboard-shortcuts-provider";
 import {
   Sidebar,
   SidebarContent,
