@@ -25,7 +25,7 @@ import {
   type BatchAddition,
   type AdditionType,
   ADDITION_TYPES,
-} from "@/lib/batch-additions";
+} from "@/domain/batch-additions";
 import { PlannedAdditions } from "@/components/domain/batch/planned-additions";
 import { format } from "date-fns";
 import { batchKeys, batchAdditionKeys } from "@/lib/query-keys";

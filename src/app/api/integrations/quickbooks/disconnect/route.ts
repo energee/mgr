@@ -7,7 +7,7 @@
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse } from "@/lib/api/response";
-import { revokeToken, clearTokens } from "@/lib/quickbooks";
+import { revokeToken, clearTokens } from "@/integrations/quickbooks";
 import { createAdminClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 

@@ -26,13 +26,13 @@ import {
   type ReadingType,
   READING_TYPES,
   formatReadingValue,
-} from "@/lib/batch-readings";
+} from "@/domain/batch-readings";
 import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch/batch-readings-chart-lazy";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
 import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import { batchKeys } from "@/lib/query-keys";
-import { usePrefillStore } from "@/stores/prefill-store";
+import { usePrefillStore } from "@/contexts/prefill-store";
 
 type BatchLog = {
   id: string;

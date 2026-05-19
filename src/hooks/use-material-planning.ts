@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { materialPlanningKeys } from "@/lib/query-keys";
-import { isWholeUnit, ratioFromDecimal } from "@/lib/inventory-units";
+import { isWholeUnit, ratioFromDecimal } from "@/domain/inventory-units";
 
 // =============================================================================
 // Types

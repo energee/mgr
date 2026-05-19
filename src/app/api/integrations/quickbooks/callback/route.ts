@@ -11,7 +11,7 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { exchangeCodeForTokens, saveTokens } from "@/lib/quickbooks";
+import { exchangeCodeForTokens, saveTokens } from "@/integrations/quickbooks";
 import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest): Promise<Response> {

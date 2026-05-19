@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
 import { recipeKeys, recipeVariantKeys } from "@/lib/query-keys";
 import { useGravityUnit } from "@/hooks/use-unit-preferences";
-import { formatGravityFromSg } from "@/lib/units";
+import { formatGravityFromSg } from "@/domain/units";
 
 // =============================================================================
 // Types

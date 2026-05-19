@@ -9,12 +9,12 @@ import {
   DEFAULT_REPLAY_WINDOW_MS,
   checkReplayWindow,
   verifyWebhookSignature,
-} from "../square/webhook";
+} from "@/integrations/square/webhook";
 import {
   dollarsToCents,
   calculateVolumeOz,
   STANDARD_POUR_OZ,
-} from "../square/utils";
+} from "@/integrations/square/utils";
 
 // =============================================================================
 // Webhook Signature Verification

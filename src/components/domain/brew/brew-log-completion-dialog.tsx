@@ -47,7 +47,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { extractBrewMeasurements } from "@/lib/brew-events";
+import { extractBrewMeasurements } from "@/domain/brew-events";
 import { useBrewMeasurementUnits } from "@/hooks/use-unit-preferences";
 import type { BrewEvent } from "@/types/domain";
 import { log } from "@/lib/client-logger";

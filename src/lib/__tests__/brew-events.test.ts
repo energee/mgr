@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import {
   extractBrewMeasurements,
   type BrewMeasurementHighlight,
-} from "@/lib/brew-events";
+} from "@/domain/brew-events";
 import type { BrewEvent } from "@/types/domain";
 
 // =============================================================================

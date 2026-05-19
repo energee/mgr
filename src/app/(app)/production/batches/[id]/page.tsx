@@ -30,7 +30,7 @@ import { BatchPackagingHistory } from "@/components/domain/batch/batch-packaging
 import { NextStepBanner } from "@/components/domain/shared/next-step-banner";
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { batchKeys, recipeKeys, packagingKeys } from "@/lib/query-keys";
-import { usePrefillStore } from "@/stores/prefill-store";
+import { usePrefillStore } from "@/contexts/prefill-store";
 
 export default function BatchDetailPage({
   params,

@@ -38,7 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTemperatureUnit } from "@/hooks/use-unit-preferences";
-import { formatTemperature } from "@/lib/units";
+import { formatTemperature } from "@/domain/units";
 import { Plus, Trash2, GripVertical, ChevronDown } from "lucide-react";
 
 export type MashStep = {

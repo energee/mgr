@@ -4,7 +4,7 @@ import {
   ADDITION_TYPES,
   UNIT_OPTIONS,
   type BatchAddition,
-} from "../batch-additions";
+} from "\@/domain/batch-additions";
 
 describe("formatAddition", () => {
   it("formats dry hop with contact time", () => {

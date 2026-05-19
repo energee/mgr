@@ -27,7 +27,7 @@ import {
   WATER_IONS,
   type WaterProfile,
   type SaltAdditions,
-} from "@/lib/water-chemistry";
+} from "@/domain/water-chemistry";
 import { useCatalog } from "@/hooks/use-catalog";
 import Link from "next/link";
 import {
@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useVolumeUnit } from "@/hooks/use-unit-preferences";
-import { convertVolume, formatVolume } from "@/lib/units";
+import { convertVolume, formatVolume } from "@/domain/units";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FlaskConical, Pencil, Loader2, Check } from "lucide-react";

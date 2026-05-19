@@ -15,7 +15,7 @@ import type { HopScheduleItem } from "@/components/domain/recipe/hop-schedule-ed
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
 import { useGravityUnit, useWeightUnit } from "@/hooks/use-unit-preferences";
-import { formatGravityFromSg, convertWeight, UNIT_LABELS, type WeightUnit } from "@/lib/units";
+import { formatGravityFromSg, convertWeight, UNIT_LABELS, type WeightUnit } from "@/domain/units";
 
 /** SRM-to-hex color lookup table for continuous beer color display */
 const SRM_COLORS: [number, string][] = [

@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getColumnPinningStyle } from "@/lib/data-table";
-import { NON_NAVIGABLE_COLUMN_IDS } from "@/lib/data-table-adapter";
+import { NON_NAVIGABLE_COLUMN_IDS } from "@/components/data-table/adapter";
 import { cn } from "@/lib/utils";
 
 type DataTableProps<TData> = React.ComponentProps<"div"> & {

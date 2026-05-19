@@ -36,9 +36,9 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { resolveYeastLineageRoot } from "@/lib/yeast-lineage";
+import { resolveYeastLineageRoot } from "@/domain/yeast-lineage";
 import { yeastKeys, entityKeys } from "@/lib/query-keys";
-import type { YeastForm } from "@/lib/yeast-calculations";
+import type { YeastForm } from "@/domain/yeast-calculations";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 // =============================================================================

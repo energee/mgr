@@ -7,9 +7,9 @@
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
-import { getTokens, getAutoSyncEnabled, qboClient } from "@/lib/quickbooks";
+import { getTokens, getAutoSyncEnabled, qboClient } from "@/integrations/quickbooks";
 import { createAdminClient } from "@/lib/supabase/server";
-import type { QBOCompanyInfo, QBOQueryResponse } from "@/lib/quickbooks";
+import type { QBOCompanyInfo, QBOQueryResponse } from "@/integrations/quickbooks";
 
 export const GET = withPermission("integrations:manage", async () => {
   const tokens = await getTokens();

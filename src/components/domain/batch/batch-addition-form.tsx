@@ -60,7 +60,7 @@ import {
   type AdditionType,
   type BatchAddition,
   type CatalogTable,
-} from "@/lib/batch-additions";
+} from "@/domain/batch-additions";
 
 const additionSchema = z.object({
   addition_type: z.enum(["dry_hop", "fruit", "adjunct", "fining", "spice", "other"]),

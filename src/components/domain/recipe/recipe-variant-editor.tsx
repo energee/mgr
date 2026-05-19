@@ -54,7 +54,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 import { useVolumeUnit } from "@/hooks/use-unit-preferences";
-import { convertVolume, UNIT_LABELS } from "@/lib/units";
+import { convertVolume, UNIT_LABELS } from "@/domain/units";
 import { toast } from "sonner";
 import {
   Plus,

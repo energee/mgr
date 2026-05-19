@@ -21,7 +21,7 @@ import { batchEntity } from "@/entities/batch";
 import { Beer, FlaskConical } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { useVolumeUnit } from "@/hooks/use-unit-preferences";
-import { formatVolume } from "@/lib/units";
+import { formatVolume } from "@/domain/units";
 
 // Segment colors for the volume bar
 const SEGMENT_COLORS = [

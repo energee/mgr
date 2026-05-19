@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { portalKeys } from "@/lib/query-keys";
-import { usePortalCustomer } from "@/lib/portal-context";
+import { usePortalCustomer } from "@/contexts/portal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,

@@ -20,7 +20,7 @@ import { RecipeSectionCard } from "./recipe-section-card";
 import { RecipeAdditionsDisplay } from "@/components/domain/recipe/recipe-additions-display";
 import { Label } from "@/components/ui/label";
 import { UnitInput } from "@/components/ui/unit-input";
-import { convertVolume } from "@/lib/units";
+import { convertVolume } from "@/domain/units";
 import {
   Select,
   SelectContent,
