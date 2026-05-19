@@ -624,7 +624,7 @@ SRM = 1.4922 * MCU^0.6859
 - `src/app/api/chat/tools.ts` — Tool definitions (32 read tools + 3 navigation tools)
 
 ### Prefill Store
-- `src/stores/prefill-store.ts` — Zustand store for NavigationIntent data (prefill + dialog auto-open)
+- `src/contexts/prefill-store.ts` — Zustand store for NavigationIntent data (prefill + dialog auto-open)
 
 ### AI Library
 - `src/lib/ai/index.ts` — Public exports

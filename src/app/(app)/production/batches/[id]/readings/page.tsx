@@ -32,7 +32,7 @@ import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
 import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import { batchKeys } from "@/lib/query-keys";
-import { usePrefillStore } from "@/stores/prefill-store";
+import { usePrefillStore } from "@/contexts/prefill-store";
 
 type BatchLog = {
   id: string;

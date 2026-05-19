@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { batchEntity } from "@/entities/batch";
-import { usePrefillStore } from "@/stores/prefill-store";
+import { usePrefillStore } from "@/contexts/prefill-store";
 
 export default function NewBatchPage() {
   const [defaultValues] = useState(() => {
