@@ -1,18 +1,20 @@
 /**
- * Customer Entity Configuration
+ * Customer Entity — presentation
  *
- * Customers include distributors, retailers, taproom sales,
- * and direct-to-consumer accounts.
+ * The React/UI half of the customer entity: list columns, list filters, the
+ * unified detail/edit sections, and actions. Includes section-level component
+ * adapters for shipping preferences, pallet configs, and QBO sync.
  */
 
-import { z } from "zod";
-import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
-import { valuesAsOptions, getValueDisplay } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { EntityPresentation } from "@/types/entity";
+import { deleteAction } from "@/types/entity";
+import { getValueDisplay } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
 import { CustomerShippingPreferences } from "@/components/domain/order/customer-shipping-preferences";
 import { CustomerPalletConfigs } from "@/components/domain/order/customer-pallet-configs";
+import { customerCore, customerTypeOptions } from "./core";
+import type { Customer } from "./core";
 
 // =============================================================================
 // Section Component Wrappers
@@ -30,74 +32,7 @@ function CustomerPalletConfigsSection({ data }: { data: { id: string } }) {
   return <CustomerPalletConfigs customerId={data.id} />;
 }
 
-// Base type from customers table
-type CustomerBase = Database["public"]["Tables"]["customers"]["Row"];
-
-// Extended type for list/detail view (includes fields from customers_with_order_summary view)
-// Note: View fields are added here since they may not be in generated types yet
-type Customer = CustomerBase & {
-  // Fields from sales_channels and pricing_tiers joins
-  sales_channel_name?: string | null;
-  price_tier_name?: string | null;
-  // Calculated order summary fields
-  total_orders?: number | null;
-  total_revenue?: number | null;
-  pending_orders?: number | null;
-  pending_revenue?: number | null;
-  last_order_date?: string | null;
-  // Keg balance summary fields (from customer_keg_balance_summary)
-  total_kegs_out?: number | null;
-  total_deposit_value?: number | null;
-}
-
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const customerSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  customer_type: z.string().min(1, "Customer type is required"),
-  contact_name: z.string().nullable().optional(),
-  email: z.string().email().nullable().optional().or(z.literal("")),
-  phone: z.string().nullable().optional(),
-  address: z.any().nullable().optional(), // JSONB
-  sales_channel_id: z.string().uuid().nullable().optional(),
-  price_tier_id: z.string().uuid().nullable().optional(),
-  notes: z.string().nullable().optional(),
-  is_active: z.boolean().default(true),
-  is_tax_exempt: z.boolean().default(false),
-  payment_terms_days: z.coerce.number().nullable().optional(),
-});
-
-export type CustomerFormValues = z.infer<typeof customerSchema>;
-
-// =============================================================================
-// Value Display Configuration
-// =============================================================================
-
-const customerTypeDisplayConfig: ValueDisplayConfig = {
-  field: "customer_type",
-  display: {
-    distributor: { label: "Distributor", color: "info" },
-    retail: { label: "Retail", color: "success" },
-    taproom: { label: "Taproom", color: "warning" },
-    direct: { label: "Direct", color: "default" },
-  },
-};
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const customerEntity: EntityConfig<Customer> = {
-  name: "customer",
-  table: "customers",
-  viewTable: "customers_with_order_summary",
-  displayName: "Customer",
-  displayNamePlural: "Customers",
-  description: "Distributors, retailers, and direct customers",
-  domain: "sales",
-
+export const customerPresentation: EntityPresentation<Customer> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -112,7 +47,7 @@ export const customerEntity: EntityConfig<Customer> = {
       header: "Type",
       sortable: true,
       render: (value) => {
-        const display = getValueDisplay(customerEntity, "customer_type", value as string);
+        const display = getValueDisplay(customerCore, "customer_type", value as string);
         return (
           <StatusBadge
             status={value as string}
@@ -157,7 +92,7 @@ export const customerEntity: EntityConfig<Customer> = {
       field: "customer_type",
       type: "multiselect",
       label: "Type",
-      options: valuesAsOptions(customerTypeDisplayConfig),
+      options: customerTypeOptions,
     },
     {
       field: "is_active",
@@ -165,17 +100,6 @@ export const customerEntity: EntityConfig<Customer> = {
       label: "Active",
     },
   ],
-
-  defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name", "contact_name", "email"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "name",
-    subtitle: "customer_type",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
@@ -198,7 +122,7 @@ export const customerEntity: EntityConfig<Customer> = {
           label: "Customer Type",
           type: "select",
           required: true,
-          options: valuesAsOptions(customerTypeDisplayConfig),
+          options: customerTypeOptions,
           colSpan: 6,
         },
         {
@@ -383,30 +307,6 @@ export const customerEntity: EntityConfig<Customer> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
-  formSchema: customerSchema,
-
-  // ---------------------------------------------------------------------------
-  // Value Display
-  // ---------------------------------------------------------------------------
-  valueDisplay: [customerTypeDisplayConfig],
-
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "orders",
-      entity: "order",
-      type: "hasMany",
-      foreignKey: "customer_id",
-      showInDetail: true,
-      detailTab: "Orders",
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
   actions: [
@@ -417,25 +317,6 @@ export const customerEntity: EntityConfig<Customer> = {
       type: "dropdown",
       confirm: true,
     },
-    {
-      name: "delete",
-      label: "Delete Customer",
-      icon: "trash",
-      type: "dropdown",
-      variant: "destructive",
-      deleteMode: "hard",
-    },
+    deleteAction("Customer"),
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all distributors",
-    "List active retail accounts",
-    "Find customer by email",
-    "What customers are in Seattle?",
-  ],
-
-  keyFields: ["name", "customer_type", "contact_name", "email", "is_active"],
 };

@@ -1,14 +1,12 @@
 /**
- * Order Entity Configuration
+ * Order Entity — presentation
  *
- * Orders track sales from draft through fulfillment.
- * Lifecycle: draft → confirmed → scheduled → picking → packed → fulfilled
+ * The React/UI half of the order entity: list columns, list filters, the
+ * unified detail/edit sections, actions, kanban config, and the order items
+ * relation component.
  */
 
-import { z } from "zod";
-import type { EntityConfig, StateMachineConfig } from "@/types/entity";
-import { statesAsOptions } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { EntityPresentation } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
 import { OrderQuickLinks } from "@/components/domain/order/order-quick-links";
@@ -16,6 +14,8 @@ import { OrderItemsEditor } from "@/components/domain/order/order-items-editor";
 import { ChangeRequestReview } from "@/components/domain/order/change-request-review";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
 import { OrderShippingMaterialsEditor } from "@/components/domain/order/order-shipping-materials-editor";
+import { orderCore, statusOptions } from "./core";
+import type { Order } from "./core";
 
 // Wrapper component to adapt OrderItemsEditor to relation component interface
 function OrderItemsRelation({ parentId, data }: { parentId: string; data?: Record<string, unknown> }) {
@@ -33,67 +33,7 @@ function OrderShippingMaterialsSection({ data }: { data: Order }) {
   return <OrderShippingMaterialsEditor orderId={data.id} />;
 }
 
-type Order = Database["public"]["Tables"]["orders"]["Row"];
-
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const orderSchema = z.object({
-  order_number: z.string().min(1, "Order number is required"),
-  customer_id: z.string().uuid().nullable().optional(),
-  status: z.string().default("draft"),
-  order_date: z.string().min(1, "Order date is required"),
-  requested_date: z.string().nullable().optional(),
-  scheduled_date: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-});
-
-export type OrderFormValues = z.infer<typeof orderSchema>;
-
-// =============================================================================
-// State Machine (defined separately to derive options)
-// =============================================================================
-
-const orderStateMachine: StateMachineConfig<Order> = {
-  stateField: "status",
-  states: ["draft", "confirmed", "scheduled", "picking", "packed", "fulfilled", "cancelled"],
-  initialState: "draft",
-  transitions: {
-    draft: ["confirmed", "cancelled"],
-    confirmed: ["scheduled", "cancelled"],
-    scheduled: ["picking", "cancelled"],
-    picking: ["packed", "cancelled"],
-    packed: ["fulfilled", "cancelled"],
-    fulfilled: [],
-    cancelled: [],
-  },
-  stateDisplay: {
-    draft: { label: "Draft", color: "default" },
-    confirmed: { label: "Confirmed", color: "info" },
-    scheduled: { label: "Scheduled", color: "info" },
-    picking: { label: "Picking", color: "warning" },
-    packed: { label: "Packed", color: "warning" },
-    fulfilled: { label: "Fulfilled", color: "success" },
-    cancelled: { label: "Cancelled", color: "error" },
-  },
-};
-
-// Derive status options from state machine (single source of truth)
-const statusOptions = statesAsOptions(orderStateMachine);
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const orderEntity: EntityConfig<Order> = {
-  name: "order",
-  table: "orders",
-  displayName: "Order",
-  displayNamePlural: "Orders",
-  description: "Sales orders from draft through fulfillment",
-  domain: "sales",
-
+export const orderPresentation: EntityPresentation<Order> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -110,7 +50,7 @@ export const orderEntity: EntityConfig<Order> = {
       render: (value) => (
         <StatusBadge
           status={value as string}
-          config={orderEntity.stateMachine?.stateDisplay}
+          config={orderCore.stateMachine?.stateDisplay}
         />
       ),
     },
@@ -142,17 +82,6 @@ export const orderEntity: EntityConfig<Order> = {
       options: statusOptions,
     },
   ],
-
-  defaultSort: { column: "order_date", direction: "desc" },
-  searchableFields: ["order_number"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "order_number",
-    badge: "status",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (detail + edit)
@@ -265,16 +194,6 @@ export const orderEntity: EntityConfig<Order> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
-  formSchema: orderSchema,
-
-  // ---------------------------------------------------------------------------
-  // State Machine
-  // ---------------------------------------------------------------------------
-  stateMachine: orderStateMachine,
-
-  // ---------------------------------------------------------------------------
   // Kanban Board
   // ---------------------------------------------------------------------------
   kanbanConfig: {
@@ -342,67 +261,9 @@ export const orderEntity: EntityConfig<Order> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Relations
+  // Relation components — woven onto `core.relations` by createEntityConfig()
   // ---------------------------------------------------------------------------
-  relations: [
-    {
-      name: "customer",
-      entity: "customer",
-      type: "belongsTo",
-      foreignKey: "customer_id",
-      showInDetail: true,
-    },
-    {
-      name: "order_items",
-      entity: "order_item",
-      type: "hasMany",
-      foreignKey: "order_id",
-      showInDetail: true,
-      detailTab: "Items",
-      component: OrderItemsRelation,
-    },
-    {
-      name: "pick_lists",
-      entity: "pick_list",
-      type: "hasMany",
-      foreignKey: "order_id",
-      showInDetail: true,
-      detailTab: "Pick Lists",
-    },
-    {
-      name: "delivery",
-      entity: "delivery",
-      type: "belongsTo",
-      foreignKey: "delivery_id",
-      showInDetail: true,
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all pending orders",
-    "What orders are scheduled for this week?",
-    "List orders for Downtown Distributors",
-    "Find orders that need to be picked",
-  ],
-
-  keyFields: ["order_number", "status", "order_date", "customer_id"],
-};
-
-/**
- * Change Request Status Display
- *
- * Status display config for order_change_requests (not a standalone entity,
- * but needs consistent status rendering via StatusBadge).
- */
-export const changeRequestStatusDisplay: Record<
-  string,
-  { label: string; color: "default" | "success" | "warning" | "error" | "info" }
-> = {
-  pending: { label: "Pending Review", color: "warning" },
-  approved: { label: "Approved", color: "success" },
-  rejected: { label: "Rejected", color: "error" },
-  cancelled: { label: "Cancelled", color: "default" },
+  relationComponents: {
+    order_items: OrderItemsRelation,
+  },
 };
