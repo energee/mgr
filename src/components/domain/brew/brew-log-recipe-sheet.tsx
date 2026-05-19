@@ -11,6 +11,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Sheet,
   SheetContent,
@@ -128,55 +129,52 @@ export function BrewLogRecipeSheet({
   // Recipe details + estimates + schedules
   const { data: recipe, isLoading: recipeLoading } = useQuery({
     queryKey: recipeKeys.summary(recipeId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipes_with_estimates")
-        .select(
-          `id, name, style_name, volume_bbl, batch_size_bbl,
+    queryFn: async () =>
+      await unwrap(
+        supabase
+          .from("recipes_with_estimates")
+          .select(
+            `id, name, style_name, volume_bbl, batch_size_bbl,
            mash_water_volume_gal, sparge_water_volume_gal, preboil_volume_bbl,
            target_ko_volume_bbl, boil_time_min, mash_temp_f, mash_efficiency,
            target_mash_ph, water_to_grain_ratio, whirlpool_time_min,
            whirlpool_temp_f, target_ko_temp_f, target_pitching_rate,
            fermentation_days, conditioning_days, est_og, est_fg, est_abv,
            est_ibu, est_srm, mash_schedule, fermentation_schedule, brew_day_notes`
-        )
-        .eq("id", recipeId)
-        .single();
-      if (error) throw error;
-      return data as unknown as RecipeData;
-    },
+          )
+          .eq("id", recipeId)
+          .single()
+      ) as unknown as RecipeData,
     enabled: open,
   });
 
   // Grain bill
   const { data: grainBill } = useQuery({
     queryKey: recipeKeys.grainBill(recipeId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_malts")
-        .select("id, weight_lbs, position, malt:malts(name, type)")
-        .eq("recipe_id", recipeId)
-        .order("position");
-      if (error) throw error;
-      return (data ?? []) as unknown as GrainBillRow[];
-    },
+    queryFn: async () =>
+      (await unwrap(
+        supabase
+          .from("recipe_malts")
+          .select("id, weight_lbs, position, malt:malts(name, type)")
+          .eq("recipe_id", recipeId)
+          .order("position")
+      ) ?? []) as unknown as GrainBillRow[],
     enabled: open,
   });
 
   // Hop schedule
   const { data: hopSchedule } = useQuery({
     queryKey: recipeKeys.hopSchedule(recipeId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_hops")
-        .select(
-          "id, weight_oz, timing, boil_time_min, alpha_acid, position, hop:hops(name, type)"
-        )
-        .eq("recipe_id", recipeId)
-        .order("position");
-      if (error) throw error;
-      return (data ?? []) as unknown as HopScheduleRow[];
-    },
+    queryFn: async () =>
+      (await unwrap(
+        supabase
+          .from("recipe_hops")
+          .select(
+            "id, weight_oz, timing, boil_time_min, alpha_acid, position, hop:hops(name, type)"
+          )
+          .eq("recipe_id", recipeId)
+          .order("position")
+      ) ?? []) as unknown as HopScheduleRow[],
     enabled: open,
   });
 
