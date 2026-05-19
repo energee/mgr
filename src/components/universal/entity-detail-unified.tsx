@@ -32,7 +32,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
-import { formatValue } from "@/lib/utils";
+import { formatValue } from "@/lib/format";
 import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { useEntityRecord } from "@/hooks/use-entity-record";

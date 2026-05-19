@@ -14,8 +14,13 @@ import {
 import Image from "next/image";
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { useAsRef } from "@/hooks/use-as-ref";
 import { useLazyRef } from "@/hooks/use-lazy-ref";
+
+function useAsRef<T>(props: T) {
+  const ref = React.useRef<T>(props);
+  React.useLayoutEffect(() => { ref.current = props; });
+  return ref;
+}
 
 const ROOT_NAME = "FileUpload";
 const DROPZONE_NAME = "FileUploadDropzone";
