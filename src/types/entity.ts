@@ -117,20 +117,8 @@ export type EntityPresentation<T = Record<string, unknown>> = {
   /** Quick filter tabs above the toolbar (presets that set URL filters on click) */
   quickFilters?: QuickFilterDef[];
 
-  /** @deprecated Use `sections` instead. Will be removed in a future update. */
-  detailSections?: EntitySectionDef<T>[];
-
-  /** Unified sections for combined detail/edit view. Takes precedence over detailSections + formFields. */
+  /** Unified sections for combined detail/edit view. */
   sections?: UnifiedSectionDef<T>[];
-
-  /** @deprecated Use `sections` instead. Kept for backward compatibility. */
-  formFields?: EntityFieldDef<T>[];
-
-  /** @deprecated Use `sections` with `editable: "create-only"` instead. */
-  createFields?: (keyof T & string)[];
-
-  /** @deprecated Use `sections` with `editable` control instead. */
-  editFields?: (keyof T & string)[];
 
   /** Kanban board config. Requires stateMachine. */
   kanbanConfig?: KanbanConfig<T>;

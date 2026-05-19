@@ -102,7 +102,6 @@ const mockEntity: EntityConfig<Record<string, unknown>> = {
   domain: "production",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
   stateMachine: fullStateMachine,
   valueDisplay: [priorityDisplay, categoryDisplay],
 };
@@ -117,7 +116,6 @@ const bareEntity: EntityConfig<Record<string, unknown>> = {
   domain: "inventory",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
 };
 
 /** Entity with state machine but no stateDisplay. */
@@ -130,7 +128,6 @@ const noDisplayEntity: EntityConfig<Record<string, unknown>> = {
   domain: "production",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
   stateMachine: noDisplayStateMachine,
 };
 

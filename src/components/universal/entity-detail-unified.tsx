@@ -4,8 +4,7 @@
  * EntityDetailUnified - Combined Detail/Edit View Component
  *
  * Replaces EntityDetail + EntityForm with a unified component that reads from
- * `sections` (UnifiedSectionDef) config. Falls back to legacy `detailSections`
- * by converting them on the fly.
+ * `sections` (UnifiedSectionDef) config.
  *
  * Supports:
  * - View mode: data display, header, tabs, relations, state transitions, actions
@@ -122,28 +121,7 @@ export type EntityDetailUnifiedProps<T = Record<string, unknown>> = {
 function getUnifiedSections<T>(
   entity: EntityConfig<T>
 ): UnifiedSectionDef<T>[] {
-  if (entity.sections) return entity.sections;
-
-  return (entity.detailSections || []).map((section) => ({
-    id: section.id,
-    title: section.title,
-    collapsible: section.collapsible,
-    defaultCollapsed: section.defaultCollapsed,
-    tab: section.tab,
-    // Legacy sections use a narrower component type (just { data: T }) or string.
-    // Cast to unified type — extra props (editing, form) will be passed but unused.
-    component: section.component as UnifiedSectionDef<T>["component"],
-    fields: section.fields?.map((f) => ({
-      name: f.field,
-      label: f.label,
-      format: f.format,
-      unitType: f.unitType,
-      relation: f.relation,
-      render: f.render,
-      fullWidth: f.fullWidth,
-      editable: false as const,
-    })),
-  }));
+  return entity.sections ?? [];
 }
 
 // =============================================================================
