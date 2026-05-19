@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { yeastKeys, vesselKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,13 +62,13 @@ export function YeastBrinksOverview() {
   const { data: brinks, isLoading: brinksLoading } = useQuery({
     queryKey: vesselKeys.brinks(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vessels")
-        .select("id, name")
-        .eq("vessel_type", "brink")
-        .order("name");
-      if (error) throw error;
-      return data as BrinkVessel[];
+      return await unwrap(
+        supabase
+          .from("vessels")
+          .select("id, name")
+          .eq("vessel_type", "brink")
+          .order("name"),
+      ) as BrinkVessel[];
     },
   });
 
@@ -75,15 +76,15 @@ export function YeastBrinksOverview() {
   const { data: activePitches, isLoading: pitchesLoading } = useQuery({
     queryKey: yeastKeys.brinks(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("yeast_pitches_with_remaining")
-        .select(
-          "id, strain_name, strain_form, quantity_remaining_lbs, estimated_viability, viability_status, generation, vessel_id, days_old"
-        )
-        .in("status", ["in_stock", "in_use"])
-        .not("vessel_id", "is", null);
-      if (error) throw error;
-      return data as ActivePitch[];
+      return await unwrap(
+        supabase
+          .from("yeast_pitches_with_remaining")
+          .select(
+            "id, strain_name, strain_form, quantity_remaining_lbs, estimated_viability, viability_status, generation, vessel_id, days_old"
+          )
+          .in("status", ["in_stock", "in_use"])
+          .not("vessel_id", "is", null),
+      ) as ActivePitch[];
     },
   });
 
