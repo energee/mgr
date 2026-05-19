@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { packagingKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Table,
   TableBody,
@@ -37,11 +38,11 @@ export function BrandPackagingSummary({ brandId }: { brandId: string }) {
   const { data: rows, isLoading } = useQuery({
     queryKey: packagingKeys.brandSummary(brandId),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "brand_packaging_summary")
-        .select("*")
-        .eq("brand_id", brandId);
-      if (error) throw error;
-      return (data ?? []) as unknown as BrandPackagingSummaryRow[];
+      return (await unwrap(
+        dynamicFrom(supabase, "brand_packaging_summary")
+          .select("*")
+          .eq("brand_id", brandId),
+      ) ?? []) as unknown as BrandPackagingSummaryRow[];
     },
   });
 

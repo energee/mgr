@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { entityKeys, materialPlanningKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { groupByCategory } from "./shipping-material-roles-editor";
 import {
   useSellingFormatBOM,
@@ -95,12 +96,12 @@ export function SellingFormatBOMEditor({
   const { data: inventoryItems = [], isLoading: itemsLoading } = useQuery({
     queryKey: entityKeys.list("inventory_items"),
     queryFn: async (): Promise<InventoryItem[]> => {
-      const { data, error } = await dynamicFrom(supabase, "inventory_items")
-        .select("id, name, category, unit")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as unknown as InventoryItem[];
+      return (await unwrap(
+        dynamicFrom(supabase, "inventory_items")
+          .select("id, name, category, unit")
+          .eq("is_active", true)
+          .order("name"),
+      ) ?? []) as unknown as InventoryItem[];
     },
   });
 
@@ -116,14 +117,15 @@ export function SellingFormatBOMEditor({
 
   const insertMutation = useMutation({
     mutationFn: async (item: InventoryItem) => {
-      const { error } = await dynamicFrom(supabase, "selling_format_materials")
-        .insert({
-          selling_format_id: sellingFormatId,
-          inventory_item_id: item.id,
-          quantity_per_unit: 1,
-          notes: null,
-        } as never);
-      if (error) throw error;
+      await unwrap(
+        dynamicFrom(supabase, "selling_format_materials")
+          .insert({
+            selling_format_id: sellingFormatId,
+            inventory_item_id: item.id,
+            quantity_per_unit: 1,
+            notes: null,
+          } as never),
+      );
     },
     onSuccess: () => {
       invalidateBOM();
@@ -142,10 +144,11 @@ export function SellingFormatBOMEditor({
       id: string;
       updates: { quantity_per_unit?: number; notes?: string | null };
     }) => {
-      const { error } = await dynamicFrom(supabase, "selling_format_materials")
-        .update(updates as never)
-        .eq("id", id);
-      if (error) throw error;
+      await unwrap(
+        dynamicFrom(supabase, "selling_format_materials")
+          .update(updates as never)
+          .eq("id", id),
+      );
     },
     onSuccess: () => {
       invalidateBOM();
@@ -157,10 +160,11 @@ export function SellingFormatBOMEditor({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await dynamicFrom(supabase, "selling_format_materials")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      await unwrap(
+        dynamicFrom(supabase, "selling_format_materials")
+          .delete()
+          .eq("id", id),
+      );
     },
     onSuccess: () => {
       invalidateBOM();

@@ -33,6 +33,7 @@ import {
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { entityKeys, sessionLineItemKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 type ReviewLineItem = {
   id: string;
@@ -81,11 +82,12 @@ export function PackagingCompletionReview({
       if (notes.trim()) {
         updates.notes = notes.trim();
       }
-      const { error } = await supabase
-        .from("packaging_sessions")
-        .update(updates)
-        .eq("id", sessionId);
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("packaging_sessions")
+          .update(updates)
+          .eq("id", sessionId),
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
