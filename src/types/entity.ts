@@ -140,6 +140,17 @@ export type EntityPresentation<T = Record<string, unknown>> = {
 
   /** Dialog configurations for actions */
   dialogs?: Record<string, EntityDialogConfig<T>>;
+
+  /**
+   * React components for relation tabs, keyed by relation name. The relation
+   * data itself lives in `EntityCore.relations` (server-safe); the matching
+   * component is supplied here so `core.ts` stays free of React imports.
+   * `createEntityConfig()` weaves each component onto its relation.
+   */
+  relationComponents?: Record<
+    string,
+    ComponentType<{ parentId: string; data?: Record<string, unknown> }>
+  >;
 }
 
 /**
@@ -150,15 +161,84 @@ export type EntityConfig<T = Record<string, unknown>> = EntityCore<T> &
   EntityPresentation<T>;
 
 /**
+ * Fields `createEntityConfig()` fills with a default when a per-entity
+ * `core.ts` omits them, so the common case stays terse:
+ *
+ *   displayNamePlural → `${displayName}s`
+ *   searchableFields  → ["name"]
+ *   defaultSort       → { column: "name", direction: "asc" }
+ *
+ * Entities opt out with explicit values — an irregular plural ("Batch" →
+ * "Batches"), a non-name sort column, a nameless entity, or
+ * `searchableFields: []` to disable quick search.
+ */
+type DefaultableCoreField = "displayNamePlural" | "searchableFields" | "defaultSort";
+
+/**
+ * The core shape a per-entity `core.ts` passes to `createEntityConfig()`.
+ * Identical to `EntityCore` except the three defaultable fields may be
+ * omitted. A complete `EntityCore` is also assignable here.
+ */
+export type EntityCoreInput<T = Record<string, unknown>> = Omit<
+  EntityCore<T>,
+  DefaultableCoreField
+> &
+  Partial<Pick<EntityCore<T>, DefaultableCoreField>>;
+
+/**
  * Assemble an EntityConfig from its server-safe core and its presentation half.
- * Every per-entity `index.ts` goes through this single seam, so shared defaults
- * can later be applied centrally without touching individual entity files.
+ * Every per-entity `index.ts` goes through this single seam. It supplies
+ * safe-field defaults (see `DefaultableCoreField`) and weaves any
+ * `relationComponents` onto their matching `core.relations` entry.
  */
 export function createEntityConfig<T>(
-  core: EntityCore<T>,
+  core: EntityCoreInput<T>,
   presentation: EntityPresentation<T>,
 ): EntityConfig<T> {
-  return { ...core, ...presentation };
+  const { relationComponents, ...presentationFields } = presentation;
+
+  const relations =
+    relationComponents && core.relations
+      ? core.relations.map((relation) =>
+          relationComponents[relation.name]
+            ? { ...relation, component: relationComponents[relation.name] }
+            : relation,
+        )
+      : core.relations;
+
+  return {
+    ...core,
+    displayNamePlural: core.displayNamePlural ?? `${core.displayName}s`,
+    searchableFields: core.searchableFields ?? (["name"] as (keyof T & string)[]),
+    defaultSort:
+      core.defaultSort ??
+      ({ column: "name", direction: "asc" } as EntityCore<T>["defaultSort"]),
+    relations,
+    ...presentationFields,
+  };
+}
+
+/**
+ * Build the standard destructive delete action. Every entity that supports
+ * deletion declares the same `{ name, icon, type, variant }` shape — this
+ * helper builds it so each `presentation.tsx` only states the noun and, on
+ * the rare soft-delete entity, the mode.
+ *
+ * @param noun Entity noun for the label, e.g. "Profile" → "Delete Profile".
+ * @param mode "hard" (default) issues a DELETE; "soft" sets is_active = false.
+ */
+export function deleteAction<T>(
+  noun: string,
+  mode: "hard" | "soft" = "hard",
+): EntityActionDef<T> {
+  return {
+    name: "delete",
+    label: `Delete ${noun}`,
+    icon: "trash",
+    type: "dropdown",
+    variant: "destructive",
+    deleteMode: mode,
+  };
 }
 
 // =============================================================================
