@@ -1,65 +1,17 @@
 /**
- * Inventory Item Entity Configuration
+ * Inventory Item Entity — presentation
  *
- * Inventory items are raw materials, packaging supplies, and other
- * consumables tracked in the brewery's inventory system.
+ * The React/UI half of the inventory item entity: list columns, list filters,
+ * and the unified detail/edit sections.
  */
 
-import { z } from "zod";
-import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
-import { valuesAsOptions, getValueDisplay } from "@/types/entity";
-import type { Database } from "@/types/supabase";
+import type { EntityPresentation } from "@/types/entity";
+import { deleteAction, valuesAsOptions } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
+import type { InventoryItem } from "./core";
+import { categoryDisplayConfig } from "./core";
 
-type InventoryItem = Database["public"]["Tables"]["inventory_items"]["Row"];
-
-// =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const inventoryItemSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  category: z.string().min(1, "Category is required"),
-  sku: z.string().nullable().optional(),
-  unit: z.string().min(1, "Unit is required"),
-  reorder_point: z.coerce.number().nullable().optional(),
-  reorder_qty: z.coerce.number().nullable().optional(),
-  notes: z.string().nullable().optional(),
-  is_active: z.boolean().default(true),
-});
-
-export type InventoryItemFormValues = z.infer<typeof inventoryItemSchema>;
-
-// =============================================================================
-// Value Display Configuration
-// =============================================================================
-
-const categoryDisplayConfig: ValueDisplayConfig = {
-  field: "category",
-  display: {
-    grain: { label: "Grain", color: "default" },
-    hop: { label: "Hop", color: "success" },
-    yeast: { label: "Yeast", color: "info" },
-    adjunct: { label: "Adjunct", color: "warning" },
-    chemical: { label: "Chemical", color: "info" },
-    packaging: { label: "Packaging", color: "default" },
-    equipment: { label: "Equipment", color: "default" },
-    other: { label: "Other", color: "default" },
-  },
-};
-
-// =============================================================================
-// Entity Configuration
-// =============================================================================
-
-export const inventoryItemEntity: EntityConfig<InventoryItem> = {
-  name: "inventory_item",
-  table: "inventory_items",
-  displayName: "Inventory Item",
-  displayNamePlural: "Inventory Items",
-  description: "Raw materials, packaging, and supplies",
-  domain: "inventory",
-
+export const inventoryItemPresentation: EntityPresentation<InventoryItem> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------
@@ -74,7 +26,7 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       header: "Category",
       sortable: true,
       render: (value) => {
-        const display = getValueDisplay(inventoryItemEntity, "category", value as string);
+        const display = categoryDisplayConfig.display[value as string];
         return (
           <StatusBadge
             status={value as string}
@@ -119,17 +71,6 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       label: "Active",
     },
   ],
-
-  defaultSort: { column: "name", direction: "asc" },
-  searchableFields: ["name", "sku"],
-
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "name",
-    subtitle: "category",
-  },
 
   // ---------------------------------------------------------------------------
   // Unified Sections (for EntityDetailUnified)
@@ -228,43 +169,7 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   ],
 
   // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
-  formSchema: inventoryItemSchema,
-
-  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
-  actions: [
-    {
-      name: "delete",
-      label: "Delete Inventory Item",
-      icon: "trash",
-      type: "dropdown",
-      variant: "destructive",
-      deleteMode: "hard",
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // Value Display
-  // ---------------------------------------------------------------------------
-  valueDisplay: [categoryDisplayConfig],
-
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
-  relations: [],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all hops in inventory",
-    "What grain items are below reorder point?",
-    "List active packaging supplies",
-    "Find items from Yakima Valley Hops",
-  ],
-
-  keyFields: ["name", "category", "unit", "reorder_point", "is_active"],
+  actions: [deleteAction("Inventory Item")],
 };

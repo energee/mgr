@@ -1,17 +1,21 @@
 /**
- * Purchase Order Line Item Entity Configuration
+ * PO Line Item Entity — server-safe core
  *
- * PO line items reference catalog items (malt, hop, yeast, etc.)
- * with quantity, unit, and pricing information.
+ * The pure-data half of the PO line item entity: identity, the zod form
+ * schema, catalog helpers, relations, and AI metadata. No React imports —
+ * safe to import from server route handlers and API routes.
+ *
+ * PO line items reference catalog items (malt, hop, yeast, etc.) with
+ * quantity, unit, and pricing information.
  */
 
 import { z } from "zod";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityCoreInput } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { dynamicFrom } from "@/services/types";
 
-type POLineItem = Database["public"]["Tables"]["po_line_items"]["Row"];
+export type POLineItem = Database["public"]["Tables"]["po_line_items"]["Row"];
 
 // =============================================================================
 // Constants
@@ -123,133 +127,25 @@ export const poLineItemSchema = z.object({
 export type POLineItemFormValues = z.infer<typeof poLineItemSchema>;
 
 // =============================================================================
-// Entity Configuration
+// Entity Core
 // =============================================================================
 
-export const poLineItemEntity: EntityConfig<POLineItem> = {
+export const poLineItemCore: EntityCoreInput<POLineItem> = {
   name: "po_line_item",
   table: "po_line_items",
   viewTable: "po_line_items_with_quantities",
   displayName: "PO Line Item",
-  displayNamePlural: "PO Line Items",
   description: "Purchase order line items for ingredients and materials",
   domain: "purchasing",
 
-  // ---------------------------------------------------------------------------
-  // List View
-  // ---------------------------------------------------------------------------
-  listColumns: [
-    {
-      accessorKey: "catalog_type",
-      header: "Type",
-      sortable: true,
-    },
-    {
-      accessorKey: "catalog_id",
-      header: "Item",
-    },
-    {
-      accessorKey: "quantity",
-      header: "Qty",
-      sortable: true,
-    },
-    {
-      accessorKey: "received_quantity",
-      header: "Received",
-      sortable: true,
-    },
-    {
-      accessorKey: "outstanding_quantity",
-      header: "Outstanding",
-      sortable: true,
-    },
-    {
-      accessorKey: "unit",
-      header: "Unit",
-    },
-    {
-      accessorKey: "unit_price",
-      header: "Unit Price",
-      format: "currency",
-    },
-  ],
-
   searchableFields: [],
 
-  // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
   detailHeader: {
     title: "catalog_type",
   },
 
-  // ---------------------------------------------------------------------------
-  // Unified Sections (detail + edit)
-  // ---------------------------------------------------------------------------
-  sections: [
-    {
-      id: "overview",
-      title: "Line Item Details",
-      fields: [
-        {
-          name: "po_id",
-          label: "Purchase Order",
-          type: "relation",
-          relation: { entity: "purchase_order", displayField: "po_number" },
-          required: true,
-          colSpan: 12,
-        },
-        {
-          name: "catalog_type",
-          label: "Item Type",
-          type: "select",
-          options: CATALOG_TYPES.map((t) => ({ value: t.value, label: t.label })),
-          required: true,
-          colSpan: 4,
-        },
-        {
-          name: "catalog_id",
-          label: "Item",
-          type: "text",
-          placeholder: "Select item type first",
-          required: true,
-          colSpan: 8,
-        },
-        {
-          name: "quantity",
-          label: "Quantity",
-          type: "number",
-          required: true,
-          colSpan: 4,
-        },
-        {
-          name: "unit",
-          label: "Unit",
-          type: "text",
-          placeholder: "e.g., lb, oz, kg",
-          required: true,
-          colSpan: 4,
-        },
-        {
-          name: "unit_price",
-          label: "Unit Price",
-          type: "number",
-          format: "currency",
-          placeholder: "0.00",
-          colSpan: 4,
-        },
-      ],
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // Form
-  // ---------------------------------------------------------------------------
   formSchema: poLineItemSchema,
 
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
   relations: [
     {
       name: "purchase_order",
@@ -268,9 +164,6 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
     },
   ],
 
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
   queryExamples: [
     "Show line items for PO-2025-001",
     "List all malt orders this month",
