@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { entityKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -117,9 +118,7 @@ export function ShippingMaterialRolesEditor({
       if (customerId) {
         query = query.eq("customer_id", customerId);
       }
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as unknown as ShippingMaterialRow[];
+      return ((await unwrap(query)) ?? []) as unknown as ShippingMaterialRow[];
     },
     enabled: customerId ? !!customerId : true,
   });
@@ -127,12 +126,12 @@ export function ShippingMaterialRolesEditor({
   const { data: inventoryItems = [], isLoading: itemsLoading } = useQuery({
     queryKey: entityKeys.list("inventory_items"),
     queryFn: async (): Promise<InventoryItem[]> => {
-      const { data, error } = await dynamicFrom(supabase, "inventory_items")
-        .select("id, name, category, unit")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as unknown as InventoryItem[];
+      return ((await unwrap(
+        dynamicFrom(supabase, "inventory_items")
+          .select("id, name, category, unit")
+          .eq("is_active", true)
+          .order("name")
+      )) ?? []) as unknown as InventoryItem[];
     },
   });
 
@@ -151,8 +150,7 @@ export function ShippingMaterialRolesEditor({
         notes: null,
       };
       if (customerId) row.customer_id = customerId;
-      const { error } = await dynamicFrom(supabase, table).insert(row as never);
-      if (error) throw error;
+      await unwrap(dynamicFrom(supabase, table).insert(row as never));
     },
     onSuccess: () => { invalidate(); toast.success(`${itemNoun} saved`); },
     onError: () => { toast.error(`Failed to save ${itemNoun}`); },
@@ -160,10 +158,9 @@ export function ShippingMaterialRolesEditor({
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, inventory_item_id }: { id: string; inventory_item_id: string }) => {
-      const { error } = await dynamicFrom(supabase, table)
-        .update({ inventory_item_id } as never)
-        .eq("id", id);
-      if (error) throw error;
+      await unwrap(
+        dynamicFrom(supabase, table).update({ inventory_item_id } as never).eq("id", id)
+      );
     },
     onSuccess: () => { invalidate(); toast.success(`${itemNoun} updated`); },
     onError: () => { toast.error(`Failed to update ${itemNoun}`); },
@@ -171,8 +168,7 @@ export function ShippingMaterialRolesEditor({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await dynamicFrom(supabase, table).delete().eq("id", id);
-      if (error) throw error;
+      await unwrap(dynamicFrom(supabase, table).delete().eq("id", id));
     },
     onSuccess: () => { invalidate(); toast.success(`${itemNoun} removed`); },
     onError: () => { toast.error(`Failed to remove ${itemNoun}`); },

@@ -14,6 +14,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys } from "@/lib/query-keys";
+import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { formatCellCount } from "@/domain/yeast-calculations";
 import {
   Table,
@@ -61,13 +63,13 @@ export function BatchYeastSection({ data }: BatchYeastSectionProps) {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: batchKeys.yeastSummary(batchId),
     queryFn: async () => {
-      const { data: result, error } = await (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (column: string, value: string) => { order: (column: string, options: { ascending: boolean }) => PromiseLike<{ data: BatchYeastSummaryRow[] | null; error: unknown }> } } } })
-        .from("batch_yeast_summary")
-        .select("event_id, pitch_id, strain_id, strain_name, strain_code, generation, quantity_lbs, cells_pitched_thousand, viability_at_pitch, pitched_at")
-        .eq("batch_id", batchId)
-        .order("pitched_at", { ascending: true });
-      if (error) throw error;
-      return (result ?? []) as BatchYeastSummaryRow[];
+      const result = (await unwrap(
+        dynamicFrom(supabase, "batch_yeast_summary")
+          .select("event_id, pitch_id, strain_id, strain_name, strain_code, generation, quantity_lbs, cells_pitched_thousand, viability_at_pitch, pitched_at")
+          .eq("batch_id", batchId)
+          .order("pitched_at", { ascending: true })
+      )) as unknown as BatchYeastSummaryRow[] | null;
+      return result ?? [];
     },
   });
 

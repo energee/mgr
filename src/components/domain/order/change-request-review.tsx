@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { entityKeys, changeRequestKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
 import {
@@ -98,7 +99,7 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
     queryKey: changeRequestKeys.pendingForOrder(orderId || ""),
     enabled: !!orderId,
     queryFn: async () => {
-      const { data: result, error } = await dynamicFrom(supabase, "order_change_requests")
+      const result = await unwrap(dynamicFrom(supabase, "order_change_requests")
         .select(`
           id, status, notes, created_at, requested_by,
           order_change_request_items (
@@ -112,9 +113,8 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return result as PendingRequest | null;
+        .maybeSingle());
+      return result as unknown as PendingRequest | null;
     },
   });
 
@@ -122,11 +122,10 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
     queryKey: entityKeys.detail("order_items_for_review", orderId || ""),
     enabled: !!orderId,
     queryFn: async () => {
-      const { data: result, error } = await dynamicFrom(supabase, "order_items")
+      const result = await unwrap(dynamicFrom(supabase, "order_items")
         .select("id, brand_id, selling_format_id, quantity, brands(name), selling_formats(name)")
-        .eq("order_id", orderId);
-      if (error) throw error;
-      return result as OrderItem[];
+        .eq("order_id", orderId));
+      return result as unknown as OrderItem[];
     },
   });
 

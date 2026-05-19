@@ -8,6 +8,7 @@ import {
 import { batchSchema } from "@/lib/schemas/batch";
 import { successResponse } from "@/lib/api/response";
 import { escapeLike } from "@/lib/utils";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 const listParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -66,13 +67,9 @@ export const POST = withPermission("batches:write", async (request, { supabase }
   const { batch_code, ...rest } = body;
   const insertPayload = batch_code ? { ...rest, batch_code } : rest;
 
-  const { data, error } = await supabase
-    .from("batches")
-    .insert(insertPayload)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return successResponse(data, undefined, 201);
+  return successResponse(
+    await unwrap(supabase.from("batches").insert(insertPayload).select().single()),
+    undefined,
+    201
+  );
 });

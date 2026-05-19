@@ -8,6 +8,7 @@ import {
 import { recipeSchema } from "@/lib/schemas/recipe";
 import { successResponse } from "@/lib/api/response";
 import { escapeLike } from "@/lib/utils";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 const listParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -59,13 +60,9 @@ export const GET = withPermission("recipes:read", async (request, { supabase }) 
 export const POST = withPermission("recipes:write", async (request, { supabase }) => {
   const body = await validateBody(recipeSchema, request);
 
-  const { data, error } = await supabase
-    .from("recipes")
-    .insert(body)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return successResponse(data, undefined, 201);
+  return successResponse(
+    await unwrap(supabase.from("recipes").insert(body).select().single()),
+    undefined,
+    201
+  );
 });

@@ -35,6 +35,7 @@ import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useIsMac } from "@/hooks/use-is-mac";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 
 // =============================================================================
@@ -131,17 +132,17 @@ export default function NotificationPreferencesPage() {
       if (!user) throw new Error("Not authenticated");
 
       // Upsert preferences
-      const { error } = await dynamicFrom(supabase, "notification_preferences")
-        .upsert(
-          {
-            user_id: user.id,
-            ...values,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
-
-      if (error) throw error;
+      await unwrap(
+        dynamicFrom(supabase, "notification_preferences")
+          .upsert(
+            {
+              user_id: user.id,
+              ...values,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id" }
+          )
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.notificationPreferences() });

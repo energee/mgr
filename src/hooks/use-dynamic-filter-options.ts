@@ -11,6 +11,7 @@
 import { useMemo } from "react";
 import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { dynamicOptionsKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { dynamicFrom } from "@/services/types";
@@ -72,8 +73,7 @@ export function useDynamicFilterOptions(
             query = query.order(labelField, { ascending: true });
           }
 
-          const { data, error } = await query;
-          if (error) throw error;
+          const data = (await unwrap(query)) as unknown as Record<string, unknown>[];
 
           const options = (data || []).map((row: Record<string, unknown>) => ({
             value: String(row[valueField]),

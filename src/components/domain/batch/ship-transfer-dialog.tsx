@@ -14,6 +14,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicRpc } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Dialog,
   DialogContent,
@@ -80,13 +81,13 @@ export function ShipTransferDialog({
     queryKey: transferKeys.lines(transferId),
     queryFn: async () => {
       // Fetch transfer lines
-      const { data: rawLines, error } = await supabase
-        .from("transfer_lines")
-        .select("id, finished_good_id, inventory_lot_id, quantity")
-        .eq("transfer_id", transferId)
-        .order("created_at");
-
-      if (error) throw error;
+      const rawLines = await unwrap(
+        supabase
+          .from("transfer_lines")
+          .select("id, finished_good_id, inventory_lot_id, quantity")
+          .eq("transfer_id", transferId)
+          .order("created_at")
+      );
       if (!rawLines || rawLines.length === 0) return [] as TransferLine[];
 
       // Resolve item names — finished goods via brands, inventory lots via items
@@ -204,13 +205,12 @@ export function ShipTransferDialog({
         quantity_shipped: shippedQuantities[line.id] ?? 0,
       }));
 
-      const { data, error } = await dynamicRpc(supabase, "ship_transfer_partial", {
-        p_transfer_id: transferId,
-        p_line_quantities: lineQuantities,
-      });
-
-      if (error) throw error;
-      return data as string | null; // remainder transfer ID or null
+      return await unwrap(
+        dynamicRpc(supabase, "ship_transfer_partial", {
+          p_transfer_id: transferId,
+          p_line_quantities: lineQuantities,
+        })
+      ) as unknown as string | null; // remainder transfer ID or null
     },
     onSuccess: (remainderId) => {
       if (remainderId) {

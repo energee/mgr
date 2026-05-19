@@ -5,6 +5,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { usePackagingFormats } from "@/hooks/use-catalog";
 import { packagingKeys } from "@/lib/query-keys";
 
@@ -57,14 +58,15 @@ export function useBatchesForBrand(brandId: string | null) {
     queryKey: packagingKeys.batchesForBrand(brandId ?? ""),
     queryFn: async () => {
       if (!brandId) return [];
-      const { data, error } = await supabase
-        .from("batches_with_brew_info")
-        .select(
-          "id, batch_code, name, status, volume_bbl, current_vessel_name, recipe_id, recipes!inner(brand_id)"
-        )
-        .in("status", ["planned", "fermenting", "conditioning", "packaging"])
-        .eq("recipes.brand_id" as string, brandId);
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("batches_with_brew_info")
+          .select(
+            "id, batch_code, name, status, volume_bbl, current_vessel_name, recipe_id, recipes!inner(brand_id)"
+          )
+          .in("status", ["planned", "fermenting", "conditioning", "packaging"])
+          .eq("recipes.brand_id" as string, brandId)
+      );
 
       return ((data ?? []) as unknown as BatchOption[]).sort(
         (a, b) =>

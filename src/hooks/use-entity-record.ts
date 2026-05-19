@@ -12,6 +12,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { entityKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
 import { CACHE_DURATIONS } from "@/lib/constants";
@@ -30,13 +31,9 @@ export function useEntityRecord<T extends Record<string, unknown>>(
     queryKey: entityKeys.detail(fetchTable, id || ""),
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     enabled,
-    queryFn: async () => {
-      const { data: row, error } = await dynamicFrom(supabase, fetchTable)
-        .select("*")
-        .eq("id", id!)
-        .single();
-      if (error) throw error;
-      return row as T;
-    },
+    queryFn: () =>
+      unwrap(
+        dynamicFrom(supabase, fetchTable).select("*").eq("id", id!).single()
+      ) as Promise<T>,
   });
 }

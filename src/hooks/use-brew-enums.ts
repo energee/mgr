@@ -8,6 +8,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { settingsKeys } from "@/lib/query-keys";
 import { ENUM_TYPES } from "@/lib/enums";
 import type { Json } from "@/types/supabase";
@@ -46,13 +47,14 @@ export function useBrewPhases() {
     queryKey: settingsKeys.enumValues(ENUM_TYPES.BREW_PHASE),
     queryFn: async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("enum_values")
-        .select("value, label, icon, group_name, sort_order")
-        .eq("enum_type", ENUM_TYPES.BREW_PHASE)
-        .eq("is_active", true)
-        .order("sort_order");
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("enum_values")
+          .select("value, label, icon, group_name, sort_order")
+          .eq("enum_type", ENUM_TYPES.BREW_PHASE)
+          .eq("is_active", true)
+          .order("sort_order")
+      );
 
       const phases: BrewPhase[] = (data ?? []).map((d) => ({
         value: d.value,
@@ -91,13 +93,14 @@ export function useBrewMetrics() {
     queryKey: settingsKeys.enumValues(ENUM_TYPES.BREW_METRIC),
     queryFn: async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("enum_values")
-        .select("value, label, description, sort_order, metadata")
-        .eq("enum_type", ENUM_TYPES.BREW_METRIC)
-        .eq("is_active", true)
-        .order("sort_order");
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("enum_values")
+          .select("value, label, description, sort_order, metadata")
+          .eq("enum_type", ENUM_TYPES.BREW_METRIC)
+          .eq("is_active", true)
+          .order("sort_order")
+      );
 
       const metrics: BrewMetric[] = (data ?? []).map((d) => {
         const meta = d.metadata as Record<string, Json> | null;

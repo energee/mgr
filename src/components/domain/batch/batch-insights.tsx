@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
 import { dynamicRpc } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Collapsible,
   CollapsibleContent,
@@ -201,12 +202,11 @@ export function BatchInsights({ batchId: propBatchId, batchNumber: propBatchNumb
     queryKey: batchKeys.performance(batchId!),
     queryFn: async () => {
       if (!batchId) return null;
-      const { data, error } = await dynamicRpc(supabase, "analyze_batch_performance", {
-        p_batch_id: batchId,
-      });
-
-      if (error) throw error;
-      return data as BatchPerformanceResult;
+      return await unwrap(
+        dynamicRpc(supabase, "analyze_batch_performance", {
+          p_batch_id: batchId,
+        })
+      ) as unknown as BatchPerformanceResult;
     },
     enabled: hasAnalyzed && !!batchId,
     retry: false,

@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { entityKeys, packagingKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { formatDate } from "@/lib/format";
 import { Loader2 } from "lucide-react";
 
@@ -60,13 +61,13 @@ export function AddToPackagingSessionDialog({
   const { data: sessions, isLoading } = useQuery({
     queryKey: entityKeys.list("packaging_sessions", { status: ["planned", "in_progress"] }),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("packaging_sessions")
-        .select("id, session_date, status")
-        .in("status", ["planned", "in_progress"])
-        .order("session_date", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      return (await unwrap(
+        supabase
+          .from("packaging_sessions")
+          .select("id, session_date, status")
+          .in("status", ["planned", "in_progress"])
+          .order("session_date", { ascending: false }),
+      )) ?? [];
     },
     enabled: open,
   });

@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys, entityKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Dialog,
   DialogContent,
@@ -98,39 +99,38 @@ export function BatchBlendDialog({
   const { data: availableBatches, isLoading: batchesLoading } = useQuery({
     queryKey: batchKeys.list({ status: ["fermenting", "conditioning"], forBlend: true }),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "batches_with_brew_info")
-        .select("id, batch_code, name, status, volume_bbl, actual_abv, actual_og, actual_fg, recipe_id")
-        .in("status", ["fermenting", "conditioning"])
-        .neq("id", batchId)
-        .order("batch_code");
-      if (error) throw error;
-      return data as SourceBatch[];
+      return await unwrap(
+        dynamicFrom(supabase, "batches_with_brew_info")
+          .select("id, batch_code, name, status, volume_bbl, actual_abv, actual_og, actual_fg, recipe_id")
+          .in("status", ["fermenting", "conditioning"])
+          .neq("id", batchId)
+          .order("batch_code")
+      ) as unknown as SourceBatch[];
     },
     enabled: open,
   });
 
   // Fetch existing blends for this batch
-  const { data: existingBlends } = useQuery({
+  const { data: existingBlends } = useQuery<{ source_batch_id: string }[]>({
     queryKey: batchKeys.blends(batchId),
-    queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "batch_blends")
-        .select("source_batch_id")
-        .eq("blend_batch_id", batchId);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () =>
+      (await unwrap(
+        dynamicFrom(supabase, "batch_blends")
+          .select("source_batch_id")
+          .eq("blend_batch_id", batchId)
+      )) as unknown as { source_batch_id: string }[],
     enabled: open,
   });
 
   // Fetch blend info for available volume calculation
-  const { data: blendInfoData } = useQuery({
+  type BlendInfoEntry = { id: string; available_volume_bbl: number; volume_blended_away_bbl: number };
+  const { data: blendInfoData } = useQuery<BlendInfoEntry[]>({
     queryKey: batchKeys.list({ blendInfo: true }),
-    queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "batches_with_blend_info")
-        .select("id, available_volume_bbl, volume_blended_away_bbl");
-      if (error) throw error;
-      return data as { id: string; available_volume_bbl: number; volume_blended_away_bbl: number }[];
-    },
+    queryFn: async () =>
+      (await unwrap(
+        dynamicFrom(supabase, "batches_with_blend_info")
+          .select("id, available_volume_bbl, volume_blended_away_bbl")
+      )) as unknown as BlendInfoEntry[],
     enabled: open,
   });
 
@@ -238,8 +238,7 @@ export function BatchBlendDialog({
         notes: globalNotes || null,
       }));
 
-      const { error } = await dynamicFrom(supabase, "batch_blends").insert(records);
-      if (error) throw error;
+      await unwrap(dynamicFrom(supabase, "batch_blends").insert(records));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });

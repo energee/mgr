@@ -21,6 +21,7 @@ import { NextStepBanner } from "@/components/domain/shared/next-step-banner";
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { Button } from "@/components/ui/button";
 import { brewLogKeys, entityKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 export default function BrewLogDetailPage({
   params,
@@ -39,13 +40,13 @@ export default function BrewLogDetailPage({
   const { data: brewLog } = useQuery({
     queryKey: brewLogKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brew_logs")
-        .select("id, brew_number, status, events")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("brew_logs")
+          .select("id, brew_number, status, events")
+          .eq("id", id)
+          .single()
+      ) as unknown as { id: string; brew_number: string; status: string; events: unknown[] };
     },
   });
 
@@ -53,11 +54,12 @@ export default function BrewLogDetailPage({
   const { data: linkedBatches } = useQuery({
     queryKey: brewLogKeys.batches(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brew_log_batches")
-        .select("batch_id, batch:batches(batch_code, recipe_id, recipe:recipes(name))")
-        .eq("brew_log_id", id);
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("brew_log_batches")
+          .select("batch_id, batch:batches(batch_code, recipe_id, recipe:recipes(name))")
+          .eq("brew_log_id", id)
+      );
       return (data ?? []) as Array<{
         batch_id: string;
         batch: {

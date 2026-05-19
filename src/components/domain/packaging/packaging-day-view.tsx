@@ -30,6 +30,7 @@ import {
 import { Trash2, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { entityKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   useSessionLineItems,
   useLineItemMutations,
@@ -68,13 +69,13 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
     queryKey: entityKeys.detail("packaging_sessions", sessionId),
     queryFn: async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("packaging_sessions")
-        .select("id, session_date, status, notes")
-        .eq("id", sessionId)
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("packaging_sessions")
+          .select("id, session_date, status, notes")
+          .eq("id", sessionId)
+          .single(),
+      ) as { id: string; session_date: string; status: string; notes: string | null } | null;
     },
   });
 

@@ -21,7 +21,7 @@ import Link from "next/link";
 import { useMemo, useState, useCallback, type ReactNode } from "react";
 import type { EntityConfig, EntityColumnDef } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { formatValue } from "@/lib/utils";
+import { formatValue } from "@/lib/format";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { Button } from "@/components/ui/button";
 import { Search, Inbox, ChevronDown } from "lucide-react";

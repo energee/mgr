@@ -24,6 +24,7 @@ import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
 import { inventoryService, type ExpiringLot } from "@/services/inventory-service";
 import { Skeleton } from "@/components/ui/skeleton";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -77,11 +78,11 @@ export default function InventoryDashboardPage() {
   const { data: lowStockItems = [] } = useQuery({
     queryKey: dashboardKeys.lowStock(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "inventory_low_stock_items")
-        .select("id, name, category, unit, reorder_point, current_qty")
-        .order("name");
-
-      if (error) throw error;
+      const data = await unwrap(
+        dynamicFrom(supabase, "inventory_low_stock_items")
+          .select("id, name, category, unit, reorder_point, current_qty")
+          .order("name")
+      ) as unknown as LowStockItem[];
 
       return (data || []).map((item: LowStockItem) => ({
         ...item,
@@ -114,11 +115,10 @@ export default function InventoryDashboardPage() {
   const { data: inventorySummary = [] } = useQuery({
     queryKey: dashboardKeys.inventorySummary(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "inventory_summary_by_category")
-        .select("category, item_count, total_value");
-
-      if (error) throw error;
-      return (data || []) as InventorySummary[];
+      return await unwrap(
+        dynamicFrom(supabase, "inventory_summary_by_category")
+          .select("category, item_count, total_value")
+      ) as unknown as InventorySummary[];
     },
     refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,

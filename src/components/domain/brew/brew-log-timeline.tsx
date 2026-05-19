@@ -11,6 +11,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { brewLogKeys, entityKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { BrewEventTimeline } from "./brew-event-timeline";
 import type { BrewEvent } from "@/entities/brew-log";
 import type { Database } from "@/types/supabase";
@@ -63,12 +64,12 @@ export function BrewLogTimeline({ data, actionTrigger }: BrewLogTimelineProps) {
   // Mutation for updating events with optimistic updates
   const updateEventsMutation = useMutation({
     mutationFn: async (newEvents: BrewEvent[]) => {
-      const { error } = await supabase
-        .from("brew_logs")
-        .update({ events: newEvents })
-        .eq("id", data.id);
-
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("brew_logs")
+          .update({ events: newEvents })
+          .eq("id", data.id)
+      );
     },
     onSuccess: () => {
       // Refetch to ensure server state is canonical

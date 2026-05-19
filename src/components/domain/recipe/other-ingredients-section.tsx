@@ -48,6 +48,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 import { Plus, Trash2, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -254,13 +255,13 @@ function AdjunctsTab({
   const { data: fetched, isLoading } = useQuery({
     queryKey: recipeKeys.adjuncts(recipeId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_adjuncts")
-        .select("id, adjunct_id, weight_lbs, timing, notes, position, adjuncts (id, name, type, potential_ppg)")
-        .eq("recipe_id", recipeId)
-        .order("position", { ascending: true });
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("recipe_adjuncts")
+          .select("id, adjunct_id, weight_lbs, timing, notes, position, adjuncts (id, name, type, potential_ppg)")
+          .eq("recipe_id", recipeId)
+          .order("position", { ascending: true })
+      );
     },
   });
 
@@ -283,23 +284,25 @@ function AdjunctsTab({
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error: del } = await supabase
-        .from("recipe_adjuncts")
-        .delete()
-        .eq("recipe_id", recipeId);
-      if (del) throw del;
+      await unwrap(
+        supabase
+          .from("recipe_adjuncts")
+          .delete()
+          .eq("recipe_id", recipeId)
+      );
       if (items.length > 0) {
-        const { error: ins } = await supabase.from("recipe_adjuncts").insert(
-          items.map((item, i) => ({
-            recipe_id: recipeId,
-            adjunct_id: item.adjunct_id,
-            weight_lbs: item.weight_lbs,
-            timing: item.timing,
-            notes: item.notes,
-            position: i,
-          }))
+        await unwrap(
+          supabase.from("recipe_adjuncts").insert(
+            items.map((item, i) => ({
+              recipe_id: recipeId,
+              adjunct_id: item.adjunct_id,
+              weight_lbs: item.weight_lbs,
+              timing: item.timing,
+              notes: item.notes,
+              position: i,
+            }))
+          )
         );
-        if (ins) throw ins;
       }
     },
     onSuccess: () => {
@@ -474,13 +477,13 @@ function SugarsTab({
   const { data: fetched, isLoading } = useQuery({
     queryKey: recipeKeys.sugars(recipeId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_sugars")
-        .select("id, sugar_id, weight_lbs, timing, notes, position, sugars (id, name, type)")
-        .eq("recipe_id", recipeId)
-        .order("position", { ascending: true });
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("recipe_sugars")
+          .select("id, sugar_id, weight_lbs, timing, notes, position, sugars (id, name, type)")
+          .eq("recipe_id", recipeId)
+          .order("position", { ascending: true })
+      );
     },
   });
 
@@ -503,23 +506,25 @@ function SugarsTab({
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error: del } = await supabase
-        .from("recipe_sugars")
-        .delete()
-        .eq("recipe_id", recipeId);
-      if (del) throw del;
+      await unwrap(
+        supabase
+          .from("recipe_sugars")
+          .delete()
+          .eq("recipe_id", recipeId)
+      );
       if (items.length > 0) {
-        const { error: ins } = await supabase.from("recipe_sugars").insert(
-          items.map((item, i) => ({
-            recipe_id: recipeId,
-            sugar_id: item.sugar_id,
-            weight_lbs: item.weight_lbs,
-            timing: item.timing,
-            notes: item.notes,
-            position: i,
-          }))
+        await unwrap(
+          supabase.from("recipe_sugars").insert(
+            items.map((item, i) => ({
+              recipe_id: recipeId,
+              sugar_id: item.sugar_id,
+              weight_lbs: item.weight_lbs,
+              timing: item.timing,
+              notes: item.notes,
+              position: i,
+            }))
+          )
         );
-        if (ins) throw ins;
       }
     },
     onSuccess: () => {
@@ -694,13 +699,13 @@ function SpicesTab({
   const { data: fetched, isLoading } = useQuery({
     queryKey: recipeKeys.spices(recipeId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_spices")
-        .select("id, spice_id, amount, unit, timing, boil_time_min, notes, position, spices (id, name, type)")
-        .eq("recipe_id", recipeId)
-        .order("position", { ascending: true });
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("recipe_spices")
+          .select("id, spice_id, amount, unit, timing, boil_time_min, notes, position, spices (id, name, type)")
+          .eq("recipe_id", recipeId)
+          .order("position", { ascending: true })
+      );
     },
   });
 
@@ -725,25 +730,27 @@ function SpicesTab({
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error: del } = await supabase
-        .from("recipe_spices")
-        .delete()
-        .eq("recipe_id", recipeId);
-      if (del) throw del;
+      await unwrap(
+        supabase
+          .from("recipe_spices")
+          .delete()
+          .eq("recipe_id", recipeId)
+      );
       if (items.length > 0) {
-        const { error: ins } = await supabase.from("recipe_spices").insert(
-          items.map((item, i) => ({
-            recipe_id: recipeId,
-            spice_id: item.spice_id,
-            amount: item.amount,
-            unit: item.unit,
-            timing: item.timing,
-            boil_time_min: item.boil_time_min,
-            notes: item.notes,
-            position: i,
-          }))
+        await unwrap(
+          supabase.from("recipe_spices").insert(
+            items.map((item, i) => ({
+              recipe_id: recipeId,
+              spice_id: item.spice_id,
+              amount: item.amount,
+              unit: item.unit,
+              timing: item.timing,
+              boil_time_min: item.boil_time_min,
+              notes: item.notes,
+              position: i,
+            }))
+          )
         );
-        if (ins) throw ins;
       }
     },
     onSuccess: () => {
@@ -951,13 +958,13 @@ function FruitsTab({
   const { data: fetched, isLoading } = useQuery({
     queryKey: recipeKeys.fruits(recipeId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_fruits")
-        .select("id, fruit_id, amount, unit, timing, notes, position, fruits (id, name, type, form)")
-        .eq("recipe_id", recipeId)
-        .order("position", { ascending: true });
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("recipe_fruits")
+          .select("id, fruit_id, amount, unit, timing, notes, position, fruits (id, name, type, form)")
+          .eq("recipe_id", recipeId)
+          .order("position", { ascending: true })
+      );
     },
   });
 
@@ -981,24 +988,26 @@ function FruitsTab({
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error: del } = await supabase
-        .from("recipe_fruits")
-        .delete()
-        .eq("recipe_id", recipeId);
-      if (del) throw del;
+      await unwrap(
+        supabase
+          .from("recipe_fruits")
+          .delete()
+          .eq("recipe_id", recipeId)
+      );
       if (items.length > 0) {
-        const { error: ins } = await supabase.from("recipe_fruits").insert(
-          items.map((item, i) => ({
-            recipe_id: recipeId,
-            fruit_id: item.fruit_id,
-            amount: item.amount,
-            unit: item.unit,
-            timing: item.timing,
-            notes: item.notes,
-            position: i,
-          }))
+        await unwrap(
+          supabase.from("recipe_fruits").insert(
+            items.map((item, i) => ({
+              recipe_id: recipeId,
+              fruit_id: item.fruit_id,
+              amount: item.amount,
+              unit: item.unit,
+              timing: item.timing,
+              notes: item.notes,
+              position: i,
+            }))
+          )
         );
-        if (ins) throw ins;
       }
     },
     onSuccess: () => {
