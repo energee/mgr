@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, DM_Mono } from "next/font/google";
-import { Providers } from "@/lib/providers";
+import { Providers } from "@/app/providers";
 import "./globals.css";
 
 // DM Sans: Modern, warm geometric sans-serif with excellent readability

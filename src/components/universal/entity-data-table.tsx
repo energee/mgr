@@ -49,7 +49,7 @@ import {
   buildSupabaseFiltersFromUrl,
   escapePostgrestOrValue,
   REL_KEY_PREFIX,
-} from "@/lib/data-table-adapter";
+} from "@/components/data-table/adapter";
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 import { useKeyboardShortcuts, type KeyboardShortcut } from "@/hooks/use-keyboard-shortcuts";
