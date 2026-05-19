@@ -14,7 +14,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, EntityCore } from "@/types/entity";
 import { entityKeys } from "@/lib/query-keys";
 import {
   type ServiceResult,
@@ -48,7 +48,7 @@ function escapePostgrestValue(value: string): string {
  * Determine which table to read from: viewTable (if available) for computed
  * fields, or the base table.
  */
-function readTable<T>(entity: EntityConfig<T>): string {
+function readTable<T>(entity: EntityCore<T>): string {
   return entity.viewTable ?? entity.table;
 }
 
@@ -84,7 +84,7 @@ export const entityService = {
    */
   async list<T>(
     supabase: SupabaseClient<Database>,
-    entity: EntityConfig<T>,
+    entity: EntityCore<T>,
     options?: ListOptions
   ): Promise<ServiceResult<T[]>> {
     try {
@@ -149,7 +149,7 @@ export const entityService = {
    */
   async getById<T>(
     supabase: SupabaseClient<Database>,
-    entity: EntityConfig<T>,
+    entity: EntityCore<T>,
     id: string
   ): Promise<ServiceResult<T>> {
     try {

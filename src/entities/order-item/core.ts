@@ -48,6 +48,7 @@ export const orderItemCore: EntityCoreInput<OrderItem> = {
   name: "order_item",
   table: "order_items",
   displayName: "Order Item",
+  defaultSort: { column: "created_at", direction: "desc" },
   description: "Line items on a sales order",
   domain: "sales",
 

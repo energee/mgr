@@ -135,6 +135,7 @@ export const poLineItemCore: EntityCoreInput<POLineItem> = {
   table: "po_line_items",
   viewTable: "po_line_items_with_quantities",
   displayName: "PO Line Item",
+  defaultSort: { column: "created_at", direction: "desc" },
   description: "Purchase order line items for ingredients and materials",
   domain: "purchasing",
 

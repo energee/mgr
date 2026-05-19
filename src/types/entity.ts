@@ -188,6 +188,26 @@ export type EntityCoreInput<T = Record<string, unknown>> = Omit<
   Partial<Pick<EntityCore<T>, DefaultableCoreField>>;
 
 /**
+ * Apply the single `EntityCore` default that doesn't depend on the
+ * presentation half (`displayNamePlural` → `${displayName}s`) and return a
+ * complete `EntityCore<T>`. Server-safe: no React imports, no `listColumns`
+ * dependency. Used by both `createEntityConfig` (the React path) and
+ * `src/entities/cores.ts` (the server path that powers the AI chat route).
+ *
+ * `searchableFields` and `defaultSort` are intentionally left as the core
+ * authored them. Both are optional on `EntityCore`; defaulting them here
+ * would change behavior for join-row entities that lack a `name` column
+ * (`order_item`, `po_line_item`, `session_line_item`). The presentation-side
+ * defaults stay in `createEntityConfig` where `listColumns` is available.
+ */
+export function resolveServerCore<T>(core: EntityCoreInput<T>): EntityCore<T> {
+  return {
+    ...core,
+    displayNamePlural: core.displayNamePlural ?? `${core.displayName}s`,
+  };
+}
+
+/**
  * Assemble an EntityConfig from its server-safe core and its presentation half.
  * Every per-entity `index.ts` goes through this single seam. It supplies
  * safe-field defaults (see `DefaultableCoreField`) and weaves any
@@ -216,8 +236,7 @@ export function createEntityConfig<T>(
   );
 
   return {
-    ...core,
-    displayNamePlural: core.displayNamePlural ?? `${core.displayName}s`,
+    ...resolveServerCore(core),
     searchableFields: core.searchableFields ?? (["name"] as (keyof T & string)[]),
     defaultSort:
       core.defaultSort ??

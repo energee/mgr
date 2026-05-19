@@ -58,6 +58,7 @@ export const kegOwnerCore: EntityCoreInput<KegOwner> = {
   name: "keg_owner",
   table: "keg_owners",
   displayName: "Keg Owner",
+  defaultSort: { column: "name", direction: "asc" },
   description: "Fleet providers that own kegs (e.g., Owned, Microstar, KegFleet)",
   domain: "inventory",
 
