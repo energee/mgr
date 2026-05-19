@@ -24,6 +24,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bell,
   Check,
@@ -36,7 +37,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, escapeLike } from "@/lib/utils";
-import { dynamicFrom, dynamicRpc } from "@/services/types";
+import { dynamicFrom } from "@/services/types";
 
 // =============================================================================
 // Types
@@ -167,16 +168,13 @@ export default function NotificationsPage() {
   const totalCount = data?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // Mark as read mutation - uses RPC function for consistency with NotificationsProvider
+  // Mark as read mutation — uses the bulk RPC introduced in migration 00171
+  // (audit F-055). One round trip per click regardless of selection size.
   const markAsReadMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      // Call RPC for each notification (RPC handles single IDs)
-      const results = await Promise.all(
-        ids.map((id) =>
-          dynamicRpc(supabase, "mark_notification_read", { p_notification_id: id })
-        )
-      );
-      const error = results.find((r) => r.error)?.error;
+      const { error } = await supabase.rpc("mark_notifications_read_bulk", {
+        p_notification_ids: ids,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -189,16 +187,12 @@ export default function NotificationsPage() {
     },
   });
 
-  // Dismiss mutation - uses RPC function for consistency with NotificationsProvider
+  // Dismiss mutation — bulk RPC from migration 00171.
   const dismissMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      // Call RPC for each notification (RPC handles single IDs)
-      const results = await Promise.all(
-        ids.map((id) =>
-          dynamicRpc(supabase, "dismiss_notification", { p_notification_id: id })
-        )
-      );
-      const error = results.find((r) => r.error)?.error;
+      const { error } = await supabase.rpc("dismiss_notifications_bulk", {
+        p_notification_ids: ids,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -378,8 +372,27 @@ export default function NotificationsPage() {
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              Loading...
+            /* Audit F-056: render skeleton rows so the page rhythm matches
+                the rest of the app (entity tables, dashboards) instead of
+                a bare "Loading..." string. Each row matches the real row's
+                ~64px height (p-4 + title + optional message) so the layout
+                does not shift when data arrives. */
+            <div className="divide-y" aria-busy aria-label="Loading notifications">
+              {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-4 p-4 min-h-[64px]"
+                  style={{ animationDelay: `${i * 75}ms` }}
+                >
+                  <Skeleton className="h-4 w-4 rounded-sm mt-1" />
+                  <Skeleton className="h-2 w-2 rounded-full mt-2" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                </div>
+              ))}
             </div>
           ) : error ? (
             <div className="flex items-center justify-center py-12 text-destructive">
