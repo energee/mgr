@@ -12,7 +12,7 @@ import {
   mapSaltAdditionsToItems,
   type WaterProfile,
   type SaltAdditions,
-} from "../water-chemistry";
+} from "\@/domain/water-chemistry";
 
 // =============================================================================
 // calculateSulfateChlorideRatio

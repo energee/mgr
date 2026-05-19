@@ -5,7 +5,7 @@ import {
   convertTemperature,
   formatReadingValue,
   getUnitLabel,
-} from "../batch-readings";
+} from "\@/domain/batch-readings";
 
 describe("validateReading", () => {
   describe("gravity", () => {

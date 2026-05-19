@@ -17,7 +17,7 @@ import {
   getProductDisplayName,
   type OrderDemand,
   type ProductionRequirement,
-} from "@/lib/planning";
+} from "@/domain/planning";
 import { StatsStrip, DashboardSection } from "@/components/dashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

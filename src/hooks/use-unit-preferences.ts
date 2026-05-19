@@ -19,7 +19,7 @@ import type {
   TemperatureUnit,
   GravityUnit,
   RetailVolumeUnit,
-} from "@/lib/units";
+} from "@/domain/units";
 
 // =============================================================================
 // Types

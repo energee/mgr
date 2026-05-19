@@ -26,7 +26,7 @@ import { getStateLabel } from "@/types/entity";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { useGravityUnit } from "@/hooks/use-unit-preferences";
-import { formatGravityFromSg } from "@/lib/units";
+import { formatGravityFromSg } from "@/domain/units";
 
 // =============================================================================
 // Types

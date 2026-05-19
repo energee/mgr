@@ -3,7 +3,7 @@ import {
   isWholeUnit,
   ratioFromDecimal,
   WHOLE_UNIT_VALUES,
-} from "../inventory-units";
+} from "\@/domain/inventory-units";
 
 describe("isWholeUnit", () => {
   it("returns true for 'each' and 'case'", () => {

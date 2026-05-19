@@ -18,7 +18,7 @@ import {
   getLandedCostSummary,
   formatLandedCost,
   landedCostMarkup,
-} from "@/lib/purchasing/landed-cost";
+} from "@/domain/purchasing/landed-cost";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,

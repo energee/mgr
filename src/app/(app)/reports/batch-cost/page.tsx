@@ -26,7 +26,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { reportKeys } from "@/lib/query-keys";
 import { formatCurrency, formatBbl } from "@/lib/format";
-import { fetchBatchIngredientDetail } from "@/lib/report-utils";
+import { fetchBatchIngredientDetail } from "@/domain/report-utils";
 import {
   Card,
   CardContent,

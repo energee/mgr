@@ -37,7 +37,7 @@ import {
   analyzeStyleCompliance,
   getRecipeSuggestions,
   type ParameterAnalysis,
-} from "@/lib/ai/recipe-analyzer";
+} from "@/domain/ai/recipe-analyzer";
 import { createClient } from "@/lib/supabase/client";
 import { recipeKeys } from "@/lib/query-keys";
 

@@ -29,14 +29,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import type { BatchReading } from "@/lib/batch-readings";
-import { convertGravity } from "@/lib/batch-readings";
+import type { BatchReading } from "@/domain/batch-readings";
+import { convertGravity } from "@/domain/batch-readings";
 import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import {
   platoToSg,
   convertTemperature,
   UNIT_LABELS,
-} from "@/lib/units";
+} from "@/domain/units";
 
 // =============================================================================
 // Types

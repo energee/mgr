@@ -23,13 +23,13 @@ import {
   calculateIngredientShortfalls,
   calculateIngredientDemand,
   getCatalogTypeDisplay,
-} from "@/lib/purchasing/demand-calculator";
-import type { IngredientShortfall } from "@/lib/purchasing/demand-calculator";
+} from "@/domain/purchasing/demand-calculator";
+import type { IngredientShortfall } from "@/domain/purchasing/demand-calculator";
 import {
   groupShortfallsBySupplier,
   createDraftPO,
-} from "@/lib/purchasing/po-generator";
-import type { PODraft } from "@/lib/purchasing/po-generator";
+} from "@/domain/purchasing/po-generator";
+import type { PODraft } from "@/domain/purchasing/po-generator";
 import { Button } from "@/components/ui/button";
 import {
   Select,

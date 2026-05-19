@@ -13,7 +13,7 @@ import {
   type GravityUnit,
   type TemperatureUnit,
   type VolumeUnit,
-} from "@/lib/units";
+} from "@/domain/units";
 
 export type BrewMeasurementHighlight = {
   label: string;

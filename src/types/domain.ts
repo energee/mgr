@@ -9,7 +9,7 @@
  */
 
 // Re-export batch reading types from the readings library
-export type { BatchReading, ReadingType } from "@/lib/batch-readings";
+export type { BatchReading, ReadingType } from "@/domain/batch-readings";
 
 /**
  * A single event in a brew log's `events` JSON column.

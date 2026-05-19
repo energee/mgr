@@ -6,7 +6,7 @@
  */
 
 import { formatBbl } from "@/lib/format";
-import { getTaxClassLabel } from "@/lib/ttb-utils";
+import { getTaxClassLabel } from "@/domain/ttb-utils";
 
 // =============================================================================
 // CSV Export
@@ -197,7 +197,7 @@ function createDataRow(
   return row;
 }
 
-// getTaxClassLabel imported from @/lib/ttb-utils
+// getTaxClassLabel imported from @/domain/ttb-utils
 
 /**
  * Export batch details to CSV

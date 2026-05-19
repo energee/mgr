@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { useWeightUnit } from "@/hooks/use-unit-preferences";
-import { formatWeight } from "@/lib/units";
+import { formatWeight } from "@/domain/units";
 import { Plus, Trash2, GripVertical, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";

@@ -11,7 +11,7 @@ import {
   shouldReplaceYeast,
   estimateHarvestVolume,
   estimatePostHarvestViability,
-} from "../yeast-calculations";
+} from "\@/domain/yeast-calculations";
 
 // =============================================================================
 // Viability Decay
