@@ -10,8 +10,8 @@ import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
-import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
+import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
+import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
 
 type PurchaseOrder = Database["public"]["Tables"]["purchase_orders"]["Row"];
 

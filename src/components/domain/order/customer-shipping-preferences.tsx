@@ -8,7 +8,7 @@
  */
 
 import { materialPlanningKeys } from "@/lib/query-keys";
-import { ShippingMaterialRolesEditor } from "./shipping-material-roles-editor";
+import { ShippingMaterialRolesEditor } from "@/components/domain/packaging/shipping-material-roles-editor";
 
 type CustomerShippingPreferencesProps = {
   customerId: string;

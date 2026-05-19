@@ -10,9 +10,9 @@ import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
 import { valuesAsOptions, getValueDisplay } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
-import { CustomerShippingPreferences } from "@/components/domain/customer-shipping-preferences";
-import { CustomerPalletConfigs } from "@/components/domain/customer-pallet-configs";
+import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { CustomerShippingPreferences } from "@/components/domain/order/customer-shipping-preferences";
+import { CustomerPalletConfigs } from "@/components/domain/order/customer-pallet-configs";
 
 // =============================================================================
 // Section Component Wrappers

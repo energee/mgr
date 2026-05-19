@@ -60,7 +60,7 @@ import {
 } from "lucide-react";
 import type { ProductionShortfall } from "@/types/planning";
 import { dynamicRpc } from "@/services/types";
-import { CreateBatchFromShortfall } from "@/components/domain/create-batch-from-shortfall";
+import { CreateBatchFromShortfall } from "@/components/domain/purchasing/create-batch-from-shortfall";
 
 // =============================================================================
 // Types

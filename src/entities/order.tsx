@@ -10,12 +10,12 @@ import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
-import { OrderQuickLinks } from "@/components/domain/order-quick-links";
-import { OrderItemsEditor } from "@/components/domain/order-items-editor";
-import { ChangeRequestReview } from "@/components/domain/change-request-review";
-import { createQBOSyncDisplay } from "@/components/domain/qbo-sync-section";
-import { OrderShippingMaterialsEditor } from "@/components/domain/order-shipping-materials-editor";
+import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
+import { OrderQuickLinks } from "@/components/domain/order/order-quick-links";
+import { OrderItemsEditor } from "@/components/domain/order/order-items-editor";
+import { ChangeRequestReview } from "@/components/domain/order/change-request-review";
+import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { OrderShippingMaterialsEditor } from "@/components/domain/order/order-shipping-materials-editor";
 
 // Wrapper component to adapt OrderItemsEditor to relation component interface
 function OrderItemsRelation({ parentId, data }: { parentId: string; data?: Record<string, unknown> }) {

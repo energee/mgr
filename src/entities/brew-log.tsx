@@ -13,10 +13,10 @@ import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { BrewLogTimeline } from "@/components/domain/brew-log-timeline";
-import { BrewEventTimelineActions } from "@/components/domain/brew-event-timeline";
-import { BrewLogSplitOverview } from "@/components/domain/brew-log-split-overview";
-import { createRevisionHistoryDisplay } from "@/components/domain/revision-history-display";
+import { BrewLogTimeline } from "@/components/domain/brew/brew-log-timeline";
+import { BrewEventTimelineActions } from "@/components/domain/brew/brew-event-timeline";
+import { BrewLogSplitOverview } from "@/components/domain/brew/brew-log-split-overview";
+import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
 
 // Use generated type from Supabase (will need regeneration after migration)
 type BrewLog = Database["public"]["Tables"]["brew_logs"]["Row"];

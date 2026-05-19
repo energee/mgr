@@ -14,7 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { packagingSessionEntity } from "@/entities/packaging-session";
-import { PackagingDayView } from "@/components/domain/packaging-day-view";
+import { PackagingDayView } from "@/components/domain/packaging/packaging-day-view";
 import { entityKeys } from "@/lib/query-keys";
 import { Loader2 } from "lucide-react";
 

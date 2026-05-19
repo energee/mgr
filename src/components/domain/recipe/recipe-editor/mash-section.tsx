@@ -15,7 +15,7 @@ import { recipeKeys, entityKeys } from "@/lib/query-keys";
 import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
-import { MashScheduleEditor, type MashStep } from "@/components/domain/mash-schedule-editor";
+import { MashScheduleEditor, type MashStep } from "@/components/domain/recipe/mash-schedule-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UnitInput } from "@/components/ui/unit-input";

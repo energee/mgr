@@ -10,7 +10,7 @@
 import { use, useCallback, useState } from "react";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { locationTransferEntity } from "@/entities/location-transfer";
-import { ShipTransferDialog } from "@/components/domain/ship-transfer-dialog";
+import { ShipTransferDialog } from "@/components/domain/batch/ship-transfer-dialog";
 
 export default function TransferDetailPage({
   params,

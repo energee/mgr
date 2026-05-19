@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
-import { KegOwnerDepositsEditor } from "@/components/domain/keg-owner-deposits-editor";
+import { KegOwnerDepositsEditor } from "@/components/domain/inventory/keg-owner-deposits-editor";
 
 // =============================================================================
 // Types

@@ -11,7 +11,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys } from "@/lib/query-keys";
-import { BrewLogLinker } from "./brew-log-linker";
+import { BrewLogLinker } from "@/components/domain/brew/brew-log-linker";
 import { Badge } from "@/components/ui/badge";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { extractBrewMeasurements } from "@/domain/brew-events";

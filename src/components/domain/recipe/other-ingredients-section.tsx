@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useRegisterSaver } from "@/components/domain/recipe-editor/recipe-editor-context";
+import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 import { Plus, Trash2, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 

@@ -16,8 +16,8 @@ import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { SessionLineItemsDisplay } from "@/components/domain/session-line-items-display";
-import { PackagingSessionMaterialsSection } from "@/components/domain/packaging-session-materials";
+import { SessionLineItemsDisplay } from "@/components/domain/packaging/session-line-items-display";
+import { PackagingSessionMaterialsSection } from "@/components/domain/packaging/packaging-session-materials";
 
 type PackagingSessionTable = Database["public"]["Tables"]["packaging_sessions"]["Row"];
 

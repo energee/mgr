@@ -25,7 +25,7 @@ import { WhirlpoolSection } from "./whirlpool-section";
 import { KnockoutSection } from "./knockout-section";
 import { FermentationSection } from "./fermentation-section";
 import { RecipeSidebar } from "./recipe-sidebar";
-import { RecipeCloneDialog } from "@/components/domain/recipe-clone-dialog";
+import { RecipeCloneDialog } from "@/components/domain/recipe/recipe-clone-dialog";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -14,8 +14,8 @@ import { useRouter } from "next/navigation";
 import { EntityList } from "@/components/universal/entity-list";
 import { batchEntity } from "@/entities/batch";
 import { batchKeys } from "@/lib/query-keys";
-import { BatchCancellationDialog } from "@/components/domain/batch-cancellation-dialog";
-import { StartBrewDayDialog } from "@/components/domain/start-brew-day-dialog";
+import { BatchCancellationDialog } from "@/components/domain/batch/batch-cancellation-dialog";
+import { StartBrewDayDialog } from "@/components/domain/brew/start-brew-day-dialog";
 
 type BatchRecord = {
   id: string;

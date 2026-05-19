@@ -40,8 +40,8 @@ import {
 } from "@/components/ui/select";
 import { RefreshCw, Loader2, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
-import { SupplierGroupCard } from "@/components/domain/supplier-group-card";
-import { UnassignedShortfallsCard } from "@/components/domain/unassigned-shortfalls-card";
+import { SupplierGroupCard } from "@/components/domain/purchasing/supplier-group-card";
+import { UnassignedShortfallsCard } from "@/components/domain/purchasing/unassigned-shortfalls-card";
 import { StatsStrip, DashboardSection, DashboardEmpty } from "@/components/dashboard";
 
 // =============================================================================

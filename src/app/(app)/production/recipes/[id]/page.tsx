@@ -9,7 +9,7 @@
 "use client";
 
 import { use } from "react";
-import { RecipeEditorPage } from "@/components/domain/recipe-editor/recipe-editor-page";
+import { RecipeEditorPage } from "@/components/domain/recipe/recipe-editor/recipe-editor-page";
 
 export default function RecipeDetailPage({
   params,

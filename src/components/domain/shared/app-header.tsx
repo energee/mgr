@@ -24,8 +24,8 @@ import { AnimatedUser, AnimatedSettings, AnimatedLogOut } from "@/components/ico
 import type { AnimatedIconHandle } from "@/components/icons/animated";
 import { useRef } from "react";
 import { toast } from "sonner";
-import { NotificationBell } from "@/components/domain/notification-bell";
-import { ChatToggle } from "@/components/domain/chat-toggle";
+import { NotificationBell } from "@/components/domain/shared/notification-bell";
+import { ChatToggle } from "@/components/domain/shared/chat-toggle";
 import { SafeSvg } from "@/components/ui/safe-svg";
 import { Sun, Moon } from "lucide-react";
 

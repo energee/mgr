@@ -11,7 +11,7 @@ import { z } from "zod";
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { PickListItems } from "@/components/domain/pick-list-items";
+import { PickListItems } from "@/components/domain/order/pick-list-items";
 
 // =============================================================================
 // Types

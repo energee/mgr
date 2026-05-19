@@ -10,7 +10,7 @@
 import dynamic from "next/dynamic";
 
 const ChatPanel = dynamic(
-  () => import("@/components/domain/chat-panel").then((m) => m.ChatPanel),
+  () => import("@/components/domain/shared/chat-panel").then((m) => m.ChatPanel),
   { ssr: false }
 );
 

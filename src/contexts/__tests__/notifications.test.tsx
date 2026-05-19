@@ -27,7 +27,7 @@ import { createRoot } from "react-dom/client";
 const NOTIFICATIONS_SRC = resolve(__dirname, "../notifications.tsx");
 const APP_PROVIDERS_SRC = resolve(
   __dirname,
-  "../../components/domain/app-providers.tsx"
+  "../../components/domain/shared/app-providers.tsx"
 );
 
 // ---------------------------------------------------------------------------
