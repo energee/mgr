@@ -1,4 +1,4 @@
-# MGR Simplification & White-Label Readiness — Design Spec
+# MGR Simplification — Design Spec
 
 **Date:** 2026-05-19
 **Status:** Draft — awaiting user review
@@ -13,36 +13,25 @@ TypeScript). At the start of this effort it was ~139k LOC across 737 TS/TSX file
 (~129k hand-written, excluding the 9,950-line generated `src/types/supabase.ts`),
 40 entities, 151 migrations.
 
-The user asked for three things:
+The user asked for two things:
 
 1. **Meaningfully reduce lines of code** — eliminate unnecessary logic, duplication,
    and reinvention while keeping functionality stable.
-2. **Make the codebase usable by multiple organizations.**
-3. **Let the AI/voice chat interact with every entity the same way the forms do** —
+2. **Let the AI/voice chat interact with every entity the same way the forms do** —
    create/update entities through chat without reinventing the form interface.
+
+Multi-organization support is **not** in scope: the app is deployed one
+organization per deployment, and that model is already adequate. No tenancy,
+`org_id`, or RLS work is planned.
 
 ## 2. Key framing decisions (already made with the user)
 
 - **Deliverable model:** Analysis → plan → execute, in reviewable phases.
 - **Risk tolerance:** Aggressive — architecture and dependency changes are in scope.
-- **Tenancy model: one deployment per organization (white-label).** Each org gets
-  its own deployment and its own Supabase project. "Multi-org" therefore means
-  *configurability and brand-ability per deployment* — **not** shared-DB SaaS
-  multi-tenancy. This is decisive: it removes a 12–15 week tenancy re-introduction
-  (no `org_id` columns, no RLS rewrite) and makes the multi-org goal *align* with
-  simplification instead of fighting it.
 - **Sequencing:** Approach A — low-risk, high-LOC wins first; the entity-system
   refactor (highest risk) is backloaded behind a solid verification baseline.
 
-### 2.1 The multi-tenant history
-
-The codebase **was** multi-tenant and the team deliberately removed it:
-`supabase/migrations/00002_single_tenant.sql` dropped the `breweries` and
-`user_breweries` tables and replaced them with singleton settings rows (hardcoded
-UUID `00000000-0000-0000-0000-000000000001`). The white-label model embraces that
-single-tenant decision rather than reversing it.
-
-## 3. Survey findings (five parallel read-only surveys)
+## 3. Survey findings (parallel read-only surveys)
 
 | Area | Finding | LOC opportunity |
 |---|---|---|
@@ -50,12 +39,11 @@ single-tenant decision rather than reversing it.
 | Entity system | 40 configs, ~73% boilerplate; "universal" components are genuinely clean (near-zero entity special-casing); a `_schema_registry` table already exists | 4,000–8,000 |
 | Reports | Heavy client-side aggregation that belongs in SQL; repeated report scaffolding | 950–1,600 |
 | AI chat & integrations | `tools.ts` search tools repeat a query+schema+error pattern ~8×; `entity-map.ts` duplicates ~38 entity definitions; QBO sync functions repeat a 6-step pattern | 800–1,200 |
-| Multi-org | App is committed to single-tenant; for white-label the per-org config surface is *already* mostly in singleton DB tables (settings, system_settings, square_settings, branding, TTB permits, pricing) | n/a (audit, not LOC) |
 
 ### 3.1 The convergence
 
 The single most valuable refactor — splitting entity configs into a **server-safe
-core** and a **client-only presentation layer** — pays off three times:
+core** and a **client-only presentation layer** — pays off twice:
 
 1. **Kills duplication.** `src/app/api/chat/entity-map.ts` (412 LOC) exists *only*
    because `src/entities/*.tsx` are React modules that cannot be imported
@@ -66,8 +54,6 @@ core** and a **client-only presentation layer** — pays off three times:
    `updateEntity` / `transitionEntity` tool — driven by `core[name].formSchema` —
    replaces every hand-coded write tool and covers all 40 entities. Forms and chat
    then share **one** validation contract.
-3. **Creates the white-label seam.** The core/defaults layer is the natural place
-   to inject per-deployment theming and configuration.
 
 ## 4. Guiding principles
 
@@ -78,7 +64,7 @@ core** and a **client-only presentation layer** — pays off three times:
 3. **Each phase is independently shippable** — its own plan, its own PR(s), its own
    merge. Work can stop after any phase.
 4. **Convergence over addition.** The entity refactor is the hinge — one piece of
-   work, three payoffs (§3.1).
+   work, two payoffs (§3.1).
 5. **knip is the dead-code authority.** A `knip.json` is now committed; future
    dead-code passes run `bun run knip`.
 
@@ -89,9 +75,9 @@ core** and a **client-only presentation layer** — pays off three times:
 | 0 | Verification baseline + dead-code removal | low | **−7,700 (done)** | safety net |
 | 1 | Shared data-access helpers | low–med | −700 to −1,500 | — |
 | 2 | Reports consolidation | low–med | −950 to −1,600 | — |
-| 3 | Entity config core/presentation split | med–high | −4,000 to −6,000 | Phases 4 & 5 |
+| 3 | Entity config core/presentation split | med–high | −4,000 to −6,000 | Phase 4 |
 | 4 | Generic AI entity tools + write safety | med | −300 to −500 net | AI/voice CRUD |
-| 5 | White-label hardening + integrations cleanup | low–med | −400 to −800 | per-org deploys |
+| 5 | Integrations cleanup | low–med | −400 to −800 | — |
 
 Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
 
@@ -172,33 +158,32 @@ Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
   user decisions.
 - **Decisions required:** the write-authorization model; the confirmation UX.
 
-### Phase 5 — White-label hardening + integrations cleanup
+### Phase 5 — Integrations cleanup
 
-- **Goal:** a fresh deployment can be stood up cleanly for a new organization.
+- **Goal:** collapse repetition in the third-party integration code.
 - **Approach:**
-  - Audit hardcoded single-org assumptions: hardcoded UUIDs
-    (`…0001`, `…0002`), branding, env-coupled config.
-  - Ensure a clean bootstrap/seed path for a new deployment; document it.
-  - Centralize per-org config access (theming seam from Phase 3).
-  - Integrations cleanup: QBO `syncEntity` factory (~200 LOC), consolidate the
-    MongoDB/QBO sync-log helpers, audit the Square integration for dead code.
+  - QBO `syncEntity` factory — the `syncBill` / `syncCustomer` / `syncInvoice` /
+    `syncSupplier` functions repeat a 6-step fetch→validate→build→call→log pattern
+    (~200 LOC).
+  - Consolidate the duplicated MongoDB / QBO sync-log helpers.
+  - Audit the Square integration for dead/incomplete code (`square/inventory.ts`,
+    `square/pricing.ts`).
 - **Risk:** low–med.
-- **Decision required:** what is genuinely per-org configurable vs build-time fixed.
 
 ## 6. Verification strategy
 
 - **Gate for every commit:** `bun run typecheck`, `bun run test`, `bun run lint`
   all green.
 - **Additional gate for phases that touch routes or the build:** `bun run build`.
-- **Phase 2/5 migrations:** applied and verified in the worktree only — never on
+- **Phase 2 migrations:** applied and verified in the worktree only — never on
   `main` (per repo policy).
 - **Phase 3:** per-entity verification; pilot entities first.
 - **Phase 4:** explicit tests for permission denial and the confirmation gate.
 
 ## 7. Out of scope / explicitly deferred
 
-- Shared-DB SaaS multi-tenancy (`org_id` columns, RLS rewrite) — excluded by the
-  white-label decision.
+- Multi-organization / multi-tenancy — the app is one-org-per-deployment and that
+  is sufficient.
 - Removing the 293 knip-flagged unused *exports* — needs case-by-case review;
   many are intentional public API.
 - `formatDate` consolidation — the 6 local definitions differ in output (year vs
@@ -217,9 +202,8 @@ per-phase planning.
 
 ## 9. Open decisions for the user
 
-1. Approve the 6-phase roadmap and ordering.
+1. Approve the 5-remaining-phase roadmap and ordering.
 2. Phase 2: which report aggregations move into SQL.
 3. Phase 3: sign off on the `EntityCore` / `EntityPresentation` type boundary.
 4. Phase 4: the AI write-authorization model and confirmation UX.
-5. Phase 5: the per-org configuration surface.
-6. `formatDate`: the standard date format and null placeholder (§7).
+5. `formatDate`: the standard date format and null placeholder (§7).
