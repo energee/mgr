@@ -162,9 +162,9 @@ Entities keep only what differs from the defaults.
   client-only helpers — audit during the pilot.
 - Estimated reduction: 4,000–6,000 LOC (including the 412-LOC `entity-map.ts`).
 
-### 3.6 Open questions for the user
+### 3.6 Resolved
 
-- Per-entity directory (`src/entities/<name>/`) vs a flatter
-  `<name>.core.ts` / `<name>.tsx` pair. Directory is cleaner; the flat form is a
-  smaller diff. (Recommendation: directory.)
-- Whether to remove the deprecated `EntityConfig` fields now or after Phase 3.
+- **File layout:** per-entity directory `src/entities/<name>/` with
+  `core.ts` / `presentation.tsx` / `index.ts` (spec §9.3).
+- **Deprecated `EntityConfig` fields:** removed *after* Phase 3 (step 6 above),
+  not during the split.

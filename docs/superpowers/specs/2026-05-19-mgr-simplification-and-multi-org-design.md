@@ -1,7 +1,7 @@
 # MGR Simplification — Design Spec
 
 **Date:** 2026-05-19
-**Status:** Draft — awaiting user review
+**Status:** Approved — decisions resolved (§9); ready for per-phase planning
 **Branch:** `refactor/simplify-phase-0-1`
 
 ---
@@ -28,8 +28,9 @@ organization per deployment, and that model is already adequate. No tenancy,
 
 - **Deliverable model:** Analysis → plan → execute, in reviewable phases.
 - **Risk tolerance:** Aggressive — architecture and dependency changes are in scope.
-- **Sequencing:** Approach A — low-risk, high-LOC wins first; the entity-system
-  refactor (highest risk) is backloaded behind a solid verification baseline.
+- **Sequencing:** **AI-first** — Phase 1 ships first (quick + safe), then the entity
+  refactor and generic AI tools (the user's priority), then reports and
+  integrations. Execution order is **0 → 1 → 3 → 4 → 2 → 5** (§5).
 
 ## 3. Survey findings (parallel read-only surveys)
 
@@ -70,13 +71,15 @@ core** and a **client-only presentation layer** — pays off twice:
 
 ## 5. The phased roadmap
 
+**Execution order: 0 → 1 → 3 → 4 → 2 → 5** (AI-first — per decision §9.1).
+
 | Phase | Name | Risk | Est. LOC Δ | Unlocks |
 |---|---|---|---|---|
 | 0 | Verification baseline + dead-code removal | low | **−7,700 (done)** | safety net |
 | 1 | Shared data-access helpers | low–med | −700 to −1,500 | — |
-| 2 | Reports consolidation | low–med | −950 to −1,600 | — |
 | 3 | Entity config core/presentation split | med–high | −4,000 to −6,000 | Phase 4 |
 | 4 | Generic AI entity tools + write safety | med | −300 to −500 net | AI/voice CRUD |
+| 2 | Reports consolidation | low–med | −950 to −1,600 | — |
 | 5 | Integrations cleanup | low–med | −400 to −800 | — |
 
 Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
@@ -90,8 +93,7 @@ Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
 - Added `knip.json` + `knip` script so dead-code detection is reliable.
 - **Not done autonomously, deferred to review:** 293 unused *exports* (too granular
   to remove unreviewed — many are intentional public API surface); `formatDate`
-  consolidation (the 6 local definitions produce genuinely different output, so
-  consolidation is not behavior-preserving without a product decision — see §7).
+  consolidation (now resolved — see §7).
 
 ### Phase 1 — Shared data-access helpers
 
@@ -101,25 +103,10 @@ Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
   maybe-variant). Roll out in bounded batches by directory, each batch verified
   green. The transformation is mechanically identical → the test suite is the gate.
 - **Also:** merge the `format.ts` / `utils.ts` `formatValue` overlap; inline
-  single-use hooks (`use-as-ref`, `use-callback-ref`). Each requires a behavior
-  check before landing.
+  single-use hooks (`use-as-ref`, `use-callback-ref`); apply the resolved
+  `formatDate` standard (§7). Each requires a behavior check before landing.
 - **Risk:** low–med. The bulk rollout touches 100+ files — mechanical but broad;
   land it as several small PRs, not one.
-
-### Phase 2 — Reports consolidation
-
-- **Goal:** shrink the four large report pages (`cogs` 1,552, `ttb` 794,
-  `projections` 746, `inventory-valuation` 732 LOC).
-- **Approach:**
-  - Extract a shared report shell: `ReportHeader`, `ReportSummaryCard`,
-    `DateRangeFilter`, `QueryResult` (loading/error/empty wrapper), `useDateRange`.
-  - Move heavy client-side aggregation (COGS by-period, COGS by-SKU, batch costing,
-    proportional cost allocation) into Supabase SQL views / RPC functions.
-- **Risk:** low–med. The shell extraction is purely presentational (low). The SQL
-  migration is medium — the SQL must reproduce the client calculation exactly;
-  needs migrations and verification in the worktree.
-- **Decision required:** which aggregations move server-side (all, or only the
-  heaviest).
 
 ### Phase 3 — Entity config core/presentation split (the keystone)
 
@@ -129,6 +116,9 @@ Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
   - Define `EntityCore` (server-safe, pure data: `table`, `formSchema`, field
     metadata, state machine, relations) and `EntityPresentation` (client-only:
     column renderers, section components, dialogs).
+  - **File layout (resolved §9.3): per-entity directory** —
+    `src/entities/<name>/{core.ts, presentation.tsx, index.ts}`. `index.ts`
+    re-exports the assembled `EntityConfig` so existing callers are unaffected.
   - Add a `createEntityConfig()` helper: smart defaults + per-entity overrides.
     Plain TypeScript — **no build-time codegen** (codegen was considered and
     rejected: it adds a generated layer that is harder to debug for marginal extra
@@ -138,8 +128,6 @@ Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
     then roll out the remaining 37.
 - **Risk:** med–high — touches all 40 entities and the universal components. The
   pilot + per-entity verification contains it.
-- **Decision required:** sign-off on the `EntityCore` / `EntityPresentation` type
-  boundary (a detailed proposal accompanies the Phase 3 plan).
 
 ### Phase 4 — Generic AI entity tools + write safety
 
@@ -149,14 +137,31 @@ Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
   - Generic `createEntity` / `updateEntity` / `transitionEntity` tools driven by
     `EntityCore[name].formSchema`; replace the hand-coded per-entity write tools.
   - Consolidate the ~8 hand-written search tools into a `buildSearchTool()` factory.
-  - **Write safety** — the chat route currently runs with a **service-role client
-    that bypasses RLS** (`src/app/api/chat/route.ts:172`). Generic writes therefore
-    need an explicit application-level layer: (a) per-entity/per-action permission
-    checks, (b) a confirmation gate so a mutation is previewed and confirmed before
-    execution (especially important for voice).
-- **Risk:** med — security-sensitive. The permission model and confirmation UX are
-  user decisions.
-- **Decisions required:** the write-authorization model; the confirmation UX.
+  - **Write safety (resolved §9.4):**
+    - **Authorization:** switch the chat route off the service-role client
+      (`src/app/api/chat/route.ts:172`) to the **user's session**, so RLS enforces
+      writes — plus tool-layer per-entity/per-action permission checks. Defense in
+      depth.
+    - **Confirmation:** **every write is confirmed** — the AI previews the
+      create/update/transition and the user confirms before it executes.
+- **Risk:** med — security-sensitive. Moving the chat route to a user-scoped client
+  must be checked against the existing read tools (some may rely on RLS-bypass).
+- **Tests:** explicit coverage for permission denial and the confirmation gate.
+
+### Phase 2 — Reports consolidation
+
+- **Goal:** shrink the four large report pages (`cogs` 1,552, `ttb` 794,
+  `projections` 746, `inventory-valuation` 732 LOC).
+- **Approach:**
+  - Extract a shared report shell: `ReportHeader`, `ReportSummaryCard`,
+    `DateRangeFilter`, `QueryResult` (loading/error/empty wrapper), `useDateRange`.
+  - **Move aggregation into SQL (resolved §9.2): all three** — `cogs_by_period`,
+    `cogs_by_sku`, and `batch_costing` become Supabase views / RPC functions. For
+    each: a test compares the new SQL output against the current client
+    calculation and must match exactly **before** the client code is deleted.
+- **Risk:** low–med. Shell extraction is presentational (low). The SQL migration is
+  medium — correctness of the ported calculation is the whole game.
+- Migrations applied + verified **in the worktree only** — never on `main`.
 
 ### Phase 5 — Integrations cleanup
 
@@ -186,24 +191,30 @@ Net target: **~9,000–12,000 LOC removed.** Phase 0 is complete (see §8).
   is sufficient.
 - Removing the 293 knip-flagged unused *exports* — needs case-by-case review;
   many are intentional public API.
-- `formatDate` consolidation — the 6 local definitions differ in output (year vs
-  no-year; `"-"` vs `"—"` vs `""` null placeholder). Consolidation needs a product
-  decision (standard date format + null placeholder), then it is a ~10-minute
-  change. Listed for review.
 - Refactoring `prompt-input.tsx` (1,266 LOC) — no upstream package to adopt; hook
   extraction only, low priority.
 - Build-time codegen for entity configs — considered and rejected (§Phase 3).
 
-## 8. Status at time of writing
+**`formatDate` standard (resolved §9.5):** in-app tables and planning views use a
+**short date without the year** (e.g. `"May 19"`) with **`"—"`** as the
+null/empty placeholder. Report pages keep their own explicit formats. The six
+local `formatDate` definitions are consolidated to this standard in Phase 1.
+
+## 8. Status
 
 Phase 0 is **complete and committed** on `refactor/simplify-phase-0-1`:
-~7,700 LOC removed, all checks green. Phases 1–5 await user review of this spec and
-per-phase planning.
+~7,700 LOC removed, all checks green (PR #319). All §9 decisions are resolved;
+the next step is `writing-plans` for Phase 1, then Phase 3.
 
-## 9. Open decisions for the user
+## 9. Resolved decisions
 
-1. Approve the 5-remaining-phase roadmap and ordering.
-2. Phase 2: which report aggregations move into SQL.
-3. Phase 3: sign off on the `EntityCore` / `EntityPresentation` type boundary.
-4. Phase 4: the AI write-authorization model and confirmation UX.
-5. `formatDate`: the standard date format and null placeholder (§7).
+1. **Roadmap ordering:** AI-first — execute **0 → 1 → 3 → 4 → 2 → 5**.
+2. **Phase 2 SQL:** move **all three** aggregations (`cogs_by_period`,
+   `cogs_by_sku`, `batch_costing`) into SQL, each test-verified byte-identical
+   before client code is deleted.
+3. **Phase 3 layout:** per-entity **directory**
+   (`src/entities/<name>/{core.ts,presentation.tsx,index.ts}`).
+4. **Phase 4 write safety:** **user-scoped client + RLS** plus tool-layer
+   permission checks; **every write is confirmed** by the user before execution.
+5. **`formatDate`:** short date **without year** + **`"—"`** null placeholder
+   (§7).
