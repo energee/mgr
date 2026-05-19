@@ -166,11 +166,13 @@ export type EntityConfig<T = Record<string, unknown>> = EntityCore<T> &
  *
  *   displayNamePlural → `${displayName}s`
  *   searchableFields  → ["name"]
- *   defaultSort       → { column: "name", direction: "asc" }
+ *   defaultSort       → { column: "name", direction: "asc" } — only when a
+ *                       "name" column exists in listColumns
  *
  * Entities opt out with explicit values — an irregular plural ("Batch" →
- * "Batches"), a non-name sort column, a nameless entity, or
- * `searchableFields: []` to disable quick search.
+ * "Batches"), a non-name sort column, or `searchableFields: []` to disable
+ * quick search. A nameless entity (no "name" column) that omits defaultSort
+ * keeps an undefined sort; it should set searchableFields explicitly.
  */
 type DefaultableCoreField = "displayNamePlural" | "searchableFields" | "defaultSort";
 
@@ -206,13 +208,22 @@ export function createEntityConfig<T>(
         )
       : core.relations;
 
+  // The name-sorted defaultSort is only safe when a "name" column actually
+  // exists. Nameless entities (join rows like session_line_item) that omit
+  // defaultSort keep an undefined sort rather than a broken one.
+  const hasNameColumn = presentationFields.listColumns.some(
+    (column) => column.accessorKey === "name",
+  );
+
   return {
     ...core,
     displayNamePlural: core.displayNamePlural ?? `${core.displayName}s`,
     searchableFields: core.searchableFields ?? (["name"] as (keyof T & string)[]),
     defaultSort:
       core.defaultSort ??
-      ({ column: "name", direction: "asc" } as EntityCore<T>["defaultSort"]),
+      (hasNameColumn
+        ? ({ column: "name", direction: "asc" } as EntityCore<T>["defaultSort"])
+        : undefined),
     relations,
     ...presentationFields,
   };
