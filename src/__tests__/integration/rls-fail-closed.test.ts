@@ -8,22 +8,22 @@
  *    user_profiles row (tests fail-closed for race conditions on signup).
  *
  * These tests run against a real Postgres instance with all migrations applied
- * and the fixtures from `_fixtures/seed-roles.sql` seeded.
+ * and the fixtures from `_fixtures/seed-roles.sql` seeded. Authentication is
+ * simulated by `SET LOCAL request.jwt.claims` on a pg connection (see
+ * `_helpers/role-client.ts`) — no GoTrue or PostgREST required.
  *
- * Run locally:   bun run test:integration
+ * Run locally:   DATABASE_URL=... bun run test:integration
  * Run in CI:     see .github/workflows/test.yml — integration-tests job.
  */
 
-import { describe, it, expect } from "vitest";
-import { getClientForRole } from "./_helpers/role-client";
+import { afterAll, describe, expect, it } from "vitest";
+import { teardownPool, withRoleClient } from "./_helpers/role-client";
 
 /**
  * Representative sample of domain tables that must be protected by RLS.
- * Each entry is the Supabase table name exactly as it appears in the schema.
- *
- * This is not exhaustive — Tasks 2–6 add per-table tests. This test is
- * specifically about the fail-closed contract: no-roles and no-profile users
- * MUST be denied on all of these regardless of future policy changes.
+ * Tasks 2–6 add per-table coverage; this test is specifically about the
+ * fail-closed contract: no-roles and no-profile users MUST be denied on all
+ * of these regardless of future policy changes.
  */
 const DOMAIN_TABLES = [
   "batches",
@@ -34,37 +34,22 @@ const DOMAIN_TABLES = [
   "purchase_orders",
 ] as const;
 
-/**
- * Attempt SELECT * LIMIT 1 on a table using the given client.
- * Returns true if denied (zero rows returned or explicit RLS error),
- * false if any rows come back (access was granted — bad).
- */
-async function isDeniedSelect(
-  client: Awaited<ReturnType<typeof getClientForRole>>,
-  table: string,
-): Promise<boolean> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (client as any).from(table).select("*").limit(1);
-
-  if (error) {
-    // An RLS error (42501 insufficient_privilege) counts as denied.
-    return true;
-  }
-
-  // Zero rows returned = RLS filtered everything = denied.
-  // If rows come back, the policy is too permissive.
-  return !data || data.length === 0;
-}
+afterAll(async () => {
+  await teardownPool();
+});
 
 describe("RLS fail-closed — empty roles array", () => {
   it.each(DOMAIN_TABLES)(
     "denies SELECT on %s for a user with roles=[]",
     async (table) => {
-      const client = await getClientForRole("no_roles");
-      const denied = await isDeniedSelect(client, table);
-      expect(denied).toBe(true);
+      await withRoleClient("no_roles", async (db) => {
+        // SELECT under RLS as the no_roles user. user_has_permission('<dom>:read')
+        // returns false for every domain, so the result must be zero rows.
+        // We don't expect an error — RLS filters silently.
+        const { rows } = await db.query(`SELECT * FROM ${table} LIMIT 1`);
+        expect(rows).toHaveLength(0);
+      });
     },
-    // Longer timeout for real network round-trips to Postgres
     15_000,
   );
 });
@@ -73,9 +58,10 @@ describe("RLS fail-closed — missing user_profiles row", () => {
   it.each(DOMAIN_TABLES)(
     "denies SELECT on %s for an auth user with no user_profiles row",
     async (table) => {
-      const client = await getClientForRole("no_profile");
-      const denied = await isDeniedSelect(client, table);
-      expect(denied).toBe(true);
+      await withRoleClient("no_profile", async (db) => {
+        const { rows } = await db.query(`SELECT * FROM ${table} LIMIT 1`);
+        expect(rows).toHaveLength(0);
+      });
     },
     15_000,
   );

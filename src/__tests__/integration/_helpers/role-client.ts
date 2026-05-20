@@ -1,25 +1,39 @@
 /**
- * Role-based Supabase client helper for integration tests.
+ * Role-based pg client helper for integration tests.
  *
- * Returns a Supabase client authenticated as a seeded test user for a given
- * role tier. RLS policies are evaluated against the user's JWT, so these
- * clients exercise real row-level security (unlike the service-role client).
+ * Returns a `pg` PoolClient whose session is configured to behave as if it
+ * were an authenticated Supabase user with a chosen role. This lets RLS
+ * policies that depend on `auth.uid()` and `user_has_permission(...)` evaluate
+ * exactly as they would in production — without requiring GoTrue or
+ * PostgREST in CI.
  *
- * Approach: signInWithPassword against seeded auth.users rows.
+ * ## Why direct pg + SET LOCAL instead of Supabase JS + signInWithPassword?
  *
- * Alternative (if signInWithPassword is unavailable — e.g. GoTrue not running):
- *   Sign a JWT manually using the Supabase JWT secret from `supabase status`
- *   or SUPABASE_JWT_SECRET env var, then call:
- *     createClient(url, anonKey, { global: { headers: { Authorization: `Bearer ${jwt}` } } })
- *   The JWT payload must include { sub: <user-uuid>, role: "authenticated" }.
+ * `signInWithPassword` requires GoTrue. Adding GoTrue to the CI Postgres-only
+ * stack (see `.github/workflows/test.yml`) would mean another container,
+ * another healthcheck, and a heavier image pull on every run. The
+ * Supabase-idiomatic alternative for RLS testing is to set
+ * `request.jwt.claims` directly on the session:
+ *
+ *   SET LOCAL ROLE authenticated;
+ *   SET LOCAL request.jwt.claims = '{"sub":"<uuid>","role":"authenticated"}';
+ *
+ * After that, `auth.uid()` (which Supabase implements via
+ * `current_setting('request.jwt.claims', true)::jsonb ->> 'sub'`) returns the
+ * UUID we set, and `user_has_permission(...)` evaluates against the seeded
+ * `user_profiles` row. RLS applies normally.
+ *
+ * ## Transaction discipline
+ *
+ * `SET LOCAL` only persists within a transaction. The helper opens a
+ * transaction before returning the client. Callers MUST end the transaction
+ * (via `ROLLBACK` or `COMMIT`) and release the client. Use `withRoleClient`
+ * to handle this automatically.
  *
  * Seeded users are defined in `_fixtures/seed-roles.sql`.
- * All use password: "test-password-123!"
  */
 
-import { createClient } from "@supabase/supabase-js";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/supabase";
+import { Pool, type PoolClient } from "pg";
 
 /** Role tiers available as seeded test users. */
 export type SeededRole =
@@ -30,93 +44,84 @@ export type SeededRole =
   | "no_roles"
   | "no_profile";
 
-/** Credentials for each seeded role tier. */
-const SEEDED_USERS: Record<SeededRole, { email: string; uuid: string }> = {
-  viewer: {
-    email: "viewer@test.local",
-    uuid: "00000000-0000-0000-0000-000000000001",
-  },
-  inventory_manager: {
-    // Seeded with roles=['production_manager'] — has inventory:write permission.
-    // The email is 'inventory-manager@test.local'; the SeededRole label is
-    // 'inventory_manager' for readability in test code.
-    email: "inventory-manager@test.local",
-    uuid: "00000000-0000-0000-0000-000000000002",
-  },
-  production_manager: {
-    email: "production-manager@test.local",
-    uuid: "00000000-0000-0000-0000-000000000003",
-  },
-  admin: {
-    email: "admin@test.local",
-    uuid: "00000000-0000-0000-0000-000000000004",
-  },
-  no_roles: {
-    // auth.users row exists; user_profiles row has roles=[]
-    email: "no-roles@test.local",
-    uuid: "00000000-0000-0000-0000-000000000005",
-  },
-  no_profile: {
-    // auth.users row exists; NO user_profiles row — tests fail-closed behavior
-    email: "no-profile@test.local",
-    uuid: "00000000-0000-0000-0000-000000000006",
-  },
+/** Deterministic UUIDs for each seeded role tier. See `_fixtures/seed-roles.sql`. */
+export const SEEDED_UUIDS: Record<SeededRole, string> = {
+  viewer: "00000000-0000-0000-0000-000000000001",
+  // inventory_manager is seeded with roles=['production_manager'] because the
+  // production_manager role carries inventory:write in the permission map.
+  inventory_manager: "00000000-0000-0000-0000-000000000002",
+  production_manager: "00000000-0000-0000-0000-000000000003",
+  admin: "00000000-0000-0000-0000-000000000004",
+  // auth.users row exists; user_profiles row has roles=[]
+  no_roles: "00000000-0000-0000-0000-000000000005",
+  // auth.users row exists; NO user_profiles row — tests fail-closed behavior
+  no_profile: "00000000-0000-0000-0000-000000000006",
 };
 
-const TEST_PASSWORD = "test-password-123!";
+let pool: Pool | undefined;
 
-function getRequiredEnv(key: string): string {
-  const val = process.env[key];
-  if (!val) {
-    throw new Error(
-      `Integration test requires env var ${key}. ` +
-        `Run 'supabase start' and set SUPABASE_URL + SUPABASE_ANON_KEY, ` +
-        `or set INTEGRATION_SUPABASE_URL + INTEGRATION_SUPABASE_ANON_KEY.`,
-    );
+function getPool(): Pool {
+  if (!pool) {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error(
+        "Integration tests require DATABASE_URL. Set it to a Postgres URL " +
+          "with all migrations + seed-roles.sql applied.",
+      );
+    }
+    pool = new Pool({ connectionString, max: 4 });
   }
-  return val;
+  return pool;
 }
 
 /**
- * Returns a Supabase client authenticated as a seeded test user with the
- * given role tier. RLS policies apply — this is NOT a service-role client.
+ * Acquire a pg client with `request.jwt.claims` set to impersonate the given
+ * role's seeded user. Opens a transaction before returning.
  *
- * @param role - One of the seeded role tiers.
- * @returns An authenticated SupabaseClient<Database>.
- * @throws If the Supabase URL/anon key env vars are not set, or if sign-in fails.
+ * CALLER MUST end the transaction (ROLLBACK / COMMIT) and release the client.
+ * Prefer `withRoleClient` to handle this automatically.
  */
-export async function getClientForRole(
-  role: SeededRole,
-): Promise<SupabaseClient<Database>> {
-  const url = process.env.INTEGRATION_SUPABASE_URL ?? getRequiredEnv("SUPABASE_URL");
-  const anonKey =
-    process.env.INTEGRATION_SUPABASE_ANON_KEY ?? getRequiredEnv("SUPABASE_ANON_KEY");
-
-  const user = SEEDED_USERS[role];
-
-  const client = createClient<Database>(url, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-
-  const { error } = await client.auth.signInWithPassword({
-    email: user.email,
-    password: TEST_PASSWORD,
-  });
-
-  if (error) {
-    throw new Error(
-      `Failed to sign in as seeded '${role}' user (${user.email}): ${error.message}. ` +
-        `Ensure seed-roles.sql has been applied and GoTrue is running.`,
-    );
+export async function getClientForRole(role: SeededRole): Promise<PoolClient> {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query("SELECT set_config('request.jwt.claims', $1, true)", [
+      JSON.stringify({ sub: SEEDED_UUIDS[role], role: "authenticated" }),
+    ]);
+    return client;
+  } catch (err) {
+    // If setup fails, release immediately so the pool isn't leaked.
+    client.release();
+    throw err;
   }
-
-  return client;
 }
 
-/** The deterministic UUID for each seeded role, for use in assertions. */
-export const SEEDED_UUIDS = Object.fromEntries(
-  Object.entries(SEEDED_USERS).map(([role, u]) => [role, u.uuid]),
-) as Record<SeededRole, string>;
+/**
+ * Convenience wrapper: acquires a role-impersonated client, runs `fn`, then
+ * ROLLBACKs and releases. Use this for read-only tests so writes can't leak.
+ */
+export async function withRoleClient<T>(
+  role: SeededRole,
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await getClientForRole(role);
+  try {
+    return await fn(client);
+  } finally {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // Best-effort; transaction may already be aborted.
+    }
+    client.release();
+  }
+}
+
+/** Tear down the shared pool. Call from a global teardown / afterAll. */
+export async function teardownPool(): Promise<void> {
+  if (pool) {
+    await pool.end();
+    pool = undefined;
+  }
+}
