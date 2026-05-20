@@ -1,3 +1,10 @@
+-- NOTE: Migration 00137_tighten_keg_owner_deposits_rls.sql is a byte-identical
+-- duplicate of this file (rebase artifact). Both are kept on disk because
+-- they have already been applied to existing databases; rewriting either
+-- would diverge applied-migration history. The second application is
+-- idempotent because all CREATE POLICY statements are preceded by
+-- DROP POLICY IF EXISTS.
+--
 -- Tighten overly permissive RLS policies on keg_owner_deposits.
 --
 -- Previously, keg_owner_deposits had either WITH CHECK (true) policies (from 00079)

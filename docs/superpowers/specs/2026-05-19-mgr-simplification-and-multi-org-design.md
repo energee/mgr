@@ -21,8 +21,11 @@ The user asked for two things:
    create/update entities through chat without reinventing the form interface.
 
 Multi-organization support is **not** in scope: the app is deployed one
-organization per deployment, and that model is already adequate. No tenancy,
-`org_id`, or RLS work is planned.
+organization per deployment, and that model is already adequate. No tenancy
+or `org_id` work is planned. Role-based RLS (introduced in migration
+`00097_permission_based_roles.sql`) remains the authorization model;
+outstanding RLS coverage gaps are tracked in
+`docs/plans/2026-05-19-rls-single-source-of-truth-plan.md`.
 
 ## 2. Key framing decisions (already made with the user)
 
