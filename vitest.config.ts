@@ -21,6 +21,11 @@ export default defineConfig({
       "src/**/*.test.tsx",
       ".github/scripts/**/*.test.ts",
     ],
+    exclude: [
+      // Integration tests require a live Postgres instance; they run under
+      // bun run test:integration (vitest.integration.config.ts), not here.
+      "src/__tests__/integration/**",
+    ],
     coverage: {
       provider: "v8",
       include: [
