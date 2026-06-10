@@ -203,7 +203,8 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
   ["yeast_pitch", entry({
     name: "yeast_pitch",
     table: "yeast_pitches",
-    viewTable: "yeast_pitches_with_details",
+    // Matches the registry config; replaced yeast_pitches_with_details (00158).
+    viewTable: "yeast_pitches_with_remaining",
     displayName: "Yeast Pitch",
     displayNamePlural: "Yeast Pitches",
     defaultSort: { column: "created_at", direction: "desc" },
@@ -212,13 +213,14 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
   })],
   ["yeast_strain", entry({
     name: "yeast_strain",
-    table: "yeast_strains",
+    // Yeast strains live in the "yeasts" table (see src/entities/yeast-strain.tsx).
+    table: "yeasts",
     displayName: "Yeast Strain",
     displayNamePlural: "Yeast Strains",
-    searchableFields: ["name", "code"],
+    searchableFields: ["name", "product_code"],
     defaultSort: { column: "name", direction: "asc" },
-    detailHeader: { title: "name", subtitle: "code" },
-    keyFields: ["manufacturer", "yeast_type"],
+    detailHeader: { title: "name", subtitle: "product_code" },
+    keyFields: ["manufacturer", "type"],
   })],
   ["brand", entry({
     name: "brand",
@@ -245,9 +247,10 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
     table: "keg_transactions",
     displayName: "Keg Transaction",
     displayNamePlural: "Keg Transactions",
-    defaultSort: { column: "transaction_date", direction: "desc" },
+    // keg_transactions has no transaction_date column; created_at is the event time.
+    defaultSort: { column: "created_at", direction: "desc" },
     detailHeader: { badge: "transaction_type" },
-    keyFields: ["transaction_date", "quantity"],
+    keyFields: ["created_at", "quantity"],
   })],
   ["inventory_item", entry({
     name: "inventory_item",

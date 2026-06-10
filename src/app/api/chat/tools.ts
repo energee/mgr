@@ -87,8 +87,9 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
     // =========================================================================
 
     searchEntity: tool({
-      description:
-        "Search any entity type. Available entities: batch, recipe, brew_log, vessel, vessel_transfer, order, customer, supplier, purchase_order, packaging_session, session_line_item, allocation, delivery, location_transfer, finished_good, pick_list, yeast_pitch, yeast_strain, brand, keg_inventory, keg_transaction, inventory_item, inventory_lot, bin, location, beer_style, package_type, keg_type, keg_owner, order_item, po_line_item, po_receive, sales_channel, pricing_tier, pricing_tier_price, user_profile, enum_value. Use 'query' for text search across searchable fields. Use 'filters' for exact-match filtering (e.g. status, category).",
+      // Entity list is derived from CHAT_ENTITY_MAP so the description can
+      // never drift from the entities the tool actually supports.
+      description: `Search any entity type. Available entities: ${Array.from(CHAT_ENTITY_MAP.keys()).join(", ")}. Use 'query' for text search across searchable fields. Use 'filters' for exact-match filtering (e.g. status, category).`,
       inputSchema: z.object({
         entityName: z
           .string()
@@ -859,9 +860,12 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, strainName, limit }) => {
-        let q = dynamicFrom(supabase, "yeast_pitches_with_details")
+        // yeast_pitches_with_details was replaced by yeast_pitches_with_remaining
+        // (migration 00158); that view has no batch_code, so vessel_name is
+        // returned instead.
+        let q = dynamicFrom(supabase, "yeast_pitches_with_remaining")
           .select(
-            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_code, location_name"
+            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, vessel_name, location_name"
           )
           .order("created_at", { ascending: false })
           .limit(limit);
