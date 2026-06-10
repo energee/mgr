@@ -52,12 +52,12 @@ Status legend: `[ ]` pending · `[x]` fixed & verified (lint+typecheck+tests gre
 
 - [x] **8.1 "Today" dashboard panel**: batches exceeding recipe `fermentation_days`/`conditioning_days` (logic exists in `timeline/page.tsx:234-246`), POs due (`expected_date`), kegs >30d at accounts, expiring lots. Done: `src/components/dashboard/today-panel.tsx`, rendered near the top of `dashboard/page.tsx`.
 - [x] **8.2 Schedule `check_low_inventory()`** via pg_cron (function exists since migration 00022, never scheduled). Migration written: `00174_schedule_low_inventory_check.sql` (daily 06:00 UTC, idempotent unschedule guard) — **not applied; needs DB push confirmation**.
-- [ ] **8.3 TTB `completed_at`**: batches lack completion timestamp; `ttb/page.tsx:160-165` filters by `planned_start_date` → wrong-month attribution. Add column + filter on it.
-  - Migration written: `00175_batches_completed_at.sql` (nullable timestamptz, backfill from `updated_at` for `status='completed'`, BEFORE UPDATE trigger `trg_batches_set_completed_at` stamps it on transition to completed) — **not applied; needs DB push confirmation**.
-  - **FOLLOW-UP (after migration applied + `bun db:generate`)**: in `src/app/(app)/reports/ttb/page.tsx` (`reportKeys.ttbBatches` queryFn, ~line 160), change the completed-batches query from `.gte("planned_start_date", startDate).lte("planned_start_date", endDate + "T23:59:59Z")` to `.gte("completed_at", startDate).lte("completed_at", endDate + "T23:59:59Z")`, add `completed_at` to the `.select(...)` list, and update the now-stale comment justifying the `planned_start_date` filter. Do NOT make this change before regenerating `src/types/supabase.ts` — the column doesn't exist in the generated types yet.
-- [ ] **8.4 Yeast `recommended_max_generations`** on `yeast_strains` + warning in pitch picker.
-  - Migration written: `00176_yeast_recommended_max_generations.sql` (nullable smallint, CHECK NULL-or-positive) — **not applied; needs DB push confirmation**.
-  - **FOLLOW-UP (after migration applied + `bun db:generate`)**: (1) pitch picker — where pitches from `yeast_pitches_with_remaining` are selected, also fetch the strain's `recommended_max_generations` and show a warning when a pitch's `generation >= recommended_max_generations`; (2) `searchYeastPitches` in `src/app/api/chat/tools.ts` — include `recommended_max_generations` (and e.g. an `over_recommended_generation` flag) in returned rows so the assistant can flag tired yeast. No code references the column yet by design — types don't exist until regeneration.
+- [x] **8.3 TTB `completed_at`**: batches lack completion timestamp; `ttb/page.tsx:160-165` filters by `planned_start_date` → wrong-month attribution. Add column + filter on it.
+  - Migration `00175_batches_completed_at.sql` (nullable timestamptz, backfill from `updated_at` for `status='completed'`, BEFORE UPDATE trigger `trg_batches_set_completed_at`) — applied; types regenerated.
+  - Done: `ttb/page.tsx` ttbBatches queryFn now filters/selects `completed_at` (gte startDate, lte endDate end-of-day); comment notes pre-backfill attribution is approximate (`completed_at` backfilled from `updated_at`).
+- [x] **8.4 Yeast `recommended_max_generations`** on `yeast_strains` + warning in pitch picker.
+  - Migration `00176_yeast_recommended_max_generations.sql` (nullable smallint, CHECK NULL-or-positive) — applied; types regenerated.
+  - Done: (1) `pitch-yeast-dialog.tsx` fetches `yeasts.recommended_max_generations` (key `yeastKeys.strainMaxGenerations()`) and shows an amber "Over gen limit" badge per option plus an inline non-blocking warning when the selected pitch's `generation >= recommended_max_generations`; (2) `searchYeastPitches` in `tools.ts` joins `yeasts` by `strain_id` and returns `recommended_max_generations` + `over_recommended_generation` per row (mentioned in tool description).
 - [x] **8.5 AI chat tool gaps**: `getIngredientInventory` add `itemName` param (`tools.ts:307`); `getVesselAvailability` add projected-free-date (`tools.ts:236`; computation exists in `timeline/page.tsx:380`). Done: `itemName` ilike filter (escapeLike); `projected_free_date` on `inUse` vessels computed from occupying batch `planned_start_date` + recipe `fermentation_days`/`conditioning_days`.
 
 ## Batch 9 — Close the inventory loop (highest product value, large)
@@ -78,10 +78,12 @@ Status legend: `[ ]` pending · `[x]` fixed & verified (lint+typecheck+tests gre
 ## Deferred / needs user decision
 
 - [x] Search input per-keystroke re-render — done in Batch 4: keystroke state moved into `ListSearchInput`; parent only re-renders on the debounced value.
-- [d] Missing indexes `batches(created_at)`, `finished_goods(created_at)` — trivial migration, bundle with Batch 8.
-- [d] Sequential per-row upserts in settings/pricing, settings/system, recipe-variant-editor — bundle with Batch 6/7.
-- [d] cmd+k navigator (cmdk primitive exists, unused) — nice-to-have.
-- [d] Pricing page split into `src/components/domain/pricing/` — mechanical, low-risk, low-priority.
+- [x] Missing indexes `batches(created_at)`, `finished_goods(created_at)` — migration `00177_report_date_indexes.sql`, applied.
+- [x] Sequential per-row upserts — settings/system single bulk upsert; pricing bulk-adjust + copy-channel single `.upsert(onConflict)`; variant saves parallelized.
+- [x] cmd+k navigator — `command-palette.tsx` (⌘K/Ctrl+K), nav config shared with sidebar via `nav-items.ts`.
+- [x] Pricing page split — `settings/pricing/page.tsx` 1170 → 207; views/dialogs extracted to `src/components/domain/pricing/`.
+- [x] Kanban-drag consumption gap (from 9.1) — `handleSingleTransition` now calls `completeBatchConsumption` on batches→completed, covering kanban/list/mobile paths.
+- [x] Migration history repair (discovered during DB push): duplicate version 00171 renumbered (perf indexes → 00178); bulk notification RPCs were never applied despite shipping in PR #279 — renumbered to 00179 and applied. 00176 fixed to target `yeasts` (table `yeast_strains` doesn't exist).
 
 ## Verification gate (every batch)
 
