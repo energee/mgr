@@ -22,6 +22,25 @@ export const entityKeys = {
   list: (table: string, filters?: Record<string, unknown>) =>
     filters ? ([table, "list", filters] as const) : ([table, "list"] as const),
 
+  /**
+   * Server-paginated list query (entity-data-table).
+   * Keyed under `[table, "list", ...]` so `entityKeys.all(table)` invalidation
+   * still covers it. `page` captures everything that changes the fetched window:
+   * fetch mode (paged/mobile/board), offset/limit, server sort order, and the
+   * column projection.
+   */
+  pagedList: (
+    table: string,
+    filters: Record<string, unknown>,
+    page: {
+      mode: "paged" | "mobile" | "board";
+      from: number;
+      to: number;
+      order: readonly { column: string; ascending: boolean }[];
+      select: string;
+    },
+  ) => [table, "list", filters, "paged", page] as const,
+
   /** Detail query for a single record */
   detail: (table: string, id: string) => [table, id] as const,
 
@@ -308,6 +327,13 @@ export const dashboardKeys = {
   },
   heatmap: {
     year: () => ["dashboard", "heatmap", "year"] as const,
+  },
+  /** "Today" attention panel — overdue batches, due POs, aging kegs, expiring lots */
+  today: {
+    overdueBatches: () => ["dashboard", "today", "overdue-batches"] as const,
+    duePOs: () => ["dashboard", "today", "due-pos"] as const,
+    agingKegs: () => ["dashboard", "today", "aging-kegs"] as const,
+    expiringLots: () => ["dashboard", "today", "expiring-lots"] as const,
   },
 };
 

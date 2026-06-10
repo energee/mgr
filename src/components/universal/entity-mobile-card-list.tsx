@@ -10,6 +10,10 @@
  * summary; any remaining listColumns are progressively disclosed
  * by a per-card "Show more" toggle (audit F-085).
  *
+ * Rows are server-paginated by the parent (entity-data-table); when
+ * more rows exist a "Load more" button asks the parent to widen the
+ * fetch window (audit 4.3).
+ *
  * Expanded state is held at the list level (Set<rowId>) so it
  * survives parent re-renders triggered by parallel mutations or
  * filter updates. It is intentionally not persisted across
@@ -40,6 +44,12 @@ type EntityMobileCardListProps = {
   onCreateClick?: () => void;
   /** Whether there are active search/filter criteria */
   hasActiveFilters: boolean;
+  /** Whether more rows exist on the server beyond those currently loaded */
+  hasMore?: boolean;
+  /** Whether the next page is currently being fetched */
+  isLoadingMore?: boolean;
+  /** Fetch the next page of rows (server pagination "Load more") */
+  onLoadMore?: () => void;
 }
 
 /**
@@ -71,6 +81,9 @@ export function EntityMobileCardList({
   showCreate,
   onCreateClick,
   hasActiveFilters,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: EntityMobileCardListProps) {
   // ---- Determine which field to use as the card title ----
   const titleField =
@@ -181,6 +194,18 @@ export function EntityMobileCardList({
           />
         );
       })}
+      {/* Server pagination: rows arrive one page at a time (audit 4.3) */}
+      {hasMore && onLoadMore && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-1 min-h-[44px]"
+          onClick={onLoadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? "Loading…" : "Load more"}
+        </Button>
+      )}
     </div>
   );
 }

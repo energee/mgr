@@ -10,22 +10,24 @@
  * - Entity configs are translated to Dice UI columns via data-table-adapter
  * - Filters are managed by DataTableFilterList via nuqs URL state
  * - Sorting is managed by TanStack Table state (DataTableSortList reads/writes via table)
- * - Data is fetched from Supabase and filtered server-side
- * - Pagination is handled client-side by TanStack Table
+ * - Data is fetched from Supabase with filters, search, sorting AND pagination
+ *   applied server-side (manualFiltering/manualSorting/manualPagination):
+ *   - "paged" mode (desktop table): `.order()` + `.range()` per page
+ *   - "mobile" mode: `.range(0, n*pageSize-1)` accumulating pages via "Load more"
+ *   - "board" mode (kanban): unpaginated but capped at KANBAN_FETCH_CAP rows,
+ *     since the board groups the full filtered dataset by state
+ * - Column projection: the select list is derived from entity config when
+ *   provably safe; falls back to "*" when custom renderers/action predicates
+ *   may read arbitrary row fields (see buildSelectList)
  */
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ColumnDef, SortingState, PaginationState, VisibilityState } from "@tanstack/react-table";
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-} from "@tanstack/react-table";
+import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
 import { usePersistedPageSize } from "@/hooks/use-persisted-page-size";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
 import { parseAsStringEnum } from "nuqs";
 import { toast } from "sonner";
@@ -95,6 +97,59 @@ export type EntityDataTableProps<T = Record<string, unknown>> = {
   onAction?: (actionName: string, record: T) => boolean;
   /** Default page size (overrides global default of 10) */
   defaultPageSize?: number;
+}
+
+// =============================================================================
+// Server-fetch helpers
+// =============================================================================
+
+/**
+ * Safety cap for the unpaginated kanban/board fetch. The board needs the full
+ * filtered dataset (cards are grouped by state), so it cannot use `.range()`;
+ * this cap prevents an unbounded fetch on very large tables.
+ */
+const KANBAN_FETCH_CAP = 1000;
+
+/**
+ * Build the PostgREST select list for the list query from entity config.
+ *
+ * Projection is only safe when no code path can read arbitrary row fields.
+ * Falls back to "*" when:
+ * - a listColumn has a custom `render` function (receives the whole row)
+ * - an action has `handler`/`showWhen`/`disabledWhen` (receive the whole record)
+ * - an `onAction` prop is passed (page-level handlers receive the record)
+ * - a delete action exists without `detailHeader.title` (delete dialog falls
+ *   back to reading `record.name`, which we can't prove exists)
+ *
+ * Otherwise projects: id ∪ stateField ∪ detailHeader.title ∪ listColumns
+ * ∪ listFilters ∪ searchableFields ∪ sort columns ∪ quickFilter columns
+ * ∪ prop-filter keys.
+ */
+function buildSelectList<T>(
+  entity: EntityConfig<T>,
+  propFilters: Record<string, unknown> | undefined,
+  hasOnAction: boolean
+): string {
+  if (hasOnAction) return "*";
+  if (entity.listColumns.some((c) => c.render)) return "*";
+  if (entity.actions?.some((a) => a.handler || a.showWhen || a.disabledWhen)) return "*";
+  if (entity.actions?.some((a) => a.deleteMode) && !entity.detailHeader?.title) return "*";
+
+  const cols = new Set<string>(["id"]);
+  if (entity.stateMachine) cols.add(entity.stateMachine.stateField as string);
+  if (entity.detailHeader?.title) cols.add(entity.detailHeader.title as string);
+  for (const c of entity.listColumns) {
+    if (c.accessorKey) cols.add(c.accessorKey as string);
+  }
+  for (const f of entity.listFilters ?? []) cols.add(f.field);
+  for (const s of entity.searchableFields ?? []) cols.add(s as string);
+  if (entity.defaultSort) cols.add(entity.defaultSort.column);
+  for (const qf of entity.quickFilters ?? []) {
+    if (qf.sort) cols.add(qf.sort.column);
+    for (const f of qf.filters) cols.add(f.column);
+  }
+  for (const k of Object.keys(propFilters ?? {})) cols.add(k);
+  return [...cols].join(",");
 }
 
 // =============================================================================
@@ -192,6 +247,19 @@ export function EntityDataTable<T = Record<string, unknown>>({
     parseAsStringEnum(["table", "board"]).withDefault("table")
   );
 
+  /**
+   * Fetch mode decides how the list query is windowed:
+   * - "board": full filtered dataset (capped) — kanban groups rows by state
+   * - "mobile": pages 0..N accumulated for the card list's "Load more"
+   * - "paged": one server page per pageIndex/pageSize
+   */
+  const isBoardView = viewMode === "board" && !!entity.kanbanConfig;
+  const fetchMode: "paged" | "mobile" | "board" = isBoardView
+    ? "board"
+    : isMobile
+      ? "mobile"
+      : "paged";
+
   // ---------------------------------------------------------------------------
   // "n" hotkey for New entity (uses useKeyboardShortcuts to skip in inputs)
   // ---------------------------------------------------------------------------
@@ -233,9 +301,9 @@ export function EntityDataTable<T = Record<string, unknown>>({
     [entity.defaultSort]
   );
   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
-  const [globalFilter, setGlobalFilter] = useState("");
+  // Debounced search value (the input itself lives in ListSearchInput so
+  // per-keystroke re-renders don't re-render the whole table)
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const debouncedSetSearch = useDebouncedCallback(setDebouncedSearch, 300);
   const [rowSelection, setRowSelection] = useState({});
 
   // Persisted page size (per-entity defaultPageSize overrides the global default)
@@ -245,16 +313,15 @@ export function EntityDataTable<T = Record<string, unknown>>({
     pageIndex: 0,
     pageSize: defaultPageSize ?? persistedPageSize,
   }));
+  // Number of server pages accumulated by the mobile card list's "Load more"
+  const [mobilePages, setMobilePages] = useState(1);
 
-  // Debounce the global search
+  // Reset when navigating between entities (search input remounts via key)
   useEffect(() => {
-    debouncedSetSearch(globalFilter);
-  }, [globalFilter, debouncedSetSearch]);
-
-  // Reset when navigating between entities
-  useEffect(() => {
-    setGlobalFilter("");
+    setDebouncedSearch("");
     setRowSelection({});
+    setMobilePages(1);
+    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
   }, [entity.name]);
 
   // ---------------------------------------------------------------------------
@@ -312,10 +379,22 @@ export function EntityDataTable<T = Record<string, unknown>>({
     parseAsStringEnum(["and", "or"]).withDefault("and")
   );
 
-  // Reset row selection when filters or search change
+  // Reset row selection and pagination when filters or search change — with
+  // server pagination a stale pageIndex would show an empty page, and row
+  // selection is positional within the current page. JSON key avoids re-runs
+  // from unstable array/object identities.
+  const filterResetKey = JSON.stringify({ urlFilters, debouncedSearch, filters });
   useEffect(() => {
     setRowSelection({});
-  }, [urlFilters, debouncedSearch]);
+    setMobilePages(1);
+    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
+  }, [filterResetKey]);
+
+  // Row selection is positional (index within the current page), so it cannot
+  // survive a page change.
+  useEffect(() => {
+    setRowSelection({});
+  }, [pagination.pageIndex]);
 
   // ---------------------------------------------------------------------------
   // Quick filter tabs
@@ -432,15 +511,83 @@ export function EntityDataTable<T = Record<string, unknown>>({
     [urlFilters, joinOperator]
   );
 
+  // Columns known to exist on the fetched table/view (the config renders/filters
+  // them), i.e. safe targets for a server-side ORDER BY.
+  const orderableColumnIds = useMemo(() => {
+    const ids = new Set<string>(["id"]);
+    for (const c of entity.listColumns) {
+      if (c.accessorKey) ids.add(c.accessorKey as string);
+    }
+    for (const f of entity.listFilters ?? []) ids.add(f.field);
+    if (entity.defaultSort) ids.add(entity.defaultSort.column);
+    for (const qf of entity.quickFilters ?? []) {
+      if (qf.sort) ids.add(qf.sort.column);
+    }
+    return ids;
+  }, [entity]);
+
+  // Server-side ORDER BY derived from TanStack sorting state. Falls back to
+  // the entity's defaultSort, and always appends a unique `id` tiebreaker so
+  // `.range()` pages never overlap or skip rows when the sort column has ties.
+  const orderSpec = useMemo(() => {
+    const orders = sorting
+      .filter((s) => orderableColumnIds.has(s.id))
+      .map((s) => ({ column: s.id, ascending: !s.desc }));
+    if (orders.length === 0 && entity.defaultSort) {
+      orders.push({
+        column: entity.defaultSort.column,
+        ascending: entity.defaultSort.direction === "asc",
+      });
+    }
+    if (!orders.some((o) => o.column === "id")) {
+      orders.push({ column: "id", ascending: true });
+    }
+    return orders;
+  }, [sorting, orderableColumnIds, entity.defaultSort]);
+
+  // Column projection — board view always fetches "*" (kanban card renderers
+  // may read arbitrary fields); see buildSelectList for the safety rules.
+  const selectList = useMemo(
+    () => (isBoardView ? "*" : buildSelectList(entity, filters, !!onAction)),
+    [entity, filters, onAction, isBoardView]
+  );
+
+  // Fetch window for the current mode
+  const rangeFrom = fetchMode === "paged" ? pagination.pageIndex * pagination.pageSize : 0;
+  const rangeTo =
+    fetchMode === "board"
+      ? KANBAN_FETCH_CAP - 1
+      : fetchMode === "mobile"
+        ? mobilePages * pagination.pageSize - 1
+        : rangeFrom + pagination.pageSize - 1;
+
   const { data, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: entityKeys.list(fetchTable, {
-      ...filters,
-      ...filterKey,
-      search: debouncedSearch || undefined,
-    }),
+    queryKey: entityKeys.pagedList(
+      fetchTable,
+      {
+        ...filters,
+        ...filterKey,
+        search: debouncedSearch || undefined,
+      },
+      {
+        mode: fetchMode,
+        from: rangeFrom,
+        to: rangeTo,
+        order: orderSpec,
+        select: selectList,
+      }
+    ),
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
+    // Keep showing the previous page while the next one loads (no flash on
+    // page/sort/filter changes) — but never across different tables, so an
+    // entity switch within the same component instance shows the skeleton
+    // instead of the previous entity's rows.
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[0] === fetchTable ? keepPreviousData(previousData) : undefined,
     queryFn: async () => {
-      let query = dynamicFrom(supabase, fetchTable).select("*");
+      let query = dynamicFrom(supabase, fetchTable).select(selectList, {
+        count: "estimated",
+      });
 
       // Apply prop-level filters
       if (filters) {
@@ -465,7 +612,15 @@ export function EntityDataTable<T = Record<string, unknown>>({
         query = query.or(searchCondition);
       }
 
-      const { data, error } = await query;
+      // Server-side sort + fetch window (see fetchMode comment above).
+      // Board mode is unpaginated (kanban needs the full filtered dataset)
+      // but capped as a safety valve.
+      for (const o of orderSpec) {
+        query = query.order(o.column, { ascending: o.ascending });
+      }
+      query = query.range(rangeFrom, rangeTo);
+
+      const { data, error, count } = await query;
       if (error) throw error;
       const rows = (data ?? []) as Record<string, unknown>[];
 
@@ -499,9 +654,12 @@ export function EntityDataTable<T = Record<string, unknown>>({
         }
       }));
 
-      return rows as T[];
+      return { rows: rows as T[], totalCount: count as number | null };
     },
   });
+
+  const rows = useMemo(() => data?.rows ?? [], [data]);
+  const totalCount = data?.totalCount ?? null;
 
   // ---------------------------------------------------------------------------
   // Table instance
@@ -522,37 +680,41 @@ export function EntityDataTable<T = Record<string, unknown>>({
   );
 
   const table = useReactTable({
-    data: data || [],
+    data: rows,
     columns,
     state: {
       sorting,
-      globalFilter,
       pagination,
       columnVisibility,
       ...(hasBulkActions ? { rowSelection } : {}),
     },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: handlePaginationChange,
     ...(hasBulkActions
       ? { onRowSelectionChange: setRowSelection, enableRowSelection: true }
       : {}),
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    // Filtering, sorting and pagination all happen server-side in the queryFn
     manualFiltering: true,
+    manualSorting: true,
+    manualPagination: true,
+    pageCount:
+      totalCount != null
+        ? Math.max(1, Math.ceil(totalCount / pagination.pageSize))
+        : -1,
+    rowCount: totalCount ?? undefined,
   });
 
   // ---------------------------------------------------------------------------
   // Bulk action helpers
   // ---------------------------------------------------------------------------
+  // Row selection keys are row indices within the current page
   const selectedRows = useMemo(() => {
-    if (!data) return [];
     return Object.entries(rowSelection)
       .filter(([, selected]) => selected)
-      .map(([key]) => data[parseInt(key)])
+      .map(([key]) => rows[parseInt(key)])
       .filter(Boolean);
-  }, [rowSelection, data]);
+  }, [rowSelection, rows]);
 
   // Check if selected rows have any common valid transitions
   const hasValidBulkTransitions = useMemo(() => {
@@ -752,7 +914,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
         ) : viewMode === "board" && entity.kanbanConfig ? (
           <EntityKanban
             entity={entity}
-            data={data || []}
+            data={rows}
             basePath={path}
             onTransition={handleSingleTransition}
           />
@@ -760,23 +922,23 @@ export function EntityDataTable<T = Record<string, unknown>>({
           <>
             {/* Search bar for mobile */}
             {entity.searchableFields && entity.searchableFields.length > 0 && (
-              <div className="relative mb-3">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
-                  value={globalFilter}
-                  onChange={(e) => setGlobalFilter(e.target.value)}
-                  className="pl-8 h-8 text-sm"
-                />
-              </div>
+              <ListSearchInput
+                key={entity.name}
+                variant="mobile"
+                placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
+                onDebouncedChange={setDebouncedSearch}
+              />
             )}
             <EntityMobileCardList
               entity={entity as EntityConfig<Record<string, unknown>>}
-              data={(data || []) as Record<string, unknown>[]}
+              data={rows as Record<string, unknown>[]}
               basePath={path}
               showCreate={showCreate}
               onCreateClick={onCreateClick}
               hasActiveFilters={!!hasActiveFilters}
+              hasMore={totalCount != null && rows.length < totalCount}
+              isLoadingMore={isFetching}
+              onLoadMore={() => setMobilePages((n) => n + 1)}
             />
           </>
         ) : (
@@ -845,20 +1007,12 @@ export function EntityDataTable<T = Record<string, unknown>>({
               {/* Global search */}
               {entity.searchableFields &&
                 entity.searchableFields.length > 0 && (
-                  <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:max-w-sm">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
-                      value={globalFilter}
-                      onChange={(e) => setGlobalFilter(e.target.value)}
-                      className="pl-8 pr-8 h-7 text-xs border-transparent bg-transparent focus-visible:border-border focus-visible:bg-background"
-                    />
-                    {!globalFilter && (
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
-                        <Kbd>/</Kbd>
-                      </div>
-                    )}
-                  </div>
+                  <ListSearchInput
+                    key={entity.name}
+                    variant="toolbar"
+                    placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
+                    onDebouncedChange={setDebouncedSearch}
+                  />
                 )}
               <DataTableFilterList table={table} />
               <DataTableSortList table={table} />
@@ -891,6 +1045,65 @@ export function EntityDataTable<T = Record<string, unknown>>({
             });
           }}
         />
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// ListSearchInput
+// =============================================================================
+
+/**
+ * Search input that owns its keystroke state locally and only notifies the
+ * parent with a debounced value, so typing doesn't re-render the whole table
+ * (audit plan item [d]). Remount via `key={entity.name}` clears it when
+ * navigating between entities.
+ */
+function ListSearchInput({
+  placeholder,
+  onDebouncedChange,
+  variant,
+}: {
+  placeholder: string;
+  onDebouncedChange: (value: string) => void;
+  variant: "mobile" | "toolbar";
+}) {
+  const [value, setValue] = useState("");
+  const debouncedNotify = useDebouncedCallback(onDebouncedChange, 300);
+
+  const handleChange = (next: string) => {
+    setValue(next);
+    debouncedNotify(next);
+  };
+
+  if (variant === "mobile") {
+    return (
+      <div className="relative mb-3">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          className="pl-8 h-8 text-sm"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:max-w-sm">
+      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <Input
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => handleChange(e.target.value)}
+        className="pl-8 pr-8 h-7 text-xs border-transparent bg-transparent focus-visible:border-border focus-visible:bg-background"
+      />
+      {!value && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
+          <Kbd>/</Kbd>
+        </div>
       )}
     </div>
   );
