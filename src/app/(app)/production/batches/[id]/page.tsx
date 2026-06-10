@@ -19,7 +19,6 @@
 
 import { use, useRef, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -31,7 +30,7 @@ import { BatchCancellationDialog } from "@/components/domain/batch/batch-cancell
 import { BatchBlendDialog } from "@/components/domain/batch/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/batch/vessel-transfer-dialog";
 import { StartBrewDayDialog } from "@/components/domain/brew/start-brew-day-dialog";
-import { BrewConsumptionDialog } from "@/components/domain/brew/brew-consumption-dialog";
+import { useBrewConsumptionFlow } from "@/components/domain/brew/use-brew-consumption-flow";
 import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-batch-dialog";
 import { AddToPackagingSessionDialog } from "@/components/domain/packaging/add-to-packaging-session-dialog";
@@ -71,13 +70,9 @@ export default function BatchDetailPage({
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
   const [showStartPackaging, setShowStartPackaging] = useState(false);
   const [showAddToSession, setShowAddToSession] = useState(false);
-  // Brew-day ingredient consumption (9.1): after a brew log is created we
-  // hold its id and show the consumption confirmation dialog before navigating.
-  const [pendingBrewLogId, setPendingBrewLogId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const supabase = createClient();
-  const router = useRouter();
 
   // Fetch batch data for the dialogs (use view to get vessel info)
   // The view includes target_og via b.* but generated types are stale; use type extension
@@ -109,6 +104,9 @@ export default function BatchDetailPage({
       return data as unknown as BatchDetail;
     },
   });
+
+  // Brew log → consumption confirmation → navigate (shared flow, 9.1)
+  const { handleBrewLogCreated, consumptionDialog } = useBrewConsumptionFlow(batch ?? null);
 
   // Fetch linked brew logs for banner logic and breadcrumb
   // Uses a separate key from BrewLogLinker to avoid cache shape conflicts
@@ -328,24 +326,11 @@ export default function BatchDetailPage({
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
       queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-      // With a recipe, confirm ingredient consumption (FIFO lot suggestions)
-      // before navigating to the brew log; without one there is nothing to plan.
-      if (batch?.recipe_id) {
-        setPendingBrewLogId(brewLogId);
-      } else {
-        router.push(`/production/brew-logs/${brewLogId}`);
-      }
+      // Shared flow: consumption confirmation (with recipe) or direct navigation.
+      handleBrewLogCreated(brewLogId);
     },
-    [queryClient, id, router, batch?.recipe_id]
+    [queryClient, id, handleBrewLogCreated]
   );
-
-  /** Continue to the brew log after the consumption dialog confirms/skips. */
-  const handleConsumptionDone = useCallback(() => {
-    if (pendingBrewLogId) {
-      router.push(`/production/brew-logs/${pendingBrewLogId}`);
-      setPendingBrewLogId(null);
-    }
-  }, [pendingBrewLogId, router]);
 
   /** Suggest a batch state transition via a toast confirmation. */
   const handleSuggestTransition = useCallback(async (toState: string) => {
@@ -486,21 +471,7 @@ export default function BatchDetailPage({
             onSuccess={handleBrewDayCreated}
           />
 
-          {batch.recipe_id && (
-            <BrewConsumptionDialog
-              batchId={batch.id}
-              batchNumber={batch.batch_code}
-              recipeId={batch.recipe_id}
-              batchVolumeBbl={batch.volume_bbl}
-              open={pendingBrewLogId !== null}
-              // Navigation happens in onDone (confirm and skip both call it);
-              // onOpenChange only mirrors the visual state.
-              onOpenChange={(o) => {
-                if (o) return;
-              }}
-              onDone={handleConsumptionDone}
-            />
-          )}
+          {consumptionDialog}
 
           {showStartPackaging && recipeBrand && (
             <PackagingBatchDialog

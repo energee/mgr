@@ -11,7 +11,9 @@
  * - table / viewTable agree with the registry,
  * - the chat map's searchableFields are a subset of the registry's,
  * - the column the chat map sorts by actually exists on the relation the
- *   entity service will query (parsed from the generated Supabase types).
+ *   entity service will query (parsed from the generated Supabase types),
+ * - keyFields and detailHeader field names exist as columns on that same
+ *   queried relation (viewTable ?? table).
  *
  * If this test fails after editing an entity config, update
  * src/app/api/chat/entity-map.ts (and the mapping below) to match.
@@ -141,7 +143,15 @@ describe("CHAT_ENTITY_MAP ↔ registry sync", () => {
   it("sanity: registry and schema parsing produced data", () => {
     expect(entityRegistry.size).toBeGreaterThan(0);
     expect(CHAT_ENTITY_MAP.size).toBeGreaterThan(0);
-    expect(schemaColumns.size).toBeGreaterThan(0);
+    // Guard against a supabase-gen format change silently breaking the regex
+    // parser: known tables AND a known view must have parsed with their
+    // well-known columns, not just `size > 0`.
+    for (const relation of ["batches", "orders", "inventory_lots", "batches_with_brew_info"]) {
+      expect(schemaColumns.has(relation), `relation '${relation}' did not parse from src/types/supabase.ts`).toBe(true);
+      expect(schemaColumns.get(relation)!.has("id"), `relation '${relation}' parsed without an 'id' column`).toBe(true);
+    }
+    expect(schemaColumns.get("batches")!.has("batch_code")).toBe(true);
+    expect(schemaColumns.get("orders")!.has("order_number")).toBe(true);
   });
 
   it("every chat-map key has an explicit registry mapping (and vice versa)", () => {
@@ -235,6 +245,42 @@ describe("CHAT_ENTITY_MAP ↔ registry sync", () => {
       const column = String(chatEntity.defaultSort.column);
       if (!cols.has(column)) {
         violations.push(`${key}: defaultSort column '${column}' does not exist on '${relation}'`);
+      }
+    }
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+
+  // The chat route reads detailHeader/keyFields off raw records fetched from
+  // (viewTable ?? table), so a misnamed field silently yields `undefined` in
+  // the AI context summary instead of erroring (the yeast_strain keyFields bug
+  // class). Verify each named field is a real column on the queried relation.
+  it("keyFields columns exist on the queried relation", () => {
+    const violations: string[] = [];
+    for (const { key, chatEntity } of pairedEntries) {
+      if (!chatEntity.keyFields?.length) continue;
+      const relation = chatEntity.viewTable ?? chatEntity.table;
+      const cols = schemaColumns.get(relation);
+      if (!cols) continue; // covered by the relation-existence test above
+      for (const field of chatEntity.keyFields) {
+        if (!cols.has(String(field))) {
+          violations.push(`${key}: keyFields column '${String(field)}' does not exist on '${relation}'`);
+        }
+      }
+    }
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+
+  it("detailHeader fields (title/subtitle/badge) exist on the queried relation", () => {
+    const violations: string[] = [];
+    for (const { key, chatEntity } of pairedEntries) {
+      if (!chatEntity.detailHeader) continue;
+      const relation = chatEntity.viewTable ?? chatEntity.table;
+      const cols = schemaColumns.get(relation);
+      if (!cols) continue; // covered by the relation-existence test above
+      for (const [part, field] of Object.entries(chatEntity.detailHeader)) {
+        if (field !== undefined && !cols.has(String(field))) {
+          violations.push(`${key}: detailHeader.${part} '${String(field)}' does not exist on '${relation}'`);
+        }
       }
     }
     expect(violations, violations.join("\n")).toEqual([]);

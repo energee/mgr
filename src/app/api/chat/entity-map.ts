@@ -58,7 +58,8 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
     searchableFields: ["batch_code", "name"],
     defaultSort: { column: "planned_start_date", direction: "desc" },
     detailHeader: { title: "batch_code", subtitle: "name", badge: "status" },
-    keyFields: ["volume_bbl", "planned_start_date", "brew_date", "current_vessel_name", "recipe_name"],
+    // batches_with_brew_info has no recipe name column (only recipe_id).
+    keyFields: ["volume_bbl", "planned_start_date", "brew_date", "current_vessel_name", "recipe_id"],
   })],
   ["recipe", entry({
     name: "recipe",
@@ -90,7 +91,8 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
     searchableFields: ["name"],
     defaultSort: { column: "name", direction: "asc" },
     detailHeader: { title: "name", badge: "status" },
-    keyFields: ["vessel_type", "capacity_bbl", "batch_code"],
+    // vessels_with_batch exposes the occupying batch's code as batch_number.
+    keyFields: ["vessel_type", "capacity_bbl", "batch_number"],
   })],
   ["vessel_transfer", entry({
     name: "vessel_transfer",
@@ -401,7 +403,8 @@ export const CHAT_ENTITY_MAP = new Map<string, EntityConfig<Record<string, unkno
     searchableFields: ["display_name", "email"],
     defaultSort: { column: "display_name", direction: "asc" },
     detailHeader: { title: "display_name", subtitle: "email", badge: "status" },
-    keyFields: ["role"],
+    // user_profiles stores roles as an array column, not a singular role.
+    keyFields: ["roles"],
   })],
   ["enum_value", entry({
     name: "enum_value",

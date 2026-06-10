@@ -56,7 +56,12 @@ type BrewConsumptionDialogProps = {
   recipeId: string;
   batchVolumeBbl: number | null;
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  /**
+   * Optional open-state mirror. Close always routes through skip/confirm
+   * (which call onDone), so flow-controlled callers — where `open` derives
+   * from pending state cleared by onDone — can omit this.
+   */
+  onOpenChange?: (open: boolean) => void;
   /** Called after confirm or skip — the caller continues its flow (e.g. navigate). */
   onDone: () => void;
 };
@@ -131,7 +136,7 @@ export function BrewConsumptionDialog({
       if (count > 0) {
         toast.success(`${count} ingredient allocation${count === 1 ? "" : "s"} planned for ${batchNumber}`);
       }
-      onOpenChange(false);
+      onOpenChange?.(false);
       onDone();
     },
     onError: (e) => {
@@ -141,7 +146,7 @@ export function BrewConsumptionDialog({
   });
 
   const handleSkip = () => {
-    onOpenChange(false);
+    onOpenChange?.(false);
     onDone();
   };
 
@@ -150,7 +155,7 @@ export function BrewConsumptionDialog({
   const shortfallCount = (plan ?? []).filter((l) => l.shortfall > 0).length;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(o) : handleSkip())}>
+    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange?.(o) : handleSkip())}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
