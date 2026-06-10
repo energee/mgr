@@ -33,6 +33,7 @@ import {
   AnimatedActionMenuItem,
   AnimatedLinkActionMenuItem,
 } from "@/components/universal/animated-action-menu-item";
+import { getApplicableActions } from "@/lib/entity-actions";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { memo } from "react";
 
@@ -257,21 +258,8 @@ export function buildActionsColumn<T>(
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <AnimatedLinkActionMenuItem icon="view" label="View" href={`${basePath}/${id}`} />
-            {entity.actions?.map((action) => {
-              if (action.showWhen && !action.showWhen(record)) return null;
-              if (action.fromStates) {
-                const stateField = entity.stateMachine?.stateField;
-                const currentState = stateField
-                  ? ((record as Record<string, unknown>)[
-                      stateField
-                    ] as string)
-                  : null;
-                if (
-                  !currentState ||
-                  !action.fromStates.includes(currentState)
-                )
-                  return null;
-              }
+            {/* showWhen/fromStates visibility shared with the mobile card menu */}
+            {getApplicableActions(entity, record).map((action) => {
               const disabledReason = action.disabledWhen?.(record);
               return (
                 <AnimatedActionMenuItem

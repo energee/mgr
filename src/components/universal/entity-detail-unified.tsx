@@ -33,6 +33,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
+import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { formatValue } from "@/lib/utils";
 import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
@@ -471,6 +472,17 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     onSuccess: (_data, { toState }) => {
       invalidateEntityCaches(id || "");
       triggerSync(id || "", toState);
+      // Post-transition side effects (e.g. completing a batch also confirms
+      // its planned ingredient consumption) — shared registry in
+      // services/transition-side-effects.ts. Fire-and-forget: the status
+      // update already succeeded, so only surface side-effect failures.
+      if (id) {
+        void runTransitionSideEffects(supabase, entity.table, [id], toState).then(
+          ({ error: sideEffectError }) => {
+            if (sideEffectError) toast.error(sideEffectError);
+          }
+        );
+      }
       toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
     },
     onError: (err) => {
@@ -543,6 +555,8 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
   const availableActions = useMemo(() => {
     if (!data || !entity.actions) return [];
+    // Deliberately diverges from lib/entity-actions getApplicableActions:
+    // when stateInfo is null, fromStates-gated actions stay visible here.
     return entity.actions.filter((action) => {
       if (action.showWhen && !action.showWhen(data)) return false;
       if (action.fromStates && stateInfo) {

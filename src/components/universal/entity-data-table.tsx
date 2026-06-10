@@ -45,8 +45,8 @@ import { useQueryState } from "nuqs";
 import { parseAsStringEnum } from "nuqs";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicFrom, formatServiceError } from "@/services/types";
-import { completeBatchConsumption } from "@/services/consumption-service";
+import { dynamicFrom } from "@/services/types";
+import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
@@ -140,6 +140,25 @@ export type EntityDataTableProps<T = Record<string, unknown>> = {
 const KANBAN_FETCH_CAP = 1000;
 
 /**
+ * Column ids the entity config provably places on the fetched table/view:
+ * `id` ∪ listColumns ∪ listFilters ∪ defaultSort ∪ quickFilter sort columns.
+ * Shared core for the safe ORDER BY targets (orderableColumnIds) and the
+ * select-list projection (buildSelectList, which extends it).
+ */
+function configColumnIds<T>(entity: EntityConfig<T>): Set<string> {
+  const ids = new Set<string>(["id"]);
+  for (const c of entity.listColumns) {
+    if (c.accessorKey) ids.add(c.accessorKey as string);
+  }
+  for (const f of entity.listFilters ?? []) ids.add(f.field);
+  if (entity.defaultSort) ids.add(entity.defaultSort.column);
+  for (const qf of entity.quickFilters ?? []) {
+    if (qf.sort) ids.add(qf.sort.column);
+  }
+  return ids;
+}
+
+/**
  * Build the PostgREST select list for the list query from entity config.
  *
  * Projection is only safe when no code path can read arbitrary row fields.
@@ -150,9 +169,8 @@ const KANBAN_FETCH_CAP = 1000;
  * - a delete action exists without `detailHeader.title` (delete dialog falls
  *   back to reading `record.name`, which we can't prove exists)
  *
- * Otherwise projects: id ∪ stateField ∪ detailHeader.title ∪ listColumns
- * ∪ listFilters ∪ searchableFields ∪ sort columns ∪ quickFilter columns
- * ∪ prop-filter keys.
+ * Otherwise projects configColumnIds ∪ stateField ∪ detailHeader.title
+ * ∪ searchableFields ∪ quickFilter filter columns ∪ prop-filter keys.
  */
 function buildSelectList<T>(
   entity: EntityConfig<T>,
@@ -164,17 +182,11 @@ function buildSelectList<T>(
   if (entity.actions?.some((a) => a.handler || a.showWhen || a.disabledWhen)) return "*";
   if (entity.actions?.some((a) => a.deleteMode) && !entity.detailHeader?.title) return "*";
 
-  const cols = new Set<string>(["id"]);
+  const cols = configColumnIds(entity);
   if (entity.stateMachine) cols.add(entity.stateMachine.stateField as string);
   if (entity.detailHeader?.title) cols.add(entity.detailHeader.title as string);
-  for (const c of entity.listColumns) {
-    if (c.accessorKey) cols.add(c.accessorKey as string);
-  }
-  for (const f of entity.listFilters ?? []) cols.add(f.field);
   for (const s of entity.searchableFields ?? []) cols.add(s as string);
-  if (entity.defaultSort) cols.add(entity.defaultSort.column);
   for (const qf of entity.quickFilters ?? []) {
-    if (qf.sort) cols.add(qf.sort.column);
     for (const f of qf.filters) cols.add(f.column);
   }
   for (const k of Object.keys(propFilters ?? {})) cols.add(k);
@@ -311,25 +323,16 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
       toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
 
-      // Batch-completion special case: completing a batch must also flip its
-      // planned brew-day ingredient allocations to completed so inventory is
-      // actually depleted. The batch detail page does this by intercepting the
-      // "complete" action and calling completeBatchConsumption; kanban drag,
-      // list-row actions, and the mobile card menu land here instead and would
-      // otherwise bypass it. A config-level onTransition hook was considered
-      // and removed as dead code — with a single consumer, a documented
-      // special case is simpler. Fire-and-forget: the status update already
-      // succeeded, so only surface consumption failures (mirrors the detail
-      // page's error handling).
-      if (entity.table === "batches" && toState === "completed") {
-        void completeBatchConsumption(supabase, id).then((result) => {
-          if (!result.success) {
-            toast.error(
-              `Batch completed, but confirming ingredient consumption failed: ${formatServiceError(result.error)}`
-            );
-          }
-        });
-      }
+      // Post-transition side effects (e.g. completing a batch also confirms
+      // its planned ingredient consumption) live in the shared registry in
+      // services/transition-side-effects.ts so every transition path runs
+      // them. Fire-and-forget: the status update already succeeded, so only
+      // surface side-effect failures.
+      void runTransitionSideEffects(supabase, entity.table, [id], toState).then(
+        ({ error: sideEffectError }) => {
+          if (sideEffectError) toast.error(sideEffectError);
+        }
+      );
 
       // Background reconcile — the row may now fall outside active filters or
       // belong on another page; the optimistic row keeps the UI instant.
@@ -619,18 +622,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
   // Columns known to exist on the fetched table/view (the config renders/filters
   // them), i.e. safe targets for a server-side ORDER BY.
-  const orderableColumnIds = useMemo(() => {
-    const ids = new Set<string>(["id"]);
-    for (const c of entity.listColumns) {
-      if (c.accessorKey) ids.add(c.accessorKey as string);
-    }
-    for (const f of entity.listFilters ?? []) ids.add(f.field);
-    if (entity.defaultSort) ids.add(entity.defaultSort.column);
-    for (const qf of entity.quickFilters ?? []) {
-      if (qf.sort) ids.add(qf.sort.column);
-    }
-    return ids;
-  }, [entity]);
+  const orderableColumnIds = useMemo(() => configColumnIds(entity), [entity]);
 
   // Server-side ORDER BY derived from TanStack sorting state. Falls back to
   // the entity's defaultSort, and always appends a unique `id` tiebreaker so
@@ -903,6 +895,15 @@ export function EntityDataTable<T = Record<string, unknown>>({
         throw error;
       }
 
+      // Post-transition side effects for the rows that actually transitioned
+      // (see services/transition-side-effects.ts). Fire-and-forget: the bulk
+      // update already succeeded, so only surface side-effect failures.
+      void runTransitionSideEffects(supabase, entity.table, validIds, targetStatus).then(
+        ({ error: sideEffectError }) => {
+          if (sideEffectError) toast.error(sideEffectError);
+        }
+      );
+
       // Invalidate queries
       queryClient.invalidateQueries({
         queryKey: entityKeys.all(fetchTable),
@@ -1032,14 +1033,24 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
         {isLoading ? (
           <LoadingSkeleton columnCount={entity.listColumns.length + 1} />
-        ) : viewMode === "board" && entity.kanbanConfig ? (
-          <EntityKanban
-            entity={entity}
-            data={rows}
-            basePath={path}
-            onTransition={handleSingleTransition}
-          />
-        ) : isMobile ? (
+        ) : isBoardView ? (
+          <>
+            <EntityKanban
+              entity={entity}
+              data={rows}
+              basePath={path}
+              onTransition={handleSingleTransition}
+            />
+            {/* Board fetches are capped at KANBAN_FETCH_CAP — tell the user
+                when the cap truncated the dataset instead of failing silently */}
+            {totalCount != null && totalCount > rows.length && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Showing first {rows.length.toLocaleString()} of{" "}
+                {totalCount.toLocaleString()} — narrow filters to see all
+              </p>
+            )}
+          </>
+        ) : fetchMode === "mobile" ? (
           <>
             {/* Mobile toolbar: search + filter/sort sheet (audit 10.3) */}
             <div className="mb-3 flex items-center gap-2">

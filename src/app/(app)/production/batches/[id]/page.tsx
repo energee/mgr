@@ -13,7 +13,8 @@
  * - Start Brew Day chains into BrewConsumptionDialog, which plans FIFO
  *   ingredient allocations (inventory_lot -> batch, status planned).
  * - The Complete action is intercepted so those planned allocations are
- *   flipped to completed alongside the status change.
+ *   flipped to completed alongside the status change (shared registry:
+ *   services/transition-side-effects.ts).
  */
 
 import { use, useRef, useState, useCallback, useMemo } from "react";
@@ -31,8 +32,7 @@ import { BatchBlendDialog } from "@/components/domain/batch/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/batch/vessel-transfer-dialog";
 import { StartBrewDayDialog } from "@/components/domain/brew/start-brew-day-dialog";
 import { BrewConsumptionDialog } from "@/components/domain/brew/brew-consumption-dialog";
-import { completeBatchConsumption } from "@/services/consumption-service";
-import { formatServiceError } from "@/services/types";
+import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-batch-dialog";
 import { AddToPackagingSessionDialog } from "@/components/domain/packaging/add-to-packaging-session-dialog";
 import { BatchPackagingHistory } from "@/components/domain/batch/batch-packaging-history";
@@ -240,30 +240,42 @@ export default function BatchDetailPage({
 
   /**
    * Complete the batch and confirm its planned brew-day consumption:
-   * transitions status to completed, then flips planned inventory_lot→batch
-   * allocations to completed so ingredient inventory is actually depleted.
+   * transitions status to completed (guarded on the loaded status so a
+   * concurrent change by another user matches 0 rows instead of clobbering),
+   * then runs the shared transition side effects
+   * (services/transition-side-effects.ts), which flip planned
+   * inventory_lot→batch allocations to completed so ingredient inventory is
+   * actually depleted.
    */
   const completeBatch = useCallback(async () => {
+    if (!batch) return;
     const client = createClient();
-    const { error } = await client
+    const { data: updated, error } = await client
       .from("batches")
       .update({ status: "completed" })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("status", batch.status)
+      .select("id");
     if (error) {
       toast.error(`Failed to complete batch: ${error.message}`);
       return;
     }
-    const result = await completeBatchConsumption(client, id);
-    if (!result.success) {
-      toast.error(`Batch completed, but confirming ingredient consumption failed: ${formatServiceError(result.error)}`);
-    } else if (result.data > 0) {
-      toast.success(`Batch completed — ${result.data} ingredient allocation${result.data === 1 ? "" : "s"} confirmed`);
+    if (!updated || updated.length === 0) {
+      toast.error("Transition no longer valid — status may have changed");
+      queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+      return;
+    }
+    const sideEffects = await runTransitionSideEffects(client, "batches", [id], "completed");
+    if (sideEffects.error) {
+      toast.error(sideEffects.error);
+    } else if (sideEffects.completedAllocations > 0) {
+      toast.success(`Batch completed — ${sideEffects.completedAllocations} ingredient allocation${sideEffects.completedAllocations === 1 ? "" : "s"} confirmed`);
     } else {
       toast.success("Batch completed");
     }
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
     queryClient.invalidateQueries({ queryKey: batchKeys.all() });
-  }, [id, queryClient]);
+  }, [id, queryClient, batch]);
 
   // Custom action handler for batch-specific actions.
   // Returns true when the action is handled by a dialog, false to let EntityDetail handle it.

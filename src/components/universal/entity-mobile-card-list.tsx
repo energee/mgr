@@ -16,8 +16,9 @@
  *
  * Each card gets a trailing three-dot menu (≥40px hit area) exposing
  * the record's applicable entity actions — state transitions and
- * custom/button actions, filtered by showWhen/fromStates exactly like
- * the desktop actions column (audit 10.2). Transitions are dispatched
+ * custom/button actions, filtered by the same getApplicableActions
+ * helper (lib/entity-actions) as the desktop actions column
+ * (audit 10.2). Transitions are dispatched
  * through the parent's handleSingleTransition so the optimistic
  * cache update + race guard are shared, not duplicated.
  *
@@ -34,6 +35,7 @@ import type { EntityConfig, EntityColumnDef, EntityActionDef } from "@/types/ent
 import { StatusBadge } from "@/components/universal/status-badge";
 import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
 import { formatValue } from "@/lib/utils";
+import { getApplicableActions } from "@/lib/entity-actions";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -240,28 +242,6 @@ export function EntityMobileCardList({
       )}
     </div>
   );
-}
-
-/**
- * Compute the entity actions applicable to a row, mirroring the filtering the
- * desktop actions column applies (showWhen + fromStates; see
- * buildActionsColumn in components/data-table/adapter.tsx).
- */
-function getApplicableActions(
-  entity: EntityConfig<Record<string, unknown>>,
-  row: Record<string, unknown>,
-): EntityActionDef<Record<string, unknown>>[] {
-  return (entity.actions ?? []).filter((action) => {
-    if (action.showWhen && !action.showWhen(row)) return false;
-    if (action.fromStates) {
-      const stateField = entity.stateMachine?.stateField as string | undefined;
-      const currentState = stateField ? (row[stateField] as string) : null;
-      if (!currentState || !action.fromStates.includes(currentState)) {
-        return false;
-      }
-    }
-    return true;
-  });
 }
 
 /**
