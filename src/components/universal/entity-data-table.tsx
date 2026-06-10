@@ -19,15 +19,28 @@
  * - Column projection: the select list is derived from entity config when
  *   provably safe; falls back to "*" when custom renderers/action predicates
  *   may read arbitrary row fields (see buildSelectList)
+ * - State transitions (row actions, kanban drag, mobile card menu) update the
+ *   paged-list cache optimistically with rollback on failure, guarded by a
+ *   state-conditioned UPDATE instead of a pre-SELECT (see handleSingleTransition)
+ * - Mobile: card list (EntityMobileCardList) with a toolbar exposing search
+ *   plus the same filter/sort controls in a bottom sheet (MobileFilterSheet);
+ *   coarse-pointer devices (tablets keep the desktop table) get enlarged
+ *   touch targets via useIsTouch
  */
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ColumnDef, SortingState, PaginationState, VisibilityState } from "@tanstack/react-table";
+import type {
+  ColumnDef,
+  SortingState,
+  PaginationState,
+  VisibilityState,
+  Table as TanstackTable,
+} from "@tanstack/react-table";
 import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
 import { usePersistedPageSize } from "@/hooks/use-persisted-page-size";
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData, type QueryKey } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
 import { parseAsStringEnum } from "nuqs";
 import { toast } from "sonner";
@@ -55,7 +68,7 @@ import {
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 import { useKeyboardShortcuts, type KeyboardShortcut } from "@/hooks/use-keyboard-shortcuts";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile, useIsTouch } from "@/hooks/use-mobile";
 import { generateId } from "@/lib/id";
 import { EntityMobileCardList } from "./entity-mobile-card-list";
 
@@ -64,12 +77,27 @@ import { DataTableAdvancedToolbar } from "@/components/data-table/data-table-adv
 import { DataTableFilterList } from "@/components/data-table/data-table-filter-list";
 import { DataTableSortList } from "@/components/data-table/data-table-sort-list";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Inbox, LayoutList, Kanban as KanbanIcon } from "lucide-react";
+import {
+  Search,
+  Inbox,
+  LayoutList,
+  Kanban as KanbanIcon,
+  SlidersHorizontal,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -180,50 +208,109 @@ export function EntityDataTable<T = Record<string, unknown>>({
   );
 
   const isMobile = useIsMobile();
+  const isTouch = useIsTouch();
   const hasBulkActions = !!entity.stateMachine;
   const fetchTable = entity.viewTable || entity.table;
 
   // ---------------------------------------------------------------------------
-  // Single item state transition (used by kanban drag-and-drop + row actions)
+  // Single item state transition (used by kanban drag-and-drop, row actions,
+  // and the mobile card action menu)
   // ---------------------------------------------------------------------------
+
+  /** Cache shape of the paged list query (see queryFn below). */
+  type PagedListData = { rows: T[]; totalCount: number | null };
+
+  // Latest paged-list query key. Assigned each render (right where the key is
+  // built, below) so this handler — which must be defined before the query to
+  // be usable in the columns memo — can target the active cache entry.
+  const listQueryKeyRef = useRef<QueryKey | null>(null);
+
+  /**
+   * Transition a single record to `toState`, optimistically flipping the row
+   * in the paged-list cache (rolled back on failure) so the UI updates without
+   * waiting for a refetch (audit 10.4). No pre-SELECT: the row's current state
+   * is read from the page cache, and the UPDATE is guarded by a WHERE on that
+   * state (`.in(validFromStates)` when the row isn't cached) so a concurrent
+   * change by another user matches 0 rows instead of clobbering.
+   */
   const handleSingleTransition = useCallback(
     async (id: string, toState: string) => {
       if (!entity.stateMachine) return;
 
-      const stateField = entity.stateMachine.stateField;
+      const stateField = entity.stateMachine.stateField as string;
       const transitions = entity.stateMachine.transitions;
 
-      const loadingId = toast.loading("Updating status...");
+      // Source states from which `toState` is reachable (server-side guard
+      // when the row's current state isn't in the cache)
+      const validFromStates = Object.keys(transitions).filter((s) =>
+        transitions[s]?.includes(toState)
+      );
 
-      // Validate transition is allowed before hitting the database
-      const { data: current } = await dynamicFrom(supabase, entity.table)
-        .select(stateField)
-        .eq("id", id)
-        .single();
+      const listKey = listQueryKeyRef.current;
+      const cachedRow = (listKey
+        ? queryClient.getQueryData<PagedListData>(listKey)?.rows
+        : undefined
+      )?.find((r) => (r as Record<string, unknown>).id === id) as
+        | Record<string, unknown>
+        | undefined;
+      const currentState = cachedRow?.[stateField] as string | undefined;
 
-      const currentState = current?.[stateField] as string | undefined;
-      if (!currentState || !transitions[currentState]?.includes(toState)) {
-        toast.dismiss(loadingId);
+      if (
+        validFromStates.length === 0 ||
+        (currentState && !transitions[currentState]?.includes(toState))
+      ) {
         toast.error("Transition no longer valid — status may have changed");
         queryClient.invalidateQueries({ queryKey: entityKeys.all(fetchTable) });
         return;
       }
 
-      // Include current state in WHERE to prevent race conditions:
-      // if another user changed the state between our SELECT and UPDATE,
-      // this UPDATE will match 0 rows, and .select() returns an empty array.
-      const { data: _updated, error } = await dynamicFrom(supabase, entity.table)
+      // Optimistic update: flip the row's state in the page cache immediately
+      let previous: PagedListData | undefined;
+      if (listKey && cachedRow) {
+        await queryClient.cancelQueries({ queryKey: listKey });
+        previous = queryClient.getQueryData<PagedListData>(listKey);
+        queryClient.setQueryData<PagedListData>(listKey, (old) =>
+          old
+            ? {
+                ...old,
+                rows: old.rows.map((r) =>
+                  (r as Record<string, unknown>).id === id
+                    ? ({ ...r, [stateField]: toState } as T)
+                    : r
+                ),
+              }
+            : old
+        );
+      }
+      const rollback = () => {
+        if (listKey && previous) queryClient.setQueryData(listKey, previous);
+      };
+
+      // State-guarded UPDATE — 0 rows affected means another user changed the
+      // state between render and click (race guard without a pre-SELECT)
+      let update = dynamicFrom(supabase, entity.table)
         .update({ [stateField]: toState })
-        .eq("id", id)
-        .eq(stateField, currentState)
-        .select("id");
+        .eq("id", id);
+      update = currentState
+        ? update.eq(stateField, currentState)
+        : update.in(stateField, validFromStates);
+      const { data: updated, error } = await update.select("id");
 
       if (error) {
-        toast.dismiss(loadingId);
+        rollback();
         toast.error("Failed to update status");
         return;
       }
+      if (!updated || updated.length === 0) {
+        rollback();
+        toast.error("Transition no longer valid — status may have changed");
+        queryClient.invalidateQueries({ queryKey: entityKeys.all(fetchTable) });
+        return;
+      }
 
+      toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
+      // Background reconcile — the row may now fall outside active filters or
+      // belong on another page; the optimistic row keeps the UI instant.
       queryClient.invalidateQueries({
         queryKey: entityKeys.all(fetchTable),
       });
@@ -232,9 +319,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
           queryKey: entityKeys.all(entity.table),
         });
       }
-
-      toast.dismiss(loadingId);
-      toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
     },
     [entity, supabase, queryClient, fetchTable],
   );
@@ -561,22 +645,28 @@ export function EntityDataTable<T = Record<string, unknown>>({
         ? mobilePages * pagination.pageSize - 1
         : rangeFrom + pagination.pageSize - 1;
 
+  // Exact key of the active list query. Mirrored into listQueryKeyRef so
+  // handleSingleTransition (defined above, before the query) can apply
+  // optimistic updates to this cache entry at event time.
+  const listQueryKey = entityKeys.pagedList(
+    fetchTable,
+    {
+      ...filters,
+      ...filterKey,
+      search: debouncedSearch || undefined,
+    },
+    {
+      mode: fetchMode,
+      from: rangeFrom,
+      to: rangeTo,
+      order: orderSpec,
+      select: selectList,
+    }
+  );
+  listQueryKeyRef.current = listQueryKey;
+
   const { data, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: entityKeys.pagedList(
-      fetchTable,
-      {
-        ...filters,
-        ...filterKey,
-        search: debouncedSearch || undefined,
-      },
-      {
-        mode: fetchMode,
-        from: rangeFrom,
-        to: rangeTo,
-        order: orderSpec,
-        select: selectList,
-      }
-    ),
+    queryKey: listQueryKey,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     // Keep showing the previous page while the next one loads (no flash on
     // page/sort/filter changes) — but never across different tables, so an
@@ -840,9 +930,11 @@ export function EntityDataTable<T = Record<string, unknown>>({
         <div className="flex items-center gap-2">
           {entity.stateMachine && entity.kanbanConfig && (
             <div className="flex gap-0.5">
+              {/* Touch devices get ≥40px hit areas (audit 10.1) */}
               <Button
                 variant={viewMode === "table" ? "secondary" : "ghost"}
                 size="icon-xs"
+                className={cn(isTouch && "size-10")}
                 onClick={() => setViewMode("table")}
                 aria-label="Table view"
                 aria-pressed={viewMode === "table"}
@@ -852,6 +944,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
               <Button
                 variant={viewMode === "board" ? "secondary" : "ghost"}
                 size="icon-xs"
+                className={cn(isTouch && "size-10")}
                 onClick={() => setViewMode("board")}
                 aria-label="Board view"
                 aria-pressed={viewMode === "board"}
@@ -861,7 +954,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
             </div>
           )}
           {showCreate && (
-            <Button variant="ghost" size="sm" asChild={!onCreateClick} onClick={onCreateClick}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(isTouch && "h-10 px-3")}
+              asChild={!onCreateClick}
+              onClick={onCreateClick}
+            >
               {onCreateClick ? (
                 <>
                   <span className="text-lg leading-none">+</span>
@@ -920,15 +1019,22 @@ export function EntityDataTable<T = Record<string, unknown>>({
           />
         ) : isMobile ? (
           <>
-            {/* Search bar for mobile */}
-            {entity.searchableFields && entity.searchableFields.length > 0 && (
-              <ListSearchInput
-                key={entity.name}
-                variant="mobile"
-                placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
-                onDebouncedChange={setDebouncedSearch}
+            {/* Mobile toolbar: search + filter/sort sheet (audit 10.3) */}
+            <div className="mb-3 flex items-center gap-2">
+              {entity.searchableFields && entity.searchableFields.length > 0 && (
+                <ListSearchInput
+                  key={entity.name}
+                  variant="mobile"
+                  isTouch={isTouch}
+                  placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
+                  onDebouncedChange={setDebouncedSearch}
+                />
+              )}
+              <MobileFilterSheet
+                table={table}
+                activeFilterCount={urlFilters.length}
               />
-            )}
+            </div>
             <EntityMobileCardList
               entity={entity as EntityConfig<Record<string, unknown>>}
               data={rows as Record<string, unknown>[]}
@@ -939,11 +1045,30 @@ export function EntityDataTable<T = Record<string, unknown>>({
               hasMore={totalCount != null && rows.length < totalCount}
               isLoadingMore={isFetching}
               onLoadMore={() => setMobilePages((n) => n + 1)}
+              onTransition={handleSingleTransition}
+              onAction={
+                onAction as
+                  | ((actionName: string, record: Record<string, unknown>) => boolean)
+                  | undefined
+              }
+              onDeleteAction={(record, action) =>
+                setDeleteTarget({
+                  record: record as T,
+                  action: action as EntityActionDef<T>,
+                })
+              }
             />
           </>
         ) : (
           <DataTable
             table={table}
+            // Touch ergonomics (audit 10.1): tablets ≥768px keep the desktop
+            // table but get taller rows and ≥40px hit areas on row buttons
+            // (e.g. the actions menu trigger) when the pointer is coarse.
+            className={cn(
+              isTouch &&
+                "[&_td]:py-3 [&_th]:h-10 [&_td_button]:min-h-10 [&_td_button]:min-w-10"
+            )}
             onRowClick={handleRowClick}
             actionBar={
               hasBulkActions && selectedRows.length > 0 && hasValidBulkTransitions ? (
@@ -1010,6 +1135,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
                   <ListSearchInput
                     key={entity.name}
                     variant="toolbar"
+                    isTouch={isTouch}
                     placeholder={`Search ${entity.displayNamePlural.toLowerCase()}...`}
                     onDebouncedChange={setDebouncedSearch}
                   />
@@ -1058,16 +1184,19 @@ export function EntityDataTable<T = Record<string, unknown>>({
  * Search input that owns its keystroke state locally and only notifies the
  * parent with a debounced value, so typing doesn't re-render the whole table
  * (audit plan item [d]). Remount via `key={entity.name}` clears it when
- * navigating between entities.
+ * navigating between entities. `isTouch` bumps the input to h-9 so the tap
+ * target is comfortable on coarse-pointer devices (audit 10.1).
  */
 function ListSearchInput({
   placeholder,
   onDebouncedChange,
   variant,
+  isTouch,
 }: {
   placeholder: string;
   onDebouncedChange: (value: string) => void;
   variant: "mobile" | "toolbar";
+  isTouch?: boolean;
 }) {
   const [value, setValue] = useState("");
   const debouncedNotify = useDebouncedCallback(onDebouncedChange, 300);
@@ -1079,13 +1208,13 @@ function ListSearchInput({
 
   if (variant === "mobile") {
     return (
-      <div className="relative mb-3">
+      <div className="relative flex-1">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
           placeholder={placeholder}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
-          className="pl-8 h-8 text-sm"
+          className={cn("pl-8 text-sm", isTouch ? "h-9" : "h-8")}
         />
       </div>
     );
@@ -1098,7 +1227,10 @@ function ListSearchInput({
         placeholder={placeholder}
         value={value}
         onChange={(e) => handleChange(e.target.value)}
-        className="pl-8 pr-8 h-7 text-xs border-transparent bg-transparent focus-visible:border-border focus-visible:bg-background"
+        className={cn(
+          "pl-8 pr-8 border-transparent bg-transparent focus-visible:border-border focus-visible:bg-background",
+          isTouch ? "h-9 text-sm" : "h-7 text-xs"
+        )}
       />
       {!value && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
@@ -1106,6 +1238,61 @@ function ListSearchInput({
         </div>
       )}
     </div>
+  );
+}
+
+// =============================================================================
+// MobileFilterSheet
+// =============================================================================
+
+/**
+ * Mobile entry point for advanced filters + sorting (audit 10.3). The desktop
+ * toolbar (DataTableAdvancedToolbar) only renders alongside the table view, so
+ * below the mobile breakpoint this exposes the same DataTableFilterList /
+ * DataTableSortList — bound to the same table instance and nuqs URL state —
+ * inside a bottom sheet. The trigger shows an active-filter count badge.
+ */
+function MobileFilterSheet<TData>({
+  table,
+  activeFilterCount,
+}: {
+  table: TanstackTable<TData>;
+  activeFilterCount: number;
+}) {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative ml-auto size-10 shrink-0"
+          aria-label={
+            activeFilterCount > 0
+              ? `Filters and sorting (${activeFilterCount} active)`
+              : "Filters and sorting"
+          }
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          {activeFilterCount > 0 && (
+            <Badge className="absolute -right-1.5 -top-1.5 h-4 min-w-4 rounded-full px-1 text-[10px]">
+              {activeFilterCount}
+            </Badge>
+          )}
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="bottom" className="max-h-[80svh] overflow-y-auto">
+        <SheetHeader className="text-left">
+          <SheetTitle>Filters &amp; sorting</SheetTitle>
+          <SheetDescription>
+            Changes apply to the list immediately.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col items-start gap-3 px-4 pb-6">
+          <DataTableFilterList table={table} />
+          <DataTableSortList table={table} />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
