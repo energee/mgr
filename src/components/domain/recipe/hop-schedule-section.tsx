@@ -3,22 +3,20 @@
 /**
  * HopScheduleSection - Section wrapper for HopScheduleEditor in recipe detail view.
  *
- * Fetches recipe_hops junction data, manages local state with dirty tracking,
- * and saves via delete-all + insert-new pattern.
+ * Uses useRecipeChildRows for the recipe_hops fetch/dirty/delete-all-reinsert
+ * save cycle, and registers with the recipe editor's saver registry.
  * Passes batchSizeGal and estimatedOG to the editor for IBU calculations.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect } from "react";
 import { recipeKeys } from "@/lib/query-keys";
+import { useRecipeChildRows } from "@/hooks/use-recipe-child-rows";
 import {
   HopScheduleEditor,
   type HopScheduleItem,
 } from "@/components/domain/recipe/hop-schedule-editor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
-import { toast } from "sonner";
 
 /** Barrels to gallons conversion factor */
 const BBL_TO_GAL = 31.0;
@@ -36,22 +34,15 @@ type HopScheduleSectionProps = {
 
 export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleSectionProps) {
   const recipeId = data.id;
-  const supabase = createClient();
-  const queryClient = useQueryClient();
 
   const batchSizeGal = (data.batch_size_bbl ?? 0) * BBL_TO_GAL || 5;
   const estimatedOG = data.est_og ?? 1.05;
 
-  const [hopItems, setHopItems] = useState<HopScheduleItem[]>([]);
-  const [hopDirty, setHopDirty] = useState(false);
-
-  const { data: fetchedHops, isLoading } = useQuery({
-    queryKey: recipeKeys.hopSchedule(recipeId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_hops")
-        .select(
-          `
+  const { items: hopItems, dirty, update, save, isLoading, isPending } =
+    useRecipeChildRows<HopScheduleItem & { hops: HopScheduleItem["hop"] }, HopScheduleItem>({
+      recipeId,
+      table: "recipe_hops",
+      select: `
           id,
           hop_id,
           weight_oz,
@@ -67,92 +58,39 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
             flavor_profile,
             bag_weight_lbs
           )
-        `
-        )
-        .eq("recipe_id", recipeId)
-        .order("position", { ascending: true });
-      if (error) throw error;
-      return data as unknown as (HopScheduleItem & {
-        hops: HopScheduleItem["hop"];
-      })[];
-    },
-  });
-
-  // Sync fetched data to local state
-  const [prevHops, setPrevHops] = useState(fetchedHops);
-  if (fetchedHops && fetchedHops !== prevHops) {
-    setPrevHops(fetchedHops);
-    const mapped = fetchedHops.map((h) => ({
-      id: h.id,
-      hop_id: h.hop_id,
-      weight_oz: h.weight_oz,
-      timing: h.timing,
-      boil_time_min: h.boil_time_min,
-      position: h.position,
-      hop: h.hops,
-    }));
-    setHopItems(mapped);
-    setHopDirty(false);
-  }
+        `,
+      queryKey: recipeKeys.hopSchedule(recipeId),
+      errorLabel: "hop schedule",
+      mapRow: (h) => ({
+        id: h.id,
+        hop_id: h.hop_id,
+        weight_oz: h.weight_oz,
+        timing: h.timing,
+        boil_time_min: h.boil_time_min,
+        position: h.position,
+        hop: h.hops,
+      }),
+      toInsert: (item) => ({
+        hop_id: item.hop_id,
+        weight_oz: item.weight_oz,
+        timing: item.timing,
+        boil_time_min: item.boil_time_min,
+      }),
+      // Validate: reject zero or negative weight entries
+      validate: (items) => {
+        const invalidItems = items.filter((item) => item.weight_oz <= 0);
+        if (invalidItems.length === 0) return null;
+        const names = invalidItems.map((item) => item.hop?.name || "Unknown").join(", ");
+        return `Cannot save hop schedule: ${names} ${invalidItems.length === 1 ? "has" : "have"} zero or negative weight`;
+      },
+    });
 
   // Notify parent of data changes via effect (avoids setState-during-render)
   useEffect(() => {
     onDataChange?.(hopItems);
   }, [hopItems, onDataChange]);
 
-  const handleChange = (items: HopScheduleItem[]) => {
-    setHopItems(items);
-    setHopDirty(true);
-  };
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      // Validate: reject zero or negative weight entries
-      const invalidItems = hopItems.filter((item) => item.weight_oz <= 0);
-      if (invalidItems.length > 0) {
-        const names = invalidItems.map((item) => item.hop?.name || "Unknown").join(", ");
-        throw new Error(`Cannot save hop schedule: ${names} ${invalidItems.length === 1 ? "has" : "have"} zero or negative weight`);
-      }
-
-      const { error: deleteError } = await supabase
-        .from("recipe_hops")
-        .delete()
-        .eq("recipe_id", recipeId);
-      if (deleteError) throw deleteError;
-
-      if (hopItems.length > 0) {
-        const insertData = hopItems.map((item, index) => ({
-          recipe_id: recipeId,
-          hop_id: item.hop_id,
-          weight_oz: item.weight_oz,
-          timing: item.timing,
-          boil_time_min: item.boil_time_min,
-          position: index,
-        }));
-        const { error: insertError } = await supabase
-          .from("recipe_hops")
-          .insert(insertData);
-        if (insertError) throw insertError;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: recipeKeys.hopSchedule(recipeId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: recipeKeys.detail(recipeId),
-      });
-      setHopDirty(false);
-    },
-    onError: (error) => {
-      toast.error("Failed to save hop schedule: " + error.message);
-    },
-  });
-
-  useRegisterSaver("hop-schedule", Boolean(editing && hopDirty), useCallback(async () => {
-    if (!hopDirty) return;
-    await saveMutation.mutateAsync();
-  }, [hopDirty, saveMutation]));
+  useRegisterSaver("hop-schedule", Boolean(editing && dirty), save);
 
   if (isLoading) {
     return (
@@ -168,8 +106,8 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
     <div className="space-y-4">
       <HopScheduleEditor
         items={hopItems}
-        onChange={handleChange}
-        disabled={!editing || saveMutation.isPending}
+        onChange={update}
+        disabled={!editing || isPending}
         batchSizeGal={batchSizeGal}
         estimatedOG={estimatedOG}
       />

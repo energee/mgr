@@ -5,8 +5,10 @@
  *
  * Renders collapsible cards for each variant with inline editing of name,
  * description, planned volume, and addition tables (hops, adjuncts, fruits,
- * spices). Uses the delete-all + insert save pattern for consistency with
- * other recipe editors.
+ * spices). All four addition tables share the column-spec-driven
+ * AdditionSection (hops add a `days` column and non-nullable timing) and the
+ * shared CatalogPicker. Uses the delete-all + insert save pattern for
+ * consistency with other recipe editors.
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -25,19 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { CatalogPicker } from "@/components/domain/recipe/catalog-picker";
 import {
   Collapsible,
   CollapsibleContent,
@@ -108,25 +98,39 @@ type VariantSpiceItem = {
   position: number;
 }
 
-type SimpleAdditionItem = VariantAdjunctItem | VariantFruitItem | VariantSpiceItem;
+type AdditionItem =
+  | VariantHopItem
+  | VariantAdjunctItem
+  | VariantFruitItem
+  | VariantSpiceItem;
 
-type SimpleAdditionType = "adjuncts" | "fruits" | "spices";
+type AdditionType = "hops" | "adjuncts" | "fruits" | "spices";
 
-/** Clone a variant with a modified simple-addition array (adjuncts, fruits, or spices). */
+/** Clone a variant with a modified addition array (hops, adjuncts, fruits, or spices). */
 function withUpdatedAdditions(
   variant: VariantItem,
-  type: SimpleAdditionType,
-  updater: (items: SimpleAdditionItem[]) => SimpleAdditionItem[]
+  type: AdditionType,
+  updater: (items: AdditionItem[]) => AdditionItem[]
 ): VariantItem {
   return { ...variant, [type]: updater(variant[type]) };
 }
 
 /** Create a new empty addition item for the given type. */
-function newSimpleAddition(
-  type: SimpleAdditionType,
+function newAddition(
+  type: AdditionType,
   catalog: SimpleAdditionCatalog,
   position: number
-): SimpleAdditionItem {
+): AdditionItem {
+  if (type === "hops") {
+    return {
+      hop_id: catalog.id,
+      hop_name: catalog.name,
+      weight_oz: 0,
+      timing: "dry_hop",
+      days: null,
+      position,
+    };
+  }
   const base = { amount: 0, unit: "oz" as const, timing: null, position };
   switch (type) {
     case "adjuncts":
@@ -176,6 +180,55 @@ const UNIT_OPTIONS = [
   { value: "ml", label: "mL" },
   { value: "l", label: "L" },
   { value: "each", label: "each" },
+];
+
+/**
+ * Declarative column spec for an addition table. Hops add a `days` column and
+ * a non-nullable timing select; the simple additions share amount/unit/timing.
+ */
+type AdditionColumn =
+  | {
+      kind: "number";
+      field: string;
+      header: string;
+      inputClass: string;
+      step?: string;
+      /** Nullable columns parse as int-or-null (e.g. days); others float-or-0. */
+      nullable?: boolean;
+      placeholder?: string;
+    }
+  | { kind: "unit"; header: string }
+  | { kind: "timing"; header: string; allowNone: boolean };
+
+const SIMPLE_ADDITION_COLUMNS: AdditionColumn[] = [
+  {
+    kind: "number",
+    field: "amount",
+    header: "Amount",
+    step: "0.25",
+    inputClass: "w-20 text-right",
+  },
+  { kind: "unit", header: "Unit" },
+  { kind: "timing", header: "Timing", allowNone: true },
+];
+
+const HOP_ADDITION_COLUMNS: AdditionColumn[] = [
+  {
+    kind: "number",
+    field: "weight_oz",
+    header: "Oz",
+    step: "0.25",
+    inputClass: "w-20 text-right",
+  },
+  { kind: "timing", header: "Timing", allowNone: false },
+  {
+    kind: "number",
+    field: "days",
+    header: "Days",
+    nullable: true,
+    inputClass: "w-16 text-right",
+    placeholder: "--",
+  },
 ];
 
 // ── Catalog types ───────────────────────────────────────────────────────────
@@ -509,69 +562,10 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
     });
   }, []);
 
-  const addHop = useCallback(
-    (variantIndex: number, hop: HopCatalogItem) => {
-      setVariants((prev) => {
-        const updated = [...prev];
-        const variant = { ...updated[variantIndex] };
-        variant.hops = [
-          ...variant.hops,
-          {
-            hop_id: hop.id,
-            hop_name: hop.name,
-            weight_oz: 0,
-            timing: "dry_hop",
-            days: null,
-            position: variant.hops.length,
-          },
-        ];
-        updated[variantIndex] = variant;
-        return updated;
-      });
-      setIsDirty(true);
-    },
-    []
-  );
-
-  const removeHop = useCallback(
-    (variantIndex: number, hopIndex: number) => {
-      setVariants((prev) => {
-        const updated = [...prev];
-        const variant = { ...updated[variantIndex] };
-        variant.hops = variant.hops.filter((_, i) => i !== hopIndex);
-        updated[variantIndex] = variant;
-        return updated;
-      });
-      setIsDirty(true);
-    },
-    []
-  );
-
-  const updateHop = useCallback(
-    (
-      variantIndex: number,
-      hopIndex: number,
-      field: keyof VariantHopItem,
-      value: unknown
-    ) => {
-      setVariants((prev) => {
-        const updated = [...prev];
-        const variant = { ...updated[variantIndex] };
-        const hops = [...variant.hops];
-        hops[hopIndex] = { ...hops[hopIndex], [field]: value };
-        variant.hops = hops;
-        updated[variantIndex] = variant;
-        return updated;
-      });
-      setIsDirty(true);
-    },
-    []
-  );
-
   const addAddition = useCallback(
     (
       variantIndex: number,
-      type: SimpleAdditionType,
+      type: AdditionType,
       item: SimpleAdditionCatalog
     ) => {
       setVariants((prev) => {
@@ -579,7 +573,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
         updated[variantIndex] = withUpdatedAdditions(
           updated[variantIndex],
           type,
-          (items) => [...items, newSimpleAddition(type, item, items.length)]
+          (items) => [...items, newAddition(type, item, items.length)]
         );
         return updated;
       });
@@ -591,7 +585,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
   const removeAddition = useCallback(
     (
       variantIndex: number,
-      type: SimpleAdditionType,
+      type: AdditionType,
       additionIndex: number
     ) => {
       setVariants((prev) => {
@@ -611,7 +605,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
   const updateAddition = useCallback(
     (
       variantIndex: number,
-      type: SimpleAdditionType,
+      type: AdditionType,
       additionIndex: number,
       field: string,
       value: unknown
@@ -624,7 +618,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
           (items) =>
             items.map((item, i) =>
               i === additionIndex
-                ? ({ ...item, [field]: value } as SimpleAdditionItem)
+                ? ({ ...item, [field]: value } as AdditionItem)
                 : item
             )
         );
@@ -772,24 +766,19 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     </div>
                   </div>
 
-                  <VariantAdditionSection
+                  <AdditionSection
                     title="Hops"
                     icon={<Leaf className="h-4 w-4" />}
+                    type="hops"
                     items={variant.hops}
                     catalog={hopCatalog}
-                    searchPlaceholder="Search hops..."
-                    emptyMessage="No hops added."
-                    renderItem={(hop, hIndex) => (
-                      <HopRow
-                        key={hIndex}
-                        hop={hop as VariantHopItem}
-                        onUpdate={(field, value) =>
-                          updateHop(vIndex, hIndex, field, value)
-                        }
-                        onRemove={() => removeHop(vIndex, hIndex)}
-                      />
-                    )}
-                    onAdd={(item) => addHop(vIndex, item as HopCatalogItem)}
+                    variantIndex={vIndex}
+                    onAdd={addAddition}
+                    onRemove={removeAddition}
+                    onUpdate={updateAddition}
+                    nameField="hop_name"
+                    nameHeader="Hop"
+                    columns={HOP_ADDITION_COLUMNS}
                     renderCatalogItem={(item) => {
                       const hop = item as HopCatalogItem;
                       return (
@@ -803,10 +792,9 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                         </div>
                       );
                     }}
-                    tableHeaders={["Hop", "Oz", "Timing", "Days", ""]}
                   />
 
-                  <SimpleAdditionSection
+                  <AdditionSection
                     title="Adjuncts"
                     icon={<Droplets className="h-4 w-4" />}
                     type="adjuncts"
@@ -817,9 +805,10 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     onRemove={removeAddition}
                     onUpdate={updateAddition}
                     nameField="adjunct_name"
+                    columns={SIMPLE_ADDITION_COLUMNS}
                   />
 
-                  <SimpleAdditionSection
+                  <AdditionSection
                     title="Fruits"
                     icon={<Cherry className="h-4 w-4" />}
                     type="fruits"
@@ -830,9 +819,10 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     onRemove={removeAddition}
                     onUpdate={updateAddition}
                     nameField="fruit_name"
+                    columns={SIMPLE_ADDITION_COLUMNS}
                   />
 
-                  <SimpleAdditionSection
+                  <AdditionSection
                     title="Spices"
                     icon={<Flame className="h-4 w-4" />}
                     type="spices"
@@ -843,6 +833,7 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
                     onRemove={removeAddition}
                     onUpdate={updateAddition}
                     nameField="spice_name"
+                    columns={SIMPLE_ADDITION_COLUMNS}
                   />
                 </CardContent>
               </CollapsibleContent>
@@ -854,106 +845,57 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
   );
 }
 
-// ── Hop Row ─────────────────────────────────────────────────────────────────
+// ── Addition section (hops, adjuncts, fruits, spices) ───────────────────────
 
-function HopRow({
-  hop,
-  onUpdate,
-  onRemove,
-}: {
-  hop: VariantHopItem;
-  onUpdate: (field: keyof VariantHopItem, value: unknown) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <TableRow>
-      <TableCell className="font-medium">{hop.hop_name || "Unknown"}</TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          step="0.25"
-          min="0"
-          value={hop.weight_oz || ""}
-          onChange={(e) =>
-            onUpdate("weight_oz", parseFloat(e.target.value) || 0)
-          }
-          className="w-20 text-right"
-        />
-      </TableCell>
-      <TableCell>
-        <Select
-          value={hop.timing}
-          onValueChange={(value) => onUpdate("timing", value)}
-        >
-          <SelectTrigger className="w-28 h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TIMING_OPTIONS.map((t) => (
-              <SelectItem key={t.value} value={t.value}>
-                {t.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          min="0"
-          value={hop.days ?? ""}
-          onChange={(e) =>
-            onUpdate(
-              "days",
-              e.target.value ? parseInt(e.target.value) : null
-            )
-          }
-          className="w-16 text-right"
-          placeholder="--"
-        />
-      </TableCell>
-      <TableCell>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onRemove}
-          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-// ── Generic addition section with catalog selector ──────────────────────────
-
-function VariantAdditionSection<T extends { id: string; name: string }>({
+/**
+ * Column-spec-driven addition table for a variant: header with the shared
+ * CatalogPicker, then one row per addition. Hops and the simple additions
+ * (adjuncts/fruits/spices) differ only via the `columns` spec.
+ */
+function AdditionSection({
   title,
   icon,
+  type,
   items,
   catalog,
-  searchPlaceholder,
-  emptyMessage,
-  renderItem,
+  variantIndex,
   onAdd,
+  onRemove,
+  onUpdate,
+  nameField,
+  nameHeader = "Name",
+  columns,
   renderCatalogItem,
-  tableHeaders,
 }: {
   title: string;
   icon: React.ReactNode;
-  items: unknown[];
-  catalog: T[];
-  searchPlaceholder: string;
-  emptyMessage: string;
-  renderItem: (item: unknown, index: number) => React.ReactNode;
-  onAdd: (item: T) => void;
-  renderCatalogItem: (item: T) => React.ReactNode;
-  tableHeaders: string[];
+  type: AdditionType;
+  items: AdditionItem[];
+  catalog: SimpleAdditionCatalog[];
+  variantIndex: number;
+  onAdd: (
+    variantIndex: number,
+    type: AdditionType,
+    item: SimpleAdditionCatalog
+  ) => void;
+  onRemove: (
+    variantIndex: number,
+    type: AdditionType,
+    index: number
+  ) => void;
+  onUpdate: (
+    variantIndex: number,
+    type: AdditionType,
+    index: number,
+    field: string,
+    value: unknown
+  ) => void;
+  nameField: string;
+  nameHeader?: string;
+  columns: AdditionColumn[];
+  renderCatalogItem?: (item: SimpleAdditionCatalog) => React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const tableHeaders = [nameHeader, ...columns.map((c) => c.header), ""];
 
   return (
     <div className="space-y-2">
@@ -965,46 +907,26 @@ function VariantAdditionSection<T extends { id: string; name: string }>({
             <span className="text-muted-foreground">({items.length})</span>
           )}
         </div>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
+        <CatalogPicker
+          items={catalog}
+          onSelect={(item) => onAdd(variantIndex, type, item)}
+          searchPlaceholder={`Search ${title.toLowerCase()}...`}
+          emptyMessage="No results found."
+          renderItem={renderCatalogItem ?? ((item) => <span>{item.name}</span>)}
+          trigger={
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
               <Plus className="h-3 w-3" />
               Add
               <ChevronsUpDown className="h-3 w-3 opacity-50" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-0" align="end">
-            <Command>
-              <CommandInput
-                placeholder={searchPlaceholder}
-                value={search}
-                onValueChange={setSearch}
-              />
-              <CommandList>
-                <CommandEmpty>No results found.</CommandEmpty>
-                <CommandGroup>
-                  {catalog.map((item) => (
-                    <CommandItem
-                      key={item.id}
-                      value={item.name}
-                      onSelect={() => {
-                        onAdd(item);
-                        setOpen(false);
-                        setSearch("");
-                      }}
-                    >
-                      {renderCatalogItem(item)}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+          }
+        />
       </div>
 
       {items.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-2">{emptyMessage}</p>
+        <p className="text-xs text-muted-foreground py-2">
+          No {title.toLowerCase()} added.
+        </p>
       ) : (
         <Table>
           <TableHeader>
@@ -1017,7 +939,37 @@ function VariantAdditionSection<T extends { id: string; name: string }>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((item, index) => renderItem(item, index))}
+            {items.map((item, index) => {
+              const row = item as AdditionItem & Record<string, unknown>;
+              return (
+                <TableRow key={index}>
+                  <TableCell className="font-medium">
+                    {(row[nameField] as string) || "Unknown"}
+                  </TableCell>
+                  {columns.map((col, cIndex) => (
+                    <AdditionCell
+                      key={cIndex}
+                      col={col}
+                      row={row}
+                      onUpdate={(field, value) =>
+                        onUpdate(variantIndex, type, index, field, value)
+                      }
+                    />
+                  ))}
+                  <TableCell>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemove(variantIndex, type, index)}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       )}
@@ -1025,140 +977,89 @@ function VariantAdditionSection<T extends { id: string; name: string }>({
   );
 }
 
-// ── Simple addition section (adjuncts, fruits, spices) ──────────────────────
-
-function SimpleAdditionSection({
-  title,
-  icon,
-  type,
-  items,
-  catalog,
-  variantIndex,
-  onAdd,
-  onRemove,
+/** Renders one declarative column cell of an addition row. */
+function AdditionCell({
+  col,
+  row,
   onUpdate,
-  nameField,
 }: {
-  title: string;
-  icon: React.ReactNode;
-  type: SimpleAdditionType;
-  items: SimpleAdditionItem[];
-  catalog: SimpleAdditionCatalog[];
-  variantIndex: number;
-  onAdd: (
-    variantIndex: number,
-    type: SimpleAdditionType,
-    item: SimpleAdditionCatalog
-  ) => void;
-  onRemove: (
-    variantIndex: number,
-    type: SimpleAdditionType,
-    index: number
-  ) => void;
-  onUpdate: (
-    variantIndex: number,
-    type: SimpleAdditionType,
-    index: number,
-    field: string,
-    value: unknown
-  ) => void;
-  nameField: string;
+  col: AdditionColumn;
+  row: Record<string, unknown>;
+  onUpdate: (field: string, value: unknown) => void;
 }) {
+  if (col.kind === "number") {
+    const value = row[col.field] as number | null;
+    return (
+      <TableCell>
+        <Input
+          type="number"
+          step={col.step}
+          min="0"
+          value={col.nullable ? value ?? "" : value || ""}
+          onChange={(e) =>
+            onUpdate(
+              col.field,
+              col.nullable
+                ? e.target.value
+                  ? parseInt(e.target.value)
+                  : null
+                : parseFloat(e.target.value) || 0
+            )
+          }
+          className={col.inputClass}
+          placeholder={col.placeholder}
+        />
+      </TableCell>
+    );
+  }
+
+  if (col.kind === "unit") {
+    return (
+      <TableCell>
+        <Select
+          value={(row.unit as string) || "oz"}
+          onValueChange={(value) => onUpdate("unit", value)}
+        >
+          <SelectTrigger className="w-20 h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {UNIT_OPTIONS.map((u) => (
+              <SelectItem key={u.value} value={u.value}>
+                {u.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </TableCell>
+    );
+  }
+
+  // timing
   return (
-    <VariantAdditionSection
-      title={title}
-      icon={icon}
-      items={items}
-      catalog={catalog}
-      searchPlaceholder={`Search ${title.toLowerCase()}...`}
-      emptyMessage={`No ${title.toLowerCase()} added.`}
-      tableHeaders={["Name", "Amount", "Unit", "Timing", ""]}
-      onAdd={(item) => onAdd(variantIndex, type, item)}
-      renderCatalogItem={(item) => <span>{item.name}</span>}
-      renderItem={(item, index) => {
-        const row = item as SimpleAdditionItem & Record<string, unknown>;
-        return (
-          <TableRow key={index}>
-            <TableCell className="font-medium">
-              {(row[nameField] as string) || "Unknown"}
-            </TableCell>
-            <TableCell>
-              <Input
-                type="number"
-                step="0.25"
-                min="0"
-                value={row.amount || ""}
-                onChange={(e) =>
-                  onUpdate(
-                    variantIndex,
-                    type,
-                    index,
-                    "amount",
-                    parseFloat(e.target.value) || 0
-                  )
-                }
-                className="w-20 text-right"
-              />
-            </TableCell>
-            <TableCell>
-              <Select
-                value={row.unit || "oz"}
-                onValueChange={(value) =>
-                  onUpdate(variantIndex, type, index, "unit", value)
-                }
-              >
-                <SelectTrigger className="w-20 h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNIT_OPTIONS.map((u) => (
-                    <SelectItem key={u.value} value={u.value}>
-                      {u.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </TableCell>
-            <TableCell>
-              <Select
-                value={row.timing || "_none"}
-                onValueChange={(value) =>
-                  onUpdate(
-                    variantIndex,
-                    type,
-                    index,
-                    "timing",
-                    value === "_none" ? null : value
-                  )
-                }
-              >
-                <SelectTrigger className="w-28 h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_none">None</SelectItem>
-                  {TIMING_OPTIONS.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </TableCell>
-            <TableCell>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => onRemove(variantIndex, type, index)}
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </TableCell>
-          </TableRow>
-        );
-      }}
-    />
+    <TableCell>
+      <Select
+        value={
+          col.allowNone
+            ? ((row.timing as string | null) || "_none")
+            : (row.timing as string)
+        }
+        onValueChange={(value) =>
+          onUpdate("timing", col.allowNone && value === "_none" ? null : value)
+        }
+      >
+        <SelectTrigger className="w-28 h-8">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {col.allowNone && <SelectItem value="_none">None</SelectItem>}
+          {TIMING_OPTIONS.map((t) => (
+            <SelectItem key={t.value} value={t.value}>
+              {t.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </TableCell>
   );
 }
