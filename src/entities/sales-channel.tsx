@@ -195,15 +195,4 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
       detailTab: "Customers",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all active sales channels",
-    "What customers are in the distributor channel?",
-    "List price tiers for retail channel",
-  ],
-
-  keyFields: ["name", "code", "is_active"],
 };

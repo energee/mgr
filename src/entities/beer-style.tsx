@@ -282,16 +282,4 @@ export const beerStyleEntity: EntityConfig<BeerStyle> = {
       deleteMode: "hard",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all IPA styles",
-    "What are the vital stats for American Pale Ale?",
-    "Show BJCP lager styles",
-    "What styles have ABV over 8%?",
-  ],
-
-  keyFields: ["name", "category", "abv_min", "abv_max", "ibu_min", "ibu_max"],
 };

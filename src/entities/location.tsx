@@ -233,15 +233,4 @@ export const locationEntity: EntityConfig<LocationWithPos> = {
   // Value Display
   // ---------------------------------------------------------------------------
   valueDisplay: [locationTypeDisplayConfig],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all locations",
-    "Which location is the primary?",
-    "Show all warehouses",
-  ],
-
-  keyFields: ["name", "location_type", "is_primary", "is_active", "square_location_id"],
 };

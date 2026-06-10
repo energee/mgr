@@ -179,15 +179,4 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
       foreignKey: "sales_channel_id",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "What is the retail price for cases in Tier 1?",
-    "Show all prices for the distributor channel",
-    "List prices for half barrel kegs across all tiers",
-  ],
-
-  keyFields: ["pricing_tier_id", "format_id", "sales_channel_id", "price"],
 };

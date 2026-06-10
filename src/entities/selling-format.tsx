@@ -237,15 +237,4 @@ export const sellingFormatEntity: EntityConfig<SellingFormat> = {
       component: BOMRelation,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show all selling formats",
-    "What formats are available for 12oz cans?",
-    "List active selling formats with unit counts",
-  ],
-
-  keyFields: ["name", "container_id", "unit_count", "is_active"],
 };

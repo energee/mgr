@@ -418,18 +418,4 @@ export const vesselEntity: EntityConfig<Vessel> = {
       detailTab: "Transfer History",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all available fermenters",
-    "Which vessels are currently in use?",
-    "What's in FV-1?",
-    "List dirty vessels that need cleaning",
-    "Find vessels under maintenance",
-    "What's the total fermenter capacity?",
-  ],
-
-  keyFields: ["name", "vessel_type", "capacity_bbl", "status"],
 };

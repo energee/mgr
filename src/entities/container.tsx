@@ -241,15 +241,4 @@ export const containerEntity: EntityConfig<Container> = {
       deleteMode: "hard",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show all containers",
-    "What keg sizes do we have?",
-    "List active can and bottle containers",
-  ],
-
-  keyFields: ["name", "type", "volume_oz", "volume_bbl", "deposit_amount", "is_active"],
 };

@@ -175,15 +175,4 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
       foreignKey: "selling_format_id",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show line items for session X",
-    "What was packaged in the last session?",
-    "Total units packaged by brand",
-  ],
-
-  keyFields: ["brand_id", "batch_id", "selling_format_id", "planned_quantity", "actual_quantity"],
 };

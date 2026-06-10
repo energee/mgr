@@ -266,16 +266,4 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
       showInDetail: false, // Using custom component instead
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show all packaging sessions this week",
-    "What sessions are in progress?",
-    "List completed sessions for January",
-    "Show sessions with line items for brand X",
-  ],
-
-  keyFields: ["session_date", "status"],
 };

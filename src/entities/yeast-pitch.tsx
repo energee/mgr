@@ -448,19 +448,4 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       detailTab: "Usage History",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show available yeast pitches",
-    "What's the viability of our lager yeast?",
-    "List pitches from WLP001",
-    "Show yeast in stock",
-    "What generation is our house yeast at?",
-    "How much yeast is remaining in the brink?",
-    "Show pitch usage history",
-  ],
-
-  keyFields: ["strain_id", "source_type", "status", "generation", "estimated_viability", "vessel_id", "quantity_remaining_lbs"],
 };

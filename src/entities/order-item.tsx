@@ -222,15 +222,4 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
       showInDetail: false,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show items for order ORD-2025-001",
-    "List all line items with unit price over $10",
-    "Find items for IPA brand",
-  ],
-
-  keyFields: ["order_id", "brand_id", "style_id", "selling_format_id", "quantity", "unit_price", "keg_owner_id"],
 };

@@ -239,15 +239,4 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
       component: KegOwnerDepositsRelation,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all keg owners",
-    "Show active fleet providers",
-    "Which fleet does Microstar provide?",
-  ],
-
-  keyFields: ["name", "code", "is_active"],
 };

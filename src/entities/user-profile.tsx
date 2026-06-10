@@ -370,17 +370,4 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
   // Form
   // ---------------------------------------------------------------------------
   formSchema: userProfileSchema,
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all users",
-    "Show admin users",
-    "Who has been inactive?",
-    "Find brewers",
-    "Show pending invitations",
-  ],
-
-  keyFields: ["display_name", "email", "roles", "status", "last_active_at"],
 };

@@ -295,21 +295,4 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
       showInDetail: true,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show lots expiring this month",
-    "Get available lots for Cascade hops (FIFO order)",
-    "Find lots with remaining quantity",
-    "Calculate COGS for batch using FIFO",
-  ],
-
-  keyFields: [
-    "lot_number",
-    "inventory_item_id",
-    "quantity",
-    "expiration_date",
-  ],
 };

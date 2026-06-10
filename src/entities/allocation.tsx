@@ -459,25 +459,4 @@ export const allocationEntity: EntityConfig<Allocation> = {
     // Note: Polymorphic relations are handled specially in the application
     // These are placeholders for documentation purposes
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all pending allocations",
-    "What allocations are awaiting approval?",
-    "List allocations for a specific batch",
-    "Find all sample allocations this month",
-    "Get TTB-relevant allocations for reporting",
-  ],
-
-  keyFields: [
-    "source_type",
-    "source_id",
-    "destination_type",
-    "destination_id",
-    "status",
-    "quantity",
-    "reason_code",
-  ],
 };

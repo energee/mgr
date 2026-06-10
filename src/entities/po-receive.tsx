@@ -160,15 +160,4 @@ export const poReceiveEntity: EntityConfig<POReceive> = {
       showInDetail: true,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show receives for PO-2025-001",
-    "Find recent receipts",
-    "List receives with expiration dates",
-  ],
-
-  keyFields: ["po_line_item_id", "quantity", "lot_number", "received_date"],
 };

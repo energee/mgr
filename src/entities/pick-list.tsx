@@ -304,16 +304,4 @@ export const pickListEntity: EntityConfig<PickListView> = {
       showInDetail: true,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all active pick lists",
-    "What pick lists are assigned to John?",
-    "Find incomplete pick lists for today",
-    "Show pick lists for order ORD-2025-001",
-  ],
-
-  keyFields: ["order_number" as keyof PickListView & string, "status", "assigned_to_name" as keyof PickListView & string, "generated_at"],
 };

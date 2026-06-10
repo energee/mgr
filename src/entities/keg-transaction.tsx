@@ -437,16 +437,4 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
   // Form
   // ---------------------------------------------------------------------------
   formSchema: kegTransactionSchema,
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show recent keg transactions",
-    "How many kegs were shipped this month?",
-    "List all keg returns from customer X",
-    "Show fill transactions for batch Y",
-  ],
-
-  keyFields: ["transaction_type", "selling_format_id", "keg_owner_id", "quantity", "from_state", "to_state", "created_at"],
 };

@@ -137,15 +137,4 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
       detailTab: "Recipes",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all pricing tiers",
-    "What tier covers COGS up to $8?",
-    "List tiers by COGS upper bound",
-  ],
-
-  keyFields: ["name", "cogs_max"],
 };

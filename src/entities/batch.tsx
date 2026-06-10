@@ -484,16 +484,4 @@ export const batchEntity: EntityConfig<Batch> = {
       showInDetail: false, // shown via custom BatchYeastSection
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all batches currently fermenting",
-    "What batches are planned for this week?",
-    "Which batches are in FV-1?",
-    "What's the total volume in fermentation?",
-  ],
-
-  keyFields: ["batch_code", "name", "status", "planned_start_date", "current_vessel_name"],
 };

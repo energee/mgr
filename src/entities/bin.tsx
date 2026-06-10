@@ -275,17 +275,4 @@ export const binEntity: EntityConfig<Bin> = {
       showInDetail: true,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all bins in the cold room",
-    "Which bins have items in them?",
-    "List all quarantine bins",
-    "What bins are available at the warehouse?",
-    "Find empty bins for staging",
-  ],
-
-  keyFields: ["name", "bin_type", "capacity", "is_active"],
 };

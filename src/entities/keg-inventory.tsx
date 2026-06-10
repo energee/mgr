@@ -175,16 +175,4 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
   // ---------------------------------------------------------------------------
   // Note: This is a calculated view. To modify inventory, record a keg transaction.
   formSchema: kegInventorySchema,
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "How many empty kegs do we have?",
-    "Show keg inventory by type",
-    "Which kegs are shipped out?",
-    "What's the total keg count by state?",
-  ],
-
-  keyFields: ["selling_format_id", "keg_owner_id", "state", "quantity", "location_id"],
 };

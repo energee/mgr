@@ -1,8 +1,8 @@
 /**
  * Tests for entity helper functions exported from @/types/entity.
  *
- * Covers: statesAsOptions, formatStateLabel, getStateLabel, getStateColor,
- * valuesAsOptions, getValueDisplay, getValueLabel, getValueColor.
+ * Covers: statesAsOptions, formatStateLabel, getStateLabel,
+ * valuesAsOptions, getValueDisplay, getValueLabel.
  */
 
 import { describe, it, expect } from "vitest";
@@ -10,11 +10,9 @@ import {
   statesAsOptions,
   formatStateLabel,
   getStateLabel,
-  getStateColor,
   valuesAsOptions,
   getValueDisplay,
   getValueLabel,
-  getValueColor,
 } from "@/types/entity";
 import type {
   EntityConfig,
@@ -102,7 +100,6 @@ const mockEntity: EntityConfig<Record<string, unknown>> = {
   domain: "production",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
   stateMachine: fullStateMachine,
   valueDisplay: [priorityDisplay, categoryDisplay],
 };
@@ -117,7 +114,6 @@ const bareEntity: EntityConfig<Record<string, unknown>> = {
   domain: "inventory",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
 };
 
 /** Entity with state machine but no stateDisplay. */
@@ -130,7 +126,6 @@ const noDisplayEntity: EntityConfig<Record<string, unknown>> = {
   domain: "production",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
-  formFields: [],
   stateMachine: noDisplayStateMachine,
 };
 
@@ -247,38 +242,6 @@ describe("getStateLabel", () => {
 });
 
 // =============================================================================
-// getStateColor
-// =============================================================================
-
-describe("getStateColor", () => {
-  it("returns color from stateDisplay", () => {
-    expect(getStateColor(mockEntity, "draft")).toBe("default");
-    expect(getStateColor(mockEntity, "active")).toBe("info");
-    expect(getStateColor(mockEntity, "completed")).toBe("success");
-  });
-
-  it('returns "default" for unknown states', () => {
-    expect(getStateColor(mockEntity, "nonexistent")).toBe("default");
-  });
-
-  it('returns "default" for null state', () => {
-    expect(getStateColor(mockEntity, null)).toBe("default");
-  });
-
-  it('returns "default" for undefined state', () => {
-    expect(getStateColor(mockEntity, undefined)).toBe("default");
-  });
-
-  it('returns "default" for entity without stateMachine', () => {
-    expect(getStateColor(bareEntity, "active")).toBe("default");
-  });
-
-  it('returns "default" when stateDisplay is missing', () => {
-    expect(getStateColor(noDisplayEntity, "in_progress")).toBe("default");
-  });
-});
-
-// =============================================================================
 // valuesAsOptions
 // =============================================================================
 
@@ -381,41 +344,5 @@ describe("getValueLabel", () => {
 
   it("returns formatted label for entity without valueDisplay", () => {
     expect(getValueLabel(bareEntity, "field", "some_value")).toBe("Some Value");
-  });
-});
-
-// =============================================================================
-// getValueColor
-// =============================================================================
-
-describe("getValueColor", () => {
-  it("returns color from valueDisplay when available", () => {
-    expect(getValueColor(mockEntity, "priority", "low")).toBe("default");
-    expect(getValueColor(mockEntity, "priority", "medium")).toBe("warning");
-    expect(getValueColor(mockEntity, "priority", "high")).toBe("error");
-  });
-
-  it('returns "default" for value without color', () => {
-    expect(getValueColor(mockEntity, "category", "grain")).toBe("default");
-  });
-
-  it('returns "default" for unknown value in known field', () => {
-    expect(getValueColor(mockEntity, "priority", "unknown")).toBe("default");
-  });
-
-  it('returns "default" for unknown field', () => {
-    expect(getValueColor(mockEntity, "nonexistent", "val")).toBe("default");
-  });
-
-  it('returns "default" for null value', () => {
-    expect(getValueColor(mockEntity, "priority", null)).toBe("default");
-  });
-
-  it('returns "default" for undefined value', () => {
-    expect(getValueColor(mockEntity, "priority", undefined)).toBe("default");
-  });
-
-  it('returns "default" for entity without valueDisplay', () => {
-    expect(getValueColor(bareEntity, "field", "val")).toBe("default");
   });
 });

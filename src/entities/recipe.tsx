@@ -479,15 +479,4 @@ export const recipeEntity: EntityConfig<Recipe> = {
         data.batch_count ? `Has ${data.batch_count} associated batch${data.batch_count === 1 ? "" : "es"}` : false,
     },
   ],
-
-  queryExamples: [
-    "Show me all IPA recipes",
-    "What recipes have estimated ABV over 7%?",
-    "List active recipes sorted by style",
-    "Find recipes with estimated IBU over 50",
-    "What recipes use Citra hops?",
-    "Show grain bill for recipe X",
-  ],
-
-  keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_active", "status"],
 };

@@ -261,16 +261,4 @@ export const finishedGoodEntity: EntityConfig<FinishedGoodView> = {
       detailTab: "Allocations",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show all finished goods for brand X",
-    "What FG has available inventory?",
-    "List finished goods expiring this month",
-    "Show allocation history for lot Y",
-  ],
-
-  keyFields: ["lot_number", "brand_id", "selling_format_id", "quantity", "available_quantity"],
 };

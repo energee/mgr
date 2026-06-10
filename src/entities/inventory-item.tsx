@@ -255,16 +255,4 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   // Relations
   // ---------------------------------------------------------------------------
   relations: [],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all hops in inventory",
-    "What grain items are below reorder point?",
-    "List active packaging supplies",
-    "Find items from Yakima Valley Hops",
-  ],
-
-  keyFields: ["name", "category", "unit", "reorder_point", "is_active"],
 };

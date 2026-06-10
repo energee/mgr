@@ -334,22 +334,4 @@ export const locationTransferEntity: EntityConfig<LocationTransferView> = {
       detailTab: "Lines",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all planned location transfers",
-    "What transfers are currently in transit?",
-    "Find transfers from the main warehouse",
-    "List completed transfers for this week",
-  ],
-
-  keyFields: [
-    "status",
-    "from_bin_id",
-    "to_bin_id",
-    "ship_date",
-    "delivery_id",
-  ],
 };

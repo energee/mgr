@@ -370,7 +370,7 @@ describe("Entity configs: sections", () => {
 
       for (const section of entity.sections) {
         // Sections with a custom component don't need fields
-        if (section.component || section.editComponent) continue;
+        if (section.component) continue;
 
         // If fields array exists, it should have at least one field
         if (section.fields) {

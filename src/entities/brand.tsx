@@ -191,16 +191,4 @@ export const brandEntity: EntityConfig<Brand> = {
       foreignKey: "style_id",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all brands",
-    "What IPAs do we make?",
-    "Show brands over 7% ABV",
-    "What's the most popular brand on Untappd?",
-  ],
-
-  keyFields: ["name", "variant", "style_id", "abv"],
 };

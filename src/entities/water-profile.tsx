@@ -113,11 +113,4 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
       deleteMode: "hard",
     },
   ],
-
-  keyFields: ["name", "is_active"],
-  queryExamples: [
-    "Show all water profiles",
-    "What is the mineral content of our tap water?",
-    "Which water profiles have high sulfate?",
-  ],
 };

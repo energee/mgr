@@ -310,16 +310,4 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
       deleteMode: "hard",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all batch statuses",
-    "Get valid vessel types",
-    "What user roles exist?",
-    "Show dropdown options with colors",
-  ],
-
-  keyFields: ["enum_type", "value", "label", "is_active"],
 };

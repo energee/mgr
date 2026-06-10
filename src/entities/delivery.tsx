@@ -317,16 +317,4 @@ export const deliveryEntity: EntityConfig<DeliveryView> = {
       detailTab: "Orders",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show planned deliveries",
-    "List deliveries for this week",
-    "Find deliveries by driver",
-    "Show in-transit deliveries",
-  ],
-
-  keyFields: ["delivery_number", "status", "scheduled_date", "driver_name"],
 };

@@ -267,15 +267,4 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
       detailTab: "Receives",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show line items for PO-2025-001",
-    "List all malt orders this month",
-    "Find hop purchases by price",
-  ],
-
-  keyFields: ["po_id", "catalog_type", "catalog_id", "quantity", "unit"],
 };

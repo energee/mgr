@@ -290,16 +290,4 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
       showInDetail: true,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all brews from this week",
-    "What brews are currently in progress?",
-    "Find brews linked to batch B-20240115-01",
-    "Which brewer did BRW-2024-015?",
-  ],
-
-  keyFields: ["brew_number", "brew_date", "status"],
 };

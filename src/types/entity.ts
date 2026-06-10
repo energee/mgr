@@ -70,9 +70,6 @@ export type EntityConfig<T = Record<string, unknown>> = {
   // Detail View Configuration
   // ---------------------------------------------------------------------------
 
-  /** @deprecated Use `sections` instead. Will be removed in a future update. */
-  detailSections?: EntitySectionDef<T>[];
-
   /** Header fields to show prominently */
   detailHeader?: {
     title: keyof T & string;
@@ -81,10 +78,10 @@ export type EntityConfig<T = Record<string, unknown>> = {
   };
 
   // ---------------------------------------------------------------------------
-  // Unified Detail/Edit View Configuration (replaces detailSections + formFields)
+  // Unified Detail/Edit View Configuration
   // ---------------------------------------------------------------------------
 
-  /** Unified sections for combined detail/edit view. Takes precedence over detailSections + formFields. */
+  /** Unified sections for combined detail/edit view. */
   sections?: UnifiedSectionDef<T>[];
 
   // ---------------------------------------------------------------------------
@@ -93,15 +90,6 @@ export type EntityConfig<T = Record<string, unknown>> = {
 
   /** Zod schema for form validation */
   formSchema: ZodSchema<Partial<T>>;
-
-  /** @deprecated Use `sections` instead. Kept for backward compatibility. */
-  formFields?: EntityFieldDef<T>[];
-
-  /** @deprecated Use `sections` with `editable: "create-only"` instead. */
-  createFields?: (keyof T & string)[];
-
-  /** @deprecated Use `sections` with `editable` control instead. */
-  editFields?: (keyof T & string)[];
 
   // ---------------------------------------------------------------------------
   // State Machine (for stateful entities)
@@ -136,14 +124,11 @@ export type EntityConfig<T = Record<string, unknown>> = {
   /** Relationships to other entities */
   relations?: EntityRelationDef[];
 
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-
-  /** Example natural language queries for AI */
-  queryExamples?: string[];
-
-  /** Key fields for AI to understand */
+  /**
+   * Key fields for AI context summaries. Not set by registry entity configs —
+   * populated only by the server-safe CHAT_ENTITY_MAP (src/app/api/chat/entity-map.ts),
+   * whose entries are typed as EntityConfig and read by the chat route.
+   */
   keyFields?: (keyof T & string)[];
 }
 
@@ -223,59 +208,6 @@ export type EntityFilterDef = {
 }
 
 // =============================================================================
-// Detail View Types
-// =============================================================================
-
-export type EntitySectionDef<T> = {
-  /** Section identifier */
-  id: string;
-
-  /** Section title */
-  title: string;
-
-  /** Fields to display in this section */
-  fields?: EntityFieldDisplay<T>[];
-
-  /** Custom component to render (overrides fields) - string for lazy loading, ComponentType for direct */
-  component?: ComponentType<{ data: T }> | string;
-
-  /** Whether this section is collapsible */
-  collapsible?: boolean;
-
-  /** Default collapsed state */
-  defaultCollapsed?: boolean;
-
-  /** Tab name if using tabbed layout */
-  tab?: string;
-}
-
-export type EntityFieldDisplay<T> = {
-  /** Field key */
-  field: keyof T & string;
-
-  /** Display label */
-  label: string;
-
-  /** Format type */
-  format?: "date" | "datetime" | "currency" | "number" | "percentage" | "json" | "unit";
-
-  /** Unit type for unit formatting (volume, weight, temperature, gravity, retail_volume) */
-  unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
-
-  /** Related entity for FK fields (fetches display name from related table) */
-  relation?: {
-    entity: string;
-    displayField: string;
-  };
-
-  /** Custom render function */
-  render?: (value: unknown, data: T) => ReactNode;
-
-  /** Span full width */
-  fullWidth?: boolean;
-}
-
-// =============================================================================
 // Form Types
 // =============================================================================
 
@@ -346,9 +278,6 @@ export type EntityFieldDef<T> = {
 
   /** Unit type for unit fields (volume, weight, temperature, gravity, retail_volume) */
   unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
-
-  /** Allow inline unit switching (for recipe builder, brew log) */
-  allowUnitSwitch?: boolean;
 }
 
 // =============================================================================
@@ -428,9 +357,6 @@ export type UnifiedFieldDef<T = Record<string, unknown>> = {
   /** Unit type for unit fields/formatting */
   unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
 
-  /** Allow inline unit switching */
-  allowUnitSwitch?: boolean;
-
   // -- Mode control --
 
   /**
@@ -466,7 +392,7 @@ export type UnifiedSectionDef<T = Record<string, unknown>> = {
   fields?: UnifiedFieldDef<T>[];
 
   /**
-   * Custom component for view mode (or both modes if editComponent is not set).
+   * Custom component for this section (used in both view and edit modes).
    * Receives { data, editing, form } props. When headerActions triggers an action,
    * the component receives it via `actionTrigger`.
    */
@@ -474,17 +400,6 @@ export type UnifiedSectionDef<T = Record<string, unknown>> = {
     data: T;
     editing?: boolean;
     form?: unknown; // UseFormReturn - typed as unknown to avoid import
-    actionTrigger?: { action: string; seq: number } | null;
-  }>;
-
-  /**
-   * Custom component for edit mode (overrides component when editing).
-   * Use this when view and edit have fundamentally different UIs.
-   */
-  editComponent?: ComponentType<{
-    data: T;
-    editing?: boolean;
-    form?: unknown;
     actionTrigger?: { action: string; seq: number } | null;
   }>;
 
@@ -571,10 +486,9 @@ export type StateMachineConfig<T> = {
     { label: string; color: "default" | "success" | "warning" | "error" | "info" }
   >;
 
-  /** Hooks for state transitions */
+  /** Hooks for state transitions. `validate` runs before a transition to the
+   *  target state and returns an error message to block it (or null to allow). */
   hooks?: {
-    onEnter?: Record<string, (data: T) => Promise<void> | void>;
-    onExit?: Record<string, (data: T) => Promise<void> | void>;
     validate?: Record<string, (data: T) => Promise<string | null> | string | null>;
   };
 }
@@ -680,12 +594,6 @@ export type EntityRelationDef = {
   /** Tab name if showing in tabs */
   detailTab?: string;
 
-  /** Inline editing allowed */
-  inlineEdit?: boolean;
-
-  /** Limit for related records query (default: 50) */
-  relationLimit?: number;
-
   /** Hide the "Add" button on relation tabs (e.g., when creation is handled by a dialog) */
   hideAdd?: boolean;
 
@@ -721,20 +629,6 @@ export const entityRegistry = new Map<string, EntityConfig<Record<string, unknow
  */
 export function registerEntity<T = Record<string, unknown>>(config: EntityConfig<T>): void {
   entityRegistry.set(config.name, config as EntityConfig<Record<string, unknown>>);
-}
-
-/**
- * Get an entity configuration by name.
- */
-export function getEntity(name: string): EntityConfig<Record<string, unknown>> | undefined {
-  return entityRegistry.get(name);
-}
-
-/**
- * Get all entities in a domain.
- */
-export function getEntitiesByDomain(domain: EntityDomain): EntityConfig<Record<string, unknown>>[] {
-  return Array.from(entityRegistry.values()).filter((e) => e.domain === domain);
 }
 
 /**
@@ -785,19 +679,6 @@ export function getStateLabel<T>(
   return display?.label || formatStateLabel(state);
 }
 
-/**
- * Get the color for a state from an entity config.
- * Falls back to "default" if not defined.
- */
-export function getStateColor<T>(
-  entity: EntityConfig<T>,
-  state: string | null | undefined
-): string {
-  if (!state) return "default";
-  const display = entity.stateMachine?.stateDisplay?.[state];
-  return display?.color || "default";
-}
-
 // =============================================================================
 // Value Display Helpers
 // =============================================================================
@@ -841,18 +722,4 @@ export function getValueLabel<T>(
   if (!value) return "";
   const display = getValueDisplay(entity, field, value);
   return display?.label || formatStateLabel(value);
-}
-
-/**
- * Get the color for a value from an entity config.
- * Falls back to "default" if not defined.
- */
-export function getValueColor<T>(
-  entity: EntityConfig<T>,
-  field: string,
-  value: string | null | undefined
-): "default" | "success" | "warning" | "error" | "info" {
-  if (!value) return "default";
-  const display = getValueDisplay(entity, field, value);
-  return display?.color || "default";
 }

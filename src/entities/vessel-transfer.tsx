@@ -200,16 +200,4 @@ export const vesselTransferEntity: EntityConfig<VesselTransfer> = {
       showInDetail: true,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all transfers for batch B-2024-001",
-    "What transfers happened this week?",
-    "Find all knockouts to fermenter FV-01",
-    "List transfers from brite tanks",
-  ],
-
-  keyFields: ["batch_id", "from_vessel_id", "to_vessel_id", "transferred_at", "volume_bbl"],
 };

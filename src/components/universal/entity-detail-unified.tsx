@@ -4,8 +4,7 @@
  * EntityDetailUnified - Combined Detail/Edit View Component
  *
  * Replaces EntityDetail + EntityForm with a unified component that reads from
- * `sections` (UnifiedSectionDef) config. Falls back to legacy `detailSections`
- * by converting them on the fly.
+ * `sections` (UnifiedSectionDef) config.
  *
  * Supports:
  * - View mode: data display, header, tabs, relations, state transitions, actions
@@ -124,37 +123,6 @@ export type EntityDetailUnifiedProps<T = Record<string, unknown>> = {
 }
 
 // =============================================================================
-// Config Resolution - Legacy to Unified conversion
-// =============================================================================
-
-function getUnifiedSections<T>(
-  entity: EntityConfig<T>
-): UnifiedSectionDef<T>[] {
-  if (entity.sections) return entity.sections;
-
-  return (entity.detailSections || []).map((section) => ({
-    id: section.id,
-    title: section.title,
-    collapsible: section.collapsible,
-    defaultCollapsed: section.defaultCollapsed,
-    tab: section.tab,
-    // Legacy sections use a narrower component type (just { data: T }) or string.
-    // Cast to unified type — extra props (editing, form) will be passed but unused.
-    component: section.component as UnifiedSectionDef<T>["component"],
-    fields: section.fields?.map((f) => ({
-      name: f.field,
-      label: f.label,
-      format: f.format,
-      unitType: f.unitType,
-      relation: f.relation,
-      render: f.render,
-      fullWidth: f.fullWidth,
-      editable: false as const,
-    })),
-  }));
-}
-
-// =============================================================================
 // Helper: Extract editable fields from sections
 // =============================================================================
 
@@ -177,9 +145,9 @@ type SectionGroup<T> =
 
 /**
  * Groups consecutive field-based sections into a single "field-group" run.
- * Custom component sections (those with `component` or `editComponent`) stay
- * standalone so they keep their own Card. In edit mode, every section is
- * standalone to preserve clear form boundaries.
+ * Custom component sections (those with `component`) stay standalone so they
+ * keep their own Card. In edit mode, every section is standalone to preserve
+ * clear form boundaries.
  */
 function groupSectionsForDisplay<T>(
   sections: UnifiedSectionDef<T>[],
@@ -190,7 +158,7 @@ function groupSectionsForDisplay<T>(
   }
 
   const isFieldBased = (s: UnifiedSectionDef<T>) =>
-    !!s.fields && !s.component && !s.editComponent;
+    !!s.fields && !s.component;
 
   const groups: SectionGroup<T>[] = [];
   let currentFieldRun: UnifiedSectionDef<T>[] = [];
@@ -358,7 +326,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
   const fetchTable = entity.viewTable || entity.table;
   const sections = useMemo(() => {
-    const all = getUnifiedSections(entity);
+    const all = entity.sections ?? [];
     return isCreateMode ? all.filter((s) => !s.hideOnCreate) : all;
   }, [entity, isCreateMode]);
 
@@ -1295,18 +1263,6 @@ function UnifiedSectionCard<T>({
   );
 
   // Custom component handling
-  if (editing && section.editComponent) {
-    const EditComponent = section.editComponent;
-    return (
-      <Card>
-        {sectionHeader}
-        <CardContent>
-          <EditComponent data={data} editing={true} form={form} actionTrigger={actionTrigger} />
-        </CardContent>
-      </Card>
-    );
-  }
-
   if (section.component) {
     const CustomComponent = section.component;
 
@@ -1618,13 +1574,12 @@ function RelationTable({
 
         const sortField = relatedEntity.defaultSort?.column || "created_at";
         const sortAsc = relatedEntity.defaultSort?.direction === "asc";
-        const limit = relation.relationLimit || 50;
 
         const { data, error } = await dynamicFrom(supabase, relatedEntity.viewTable || relatedEntity.table)
           .select(selectClause)
           .eq(relation.foreignKey, parentId)
           .order(sortField, { ascending: sortAsc })
-          .limit(limit);
+          .limit(50);
 
         if (error) throw error;
         return data || [];

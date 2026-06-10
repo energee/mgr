@@ -426,16 +426,4 @@ export const customerEntity: EntityConfig<Customer> = {
       deleteMode: "hard",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all distributors",
-    "List active retail accounts",
-    "Find customer by email",
-    "What customers are in Seattle?",
-  ],
-
-  keyFields: ["name", "customer_type", "contact_name", "email", "is_active"],
 };

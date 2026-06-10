@@ -10,7 +10,7 @@
  * Accepts both EntityFieldDef and UnifiedFieldDef since they share the same
  * property names for edit-mode fields (name, label, type, required, colSpan,
  * placeholder, description, disabled, options, dynamicOptions, relation,
- * unitType, allowUnitSwitch).
+ * unitType).
  */
 
 "use client";
@@ -63,7 +63,6 @@ type FieldDef = {
     displayField: string;
   };
   unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
-  allowUnitSwitch?: boolean;
   quickCreate?: FC<{ onCreated: (id: string) => void }>;
 }
 
@@ -347,7 +346,6 @@ export function renderFieldInput(
           value={value as number | null | undefined}
           onChange={onChange}
           unitType={field.unitType}
-          allowSwitch={field.allowUnitSwitch}
           placeholder={field.placeholder}
           disabled={disabled}
           {...ariaProps}

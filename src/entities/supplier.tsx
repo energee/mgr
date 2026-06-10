@@ -225,16 +225,4 @@ export const supplierEntity: EntityConfig<Supplier> = {
       detailTab: "Orders",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "List all active suppliers",
-    "Find suppliers with lead time under 7 days",
-    "Show suppliers for malt ingredients",
-    "Which suppliers have Net 30 terms?",
-  ],
-
-  keyFields: ["name", "is_active", "payment_terms", "default_lead_time_days"],
 };

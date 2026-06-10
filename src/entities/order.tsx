@@ -400,18 +400,6 @@ export const orderEntity: EntityConfig<Order> = {
       showInDetail: true,
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all pending orders",
-    "What orders are scheduled for this week?",
-    "List orders for Downtown Distributors",
-    "Find orders that need to be picked",
-  ],
-
-  keyFields: ["order_number", "status", "order_date", "customer_id"],
 };
 
 /**

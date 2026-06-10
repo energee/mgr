@@ -336,16 +336,4 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       detailTab: "Line Items",
     },
   ],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show me all pending purchase orders",
-    "What POs are expected this week?",
-    "List purchase orders for BSG",
-    "Find POs that need to be received",
-  ],
-
-  keyFields: ["po_number", "status", "supplier_id", "order_date", "expected_date"],
 };

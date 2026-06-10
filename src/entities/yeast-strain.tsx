@@ -347,17 +347,4 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
   // Value Display
   // ---------------------------------------------------------------------------
   valueDisplay: [typeDisplayConfig, formDisplayConfig, flocculationDisplayConfig],
-
-  // ---------------------------------------------------------------------------
-  // AI Context
-  // ---------------------------------------------------------------------------
-  queryExamples: [
-    "Show all yeast strains",
-    "What ale yeasts do we have?",
-    "Find yeasts with high attenuation",
-    "List dry yeasts",
-    "What yeasts work at 60°F?",
-  ],
-
-  keyFields: ["name", "manufacturer", "type", "form", "attenuation_typical", "is_active"],
 };
