@@ -9,6 +9,8 @@
  *
  * Supports:
  * - View mode: data display, header, tabs, relations, state transitions, actions
+ *   (`type: "button"` actions render as visible header buttons, capped at
+ *   MAX_HEADER_ACTION_BUTTONS; the rest live in the Actions dropdown)
  * - Edit mode: inline form editing with react-hook-form, Zod validation,
  *   optimistic locking, dirty form guard, keyboard shortcuts
  * - Create mode: when id is undefined, starts in edit mode with INSERT on save
@@ -48,6 +50,7 @@ import {
   type UnifiedSectionDef,
   type UnifiedFieldDef,
   resolveEntityBasePath,
+  getStateLabel,
 } from "@/types/entity";
 import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
@@ -91,6 +94,12 @@ import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
 import type { UseFormReturn } from "react-hook-form";
 import { log } from "@/lib/client-logger";
+
+/**
+ * Max number of `type: "button"` actions rendered as visible header buttons.
+ * Any beyond this overflow into the Actions dropdown.
+ */
+const MAX_HEADER_ACTION_BUTTONS = 3;
 
 // =============================================================================
 // Props
@@ -463,20 +472,48 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
   // ---------------------------------------------------------------------------
   // State transition mutation
+  //
+  // Mirrors the list-view pattern in entity-data-table.tsx
+  // (handleSingleTransition): loading/success/error toasts plus a
+  // `.eq(stateField, currentState)` guard on the UPDATE so a concurrent
+  // state change matches 0 rows and surfaces as a conflict instead of
+  // silently clobbering the other user's change.
   // ---------------------------------------------------------------------------
   const transitionMutation = useMutation({
     mutationFn: async ({ toState }: { toState: string }) => {
       if (!entity.stateMachine)
         throw new Error("No state machine configured");
       const stateField = entity.stateMachine.stateField;
-      const { error } = await dynamicFrom(supabase, entity.table)
+      const currentState = (data as Record<string, unknown> | null)?.[
+        stateField
+      ] as string | undefined;
+      if (!currentState)
+        throw new Error("Current status unknown — refresh and try again");
+      const { data: updated, error } = await dynamicFrom(supabase, entity.table)
         .update({ [stateField]: toState })
-        .eq("id", id);
+        .eq("id", id)
+        .eq(stateField, currentState)
+        .select("id");
       if (error) throw error;
+      // 0 rows affected = the guard didn't match: someone else changed the state
+      if (!updated || updated.length === 0)
+        throw new Error("Status changed by someone else — refresh and try again");
     },
+    onMutate: () => ({ loadingId: toast.loading("Updating status...") }),
     onSuccess: (_data, { toState }) => {
       invalidateEntityCaches(id || "");
       triggerSync(id || "", toState);
+      toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
+    },
+    onError: (err) => {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update status"
+      );
+      // Refetch so the UI reflects whichever state won the race
+      invalidateEntityCaches(id || "");
+    },
+    onSettled: (_data, _err, _vars, context) => {
+      if (context?.loadingId) toast.dismiss(context.loadingId);
     },
   });
 
@@ -546,6 +583,19 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       return true;
     });
   }, [data, entity.actions, stateInfo]);
+
+  // Split actions by configured presentation: `type: "button"` actions render
+  // as visible header buttons (capped at MAX_HEADER_ACTION_BUTTONS; overflow
+  // falls back into the dropdown), everything else stays in the dropdown.
+  const { headerButtonActions, dropdownActions } = useMemo(() => {
+    const buttons = availableActions
+      .filter((a) => a.type === "button")
+      .slice(0, MAX_HEADER_ACTION_BUTTONS);
+    return {
+      headerButtonActions: buttons,
+      dropdownActions: availableActions.filter((a) => !buttons.includes(a)),
+    };
+  }, [availableActions]);
 
   // ---------------------------------------------------------------------------
   // Edit mode: toggle in
@@ -815,6 +865,24 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
   const displayData = (data || ({} as T)) as T;
 
+  // Shared action dispatcher used by both visible header buttons and dropdown
+  // items, so presentation differences never change behavior (delete dialog,
+  // onAction override, state transition vs. custom handler).
+  const runAction = (action: EntityActionDef<T>) => {
+    if (action.disabledWhen?.(displayData)) return;
+    if (action.name === "delete" && action.deleteMode) {
+      setDeleteAction(action);
+      return;
+    }
+    if (onAction && onAction(action.name, displayData)) return;
+    if (action.toState) {
+      if (transitionMutation.isPending) return;
+      transitionMutation.mutate({ toState: action.toState });
+    } else {
+      action.handler?.(displayData);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -865,9 +933,32 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             </Button>
           )}
 
+          {/* Visible `type: "button"` actions (first gets primary styling
+              unless the config sets an explicit variant) */}
           {!editing &&
             !isCreateMode &&
-            (availableActions.length > 0 ||
+            headerButtonActions.map((action, index) => {
+              const disabledReason = action.disabledWhen?.(displayData);
+              return (
+                <Button
+                  key={action.name}
+                  size="sm"
+                  className="max-sm:h-9 max-sm:px-3"
+                  variant={
+                    action.variant ?? (index === 0 ? "default" : "outline")
+                  }
+                  disabled={!!disabledReason || transitionMutation.isPending}
+                  title={disabledReason || undefined}
+                  onClick={() => runAction(action)}
+                >
+                  {action.label}
+                </Button>
+              );
+            })}
+
+          {!editing &&
+            !isCreateMode &&
+            (dropdownActions.length > 0 ||
               (stateInfo && stateInfo.validTransitions.length > 0)) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -885,21 +976,22 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
                         return (
                           <DropdownMenuItem
                             key={toState}
-                            onClick={() =>
-                              transitionMutation.mutate({ toState })
-                            }
+                            onClick={() => {
+                              if (transitionMutation.isPending) return;
+                              transitionMutation.mutate({ toState });
+                            }}
                           >
                             Move to {display?.label || toState}
                           </DropdownMenuItem>
                         );
                       })}
-                      {availableActions.length > 0 && (
+                      {dropdownActions.length > 0 && (
                         <DropdownMenuSeparator />
                       )}
                     </>
                   )}
 
-                  {availableActions.map((action) => {
+                  {dropdownActions.map((action) => {
                     const disabledReason = action.disabledWhen?.(
                       displayData
                     );
@@ -915,26 +1007,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
                         }
                         disabled={!!disabledReason}
                         title={disabledReason || undefined}
-                        onClick={() => {
-                          if (disabledReason) return;
-                          if (action.name === "delete" && action.deleteMode) {
-                            setDeleteAction(action);
-                            return;
-                          }
-                          if (
-                            onAction &&
-                            onAction(action.name, displayData)
-                          ) {
-                            return;
-                          }
-                          if (action.toState) {
-                            transitionMutation.mutate({
-                              toState: action.toState,
-                            });
-                          } else {
-                            action.handler?.(displayData);
-                          }
-                        }}
+                        onClick={() => runAction(action)}
                       />
                     );
                   })}
