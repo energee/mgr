@@ -193,6 +193,19 @@ export const inventoryKeys = {
 };
 
 // =============================================================================
+// Consumption Keys (brew-day ingredient consumption, quick depletions)
+// =============================================================================
+
+export const consumptionKeys = {
+  /** FIFO-suggested brew-day consumption plan for a batch's recipe */
+  brewPlan: (recipeId: string, batchVolumeBbl: number | null) =>
+    ["consumption", "brew-plan", recipeId, batchVolumeBbl] as const,
+  /** Source options (finished goods or lots) for the quick depletion dialog */
+  depletionSources: (sourceType: string) =>
+    ["consumption", "depletion-sources", sourceType] as const,
+};
+
+// =============================================================================
 // Customer Keys
 // =============================================================================
 
@@ -299,6 +312,10 @@ export const reportKeys = {
     dateRange
       ? (["reports", "cogs", "by-period", granularity, dateRange] as const)
       : (["reports", "cogs", "by-period", granularity] as const),
+  /** Batch trace report — upstream/downstream hops for one batch */
+  trace: (batchId: string) => ["reports", "trace", batchId] as const,
+  /** Batch options for the trace report picker */
+  traceBatches: () => ["reports", "trace", "batches"] as const,
 };
 
 // =============================================================================

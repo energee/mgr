@@ -8,6 +8,12 @@
  * Packaging, and Cancel/Archive dialogs. State transitions (planned ->
  * fermenting, fermenting -> conditioning) are suggested via toast after
  * actions rather than being direct state-change buttons.
+ *
+ * Inventory loop wiring (audit Batch 9):
+ * - Start Brew Day chains into BrewConsumptionDialog, which plans FIFO
+ *   ingredient allocations (inventory_lot -> batch, status planned).
+ * - The Complete action is intercepted so those planned allocations are
+ *   flipped to completed alongside the status change.
  */
 
 import { use, useRef, useState, useCallback, useMemo } from "react";
@@ -24,6 +30,9 @@ import { BatchCancellationDialog } from "@/components/domain/batch/batch-cancell
 import { BatchBlendDialog } from "@/components/domain/batch/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/batch/vessel-transfer-dialog";
 import { StartBrewDayDialog } from "@/components/domain/brew/start-brew-day-dialog";
+import { BrewConsumptionDialog } from "@/components/domain/brew/brew-consumption-dialog";
+import { completeBatchConsumption } from "@/services/consumption-service";
+import { formatServiceError } from "@/services/types";
 import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-batch-dialog";
 import { AddToPackagingSessionDialog } from "@/components/domain/packaging/add-to-packaging-session-dialog";
 import { BatchPackagingHistory } from "@/components/domain/batch/batch-packaging-history";
@@ -62,6 +71,9 @@ export default function BatchDetailPage({
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
   const [showStartPackaging, setShowStartPackaging] = useState(false);
   const [showAddToSession, setShowAddToSession] = useState(false);
+  // Brew-day ingredient consumption (9.1): after a brew log is created we
+  // hold its id and show the consumption confirmation dialog before navigating.
+  const [pendingBrewLogId, setPendingBrewLogId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const supabase = createClient();
@@ -226,9 +238,42 @@ export default function BatchDetailPage({
     return null;
   }, [batch, linkedBrewLogs, id]);
 
+  /**
+   * Complete the batch and confirm its planned brew-day consumption:
+   * transitions status to completed, then flips planned inventory_lot→batch
+   * allocations to completed so ingredient inventory is actually depleted.
+   */
+  const completeBatch = useCallback(async () => {
+    const client = createClient();
+    const { error } = await client
+      .from("batches")
+      .update({ status: "completed" })
+      .eq("id", id);
+    if (error) {
+      toast.error(`Failed to complete batch: ${error.message}`);
+      return;
+    }
+    const result = await completeBatchConsumption(client, id);
+    if (!result.success) {
+      toast.error(`Batch completed, but confirming ingredient consumption failed: ${formatServiceError(result.error)}`);
+    } else if (result.data > 0) {
+      toast.success(`Batch completed — ${result.data} ingredient allocation${result.data === 1 ? "" : "s"} confirmed`);
+    } else {
+      toast.success("Batch completed");
+    }
+    queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+    queryClient.invalidateQueries({ queryKey: batchKeys.all() });
+  }, [id, queryClient]);
+
   // Custom action handler for batch-specific actions.
   // Returns true when the action is handled by a dialog, false to let EntityDetail handle it.
   const handleAction = useCallback((actionName: string) => {
+    if (actionName === "complete") {
+      // Handled here (not the generic state transition) so planned
+      // brew-day consumption allocations are completed alongside the batch.
+      void completeBatch();
+      return true;
+    }
     if (actionName === "start_brew_day") {
       setShowStartBrewDay(true);
       return true;
@@ -259,7 +304,7 @@ export default function BatchDetailPage({
       return true;
     }
     return false;
-  }, []);
+  }, [completeBatch]);
 
   const handleDialogSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
@@ -271,10 +316,24 @@ export default function BatchDetailPage({
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
       queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-      router.push(`/production/brew-logs/${brewLogId}`);
+      // With a recipe, confirm ingredient consumption (FIFO lot suggestions)
+      // before navigating to the brew log; without one there is nothing to plan.
+      if (batch?.recipe_id) {
+        setPendingBrewLogId(brewLogId);
+      } else {
+        router.push(`/production/brew-logs/${brewLogId}`);
+      }
     },
-    [queryClient, id, router]
+    [queryClient, id, router, batch?.recipe_id]
   );
+
+  /** Continue to the brew log after the consumption dialog confirms/skips. */
+  const handleConsumptionDone = useCallback(() => {
+    if (pendingBrewLogId) {
+      router.push(`/production/brew-logs/${pendingBrewLogId}`);
+      setPendingBrewLogId(null);
+    }
+  }, [pendingBrewLogId, router]);
 
   /** Suggest a batch state transition via a toast confirmation. */
   const handleSuggestTransition = useCallback(async (toState: string) => {
@@ -414,6 +473,22 @@ export default function BatchDetailPage({
             onOpenChange={setShowStartBrewDay}
             onSuccess={handleBrewDayCreated}
           />
+
+          {batch.recipe_id && (
+            <BrewConsumptionDialog
+              batchId={batch.id}
+              batchNumber={batch.batch_code}
+              recipeId={batch.recipe_id}
+              batchVolumeBbl={batch.volume_bbl}
+              open={pendingBrewLogId !== null}
+              // Navigation happens in onDone (confirm and skip both call it);
+              // onOpenChange only mirrors the visual state.
+              onOpenChange={(o) => {
+                if (o) return;
+              }}
+              onDone={handleConsumptionDone}
+            />
+          )}
 
           {showStartPackaging && recipeBrand && (
             <PackagingBatchDialog

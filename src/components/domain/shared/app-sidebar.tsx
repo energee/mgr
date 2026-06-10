@@ -174,6 +174,7 @@ const navigation: NavSection[] = [
       { label: "Batch Cost", href: "/reports/batch-cost", icon: AnimatedCircleDollarSign },
       { label: "Projections", href: "/reports/projections", icon: AnimatedTelescope },
       { label: "COGS", href: "/reports/cogs", icon: AnimatedCog },
+      { label: "Batch Trace", href: "/reports/trace", icon: AnimatedRoute },
     ],
   },
 ];

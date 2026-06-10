@@ -5,7 +5,16 @@
  *
  * Review dialog shown before completing a packaging session. Displays
  * per-line-item variance, flags missing actuals, and requires confirmation.
- * On confirm, transitions the session to "completed" status.
+ *
+ * Completion flow (audit Batch 9):
+ * 1. Implied loss check (9.3): planned units x fill volume - actual units x
+ *    fill volume per batch (fill volume = container volume_bbl x unit_count).
+ *    Positive differences prompt a RecordLossDialog per batch BEFORE the
+ *    status flips (the dialog unmounts once the session is completed).
+ * 2. Transition the session to "completed" (DB trigger creates finished goods).
+ * 3. Material depletion (9.2): consume selling_format_materials BOM lines x
+ *    actual quantity from inventory lots (FIFO, completed allocations,
+ *    destination = the line item's batch) via consumePackagingMaterials.
  */
 
 import { useState } from "react";
@@ -32,7 +41,12 @@ import {
 } from "@/components/ui/table";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { entityKeys, sessionLineItemKeys } from "@/lib/query-keys";
+import { entityKeys, sessionLineItemKeys, inventoryKeys, materialPlanningKeys } from "@/lib/query-keys";
+import { consumePackagingMaterials } from "@/services/consumption-service";
+import { computePackagingLoss } from "@/domain/consumption-planning";
+import { RecordLossDialog } from "@/components/domain/shared/record-loss-dialog";
+import { formatServiceError } from "@/services/types";
+import { log } from "@/lib/client-logger";
 
 type ReviewLineItem = {
   id: string;
@@ -51,6 +65,13 @@ type PackagingCompletionReviewProps = {
   onCompleted: () => void;
 };
 
+/** One queued implied-loss prompt (per source batch). */
+type LossPrompt = {
+  batchId: string;
+  batchCode: string;
+  volumeBbl: number;
+};
+
 export function PackagingCompletionReview({
   sessionId,
   items,
@@ -61,6 +82,8 @@ export function PackagingCompletionReview({
   const supabase = createClient();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState("");
+  // Implied-loss prompts queued before completion. null = not computed yet.
+  const [lossQueue, setLossQueue] = useState<LossPrompt[] | null>(null);
 
   const missingActualCount = items.filter(
     (item) => item.actual_quantity == null
@@ -75,6 +98,7 @@ export function PackagingCompletionReview({
     0
   );
 
+  // Step 2+3: flip status (trigger creates FGs), then deplete materials.
   const completeMutation = useMutation({
     mutationFn: async () => {
       const updates: Record<string, unknown> = { status: "completed" };
@@ -86,8 +110,13 @@ export function PackagingCompletionReview({
         .update(updates)
         .eq("id", sessionId);
       if (error) throw error;
+
+      // Material depletion (9.2). The session is already completed at this
+      // point — depletion failures are surfaced but do not roll it back.
+      const depletion = await consumePackagingMaterials(supabase, sessionId);
+      return depletion;
     },
-    onSuccess: () => {
+    onSuccess: (depletion) => {
       queryClient.invalidateQueries({
         queryKey: entityKeys.detail("packaging_sessions", sessionId),
       });
@@ -97,7 +126,26 @@ export function PackagingCompletionReview({
       queryClient.invalidateQueries({
         queryKey: entityKeys.list("packaging_sessions_with_summary"),
       });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.allocations() });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.lots() });
+      queryClient.invalidateQueries({
+        queryKey: materialPlanningKeys.sessionMaterials(sessionId),
+      });
       toast.success("Packaging session completed");
+      if (!depletion.success) {
+        log.error("Packaging material depletion failed:", depletion.error);
+        toast.warning(
+          `Material depletion failed: ${formatServiceError(depletion.error)}`
+        );
+      } else if (depletion.data.shortfalls.length > 0) {
+        toast.warning(
+          `${depletion.data.shortfalls.length} material${depletion.data.shortfalls.length === 1 ? "" : "s"} had insufficient lot inventory — partial depletion recorded`
+        );
+      } else if (depletion.data.allocations_inserted > 0) {
+        toast.success(
+          `${depletion.data.allocations_inserted} material allocation${depletion.data.allocations_inserted === 1 ? "" : "s"} recorded`
+        );
+      }
       onCompleted();
       onOpenChange(false);
     },
@@ -108,7 +156,93 @@ export function PackagingCompletionReview({
     },
   });
 
+  // Step 1: compute implied packaging loss per batch, prompting before
+  // completion (this dialog unmounts once the session status flips).
+  const lossCheckMutation = useMutation({
+    mutationFn: async (): Promise<LossPrompt[]> => {
+      const { data, error } = await supabase
+        .from("session_line_items")
+        .select(
+          `batch_id, planned_quantity, actual_quantity,
+           batch:batches(batch_code),
+           selling_format:selling_formats(unit_count, container:containers(volume_bbl))`
+        )
+        .eq("session_id", sessionId);
+      if (error) throw error;
+
+      // Supabase infers the batches join as an array; it is many-to-one
+      type LossRow = {
+        batch_id: string | null;
+        planned_quantity: number | null;
+        actual_quantity: number | null;
+        batch: { batch_code: string } | null;
+        selling_format: {
+          unit_count: number | null;
+          container: { volume_bbl: number | null } | null;
+        } | null;
+      };
+      const rows = (data ?? []) as unknown as LossRow[];
+
+      const codeByBatch = new Map<string, string>();
+      const lossLines = rows.map((row) => {
+        const unitVolume =
+          row.selling_format?.container?.volume_bbl != null
+            ? row.selling_format.container.volume_bbl *
+              (row.selling_format.unit_count ?? 1)
+            : null;
+        if (row.batch_id && row.batch?.batch_code) {
+          codeByBatch.set(row.batch_id, row.batch.batch_code);
+        }
+        return {
+          batch_id: row.batch_id,
+          planned_quantity: row.planned_quantity,
+          actual_quantity: row.actual_quantity,
+          unit_volume_bbl: unitVolume,
+        };
+      });
+
+      const lossByBatch = computePackagingLoss(lossLines);
+      return [...lossByBatch.entries()].map(([batchId, volumeBbl]) => ({
+        batchId,
+        batchCode: codeByBatch.get(batchId) ?? batchId.slice(0, 8),
+        volumeBbl,
+      }));
+    },
+    onSuccess: (prompts) => {
+      if (prompts.length === 0) {
+        completeMutation.mutate();
+      } else {
+        setLossQueue(prompts);
+      }
+    },
+    onError: (error) => {
+      // Loss capture is best-effort — never block completion on it
+      log.error("Packaging loss check failed:", error);
+      completeMutation.mutate();
+    },
+  });
+
+  /** Advance the loss queue; completes the session when drained. */
+  const advanceLossQueue = () => {
+    const next = (lossQueue ?? []).slice(1);
+    if (next.length === 0) {
+      setLossQueue(null);
+      completeMutation.mutate();
+    } else {
+      setLossQueue(next);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (completeMutation.isPending || lossCheckMutation.isPending) return;
+    lossCheckMutation.mutate();
+  };
+
+  const isPending = completeMutation.isPending || lossCheckMutation.isPending;
+  const currentLoss = lossQueue?.[0] ?? null;
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
@@ -217,11 +351,8 @@ export function PackagingCompletionReview({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Go Back
           </Button>
-          <Button
-            onClick={() => completeMutation.mutate()}
-            disabled={completeMutation.isPending}
-          >
-            {completeMutation.isPending && (
+          <Button onClick={handleConfirm} disabled={isPending || !!currentLoss}>
+            {isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
             Confirm Completion
@@ -229,5 +360,20 @@ export function PackagingCompletionReview({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Implied packaging loss prompt (9.3), one per source batch */}
+    {currentLoss && (
+      <RecordLossDialog
+        batchId={currentLoss.batchId}
+        batchNumber={currentLoss.batchCode}
+        suggestedVolumeBbl={currentLoss.volumeBbl}
+        context="Packaging variance (planned vs actual fill volume)"
+        open={!!currentLoss}
+        onOpenChange={(o) => {
+          if (!o) advanceLossQueue();
+        }}
+      />
+    )}
+    </>
   );
 }
