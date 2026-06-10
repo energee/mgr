@@ -421,7 +421,10 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
         .eq("recipe_id", recipeId);
       if (deleteError) throw deleteError;
 
-      for (const [index, variant] of items.entries()) {
+      // Variants are independent of each other, so save them in parallel.
+      // Within a variant the inserts stay sequential: child rows need the
+      // parent variant id from the first insert.
+      const saveVariant = async (variant: VariantItem, index: number) => {
         const { data: inserted, error: insertError } = await client
           .from("recipe_variants")
           .insert({
@@ -500,7 +503,9 @@ export function RecipeVariantEditor({ data }: RecipeVariantEditorProps) {
             );
           if (error) throw error;
         }
-      }
+      };
+
+      await Promise.all(items.map((variant, index) => saveVariant(variant, index)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({

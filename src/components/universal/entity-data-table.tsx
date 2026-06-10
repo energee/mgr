@@ -45,7 +45,8 @@ import { useQueryState } from "nuqs";
 import { parseAsStringEnum } from "nuqs";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicFrom } from "@/services/types";
+import { dynamicFrom, formatServiceError } from "@/services/types";
+import { completeBatchConsumption } from "@/services/consumption-service";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
@@ -309,6 +310,27 @@ export function EntityDataTable<T = Record<string, unknown>>({
       }
 
       toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
+
+      // Batch-completion special case: completing a batch must also flip its
+      // planned brew-day ingredient allocations to completed so inventory is
+      // actually depleted. The batch detail page does this by intercepting the
+      // "complete" action and calling completeBatchConsumption; kanban drag,
+      // list-row actions, and the mobile card menu land here instead and would
+      // otherwise bypass it. A config-level onTransition hook was considered
+      // and removed as dead code — with a single consumer, a documented
+      // special case is simpler. Fire-and-forget: the status update already
+      // succeeded, so only surface consumption failures (mirrors the detail
+      // page's error handling).
+      if (entity.table === "batches" && toState === "completed") {
+        void completeBatchConsumption(supabase, id).then((result) => {
+          if (!result.success) {
+            toast.error(
+              `Batch completed, but confirming ingredient consumption failed: ${formatServiceError(result.error)}`
+            );
+          }
+        });
+      }
+
       // Background reconcile — the row may now fall outside active filters or
       // belong on another page; the optimistic row keeps the UI instant.
       queryClient.invalidateQueries({
