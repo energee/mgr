@@ -896,7 +896,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
     searchYeastPitches: tool({
       description:
-        "Search yeast pitches with viability and strain details. Filter by status or strain name.",
+        "Search yeast pitches with viability and strain details. Filter by status or strain name. Each row includes the strain's recommended_max_generations and an over_recommended_generation flag for spotting tired yeast past its recommended repitch limit.",
       inputSchema: z.object({
         status: z
           .string()
@@ -914,7 +914,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         // returned instead.
         let q = dynamicFrom(supabase, "yeast_pitches_with_remaining")
           .select(
-            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, vessel_name, location_name"
+            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_id, strain_name, strain_code, strain_manufacturer, vessel_name, location_name"
           )
           .order("created_at", { ascending: false })
           .limit(limit);
@@ -925,7 +925,42 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
-        return data;
+
+        // The view predates yeasts.recommended_max_generations (migration
+        // 00176) and doesn't expose it, so fetch it per strain and annotate
+        // each pitch with an over_recommended_generation flag.
+        const rows = (data ?? []) as Array<
+          Record<string, unknown> & {
+            strain_id: string | null;
+            generation: number | null;
+          }
+        >;
+        const strainIds = [
+          ...new Set(rows.map((r) => r.strain_id).filter((id) => id != null)),
+        ];
+        const maxGenByStrain = new Map<string, number | null>();
+        if (strainIds.length > 0) {
+          const { data: strains, error: strainsError } = await supabase
+            .from("yeasts")
+            .select("id, recommended_max_generations")
+            .in("id", strainIds);
+          if (strainsError) throw new Error(strainsError.message);
+          for (const s of strains ?? []) {
+            maxGenByStrain.set(s.id, s.recommended_max_generations);
+          }
+        }
+
+        return rows.map((r) => {
+          const maxGen = r.strain_id
+            ? (maxGenByStrain.get(r.strain_id) ?? null)
+            : null;
+          return {
+            ...r,
+            recommended_max_generations: maxGen,
+            over_recommended_generation:
+              maxGen != null && r.generation != null && r.generation >= maxGen,
+          };
+        });
       },
     }),
 

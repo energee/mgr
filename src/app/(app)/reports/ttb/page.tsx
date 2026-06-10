@@ -81,7 +81,7 @@ type BatchSummary = {
   name: string;
   status: string;
   volume_bbl: number | null;
-  planned_start_date: string | null;
+  completed_at: string | null;
 }
 
 // =============================================================================
@@ -157,18 +157,21 @@ export default function TTBReportPage() {
 
       // Fetch in parallel: the two queries are independent.
       const [
-        // Batches completed in the period (filter by planned_start_date, which
-        // represents the production date, not updated_at which changes on any edit)
+        // Batches completed in the period (filter by completed_at, stamped by
+        // trigger on transition to "completed" — migration 00175). Note:
+        // completed_at was backfilled from updated_at for batches completed
+        // before that migration, so period attribution for those older
+        // batches is approximate.
         { data: completedBatches, error: completedError },
         // Batches in production (fermenting, conditioning, packaging)
         { data: inProgressBatches, error: inProgressError },
       ] = await Promise.all([
         supabase
           .from("batches")
-          .select("id, batch_code, name, status, volume_bbl, planned_start_date")
+          .select("id, batch_code, name, status, volume_bbl, completed_at")
           .eq("status", "completed")
-          .gte("planned_start_date", startDate)
-          .lte("planned_start_date", endDate + "T23:59:59Z"),
+          .gte("completed_at", startDate)
+          .lte("completed_at", endDate + "T23:59:59Z"),
         supabase
           .from("batches")
           .select("id, batch_code, name, status, volume_bbl")

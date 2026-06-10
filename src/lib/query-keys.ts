@@ -417,6 +417,8 @@ export const yeastKeys = {
   all: () => ["yeast-pitches"] as const,
   detail: (id: string) => ["yeast-pitches", id] as const,
   available: () => ["yeast-pitches", "available"] as const,
+  /** Strain id → recommended_max_generations map (for generation warnings) */
+  strainMaxGenerations: () => ["yeast-strains", "max-generations"] as const,
   brinks: () => ["yeast-pitches", "brinks"] as const,
   brinksDetail: (vesselId: string) => ["yeast-pitches", "brinks", vesselId] as const,
   lineageRoot: (pitchId: string) => ["yeast-lineage-root", pitchId] as const,

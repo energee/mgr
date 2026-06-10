@@ -127,6 +127,35 @@ export function PitchYeastDialog({
     enabled: open,
   });
 
+  // ---------------------------------------------------------------------------
+  // Fetch strains' recommended_max_generations (the view above doesn't expose
+  // it) so we can warn — without blocking — when a pitch is at or past the
+  // strain's recommended generation limit.
+  // ---------------------------------------------------------------------------
+  const { data: strainMaxGenerations } = useQuery({
+    queryKey: yeastKeys.strainMaxGenerations(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("yeasts")
+        .select("id, recommended_max_generations");
+      if (error) throw error;
+      return new Map(
+        (data ?? []).map((y) => [y.id, y.recommended_max_generations])
+      );
+    },
+    enabled: open,
+  });
+
+  /** Recommended max generations for a pitch's strain (null = no limit set). */
+  const getMaxGenerations = (pitch: AvailablePitch): number | null =>
+    strainMaxGenerations?.get(pitch.strain_id) ?? null;
+
+  /** True when the pitch is at or past its strain's recommended generation limit. */
+  const isOverGeneration = (pitch: AvailablePitch): boolean => {
+    const maxGen = getMaxGenerations(pitch);
+    return maxGen != null && pitch.generation >= maxGen;
+  };
+
   // Sort recipe-matching strains first if recipeYeastIds provided
   const sortedPitches = useMemo(() => {
     if (!pitches) return [];
@@ -346,6 +375,11 @@ export function PitchYeastDialog({
                           Recipe match
                         </span>
                       )}
+                      {isOverGeneration(pitch) && (
+                        <span className="ml-1 text-xs text-amber-600 font-medium">
+                          Over gen limit
+                        </span>
+                      )}
                     </SelectItem>
                   ))
                 )}
@@ -354,6 +388,16 @@ export function PitchYeastDialog({
             {form.formState.errors.pitch_id && (
               <p className="text-sm text-destructive">
                 {form.formState.errors.pitch_id.message}
+              </p>
+            )}
+            {/* Generation warning — informational only, never blocks pitching */}
+            {selectedPitch && isOverGeneration(selectedPitch) && (
+              <p className="text-sm text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Generation {selectedPitch.generation} is at or past the
+                recommended max of {getMaxGenerations(selectedPitch)} for this
+                strain. You can still pitch, but viability and flavor may
+                drift.
               </p>
             )}
           </div>
