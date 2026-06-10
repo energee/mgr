@@ -16,6 +16,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import { addDays, format, parseISO } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { formatStateLabel } from "@/types/entity";
@@ -236,7 +237,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
     getVesselAvailability: tool({
       description:
-        "Get vessel utilization: which vessels are available, which are in use, and their current batch assignments.",
+        "Get vessel utilization: which vessels are available, which are in use with their current batch assignments, and the projected date each occupied vessel frees up (based on the batch's recipe schedule).",
       inputSchema: z.object({}),
       execute: async () => {
         const data = await query<
@@ -261,6 +262,43 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           (v) => v.status === "ready_for_use" && !v.current_batch_id
         );
         const inUse = data.filter((v) => v.current_batch_id);
+
+        // Projected free date per occupying batch: planned_start_date +
+        // fermentation_days + conditioning_days — mirrors the timeline page's
+        // estimated_ready_date math, including the 14/7-day fallbacks.
+        // Null when the batch has no planned start date.
+        const projectedFreeByBatch = new Map<string, string | null>();
+        const occupyingBatchIds = inUse
+          .map((v) => v.current_batch_id)
+          .filter((id): id is string => id !== null);
+        if (occupyingBatchIds.length > 0) {
+          const batches = await query(
+            supabase
+              .from("batches")
+              .select(
+                "id, planned_start_date, recipes:recipe_id(fermentation_days, conditioning_days)"
+              )
+              .in("id", occupyingBatchIds),
+          );
+          for (const b of batches ?? []) {
+            const recipe = b.recipes as {
+              fermentation_days: number | null;
+              conditioning_days: number | null;
+            } | null;
+            const fermDays = recipe?.fermentation_days || 14;
+            const condDays = recipe?.conditioning_days || 7;
+            projectedFreeByBatch.set(
+              b.id,
+              b.planned_start_date
+                ? format(
+                    addDays(parseISO(b.planned_start_date), fermDays + condDays),
+                    "yyyy-MM-dd",
+                  )
+                : null,
+            );
+          }
+        }
+
         return {
           summary: {
             total: data.length,
@@ -279,6 +317,9 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
             type: v.vessel_type,
             capacity_bbl: v.capacity_bbl,
             batch_code: v.batch_code,
+            projected_free_date: v.current_batch_id
+              ? (projectedFreeByBatch.get(v.current_batch_id) ?? null)
+              : null,
           })),
         };
       },
@@ -307,20 +348,28 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
     getIngredientInventory: tool({
       description:
-        "Get raw ingredient inventory levels. Optionally filter by category (malt, hop, yeast, adjunct, chemical). Returns totals per item.",
+        "Get raw ingredient inventory levels. Optionally filter by category (malt, hop, yeast, adjunct, chemical) and/or by item name (partial match). Returns totals per item.",
       inputSchema: z.object({
         category: z
           .string()
           .optional()
           .describe("Filter by category: malt, hop, yeast, adjunct, chemical"),
+        itemName: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by item name, case-insensitive partial match (e.g. 'citra')",
+          ),
       }),
-      execute: async ({ category }) => {
+      execute: async ({ category, itemName }) => {
         // Fetch active items, then lots from the view that accounts for
         // allocations (remaining_quantity = received - allocated).
         let itemsQ = dynamicFrom(supabase, "inventory_items")
           .select("id, name, category, unit, reorder_point")
           .eq("is_active", true);
         if (category) itemsQ = itemsQ.eq("category", category);
+        if (itemName)
+          itemsQ = itemsQ.ilike("name", `%${escapeLike(itemName)}%`);
 
         const items = await query<{ id: string; name: string; category: string; unit: string; reorder_point: number | null }[]>(itemsQ);
         if (!items?.length) return [];

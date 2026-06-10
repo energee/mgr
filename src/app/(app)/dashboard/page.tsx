@@ -4,6 +4,7 @@
  * Production Dashboard
  *
  * Overview of production metrics:
+ * - "Today" attention panel (overdue batches, due POs, aging kegs, expiring lots)
  * - Batch status summary
  * - Active batches list
  * - Vessel utilization
@@ -36,6 +37,7 @@ import {
   calculateDelta,
   TrendChartLazy,
   BatchActivityHeatmap,
+  TodayPanel,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
@@ -316,6 +318,9 @@ export default function DashboardPage() {
           <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
         )}
       </div>
+
+      {/* Today: morning attention list (hidden when nothing needs attention) */}
+      <TodayPanel />
 
       {/* Two-Column Layout */}
       <div className="grid gap-6 lg:grid-cols-5">

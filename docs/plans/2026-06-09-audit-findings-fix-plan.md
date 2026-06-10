@@ -21,40 +21,44 @@ Status legend: `[ ]` pending · `[x]` fixed & verified (lint+typecheck+tests gre
 
 ## Batch 3 — Detail-page action ergonomics (high UX impact)
 
-- [ ] **3.1 Render `type: "button"` actions as visible header buttons**: `entity-detail-unified.tsx:860-935` collapses all actions into one dropdown, ignoring the configured `type: "button"` vs `"dropdown"` distinction (configs: `batch.tsx:368-441`, `order.tsx:291-342`).
-- [ ] **3.2 Transition feedback + race guard on detail page**: `entity-detail-unified.tsx:462-476` — `transitionMutation` has no `onError`, no toasts, no `.eq(stateField, currentState)` guard. Port the list-view pattern (`entity-data-table.tsx:134-184`).
+- [x] **3.1 Render `type: "button"` actions as visible header buttons**: `entity-detail-unified.tsx:860-935` collapses all actions into one dropdown, ignoring the configured `type: "button"` vs `"dropdown"` distinction (configs: `batch.tsx:368-441`, `order.tsx:291-342`).
+- [x] **3.2 Transition feedback + race guard on detail page**: `entity-detail-unified.tsx:462-476` — `transitionMutation` has no `onError`, no toasts, no `.eq(stateField, currentState)` guard. Port the list-view pattern (`entity-data-table.tsx:134-184`).
 
 ## Batch 4 — Server-side pagination (structural perf)
 
-- [ ] **4.1 Server pagination/sort**: `entity-data-table.tsx:442-504` — `select("*")`, no `.range()`/`.limit()`/`.order()`; all 40 entity lists fetch entire tables. Wire pagination+sorting state into queryKey, apply `.order()` + `.range()` with `{ count: "estimated" }`, set `manualPagination`/`manualSorting`. Keep capped unpaginated path for kanban.
-- [ ] **4.2 Column projection**: derive select list from `listColumns ∪ listFilters ∪ searchableFields ∪ id/state`; fall back to `*` for custom renderers.
-- [ ] **4.3 Mobile list cap**: `entity-mobile-card-list.tsx:167-184` renders all rows; respect pagination or "Load more".
+- [x] **4.1 Server pagination/sort** (done: manualPagination/manualSorting, `.order()` + id tiebreaker + `.range()` with `count: "estimated"`, `entityKeys.pagedList`, keepPreviousData, kanban capped at 1000): `entity-data-table.tsx:442-504` — `select("*")`, no `.range()`/`.limit()`/`.order()`; all 40 entity lists fetch entire tables. Wire pagination+sorting state into queryKey, apply `.order()` + `.range()` with `{ count: "estimated" }`, set `manualPagination`/`manualSorting`. Keep capped unpaginated path for kanban.
+- [x] **4.2 Column projection** (done: `buildSelectList` auto-detects safety; falls back to `*` when render fns / action predicates / onAction can read arbitrary fields; board mode always `*`): derive select list from `listColumns ∪ listFilters ∪ searchableFields ∪ id/state`; fall back to `*` for custom renderers.
+- [x] **4.3 Mobile list cap** (done: mobile fetches pages 0..N with "Load more" button driven by server count): `entity-mobile-card-list.tsx:167-184` renders all rows; respect pagination or "Load more".
 
 ## Batch 5 — Dead code deletion (zero-risk, ~500+ lines)
 
-- [ ] **5.1 Delete `queryExamples` + `keyFields`** from `EntityConfig` (`src/types/entity.ts:144,147`) and all ~38 entity configs. Zero consumers (chat reads `CHAT_ENTITY_MAP` instead).
-- [ ] **5.2 Delete dead config knobs**: `detailSections`/`formFields`/`createFields`/`editFields` (deprecated, 0/40) + legacy converter `getUnifiedSections()` (`entity-detail-unified.tsx:121-146`), `editComponent` (0/40 + branch at `:1217`), `stateMachine.hooks` (`onEnter`/`onExit` zero consumers; keep `validate`), `allowUnitSwitch` (0/40), `relationLimit` (0/40), relation `inlineEdit` (0/40).
-- [ ] **5.3 Delete dead helpers**: `types/entity.ts` — `getEntity`, `getEntitiesByDomain`, `getStateColor`, `getValueColor` (0 callers).
-- [ ] **5.4 Trim `ui/file-upload.tsx`**: only `FileUpload`, `FileUploadDropzone`, `FileUploadTrigger` used (sole consumer `settings/system/page.tsx:33`); delete unused subcomponents (~lines 919-1409 + their store actions).
+- [x] **5.1 Delete `queryExamples` + `keyFields`** (keyFields *type member* kept — CHAT_ENTITY_MAP casts to EntityConfig and route.ts reads it; untangle with a future map/registry dedup) from `EntityConfig` (`src/types/entity.ts:144,147`) and all ~38 entity configs. Zero consumers (chat reads `CHAT_ENTITY_MAP` instead).
+- [x] **5.2 Delete dead config knobs** (also deleted orphaned recipe-schedule-edit.tsx): `detailSections`/`formFields`/`createFields`/`editFields` (deprecated, 0/40) + legacy converter `getUnifiedSections()` (`entity-detail-unified.tsx:121-146`), `editComponent` (0/40 + branch at `:1217`), `stateMachine.hooks` (`onEnter`/`onExit` zero consumers; keep `validate`), `allowUnitSwitch` (0/40), `relationLimit` (0/40), relation `inlineEdit` (0/40).
+- [x] **5.3 Delete dead helpers**: `types/entity.ts` — `getEntity`, `getEntitiesByDomain`, `getStateColor`, `getValueColor` (0 callers).
+- [x] **5.4 Trim `ui/file-upload.tsx`** (1410 → 803): only `FileUpload`, `FileUploadDropzone`, `FileUploadTrigger` used (sole consumer `settings/system/page.tsx:33`); delete unused subcomponents (~lines 919-1409 + their store actions).
 
 ## Batch 6 — Recipe-domain dedup (~800-line reduction)
 
-- [ ] **6.1 Generic `IngredientTab`**: `other-ingredients-section.tsx` — four ~230-line clone tabs (Adjuncts/Sugars/Spices/Fruits) → one component driven by `{ table, fkColumn, catalogTable, columns[] }` spec.
-- [ ] **6.2 `useRecipeChildRows` hook**: 11 components re-implement fetch/sync/dirty/delete-all-reinsert-save/invalidate (~60-90 lines each; all `useRegisterSaver` callers).
-- [ ] **6.3 Fold hops into generic section + shared `CatalogPicker`**: `recipe-variant-editor.tsx:219-932` — hops duplicate the generic addition section with one extra column; catalog picker duplicates `CatalogSelector` (`other-ingredients-section.tsx:161`).
+- [x] **6.1 Generic `IngredientTab`** (1218 → 678 lines): `other-ingredients-section.tsx` — four ~230-line clone tabs (Adjuncts/Sugars/Spices/Fruits) → one component driven by `{ table, fkColumn, catalogTable, columns[] }` spec.
+- [x] **6.2 `useRecipeChildRows` hook** (6 true child-row savers migrated; 7 recipe-editor callers are form-based parent updates — different pattern, correctly left): 11 components re-implement fetch/sync/dirty/delete-all-reinsert-save/invalidate (~60-90 lines each; all `useRegisterSaver` callers).
+- [x] **6.3 Fold hops into generic section + shared `CatalogPicker`**: `recipe-variant-editor.tsx:219-932` — hops duplicate the generic addition section with one extra column; catalog picker duplicates `CatalogSelector` (`other-ingredients-section.tsx:161`).
 
 ## Batch 7 — Drift prevention + COGS testability
 
-- [ ] **7.1 `CHAT_ENTITY_MAP` dedup**: `src/app/api/chat/entity-map.ts` (412 lines) hand-duplicates metadata for 25 entities. Split data-only `*.meta.ts` per entity imported by both config and map, OR add a test asserting map ≡ registry. Also generate `searchEntity` description's entity list from map keys (`tools.ts:90-92`).
-- [ ] **7.2 Extract COGS math**: `reports/cogs/page.tsx` — move SKU cost allocation (~330-480) and period bucketing (~490-620) into `src/lib/reports/cogs.ts` with unit tests; split per-tab components. Also dedupe double-fetch of finished_goods/allocations (`:253-265, 329-366`).
+- [x] **7.1 `CHAT_ENTITY_MAP` dedup** (sync test added; caught 3 real runtime bugs — yeast_strain table, keg_transaction sort, yeast_pitch dropped view; searchYeastPitches also fixed): `src/app/api/chat/entity-map.ts` (412 lines) hand-duplicates metadata for 25 entities. Split data-only `*.meta.ts` per entity imported by both config and map, OR add a test asserting map ≡ registry. Also generate `searchEntity` description's entity list from map keys (`tools.ts:90-92`).
+- [x] **7.2 Extract COGS math** (src/lib/reports/cogs.ts + 19 tests; double-fetch intentionally kept — tabs use genuinely different date semantics): `reports/cogs/page.tsx` — move SKU cost allocation (~330-480) and period bucketing (~490-620) into `src/lib/reports/cogs.ts` with unit tests; split per-tab components. Also dedupe double-fetch of finished_goods/allocations (`:253-265, 329-366`).
 
 ## Batch 8 — Operations: attention surface + small schema adds (MIGRATIONS — apply only after user confirms DB push)
 
-- [ ] **8.1 "Today" dashboard panel**: batches exceeding recipe `fermentation_days`/`conditioning_days` (logic exists in `timeline/page.tsx:234-246`), POs due (`expected_date`), kegs >30d at accounts, expiring lots.
-- [ ] **8.2 Schedule `check_low_inventory()`** via pg_cron (function exists since migration 00022, never scheduled).
+- [x] **8.1 "Today" dashboard panel**: batches exceeding recipe `fermentation_days`/`conditioning_days` (logic exists in `timeline/page.tsx:234-246`), POs due (`expected_date`), kegs >30d at accounts, expiring lots. Done: `src/components/dashboard/today-panel.tsx`, rendered near the top of `dashboard/page.tsx`.
+- [x] **8.2 Schedule `check_low_inventory()`** via pg_cron (function exists since migration 00022, never scheduled). Migration written: `00174_schedule_low_inventory_check.sql` (daily 06:00 UTC, idempotent unschedule guard) — **not applied; needs DB push confirmation**.
 - [ ] **8.3 TTB `completed_at`**: batches lack completion timestamp; `ttb/page.tsx:160-165` filters by `planned_start_date` → wrong-month attribution. Add column + filter on it.
+  - Migration written: `00175_batches_completed_at.sql` (nullable timestamptz, backfill from `updated_at` for `status='completed'`, BEFORE UPDATE trigger `trg_batches_set_completed_at` stamps it on transition to completed) — **not applied; needs DB push confirmation**.
+  - **FOLLOW-UP (after migration applied + `bun db:generate`)**: in `src/app/(app)/reports/ttb/page.tsx` (`reportKeys.ttbBatches` queryFn, ~line 160), change the completed-batches query from `.gte("planned_start_date", startDate).lte("planned_start_date", endDate + "T23:59:59Z")` to `.gte("completed_at", startDate).lte("completed_at", endDate + "T23:59:59Z")`, add `completed_at` to the `.select(...)` list, and update the now-stale comment justifying the `planned_start_date` filter. Do NOT make this change before regenerating `src/types/supabase.ts` — the column doesn't exist in the generated types yet.
 - [ ] **8.4 Yeast `recommended_max_generations`** on `yeast_strains` + warning in pitch picker.
-- [ ] **8.5 AI chat tool gaps**: `getIngredientInventory` add `itemName` param (`tools.ts:307`); `getVesselAvailability` add projected-free-date (`tools.ts:236`; computation exists in `timeline/page.tsx:380`).
+  - Migration written: `00176_yeast_recommended_max_generations.sql` (nullable smallint, CHECK NULL-or-positive) — **not applied; needs DB push confirmation**.
+  - **FOLLOW-UP (after migration applied + `bun db:generate`)**: (1) pitch picker — where pitches from `yeast_pitches_with_remaining` are selected, also fetch the strain's `recommended_max_generations` and show a warning when a pitch's `generation >= recommended_max_generations`; (2) `searchYeastPitches` in `src/app/api/chat/tools.ts` — include `recommended_max_generations` (and e.g. an `over_recommended_generation` flag) in returned rows so the assistant can flag tired yeast. No code references the column yet by design — types don't exist until regeneration.
+- [x] **8.5 AI chat tool gaps**: `getIngredientInventory` add `itemName` param (`tools.ts:307`); `getVesselAvailability` add projected-free-date (`tools.ts:236`; computation exists in `timeline/page.tsx:380`). Done: `itemName` ilike filter (escapeLike); `projected_free_date` on `inUse` vessels computed from occupying batch `planned_start_date` + recipe `fermentation_days`/`conditioning_days`.
 
 ## Batch 9 — Close the inventory loop (highest product value, large)
 
@@ -73,7 +77,7 @@ Status legend: `[ ]` pending · `[x]` fixed & verified (lint+typecheck+tests gre
 
 ## Deferred / needs user decision
 
-- [d] Search input per-keystroke re-render (`entity-data-table.tsx:236-238`) — fold into Batch 4 work if convenient.
+- [x] Search input per-keystroke re-render — done in Batch 4: keystroke state moved into `ListSearchInput`; parent only re-renders on the debounced value.
 - [d] Missing indexes `batches(created_at)`, `finished_goods(created_at)` — trivial migration, bundle with Batch 8.
 - [d] Sequential per-row upserts in settings/pricing, settings/system, recipe-variant-editor — bundle with Batch 6/7.
 - [d] cmd+k navigator (cmdk primitive exists, unused) — nice-to-have.

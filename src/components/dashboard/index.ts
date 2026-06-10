@@ -11,3 +11,4 @@ export { StatCardWithDelta, calculateDelta } from "./stat-card-with-delta";
 export { TrendChart } from "./trend-chart";
 export { TrendChartLazy } from "./trend-chart-lazy";
 export { BatchActivityHeatmap } from "./batch-activity-heatmap";
+export { TodayPanel } from "./today-panel";
