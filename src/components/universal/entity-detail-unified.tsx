@@ -380,10 +380,15 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Fetch record (skip in create mode)
   // ---------------------------------------------------------------------------
-  const { data, isLoading, error } = useEntityRecord(
+  const { data, isLoading, error, refetch } = useEntityRecord(
     entity as EntityConfig<Record<string, unknown>>,
     id,
-  ) as { data: T | undefined; isLoading: boolean; error: unknown };
+  ) as {
+    data: T | undefined;
+    isLoading: boolean;
+    error: unknown;
+    refetch: () => void;
+  };
 
   // ---------------------------------------------------------------------------
   // react-hook-form setup
@@ -786,8 +791,11 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   if (!isCreateMode) {
     if (error) {
       return (
-        <div className="text-center py-8 text-destructive">
-          Failed to load {entity.displayName.toLowerCase()}
+        <div className="flex flex-col items-center gap-3 py-8">
+          <p className="text-destructive">
+            Failed to load {entity.displayName.toLowerCase()}
+          </p>
+          <Button onClick={() => refetch()}>Try Again</Button>
         </div>
       );
     }

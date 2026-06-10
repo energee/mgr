@@ -141,7 +141,6 @@ const navigation: NavSection[] = [
       { label: "Kegs", href: "/inventory/kegs", icon: AnimatedDrum },
       { label: "Bins", href: "/inventory/bins", icon: AnimatedBoxes },
       { label: "Transfers", href: "/inventory/transfers", icon: AnimatedRoute },
-      { label: "Deliveries", href: "/inventory/deliveries", icon: AnimatedShip },
     ],
   },
   {
@@ -160,6 +159,7 @@ const navigation: NavSection[] = [
     items: [
       { label: "Orders", href: "/sales/orders", icon: AnimatedFileCheck },
       { label: "Pick Lists", href: "/sales/pick-lists", icon: AnimatedCheckCheck },
+      { label: "Deliveries", href: "/inventory/deliveries", icon: AnimatedShip },
       { label: "Customers", href: "/sales/customers", icon: AnimatedUsers },
     ],
   },
@@ -250,8 +250,9 @@ export function AppSidebar() {
   const activeSection = navigation.find((s) =>
     s.items.some((item) => pathname.startsWith(item.href))
   );
-  const [openSection, setOpenSection] = useState<string | null>(
-    activeSection?.label ?? null
+  // Multiple sections can be open at once; start with the active route's section expanded.
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(activeSection ? [activeSection.label] : [])
   );
 
   return (
@@ -288,9 +289,14 @@ export function AppSidebar() {
         {navigation.map((section) => (
           <Collapsible
             key={section.label}
-            open={openSection === section.label}
+            open={openSections.has(section.label)}
             onOpenChange={(open) =>
-              setOpenSection(open ? section.label : null)
+              setOpenSections((prev) => {
+                const next = new Set(prev);
+                if (open) next.add(section.label);
+                else next.delete(section.label);
+                return next;
+              })
             }
             className="group/collapsible"
           >

@@ -127,7 +127,8 @@ export function FieldInput({
 
   return (
     <div className={getColSpanClass(field.colSpan, field.fullWidth)}>
-      <Label htmlFor={field.name} className={field.required ? "required" : ""}>
+      {/* Required fields show an explicit asterisk below; no CSS `.required` rule exists. */}
+      <Label htmlFor={field.name}>
         {field.label}
         {field.required && (
           <>

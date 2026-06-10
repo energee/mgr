@@ -6,18 +6,18 @@ Status legend: `[ ]` pending · `[x]` fixed & verified (lint+typecheck+tests gre
 
 ## Batch 1 — Quick wins A: correctness + perf (code-only)
 
-- [ ] **1.1 Timeline queryKey omits date-range end** (correctness bug): `src/app/(app)/production/planning/timeline/page.tsx:192-196` — `entityKeys.timeline(...)` keyed only on `startDate`, but queryFn filters through `endDate = addWeeks(startDate, weeksToShow)`. Changing 6→12 weeks serves stale 6-week cache. Fix: include `weeksToShow`/endDate in the key.
-- [ ] **1.2 Timeline scroll reset + unmemoized `days`**: same file `:188-189, 362-372` — `days` rebuilt every render; scroll-to-today effect depends on it and force-resets `scrollLeft` whenever any query settles. Fix: `useMemo` days on `[startDate, weeksToShow]`; key scroll effect on `[startDate]`.
-- [ ] **1.3 Dashboard false empty state**: `src/app/(app)/dashboard/page.tsx:166-232, 324-329` — batch/vessel sections render "No active batches" + 0% utilization during initial fetch. Fix: gate on `isLoading` with skeletons (pattern exists: `ProductionTrendsSkeleton`).
-- [ ] **1.4 Lazy-load recharts**: `dashboard/page.tsx:37` (TrendChart), `dashboard/sales/page.tsx:20`, `reports/cogs/page.tsx:77-86` — wrap charts in `next/dynamic` like existing `batch-readings-chart-lazy.tsx`.
-- [ ] **1.5 TTB sequential queries**: `reports/ttb/page.tsx:160-175` — two independent queries awaited sequentially; wrap in `Promise.all`.
+- [x] **1.1 Timeline queryKey omits date-range end** (correctness bug): `src/app/(app)/production/planning/timeline/page.tsx:192-196` — `entityKeys.timeline(...)` keyed only on `startDate`, but queryFn filters through `endDate = addWeeks(startDate, weeksToShow)`. Changing 6→12 weeks serves stale 6-week cache. Fix: include `weeksToShow`/endDate in the key.
+- [x] **1.2 Timeline scroll reset + unmemoized `days`**: same file `:188-189, 362-372` — `days` rebuilt every render; scroll-to-today effect depends on it and force-resets `scrollLeft` whenever any query settles. Fix: `useMemo` days on `[startDate, weeksToShow]`; key scroll effect on `[startDate]`.
+- [x] **1.3 Dashboard false empty state**: `src/app/(app)/dashboard/page.tsx:166-232, 324-329` — batch/vessel sections render "No active batches" + 0% utilization during initial fetch. Fix: gate on `isLoading` with skeletons (pattern exists: `ProductionTrendsSkeleton`).
+- [x] **1.4 Lazy-load recharts** (COGS chart extracted to `src/components/domain/reports/cogs-period-chart{,-lazy}.tsx`): `dashboard/page.tsx:37` (TrendChart), `dashboard/sales/page.tsx:20`, `reports/cogs/page.tsx:77-86` — wrap charts in `next/dynamic` like existing `batch-readings-chart-lazy.tsx`.
+- [x] **1.5 TTB sequential queries**: `reports/ttb/page.tsx:160-175` — two independent queries awaited sequentially; wrap in `Promise.all`.
 
 ## Batch 2 — Quick wins B: UX config + polish
 
-- [ ] **2.1 Order quickFilters**: `src/entities/order.tsx` — add `quickFilters` (Open = draft…packed default, Due sorted by `scheduled_date asc`, Done) mirroring `batch.tsx:179-200`.
-- [ ] **2.2 Required-field indicator**: `src/components/universal/field-input.tsx:130` sets class `required` but no CSS rule exists. Add `.required::after { content: " *" }` (or asterisk span).
-- [ ] **2.3 List/detail error retry**: `entity-data-table.tsx:654-660` and `entity-detail-unified.tsx:787-793` render plain "Failed to load" text. Add `refetch()` retry button (pattern: `route-error.tsx:24-51`).
-- [ ] **2.4 Sidebar IA**: `src/components/domain/shared/app-sidebar.tsx:102-179, 253-255` — move Deliveries from Inventory → Sales; allow multiple sections open simultaneously.
+- [x] **2.1 Order quickFilters** (real states: draft/confirmed/scheduled/picking/packed open; fulfilled/cancelled terminal): `src/entities/order.tsx` — add `quickFilters` (Open = draft…packed default, Due sorted by `scheduled_date asc`, Done) mirroring `batch.tsx:179-200`.
+- [x] **2.2 Required-field indicator** (asterisk span already existed; removed dead `required` class): `src/components/universal/field-input.tsx:130` sets class `required` but no CSS rule exists. Add `.required::after { content: " *" }` (or asterisk span).
+- [x] **2.3 List/detail error retry**: `entity-data-table.tsx:654-660` and `entity-detail-unified.tsx:787-793` render plain "Failed to load" text. Add `refetch()` retry button (pattern: `route-error.tsx:24-51`).
+- [x] **2.4 Sidebar IA**: `src/components/domain/shared/app-sidebar.tsx:102-179, 253-255` — move Deliveries from Inventory → Sales; allow multiple sections open simultaneously.
 
 ## Batch 3 — Detail-page action ergonomics (high UX impact)
 

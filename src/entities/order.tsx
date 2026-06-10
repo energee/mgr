@@ -143,6 +143,29 @@ export const orderEntity: EntityConfig<Order> = {
     },
   ],
 
+  quickFilters: [
+    {
+      label: "Open",
+      filters: [
+        { column: "status", values: ["draft", "confirmed", "scheduled", "picking", "packed"] },
+      ],
+      isDefault: true,
+    },
+    {
+      label: "Due",
+      filters: [
+        { column: "status", values: ["draft", "confirmed", "scheduled", "picking", "packed"] },
+      ],
+      sort: { column: "scheduled_date", direction: "asc" },
+    },
+    {
+      label: "Done",
+      filters: [
+        { column: "status", values: ["fulfilled", "cancelled"] },
+      ],
+    },
+  ],
+
   defaultSort: { column: "order_date", direction: "desc" },
   searchableFields: ["order_number"],
 

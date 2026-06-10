@@ -432,7 +432,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
     [urlFilters, joinOperator]
   );
 
-  const { data, isLoading, isFetching, error } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: entityKeys.list(fetchTable, {
       ...filters,
       ...filterKey,
@@ -653,8 +653,11 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   if (error) {
     return (
-      <div className="text-center py-8 text-destructive">
-        Failed to load {entity.displayNamePlural.toLowerCase()}
+      <div className="flex flex-col items-center gap-3 py-8">
+        <p className="text-destructive">
+          Failed to load {entity.displayNamePlural.toLowerCase()}
+        </p>
+        <Button onClick={() => refetch()}>Try Again</Button>
       </div>
     );
   }
