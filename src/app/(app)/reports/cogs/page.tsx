@@ -74,16 +74,9 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+// Chart is lazy-loaded so recharts stays out of the initial bundle — it only
+// renders in the By Period tab.
+import { CogsPeriodChartLazy } from "@/components/domain/reports/cogs-period-chart-lazy";
 
 // =============================================================================
 // Types
@@ -1393,51 +1386,7 @@ export default function CogsReportPage() {
                   No data for the selected date range
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={periodData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="period" />
-                    <YAxis
-                      tickFormatter={(v: number) =>
-                        `$${(v / 1000).toFixed(0)}k`
-                      }
-                    />
-                    <Tooltip
-                      formatter={(v) => formatCurrency(v as number)}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="malt_cost"
-                      name="Malts"
-                      stackId="a"
-                      fill="hsl(var(--chart-1))"
-                    />
-                    <Bar
-                      dataKey="hop_cost"
-                      name="Hops"
-                      stackId="a"
-                      fill="hsl(var(--chart-2))"
-                    />
-                    <Bar
-                      dataKey="yeast_cost"
-                      name="Yeast"
-                      stackId="a"
-                      fill="hsl(var(--chart-3))"
-                    />
-                    <Bar
-                      dataKey="adjunct_cost"
-                      name="Adjuncts"
-                      stackId="a"
-                      fill="hsl(var(--chart-4))"
-                    />
-                    <Bar
-                      dataKey="other_cost"
-                      name="Other"
-                      stackId="a"
-                      fill="hsl(var(--chart-5))"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <CogsPeriodChartLazy data={periodData} />
               )}
             </CardContent>
           </Card>

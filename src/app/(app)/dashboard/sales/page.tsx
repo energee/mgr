@@ -17,7 +17,7 @@ import { orderEntity } from "@/entities/order";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Suspense } from "react";
 import { ShoppingCart, Users, BarChart3 } from "lucide-react";
-import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
+import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChartLazy } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
@@ -499,7 +499,7 @@ function SalesTrends() {
       {/* Trend Charts */}
       <div className="grid gap-6 md:grid-cols-2">
         <DashboardSection title="Revenue">
-          <TrendChart
+          <TrendChartLazy
             data={currentPeriodData}
             xKey="date"
             type="bar"
@@ -508,7 +508,7 @@ function SalesTrends() {
           />
         </DashboardSection>
         <DashboardSection title="Orders">
-          <TrendChart
+          <TrendChartLazy
             data={currentPeriodData}
             xKey="date"
             series={[{ key: "order_count", label: "Orders" }]}

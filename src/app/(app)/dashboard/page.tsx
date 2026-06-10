@@ -34,7 +34,7 @@ import {
   usePeriod,
   StatCardWithDelta,
   calculateDelta,
-  TrendChart,
+  TrendChartLazy,
   BatchActivityHeatmap,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
@@ -163,7 +163,7 @@ export default function DashboardPage() {
   const supabase = createClient();
   const volumeUnit = useVolumeUnit();
 
-  const { data: batchCounts = DEFAULT_BATCH_COUNTS } = useQuery({
+  const { data: batchCounts = DEFAULT_BATCH_COUNTS, isLoading: countsLoading } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
     queryFn: async () => {
       const { data, error } = await dynamicFrom(supabase, "batch_status_counts")
@@ -186,7 +186,7 @@ export default function DashboardPage() {
   });
 
   // Fetch active batches (not completed or cancelled)
-  const { data: activeBatches = [] } = useQuery({
+  const { data: activeBatches = [], isLoading: batchesLoading } = useQuery({
     queryKey: dashboardKeys.activeBatches(),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -217,7 +217,7 @@ export default function DashboardPage() {
   });
 
   // Fetch vessel status — throws on error; a silent fallback to the base table would hide regressions in vessels_with_batch.
-  const { data: vessels = [] } = useQuery({
+  const { data: vessels = [], isLoading: vesselsLoading } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
       const { data, error } = await dynamicFrom(supabase, "vessels_with_batch")
@@ -310,7 +310,11 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
-        <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
+        {countsLoading ? (
+          <Skeleton className="h-9 w-full max-w-md" />
+        ) : (
+          <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
+        )}
       </div>
 
       {/* Two-Column Layout */}
@@ -321,7 +325,14 @@ export default function DashboardPage() {
           viewAllHref="/production/batches"
           className="lg:col-span-3"
         >
-          {activeBatches.length === 0 ? (
+          {batchesLoading ? (
+            // Skeleton while fetching — avoids flashing the empty state + CTA
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
+              ))}
+            </div>
+          ) : activeBatches.length === 0 ? (
             <DashboardEmpty
               message="No active batches"
               icon={FlaskConical}
@@ -370,31 +381,45 @@ export default function DashboardPage() {
           viewAllHref="/production/vessels"
           className="lg:col-span-2"
         >
-          {/* Big utilization percentage */}
-          <div className="mb-5">
-            <span className="font-mono text-4xl font-semibold">{utilizationPercent}%</span>
-            <span className="text-muted-foreground ml-2 text-sm">
-              in use ({totalInUse}/{totalVessels})
-            </span>
-          </div>
-
-          {/* Per-Type Progress Bars */}
-          <div className="space-y-3">
-            {vesselsByType.map(({ type, label, total, inUse }) => (
-              <div key={type}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {inUse}/{total}
-                  </span>
-                </div>
-                <Progress
-                  value={total > 0 ? (inUse / total) * 100 : 0}
-                  className="h-[3px]"
-                />
+          {vesselsLoading ? (
+            // Skeleton while fetching — avoids flashing 0% utilization
+            <>
+              <Skeleton className="mb-5 h-10 w-40" />
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-7 w-full" />
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <>
+              {/* Big utilization percentage */}
+              <div className="mb-5">
+                <span className="font-mono text-4xl font-semibold">{utilizationPercent}%</span>
+                <span className="text-muted-foreground ml-2 text-sm">
+                  in use ({totalInUse}/{totalVessels})
+                </span>
+              </div>
+
+              {/* Per-Type Progress Bars */}
+              <div className="space-y-3">
+                {vesselsByType.map(({ type, label, total, inUse }) => (
+                  <div key={type}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium">{label}</span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {inUse}/{total}
+                      </span>
+                    </div>
+                    <Progress
+                      value={total > 0 ? (inUse / total) * 100 : 0}
+                      className="h-[3px]"
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </DashboardSection>
       </div>
 
@@ -528,7 +553,7 @@ function ProductionTrends() {
           <BatchActivityHeatmap />
         </DashboardSection>
         <DashboardSection title="Volume Brewed (weekly)">
-          <TrendChart
+          <TrendChartLazy
             data={weeklyVolumeData}
             xKey="date"
             type="bar"

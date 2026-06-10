@@ -184,15 +184,19 @@ export default function ProductionTimelinePage() {
   const [brandFilter, setBrandFilter] = useState<string>("_all");
   const [recipeFilter, setRecipeFilter] = useState<string>("_all");
 
-  // Calculate date range
-  const endDate = addWeeks(startDate, weeksToShow);
-  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  // Calculate date range (memoized so `days` is referentially stable across
+  // unrelated re-renders, e.g. query settles)
+  const { endDate, days } = useMemo(() => {
+    const end = addWeeks(startDate, weeksToShow);
+    return { endDate: end, days: eachDayOfInterval({ start: startDate, end }) };
+  }, [startDate, weeksToShow]);
 
   // Fetch batches with recipe info
   const { data: batches = [] } = useQuery({
     queryKey: entityKeys.timeline(
       "batches_with_brew_info",
       startDate.toISOString(),
+      endDate.toISOString(),
     ),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -358,10 +362,12 @@ export default function ProductionTimelinePage() {
   const goToToday = () =>
     setStartDate(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-  // Scroll to today on mount
+  // Scroll to today on mount and when the window start moves. Keyed on
+  // startDate (not `days`) so query settles / range-length changes don't
+  // reset the user's scroll position.
   useEffect(() => {
     if (scrollContainerRef.current) {
-      const todayIndex = days.findIndex((d) => isToday(d));
+      const todayIndex = differenceInDays(new Date(), startDate);
       if (todayIndex > 0) {
         scrollContainerRef.current.scrollLeft = Math.max(
           0,
@@ -369,7 +375,7 @@ export default function ProductionTimelinePage() {
         );
       }
     }
-  }, [days, dayWidth]);
+  }, [startDate, dayWidth]);
 
   // Calculate batch position and width
   const getBatchStyle = (batch: TimelineBatch) => {

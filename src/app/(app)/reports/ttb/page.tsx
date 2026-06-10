@@ -155,23 +155,27 @@ export default function TTBReportPage() {
       const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
       const endDate = new Date(year, month, 0).toISOString().split("T")[0];
 
-      // Batches completed in the period (filter by planned_start_date, which
-      // represents the production date, not updated_at which changes on any edit)
-      const { data: completedBatches, error: completedError } = await supabase
-        .from("batches")
-        .select("id, batch_code, name, status, volume_bbl, planned_start_date")
-        .eq("status", "completed")
-        .gte("planned_start_date", startDate)
-        .lte("planned_start_date", endDate + "T23:59:59Z");
+      // Fetch in parallel: the two queries are independent.
+      const [
+        // Batches completed in the period (filter by planned_start_date, which
+        // represents the production date, not updated_at which changes on any edit)
+        { data: completedBatches, error: completedError },
+        // Batches in production (fermenting, conditioning, packaging)
+        { data: inProgressBatches, error: inProgressError },
+      ] = await Promise.all([
+        supabase
+          .from("batches")
+          .select("id, batch_code, name, status, volume_bbl, planned_start_date")
+          .eq("status", "completed")
+          .gte("planned_start_date", startDate)
+          .lte("planned_start_date", endDate + "T23:59:59Z"),
+        supabase
+          .from("batches")
+          .select("id, batch_code, name, status, volume_bbl")
+          .in("status", ["fermenting", "conditioning", "packaging"]),
+      ]);
 
       if (completedError) throw completedError;
-
-      // Batches in production (fermenting, conditioning, packaging)
-      const { data: inProgressBatches, error: inProgressError } = await supabase
-        .from("batches")
-        .select("id, batch_code, name, status, volume_bbl")
-        .in("status", ["fermenting", "conditioning", "packaging"]);
-
       if (inProgressError) throw inProgressError;
 
       const completedVolume = (completedBatches || []).reduce(

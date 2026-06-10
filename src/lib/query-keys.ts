@@ -29,9 +29,9 @@ export const entityKeys = {
   related: (table: string, foreignKey: string, parentId: string) =>
     [table, "by", foreignKey, parentId] as const,
 
-  /** Timeline view for a table */
-  timeline: (table: string, startDate: string) =>
-    [table, "list", "timeline", startDate] as const,
+  /** Timeline view for a table over a date range (both ends must be in the key so range changes refetch) */
+  timeline: (table: string, startDate: string, endDate: string) =>
+    [table, "list", "timeline", startDate, endDate] as const,
 
   /** Display values for relation fields (FK name resolution) */
   relationDisplay: (queries: { table: string; id: string }[]) =>
