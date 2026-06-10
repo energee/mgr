@@ -17,9 +17,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
+import { formatDate } from "@/lib/format";
 import { reportKeys } from "@/lib/query-keys";
 import {
   Card,
@@ -101,6 +101,41 @@ type TraceData = {
 };
 
 // =============================================================================
+// Presentational helpers
+// =============================================================================
+
+/** Card scaffolding shared by the four trace sections (header + empty state). */
+function TraceSection({
+  title,
+  description,
+  emptyMessage,
+  isEmpty,
+  children,
+}: {
+  title: React.ReactNode;
+  description: React.ReactNode;
+  emptyMessage: React.ReactNode;
+  isEmpty: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isEmpty ? (
+          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          children
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================================
 // Page
 // =============================================================================
 
@@ -125,117 +160,136 @@ export default function BatchTracePage() {
   const { data: trace, isLoading: traceLoading, error } = useQuery({
     queryKey: reportKeys.trace(batchId),
     queryFn: async (): Promise<TraceData> => {
-      // ----- Upstream: lot allocations into the batch -----
-      const { data: upstreamAllocs, error: upErr } = await supabase
-        .from("allocations")
-        .select("id, source_id, quantity, status, lot_number, notes, created_at")
-        .eq("destination_type", "batch")
-        .eq("destination_id", batchId)
-        .eq("source_type", "inventory_lot")
-        .in("status", ["planned", "completed"])
-        .order("created_at", { ascending: true });
-      if (upErr) throw upErr;
-
-      // Resolve lot → item names for the upstream rows
-      const lotIds = [...new Set((upstreamAllocs ?? []).map((a) => a.source_id).filter((x): x is string => !!x))];
-      const lotInfo = new Map<string, { item_name: string | null; lot_number: string | null; unit: string | null }>();
-      if (lotIds.length > 0) {
-        const { data: lots, error: lotErr } = await dynamicFrom(supabase, "inventory_lots_with_quantities")
-          .select("id, item_name, lot_number, unit")
-          .in("id", lotIds);
-        if (lotErr) throw lotErr;
-        for (const lot of (lots ?? []) as unknown as Array<{ id: string; item_name: string | null; lot_number: string | null; unit: string | null }>) {
-          lotInfo.set(lot.id, lot);
-        }
-      }
-
-      const upstream: UpstreamRow[] = (upstreamAllocs ?? []).map((a) => {
-        const lot = a.source_id ? lotInfo.get(a.source_id) : undefined;
-        return {
-          id: a.id,
-          lot_id: a.source_id,
-          item_name: lot?.item_name ?? null,
-          lot_number: a.lot_number ?? lot?.lot_number ?? null,
-          quantity: a.quantity,
-          unit: lot?.unit ?? null,
-          status: a.status,
-          created_at: a.created_at,
-          notes: a.notes,
-        };
-      });
-
-      // ----- Downstream hop 1: finished goods from the batch -----
-      const { data: fgs, error: fgErr } = await supabase
-        .from("finished_goods_with_availability")
-        .select("id, brand_name, selling_format_name, lot_number, quantity, production_date")
-        .eq("batch_id", batchId)
-        .order("production_date", { ascending: true });
-      if (fgErr) throw fgErr;
-      const finishedGoods: FinishedGoodRow[] = (fgs ?? [])
-        .filter((fg): fg is typeof fg & { id: string } => !!fg.id)
-        .map((fg) => ({
-          id: fg.id,
-          brand_name: fg.brand_name,
-          selling_format_name: fg.selling_format_name,
-          lot_number: fg.lot_number,
-          quantity: fg.quantity,
-          production_date: fg.production_date,
-        }));
-
-      // ----- Downstream hop 2: order allocations from those finished goods -----
-      let orderAllocations: OrderAllocationRow[] = [];
-      const fgIds = finishedGoods.map((fg) => fg.id);
-      if (fgIds.length > 0) {
-        const { data: orderAllocs, error: oaErr } = await supabase
+      // ----- Upstream chain: lot allocations into the batch → lot names -----
+      const fetchUpstream = async (): Promise<UpstreamRow[]> => {
+        const { data: upstreamAllocs, error: upErr } = await supabase
           .from("allocations")
-          .select("id, source_id, destination_id, quantity, status")
-          .eq("source_type", "finished_good")
-          .eq("destination_type", "order")
-          .in("source_id", fgIds)
-          .in("status", ["planned", "completed"]);
-        if (oaErr) throw oaErr;
+          .select("id, source_id, quantity, status, lot_number, notes, created_at")
+          .eq("destination_type", "batch")
+          .eq("destination_id", batchId)
+          .eq("source_type", "inventory_lot")
+          .in("status", ["planned", "completed"])
+          .order("created_at", { ascending: true });
+        if (upErr) throw upErr;
 
-        const orderIds = [...new Set((orderAllocs ?? []).map((a) => a.destination_id).filter((x): x is string => !!x))];
-        const orderInfo = new Map<string, { order_number: string | null; customer_name: string | null }>();
-        if (orderIds.length > 0) {
-          const { data: orders, error: ordErr } = await supabase
-            .from("orders")
-            .select("id, order_number, customer:customers(name)")
-            .in("id", orderIds);
-          if (ordErr) throw ordErr;
-          for (const o of orders ?? []) {
-            orderInfo.set(o.id, {
-              order_number: o.order_number,
-              customer_name: (o.customer as { name: string } | null)?.name ?? null,
-            });
+        // Resolve lot → item names for the upstream rows
+        const lotIds = [...new Set((upstreamAllocs ?? []).map((a) => a.source_id).filter((x): x is string => !!x))];
+        const lotInfo = new Map<string, { item_name: string | null; lot_number: string | null; unit: string | null }>();
+        if (lotIds.length > 0) {
+          const { data: lots, error: lotErr } = await dynamicFrom(supabase, "inventory_lots_with_quantities")
+            .select("id, item_name, lot_number, unit")
+            .in("id", lotIds);
+          if (lotErr) throw lotErr;
+          for (const lot of (lots ?? []) as unknown as Array<{ id: string; item_name: string | null; lot_number: string | null; unit: string | null }>) {
+            lotInfo.set(lot.id, lot);
           }
         }
 
-        const fgLabel = new Map(
-          finishedGoods.map((fg) => [
-            fg.id,
-            [fg.brand_name, fg.selling_format_name, fg.lot_number].filter(Boolean).join(" · "),
-          ])
-        );
-        orderAllocations = (orderAllocs ?? []).map((a) => ({
-          id: a.id,
-          finished_good_id: a.source_id,
-          finished_good_label: (a.source_id && fgLabel.get(a.source_id)) || "—",
-          order_id: a.destination_id,
-          order_number: a.destination_id ? orderInfo.get(a.destination_id)?.order_number ?? null : null,
-          customer_name: a.destination_id ? orderInfo.get(a.destination_id)?.customer_name ?? null : null,
-          quantity: a.quantity,
-          status: a.status,
-        }));
-      }
+        return (upstreamAllocs ?? []).map((a) => {
+          const lot = a.source_id ? lotInfo.get(a.source_id) : undefined;
+          return {
+            id: a.id,
+            lot_id: a.source_id,
+            item_name: lot?.item_name ?? null,
+            lot_number: a.lot_number ?? lot?.lot_number ?? null,
+            quantity: a.quantity,
+            unit: lot?.unit ?? null,
+            status: a.status,
+            created_at: a.created_at,
+            notes: a.notes,
+          };
+        });
+      };
 
-      // ----- Downstream hop 3: keg transactions against the batch -----
-      const { data: kegTx, error: kegErr } = await dynamicFrom(supabase, "keg_transactions_with_details")
-        .select("id, transaction_type, quantity, customer_name, created_at")
-        .eq("batch_id", batchId)
-        .order("created_at", { ascending: true });
-      if (kegErr) throw kegErr;
-      const kegTransactions = ((kegTx ?? []) as unknown as KegTransactionRow[]);
+      // ----- Downstream chain: finished goods → order allocations → orders -----
+      const fetchFinishedGoodChain = async (): Promise<{
+        finishedGoods: FinishedGoodRow[];
+        orderAllocations: OrderAllocationRow[];
+      }> => {
+        const { data: fgs, error: fgErr } = await supabase
+          .from("finished_goods_with_availability")
+          .select("id, brand_name, selling_format_name, lot_number, quantity, production_date")
+          .eq("batch_id", batchId)
+          .order("production_date", { ascending: true });
+        if (fgErr) throw fgErr;
+        const finishedGoods: FinishedGoodRow[] = (fgs ?? [])
+          .filter((fg): fg is typeof fg & { id: string } => !!fg.id)
+          .map((fg) => ({
+            id: fg.id,
+            brand_name: fg.brand_name,
+            selling_format_name: fg.selling_format_name,
+            lot_number: fg.lot_number,
+            quantity: fg.quantity,
+            production_date: fg.production_date,
+          }));
+
+        let orderAllocations: OrderAllocationRow[] = [];
+        const fgIds = finishedGoods.map((fg) => fg.id);
+        if (fgIds.length > 0) {
+          const { data: orderAllocs, error: oaErr } = await supabase
+            .from("allocations")
+            .select("id, source_id, destination_id, quantity, status")
+            .eq("source_type", "finished_good")
+            .eq("destination_type", "order")
+            .in("source_id", fgIds)
+            .in("status", ["planned", "completed"]);
+          if (oaErr) throw oaErr;
+
+          const orderIds = [...new Set((orderAllocs ?? []).map((a) => a.destination_id).filter((x): x is string => !!x))];
+          const orderInfo = new Map<string, { order_number: string | null; customer_name: string | null }>();
+          if (orderIds.length > 0) {
+            const { data: orders, error: ordErr } = await supabase
+              .from("orders")
+              .select("id, order_number, customer:customers(name)")
+              .in("id", orderIds);
+            if (ordErr) throw ordErr;
+            for (const o of orders ?? []) {
+              orderInfo.set(o.id, {
+                order_number: o.order_number,
+                customer_name: (o.customer as { name: string } | null)?.name ?? null,
+              });
+            }
+          }
+
+          const fgLabel = new Map(
+            finishedGoods.map((fg) => [
+              fg.id,
+              [fg.brand_name, fg.selling_format_name, fg.lot_number].filter(Boolean).join(" · "),
+            ])
+          );
+          orderAllocations = (orderAllocs ?? []).map((a) => ({
+            id: a.id,
+            finished_good_id: a.source_id,
+            finished_good_label: (a.source_id && fgLabel.get(a.source_id)) || "—",
+            order_id: a.destination_id,
+            order_number: a.destination_id ? orderInfo.get(a.destination_id)?.order_number ?? null : null,
+            customer_name: a.destination_id ? orderInfo.get(a.destination_id)?.customer_name ?? null : null,
+            quantity: a.quantity,
+            status: a.status,
+          }));
+        }
+
+        return { finishedGoods, orderAllocations };
+      };
+
+      // ----- Keg chain: keg transactions against the batch -----
+      const fetchKegTransactions = async (): Promise<KegTransactionRow[]> => {
+        const { data: kegTx, error: kegErr } = await dynamicFrom(supabase, "keg_transactions_with_details")
+          .select("id, transaction_type, quantity, customer_name, created_at")
+          .eq("batch_id", batchId)
+          .order("created_at", { ascending: true });
+        if (kegErr) throw kegErr;
+        return (kegTx ?? []) as unknown as KegTransactionRow[];
+      };
+
+      // The three chains are independent — run them in parallel. Dependent
+      // hops (lot/order lookups) stay sequential within their own chain.
+      const [upstream, { finishedGoods, orderAllocations }, kegTransactions] =
+        await Promise.all([
+          fetchUpstream(),
+          fetchFinishedGoodChain(),
+          fetchKegTransactions(),
+        ]);
 
       return { upstream, finishedGoods, orderAllocations, kegTransactions };
     },
@@ -291,23 +345,12 @@ export default function BatchTracePage() {
       {trace && selectedBatch && (
         <div className="space-y-6">
           {/* Upstream */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Upstream — Ingredient &amp; Material Lots
-              </CardTitle>
-              <CardDescription>
-                Inventory lot allocations into {selectedBatch.batch_code}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {trace.upstream.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No ingredient lot allocations recorded for this batch yet.
-                  These are created by the brew-day consumption confirmation
-                  (Start Brew Day) and packaging material depletion.
-                </p>
-              ) : (
+          <TraceSection
+            title={<>Upstream — Ingredient &amp; Material Lots</>}
+            description={<>Inventory lot allocations into {selectedBatch.batch_code}.</>}
+            emptyMessage="No ingredient lot allocations recorded for this batch yet. These are created by the brew-day consumption confirmation (Start Brew Day) and packaging material depletion."
+            isEmpty={trace.upstream.length === 0}
+          >
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -338,30 +381,21 @@ export default function BatchTracePage() {
                         </TableCell>
                         <TableCell className="capitalize">{row.status}</TableCell>
                         <TableCell>
-                          {row.created_at ? format(new Date(row.created_at), "MMM d, yyyy") : "—"}
+                          {row.created_at ? formatDate(row.created_at, { month: "short" }) : "—"}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
+          </TraceSection>
 
           {/* Finished goods */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Finished Goods</CardTitle>
-              <CardDescription>
-                Packaged inventory produced from {selectedBatch.batch_code}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {trace.finishedGoods.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No finished goods produced from this batch yet.
-                </p>
-              ) : (
+          <TraceSection
+            title="Finished Goods"
+            description={<>Packaged inventory produced from {selectedBatch.batch_code}.</>}
+            emptyMessage="No finished goods produced from this batch yet."
+            isEmpty={trace.finishedGoods.length === 0}
+          >
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -385,31 +419,22 @@ export default function BatchTracePage() {
                         <TableCell className="text-right">{fg.quantity ?? "—"}</TableCell>
                         <TableCell>
                           {fg.production_date
-                            ? format(new Date(fg.production_date), "MMM d, yyyy")
+                            ? formatDate(fg.production_date, { month: "short" })
                             : "—"}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
+          </TraceSection>
 
           {/* Orders / customers */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Orders &amp; Customers</CardTitle>
-              <CardDescription>
-                Order allocations drawing on this batch&apos;s finished goods.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {trace.orderAllocations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No order allocations from this batch&apos;s finished goods.
-                </p>
-              ) : (
+          <TraceSection
+            title={<>Orders &amp; Customers</>}
+            description={<>Order allocations drawing on this batch&apos;s finished goods.</>}
+            emptyMessage={<>No order allocations from this batch&apos;s finished goods.</>}
+            isEmpty={trace.orderAllocations.length === 0}
+          >
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -440,24 +465,15 @@ export default function BatchTracePage() {
                     ))}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
+          </TraceSection>
 
           {/* Keg transactions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Keg Transactions</CardTitle>
-              <CardDescription>
-                Keg fills and shipments recorded against {selectedBatch.batch_code}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {trace.kegTransactions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No keg transactions recorded against this batch.
-                </p>
-              ) : (
+          <TraceSection
+            title="Keg Transactions"
+            description={<>Keg fills and shipments recorded against {selectedBatch.batch_code}.</>}
+            emptyMessage="No keg transactions recorded against this batch."
+            isEmpty={trace.kegTransactions.length === 0}
+          >
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -476,15 +492,13 @@ export default function BatchTracePage() {
                         <TableCell className="text-right">{tx.quantity}</TableCell>
                         <TableCell>{tx.customer_name ?? "—"}</TableCell>
                         <TableCell>
-                          {tx.created_at ? format(new Date(tx.created_at), "MMM d, yyyy") : "—"}
+                          {tx.created_at ? formatDate(tx.created_at, { month: "short" }) : "—"}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
+          </TraceSection>
         </div>
       )}
     </div>

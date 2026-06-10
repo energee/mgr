@@ -133,13 +133,16 @@ export function PricingMatrixView({
   });
 
   // Build price lookup: tier_id -> format_id -> price
-  const priceMap = new Map<string, Map<string, PricingTierPrice>>();
-  prices?.forEach((p) => {
-    if (!priceMap.has(p.pricing_tier_id)) {
-      priceMap.set(p.pricing_tier_id, new Map());
-    }
-    priceMap.get(p.pricing_tier_id)!.set(p.format_id, p);
-  });
+  const priceMap = useMemo(() => {
+    const map = new Map<string, Map<string, PricingTierPrice>>();
+    prices?.forEach((p) => {
+      if (!map.has(p.pricing_tier_id)) {
+        map.set(p.pricing_tier_id, new Map());
+      }
+      map.get(p.pricing_tier_id)!.set(p.format_id, p);
+    });
+    return map;
+  }, [prices]);
 
   // ---------------------------------------------------------------------------
   // Mutations

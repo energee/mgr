@@ -16,7 +16,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
-import { addDays, format, parseISO } from "date-fns";
+import { projectedReadyDate } from "@/domain/batch-schedule";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { formatStateLabel } from "@/types/entity";
@@ -264,8 +264,8 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         const inUse = data.filter((v) => v.current_batch_id);
 
         // Projected free date per occupying batch: planned_start_date +
-        // fermentation_days + conditioning_days — mirrors the timeline page's
-        // estimated_ready_date math, including the 14/7-day fallbacks.
+        // fermentation_days + conditioning_days via the shared schedule math
+        // in src/domain/batch-schedule.ts (14/7-day fallbacks included).
         // Null when the batch has no planned start date.
         const projectedFreeByBatch = new Map<string, string | null>();
         const occupyingBatchIds = inUse
@@ -285,16 +285,9 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
               fermentation_days: number | null;
               conditioning_days: number | null;
             } | null;
-            const fermDays = recipe?.fermentation_days || 14;
-            const condDays = recipe?.conditioning_days || 7;
             projectedFreeByBatch.set(
               b.id,
-              b.planned_start_date
-                ? format(
-                    addDays(parseISO(b.planned_start_date), fermDays + condDays),
-                    "yyyy-MM-dd",
-                  )
-                : null,
+              projectedReadyDate(b.planned_start_date, recipe),
             );
           }
         }

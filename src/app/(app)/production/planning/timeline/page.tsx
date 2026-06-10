@@ -30,6 +30,7 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { scheduleDays, projectedReadyDate } from "@/domain/batch-schedule";
 import { batchEntity } from "@/entities/batch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -235,22 +236,18 @@ export default function ProductionTimelinePage() {
           conditioning_days: number;
           brands: { name: string };
         } | null;
-        const fermDays = recipe?.fermentation_days || 14;
-        const condDays = recipe?.conditioning_days || 7;
-        const startDt = b.planned_start_date
-          ? parseISO(b.planned_start_date)
-          : null;
+        // Shared schedule math (src/domain/batch-schedule.ts): 14/7-day
+        // fallbacks and planned start + ferm + cond ready-date projection.
+        const { fermentationDays, conditioningDays } = scheduleDays(recipe);
 
         return {
           ...b,
           recipe_name: recipe?.name,
           brand_id: recipe?.brand_id,
           brand_name: recipe?.brands?.name,
-          fermentation_days: fermDays,
-          conditioning_days: condDays,
-          estimated_ready_date: startDt
-            ? format(addDays(startDt, fermDays + condDays), "yyyy-MM-dd")
-            : null,
+          fermentation_days: fermentationDays,
+          conditioning_days: conditioningDays,
+          estimated_ready_date: projectedReadyDate(b.planned_start_date, recipe),
         } as TimelineBatch;
       });
     },
@@ -382,8 +379,8 @@ export default function ProductionTimelinePage() {
     if (!batch.planned_start_date) return null;
 
     const batchStart = parseISO(batch.planned_start_date);
-    const totalDays =
-      (batch.fermentation_days || 14) + (batch.conditioning_days || 7);
+    const { fermentationDays, conditioningDays } = scheduleDays(batch);
+    const totalDays = fermentationDays + conditioningDays;
 
     const startOffset = differenceInDays(batchStart, startDate);
     const duration = totalDays;

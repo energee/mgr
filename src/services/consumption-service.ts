@@ -104,6 +104,18 @@ export type PackagingDepletionResult = {
   shortfalls: Array<{ inventory_item_id: string; quantity: number }>;
 };
 
+/**
+ * The session_line_items columns consumePackagingMaterials needs. Callers
+ * that already fetched the session's line items (e.g. the packaging
+ * completion review's loss check) can pass them through to avoid a
+ * duplicate fetch — their select just has to include this column union.
+ */
+export type PackagingDepletionLineItem = {
+  selling_format_id: string | null;
+  actual_quantity: number | null;
+  batch_id: string | null;
+};
+
 // =============================================================================
 // Internal helpers
 // =============================================================================
@@ -350,18 +362,26 @@ export async function completeBatchConsumption(
  * (inventory_lot → batch of the line item; destination_id null when a line
  * item has no batch). Shortfalls are reported, not blocked on — the session
  * already physically happened.
+ *
+ * Pass `preloadedLineItems` when the caller already fetched the session's
+ * line items (avoids re-fetching the same rows); falls back to fetching.
  */
 export async function consumePackagingMaterials(
   supabase: Client,
-  sessionId: string
+  sessionId: string,
+  preloadedLineItems?: PackagingDepletionLineItem[]
 ): Promise<ServiceResult<PackagingDepletionResult>> {
   try {
-    const { data: lineItems, error: liError } = await supabase
-      .from("session_line_items")
-      .select("selling_format_id, actual_quantity, batch_id")
-      .eq("session_id", sessionId);
-    if (liError) return err(parseSupabaseError(liError, { table: "session_line_items" }));
-    if (!lineItems || lineItems.length === 0) {
+    let lineItems: PackagingDepletionLineItem[] | undefined = preloadedLineItems;
+    if (!lineItems) {
+      const { data, error: liError } = await supabase
+        .from("session_line_items")
+        .select("selling_format_id, actual_quantity, batch_id")
+        .eq("session_id", sessionId);
+      if (liError) return err(parseSupabaseError(liError, { table: "session_line_items" }));
+      lineItems = data ?? [];
+    }
+    if (lineItems.length === 0) {
       return ok({ allocations_inserted: 0, shortfalls: [] });
     }
 

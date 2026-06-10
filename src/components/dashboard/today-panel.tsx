@@ -9,9 +9,9 @@
  *
  * - Batches at/past their recipe schedule: fermenting batches whose elapsed
  *   days >= recipe fermentation_days, conditioning batches past
- *   fermentation_days + conditioning_days. Mirrors the projected-occupancy
- *   math in production/planning/timeline/page.tsx (planned_start_date +
- *   recipe durations, with the same 14/7-day fallbacks).
+ *   fermentation_days + conditioning_days. Uses the shared schedule math in
+ *   src/domain/batch-schedule.ts (planned_start_date + recipe durations,
+ *   with the standard 14/7-day fallbacks).
  * - Purchase orders due or overdue: expected_date <= today and still open
  *   (submitted / confirmed / partial).
  * - Kegs out at customers for more than 30 days (keg_aging_report view, the
@@ -31,6 +31,7 @@ import { AlertTriangle, CalendarClock, PackageOpen, Timer } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardKeys } from "@/lib/query-keys";
+import { phaseEndDays } from "@/domain/batch-schedule";
 import { dynamicFrom } from "@/services/types";
 import { inventoryService, formatServiceError } from "@/services";
 import type { ExpiringLot } from "@/services";
@@ -80,18 +81,28 @@ function todayISODate(): string {
   return format(new Date(), "yyyy-MM-dd");
 }
 
-/** Centralized keys for this panel live at dashboardKeys.today.* */
-const todayPanelKeys = dashboardKeys.today;
+/** Kegs out at customers longer than this many days need attention. */
+const KEG_AGING_THRESHOLD_DAYS = 30;
+
+/** Inventory lots expiring within this many days are surfaced. */
+const EXPIRING_LOT_WINDOW_DAYS = 30;
+
+/** Query options shared by all four Today-panel queries. */
+const todayQueryOptions = {
+  refetchInterval: POLLING_INTERVALS.NORMAL,
+  refetchIntervalInBackground: false,
+  staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
+} as const;
 
 export function TodayPanel() {
   const supabase = createClient();
 
   // --- Batches at/past schedule -------------------------------------------
-  // Reuses the timeline page's occupancy model: a batch occupies its phase for
-  // planned_start_date + fermentation_days (+ conditioning_days), defaulting
-  // to 14/7 days when the recipe doesn't specify.
+  // Shared occupancy model (src/domain/batch-schedule.ts): a batch occupies
+  // its phase for planned_start_date + fermentation_days (+ conditioning_days),
+  // defaulting to 14/7 days when the recipe doesn't specify.
   const { data: overdueBatches = [], isLoading: batchesLoading } = useQuery({
-    queryKey: todayPanelKeys.overdueBatches(),
+    queryKey: dashboardKeys.today.overdueBatches(),
     queryFn: async (): Promise<OverdueBatch[]> => {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
@@ -118,12 +129,9 @@ export function TodayPanel() {
           fermentation_days: number | null;
           conditioning_days: number | null;
         } | null;
-        const fermDays = recipe?.fermentation_days || 14;
-        const condDays = recipe?.conditioning_days || 7;
         // Phase is "at schedule" once elapsed days reach the recipe duration:
         // fermenting -> fermentation_days, conditioning -> ferm + conditioning.
-        const phaseDays =
-          b.status === "fermenting" ? fermDays : fermDays + condDays;
+        const phaseDays = phaseEndDays(recipe, b.status);
         const elapsed = differenceInCalendarDays(
           today,
           parseISO(b.planned_start_date),
@@ -141,14 +149,12 @@ export function TodayPanel() {
       }
       return result.sort((a, b) => b.days_over - a.days_over);
     },
-    refetchInterval: POLLING_INTERVALS.NORMAL,
-    refetchIntervalInBackground: false,
-    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
+    ...todayQueryOptions,
   });
 
   // --- Purchase orders due/overdue ------------------------------------------
   const { data: duePOs = [], isLoading: posLoading } = useQuery({
-    queryKey: todayPanelKeys.duePOs(),
+    queryKey: dashboardKeys.today.duePOs(),
     queryFn: async (): Promise<DuePurchaseOrder[]> => {
       const { data, error } = await supabase
         .from("purchase_orders")
@@ -170,39 +176,37 @@ export function TodayPanel() {
         supplier_name: (po.supplier as { name: string } | null)?.name ?? null,
       }));
     },
-    refetchInterval: POLLING_INTERVALS.NORMAL,
-    refetchIntervalInBackground: false,
-    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
+    ...todayQueryOptions,
   });
 
   // --- Kegs out > 30 days ----------------------------------------------------
   const { data: agingKegs = [], isLoading: kegsLoading } = useQuery({
-    queryKey: todayPanelKeys.agingKegs(),
+    queryKey: dashboardKeys.today.agingKegs(),
     queryFn: async (): Promise<AgingKegRow[]> => {
       const { data, error } = await dynamicFrom(supabase, "keg_aging_report")
         .select("customer_id, customer_name, keg_type_name, kegs_out, days_out")
-        .gt("days_out", 30)
+        .gt("days_out", KEG_AGING_THRESHOLD_DAYS)
         .order("days_out", { ascending: false })
         .limit(10);
       if (error) throw error;
       return (data || []) as AgingKegRow[];
     },
-    refetchInterval: POLLING_INTERVALS.NORMAL,
-    refetchIntervalInBackground: false,
-    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
+    ...todayQueryOptions,
   });
 
   // --- Lots expiring within 30 days -----------------------------------------
   const { data: expiringLots = [], isLoading: lotsLoading } = useQuery({
-    queryKey: todayPanelKeys.expiringLots(),
+    queryKey: dashboardKeys.today.expiringLots(),
     queryFn: async (): Promise<ExpiringLot[]> => {
-      const result = await inventoryService.getExpiringLots(supabase, 30, 10);
+      const result = await inventoryService.getExpiringLots(
+        supabase,
+        EXPIRING_LOT_WINDOW_DAYS,
+        10,
+      );
       if (!result.success) throw new Error(formatServiceError(result.error));
       return result.data;
     },
-    refetchInterval: POLLING_INTERVALS.NORMAL,
-    refetchIntervalInBackground: false,
-    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
+    ...todayQueryOptions,
   });
 
   const isLoading = batchesLoading || posLoading || kegsLoading || lotsLoading;
@@ -239,7 +243,9 @@ export function TodayPanel() {
                 href={`/production/batches/${b.id}`}
                 primary={b.batch_code}
                 secondary={[
-                  b.status === "fermenting" ? "fermenting" : "conditioning",
+                  // Query filters to fermenting/conditioning, so status is
+                  // already the display string.
+                  b.status,
                   b.current_vessel_name,
                 ]
                   .filter(Boolean)
@@ -269,7 +275,10 @@ export function TodayPanel() {
         )}
 
         {agingKegs.length > 0 && (
-          <TodayGroup icon={PackageOpen} title="Kegs out > 30 days">
+          <TodayGroup
+            icon={PackageOpen}
+            title={`Kegs out > ${KEG_AGING_THRESHOLD_DAYS} days`}
+          >
             {agingKegs.map((row, i) => (
               <TodayRow
                 key={`${row.customer_id}-${row.keg_type_name}-${i}`}
@@ -284,7 +293,10 @@ export function TodayPanel() {
         )}
 
         {expiringLots.length > 0 && (
-          <TodayGroup icon={AlertTriangle} title="Expiring lots (30d)">
+          <TodayGroup
+            icon={AlertTriangle}
+            title={`Expiring lots (${EXPIRING_LOT_WINDOW_DAYS}d)`}
+          >
             {expiringLots.map((lot) => (
               <TodayRow
                 key={lot.id}

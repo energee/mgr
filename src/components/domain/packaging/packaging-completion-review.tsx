@@ -17,7 +17,7 @@
  *    destination = the line item's batch) via consumePackagingMaterials.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -42,7 +42,10 @@ import {
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { entityKeys, sessionLineItemKeys, inventoryKeys, materialPlanningKeys } from "@/lib/query-keys";
-import { consumePackagingMaterials } from "@/services/consumption-service";
+import {
+  consumePackagingMaterials,
+  type PackagingDepletionLineItem,
+} from "@/services/consumption-service";
 import { computePackagingLoss } from "@/domain/consumption-planning";
 import { RecordLossDialog } from "@/components/domain/shared/record-loss-dialog";
 import { formatServiceError } from "@/services/types";
@@ -84,6 +87,10 @@ export function PackagingCompletionReview({
   const [notes, setNotes] = useState("");
   // Implied-loss prompts queued before completion. null = not computed yet.
   const [lossQueue, setLossQueue] = useState<LossPrompt[] | null>(null);
+  // Line items fetched by the loss check, reused by consumePackagingMaterials
+  // so the service doesn't re-fetch the same rows. null when the loss check
+  // failed (the service then falls back to fetching them itself).
+  const lineItemsRef = useRef<PackagingDepletionLineItem[] | null>(null);
 
   const missingActualCount = items.filter(
     (item) => item.actual_quantity == null
@@ -113,7 +120,12 @@ export function PackagingCompletionReview({
 
       // Material depletion (9.2). The session is already completed at this
       // point — depletion failures are surfaced but do not roll it back.
-      const depletion = await consumePackagingMaterials(supabase, sessionId);
+      // Reuses the loss check's line-item rows when available.
+      const depletion = await consumePackagingMaterials(
+        supabase,
+        sessionId,
+        lineItemsRef.current ?? undefined,
+      );
       return depletion;
     },
     onSuccess: (depletion) => {
@@ -160,10 +172,14 @@ export function PackagingCompletionReview({
   // completion (this dialog unmounts once the session status flips).
   const lossCheckMutation = useMutation({
     mutationFn: async (): Promise<LossPrompt[]> => {
+      lineItemsRef.current = null;
+      // Selects the union of what the loss math needs and what
+      // consumePackagingMaterials needs (selling_format_id), so the rows
+      // can be passed through and the service skips its own fetch.
       const { data, error } = await supabase
         .from("session_line_items")
         .select(
-          `batch_id, planned_quantity, actual_quantity,
+          `batch_id, selling_format_id, planned_quantity, actual_quantity,
            batch:batches(batch_code),
            selling_format:selling_formats(unit_count, container:containers(volume_bbl))`
         )
@@ -173,6 +189,7 @@ export function PackagingCompletionReview({
       // Supabase infers the batches join as an array; it is many-to-one
       type LossRow = {
         batch_id: string | null;
+        selling_format_id: string | null;
         planned_quantity: number | null;
         actual_quantity: number | null;
         batch: { batch_code: string } | null;
@@ -182,6 +199,11 @@ export function PackagingCompletionReview({
         } | null;
       };
       const rows = (data ?? []) as unknown as LossRow[];
+      lineItemsRef.current = rows.map((row) => ({
+        selling_format_id: row.selling_format_id,
+        actual_quantity: row.actual_quantity,
+        batch_id: row.batch_id,
+      }));
 
       const codeByBatch = new Map<string, string>();
       const lossLines = rows.map((row) => {

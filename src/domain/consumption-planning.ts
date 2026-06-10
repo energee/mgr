@@ -7,7 +7,7 @@
  *   in migration 00057, which orders by production_date).
  * - Recipe scaling: batch volume vs recipe batch size.
  * - Ingredient unit conversion: recipe quantities (lbs/oz) vs inventory item
- *   units (lb/oz/kg/g).
+ *   units (lb/oz/kg/g) — implemented in src/domain/units.ts, re-exported here.
  * - Packaging BOM consumption: BOM lines x actual packaged quantity.
  * - Implied loss math for vessel transfers and packaging completion.
  *
@@ -148,38 +148,12 @@ export function recipeScaleFactor(
   return batchVolumeBbl / recipeBatchSizeBbl;
 }
 
-/** Weight units convertible to lbs. Inventory items use free-text units. */
-const WEIGHT_TO_LBS: Record<string, number> = {
-  lb: 1,
-  lbs: 1,
-  pound: 1,
-  pounds: 1,
-  oz: 1 / 16,
-  ounce: 1 / 16,
-  ounces: 1 / 16,
-  kg: 2.2046226218,
-  g: 0.0022046226218,
-};
-
 /**
- * Convert an ingredient quantity between weight units (lb/lbs/oz/kg/g,
- * case-insensitive). Returns null when either unit is not a recognized
- * weight unit — the caller should then use the quantity 1:1 and surface
- * the unit mismatch to the user.
+ * Alias-tolerant ingredient weight conversion lives with the rest of the
+ * unit tables in src/domain/units.ts; re-exported here so consumption
+ * callers (and tests) keep a single import site for planning math.
  */
-export function convertIngredientQuantity(
-  quantity: number,
-  fromUnit: string | null | undefined,
-  toUnit: string | null | undefined
-): number | null {
-  const from = fromUnit?.trim().toLowerCase() ?? "";
-  const to = toUnit?.trim().toLowerCase() ?? "";
-  if (from === to && from !== "") return quantity;
-  const fromFactor = WEIGHT_TO_LBS[from];
-  const toFactor = WEIGHT_TO_LBS[to];
-  if (fromFactor === undefined || toFactor === undefined) return null;
-  return (quantity * fromFactor) / toFactor;
-}
+export { convertIngredientQuantity } from "@/domain/units";
 
 // =============================================================================
 // Packaging BOM consumption

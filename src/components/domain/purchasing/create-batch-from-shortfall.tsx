@@ -38,6 +38,7 @@ import {
 import { Loader2, FlaskConical, Calendar, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductionShortfall } from "@/types/planning";
+import { scheduleDays } from "@/domain/batch-schedule";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -260,8 +261,9 @@ export function CreateBatchFromShortfall({
             )}
             {selectedRecipe && (
               <p className="text-xs text-muted-foreground">
-                Lead time: {selectedRecipe.fermentation_days || 14} fermentation +{" "}
-                {selectedRecipe.conditioning_days || 7} conditioning days
+                Lead time: {scheduleDays(selectedRecipe).fermentationDays}{" "}
+                fermentation + {scheduleDays(selectedRecipe).conditioningDays}{" "}
+                conditioning days
               </p>
             )}
           </div>

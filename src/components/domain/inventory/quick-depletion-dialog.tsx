@@ -45,6 +45,7 @@ import {
   type QuickDepletionType,
 } from "@/services/consumption-service";
 import { formatServiceError, dynamicFrom } from "@/services/types";
+import { parsePositiveNumber } from "@/lib/format";
 import { REASON_CODES } from "@/entities/allocation";
 import { log } from "@/lib/client-logger";
 
@@ -115,7 +116,9 @@ export function QuickDepletionDialog({
           .from("finished_goods_with_availability")
           .select("id, brand_name, selling_format_name, lot_number, available_quantity")
           .gt("available_quantity", 0)
-          .order("brand_name");
+          .order("brand_name")
+          // Defensive cap — keeps the picker dropdown bounded
+          .limit(200);
         if (error) throw error;
         return (data ?? [])
           .filter((fg) => fg.id)
@@ -131,7 +134,9 @@ export function QuickDepletionDialog({
       const { data, error } = await dynamicFrom(supabase, "inventory_lots_with_quantities")
         .select("id, item_name, lot_number, remaining_quantity, unit")
         .gt("remaining_quantity", 0)
-        .order("item_name");
+        .order("item_name")
+        // Defensive cap — keeps the picker dropdown bounded
+        .limit(200);
       if (error) throw error;
       return ((data ?? []) as unknown as Array<{
         id: string;
@@ -150,14 +155,17 @@ export function QuickDepletionDialog({
   });
 
   const selectedSource = sources?.find((s) => s.id === sourceId);
-  const parsedQuantity = parseFloat(quantity);
-  const quantityValid = Number.isFinite(parsedQuantity) && parsedQuantity > 0;
+  // null when empty, non-numeric, or non-positive
+  const parsedQuantity = parsePositiveNumber(quantity);
+  const quantityValid = parsedQuantity !== null;
   const exceedsAvailable =
-    quantityValid && selectedSource ? parsedQuantity > selectedSource.available : false;
+    parsedQuantity !== null && selectedSource
+      ? parsedQuantity > selectedSource.available
+      : false;
 
   const depleteMutation = useMutation({
     mutationFn: async () => {
-      if (!sourceId || !quantityValid) throw new Error("Pick a source and quantity");
+      if (!sourceId || parsedQuantity === null) throw new Error("Pick a source and quantity");
       const result = await recordQuickDepletion(supabase, {
         sourceType,
         sourceId,

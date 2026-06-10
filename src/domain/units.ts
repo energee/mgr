@@ -183,6 +183,50 @@ export function weightToDisplay(lbs: number, displayUnit: WeightUnit): number {
 }
 
 // =============================================================================
+// Ingredient Weight Conversions (alias-tolerant, free-text units)
+// =============================================================================
+
+/** lbs per kg, derived from the canonical WEIGHT_CONVERSIONS table. */
+const LBS_PER_KG = 1 / WEIGHT_CONVERSIONS.kg;
+
+/**
+ * Weight-unit aliases convertible to lbs. Inventory items and recipe lines
+ * use free-text units (lb/lbs/pound(s), oz/ounce(s), kg, g), unlike the
+ * strict WeightUnit pair handled by convertWeight.
+ */
+const WEIGHT_TO_LBS: Record<string, number> = {
+  lb: 1,
+  lbs: 1,
+  pound: 1,
+  pounds: 1,
+  oz: 1 / 16,
+  ounce: 1 / 16,
+  ounces: 1 / 16,
+  kg: LBS_PER_KG,
+  g: LBS_PER_KG / 1000,
+};
+
+/**
+ * Convert an ingredient quantity between weight units (lb/lbs/oz/kg/g,
+ * case-insensitive). Returns null when either unit is not a recognized
+ * weight unit — the caller should then use the quantity 1:1 and surface
+ * the unit mismatch to the user.
+ */
+export function convertIngredientQuantity(
+  quantity: number,
+  fromUnit: string | null | undefined,
+  toUnit: string | null | undefined
+): number | null {
+  const from = fromUnit?.trim().toLowerCase() ?? "";
+  const to = toUnit?.trim().toLowerCase() ?? "";
+  if (from === to && from !== "") return quantity;
+  const fromFactor = WEIGHT_TO_LBS[from];
+  const toFactor = WEIGHT_TO_LBS[to];
+  if (fromFactor === undefined || toFactor === undefined) return null;
+  return (quantity * fromFactor) / toFactor;
+}
+
+// =============================================================================
 // Temperature Conversions
 // =============================================================================
 
