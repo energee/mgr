@@ -18,7 +18,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
-import { completeBatchConsumption } from "./consumption-service";
+import {
+  completeBatchConsumption,
+  consumePackagingMaterials,
+} from "./consumption-service";
 import { formatServiceError } from "./types";
 
 type Client = SupabaseClient<Database>;
@@ -66,6 +69,23 @@ export async function runTransitionSideEffects(
     }
     if (failures.length > 0) {
       result.error = `Batch completed, but confirming ingredient consumption failed: ${[...new Set(failures)].join("; ")}`;
+    }
+  }
+
+  // packaging_sessions → completed: consume the session's packaging-material
+  // BOM from inventory lots. The completion dialog also calls
+  // consumePackagingMaterials directly; the service's session-note guard
+  // makes whichever call runs second a no-op, so both paths are safe. (The
+  // dialog additionally prompts for loss capture — that part is interactive
+  // and intentionally does not run from generic transition paths.)
+  if (table === "packaging_sessions" && toState === "completed") {
+    const failures: string[] = [];
+    for (const id of ids) {
+      const res = await consumePackagingMaterials(supabase, id);
+      if (!res.success) failures.push(formatServiceError(res.error));
+    }
+    if (failures.length > 0) {
+      result.error = `Session completed, but material depletion failed: ${[...new Set(failures)].join("; ")}`;
     }
   }
 

@@ -372,6 +372,21 @@ export async function consumePackagingMaterials(
   preloadedLineItems?: PackagingDepletionLineItem[]
 ): Promise<ServiceResult<PackagingDepletionResult>> {
   try {
+    // Idempotence guard: depletion can be triggered both by the completion
+    // dialog and by the transition side-effect registry (bulk bar, generic
+    // dropdown). Every insert below tags notes with the session id, so an
+    // existing tagged allocation means this session was already depleted.
+    const sessionNote = `Packaging session ${sessionId} material consumption`;
+    const { data: existing, error: existingError } = await supabase
+      .from("allocations")
+      .select("id")
+      .eq("notes", sessionNote)
+      .limit(1);
+    if (existingError) return err(parseSupabaseError(existingError, { table: "allocations" }));
+    if (existing && existing.length > 0) {
+      return ok({ allocations_inserted: 0, shortfalls: [] });
+    }
+
     let lineItems: PackagingDepletionLineItem[] | undefined = preloadedLineItems;
     if (!lineItems) {
       const { data, error: liError } = await supabase
@@ -448,7 +463,7 @@ export async function consumePackagingMaterials(
             status: "completed",
             completed_at: now,
             lot_number: pick.lot_number,
-            notes: `Packaging session ${sessionId} material consumption`,
+            notes: sessionNote,
           });
         }
         if (shortfall > 0) {

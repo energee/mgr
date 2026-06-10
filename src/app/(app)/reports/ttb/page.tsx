@@ -152,8 +152,11 @@ export default function TTBReportPage() {
   const { data: batchData, isLoading: batchLoading } = useQuery({
     queryKey: reportKeys.ttbBatches(year, month),
     queryFn: async () => {
-      const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
-      const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+      // Full local-time month boundaries: completed_at is timestamptz, so
+      // comparing against bare UTC dates would attribute evening completions
+      // near month end to the wrong month for breweries west of UTC.
+      const periodStart = new Date(year, month - 1, 1).toISOString();
+      const periodEndExclusive = new Date(year, month, 1).toISOString();
 
       // Fetch in parallel: the two queries are independent.
       const [
@@ -170,8 +173,8 @@ export default function TTBReportPage() {
           .from("batches")
           .select("id, batch_code, name, status, volume_bbl, completed_at")
           .eq("status", "completed")
-          .gte("completed_at", startDate)
-          .lte("completed_at", endDate + "T23:59:59Z"),
+          .gte("completed_at", periodStart)
+          .lt("completed_at", periodEndExclusive),
         supabase
           .from("batches")
           .select("id, batch_code, name, status, volume_bbl")
