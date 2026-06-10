@@ -62,18 +62,18 @@ Status legend: `[ ]` pending · `[x]` fixed & verified (lint+typecheck+tests gre
 
 ## Batch 9 — Close the inventory loop (highest product value, large)
 
-- [ ] **9.1 Brew-day ingredient consumption**: auto-generate `planned` allocations from recipe grain bill/hop schedule with FIFO lot suggestion at brew start; confirm-to-complete on brew completion (mirror pick-list FIFO, migration 00057).
-- [ ] **9.2 Packaging material depletion**: on session completion, insert consumption allocations per `selling_format_materials` BOM line × `actual_quantity` (FIFO).
-- [ ] **9.3 Loss capture**: compute implied loss at vessel-transfer and packaging completion; prompt to record loss allocation with reason code; feeds TTB `losses_bbl`.
-- [ ] **9.4 Quick depletion actions**: "Record sample" / "Taproom depletion" / "Write off" wrapping allocation insert (replaces raw UUID form for common cases).
-- [ ] **9.5 Batch trace report**: downstream batch → finished goods → pick allocations → order/customer (buildable now); upstream unlocked by 9.1.
+- [x] **9.1 Brew-day ingredient consumption**: Start Brew Day prompts FIFO lot allocations from the recipe bill (scaled by batch volume), planned → completed on batch completion. App-side, no migration (`src/domain/consumption-planning.ts`, `src/services/consumption-service.ts`, `BrewConsumptionDialog`). Known gap: kanban-drag completion bypasses the planned→completed hook.
+- [x] **9.2 Packaging material depletion**: `PackagingCompletionReview` consumes `selling_format_materials` BOM × actual quantity from lots (FIFO); shortfalls allocate what's available + warning; depletion failure never rolls back completion.
+- [x] **9.3 Loss capture**: `RecordLossDialog` prompted at vessel-transfer and packaging completion with implied-loss math (epsilon 0.005 bbl); records `destination_type='loss'` allocations — feeds TTB `losses_bbl` automatically.
+- [x] **9.4 Quick depletion actions**: Record Sample / Taproom Depletion / Write Off header actions on the allocations list (`QuickDepletionDialog`) with source picker, over-available warning, reason codes.
+- [x] **9.5 Batch trace report**: `/reports/trace` — ingredient lots → batch → finished goods → orders/customers + keg shipments; in reports index + sidebar.
 
 ## Batch 10 — Mobile/tablet ergonomics
 
-- [ ] **10.1 Tablet breakpoint**: `use-mobile.ts:5` (768px) gives iPads the dense desktop table; use card list or larger hit areas up to ~1024px for entity lists, or density toggle.
-- [ ] **10.2 Mobile card actions**: `entity-mobile-card-list.tsx:223-296` — cards are pure links; add trailing menu exposing valid state transitions.
-- [ ] **10.3 Mobile filter sheet**: `entity-data-table.tsx:756-778` — advanced filters/sort unreachable on mobile; reuse nuqs state in a drawer.
-- [ ] **10.4 Optimistic transitions**: `setQueryData` + rollback for status changes (list + detail), replacing full-table invalidation; also drop redundant pre-SELECT in `handleSingleTransition` via `.in(stateField, validFromStates)`.
+- [x] **10.1 Tablet breakpoint**: `useIsTouch()` (pointer: coarse) grows hit areas to 40px, taller rows, h-9 search on touch devices; breakpoint and desktop pointer experience unchanged.
+- [x] **10.2 Mobile card actions**: trailing 40px menu on cards exposing the same filtered actions/transitions as desktop (shared dispatch via props from EntityDataTable).
+- [x] **10.3 Mobile filter sheet**: bottom Sheet rendering the existing DataTableFilterList + DataTableSortList against the same table/nuqs state; active-filter count badge.
+- [x] **10.4 Optimistic transitions**: paged-cache `setQueryData` flip with rollback; pre-SELECT dropped in favor of cached-state `.eq` guard (`.in(validFromStates)` fallback); friendly conflict message kept.
 
 ## Deferred / needs user decision
 
