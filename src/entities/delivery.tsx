@@ -94,6 +94,7 @@ export const deliveryEntity: EntityConfig<DeliveryView> = {
   displayNamePlural: "Deliveries",
   description: "Groups transfers and order fulfillments into delivery runs",
   domain: "inventory",
+  basePath: "/inventory/deliveries",
 
   // ---------------------------------------------------------------------------
   // List View

@@ -4,9 +4,13 @@
  * UnassignedShortfallsCard - Card for shortfall items without a preferred supplier
  *
  * Shows same table columns as SupplierGroupCard but with a supplier dropdown per row
- * so users can assign a supplier before generating POs.
+ * so users can assign a supplier before generating POs. A "Remember supplier"
+ * checkbox (checked by default) tells the parent to persist the assignment to
+ * supplier_catalog as the item's preferred supplier, so the item is
+ * auto-assigned on future visits instead of landing here again.
  */
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { supplierKeys } from "@/lib/query-keys";
@@ -33,6 +37,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { AlertTriangle } from "lucide-react";
 import type { IngredientShortfall } from "@/domain/purchasing/demand-calculator";
 import { getCatalogTypeDisplay } from "@/domain/purchasing/demand-calculator";
@@ -43,11 +49,18 @@ import { getCatalogTypeDisplay } from "@/domain/purchasing/demand-calculator";
 
 type UnassignedShortfallsCardProps = {
   shortfalls: IngredientShortfall[];
+  /**
+   * Called when a supplier is picked for an item. `remember` reflects the
+   * card's "Remember supplier" checkbox: when true the parent should persist
+   * the assignment to supplier_catalog (preferred supplier) in addition to
+   * any per-visit state.
+   */
   onAssignSupplier: (
     catalogType: string,
     catalogId: string,
     supplierId: string,
-    supplierName: string
+    supplierName: string,
+    remember: boolean
   ) => void;
 }
 
@@ -60,6 +73,10 @@ export function UnassignedShortfallsCard({
   onAssignSupplier,
 }: UnassignedShortfallsCardProps) {
   const supabase = createClient();
+
+  // Persist assignments to supplier_catalog by default so items stop
+  // showing up unassigned on every visit; uncheck for one-off sourcing.
+  const [rememberAssignments, setRememberAssignments] = useState(true);
 
   const { data: suppliers = [] } = useQuery({
     queryKey: supplierKeys.active(),
@@ -79,14 +96,29 @@ export function UnassignedShortfallsCard({
   return (
     <Card className="border-amber-500/50">
       <CardHeader>
-        <div className="flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-500" />
-          <div>
-            <CardTitle className="text-base">Unassigned Items</CardTitle>
-            <CardDescription>
-              {shortfalls.length} item{shortfalls.length !== 1 ? "s" : ""} without
-              a preferred supplier. Assign a supplier to include in PO generation.
-            </CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <div>
+              <CardTitle className="text-base">Unassigned Items</CardTitle>
+              <CardDescription>
+                {shortfalls.length} item{shortfalls.length !== 1 ? "s" : ""} without
+                a preferred supplier. Assign a supplier to include in PO generation.
+              </CardDescription>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1 shrink-0">
+            <Checkbox
+              id="remember-supplier-assignments"
+              checked={rememberAssignments}
+              onCheckedChange={(checked) => setRememberAssignments(checked === true)}
+            />
+            <Label
+              htmlFor="remember-supplier-assignments"
+              className="text-xs font-normal text-muted-foreground cursor-pointer"
+            >
+              Remember supplier for future orders
+            </Label>
           </div>
         </div>
       </CardHeader>
@@ -147,7 +179,8 @@ export function UnassignedShortfallsCard({
                             shortfall.catalog_type,
                             shortfall.catalog_id,
                             supplier.id,
-                            supplier.name
+                            supplier.name,
+                            rememberAssignments
                           );
                         }
                       }}

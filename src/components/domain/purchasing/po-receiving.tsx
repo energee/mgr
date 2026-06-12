@@ -3,9 +3,16 @@
 /**
  * PO Receiving
  *
- * Component for receiving purchase order line items into inventory.
- * Supports partial receives with lot numbers and expiration dates.
- * Creates inventory_lots records to track received materials.
+ * Bulk-receive dialog for purchase order line items, opened by the
+ * "Receive Items" action on the PO detail page (pos/[id]/page.tsx).
+ * Records po_receives rows (partial receives supported) with lot numbers and
+ * expiration dates, then flips the PO to partial/fulfilled based on received
+ * totals. Inventory lots are NOT created here — the downstream
+ * "Accept into Inventory" flow turns unaccepted receives into inventory_lots.
+ *
+ * Quantity cells include a bundles × per-bundle helper (popover) for suppliers
+ * that ship in bundles (e.g., 10 stacks × 250 trays); only the computed
+ * single-unit quantity is persisted.
  */
 
 import { useState, useEffect } from "react";
@@ -33,14 +40,20 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, Package, Check, AlertCircle } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Loader2, Package, Check, AlertCircle, Boxes } from "lucide-react";
 import { toast } from "sonner";
 import {
   getCatalogTypeLabel,
   resolveCatalogNames,
 } from "@/entities/po-line-item";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
-import { purchaseOrderKeys } from "@/lib/query-keys";
+import { purchaseOrderKeys, entityKeys } from "@/lib/query-keys";
+import { parsePositiveNumber } from "@/lib/format";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -64,6 +77,13 @@ type ReceiveEntry = {
   lot_number: string;
   expiration_date: string;
   notes: string;
+}
+
+/** Ephemeral per-row bundles × per-bundle inputs (not persisted — only the
+ *  computed single-unit quantity goes to po_receives). */
+type BundleEntry = {
+  bundles: string;
+  perBundle: string;
 }
 
 type POReceivingProps = {
@@ -109,6 +129,8 @@ export function POReceiving({
 
   // Track receive quantities per line item
   const [receives, setReceives] = useState<Record<string, ReceiveEntry>>({});
+  // Per-row bundle helper inputs (keyed by line item id)
+  const [bundleInputs, setBundleInputs] = useState<Record<string, BundleEntry>>({});
   const [globalNotes, setGlobalNotes] = useState("");
 
   // Reset state when dialog opens (clean slate for each session)
@@ -116,6 +138,7 @@ export function POReceiving({
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- dialog reset on open is intentional
       setReceives({});
+      setBundleInputs({});
       setGlobalNotes("");
     }
   }, [open]);
@@ -266,8 +289,12 @@ export function POReceiving({
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItemsForReceive(poId) });
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.detail(poId) });
+      // The generic detail page caches under entityKeys — refresh so the
+      // status badge reflects the partial/fulfilled flip immediately.
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("purchase_orders") });
       toast.success("Items received successfully");
       setReceives({});
+      setBundleInputs({});
       onOpenChange(false);
       onSuccess?.();
     },
@@ -302,6 +329,24 @@ export function POReceiving({
         quantity: validQty,
       },
     }));
+  };
+
+  // Bundle helper: when both inputs parse as positive numbers, auto-fill the
+  // row's quantity with bundles × per-bundle (clamped to remaining by
+  // handleQuantityChange).
+  const handleBundleChange = (
+    itemId: string,
+    remaining: number,
+    patch: Partial<BundleEntry>
+  ) => {
+    const next = { ...(bundleInputs[itemId] ?? { bundles: "", perBundle: "" }), ...patch };
+    setBundleInputs((prev) => ({ ...prev, [itemId]: next }));
+
+    const bundles = parsePositiveNumber(next.bundles);
+    const perBundle = parsePositiveNumber(next.perBundle);
+    if (bundles !== null && perBundle !== null) {
+      handleQuantityChange(itemId, remaining, String(bundles * perBundle));
+    }
   };
 
   const handleFieldChange = (
@@ -406,19 +451,84 @@ export function POReceiving({
                         )}
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          max={remaining}
-                          value={receives[item.id]?.quantity || ""}
-                          onChange={(e) =>
-                            handleQuantityChange(item.id, remaining, e.target.value)
-                          }
-                          disabled={isFullyReceived}
-                          className="h-8 w-full"
-                          placeholder="0"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            max={remaining}
+                            value={receives[item.id]?.quantity || ""}
+                            onChange={(e) =>
+                              handleQuantityChange(item.id, remaining, e.target.value)
+                            }
+                            disabled={isFullyReceived}
+                            className="h-8 w-full"
+                            placeholder="0"
+                          />
+                          {/* Bundles × per-bundle entry helper */}
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                disabled={isFullyReceived}
+                                aria-label="Enter quantity as bundles"
+                              >
+                                <Boxes className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 space-y-2" align="end">
+                              <p className="text-sm font-medium">Received in bundles</p>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="0"
+                                  step="1"
+                                  placeholder="Bundles"
+                                  aria-label="Number of bundles"
+                                  value={bundleInputs[item.id]?.bundles ?? ""}
+                                  onChange={(e) =>
+                                    handleBundleChange(item.id, remaining, {
+                                      bundles: e.target.value,
+                                    })
+                                  }
+                                  className="h-8 w-24"
+                                />
+                                <span className="text-sm text-muted-foreground">×</span>
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="0"
+                                  step="1"
+                                  placeholder="Per bundle"
+                                  aria-label="Units per bundle"
+                                  value={bundleInputs[item.id]?.perBundle ?? ""}
+                                  onChange={(e) =>
+                                    handleBundleChange(item.id, remaining, {
+                                      perBundle: e.target.value,
+                                    })
+                                  }
+                                  className="h-8 w-24"
+                                />
+                              </div>
+                              {(() => {
+                                const b = parsePositiveNumber(bundleInputs[item.id]?.bundles ?? "");
+                                const p = parsePositiveNumber(bundleInputs[item.id]?.perBundle ?? "");
+                                const total = b !== null && p !== null ? b * p : null;
+                                return (
+                                  <p className="text-xs text-muted-foreground tabular-nums">
+                                    = {total !== null ? total.toLocaleString() : "—"} {item.unit}
+                                    {total !== null && total > remaining
+                                      ? ` (capped at ${remaining} remaining)`
+                                      : ""}
+                                  </p>
+                                );
+                              })()}
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input

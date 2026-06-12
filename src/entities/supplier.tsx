@@ -2,7 +2,10 @@
  * Supplier Entity Configuration
  *
  * Suppliers provide ingredients and materials for brewing.
- * Includes contact info, payment terms, and lead time tracking.
+ * Includes contact info, payment terms, and lead time tracking, plus a
+ * "Catalog Items" tab (custom relation component — supplier_catalog is
+ * polymorphic) managing per-item price / MOQ / lead time / preferred flags
+ * that drive supplier assignment in demand planning.
  */
 
 import { z } from "zod";
@@ -10,6 +13,7 @@ import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { Badge } from "@/components/ui/badge";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { SupplierCatalogSection } from "@/components/domain/purchasing/supplier-catalog-section";
 
 type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
 
@@ -198,6 +202,10 @@ export const supplierEntity: EntityConfig<Supplier> = {
   // ---------------------------------------------------------------------------
   formSchema: supplierSchema,
 
+  // Framework Duplicate action (EntityDetailUnified): no identity fields
+  // beyond the framework baseline — name carries over for the user to tweak.
+  excludeOnDuplicate: [],
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -223,6 +231,17 @@ export const supplierEntity: EntityConfig<Supplier> = {
       foreignKey: "supplier_id",
       showInDetail: true,
       detailTab: "Orders",
+    },
+    {
+      // supplier_catalog is polymorphic (catalog_type + catalog_id), so the
+      // tab uses a custom component instead of the generic RelationTable.
+      name: "catalog_items",
+      entity: "supplier_catalog",
+      type: "hasMany",
+      foreignKey: "supplier_id",
+      showInDetail: true,
+      detailTab: "Catalog Items",
+      component: SupplierCatalogSection,
     },
   ],
 };

@@ -133,7 +133,52 @@ const TRANSACTION_TYPE_VALUES = TRANSACTION_TYPES.map((t) => t.value) as [KegTra
 // Zod Schema
 // =============================================================================
 
-export const kegTransactionSchema = z.object({
+/**
+ * Derive from_state/to_state from the selected transaction_type before
+ * validation (used as a z.preprocess step on kegTransactionSchema).
+ *
+ * The state selects are hidden for most types (see the showWhen predicates on
+ * the from_state/to_state fields below), yet keg_transactions.to_state is NOT
+ * NULL with per-type CHECK constraints (00032_keg_transactions.sql). Deriving
+ * here — at the schema level, which every save path runs through — guarantees
+ * valid states for ALL entry points: the bare /inventory/kegs/transactions/new
+ * page, URL-prefilled flows, and mid-form type changes that would otherwise
+ * leave stale states from a previously selected type.
+ *
+ * Per type:
+ * - receive/fill/ship/return/clean: both states are fully determined by the
+ *   type (TRANSACTION_TYPES is the source of truth); any user/stale values
+ *   are overwritten.
+ * - maintain/retire: from_state is user-picked ("from any state", visible in
+ *   the form) and preserved; to_state is forced to maintenance/retired.
+ * - adjust: both states are user-picked; to_state falls back to the type's
+ *   default ("empty") when left blank so the NOT NULL constraint can't trip.
+ */
+function deriveStatesFromType(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const data = raw as Record<string, unknown>;
+  const typeConfig = TRANSACTION_TYPES.find(
+    (t) => t.value === data.transaction_type,
+  );
+  if (!typeConfig) return raw;
+
+  if (typeConfig.value === "adjust") {
+    // `||` (not `??`) so an empty-string select value also falls back.
+    return { ...data, to_state: data.to_state || typeConfig.toState };
+  }
+
+  if (typeConfig.value === "maintain" || typeConfig.value === "retire") {
+    return { ...data, to_state: typeConfig.toState };
+  }
+
+  return {
+    ...data,
+    from_state: typeConfig.fromState,
+    to_state: typeConfig.toState,
+  };
+}
+
+const baseKegTransactionSchema = z.object({
   transaction_type: z.enum(TRANSACTION_TYPE_VALUES),
   selling_format_id: z.string().uuid("Select a selling format"),
   keg_owner_id: z.string().uuid().nullable().optional(),
@@ -175,6 +220,16 @@ export const kegTransactionSchema = z.object({
   }
 );
 
+/**
+ * Form schema with type→state derivation applied before validation, so the
+ * parsed output (which entity-detail-unified inserts verbatim) always carries
+ * DB-valid from_state/to_state even when the selects are hidden.
+ */
+export const kegTransactionSchema = z.preprocess(
+  deriveStatesFromType,
+  baseKegTransactionSchema,
+);
+
 export type KegTransactionFormValues = z.infer<typeof kegTransactionSchema>;
 
 // =============================================================================
@@ -191,6 +246,7 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
   displayNamePlural: "Keg Transactions",
   description: "Immutable audit log for keg state transitions (inventory calculated from these records)",
   domain: "inventory",
+  basePath: "/inventory/kegs/transactions",
 
   // Use the view for list display (includes joined names)
   viewTable: "keg_transactions_with_details",
@@ -402,6 +458,16 @@ export const kegTransactionEntity: EntityConfig<KegTransaction> = {
           relation: { entity: "finished_good", displayField: "lot_number" },
           description: "Required for fill transactions",
           colSpan: 6,
+        },
+        {
+          name: "packaging_session_id",
+          label: "Packaging Session",
+          type: "relation",
+          relation: { entity: "packaging_session", displayField: "session_date" },
+          description: "Optional: Link to the packaging session that filled these kegs",
+          colSpan: 6,
+          showWhen: (values: Partial<KegTransaction>) =>
+            values.transaction_type === "fill",
         },
       ],
     },

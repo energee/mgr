@@ -69,6 +69,7 @@ export const kegOwnerEntity: EntityConfig<KegOwner> = {
   displayNamePlural: "Keg Owners",
   description: "Fleet providers that own kegs (e.g., Owned, Microstar, KegFleet)",
   domain: "inventory",
+  basePath: "/inventory/kegs/owners",
 
   // ---------------------------------------------------------------------------
   // List View

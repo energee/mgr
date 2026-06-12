@@ -10,6 +10,8 @@ import type { EntityConfig, ValueDisplayConfig } from "@/types/entity";
 import { valuesAsOptions, getValueDisplay } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { ItemOnHandCell } from "@/components/domain/inventory/item-on-hand-cell";
+import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 
 type InventoryItem = Database["public"]["Tables"]["inventory_items"]["Row"];
 
@@ -59,6 +61,7 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   displayNamePlural: "Inventory Items",
   description: "Raw materials, packaging, and supplies",
   domain: "inventory",
+  basePath: "/inventory/items",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -92,6 +95,16 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
       accessorKey: "unit",
       header: "Unit",
       sortable: true,
+    },
+    {
+      // Virtual column (no inventory_items column): each cell reads the
+      // item's total from one shared lots-with-quantities query — see
+      // ItemOnHandCell. Not sortable because the value never hits the DB
+      // query for this list.
+      accessorKey: "on_hand",
+      header: "On Hand",
+      sortable: false,
+      render: (_value, row) => <ItemOnHandCell itemId={row.id} unit={row.unit} />,
     },
     {
       accessorKey: "reorder_point",
@@ -167,15 +180,9 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
           label: "Unit of Measure",
           type: "select",
           required: true,
-          options: [
-            { value: "lb", label: "Pounds (lb)" },
-            { value: "oz", label: "Ounces (oz)" },
-            { value: "kg", label: "Kilograms (kg)" },
-            { value: "g", label: "Grams (g)" },
-            { value: "each", label: "Each" },
-            { value: "case", label: "Case" },
-            { value: "gal", label: "Gallons" },
-          ],
+          // Shared with inventory lots and PO line items so units stay
+          // consistent across the purchasing → inventory flow.
+          options: INVENTORY_UNIT_OPTIONS,
           colSpan: 6,
         },
         {
@@ -232,6 +239,11 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   // ---------------------------------------------------------------------------
   formSchema: inventoryItemSchema,
 
+  // Framework Duplicate action (EntityDetailUnified): SKU is identity and
+  // must not carry over; everything else (category, unit, reorder levels)
+  // copies so similar items start one edit away.
+  excludeOnDuplicate: ["sku"],
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -254,5 +266,17 @@ export const inventoryItemEntity: EntityConfig<InventoryItem> = {
   // ---------------------------------------------------------------------------
   // Relations
   // ---------------------------------------------------------------------------
-  relations: [],
+  relations: [
+    {
+      // Lots tab on item detail: shows each lot's remaining quantity (via
+      // the inventory_lot entity's viewTable) so a counter can see expected
+      // stock per lot without leaving the item.
+      name: "lots",
+      entity: "inventory_lot",
+      type: "hasMany",
+      foreignKey: "inventory_item_id",
+      showInDetail: true,
+      detailTab: "Lots",
+    },
+  ],
 };

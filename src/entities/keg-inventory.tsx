@@ -87,6 +87,7 @@ export const kegInventoryEntity: EntityConfig<KegInventory> = {
   displayNamePlural: "Keg Inventory",
   description: "Calculated view of keg quantities by type, state, and location (derived from transactions)",
   domain: "inventory",
+  basePath: "/inventory/kegs",
 
   // ---------------------------------------------------------------------------
   // List View

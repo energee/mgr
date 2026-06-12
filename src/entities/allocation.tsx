@@ -8,6 +8,11 @@
  * Destination types: batch, finished_good, order, taproom_sale, sample, adjustment, destruction, loss, transfer
  *
  * Lifecycle: planned -> pending_approval -> completed (or rejected/cancelled)
+ *
+ * Common movements should NOT go through this generic form — the Allocations
+ * page offers guided dialogs that fill source/destination automatically:
+ * QuickDepletionDialog (samples / taproom / write-offs) and CountAdjustDialog
+ * (cycle counts -> 'adjustment' allocations or direct lot increases).
  */
 
 import { z } from "zod";
@@ -224,6 +229,8 @@ export const allocationEntity: EntityConfig<Allocation> = {
           label: "Source ID",
           type: "text",
           placeholder: "UUID of source record (optional for external)",
+          description:
+            "Record ID in the source table. For samples, write-offs, and counts prefer the guided dialogs on the Allocations page — they fill this automatically.",
           colSpan: 6,
         },
         {
@@ -240,6 +247,8 @@ export const allocationEntity: EntityConfig<Allocation> = {
           label: "Destination ID",
           type: "text",
           placeholder: "UUID of destination record (optional)",
+          description:
+            "Record ID in the destination table. Leave empty for terminal destinations (sample, adjustment, loss, ...).",
           colSpan: 6,
         },
         {
@@ -326,6 +335,8 @@ export const allocationEntity: EntityConfig<Allocation> = {
       id: "approval",
       title: "Approval",
       collapsible: true,
+      // Display-only audit fields — empty noise on /inventory/allocations/new
+      hideOnCreate: true,
       fields: [
         {
           name: "approved_by",
@@ -353,6 +364,8 @@ export const allocationEntity: EntityConfig<Allocation> = {
       id: "timestamps",
       title: "Timestamps",
       collapsible: true,
+      // Display-only audit fields — empty noise on /inventory/allocations/new
+      hideOnCreate: true,
       fields: [
         {
           name: "created_at",

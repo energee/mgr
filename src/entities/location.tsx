@@ -66,6 +66,7 @@ export const locationEntity: EntityConfig<LocationWithPos> = {
   displayNamePlural: "Locations",
   description: "Physical facilities for production, storage, and sales",
   domain: "system",
+  basePath: "/settings/locations",
 
   // ---------------------------------------------------------------------------
   // List View

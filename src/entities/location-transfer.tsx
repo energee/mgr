@@ -13,6 +13,26 @@ import { z } from "zod";
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { TransferLinesEditor } from "@/components/domain/inventory/transfer-lines-editor";
+
+// Wrapper adapting TransferLinesEditor to the relation component interface.
+// Passes from_bin_id (scopes the item picker to source-bin stock) and status
+// (lines are only editable while "planned") from the detail row.
+function TransferLinesRelation({
+  parentId,
+  data,
+}: {
+  parentId: string;
+  data?: Record<string, unknown>;
+}) {
+  return (
+    <TransferLinesEditor
+      transferId={parentId}
+      fromBinId={(data?.from_bin_id as string | null | undefined) ?? null}
+      status={(data?.status as string | null | undefined) ?? null}
+    />
+  );
+}
 
 // =============================================================================
 // Types
@@ -100,6 +120,7 @@ export const locationTransferEntity: EntityConfig<LocationTransferView> = {
   description:
     "Inventory movements between bins and locations for multi-site operations",
   domain: "inventory",
+  basePath: "/inventory/transfers",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -332,6 +353,11 @@ export const locationTransferEntity: EntityConfig<LocationTransferView> = {
       foreignKey: "transfer_id",
       showInDetail: true,
       detailTab: "Lines",
+      // Custom editor replaces the generic RelationTable — transfer_line is
+      // not a registered entity, so the generic tab (and its Add button
+      // linking to a nonexistent create route) cannot work here.
+      component: TransferLinesRelation,
+      hideAdd: true,
     },
   ],
 };

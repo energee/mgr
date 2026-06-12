@@ -8,6 +8,7 @@
 import { z } from "zod";
 import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 
 /** Extended type including computed columns from the inventory_lots_with_quantities view */
 type InventoryLotWithQuantities =
@@ -46,6 +47,7 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
   description:
     "Lot-level inventory tracking for raw materials with FIFO costing",
   domain: "inventory",
+  basePath: "/inventory/lots",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -154,10 +156,23 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
           colSpan: 6,
         },
         {
+          // Legacy text column, now constrained to canonical bin names so
+          // values stay reconcilable with the bins entity. Lots accepted
+          // from POs additionally get a structured bin_inventory_items
+          // placement row (see po-accept-inventory-dialog.tsx); pre-existing
+          // free-text values remain readable but won't match an option.
           name: "location",
           label: "Storage Location",
-          type: "text",
-          placeholder: "e.g., Grain Room A",
+          type: "select",
+          dynamicOptions: {
+            table: "bins",
+            valueField: "name",
+            labelField: "name",
+            orderBy: "name",
+            filter: { is_active: true },
+          },
+          placeholder: "Select a bin...",
+          description: "Bins are managed at Inventory → Bins",
           colSpan: 6,
         },
         {
@@ -199,14 +214,10 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
           label: "Unit",
           type: "select",
           required: true,
-          options: [
-            { value: "lb", label: "Pounds (lb)" },
-            { value: "oz", label: "Ounces (oz)" },
-            { value: "kg", label: "Kilograms (kg)" },
-            { value: "g", label: "Grams (g)" },
-            { value: "each", label: "Each" },
-            { value: "gal", label: "Gallons" },
-          ],
+          // Shared with inventory items and PO line items (the old inline
+          // list here was missing "case", so case-tracked items could never
+          // have their lots edited back to the item's own unit).
+          options: INVENTORY_UNIT_OPTIONS,
           colSpan: 4,
         },
       ],
@@ -275,6 +286,12 @@ export const inventoryLotEntity: EntityConfig<InventoryLotWithQuantities> = {
   // Form
   // ---------------------------------------------------------------------------
   formSchema: inventoryLotSchema,
+
+  // Framework Duplicate action (EntityDetailUnified): a duplicated lot is a
+  // new physical lot — it gets its own lot number, is not tied to the
+  // original's PO receipt, and is received fresh. remaining/allocated
+  // quantities are editable:false and never carry over.
+  excludeOnDuplicate: ["lot_number", "po_receive_id", "received_date"],
 
   // ---------------------------------------------------------------------------
   // Relations

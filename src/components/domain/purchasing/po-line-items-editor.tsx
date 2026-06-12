@@ -5,6 +5,11 @@
  *
  * Inline editor for purchase order line items. Supports catalog type selection
  * and dynamic item lookup based on type (malt, hop, yeast, etc.).
+ *
+ * Units come from the shared INVENTORY_UNIT_OPTIONS list (same list as
+ * inventory items/lots) so units survive the accept-into-inventory copy;
+ * legacy free-text units on existing rows are still rendered as an extra
+ * option so they display and round-trip until deliberately changed.
  */
 
 import { useState } from "react";
@@ -47,6 +52,7 @@ import {
   getCatalogTypeLabel,
   isFreeTextCatalogType,
 } from "@/entities/po-line-item";
+import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 
 // =============================================================================
 // Types
@@ -311,17 +317,15 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 {readOnly ? (
                   item.unit
                 ) : (
-                  <Input
-                    type="text"
+                  <UnitSelect
                     value={item.unit}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       updateItem.mutate({
                         id: item.id,
                         field: "unit",
-                        value: e.target.value,
+                        value,
                       })
                     }
-                    className="h-8 w-full"
                   />
                 )}
               </TableCell>
@@ -436,12 +440,9 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 />
               </TableCell>
               <TableCell>
-                <Input
-                  type="text"
+                <UnitSelect
                   value={newItem.unit}
-                  onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                  className="h-8 w-full"
-                  placeholder="lb"
+                  onChange={(value) => setNewItem({ ...newItem, unit: value })}
                 />
               </TableCell>
               <TableCell>
@@ -510,5 +511,42 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
         </div>
       )}
     </div>
+  );
+}
+
+// =============================================================================
+// UnitSelect — shared-list unit picker for table cells
+// =============================================================================
+
+/**
+ * Compact unit Select backed by the shared INVENTORY_UNIT_OPTIONS list.
+ * Rows created before units were constrained may hold free-text values
+ * ("sack", "55lb bag") — those are rendered as an extra option so the
+ * stored value stays visible and is preserved unless deliberately changed.
+ */
+function UnitSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const isLegacyValue =
+    !!value && !INVENTORY_UNIT_OPTIONS.some((u) => u.value === value);
+
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-8 w-full" aria-label="Unit">
+        <SelectValue placeholder="Unit" />
+      </SelectTrigger>
+      <SelectContent>
+        {isLegacyValue && <SelectItem value={value}>{value}</SelectItem>}
+        {INVENTORY_UNIT_OPTIONS.map((u) => (
+          <SelectItem key={u.value} value={u.value}>
+            {u.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

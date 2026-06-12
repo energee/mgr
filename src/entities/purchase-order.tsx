@@ -3,6 +3,12 @@
  *
  * Purchase orders track ingredient and material orders to suppliers.
  * Lifecycle: draft → submitted → confirmed → partial → fulfilled → closed
+ *
+ * Line items are edited inline on the detail page (POLineItemsEditor) while
+ * the PO is in draft. The partial/fulfilled states are normally reached
+ * through the "Receive Items" flow (POReceiving, intercepted by
+ * pos/[id]/page.tsx), which records po_receives rows and derives the target
+ * state from received totals.
  */
 
 import { z } from "zod";
@@ -12,8 +18,23 @@ import type { Database } from "@/types/supabase";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { POLineItemsEditor } from "@/components/domain/purchasing/po-line-items-editor";
 
 type PurchaseOrder = Database["public"]["Tables"]["purchase_orders"]["Row"];
+
+// Wrapper adapting POLineItemsEditor ({ poId, readOnly }) to the relation
+// component interface ({ parentId, data }) — same pattern as order.tsx
+// OrderItemsRelation. Line items are editable only while the PO is in draft;
+// once submitted, the supplier-facing document is locked.
+function POLineItemsRelation({
+  parentId,
+  data,
+}: {
+  parentId: string;
+  data?: Record<string, unknown>;
+}) {
+  return <POLineItemsEditor poId={parentId} readOnly={data?.status !== "draft"} />;
+}
 
 // =============================================================================
 // Zod Schema
@@ -49,6 +70,13 @@ const purchaseOrderStateMachine: StateMachineConfig<PurchaseOrder> = {
     cancelled: [],
     closed: [],
   },
+  // NOTE: partial/fulfilled are normally reached via the "Receive Items"
+  // action (POReceiving computes the target from received totals). They are
+  // deliberately NOT listed in `requiresAction`: that mechanism requires the
+  // named action to carry a fixed `toState` (see requires-action.test.ts),
+  // which an interception action with a dynamic target cannot provide. Raw
+  // "Move to Partial/Fulfilled" items therefore remain available as a manual
+  // escape hatch (e.g. closing out a PO without per-line receipts).
   stateDisplay: {
     draft: { label: "Draft", color: "default" },
     submitted: { label: "Submitted", color: "info" },
@@ -73,6 +101,7 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
   displayNamePlural: "Purchase Orders",
   description: "Purchase orders to suppliers for ingredients and materials",
   domain: "purchasing",
+  basePath: "/purchasing/pos",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -137,6 +166,10 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       title: "Overview",
       fields: [
         {
+          // Prefilled by pos/new/page.tsx with the next PO-YYYY-NNN suggestion
+          // from generate_next_po_number() (migration 00142) — the same
+          // sequence the automated demand→PO flow uses. Stays editable; the
+          // po_number UNIQUE constraint backstops concurrent suggestions.
           name: "po_number",
           label: "PO Number",
           type: "text",
@@ -160,11 +193,14 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
           colSpan: 12,
         },
         {
+          // Defaults to today on create (the answer ~95% of the time);
+          // editable for backdating. Sync function per buildDefaultValues.
           name: "order_date",
           label: "Order Date",
           type: "date",
           format: "date",
           required: true,
+          defaultValue: () => new Date().toISOString().split("T")[0],
           colSpan: 6,
         },
         {
@@ -221,15 +257,19 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       ],
     },
     {
+      // hideOnCreate: sync status only exists for persisted POs.
       id: "qbo-sync",
       title: "QuickBooks",
       component: createQBOSyncDisplay("purchase_order"),
+      hideOnCreate: true,
     },
     {
+      // hideOnCreate: no revisions before the first save.
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("purchase_orders"),
       collapsible: true,
+      hideOnCreate: true,
     },
   ],
 
@@ -242,6 +282,12 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
   // State Machine
   // ---------------------------------------------------------------------------
   stateMachine: purchaseOrderStateMachine,
+
+  // Framework Duplicate action (EntityDetailUnified): carries over supplier,
+  // costs and notes. po_number is identity, and dates would silently go stale
+  // on the copy; status/id/audit/version are excluded by the framework
+  // baseline (see buildDuplicateDefaults).
+  excludeOnDuplicate: ["po_number", "order_date", "expected_date", "submitted_at"],
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -264,20 +310,16 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       toState: "confirmed",
     },
     {
-      name: "mark_partial",
-      label: "Partial Receipt",
+      // Intercepted by pos/[id]/page.tsx handleAction → opens the POReceiving
+      // bulk-receive dialog, which inserts po_receives rows and flips the PO
+      // to partial or fulfilled based on received totals. Replaces the former
+      // bare mark_partial/fulfill transition buttons. Not offered from
+      // "submitted": submitted → partial/fulfilled is not a legal transition.
+      name: "receive_items",
+      label: "Receive Items",
       icon: "package",
       type: "button",
-      fromStates: ["confirmed"],
-      toState: "partial",
-    },
-    {
-      name: "fulfill",
-      label: "Mark Fulfilled",
-      icon: "check-circle",
-      type: "button",
       fromStates: ["confirmed", "partial"],
-      toState: "fulfilled",
     },
     {
       name: "close",
@@ -334,6 +376,9 @@ export const purchaseOrderEntity: EntityConfig<PurchaseOrder> = {
       foreignKey: "po_id",
       showInDetail: true,
       detailTab: "Line Items",
+      // Inline editor replaces the generic RelationTable (and its Add link —
+      // po_line_item is an inline-only entity with no create route).
+      component: POLineItemsRelation,
     },
   ],
 };

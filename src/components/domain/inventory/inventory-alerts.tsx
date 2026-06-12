@@ -6,9 +6,14 @@
  * Displays inventory status for finished goods, raw materials, and
  * batches in progress. Highlights low stock and availability issues.
  * Uses the get_inventory_overview database function.
+ *
+ * The raw-materials section links to material planning (the RPC returns
+ * names only — no item ids — so per-row links are not possible without a
+ * schema change). The empty state links to inventory item creation.
  */
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { inventoryKeys } from "@/lib/query-keys";
@@ -36,6 +41,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EmptyStateHint } from "@/components/universal/empty-state-hint";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
 
@@ -153,9 +159,18 @@ function RawMaterialsSection({ materials }: { materials: RawMaterial[] }) {
 
   return (
     <div className="space-y-2">
-      <h4 className="font-medium">
-        Raw Materials ({materials.length})
-      </h4>
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium">
+          Raw Materials ({materials.length})
+        </h4>
+        {/* Path to the purchasing surface; rows can't deep-link (no ids in RPC) */}
+        <Link
+          href="/purchasing/material-planning"
+          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+        >
+          Material planning →
+        </Link>
+      </div>
       <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
         {Object.entries(grouped).map(([type, items]) => (
           <div key={type} className="p-2">
@@ -348,9 +363,11 @@ export function InventoryAlerts({
                 {!overview.finished_goods?.length &&
                   !overview.batches_in_progress?.length &&
                   !overview.raw_materials?.length && (
-                    <div className="text-center py-6 text-muted-foreground">
-                      No inventory data available.
-                    </div>
+                    <EmptyStateHint
+                      message="No inventory data available."
+                      href="/inventory/items/new"
+                      linkLabel="Add your first inventory item"
+                    />
                   )}
               </>
             ) : null}

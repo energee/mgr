@@ -10,6 +10,7 @@ import type { EntityConfig } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { dynamicFrom } from "@/services/types";
+import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 
 type POLineItem = Database["public"]["Tables"]["po_line_items"]["Row"];
 
@@ -24,6 +25,10 @@ export const CATALOG_TYPES = [
   { value: "adjunct", label: "Adjunct" },
   { value: "additive", label: "Additive" },
   { value: "packaging", label: "Packaging" },
+  // Non-brewing materials (packaging/shipping supplies) ordered directly as
+  // inventory items — used by Material Planning PO generation and supported
+  // by supplier_catalog + the shortfall RPC (migrations 00161/00164).
+  { value: "inventory_item", label: "Inventory Item" },
   { value: "other", label: "Other" },
 ] as const;
 
@@ -38,6 +43,7 @@ export const CATALOG_TABLES: Record<string, string> = {
   adjunct: "adjuncts",
   additive: "additives",
   packaging: "selling_formats",
+  inventory_item: "inventory_items",
 };
 
 /**
@@ -134,6 +140,8 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
   displayNamePlural: "PO Line Items",
   description: "Purchase order line items for ingredients and materials",
   domain: "purchasing",
+  // Inline-only: line items are managed on the purchase order detail page.
+  basePath: null,
 
   // ---------------------------------------------------------------------------
   // List View
@@ -225,8 +233,13 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
         {
           name: "unit",
           label: "Unit",
-          type: "text",
-          placeholder: "e.g., lb, oz, kg",
+          type: "select",
+          // Shared with inventory items/lots: accept-into-inventory copies
+          // this unit verbatim onto the created lot, so a free-text value
+          // here ("sack") would create a lot the lot form can't display.
+          // The zod schema stays min(1) string so legacy free-text rows
+          // still validate. (Was a bare text input before.)
+          options: INVENTORY_UNIT_OPTIONS,
           required: true,
           colSpan: 4,
         },
@@ -265,6 +278,8 @@ export const poLineItemEntity: EntityConfig<POLineItem> = {
       foreignKey: "po_line_item_id",
       showInDetail: true,
       detailTab: "Receives",
+      // Receipts have no create route — recorded from the PO detail page.
+      hideAdd: true,
     },
   ],
 };

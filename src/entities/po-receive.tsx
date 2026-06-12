@@ -2,7 +2,13 @@
  * PO Receive Entity Configuration
  *
  * PO receives track partial receipts against purchase order line items.
- * Each receive can create an inventory lot with lot number and expiration.
+ * Rows are created by the bulk "Receive Items" dialog on the purchase order
+ * detail page (POReceiving) and consumed by the "Accept into Inventory" flow,
+ * which turns unaccepted receives into inventory lots.
+ *
+ * Deliberately minimal: po_receive has no routes and no standalone detail or
+ * edit form (no sections/detailHeader). The config exists for registry
+ * metadata — chat read tools and the po_line_item "Receives" relation table.
  */
 
 import { z } from "zod";
@@ -37,6 +43,8 @@ export const poReceiveEntity: EntityConfig<POReceive> = {
   displayNamePlural: "PO Receives",
   description: "Partial receipts against purchase order line items",
   domain: "purchasing",
+  // Inline-only: receipts are recorded from the purchase order detail page.
+  basePath: null,
 
   // ---------------------------------------------------------------------------
   // List View
@@ -74,77 +82,8 @@ export const poReceiveEntity: EntityConfig<POReceive> = {
   searchableFields: ["lot_number", "notes"],
 
   // ---------------------------------------------------------------------------
-  // Detail View
-  // ---------------------------------------------------------------------------
-  detailHeader: {
-    title: "lot_number",
-  },
-
-  // ---------------------------------------------------------------------------
-  // Unified Sections (detail + edit)
-  // ---------------------------------------------------------------------------
-  sections: [
-    {
-      id: "overview",
-      title: "Receipt Information",
-      fields: [
-        {
-          name: "po_line_item_id",
-          label: "PO Line Item",
-          type: "relation",
-          relation: { entity: "po_line_item", displayField: "id" },
-          required: true,
-          colSpan: 12,
-        },
-        {
-          name: "quantity",
-          label: "Quantity Received",
-          type: "number",
-          required: true,
-          colSpan: 4,
-        },
-        {
-          name: "lot_number",
-          label: "Lot Number",
-          type: "text",
-          placeholder: "Supplier's lot number",
-          colSpan: 4,
-        },
-        {
-          name: "received_date",
-          label: "Received Date",
-          type: "date",
-          format: "date",
-          colSpan: 4,
-        },
-        {
-          name: "expiration_date",
-          label: "Expiration Date",
-          type: "date",
-          format: "date",
-          colSpan: 6,
-        },
-      ],
-    },
-    {
-      id: "notes",
-      title: "Notes",
-      collapsible: true,
-      fields: [
-        {
-          name: "notes",
-          label: "Notes",
-          type: "textarea",
-          placeholder: "Quality notes, discrepancies...",
-          fullWidth: true,
-          colSpan: 12,
-        },
-      ],
-    },
-  ],
-
-  // ---------------------------------------------------------------------------
-  // Form
+  // Form (canonical insert shape — writes happen via POReceiving, not a
+  // generic entity form; there are no sections to render one)
   // ---------------------------------------------------------------------------
   formSchema: poReceiveSchema,
 
