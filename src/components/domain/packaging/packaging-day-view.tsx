@@ -4,9 +4,10 @@
  * PackagingDayView — full-width live data-entry view for in-progress packaging sessions.
  *
  * Replaces EntityDetailUnified when a session has status "in_progress".
- * Optimized for real-time entry: always-visible quick-add row, highlighted
- * Actual Qty column (bg-amber-50), live variance calculation, and a
- * "Complete Session" button that opens the PackagingCompletionReview modal.
+ * Optimized for real-time entry: always-visible batch-first quick-add row
+ * (batch + brand carry over between adds), highlighted Actual Qty column
+ * (bg-amber-50), live variance calculation, and a "Complete Session" button
+ * that opens the PackagingCompletionReview modal.
  */
 
 import { useState, useCallback } from "react";
@@ -38,7 +39,8 @@ import {
   type NewItemState,
 } from "@/hooks/use-session-line-items";
 import { parseIntOrNull } from "@/lib/format";
-import { BatchCell, FormatCell, AddLineItemRow } from "./packaging-shared";
+import { BatchCell, FormatCell } from "./packaging-shared";
+import { AddLineItemRow } from "./add-line-item-row";
 import { PackagingCompletionReview } from "./packaging-completion-review";
 
 // =============================================================================
@@ -95,7 +97,14 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
       return;
     }
     addItem.mutate(newItem, {
-      onSuccess: () => setNewItem({ ...EMPTY_NEW_ITEM }),
+      // Carry over batch + brand so multi-format runs from one batch need
+      // only format + quantities per line; reset everything else.
+      onSuccess: () =>
+        setNewItem({
+          ...EMPTY_NEW_ITEM,
+          brand_id: newItem.brand_id,
+          batch_id: newItem.batch_id,
+        }),
     });
   };
 
@@ -184,8 +193,8 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Brand</TableHead>
             <TableHead>Batch</TableHead>
+            <TableHead>Brand</TableHead>
             <TableHead>Format</TableHead>
             <TableHead className="w-[120px]">Planned Qty</TableHead>
             <TableHead className="w-[120px] bg-amber-50">Actual Qty</TableHead>
@@ -197,8 +206,6 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
         <TableBody>
           {items?.map((item) => (
             <TableRow key={item.id}>
-              <TableCell className="font-medium">{item.brand_name}</TableCell>
-
               <TableCell>
                 <BatchCell
                   brandId={item.brand_id}
@@ -212,6 +219,8 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
                   }
                 />
               </TableCell>
+
+              <TableCell className="font-medium">{item.brand_name}</TableCell>
 
               <TableCell>
                 <FormatCell

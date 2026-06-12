@@ -7,8 +7,16 @@
  * Lifecycle: planned → in_progress → completed → revised | cancelled
  *
  * Note: "revised" and "cancelled" are terminal states. "Revised" indicates
- * the session was completed but later adjusted (e.g., quantity corrections).
+ * the session was completed but later adjusted (quantity corrections).
  * Historical record is preserved; to re-run packaging, create a new session.
+ *
+ * completed → revised is gated by stateMachine.requiresAction: it can only
+ * happen through the "revise" action, which the detail page intercepts to
+ * open RevisePackagingSession (quantity edits + finished-goods/material
+ * deltas via the revise_packaging_session RPC, migration 00184). A DB
+ * trigger blocks bare status UPDATEs into "revised" as the backstop, so
+ * surfaces without the dialog (e.g. the list row menu) fail with guidance
+ * instead of silently flipping the label.
  */
 
 import { z } from "zod";
@@ -57,6 +65,12 @@ const packagingSessionStateMachine: StateMachineConfig<PackagingSession> = {
     revised: [],
     cancelled: [],
   },
+  // Reaching "revised" requires the interactive revise flow (quantity edits +
+  // finished-goods/material adjustments) — suppresses the generic "Move to
+  // Revised" item and the bulk-bar option in favor of the "revise" action.
+  requiresAction: {
+    revised: "revise",
+  },
   stateDisplay: {
     planned: { label: "Planned", color: "default" },
     in_progress: { label: "In Progress", color: "info" },
@@ -83,6 +97,7 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
   displayNamePlural: "Packaging Sessions",
   description: "Track kegging, canning, and bottling runs",
   domain: "production",
+  basePath: "/production/packaging",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -183,10 +198,14 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
           colSpan: 6,
         },
         {
+          // Defaults to today on create. Only the generic /production/packaging/new
+          // form needs this — the domain dialogs (packaging-batch-dialog,
+          // add-to-packaging-session-dialog) already set today themselves.
           name: "session_date",
           label: "Session Date",
           type: "date",
           required: true,
+          defaultValue: () => new Date().toISOString().split("T")[0],
           colSpan: 6,
         },
         {
@@ -244,6 +263,45 @@ export const packagingSessionEntity: EntityConfig<PackagingSession> = {
       title: "Materials Required",
       component: PackagingSessionMaterialsSection,
       collapsible: true,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      // Paired with stateMachine.requiresAction.revised. The detail page
+      // ([id]/page.tsx) intercepts this via onAction and opens
+      // RevisePackagingSession; the actual status flip happens inside the
+      // revise_packaging_session RPC. toState is declared so the
+      // requiresAction contract holds (see requires-action.test.ts) — a
+      // surface that dispatches the bare transition instead (list row menu)
+      // is refused by the DB trigger guard with a pointer to this flow.
+      name: "revise",
+      label: "Revise Quantities",
+      icon: "pencil",
+      type: "button",
+      fromStates: ["completed", "revised"],
+      toState: "revised",
+    },
+    {
+      // Navigation-only: jumps to the keg-transaction create page with the
+      // fill type and this session prefilled (EntityDetailPage merges these
+      // searchParams into create defaults; from/to keg states derive from
+      // transaction_type at the schema level). Links the fill transactions
+      // back to the session that produced them.
+      name: "record_keg_fills",
+      label: "Record Keg Fills",
+      icon: "external-link",
+      type: "dropdown",
+      fromStates: ["completed", "revised"],
+      handler: (session) => {
+        // Entity configs run outside React, so there is no client router here.
+        window.location.assign(
+          `/inventory/kegs/transactions/new?transaction_type=fill&packaging_session_id=${session.id}`
+        );
+      },
     },
   ],
 

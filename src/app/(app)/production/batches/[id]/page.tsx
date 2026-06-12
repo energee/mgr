@@ -74,15 +74,17 @@ export default function BatchDetailPage({
   const queryClient = useQueryClient();
   const supabase = createClient();
 
-  // Fetch batch data for the dialogs (use view to get vessel info)
-  // The view includes target_og via b.* but generated types are stale; use type extension
+  // Fetch batch data for the dialogs (use view to get vessel info and
+  // actual_og, which the view computes from brew-log knockout measurements).
+  // Note: the batches table/view has NO target_og column — recipe targets
+  // come from the recipe query below.
   type BatchDetail = {
     id: string;
     batch_code: string;
     name: string;
     status: string;
     volume_bbl: number | null;
-    target_og: number | null;
+    actual_og: number | null;
     current_vessel_id: string | null;
     current_vessel_name: string | null;
     recipe_id: string | null;
@@ -92,11 +94,10 @@ export default function BatchDetailPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("batches_with_brew_info")
-        .select("id, batch_code, name, status, volume_bbl, current_vessel_id, current_vessel_name, recipe_id")
+        .select("id, batch_code, name, status, volume_bbl, actual_og, current_vessel_id, current_vessel_name, recipe_id")
         .eq("id", id)
         .single();
       if (error) throw error;
-      // target_og is available in the view (via b.*) but not in generated types yet
       // Runtime-validate required fields before casting
       if (!data || typeof data.id !== "string") {
         throw new Error("Batch detail query returned invalid data");
@@ -125,14 +126,18 @@ export default function BatchDetailPage({
     },
   });
 
-  // Fetch recipe info (includes brand for packaging dialog)
-  const { data: recipe } = useQuery({
+  // Fetch recipe info: brand for the packaging dialogs, target_og and yeast
+  // strain links for the pitch-rate calculator in PitchYeastDialog.
+  // recipeBrand stays null for recipe-less batches (query disabled) and for
+  // recipes without a brand — the packaging dialogs handle that by showing
+  // an in-dialog brand picker instead of silently not opening.
+  const { data: recipe, isLoading: recipeLoading } = useQuery({
     queryKey: recipeKeys.detail(batch?.recipe_id ?? ""),
     queryFn: async () => {
       if (!batch?.recipe_id) return null;
       const { data, error } = await supabase
         .from("recipes")
-        .select("id, name, brand_id, brands(id, name)")
+        .select("id, name, brand_id, target_og, brands(id, name), recipe_yeasts(yeast_id)")
         .eq("id", batch.recipe_id)
         .single();
       if (error) throw error;
@@ -412,7 +417,10 @@ export default function BatchDetailPage({
             batchName={batch.name}
             batchStatus={batch.status}
             batchVolumeBbl={batch.volume_bbl}
-            recipeOg={batch.target_og}
+            // Prefer measured knockout OG (pitching happens post-knockout);
+            // fall back to the recipe's target.
+            recipeOg={batch.actual_og ?? recipe?.target_og}
+            recipeYeastIds={recipe?.recipe_yeasts?.map((ry) => ry.yeast_id)}
             onSuccess={handleDialogSuccess}
             onSuggestTransition={(state) => handleSuggestTransition(state)}
           />
@@ -473,25 +481,30 @@ export default function BatchDetailPage({
 
           {consumptionDialog}
 
-          {showStartPackaging && recipeBrand && (
+          {/* Packaging dialogs: mount once the recipe query has settled so a
+              batch whose brand is still loading doesn't briefly show the
+              in-dialog brand picker. A null brand (no recipe, or recipe
+              without a brand) is handled inside the dialogs. */}
+          {showStartPackaging && !recipeLoading && (
             <PackagingBatchDialog
               open={showStartPackaging}
               onOpenChange={setShowStartPackaging}
               batchId={id}
               batchNumber={batch.batch_code}
-              brandId={recipeBrand.id}
-              brandName={recipeBrand.name}
+              brandId={recipeBrand?.id ?? null}
+              brandName={recipeBrand?.name ?? null}
+              volumeBbl={batch.volume_bbl}
             />
           )}
 
-          {showAddToSession && recipeBrand && (
+          {showAddToSession && !recipeLoading && (
             <AddToPackagingSessionDialog
               open={showAddToSession}
               onOpenChange={setShowAddToSession}
               batchId={id}
               batchNumber={batch.batch_code}
-              brandId={recipeBrand.id}
-              brandName={recipeBrand.name}
+              brandId={recipeBrand?.id ?? null}
+              brandName={recipeBrand?.name ?? null}
             />
           )}
         </>

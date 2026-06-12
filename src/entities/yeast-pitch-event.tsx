@@ -31,6 +31,8 @@ export const yeastPitchEventEntity: EntityConfig<YeastPitchEvent> = {
   displayNamePlural: "Pitch Events",
   description: "Records of yeast being pitched to batches",
   domain: "production",
+  // Inline-only: pitch events are recorded from the batch yeast section.
+  basePath: null,
 
   listColumns: [
     {

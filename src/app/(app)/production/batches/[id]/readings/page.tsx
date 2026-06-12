@@ -5,20 +5,40 @@
  *
  * Mobile-optimized page for viewing and recording fermentation readings.
  * Features:
- * - Quick add reading form
- * - Chronological readings list
+ * - Quick add reading form with "Save & Add Another" for multi-metric
+ *   cellar rounds (form stays open between saves)
+ * - Per-row edit (dialog) and delete (confirm) for mis-entered readings
+ * - History and latest-by-type ordered by the user-entered reading
+ *   timestamp (falls back to created_at), so backdated readings land in
+ *   the right place
  * - Real-time updates
  */
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { BatchReadingForm } from "@/components/domain/batch/batch-reading-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -27,11 +47,16 @@ import {
   READING_TYPES,
   formatReadingValue,
 } from "@/domain/batch-readings";
+import {
+  readingLogTime,
+  sortReadingLogsByTimestampDesc,
+} from "@/domain/batch-reading-log";
 import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch/batch-readings-chart-lazy";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
 import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import { batchKeys } from "@/lib/query-keys";
+import { parseUnknownError } from "@/lib/errors";
 import { usePrefillStore } from "@/contexts/prefill-store";
 
 type BatchLog = {
@@ -65,6 +90,8 @@ export default function BatchReadingsPage({
     const { prefillData } = usePrefillStore.getState().consume();
     return !!prefillData;
   });
+  const [editingLog, setEditingLog] = useState<BatchLog | null>(null);
+  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
 
   // Fetch batch details
   const { data: batch, isLoading: batchLoading } = useQuery({
@@ -95,7 +122,15 @@ export default function BatchReadingsPage({
     },
   });
 
-  // Add reading mutation
+  // Re-sort newest-first by the user-entered reading timestamp (falling back
+  // to created_at) so backdated readings appear in the right place.
+  const sortedReadings = useMemo(
+    () => (readings ? sortReadingLogsByTimestampDesc(readings) : undefined),
+    [readings]
+  );
+
+  // Add reading mutation. The form decides whether to stay open ("Save &
+  // Add Another") or close (plain save, via onSaved) — don't close it here.
   const addReading = useMutation({
     mutationFn: async (reading: BatchReading) => {
       const { data, error } = await supabase
@@ -112,16 +147,58 @@ export default function BatchReadingsPage({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: batchKeys.readings(id) });
-      setShowForm(false);
       toast.success("Reading saved");
     },
     onError: (error) => {
-      toast.error("Failed to save reading: " + error.message);
+      toast.error("Failed to save reading: " + parseUnknownError(error).message);
+    },
+  });
+
+  // Update an existing reading's data payload in place
+  const updateReading = useMutation({
+    mutationFn: async ({
+      logId,
+      reading,
+    }: {
+      logId: string;
+      reading: BatchReading;
+    }) => {
+      const { error } = await supabase
+        .from("batch_logs")
+        .update({ data: reading as unknown as Json })
+        .eq("id", logId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: batchKeys.readings(id) });
+      toast.success("Reading updated");
+    },
+    onError: (error) => {
+      toast.error("Failed to update reading: " + parseUnknownError(error).message);
+    },
+  });
+
+  // Delete a mis-entered reading (confirmed via AlertDialog)
+  const deleteReading = useMutation({
+    mutationFn: async (logId: string) => {
+      const { error } = await supabase
+        .from("batch_logs")
+        .delete()
+        .eq("id", logId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: batchKeys.readings(id) });
+      setDeletingLogId(null);
+      toast.success("Reading deleted");
+    },
+    onError: (error) => {
+      toast.error("Failed to delete reading: " + parseUnknownError(error).message);
     },
   });
 
   // Group readings by type for summary
-  const readingsByType = readings?.reduce(
+  const readingsByType = sortedReadings?.reduce(
     (acc, log) => {
       const type = log.data.reading_type;
       if (!acc[type]) acc[type] = [];
@@ -135,7 +212,7 @@ export default function BatchReadingsPage({
   const latestByType = readingsByType
     ? (Object.entries(readingsByType) as [ReadingType, BatchLog[]][]).reduce(
         (acc, [type, logs]) => {
-          acc[type] = logs[0]; // Already sorted DESC
+          acc[type] = logs[0]; // Already sorted DESC by effective timestamp
           return acc;
         },
         {} as Record<ReadingType, BatchLog>
@@ -178,6 +255,7 @@ export default function BatchReadingsPage({
         <BatchReadingForm
           batchId={id}
           onSubmit={async (data) => { await addReading.mutateAsync(data); }}
+          onSaved={() => setShowForm(false)}
           onCancel={() => setShowForm(false)}
           isSubmitting={addReading.isPending}
         />
@@ -217,8 +295,8 @@ export default function BatchReadingsPage({
       )}
 
       {/* Fermentation Chart */}
-      {readings && readings.length > 0 && (
-        <BatchReadingsChart readings={readings} />
+      {sortedReadings && sortedReadings.length > 0 && (
+        <BatchReadingsChart readings={sortedReadings} />
       )}
 
       {/* Readings History */}
@@ -233,14 +311,15 @@ export default function BatchReadingsPage({
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : !readings || readings.length === 0 ? (
+          ) : !sortedReadings || sortedReadings.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               No readings recorded yet. Add your first reading above.
             </p>
           ) : (
             <div className="space-y-3">
-              {readings?.map((log) => {
+              {sortedReadings.map((log) => {
                 const config = READING_TYPES[log.data.reading_type];
+                const effectiveTime = readingLogTime(log);
                 return (
                   <div
                     key={log.id}
@@ -265,8 +344,28 @@ export default function BatchReadingsPage({
                       )}
                     </div>
                     <div className="text-right text-sm text-muted-foreground flex-shrink-0">
-                      <p>{format(new Date(log.created_at), "MMM d")}</p>
-                      <p>{format(new Date(log.created_at), "h:mm a")}</p>
+                      <p>{format(effectiveTime, "MMM d")}</p>
+                      <p>{format(effectiveTime, "h:mm a")}</p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9"
+                        aria-label="Edit reading"
+                        onClick={() => setEditingLog(log)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                        aria-label="Delete reading"
+                        onClick={() => setDeletingLogId(log.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 );
@@ -275,6 +374,65 @@ export default function BatchReadingsPage({
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Reading Dialog */}
+      <Dialog
+        open={!!editingLog}
+        onOpenChange={(open) => {
+          if (!open) setEditingLog(null);
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Reading</DialogTitle>
+          </DialogHeader>
+          {editingLog && (
+            <BatchReadingForm
+              batchId={id}
+              embedded
+              initialData={editingLog.data}
+              onSubmit={async (reading) => {
+                await updateReading.mutateAsync({ logId: editingLog.id, reading });
+              }}
+              onSaved={() => setEditingLog(null)}
+              onCancel={() => setEditingLog(null)}
+              isSubmitting={updateReading.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog
+        open={!!deletingLogId}
+        onOpenChange={(open) => {
+          if (!open) setDeletingLogId(null);
+        }}
+      >
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete reading?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this reading from the batch history.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="outline" disabled={deleteReading.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (deletingLogId) deleteReading.mutate(deletingLogId);
+              }}
+              disabled={deleteReading.isPending}
+            >
+              {deleteReading.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </ErrorBoundary>
   );

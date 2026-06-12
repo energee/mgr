@@ -6,6 +6,10 @@
  * Recipe is derived from linked batches (not stored on brew_logs).
  *
  * Lifecycle: draft → in_progress → completed
+ * Note: StartBrewDayDialog (the only creation path) inserts brew logs
+ * already in_progress, so draft is only reached via manual status edit
+ * (e.g., scheduling a brew ahead of time). The start_brew action remains
+ * as the path from draft back to in_progress.
  */
 
 import { z } from "zod";
@@ -50,7 +54,9 @@ const brewEventSchema = z.object({
 // =============================================================================
 
 export const brewLogSchema = z.object({
-  brew_number: z.string().min(1, "Brew number is required"),
+  // Optional: when empty, the generate_brew_number() trigger (migration 00181)
+  // assigns BRW-YYYY-DDD with a dedup suffix server-side.
+  brew_number: z.string().optional(),
   brew_date: z.string().min(1, "Brew date is required"),
   brewer_id: z.string().uuid().nullable().optional(),
   status: z.string().default("draft"),
@@ -175,6 +181,7 @@ export const brewLogEntity: EntityConfig<BrewLog> = {
           label: "Brew Number",
           type: "text",
           editable: false,
+          description: "Auto-generated from brew date (BRW-YYYY-DDD)",
           colSpan: 6,
         },
         {

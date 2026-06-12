@@ -44,6 +44,8 @@ export const sessionLineItemEntity: EntityConfig<SessionLineItem> = {
   displayNamePlural: "Line Items",
   description: "Products packaged in a session",
   domain: "production",
+  // Inline-only: line items are managed on the packaging session detail page.
+  basePath: null,
 
   // ---------------------------------------------------------------------------
   // List View

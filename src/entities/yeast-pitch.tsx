@@ -105,6 +105,7 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
   displayNamePlural: "Yeast Pitches",
   description: "Individual yeast pitches tracking lineage, viability, and usage",
   domain: "production",
+  basePath: "/production/yeast-pitches",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -446,6 +447,8 @@ export const yeastPitchEntity: EntityConfig<YeastPitch> = {
       foreignKey: "pitch_id",
       showInDetail: true,
       detailTab: "Usage History",
+      // Pitch events have no create route — recorded from the batch yeast section.
+      hideAdd: true,
     },
   ],
 };

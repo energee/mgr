@@ -322,6 +322,11 @@ export const vesselEntity: EntityConfig<Vessel> = {
   // ---------------------------------------------------------------------------
   stateMachine: vesselStateMachine,
 
+  // Framework Duplicate action (EntityDetailUnified): status is the state
+  // field (framework-excluded); name carries over for the user to renumber
+  // (e.g. "FV1" → "FV5") and type/capacity/location copy as-is.
+  excludeOnDuplicate: [],
+
   // ---------------------------------------------------------------------------
   // Value Display
   // ---------------------------------------------------------------------------

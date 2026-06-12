@@ -58,6 +58,17 @@ const batchStateMachine: StateMachineConfig<Batch> = {
   states: [...batchStates],
   initialState: "planned",
   transitions: batchTransitions,
+  // Terminating a batch must run the cancel/archive flow (the batch pages
+  // intercept these actions via onAction and open BatchCancellationDialog,
+  // which captures a reason + loss volume and calls the cancel_batch /
+  // archive_batch RPCs that release the vessel and record the TTB loss).
+  // Listing the targets here suppresses the generic "Move to {state}" item
+  // and the bulk-bar option, so a bare status UPDATE can never skip that
+  // data capture.
+  requiresAction: {
+    cancelled: "cancel",
+    archived: "archive",
+  },
   stateDisplay: {
     planned: { label: "Planned", color: "default" },
     fermenting: { label: "Fermenting", color: "info" },
@@ -87,6 +98,7 @@ export const batchEntity: EntityConfig<Batch> = {
   displayNamePlural: "Batches",
   description: "Production batches from brewing through packaging",
   domain: "production",
+  basePath: "/production/batches",
 
   // ---------------------------------------------------------------------------
   // List View

@@ -19,6 +19,7 @@ import { RecipeAnalysis } from "@/components/domain/recipe/recipe-analysis";
 import { StatusBadge } from "@/components/universal/status-badge";
 
 import { WaterProfileQuickCreate } from "@/components/domain/recipe/water-profile-quick-create";
+import { preparePlanBatchPrefill } from "@/components/domain/recipe/plan-batch-from-recipe";
 import { recipeSchema } from "@/lib/schemas/recipe";
 
 export { recipeSchema, type RecipeFormValues } from "@/lib/schemas/recipe";
@@ -467,6 +468,29 @@ export const recipeEntity: EntityConfig<Recipe> = {
       label: "Clone Recipe",
       icon: "copy",
       type: "button",
+    },
+    {
+      // Plan a batch from this recipe: stages recipe-derived defaults
+      // (recipe_id, "{brand} - {recipe}" name, volume from batch_size_bbl)
+      // in the prefill store and opens /production/batches/new. This action
+      // only surfaces on list rows / mobile cards — the recipe detail view
+      // is the custom RecipeEditorPage, which has its own header button.
+      name: "plan_batch",
+      label: "Plan Batch",
+      icon: "calendar-plus",
+      type: "dropdown",
+      handler: async (recipe) => {
+        const url = await preparePlanBatchPrefill({
+          id: recipe.id,
+          name: recipe.name,
+          brand_id: recipe.brand_id,
+          batch_size_bbl: recipe.batch_size_bbl,
+        });
+        // Entity configs run outside React, so there is no client router
+        // here; the prefill store persists to sessionStorage and survives
+        // this full-page navigation.
+        window.location.assign(url);
+      },
     },
     {
       name: "delete",

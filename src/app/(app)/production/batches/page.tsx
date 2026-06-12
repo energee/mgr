@@ -4,20 +4,23 @@
  * Batches List Page
  *
  * Displays all batches using the universal EntityList component.
- * Includes custom action handling for cancel/archive dialogs and
- * start brew day dialog. Start Brew Day chains into the
+ * Includes custom action handling for cancel/archive dialogs, the
+ * start brew day dialog, and Start Packaging (which previously
+ * silently no-oped from row menus). Start Brew Day chains into the
  * BrewConsumptionDialog (FIFO ingredient allocations) when the batch
  * has a recipe, via useBrewConsumptionFlow (shared with the batch
  * detail page).
  */
 
 import { useState, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import { EntityList } from "@/components/universal/entity-list";
 import { batchEntity } from "@/entities/batch";
-import { batchKeys } from "@/lib/query-keys";
+import { batchKeys, recipeKeys } from "@/lib/query-keys";
 import { BatchCancellationDialog } from "@/components/domain/batch/batch-cancellation-dialog";
 import { StartBrewDayDialog } from "@/components/domain/brew/start-brew-day-dialog";
+import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-batch-dialog";
 import { useBrewConsumptionFlow } from "@/components/domain/brew/use-brew-consumption-flow";
 
 type BatchRecord = {
@@ -32,11 +35,34 @@ type BatchRecord = {
 
 export default function BatchesPage() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
   const [selectedBatch, setSelectedBatch] = useState<BatchRecord | null>(null);
   const [showTerminationDialog, setShowTerminationDialog] = useState(false);
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
+  const [showStartPackaging, setShowStartPackaging] = useState(false);
   // Brew log → consumption confirmation → navigate (shared flow, 9.1)
   const { handleBrewLogCreated, consumptionDialog } = useBrewConsumptionFlow(selectedBatch);
+
+  // Recipe brand for the Start Packaging dialog. Mirrors the batch detail
+  // page's recipe query (same key + select) so the cache is shared. A null
+  // brand (recipe-less batch, or recipe without a brand) is handled by the
+  // dialog's in-dialog brand picker.
+  const { data: packagingRecipe, isLoading: packagingRecipeLoading } = useQuery({
+    queryKey: recipeKeys.detail(selectedBatch?.recipe_id ?? ""),
+    queryFn: async () => {
+      if (!selectedBatch?.recipe_id) return null;
+      const { data, error } = await supabase
+        .from("recipes")
+        .select("id, name, brand_id, target_og, brands(id, name), recipe_yeasts(yeast_id)")
+        .eq("id", selectedBatch.recipe_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: showStartPackaging && !!selectedBatch?.recipe_id,
+  });
+  const packagingBrand =
+    (packagingRecipe?.brands as { id: string; name: string } | null) ?? null;
 
   // Custom action handler for batch-specific actions
   const handleAction = useCallback((actionName: string, record: Record<string, unknown>) => {
@@ -48,6 +74,11 @@ export default function BatchesPage() {
     if (actionName === "start_brew_day") {
       setSelectedBatch(record as unknown as BatchRecord);
       setShowStartBrewDay(true);
+      return true;
+    }
+    if (actionName === "start_packaging") {
+      setSelectedBatch(record as unknown as BatchRecord);
+      setShowStartPackaging(true);
       return true;
     }
     return false;
@@ -92,6 +123,20 @@ export default function BatchesPage() {
               handleBrewLogCreated(brewLogId);
             }}
           />
+
+          {/* Mount once the recipe query has settled so a batch whose brand
+              is still loading doesn't briefly show the in-dialog brand picker. */}
+          {showStartPackaging && !packagingRecipeLoading && (
+            <PackagingBatchDialog
+              open={showStartPackaging}
+              onOpenChange={setShowStartPackaging}
+              batchId={selectedBatch.id}
+              batchNumber={selectedBatch.batch_code}
+              brandId={packagingBrand?.id ?? null}
+              brandName={packagingBrand?.name ?? null}
+              volumeBbl={selectedBatch.volume_bbl}
+            />
+          )}
 
           {consumptionDialog}
         </>

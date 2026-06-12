@@ -83,6 +83,7 @@ export const yeastStrainEntity: EntityConfig<Yeast> = {
   displayNamePlural: "Yeast Strains",
   description: "Yeast strains catalog with fermentation characteristics",
   domain: "production",
+  basePath: "/settings/yeasts",
 
   // ---------------------------------------------------------------------------
   // List View
