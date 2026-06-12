@@ -61,6 +61,7 @@ export const beerStyleEntity: EntityConfig<BeerStyle> = {
   displayNamePlural: "Beer Styles",
   description: "BJCP style guidelines and custom brewery styles",
   domain: "production",
+  basePath: "/settings/beer-styles",
 
   // ---------------------------------------------------------------------------
   // List View

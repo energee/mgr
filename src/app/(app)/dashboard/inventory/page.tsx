@@ -4,7 +4,8 @@
  * Inventory Dashboard
  *
  * Overview of inventory metrics:
- * - Low stock alerts
+ * - Low stock alerts (each row links to the item, with a "Reorder" shortcut
+ *   into PO creation and a section link to material planning)
  * - Expiring lots
  * - Inventory summary by category
  */
@@ -15,7 +16,8 @@ import { dashboardKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { InventoryAlerts } from "@/components/domain/inventory/inventory-alerts";
 import { Suspense } from "react";
-import { PackageCheck, Clock } from "lucide-react";
+import { PackageCheck, Clock, ShoppingCart } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
@@ -173,34 +175,57 @@ export default function InventoryDashboardPage() {
           {lowStockItems.length === 0 ? (
             <DashboardEmpty message="All items are stocked" icon={PackageCheck} />
           ) : (
-            <div className="divide-y">
-              {lowStockItems.slice(0, MAX_ITEMS_SHOWN).map((item) => {
-                const percentOfReorder = Math.round((item.current_qty / item.reorder_point) * 100);
+            <>
+              <div className="divide-y">
+                {lowStockItems.slice(0, MAX_ITEMS_SHOWN).map((item) => {
+                  const percentOfReorder = Math.round((item.current_qty / item.reorder_point) * 100);
 
-                return (
-                  <Link
-                    key={item.id}
-                    href={`/inventory/items/${item.id}`}
-                    className="flex items-center justify-between py-2 hover:bg-muted/50 -mx-1 px-1"
-                  >
-                    <div>
-                      <div className="font-medium text-sm">{item.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Reorder: <span className="font-mono">{item.reorder_point}</span> {item.unit}
-                      </div>
+                  return (
+                    <div key={item.id} className="flex items-center gap-2 py-2">
+                      <Link
+                        href={`/inventory/items/${item.id}`}
+                        className="flex flex-1 items-center justify-between gap-3 min-w-0 hover:bg-muted/50 -mx-1 px-1 rounded"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm truncate">{item.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Reorder: <span className="font-mono">{item.reorder_point}</span> {item.unit}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono font-semibold text-amber-600">
+                            {item.current_qty} {item.unit}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ({percentOfReorder}%)
+                          </span>
+                        </div>
+                      </Link>
+                      {/* Shortcut to the resolving purchase action (draft PO) */}
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 h-7 px-2 text-xs"
+                      >
+                        <Link href="/purchasing/pos/new" aria-label={`Reorder ${item.name}`}>
+                          <ShoppingCart className="h-3.5 w-3.5 mr-1" />
+                          Reorder
+                        </Link>
+                      </Button>
                     </div>
-                    <div className="text-right">
-                      <span className="font-mono font-semibold text-amber-600">
-                        {item.current_qty} {item.unit}
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-2">
-                        ({percentOfReorder}%)
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                <Link
+                  href="/purchasing/material-planning"
+                  className="hover:text-foreground underline underline-offset-2"
+                >
+                  Plan upcoming material purchases →
+                </Link>
+              </p>
+            </>
           )}
         </DashboardSection>
 

@@ -56,6 +56,7 @@ export const containerEntity: EntityConfig<Container> = {
   displayNamePlural: "Containers",
   description: "Physical vessels — cans, bottles, kegs. Parent of selling formats.",
   domain: "inventory",
+  basePath: "/settings/containers",
 
   // ---------------------------------------------------------------------------
   // List View

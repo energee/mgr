@@ -120,6 +120,7 @@ export const userProfileEntity: EntityConfig<UserProfile> = {
   displayNamePlural: "Users",
   description: "Team members with role assignments and activity tracking",
   domain: "system",
+  basePath: "/settings/users",
 
   // ---------------------------------------------------------------------------
   // List View

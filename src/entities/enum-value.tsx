@@ -91,6 +91,7 @@ export const enumValueEntity: EntityConfig<EnumValue> = {
   displayNamePlural: "Status & Options",
   description: "Values that appear in dropdowns and status fields throughout the app",
   domain: "system",
+  basePath: "/settings/status-options",
 
   // ---------------------------------------------------------------------------
   // List View

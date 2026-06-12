@@ -40,6 +40,7 @@ export const brandEntity: EntityConfig<Brand> = {
   displayNamePlural: "Brands",
   description: "Beer brands and products",
   domain: "production",
+  basePath: "/settings/brands",
 
   // ---------------------------------------------------------------------------
   // List View

@@ -36,6 +36,7 @@ export const waterProfileEntity: EntityConfig<WaterProfile> = {
   displayNamePlural: "Water Profiles",
   description: "Source water chemistry profiles with mineral content",
   domain: "system",
+  basePath: "/settings/water-profiles",
 
   listColumns: [
     { accessorKey: "name", header: "Name", sortable: true },
