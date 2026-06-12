@@ -21,11 +21,21 @@
  *   may read arbitrary row fields (see buildSelectList)
  * - State transitions (row actions, kanban drag, mobile card menu) update the
  *   paged-list cache optimistically with rollback on failure, guarded by a
- *   state-conditioned UPDATE instead of a pre-SELECT (see handleSingleTransition)
+ *   state-conditioned UPDATE instead of a pre-SELECT (see handleSingleTransition).
+ *   All of these routes go through requestTransition, which opens the
+ *   pre-transition fields dialog (EntityActionDef.transitionFields) when the
+ *   target state's action declares one, merging the collected values into
+ *   the same UPDATE as the status flip
  * - Mobile: card list (EntityMobileCardList) with a toolbar exposing search
  *   plus the same filter/sort controls in a bottom sheet (MobileFilterSheet);
  *   coarse-pointer devices (tablets keep the desktop table) get enlarged
  *   touch targets via useIsTouch
+ * - Bulk operations: row selection is enabled for any bulk-capable entity
+ *   (stateMachine and/or delete action) and is keyed by record id (getRowId)
+ *   so it survives pagination; an id→row snapshot map
+ *   (syncSelectionSnapshots) keeps off-page selected rows available to the
+ *   bulk bar. The bar offers status transitions (server-revalidated by id)
+ *   and bulk delete (EntityBulkDeleteDialog with per-row failure reporting)
  */
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
@@ -35,6 +45,7 @@ import type {
   ColumnDef,
   SortingState,
   PaginationState,
+  RowSelectionState,
   VisibilityState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
@@ -48,15 +59,19 @@ import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { entityKeys } from "@/lib/query-keys";
+import { parsePostgresError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
-import { getStateLabel, entityRegistry } from "@/types/entity";
+import { getStateLabel, getTransitionFieldsAction, entityRegistry } from "@/types/entity";
 import type { EntityColumnDef } from "@/types/entity";
 import type { ExtendedColumnFilter } from "@/types/data-table";
 import { getFiltersStateParser } from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { EntityKanban } from "@/components/universal/entity-kanban";
-import { EntityDeleteDialog } from "./entity-delete-dialog";
+import { EntityDeleteDialog, EntityBulkDeleteDialog } from "./entity-delete-dialog";
+import { getApplicableActions } from "@/lib/entity-actions";
+import { EntityActionConfirmDialog } from "./entity-action-confirm-dialog";
+import { EntityTransitionFieldsDialog } from "./entity-transition-fields-dialog";
 import { BulkStatusActionBar } from "./bulk-status-action-bar";
 import {
   buildDataTableColumns,
@@ -193,6 +208,40 @@ function buildSelectList<T>(
   return [...cols].join(",");
 }
 
+/**
+ * Reconcile the id→row snapshot map backing cross-page row selection and
+ * return the selected rows. Selection is keyed by record id (getRowId) so it
+ * survives pagination, but off-page rows leave the fetched page while the
+ * bulk bar still derives transition options and delete eligibility from row
+ * data — so every selected row's last-seen snapshot is retained as pages
+ * stream through:
+ * - rows on the current page refresh their snapshot (latest server data)
+ * - ids no longer selected are dropped
+ * - selected ids whose row has paged out keep their last-seen snapshot
+ * Exported for tests.
+ */
+export function syncSelectionSnapshots<T>(
+  snapshots: Map<string, T>,
+  rowSelection: RowSelectionState,
+  rows: T[]
+): T[] {
+  const selectedIds = new Set(
+    Object.entries(rowSelection)
+      .filter(([, selected]) => selected)
+      .map(([id]) => id)
+  );
+  for (const row of rows) {
+    const id = String((row as Record<string, unknown>).id);
+    if (selectedIds.has(id)) snapshots.set(id, row);
+  }
+  for (const id of [...snapshots.keys()]) {
+    if (!selectedIds.has(id)) snapshots.delete(id);
+  }
+  return [...selectedIds]
+    .map((id) => snapshots.get(id))
+    .filter((r): r is T => r !== undefined);
+}
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -211,6 +260,12 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const path = basePath || `/${entity.domain}/${entity.table}`;
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<{ record: T; action: EntityActionDef<T> } | null>(null);
+  // Action awaiting user confirmation (EntityActionDef.confirm) or its
+  // pre-transition fields dialog (EntityActionDef.transitionFields) from the
+  // row menu, mobile card menu, or a routed bare transition (kanban drag) —
+  // dispatched by executeConfirmedAction below. Which dialog renders is
+  // decided at render time by the action's `transitionFields`.
+  const [confirmTarget, setConfirmTarget] = useState<{ record: T; action: EntityActionDef<T> } | null>(null);
 
   const handleRowClick = useCallback(
     (row: T) => {
@@ -222,7 +277,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
   const isMobile = useIsMobile();
   const isTouch = useIsTouch();
-  const hasBulkActions = !!entity.stateMachine;
+  // Bulk-capable surfaces: status transitions (stateMachine) and bulk delete
+  // (delete action). Selection is enabled whenever either exists — not just
+  // for stateMachine entities (audit finding 08).
+  const bulkDeleteAction = entity.actions?.find(
+    (a) => a.name === "delete" && a.deleteMode
+  );
+  const hasBulkActions = !!entity.stateMachine || !!bulkDeleteAction;
   const fetchTable = entity.viewTable || entity.table;
 
   // ---------------------------------------------------------------------------
@@ -245,9 +306,14 @@ export function EntityDataTable<T = Record<string, unknown>>({
    * is read from the page cache, and the UPDATE is guarded by a WHERE on that
    * state (`.in(validFromStates)` when the row isn't cached) so a concurrent
    * change by another user matches 0 rows instead of clobbering.
+   *
+   * `extraFields` carries values collected by EntityTransitionFieldsDialog
+   * (EntityActionDef.transitionFields) — written in the same UPDATE as the
+   * status flip. Use requestTransition (below) for user-initiated bare
+   * transitions so the fields dialog is never skipped.
    */
   const handleSingleTransition = useCallback(
-    async (id: string, toState: string) => {
+    async (id: string, toState: string, extraFields?: Record<string, unknown>) => {
       if (!entity.stateMachine) return;
 
       const stateField = entity.stateMachine.stateField as string;
@@ -288,7 +354,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
                 ...old,
                 rows: old.rows.map((r) =>
                   (r as Record<string, unknown>).id === id
-                    ? ({ ...r, [stateField]: toState } as T)
+                    ? ({ ...r, ...extraFields, [stateField]: toState } as T)
                     : r
                 ),
               }
@@ -302,7 +368,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       // State-guarded UPDATE — 0 rows affected means another user changed the
       // state between render and click (race guard without a pre-SELECT)
       let update = dynamicFrom(supabase, entity.table)
-        .update({ [stateField]: toState })
+        .update({ ...extraFields, [stateField]: toState })
         .eq("id", id);
       update = currentState
         ? update.eq(stateField, currentState)
@@ -311,7 +377,10 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
       if (error) {
         rollback();
-        toast.error("Failed to update status");
+        // Friendly translation of DB-level failures — e.g. keg_transactions
+        // state checks surface their CONSTRAINT_MESSAGES entry instead of a
+        // generic failure (src/lib/errors.ts)
+        toast.error(parsePostgresError(error));
         return;
       }
       if (!updated || updated.length === 0) {
@@ -347,6 +416,55 @@ export function EntityDataTable<T = Record<string, unknown>>({
     },
     [entity, supabase, queryClient, fetchTable],
   );
+
+  /**
+   * Route a bare transition request (row menu, kanban drag, mobile card
+   * menu) through the pre-transition fields dialog when an action declares
+   * `transitionFields` for the target state; otherwise transition
+   * immediately. This is the onTransition handler handed to every list
+   * surface so none of them can bare-flip past the dialog. The pending
+   * record is read from the page cache (same listQueryKeyRef pattern as
+   * handleSingleTransition) so field defaults can derive from it.
+   */
+  const requestTransition = useCallback(
+    async (id: string, toState: string) => {
+      const fieldsAction = getTransitionFieldsAction(entity, toState);
+      if (!fieldsAction) {
+        return handleSingleTransition(id, toState);
+      }
+      const listKey = listQueryKeyRef.current;
+      const cachedRow = (listKey
+        ? queryClient.getQueryData<PagedListData>(listKey)?.rows
+        : undefined
+      )?.find((r) => (r as Record<string, unknown>).id === id);
+      setConfirmTarget({
+        record: (cachedRow ?? ({ id } as Record<string, unknown>)) as T,
+        action: fieldsAction,
+      });
+    },
+    [entity, queryClient, handleSingleTransition],
+  );
+
+  /**
+   * Dispatch a confirm-gated action after the user accepts the shared
+   * EntityActionConfirmDialog, or a transition-fields action after its
+   * dialog submits (`extraFields` = the collected values, merged into the
+   * status UPDATE). Mirrors the post-confirm portion of the row menu's
+   * onClick in adapter.tsx buildActionsColumn: onAction override first,
+   * then state transition or custom handler.
+   */
+  const executeConfirmedAction = useCallback((extraFields?: Record<string, unknown>) => {
+    if (!confirmTarget) return;
+    const { record, action } = confirmTarget;
+    setConfirmTarget(null);
+    if (onAction && onAction(action.name, record)) return;
+    if (action.toState) {
+      const id = (record as Record<string, unknown>).id as string;
+      void handleSingleTransition(id, action.toState, extraFields);
+      return;
+    }
+    void action.handler?.(record);
+  }, [confirmTarget, onAction, handleSingleTransition]);
 
   // ---------------------------------------------------------------------------
   // View mode (table vs board)
@@ -413,7 +531,10 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // Debounced search value (the input itself lives in ListSearchInput so
   // per-keystroke re-renders don't re-render the whole table)
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [rowSelection, setRowSelection] = useState({});
+  // Keyed by record id (getRowId below), so selection survives page flips
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  // Multi-record delete confirmation (EntityBulkDeleteDialog) visibility
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   // Persisted page size (per-entity defaultPageSize overrides the global default)
   const { pageSize: persistedPageSize, setPageSize: setPersistedPageSize } =
@@ -442,15 +563,18 @@ export function EntityDataTable<T = Record<string, unknown>>({
       entity,
       path,
       onAction,
-      handleSingleTransition,
-      (record, action) => setDeleteTarget({ record, action })
+      // requestTransition (not handleSingleTransition) so transitions whose
+      // action declares transitionFields open the fields dialog first
+      requestTransition,
+      (record, action) => setDeleteTarget({ record, action }),
+      (record, action) => setConfirmTarget({ record, action })
     );
 
     if (hasBulkActions) {
       return [buildSelectColumn<T>(), ...dataColumns, actionsColumn];
     }
     return [...dataColumns, actionsColumn];
-  }, [entity, dynamicFilterOptions, path, onAction, hasBulkActions, handleSingleTransition]);
+  }, [entity, dynamicFilterOptions, path, onAction, hasBulkActions, requestTransition]);
 
   // Hide filter-only columns (filters whose field doesn't match any listColumn accessorKey)
   const columnVisibility = useMemo((): VisibilityState => {
@@ -489,21 +613,17 @@ export function EntityDataTable<T = Record<string, unknown>>({
   );
 
   // Reset row selection and pagination when filters or search change — with
-  // server pagination a stale pageIndex would show an empty page, and row
-  // selection is positional within the current page. JSON key avoids re-runs
-  // from unstable array/object identities.
+  // server pagination a stale pageIndex would show an empty page, and rows
+  // selected under the old criteria may not appear anywhere in the new result
+  // set (selection itself is id-keyed and survives page flips, so there is
+  // deliberately NO reset on pageIndex changes). JSON key avoids re-runs from
+  // unstable array/object identities.
   const filterResetKey = JSON.stringify({ urlFilters, debouncedSearch, filters });
   useEffect(() => {
     setRowSelection({});
     setMobilePages(1);
     setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
   }, [filterResetKey]);
-
-  // Row selection is positional (index within the current page), so it cannot
-  // survive a page change.
-  useEffect(() => {
-    setRowSelection({});
-  }, [pagination.pageIndex]);
 
   // ---------------------------------------------------------------------------
   // Quick filter tabs
@@ -786,6 +906,9 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const table = useReactTable({
     data: rows,
     columns,
+    // Row identity = record id (not the default page-positional index) so
+    // rowSelection keys are ids and selection survives pagination
+    getRowId: (row) => String((row as Record<string, unknown>).id),
     state: {
       sorting,
       pagination,
@@ -812,13 +935,31 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Bulk action helpers
   // ---------------------------------------------------------------------------
-  // Row selection keys are row indices within the current page
-  const selectedRows = useMemo(() => {
-    return Object.entries(rowSelection)
-      .filter(([, selected]) => selected)
-      .map(([key]) => rows[parseInt(key)])
-      .filter(Boolean);
-  }, [rowSelection, rows]);
+  // Row selection keys are record ids (getRowId). The ref holds the last-seen
+  // snapshot of every selected row so rows selected on other pages remain
+  // available to the bulk bar (see syncSelectionSnapshots). The memo body
+  // mutates the ref map, which is safe: the reconciliation is idempotent and
+  // re-runs whenever selection or the fetched page changes.
+  const selectionSnapshotsRef = useRef(new Map<string, T>());
+  const selectedRows = useMemo(
+    () =>
+      syncSelectionSnapshots(selectionSnapshotsRef.current, rowSelection, rows),
+    [rowSelection, rows]
+  );
+
+  // Selected rows the delete action actually applies to — same per-row
+  // visibility rules as the row/card menus (getApplicableActions: showWhen,
+  // fromStates) plus disabledWhen, evaluated against the row snapshots. The
+  // bulk bar surfaces the count when it's a strict subset of the selection.
+  const bulkDeletableRows = useMemo(() => {
+    if (!bulkDeleteAction) return [];
+    return selectedRows.filter(
+      (row) =>
+        getApplicableActions(entity, row).some(
+          (a) => a.name === bulkDeleteAction.name
+        ) && !bulkDeleteAction.disabledWhen?.(row)
+    );
+  }, [bulkDeleteAction, entity, selectedRows]);
 
   // Check if selected rows have any common valid transitions
   const hasValidBulkTransitions = useMemo(() => {
@@ -852,6 +993,24 @@ export function EntityDataTable<T = Record<string, unknown>>({
     async (targetStatus: string) => {
       if (!entity.stateMachine || !targetStatus || selectedRows.length === 0)
         return;
+
+      // Backstop for stateMachine.requiresAction targets and
+      // transition-fields actions: the bulk bar already disables
+      // requiresAction options, but never bare-UPDATE into a state whose
+      // transition is owned by a named action's interactive flow (e.g. the
+      // schedule dialog capturing scheduled_date — bulk can't collect
+      // per-record fields).
+      const requiredActionName = entity.stateMachine.requiresAction?.[targetStatus];
+      const fieldsAction = getTransitionFieldsAction(entity, targetStatus);
+      if (requiredActionName || fieldsAction) {
+        const requiredAction = requiredActionName
+          ? entity.actions?.find((a) => a.name === requiredActionName)
+          : fieldsAction;
+        toast.error(
+          `Use the ${requiredAction?.label ?? requiredActionName} action on each ${entity.displayName.toLowerCase()} instead`
+        );
+        return 0;
+      }
 
       const stateField = entity.stateMachine.stateField;
       const transitions = entity.stateMachine.transitions;
@@ -1039,7 +1198,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
               entity={entity}
               data={rows}
               basePath={path}
-              onTransition={handleSingleTransition}
+              onTransition={requestTransition}
             />
             {/* Board fetches are capped at KANBAN_FETCH_CAP — tell the user
                 when the cap truncated the dataset instead of failing silently */}
@@ -1078,7 +1237,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
               hasMore={totalCount != null && rows.length < totalCount}
               isLoadingMore={isFetching}
               onLoadMore={() => setMobilePages((n) => n + 1)}
-              onTransition={handleSingleTransition}
+              onTransition={requestTransition}
               onAction={
                 onAction as
                   | ((actionName: string, record: Record<string, unknown>) => boolean)
@@ -1086,6 +1245,12 @@ export function EntityDataTable<T = Record<string, unknown>>({
               }
               onDeleteAction={(record, action) =>
                 setDeleteTarget({
+                  record: record as T,
+                  action: action as EntityActionDef<T>,
+                })
+              }
+              onConfirmAction={(record, action) =>
+                setConfirmTarget({
                   record: record as T,
                   action: action as EntityActionDef<T>,
                 })
@@ -1104,12 +1269,21 @@ export function EntityDataTable<T = Record<string, unknown>>({
             )}
             onRowClick={handleRowClick}
             actionBar={
-              hasBulkActions && selectedRows.length > 0 && hasValidBulkTransitions ? (
+              // Show the bar when the selection has something actionable:
+              // a common status transition and/or deletable rows
+              selectedRows.length > 0 &&
+              (hasValidBulkTransitions || bulkDeletableRows.length > 0) ? (
                 <BulkStatusActionBar
                   entity={entity}
                   selectedRows={selectedRows}
                   onStatusChange={handleBulkStatusChange}
                   onClearSelection={() => setRowSelection({})}
+                  onBulkDelete={
+                    bulkDeletableRows.length > 0
+                      ? () => setBulkDeleteOpen(true)
+                      : undefined
+                  }
+                  bulkDeleteCount={bulkDeletableRows.length}
                 />
               ) : undefined
             }
@@ -1180,6 +1354,51 @@ export function EntityDataTable<T = Record<string, unknown>>({
         )}
       </div>
 
+      {/* Action Confirmation / Pre-Transition Fields Dialog — shared by the
+          desktop row menu, mobile card menu, and kanban drag. Actions with
+          transitionFields get the fields dialog (which doubles as the
+          confirm step); plain confirm actions get the confirm dialog. */}
+      {confirmTarget &&
+        (confirmTarget.action.transitionFields?.length ? (
+          <EntityTransitionFieldsDialog
+            actionLabel={confirmTarget.action.label}
+            recordTitle={String(
+              (confirmTarget.record as Record<string, unknown>)[
+                entity.detailHeader?.title ?? "name"
+              ] ?? entity.displayName
+            )}
+            fields={confirmTarget.action.transitionFields}
+            record={confirmTarget.record}
+            open={!!confirmTarget}
+            onOpenChange={(open) => {
+              if (!open) {
+                setConfirmTarget(null);
+                // Kanban moves the card optimistically during drag — refetch
+                // so a cancelled dialog snaps it back to its real column.
+                if (isBoardView) {
+                  queryClient.invalidateQueries({
+                    queryKey: entityKeys.all(fetchTable),
+                  });
+                }
+              }
+            }}
+            onSubmit={(values) => executeConfirmedAction(values)}
+          />
+        ) : (
+          <EntityActionConfirmDialog
+            actionLabel={confirmTarget.action.label}
+            recordTitle={String(
+              (confirmTarget.record as Record<string, unknown>)[
+                entity.detailHeader?.title ?? "name"
+              ] ?? entity.displayName
+            )}
+            destructive={confirmTarget.action.variant === "destructive"}
+            open={!!confirmTarget}
+            onOpenChange={(open) => { if (!open) setConfirmTarget(null); }}
+            onConfirm={() => executeConfirmedAction()}
+          />
+        ))}
+
       {/* Entity Delete Dialog */}
       {deleteTarget?.action.deleteMode && (
         <EntityDeleteDialog
@@ -1196,6 +1415,43 @@ export function EntityDataTable<T = Record<string, unknown>>({
           onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
           onSuccess={() => {
             setDeleteTarget(null);
+            queryClient.invalidateQueries({
+              queryKey: entityKeys.all(entity.viewTable ?? entity.table),
+            });
+            queryClient.invalidateQueries({
+              queryKey: entityKeys.all(entity.table),
+            });
+          }}
+        />
+      )}
+
+      {/* Bulk Delete Dialog — multi-record variant with per-row failure
+          reporting. onDeleted also fires on partial success, dropping the
+          deleted ids from the id-keyed selection so the records prop shrinks
+          to the failed rows (a retry only retries those). */}
+      {bulkDeleteAction?.deleteMode && (
+        <EntityBulkDeleteDialog
+          entityTable={entity.table}
+          entityDisplayName={entity.displayName}
+          entityDisplayNamePlural={entity.displayNamePlural}
+          records={bulkDeletableRows.map((row) => {
+            const rec = row as Record<string, unknown>;
+            return {
+              id: String(rec.id),
+              title: String(
+                rec[entity.detailHeader?.title ?? "name"] ?? entity.displayName
+              ),
+            };
+          })}
+          deleteMode={bulkDeleteAction.deleteMode}
+          open={bulkDeleteOpen}
+          onOpenChange={setBulkDeleteOpen}
+          onDeleted={(deletedIds) => {
+            setRowSelection((prev) => {
+              const next = { ...prev };
+              for (const id of deletedIds) delete next[id];
+              return next;
+            });
             queryClient.invalidateQueries({
               queryKey: entityKeys.all(entity.viewTable ?? entity.table),
             });

@@ -47,6 +47,24 @@ export type EntityConfig<T = Record<string, unknown>> = {
   /** Domain this entity belongs to */
   domain: EntityDomain;
 
+  /**
+   * Explicit route base path for this entity's pages. The app router tree
+   * under `src/app/(app)` is the source of truth: the list page lives at
+   * `basePath`, detail pages at `${basePath}/${id}`, and the create page at
+   * `${basePath}/new`.
+   *
+   * - Omit for conventional routes, derived as `/{domain}/{name-with-dashes}s`
+   *   (e.g. customer → `/sales/customers`).
+   * - Set a string when the routes don't follow the convention
+   *   (e.g. purchase_order → `/purchasing/pos`).
+   * - Set `null` for inline-only entities with no standalone pages
+   *   (e.g. po_line_item). Relation tables then render non-navigable rows
+   *   and suppress their "Add" link.
+   *
+   * Validated against the route tree by entity-configs.test.ts.
+   */
+  basePath?: string | null;
+
   // ---------------------------------------------------------------------------
   // List View Configuration
   // ---------------------------------------------------------------------------
@@ -113,6 +131,25 @@ export type EntityConfig<T = Record<string, unknown>> = {
 
   /** Available actions for this entity */
   actions?: EntityActionDef<T>[];
+
+  /**
+   * Opt in to the framework-provided "Duplicate" action on the detail page.
+   * When defined (even as an empty array), EntityDetailUnified appends a
+   * Duplicate item to the detail Actions dropdown that navigates to the
+   * entity's create route with the current record's editable field values
+   * pre-filled via the prefill store (src/contexts/prefill-store.ts).
+   *
+   * List the entity-specific identity fields that must NOT carry over to the
+   * copy (e.g. po_number, sku, lot_number). The framework additionally always
+   * excludes row identity/audit fields (id, created_at, updated_at,
+   * created_by, updated_by, version), the stateMachine.stateField, and any
+   * field that doesn't render an input in create mode (no `type`, or
+   * `editable: false`) — so only true identity/content fields need listing
+   * here. Exclusions are explicit by design: do NOT derive them from
+   * `editable: false` alone, since create-only fields are editable in create
+   * mode on purpose. See buildDuplicateDefaults in entity-detail-unified.tsx.
+   */
+  excludeOnDuplicate?: (keyof T & string)[];
 
   /** Dialog configurations for actions */
   dialogs?: Record<string, EntityDialogConfig<T>>;
@@ -480,6 +517,23 @@ export type StateMachineConfig<T> = {
   /** Valid transitions: { fromState: [toStates] } */
   transitions: Record<string, string[]>;
 
+  /**
+   * Per-target action requirement: { toState: actionName }. When a target
+   * state is listed here, reaching it requires the named entity action
+   * (EntityActionDef.name) so the action's interactive flow (page-level
+   * `onAction` interception, dialogs, side effects) always runs. Generic UI
+   * paths that would otherwise perform a bare status UPDATE to that state
+   * are suppressed:
+   * - the "Move to {state}" item in the detail Actions dropdown
+   *   (entity-detail-unified.tsx) is hidden — the named action's own menu
+   *   item stands in for it
+   * - the bulk status bar option (bulk-status-action-bar.tsx) is disabled
+   *   with a hint pointing at the named action, and the bulk apply path
+   *   (entity-data-table.tsx handleBulkStatusChange) refuses the target
+   *   as a backstop
+   */
+  requiresAction?: Record<string, string>;
+
   /** State display configuration */
   stateDisplay?: Record<
     string,
@@ -496,6 +550,47 @@ export type StateMachineConfig<T> = {
 // =============================================================================
 // Action Types
 // =============================================================================
+
+/**
+ * A field collected by the pre-transition dialog
+ * (EntityActionDef.transitionFields, rendered by
+ * EntityTransitionFieldsDialog). Deliberately narrower than EntityFieldDef:
+ * only simple inputs that make sense in a small modal. Collected values are
+ * merged into the same UPDATE payload as the status flip, so they must be
+ * real columns on the entity's base table.
+ */
+export type TransitionFieldDef<T> = {
+  /** Column on the entity's base table, included in the transition UPDATE */
+  name: string;
+
+  /** Input label */
+  label: string;
+
+  /** Input type ("relation" resolves options via the entity registry) */
+  type: "date" | "text" | "select" | "relation";
+
+  /** Static options for type "select" */
+  options?: { value: string; label: string }[];
+
+  /** Options fetched from an arbitrary table (same shape as EntityFieldDef.dynamicOptions) */
+  dynamicOptions?: {
+    table: string;
+    valueField: string;
+    labelField: string;
+    filter?: Record<string, unknown>;
+    orderBy?: string;
+  };
+
+  /** Registry lookup for type "relation" (same shape as EntityFieldDef.relation) */
+  relation?: { entity: string; displayField: string };
+
+  /** Block dialog submit until the field has a value */
+  required?: boolean;
+
+  /** Initial value derived from the record being transitioned (e.g. default
+   *  scheduled_date to the order's requested_date) */
+  defaultValue?: (data: T) => unknown;
+}
 
 export type EntityActionDef<T> = {
   /** Action identifier */
@@ -525,8 +620,37 @@ export type EntityActionDef<T> = {
   /** Target state after action (for state transitions) */
   toState?: string;
 
-  /** Confirm before executing */
+  /**
+   * Confirm before executing. Honored by every action surface — detail
+   * header buttons and Actions dropdown (entity-detail-unified.tsx runAction,
+   * gated before the page-level `onAction` override), the list row menu
+   * (data-table/adapter.tsx buildActionsColumn) and the mobile card menu
+   * (entity-mobile-card-list.tsx) — via the shared
+   * EntityActionConfirmDialog. Raw "Move to {state}" items whose target
+   * matches a confirm action's `toState` are routed through that action so
+   * they get the same gate.
+   */
   confirm?: boolean;
+
+  /**
+   * Fields collected in a small pre-transition dialog
+   * (EntityTransitionFieldsDialog) and merged into the same UPDATE payload
+   * as the status flip, so a transition never lands without the data that
+   * gives it meaning (e.g. orders.schedule collects scheduled_date,
+   * pick_lists.assign collects assigned_to). Only meaningful with `toState`.
+   *
+   * Honored by every transition surface: the detail page gates the action
+   * in runAction (entity-detail-unified.tsx), and the list view routes bare
+   * transitions (row menu, kanban drag, mobile card menu) through the
+   * dialog via getTransitionFieldsAction (entity-data-table.tsx
+   * requestTransition). When set together with `confirm`, the fields dialog
+   * replaces the plain confirm dialog — it is itself a confirmation step.
+   *
+   * Pair with stateMachine.requiresAction for the target state so bulk
+   * status updates (which can't collect per-record fields) are suppressed
+   * with a hint instead of bare-flipping.
+   */
+  transitionFields?: TransitionFieldDef<T>[];
 
   /** Handler function */
   handler?: (data: T) => Promise<void> | void;
@@ -632,14 +756,23 @@ export function registerEntity<T = Record<string, unknown>>(config: EntityConfig
 }
 
 /**
- * Resolve the list/back route for an entity. Uses an explicit override when
- * provided, otherwise derives `/{domain}/{name}s` from the entity config.
+ * Resolve the route base path for an entity's pages (list at the returned
+ * path, detail at `{path}/{id}`, create at `{path}/new`). This is the single
+ * source of truth for entity URL derivation — shared by detail pages,
+ * breadcrumbs, and relation-table links so they can never diverge.
+ *
+ * Resolution order: explicit `override` (page-level prop) → the entity
+ * config's `basePath` → the conventional `/{domain}/{name-with-dashes}s`
+ * derivation. Returns `null` when the entity opts out of standalone routes
+ * via `basePath: null` (inline-only entities).
  */
 export function resolveEntityBasePath<T>(
   entity: EntityConfig<T>,
   override?: string,
-): string {
-  return override || `/${entity.domain}/${entity.name}s`;
+): string | null {
+  if (override) return override;
+  if (entity.basePath !== undefined) return entity.basePath;
+  return `/${entity.domain}/${entity.name.replace(/_/g, "-")}s`;
 }
 
 /**
@@ -677,6 +810,22 @@ export function getStateLabel<T>(
   if (!state) return "";
   const display = entity.stateMachine?.stateDisplay?.[state];
   return display?.label || formatStateLabel(state);
+}
+
+/**
+ * Find the entity action whose `transitionFields` dialog must collect data
+ * before transitioning to `toState`. Used by generic transition surfaces
+ * (kanban drag, mobile card menu, list row menu — see entity-data-table.tsx
+ * requestTransition) to route what would otherwise be a bare status UPDATE
+ * through the pre-transition dialog.
+ */
+export function getTransitionFieldsAction<T>(
+  entity: EntityConfig<T>,
+  toState: string
+): EntityActionDef<T> | undefined {
+  return entity.actions?.find(
+    (a) => a.toState === toState && !!a.transitionFields?.length
+  );
 }
 
 // =============================================================================

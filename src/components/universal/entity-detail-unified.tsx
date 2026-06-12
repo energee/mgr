@@ -9,10 +9,35 @@
  * Supports:
  * - View mode: data display, header, tabs, relations, state transitions, actions
  *   (`type: "button"` actions render as visible header buttons, capped at
- *   MAX_HEADER_ACTION_BUTTONS; the rest live in the Actions dropdown)
+ *   MAX_HEADER_ACTION_BUTTONS; the rest live in the Actions dropdown).
+ *   Actions with `confirm: true` are gated behind EntityActionConfirmDialog
+ *   and actions with `transitionFields` behind EntityTransitionFieldsDialog
+ *   (which collects field values merged into the same UPDATE as the status
+ *   flip) before any dispatch (including the page-level `onAction`
+ *   override). Raw "Move to {state}" items are suppressed for targets listed
+ *   in stateMachine.requiresAction (the named action stands in for them) or
+ *   routed through a matching confirm/transition-fields action.
  * - Edit mode: inline form editing with react-hook-form, Zod validation,
  *   optimistic locking, dirty form guard, keyboard shortcuts
+ * - Field-level conditional visibility (UnifiedFieldDef.showWhen): evaluated
+ *   in FieldGrid against live form values in edit/create mode and against the
+ *   loaded record in view mode. On save, user-entered values of fields hidden
+ *   at save time are nulled out (see nullHiddenDirtyFieldValues)
  * - Create mode: when id is undefined, starts in edit mode with INSERT on save
+ *   (relation tabs are hidden — there is no parent record to relate to yet).
+ *   Any pending prefill-store payload (src/contexts/prefill-store.ts) is
+ *   consumed once on mount and merged under the page's explicit
+ *   `defaultValues`, so Duplicate/"Brew again"/AI-chat flows pre-fill the
+ *   form on every create route. After a successful create, entities listed
+ *   in POST_CREATE_TAB land on a specific tab of the new record (e.g. orders
+ *   open on Items so line entry is the obvious next step) instead of Details.
+ * - Duplicate: entities that set EntityConfig.excludeOnDuplicate get a
+ *   framework-synthesized "Duplicate" item in the detail Actions dropdown
+ *   that routes the record's carry-over values (buildDuplicateDefaults)
+ *   through the prefill store to the create route.
+ * - Tab deep-linking: `?tab=` selects the initial detail tab (a section tab
+ *   name or a relation name, e.g. ?tab=order_items); tab changes are
+ *   reflected back into the URL via history.replaceState
  * - Section headerActions: optional component rendered next to section title
  *   (e.g., "Add Event" button on brew day timeline)
  *
@@ -27,17 +52,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePermissions } from "@/contexts/permissions";
 import { DOMAIN_WRITE_PERMISSIONS } from "@/lib/permissions";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { formatValue } from "@/lib/utils";
 import { entityKeys, revisionKeys } from "@/lib/query-keys";
+import { parseUnknownError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { useEntityRecord } from "@/hooks/use-entity-record";
+import { usePrefillStore } from "@/contexts/prefill-store";
 import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
@@ -56,6 +83,8 @@ import { entityRegistry } from "@/entities";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { UnifiedField } from "./unified-field";
 import { EntityDeleteDialog } from "./entity-delete-dialog";
+import { EntityActionConfirmDialog } from "./entity-action-confirm-dialog";
+import { EntityTransitionFieldsDialog } from "./entity-transition-fields-dialog";
 import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -101,6 +130,53 @@ import { log } from "@/lib/client-logger";
  */
 const MAX_HEADER_ACTION_BUTTONS = 3;
 
+/**
+ * Entities that opt in to landing on a specific tab right after create,
+ * keyed by EntityConfig.name. Values must be a valid tab value on the
+ * detail page: a relation name (EntityRelationDef.name) or a section tab.
+ *
+ * Creation is two-phase for these entities (save the header, then add
+ * child rows), so the post-create redirect deep-links straight to the
+ * child-row tab — e.g. a new order opens on Items so line entry is the
+ * obvious next step — instead of dropping the user on Details.
+ *
+ * Lives here rather than on EntityConfig because the redirect is a detail
+ * of this component's create flow; promote it to a config field if more
+ * entities opt in.
+ */
+const POST_CREATE_TAB: Record<string, string> = {
+  order: "order_items",
+};
+
+/**
+ * Build the route pushed after a successful create: the new record's detail
+ * page, deep-linked to the entity's POST_CREATE_TAB when one is configured.
+ * Exported for src/components/universal/__tests__/detail-tab-deep-link.test.ts.
+ */
+export function buildPostCreateRedirect(
+  entityName: string,
+  basePath: string,
+  newId: string
+): string {
+  const tab = POST_CREATE_TAB[entityName];
+  return tab ? `${basePath}/${newId}?tab=${tab}` : `${basePath}/${newId}`;
+}
+
+/**
+ * Resolve the initial detail tab from a `?tab=` search param. Unknown or
+ * missing values fall back to "details" so stale deep links never select an
+ * empty pane (e.g. a relation tab that is hidden in create mode).
+ * Exported for src/components/universal/__tests__/detail-tab-deep-link.test.ts.
+ */
+export function resolveInitialTab(
+  requestedTab: string | null,
+  validTabs: string[]
+): string {
+  return requestedTab && validTabs.includes(requestedTab)
+    ? requestedTab
+    : "details";
+}
+
 // =============================================================================
 // Props
 // =============================================================================
@@ -133,6 +209,56 @@ function getEditableFieldsFromSections<T>(
   return sections
     .flatMap((s) => s.fields ?? [])
     .filter((f) => f.type);
+}
+
+// =============================================================================
+// Helper: Field-level conditional visibility (UnifiedFieldDef.showWhen)
+// =============================================================================
+
+/**
+ * Evaluate a field's conditional visibility against a values snapshot —
+ * live form values in edit/create mode, the loaded record in view mode.
+ * Fields without `showWhen` are always visible.
+ *
+ * Exported for the entity-config test that asserts the framework honors
+ * field-level showWhen (src/entities/__tests__/field-show-when.test.ts).
+ */
+export function isFieldVisible<T>(
+  field: UnifiedFieldDef<T>,
+  values: Partial<T>
+): boolean {
+  return !field.showWhen || field.showWhen(values);
+}
+
+/**
+ * Null out USER-ENTERED values of fields whose `showWhen` evaluates false at
+ * save time, so a value typed/picked before the field became hidden (e.g. a
+ * keg-transaction state select filled in, then the transaction type changed
+ * so the select disappeared) is never persisted. Mutates `values` in place.
+ *
+ * Only dirty fields are nulled. Programmatic values must survive even while
+ * their field is hidden: keg-transaction derives from_state/to_state defaults
+ * from the URL (transactions/new/page.tsx), and in edit mode the loaded
+ * record's legitimate values back-fill the form — nulling those would corrupt
+ * the keg_inventory view, which is calculated from stored from/to states.
+ *
+ * Visibility is evaluated against a pre-pass snapshot so nulling one field
+ * cannot change another field's visibility check (order-independent).
+ *
+ * Exported for src/entities/__tests__/field-show-when.test.ts.
+ */
+export function nullHiddenDirtyFieldValues<T>(
+  values: Record<string, unknown>,
+  fields: UnifiedFieldDef<T>[],
+  dirtyFields: Record<string, unknown>
+): void {
+  const snapshot = { ...values } as Partial<T>;
+  for (const field of fields) {
+    if (isFieldVisible(field, snapshot)) continue;
+    if (dirtyFields[field.name]) {
+      values[field.name] = null;
+    }
+  }
 }
 
 // =============================================================================
@@ -228,6 +354,61 @@ function buildDefaultValues<T>(
 }
 
 // =============================================================================
+// Helper: Build prefill values for the framework Duplicate action
+// =============================================================================
+
+/**
+ * Fields the framework always strips when duplicating a record, regardless of
+ * the entity's `excludeOnDuplicate` list: row identity, audit columns, and the
+ * optimistic-lock version. The state-machine state field is excluded
+ * separately in buildDuplicateDefaults (its name varies per entity).
+ */
+const DUPLICATE_BASE_EXCLUSIONS = [
+  "id",
+  "created_at",
+  "updated_at",
+  "created_by",
+  "updated_by",
+  "version",
+] as const;
+
+/**
+ * Build create-form prefill values for the framework Duplicate action
+ * (EntityConfig.excludeOnDuplicate): the record's section-field values minus
+ * DUPLICATE_BASE_EXCLUSIONS, the state-machine state field, and the entity's
+ * own `excludeOnDuplicate` identity fields.
+ *
+ * Only fields that render inputs in create mode carry over (`type` set and
+ * not `editable: false` — "create-only" fields qualify), so display-only and
+ * computed view columns (e.g. customer order stats) never leak into the
+ * INSERT payload. Null/undefined values are dropped so per-field
+ * `defaultValue`s still apply on the create form.
+ *
+ * Exported for src/components/universal/__tests__/duplicate-defaults.test.ts.
+ */
+export function buildDuplicateDefaults<T>(
+  entity: EntityConfig<T>,
+  record: Record<string, unknown>
+): Record<string, unknown> {
+  const excluded = new Set<string>([
+    ...DUPLICATE_BASE_EXCLUSIONS,
+    ...(entity.stateMachine ? [entity.stateMachine.stateField] : []),
+    ...(entity.excludeOnDuplicate ?? []),
+  ]);
+  const prefill: Record<string, unknown> = {};
+  for (const section of entity.sections ?? []) {
+    for (const field of section.fields ?? []) {
+      if (!field.type || field.editable === false) continue;
+      if (excluded.has(field.name)) continue;
+      const value = record[field.name];
+      if (value === undefined || value === null) continue;
+      prefill[field.name] = value;
+    }
+  }
+  return prefill;
+}
+
+// =============================================================================
 // Helper: Reset form from loaded record data and store optimistic lock version
 // =============================================================================
 
@@ -315,7 +496,10 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const queryClient = useQueryClient();
   const router = useRouter();
   const supabase = createClient();
-  const path = resolveEntityBasePath(entity, basePath);
+  // Resolved route base for this entity (list page; detail/create nested
+  // under it). Only inline-only entities (`basePath: null`) resolve to null,
+  // and those never render as standalone pages — "/" is a defensive fallback.
+  const path = resolveEntityBasePath(entity, basePath) ?? "/";
 
   const isCreateMode = !id;
   const { can } = usePermissions();
@@ -339,6 +523,12 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   const loadedVersionRef = useRef<number | null>(null);
   const conflictDialog = useConflictDialog();
   const [deleteAction, setDeleteAction] = useState<EntityActionDef<T> | null>(null);
+  // Action awaiting user confirmation (EntityActionDef.confirm) — see runAction
+  const [confirmAction, setConfirmAction] = useState<EntityActionDef<T> | null>(null);
+  // Action awaiting its pre-transition fields dialog
+  // (EntityActionDef.transitionFields) — see runAction
+  const [transitionFieldsAction, setTransitionFieldsAction] =
+    useState<EntityActionDef<T> | null>(null);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const pendingDiscardRef = useRef<(() => void) | null>(null);
 
@@ -371,9 +561,24 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // react-hook-form setup
   // ---------------------------------------------------------------------------
+  // Create-mode prefill: consume any pending prefill-store payload exactly
+  // once on mount — set by the framework Duplicate action (see runAction
+  // below), domain flows like "Brew again", or the AI chat panel. Pages that
+  // drain the store themselves (e.g. batches/new, packaging/new) consume it
+  // during their own render, before this child runs, so this is a no-op
+  // there. Explicit `defaultValues` (including URL-param prefill merged by
+  // EntityDetailPage) win over store prefill.
+  const [storePrefill] = useState<Record<string, unknown> | null>(() =>
+    isCreateMode ? usePrefillStore.getState().consume().prefillData : null
+  );
+
   const formDefaults = useMemo(
-    () => buildDefaultValues(sections, defaultValues as Partial<T> | undefined),
-    [sections, defaultValues]
+    () =>
+      buildDefaultValues(sections, {
+        ...storePrefill,
+        ...(defaultValues as Partial<T> | undefined),
+      } as Partial<T>),
+    [sections, defaultValues, storePrefill]
   );
 
   const form = useForm<Record<string, unknown>>({
@@ -449,7 +654,15 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // silently clobbering the other user's change.
   // ---------------------------------------------------------------------------
   const transitionMutation = useMutation({
-    mutationFn: async ({ toState }: { toState: string }) => {
+    mutationFn: async ({
+      toState,
+      extraFields,
+    }: {
+      toState: string;
+      /** Values collected by EntityTransitionFieldsDialog, written in the
+       *  same UPDATE as the status flip (EntityActionDef.transitionFields) */
+      extraFields?: Record<string, unknown>;
+    }) => {
       if (!entity.stateMachine)
         throw new Error("No state machine configured");
       const stateField = entity.stateMachine.stateField;
@@ -459,7 +672,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       if (!currentState)
         throw new Error("Current status unknown — refresh and try again");
       const { data: updated, error } = await dynamicFrom(supabase, entity.table)
-        .update({ [stateField]: toState })
+        .update({ ...extraFields, [stateField]: toState })
         .eq("id", id)
         .eq(stateField, currentState)
         .select("id");
@@ -486,9 +699,10 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
     },
     onError: (err) => {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update status"
-      );
+      // parseUnknownError keeps the hand-written guard messages above verbatim
+      // while translating DB-level failures (check constraints, RLS) to
+      // friendly text (src/lib/errors.ts)
+      toast.error(parseUnknownError(err).message);
       // Refetch so the UI reflects whichever state won the race
       invalidateEntityCaches(id || "");
     },
@@ -522,6 +736,17 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     };
   }, [data, entity.stateMachine]);
 
+  // Generic "Move to {state}" dropdown targets, minus those owned by a named
+  // action (stateMachine.requiresAction) — for such targets the action's own
+  // menu item stands in, so its interactive flow (onAction interception,
+  // dialogs) always runs instead of a bare status UPDATE.
+  const rawTransitions = useMemo(() => {
+    if (!stateInfo) return [];
+    const requires = entity.stateMachine?.requiresAction;
+    if (!requires) return stateInfo.validTransitions;
+    return stateInfo.validTransitions.filter((toState) => !requires[toState]);
+  }, [stateInfo, entity.stateMachine]);
+
   // Group sections by tab
   const { tabs, defaultSections } = useMemo(() => {
     const tabMap = new Map<string, UnifiedSectionDef<T>[]>();
@@ -547,11 +772,13 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   }, [sections]);
 
   const relationTabs = useMemo(() => {
-    if (!entity.relations) return [];
+    // Hidden in create mode: with no parent id yet, relation queries and
+    // "Add" links would carry an empty parentId and dead-end mid-task.
+    if (isCreateMode || !entity.relations) return [];
     return entity.relations.filter(
       (rel) => rel.showInDetail && rel.detailTab && rel.type === "hasMany"
     );
-  }, [entity.relations]);
+  }, [entity.relations, isCreateMode]);
 
   const availableActions = useMemo(() => {
     if (!data || !entity.actions) return [];
@@ -566,18 +793,41 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     });
   }, [data, entity.actions, stateInfo]);
 
+  // Framework-synthesized Duplicate action (EntityConfig.excludeOnDuplicate).
+  // Deliberately NOT declared in entity.actions: it is appended to the detail
+  // dropdown here and dispatched by runAction, so list surfaces (row menu,
+  // mobile cards) — which have no navigate-with-prefill plumbing — never
+  // render a dead menu item for it. Requires write permission because it
+  // leads straight into the create form.
+  const duplicateAction = useMemo<EntityActionDef<T> | null>(() => {
+    if (
+      isCreateMode ||
+      !entity.excludeOnDuplicate ||
+      !entity.formSchema ||
+      !hasWritePermission
+    ) {
+      return null;
+    }
+    return { name: "duplicate", label: "Duplicate", icon: "copy", type: "dropdown" };
+  }, [isCreateMode, entity, hasWritePermission]);
+
   // Split actions by configured presentation: `type: "button"` actions render
   // as visible header buttons (capped at MAX_HEADER_ACTION_BUTTONS; overflow
   // falls back into the dropdown), everything else stays in the dropdown.
+  // The synthesized Duplicate slots in just before Delete (destructive
+  // actions stay last) or at the end of the menu.
   const { headerButtonActions, dropdownActions } = useMemo(() => {
     const buttons = availableActions
       .filter((a) => a.type === "button")
       .slice(0, MAX_HEADER_ACTION_BUTTONS);
-    return {
-      headerButtonActions: buttons,
-      dropdownActions: availableActions.filter((a) => !buttons.includes(a)),
-    };
-  }, [availableActions]);
+    const dropdown = availableActions.filter((a) => !buttons.includes(a));
+    if (duplicateAction) {
+      const deleteIdx = dropdown.findIndex((a) => a.name === "delete");
+      if (deleteIdx >= 0) dropdown.splice(deleteIdx, 0, duplicateAction);
+      else dropdown.push(duplicateAction);
+    }
+    return { headerButtonActions: buttons, dropdownActions: dropdown };
+  }, [availableActions, duplicateAction]);
 
   // ---------------------------------------------------------------------------
   // Edit mode: toggle in
@@ -631,12 +881,23 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     const values = form.getValues();
 
     // Pre-process: convert empty strings to null for optional fields
-    for (const field of getEditableFieldsFromSections(sections)) {
+    const editableFields = getEditableFieldsFromSections(sections);
+    for (const field of editableFields) {
       const key = field.name as string;
       if (values[key] === "" && !field.required) {
         values[key] = null;
       }
     }
+
+    // Field-level showWhen: drop user-entered values of fields hidden at
+    // save time (entered, then hidden by a later change to the controlling
+    // field). Runs after the ""→null pass so visibility predicates see the
+    // same normalized values the zod schema will parse.
+    nullHiddenDirtyFieldValues(
+      values,
+      editableFields,
+      form.formState.dirtyFields as Record<string, unknown>
+    );
 
     if (!entity.formSchema) return;
     const result = entity.formSchema.safeParse(values);
@@ -649,6 +910,19 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
       }
       showFormErrors(errors);
       return;
+    }
+
+    // State-machine state fields must only change via the guarded transition
+    // path (transitionMutation above), which validates the transition and runs
+    // side effects — a plain form save does neither. The field is also locked
+    // in the UI (see isFieldEditable in unified-field.tsx), but the stale form
+    // value still flows through safeParse, and on tables without a version
+    // column the un-guarded UPDATE branch below could silently revert a
+    // concurrent transition. Strip it from non-create payloads entirely.
+    if (!isCreateMode && entity.stateMachine) {
+      delete (result.data as Record<string, unknown>)[
+        entity.stateMachine.stateField
+      ];
     }
 
     setIsSubmitting(true);
@@ -664,7 +938,9 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         toast.success(`${entity.displayName} created successfully`);
         const newId = (newRow as Record<string, unknown>).id as string;
         invalidateEntityCaches(newId);
-        router.push(`${path}/${newId}`);
+        // Opted-in entities (POST_CREATE_TAB) land on a specific tab of the
+        // new record — e.g. orders open on Items for line entry.
+        router.push(buildPostCreateRedirect(entity.name, path, newId));
       } else if (id) {
         if (loadedVersionRef.current !== null) {
           const lockResult = await updateWithOptimisticLock(
@@ -698,10 +974,22 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         setEditing(false);
       }
     } catch (err) {
-      // Supabase PostgrestError has .message, .code, .details, .hint but isn't an Error instance
-      const pgErr = err as { message?: string; code?: string; details?: string; hint?: string };
-      const message = pgErr?.message || (err instanceof Error ? err.message : "An unexpected error occurred");
-      toast.error(message);
+      // Translate Postgres errors (constraint names, RLS, unique collisions)
+      // to friendly messages via src/lib/errors.ts. Single-column unique
+      // violations land on the offending form field when it's editable here
+      // (e.g. a duplicate po_number highlights the PO Number input) instead
+      // of only toasting.
+      const parsed = parseUnknownError(err);
+      const fieldOnForm = parsed.field &&
+        editableFields.some((f) => (f.name as string) === parsed.field)
+          ? parsed.field
+          : undefined;
+      if (fieldOnForm) {
+        form.setError(fieldOnForm, { message: parsed.message });
+        showFormErrors([{ field: fieldOnForm, message: parsed.message }]);
+      } else {
+        toast.error(parsed.message);
+      }
       log.error("Form submission error:", JSON.stringify(err, null, 2));
     } finally {
       toast.dismiss(loadingId);
@@ -847,22 +1135,62 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
   const displayData = (data || ({} as T)) as T;
 
+  // Dispatch an action's effect (page-level onAction override, then state
+  // transition or custom handler). Only called once any confirm /
+  // transition-fields gate has passed — use runAction for user-initiated
+  // clicks. `extraFields` carries values collected by the transition-fields
+  // dialog into the same UPDATE payload as the status flip.
+  const executeAction = (
+    action: EntityActionDef<T>,
+    extraFields?: Record<string, unknown>
+  ) => {
+    if (onAction && onAction(action.name, displayData)) return;
+    if (action.toState) {
+      if (transitionMutation.isPending) return;
+      transitionMutation.mutate({ toState: action.toState, extraFields });
+    } else {
+      action.handler?.(displayData);
+    }
+  };
+
   // Shared action dispatcher used by both visible header buttons and dropdown
   // items, so presentation differences never change behavior (delete dialog,
-  // onAction override, state transition vs. custom handler).
+  // transition-fields/confirm gates, onAction override, state transition vs.
+  // custom handler). The gates run BEFORE the onAction override so
+  // page-intercepted actions (e.g. calculate_landed_cost) are covered too.
   const runAction = (action: EntityActionDef<T>) => {
     if (action.disabledWhen?.(displayData)) return;
     if (action.name === "delete" && action.deleteMode) {
       setDeleteAction(action);
       return;
     }
-    if (onAction && onAction(action.name, displayData)) return;
-    if (action.toState) {
-      if (transitionMutation.isPending) return;
-      transitionMutation.mutate({ toState: action.toState });
-    } else {
-      action.handler?.(displayData);
+    // Framework Duplicate (EntityConfig.excludeOnDuplicate): stash the
+    // record's carry-over field values in the prefill store and open the
+    // create route, whose mount-time consume (storePrefill above) feeds them
+    // into the form defaults. Like delete, this is framework-owned — it
+    // bypasses the page-level onAction override. An entity-declared action
+    // named "duplicate" with its own handler still takes the normal path.
+    if (action.name === "duplicate" && !action.handler && entity.excludeOnDuplicate) {
+      usePrefillStore
+        .getState()
+        .setPrefill(
+          buildDuplicateDefaults(entity, displayData as Record<string, unknown>)
+        );
+      router.push(`${path}/new`);
+      return;
     }
+    // Transition-fields gate first: when an action declares both
+    // `transitionFields` and `confirm`, the fields dialog stands in for the
+    // plain confirm dialog (it is itself a confirmation step).
+    if (action.transitionFields?.length) {
+      setTransitionFieldsAction(action);
+      return;
+    }
+    if (action.confirm) {
+      setConfirmAction(action);
+      return;
+    }
+    executeAction(action);
   };
 
   return (
@@ -940,8 +1268,7 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
 
           {!editing &&
             !isCreateMode &&
-            (dropdownActions.length > 0 ||
-              (stateInfo && stateInfo.validTransitions.length > 0)) && (
+            (dropdownActions.length > 0 || rawTransitions.length > 0) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm">
@@ -950,15 +1277,29 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {stateInfo && stateInfo.validTransitions.length > 0 && (
+                  {rawTransitions.length > 0 && (
                     <>
-                      {stateInfo.validTransitions.map((toState) => {
+                      {rawTransitions.map((toState) => {
                         const display =
                           entity.stateMachine?.stateDisplay?.[toState];
+                        // A confirm- or transition-fields-gated action
+                        // targeting the same state stands in for the raw
+                        // transition, so its dialog (and onAction
+                        // interception) runs instead of a one-click bare
+                        // UPDATE into e.g. a terminal state.
+                        const confirmEquivalent = entity.actions?.find(
+                          (a) =>
+                            (a.confirm || a.transitionFields?.length) &&
+                            a.toState === toState
+                        );
                         return (
                           <DropdownMenuItem
                             key={toState}
                             onClick={() => {
+                              if (confirmEquivalent) {
+                                runAction(confirmEquivalent);
+                                return;
+                              }
                               if (transitionMutation.isPending) return;
                               transitionMutation.mutate({ toState });
                             }}
@@ -1102,6 +1443,52 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
         isRefreshing={conflictDialog.isRefreshing}
       />
 
+      {/* Action Confirmation Dialog (EntityActionDef.confirm) */}
+      {confirmAction && (
+        <EntityActionConfirmDialog
+          actionLabel={confirmAction.label}
+          recordTitle={String(
+            (displayData as Record<string, unknown>)[
+              entity.detailHeader?.title ?? "name"
+            ] ?? entity.displayName
+          )}
+          destructive={confirmAction.variant === "destructive"}
+          open={!!confirmAction}
+          onOpenChange={(open) => {
+            if (!open) setConfirmAction(null);
+          }}
+          onConfirm={() => {
+            const action = confirmAction;
+            setConfirmAction(null);
+            executeAction(action);
+          }}
+        />
+      )}
+
+      {/* Pre-Transition Fields Dialog (EntityActionDef.transitionFields) —
+          collected values ride in the same UPDATE as the status flip */}
+      {transitionFieldsAction?.transitionFields && (
+        <EntityTransitionFieldsDialog
+          actionLabel={transitionFieldsAction.label}
+          recordTitle={String(
+            (displayData as Record<string, unknown>)[
+              entity.detailHeader?.title ?? "name"
+            ] ?? entity.displayName
+          )}
+          fields={transitionFieldsAction.transitionFields}
+          record={displayData}
+          open={!!transitionFieldsAction}
+          onOpenChange={(open) => {
+            if (!open) setTransitionFieldsAction(null);
+          }}
+          onSubmit={(values) => {
+            const action = transitionFieldsAction;
+            setTransitionFieldsAction(null);
+            executeAction(action, values);
+          }}
+        />
+      )}
+
       {/* Entity Delete Dialog */}
       {deleteAction?.deleteMode && (
         <EntityDeleteDialog
@@ -1124,8 +1511,9 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             queryClient.invalidateQueries({
               queryKey: entityKeys.all(entity.table),
             });
-            const listPath = backUrl ?? basePath ?? `/${entity.domain}/${entity.table.replace(/_/g, "-")}`;
-            router.push(listPath);
+            // `path` already factors in the basePath prop, the entity
+            // config's basePath, and the conventional derivation.
+            router.push(backUrl ?? path);
           }}
         />
       )}
@@ -1162,10 +1550,34 @@ function UnifiedTabsWithRelations<T>({
   optionsMap: Record<string, { value: string; label: string }[]>;
   disabledFields?: string[];
 }) {
-  const [activeTab, setActiveTab] = useState("details");
+  // Deep-linking: `?tab=` selects the initial tab (a section tab name or a
+  // relation name, e.g. ?tab=order_items); unknown values fall back to
+  // "details". Read once on mount — the post-create redirect lands on a new
+  // route, so the param is picked up by the fresh mount there.
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() =>
+    resolveInitialTab(searchParams.get("tab"), [
+      ...tabs.map(([tabName]) => tabName),
+      ...relationTabs.map((rel) => rel.name),
+    ])
+  );
+
+  // Reflect tab changes back into the URL so the current tab survives
+  // refresh/share. history.replaceState avoids a router navigation (Next.js
+  // syncs useSearchParams from native history updates).
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value);
+    const url = new URL(window.location.href);
+    if (value === "details") {
+      url.searchParams.delete("tab");
+    } else {
+      url.searchParams.set("tab", value);
+    }
+    window.history.replaceState(null, "", url);
+  }, []);
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab}>
+    <Tabs value={activeTab} onValueChange={handleTabChange}>
       <TabsList>
         <TabsTrigger value="details">Details</TabsTrigger>
         {tabs.map(([tabName]) => (
@@ -1339,18 +1751,7 @@ function UnifiedSectionCard<T>({
 // Shared Field Grid - renders a list of UnifiedField items in a 12-col grid
 // =============================================================================
 
-/** Renders a `dl` grid of UnifiedField elements. Shared across section variants. */
-function FieldGrid<T>({
-  fields,
-  data,
-  entity,
-  editing,
-  isCreateMode,
-  form,
-  optionsMap = {},
-  disabledFields,
-  relationDisplayValues,
-}: {
+type FieldGridProps<T> = {
   fields: UnifiedFieldDef<T>[] | undefined;
   data: T;
   entity: EntityConfig<T>;
@@ -1360,7 +1761,58 @@ function FieldGrid<T>({
   optionsMap?: Record<string, { value: string; label: string }[]>;
   disabledFields?: string[];
   relationDisplayValues: Record<string, string>;
-}) {
+};
+
+/**
+ * Renders a `dl` grid of UnifiedField elements. Shared across section
+ * variants. Field-level `showWhen` is evaluated here: in edit/create mode
+ * against live form values (LiveShowWhenFieldGrid subscribes via useWatch so
+ * visibility reacts to in-form changes, e.g. keg-transaction state selects
+ * appearing only for the types that need them); in view mode against the
+ * loaded record. Hidden fields are not rendered at all.
+ */
+function FieldGrid<T>(props: FieldGridProps<T>) {
+  const { fields, data, editing, form } = props;
+  const hasConditionalFields = !!fields?.some((f) => f.showWhen);
+
+  if (hasConditionalFields && editing && form) {
+    return <LiveShowWhenFieldGrid {...props} form={form} />;
+  }
+
+  const visibleFields = hasConditionalFields
+    ? fields?.filter((f) => isFieldVisible(f, data as Partial<T>))
+    : fields;
+  return <FieldGridDl {...props} fields={visibleFields} />;
+}
+
+/**
+ * Edit/create-mode FieldGrid for sections containing `showWhen` fields.
+ * Split out so the useWatch subscription (which re-renders on every form
+ * value change) only exists when a section actually has conditional fields
+ * and a form to watch.
+ */
+function LiveShowWhenFieldGrid<T>(
+  props: FieldGridProps<T> & { form: UseFormReturn<Record<string, unknown>> }
+) {
+  const liveValues = useWatch({ control: props.form.control });
+  const visibleFields = props.fields?.filter((f) =>
+    isFieldVisible(f, liveValues as Partial<T>)
+  );
+  return <FieldGridDl {...props} fields={visibleFields} />;
+}
+
+/** Bare `dl` renderer shared by both FieldGrid variants (fields pre-filtered). */
+function FieldGridDl<T>({
+  fields,
+  data,
+  entity,
+  editing,
+  isCreateMode,
+  form,
+  optionsMap = {},
+  disabledFields,
+  relationDisplayValues,
+}: FieldGridProps<T>) {
   return (
     <dl className="grid grid-cols-12 gap-4">
       {fields?.map((field) => {
@@ -1545,6 +1997,14 @@ function InlineFieldSection<T>({
 // Relation Table (renders related entity records in a tabular format)
 // =============================================================================
 
+/**
+ * Generic table for a hasMany relation tab. Routes are resolved through
+ * `resolveEntityBasePath` (the shared resolver, same as detail pages and
+ * breadcrumbs): the "Add" link points at `{base}/new?{foreignKey}={parentId}`
+ * so the create form pre-fills the parent (see EntityDetailPage), and rows
+ * navigate to `{base}/{id}`. When the related entity has no standalone routes
+ * (`basePath: null`), the Add link is suppressed and rows are not clickable.
+ */
 function RelationTable({
   relation,
   parentId,
@@ -1555,6 +2015,7 @@ function RelationTable({
   enabled?: boolean;
 }) {
   const supabase = createClient();
+  const router = useRouter();
   const relatedEntity = entityRegistry.get(relation.entity);
 
   const {
@@ -1622,16 +2083,18 @@ function RelationTable({
     (col) => col.accessorKey && col.accessorKey !== relation.foreignKey
   );
 
-  const routeName = relatedEntity.name.replace(/_/g, "-");
+  // Null when the related entity is inline-only (no standalone routes):
+  // disables both the Add link and row navigation.
+  const relatedBasePath = resolveEntityBasePath(relatedEntity);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{relation.detailTab}</CardTitle>
-        {!relation.hideAdd && (
+        {!relation.hideAdd && relatedBasePath && (
           <Button size="sm" variant="outline" asChild>
             <Link
-              href={`/${relatedEntity.domain}/${routeName}s/new?${relation.foreignKey}=${parentId}`}
+              href={`${relatedBasePath}/new?${relation.foreignKey}=${parentId}`}
               aria-label={`Add new ${relatedEntity.displayName.toLowerCase()}`}
             >
               Add
@@ -1668,8 +2131,42 @@ function RelationTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((item: Record<string, unknown>) => (
-                <TableRow key={item.id as string}>
+              {items.map((item: Record<string, unknown>) => {
+                // Rows navigate to the related record's detail page —
+                // mirrors handleRowClick in entity-data-table.tsx. Only
+                // enabled when the target entity has a resolvable route.
+                const rowHref = relatedBasePath
+                  ? `${relatedBasePath}/${item.id}`
+                  : null;
+                return (
+                <TableRow
+                  key={item.id as string}
+                  className={rowHref ? "cursor-pointer" : undefined}
+                  tabIndex={rowHref ? 0 : undefined}
+                  onClick={
+                    rowHref
+                      ? (e) => {
+                          // Ignore clicks on interactive elements in cells
+                          if ((e.target as HTMLElement).closest("a, button"))
+                            return;
+                          router.push(rowHref);
+                        }
+                      : undefined
+                  }
+                  onKeyDown={
+                    rowHref
+                      ? (e) => {
+                          if (
+                            e.key === "Enter" &&
+                            e.target === e.currentTarget
+                          ) {
+                            e.preventDefault();
+                            router.push(rowHref);
+                          }
+                        }
+                      : undefined
+                  }
+                >
                   {columns.map((col, colIdx) => {
                     const key = col.accessorKey;
                     if (!key)
@@ -1700,7 +2197,8 @@ function RelationTable({
                     );
                   })}
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

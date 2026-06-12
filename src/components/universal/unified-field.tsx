@@ -4,6 +4,10 @@
  * Renders a field in either view mode (FieldDisplay) or edit mode (FieldInput)
  * based on editing state and field editability. Bridges react-hook-form's
  * Controller to FieldInput's value/onChange/error interface.
+ *
+ * Conditional visibility (UnifiedFieldDef.showWhen) is evaluated upstream in
+ * FieldGrid (entity-detail-unified.tsx): hidden fields are never passed here,
+ * so this component only decides HOW a visible field renders, not WHETHER.
  */
 
 "use client";
@@ -30,15 +34,32 @@ type UnifiedFieldProps = {
  * A field is editable when: editing is on, the field has a type,
  * it is not explicitly non-editable, and create-only fields are
  * only editable during creation.
+ *
+ * State-machine state fields (entity.stateMachine.stateField) are locked
+ * when editing an existing record: status changes must go through the
+ * guarded transition path (Actions menu), which validates the transition
+ * and runs side effects — a plain form save does neither. Create mode is
+ * untouched so initial-state selection still works.
+ *
+ * Exported for the entity-registry test that asserts every state field is
+ * covered by this lock (src/entities/__tests__/state-field-lock.test.ts).
  */
-function isFieldEditable(
+export function isFieldEditable(
   field: UnifiedFieldDef<Record<string, unknown>>,
   editing: boolean,
   isCreateMode: boolean,
+  entity?: EntityConfig<Record<string, unknown>>,
 ): boolean {
   if (!editing || !field.type) return false;
   if (field.editable === false) return false;
   if (field.editable === "create-only" && !isCreateMode) return false;
+  if (
+    !isCreateMode &&
+    entity?.stateMachine &&
+    field.name === entity.stateMachine.stateField
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -52,7 +73,7 @@ export function UnifiedField({
   relationDisplayValues,
   dynamicOptions,
 }: UnifiedFieldProps) {
-  if (isFieldEditable(field, editing, isCreateMode) && form) {
+  if (isFieldEditable(field, editing, isCreateMode, entity) && form) {
     return (
       <Controller
         control={form.control}

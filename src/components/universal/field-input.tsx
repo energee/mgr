@@ -11,6 +11,12 @@
  * property names for edit-mode fields (name, label, type, required, colSpan,
  * placeholder, description, disabled, options, dynamicOptions, relation,
  * unitType).
+ *
+ * Relation fields get an inline quick-create "+" button automatically when
+ * the target entity is master data (see QUICK_CREATE_ENTITIES in
+ * quick-create-dialog.tsx). An explicit `field.quickCreate` component takes
+ * precedence; `disableQuickCreate` suppresses the button entirely (used by
+ * QuickCreateDialog itself to prevent nested quick-creates).
  */
 
 "use client";
@@ -38,9 +44,11 @@ import {
 } from "@/components/ui/combobox";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { UnitInput } from "@/components/ui/unit-input";
+import { useNumericInput } from "@/hooks/use-numeric-input";
 import { X } from "lucide-react";
 import { useState, useEffect, useMemo, type FC } from "react";
 import { getColSpanClass } from "./field-utils";
+import { QuickCreateButton, isQuickCreateEntity } from "./quick-create-dialog";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -98,6 +106,13 @@ export type FieldInputProps = {
 
   /** Dynamic/relation options fetched by useDynamicOptions */
   dynamicOptions?: { value: string; label: string }[];
+
+  /**
+   * Suppress the inline quick-create "+" button on relation fields (both the
+   * auto-attached master-data button and any explicit field.quickCreate).
+   * Used inside QuickCreateDialog to prevent nested quick-creates.
+   */
+  disableQuickCreate?: boolean;
 }
 
 // =============================================================================
@@ -111,6 +126,7 @@ export function FieldInput({
   onChange,
   disabled,
   dynamicOptions,
+  disableQuickCreate,
 }: FieldInputProps) {
   // Build aria-describedby from present elements
   const describedByParts: string[] = [];
@@ -138,7 +154,7 @@ export function FieldInput({
       </Label>
 
       <div className="mt-1.5">
-        {renderFieldInput(field, value, onChange, disabled, dynamicOptions, ariaProps)}
+        {renderFieldInput(field, value, onChange, disabled, dynamicOptions, ariaProps, disableQuickCreate)}
       </div>
 
       {field.description && (
@@ -166,7 +182,8 @@ export function renderFieldInput(
   onChange: (value: unknown) => void,
   disabled?: boolean,
   dynamicOptions?: { value: string; label: string }[],
-  ariaProps?: FieldAriaProps
+  ariaProps?: FieldAriaProps,
+  disableQuickCreate?: boolean
 ) {
   switch (field.type) {
     case "text":
@@ -196,15 +213,13 @@ export function renderFieldInput(
 
     case "number":
       return (
-        <Input
+        <NumberFieldInput
           id={field.name}
-          type="text"
-          inputMode="decimal"
-          value={value !== undefined && value !== null ? String(value) : ""}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+          value={value}
+          onChange={onChange}
           placeholder={field.placeholder}
           disabled={disabled}
-          {...ariaProps}
+          ariaProps={ariaProps}
         />
       );
 
@@ -269,7 +284,13 @@ export function renderFieldInput(
 
     case "relation": {
       const options = dynamicOptions || [];
+      // Explicit per-field quickCreate component wins; otherwise auto-attach
+      // the generic QuickCreateButton for master-data target entities.
       const QuickCreate = field.quickCreate;
+      const autoQuickCreateEntity =
+        !QuickCreate && isQuickCreateEntity(field.relation?.entity)
+          ? field.relation!.entity
+          : null;
       return (
         <div className="flex items-start gap-1.5">
           <RelationCombobox
@@ -282,8 +303,15 @@ export function renderFieldInput(
             onChange={onChange}
             ariaProps={ariaProps}
           />
-          {QuickCreate && !disabled && (
-            <QuickCreate onCreated={(id) => onChange(id)} />
+          {!disabled && !disableQuickCreate && (
+            QuickCreate ? (
+              <QuickCreate onCreated={(id) => onChange(id)} />
+            ) : autoQuickCreateEntity ? (
+              <QuickCreateButton
+                entityName={autoQuickCreateEntity}
+                onCreated={(id) => onChange(id)}
+              />
+            ) : null
           )}
         </div>
       );
@@ -328,16 +356,15 @@ export function renderFieldInput(
     case "unit":
       if (!field.unitType) {
         log.warn(`Field ${field.name} has type "unit" but no unitType specified`);
+        // Fall back to a plain number input when no unitType is configured.
         return (
-          <Input
+          <NumberFieldInput
             id={field.name}
-            type="text"
-            inputMode="decimal"
-            value={value !== undefined && value !== null ? String(value) : ""}
-            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+            value={value}
+            onChange={onChange}
             placeholder={field.placeholder}
             disabled={disabled}
-            {...ariaProps}
+            ariaProps={ariaProps}
           />
         );
       }
@@ -365,6 +392,55 @@ export function renderFieldInput(
         />
       );
   }
+}
+
+// =============================================================================
+// NumberFieldInput — raw-string editing for number fields
+// =============================================================================
+
+/**
+ * Number input that keeps the raw typed string in local state (via
+ * useNumericInput) so in-progress entries like "-", ".", or "1.05" are never
+ * reformatted or rendered as "NaN" by controlled re-renders. Commits a finite
+ * number on every parseable keystroke and undefined for empty/in-progress
+ * text; the visible text resyncs from the form value only while unfocused.
+ */
+function NumberFieldInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  ariaProps,
+}: {
+  id: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  ariaProps?: FieldAriaProps;
+}) {
+  const { text, handleTextChange, handleFocus, handleBlur } = useNumericInput({
+    formattedValue: value !== undefined && value !== null ? String(value) : "",
+    // Number fields use undefined (not null) for "no value" to match the
+    // optional-number zod schemas used by entity forms.
+    onCommit: (parsed) => onChange(parsed ?? undefined),
+  });
+
+  return (
+    <Input
+      id={id}
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={(e) => handleTextChange(e.target.value)}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      placeholder={placeholder}
+      disabled={disabled}
+      {...ariaProps}
+    />
+  );
 }
 
 // =============================================================================

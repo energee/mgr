@@ -231,13 +231,19 @@ export function buildSelectColumn<T>(): ColumnDef<T, unknown> {
 
 /**
  * Creates the row actions dropdown column (View, state transitions, custom actions).
+ *
+ * Actions with `confirm: true` are routed through `onConfirmRequired` instead
+ * of dispatching directly — the caller (entity-data-table) owns the shared
+ * EntityActionConfirmDialog and re-dispatches on confirm, mirroring the
+ * onDelete/setDeleteTarget plumbing.
  */
 export function buildActionsColumn<T>(
   entity: EntityConfig<T>,
   basePath: string,
   onAction?: (actionName: string, record: T) => boolean,
   onTransition?: (id: string, toState: string) => void,
-  onDelete?: (record: T, action: EntityActionDef<T>) => void
+  onDelete?: (record: T, action: EntityActionDef<T>) => void,
+  onConfirmRequired?: (record: T, action: EntityActionDef<T>) => void
 ): ColumnDef<T, unknown> {
   return {
     id: "actions",
@@ -273,6 +279,12 @@ export function buildActionsColumn<T>(
                     if (disabledReason) return;
                     if (action.name === "delete" && action.deleteMode && onDelete) {
                       onDelete(record, action);
+                      return;
+                    }
+                    // Confirm gate runs BEFORE the onAction override so
+                    // page-intercepted actions are covered too.
+                    if (action.confirm && onConfirmRequired) {
+                      onConfirmRequired(record, action);
                       return;
                     }
                     if (onAction && onAction(action.name, record)) {

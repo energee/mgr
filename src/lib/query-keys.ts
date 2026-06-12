@@ -159,6 +159,10 @@ export const orderKeys = {
   detail: (id: string) => ["orders", id] as const,
   items: (id: string) => ["orders", id, "items"] as const,
   allocations: (id: string) => ["order-allocations", id] as const,
+  /** Per-lot planned/completed allocations with brand/format — used by the
+   *  allocation dialog's remaining-to-allocate math. Nested under
+   *  allocations(id) so invalidating the list also refreshes this. */
+  allocatedLots: (id: string) => ["order-allocations", id, "lots"] as const,
   pickList: (id: string, subKey?: string) =>
     subKey
       ? (["order-pick-list", id, subKey] as const)
@@ -184,7 +188,11 @@ export const changeRequestKeys = {
 export const inventoryKeys = {
   all: () => ["inventory"] as const,
   items: () => ["inventory", "items"] as const,
+  /** Per-item on-hand totals (sum of lot remaining quantities) for the items list. */
+  itemOnHand: () => ["inventory", "items", "on-hand"] as const,
   lots: () => ["inventory", "lots"] as const,
+  /** Lot options (incl. zero-remaining lots) for the guided count/adjust dialog. */
+  countLots: () => ["inventory", "lots", "count-options"] as const,
   allocations: () => ["allocations"] as const,
   summary: () => ["inventory", "summary"] as const,
   overview: () => ["inventory-overview"] as const,
@@ -393,6 +401,8 @@ export const supplierKeys = {
     filters ? (["suppliers", "list", filters] as const) : (["suppliers", "list"] as const),
   active: () => ["suppliers", "active"] as const,
   detail: (id: string) => ["suppliers", id] as const,
+  /** supplier_catalog rows for one supplier (Catalog Items tab) */
+  catalog: (supplierId: string) => ["suppliers", supplierId, "catalog"] as const,
 };
 
 // =============================================================================
@@ -661,6 +671,19 @@ export const transferKeys = {
       : (["transfers", "list"] as const),
   detail: (id: string) => ["transfers", id] as const,
   lines: (transferId: string) => ["transfers", transferId, "lines"] as const,
+  /**
+   * TransferLinesEditor's view of a transfer's lines (includes
+   * quantity_shipped). Nested under lines() so existing
+   * `invalidateQueries(transferKeys.lines(id))` calls cover it.
+   */
+  linesEdit: (transferId: string) =>
+    ["transfers", transferId, "lines", "edit"] as const,
+  /**
+   * Items physically present in a transfer's from-bin (finished goods +
+   * inventory lots), used to populate the line-item picker.
+   */
+  sourceItems: (binId: string) =>
+    ["transfers", "source-items", binId] as const,
 };
 
 // =============================================================================
@@ -773,6 +796,9 @@ export const mongodbKeys = {
 export const poReceiveKeys = {
   all: () => ["po-receives"] as const,
   unaccepted: (poId: string) => ["po-receives", "unaccepted", poId] as const,
+  /** Most-recent catalog→inventory-item/bin mappings from prior accepted
+   *  lots, used to prefill the accept dialog */
+  mappingDefaults: () => ["po-receives", "mapping-defaults"] as const,
 };
 
 // =============================================================================
@@ -780,7 +806,11 @@ export const poReceiveKeys = {
 // =============================================================================
 
 export const onboardingKeys = {
-  /** Counts of key entities for the getting-started checklist */
+  /**
+   * Counts of key entities for the getting-started checklist
+   * (production track: locations/recipes/batches; sales track:
+   * brands/containers/selling formats/pricing tiers/customers).
+   */
   counts: () => ["onboarding", "counts"] as const,
 };
 
@@ -794,4 +824,21 @@ export const emailKeys = {
     filters
       ? (["email", "send-history", filters] as const)
       : (["email", "send-history"] as const),
+};
+
+// =============================================================================
+// Global Search Keys (cmd+K command palette record search)
+// =============================================================================
+
+export const globalSearchKeys = {
+  /** All palette record-search queries */
+  all: () => ["global-search"] as const,
+
+  /**
+   * One record search: the debounced term plus the (permission-filtered) set
+   * of entity names searched, so users with different roles never share
+   * cached results.
+   */
+  results: (term: string, entityNames: readonly string[]) =>
+    ["global-search", term, entityNames] as const,
 };

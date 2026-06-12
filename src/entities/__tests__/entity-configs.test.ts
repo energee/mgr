@@ -4,10 +4,16 @@
  * Validates that all registered entity configurations are structurally correct.
  * Catches misconfigurations (missing fields, invalid state machine references,
  * duplicate names, etc.) at test time rather than runtime.
+ *
+ * Also validates entity routes against the actual app router tree under
+ * src/app/(app): resolved base paths, relation-tab "Add" links, and
+ * relation-row detail links must all point at existing page.tsx files.
  */
 
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import type { EntityConfig } from "@/types/entity";
+import type { EntityConfig, EntityRelationDef } from "@/types/entity";
 
 // Mock the Supabase client to avoid env var requirements during import.
 // Several entity configs transitively import components that call createClient()
@@ -20,7 +26,7 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
-import { entityRegistry } from "@/types/entity";
+import { entityRegistry, resolveEntityBasePath } from "@/types/entity";
 
 // Import the entity registry module to trigger registration of all entities
 import "@/entities/index";
@@ -635,6 +641,108 @@ describe("Entity configs: searchableFields", () => {
         ).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+// =============================================================================
+// Routes: resolved entity paths must exist in the app router tree
+// =============================================================================
+
+/** Root of the (app) route group — the source of truth for entity routes. */
+const APP_ROUTES_DIR = resolve(__dirname, "../../app/(app)");
+
+/** True when a page.tsx exists for the given URL path under src/app/(app). */
+function pageExists(urlPath: string): boolean {
+  const segments = urlPath.split("/").filter(Boolean);
+  return existsSync(join(APP_ROUTES_DIR, ...segments, "page.tsx"));
+}
+
+/**
+ * Relations rendered as generic RelationTable tabs on detail pages.
+ * Mirrors the relationTabs filter in entity-detail-unified.tsx.
+ */
+function renderedHasManyRelations(
+  entity: EntityConfig<Record<string, unknown>>
+): EntityRelationDef[] {
+  return (entity.relations ?? []).filter(
+    (rel) => rel.showInDetail && rel.detailTab && rel.type === "hasMany"
+  );
+}
+
+describe("Entity configs: routes", () => {
+  it("every entity with standalone routes resolves to an existing list page", () => {
+    const violations: string[] = [];
+    for (const entity of Array.from(entityRegistry.values())) {
+      const base = resolveEntityBasePath(entity);
+      if (base === null) continue; // inline-only entity (basePath: null)
+      if (!pageExists(base)) {
+        violations.push(
+          `${entity.name}: resolved base path '${base}' has no page.tsx — ` +
+            `set 'basePath' to the real route (or 'basePath: null' for inline-only entities)`
+        );
+      }
+    }
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+
+  it("every rendered hasMany relation 'Add' link resolves to an existing create route", () => {
+    const violations: string[] = [];
+    for (const entity of Array.from(entityRegistry.values())) {
+      for (const rel of renderedHasManyRelations(entity)) {
+        // Custom components own their UI; hideAdd suppresses the Add link.
+        if (rel.component || rel.hideAdd) continue;
+
+        const target = entityRegistry.get(rel.entity);
+        if (!target) {
+          violations.push(
+            `${entity.name}.relations['${rel.name}']: target entity '${rel.entity}' is not registered`
+          );
+          continue;
+        }
+
+        const base = resolveEntityBasePath(target);
+        if (base === null) {
+          violations.push(
+            `${entity.name}.relations['${rel.name}']: target '${rel.entity}' has no routes — set 'hideAdd: true'`
+          );
+          continue;
+        }
+
+        const createPath = `${base}/new`;
+        if (!pageExists(createPath)) {
+          violations.push(
+            `${entity.name}.relations['${rel.name}']: Add link '${createPath}' has no page.tsx — ` +
+              `fix 'basePath' on '${rel.entity}' or set 'hideAdd: true'`
+          );
+        }
+      }
+    }
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
+
+  it("every row-clickable relation target has a detail route", () => {
+    // RelationTable makes rows navigate to `${base}/${id}` whenever the
+    // target entity resolves a base path, so a [id] page must exist.
+    const violations: string[] = [];
+    for (const entity of Array.from(entityRegistry.values())) {
+      for (const rel of renderedHasManyRelations(entity)) {
+        if (rel.component) continue;
+
+        const target = entityRegistry.get(rel.entity);
+        if (!target) continue; // reported by the Add-link test above
+
+        const base = resolveEntityBasePath(target);
+        if (base === null) continue; // rows are non-clickable by design
+
+        if (!pageExists(`${base}/[id]`)) {
+          violations.push(
+            `${entity.name}.relations['${rel.name}']: row link '${base}/[id]' has no page.tsx — ` +
+              `fix 'basePath' on '${rel.entity}' or set 'basePath: null' to disable row navigation`
+          );
+        }
+      }
+    }
+    expect(violations, violations.join("\n")).toEqual([]);
   });
 });
 

@@ -78,6 +78,15 @@ type EntityMobileCardListProps = {
     record: Record<string, unknown>,
     action: EntityActionDef<Record<string, unknown>>,
   ) => void;
+  /**
+   * Open the shared action-confirmation dialog (EntityActionDef.confirm)
+   * for a record. Owned by entity-data-table (EntityActionConfirmDialog) so
+   * the desktop row menu and mobile cards share one dialog + dispatch path.
+   */
+  onConfirmAction?: (
+    record: Record<string, unknown>,
+    action: EntityActionDef<Record<string, unknown>>,
+  ) => void;
 }
 
 /**
@@ -115,6 +124,7 @@ export function EntityMobileCardList({
   onTransition,
   onAction,
   onDeleteAction,
+  onConfirmAction,
 }: EntityMobileCardListProps) {
   // ---- Determine which field to use as the card title ----
   const titleField =
@@ -225,6 +235,7 @@ export function EntityMobileCardList({
             onTransition={onTransition}
             onAction={onAction}
             onDeleteAction={onDeleteAction}
+            onConfirmAction={onConfirmAction}
           />
         );
       })}
@@ -267,6 +278,7 @@ function EntityMobileCard({
   onTransition,
   onAction,
   onDeleteAction,
+  onConfirmAction,
 }: {
   row: Record<string, unknown>;
   entity: EntityConfig<Record<string, unknown>>;
@@ -280,6 +292,10 @@ function EntityMobileCard({
   onTransition?: (id: string, toState: string) => Promise<void>;
   onAction?: (actionName: string, record: Record<string, unknown>) => boolean;
   onDeleteAction?: (
+    record: Record<string, unknown>,
+    action: EntityActionDef<Record<string, unknown>>,
+  ) => void;
+  onConfirmAction?: (
     record: Record<string, unknown>,
     action: EntityActionDef<Record<string, unknown>>,
   ) => void;
@@ -377,6 +393,12 @@ function EntityMobileCard({
                     if (disabledReason) return;
                     if (action.name === "delete" && action.deleteMode && onDeleteAction) {
                       onDeleteAction(row, action);
+                      return;
+                    }
+                    // Confirm gate runs BEFORE the onAction override so
+                    // page-intercepted actions are covered too.
+                    if (action.confirm && onConfirmAction) {
+                      onConfirmAction(row, action);
                       return;
                     }
                     if (onAction && onAction(action.name, row)) {

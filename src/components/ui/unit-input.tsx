@@ -6,6 +6,11 @@
  * An input field that handles unit conversion between user display units
  * and canonical storage units. Optionally shows an inline unit switcher.
  *
+ * While focused, the input holds the raw typed string (via useNumericInput)
+ * so controlled re-renders never round or reformat in-progress entries;
+ * formatSmartDecimal is applied only at rest (blur, external value change,
+ * or unit switch). Commits are always finite canonical numbers or null.
+ *
  * @see docs/MGR-SPECIFICATION.md Section 9 - Unit System
  */
 
@@ -20,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { formatSmartDecimal } from "@/lib/format";
+import { useNumericInput } from "@/hooks/use-numeric-input";
 import { useUnitPreferences } from "@/hooks/use-unit-preferences";
 import {
   getUnitOptions,
@@ -92,6 +98,8 @@ export function UnitInput({
   className,
   placeholder,
   disabled,
+  onFocus,
+  onBlur,
   ...props
 }: UnitInputProps) {
   const { data: prefs, isLoading: prefsLoading } = useUnitPreferences();
@@ -104,27 +112,24 @@ export function UnitInput({
   const globalUnit = prefs?.[preferenceKey] as AnyUnit | undefined;
   const displayUnit = localUnit ?? globalUnit ?? getDefaultUnit(unitType);
 
-  // Convert canonical value to display value
-  const displayValue = React.useMemo(() => {
+  // Convert canonical value to a formatted display string. Applied to the
+  // visible text only at resync points (blur, external change, unit switch) —
+  // never while the user is typing, so extra decimals survive keystrokes.
+  const formattedValue = React.useMemo(() => {
     if (value == null) return "";
     return formatSmartDecimal(toDisplayValue(value, unitType, displayUnit), decimals);
   }, [value, unitType, displayUnit, decimals]);
 
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-
-    if (inputValue === "" || inputValue === "-") {
-      onChange(null);
-      return;
-    }
-
-    const parsed = parseFloat(inputValue);
-    if (!isNaN(parsed)) {
-      const canonical = toCanonicalValue(parsed, unitType, displayUnit);
-      onChange(canonical);
-    }
-  };
+  const { text, handleTextChange, handleFocus, handleBlur } = useNumericInput({
+    formattedValue,
+    // A unit switch (inline switcher or global preference load) changes the
+    // displayed magnitude, so force a resync even while the input is focused.
+    resyncKey: displayUnit,
+    // Commit finite display numbers as canonical; in-progress strings like
+    // "-" or "." stay visible but commit null (never NaN).
+    onCommit: (parsed) =>
+      onChange(parsed == null ? null : toCanonicalValue(parsed, unitType, displayUnit)),
+  });
 
   // Handle unit change (inline switcher)
   const handleUnitChange = (newUnit: string) => {
@@ -148,8 +153,16 @@ export function UnitInput({
       <Input
         type="text"
         inputMode="decimal"
-        value={displayValue}
-        onChange={handleInputChange}
+        value={text}
+        onChange={(e) => handleTextChange(e.target.value)}
+        onFocus={(e) => {
+          handleFocus();
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          handleBlur();
+          onBlur?.(e);
+        }}
         placeholder={placeholder}
         disabled={disabled}
         className={cn("flex-1", className)}
