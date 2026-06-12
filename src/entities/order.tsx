@@ -6,9 +6,13 @@
  */
 
 import { z } from "zod";
+import { toast } from "sonner";
 import type { EntityConfig, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
+import { createClient } from "@/lib/supabase/client";
+import { parseUnknownError } from "@/lib/errors";
+import { duplicateOrder } from "@/components/domain/order/reorder";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
 import { OrderQuickLinks } from "@/components/domain/order/order-quick-links";
@@ -33,7 +37,15 @@ function OrderShippingMaterialsSection({ data }: { data: Order }) {
   return <OrderShippingMaterialsEditor orderId={data.id} />;
 }
 
-type Order = Database["public"]["Tables"]["orders"]["Row"];
+// Base type from orders table
+type OrderBase = Database["public"]["Tables"]["orders"]["Row"];
+
+// Extended type for list/detail reads: the entity reads from the
+// order_list_details view (migration 00185), which is orders.* plus the
+// joined customer name. Writes still target the orders base table.
+type Order = OrderBase & {
+  customer_name?: string | null;
+};
 
 // =============================================================================
 // Zod Schema
@@ -77,6 +89,13 @@ const orderStateMachine: StateMachineConfig<Order> = {
     fulfilled: { label: "Fulfilled", color: "success" },
     cancelled: { label: "Cancelled", color: "error" },
   },
+  // Scheduling must go through the schedule action so its transitionFields
+  // dialog captures scheduled_date — bulk/raw status flips into "scheduled"
+  // are suppressed (a scheduled order without a date is meaningless to
+  // production planning, which keys off COALESCE(scheduled_date, requested_date)).
+  requiresAction: {
+    scheduled: "schedule",
+  },
 };
 
 // Derive status options from state machine (single source of truth)
@@ -89,6 +108,9 @@ const statusOptions = statesAsOptions(orderStateMachine);
 export const orderEntity: EntityConfig<Order> = {
   name: "order",
   table: "orders",
+  // Reads come from this view (adds customer_name for list/kanban/search);
+  // all writes go to the orders base table.
+  viewTable: "order_list_details",
   displayName: "Order",
   displayNamePlural: "Orders",
   description: "Sales orders from draft through fulfillment",
@@ -101,6 +123,12 @@ export const orderEntity: EntityConfig<Order> = {
     {
       accessorKey: "order_number",
       header: "Order #",
+      sortable: true,
+    },
+    {
+      // Server-side sortable/searchable via the order_list_details view
+      accessorKey: "customer_name",
+      header: "Customer",
       sortable: true,
     },
     {
@@ -167,7 +195,7 @@ export const orderEntity: EntityConfig<Order> = {
   ],
 
   defaultSort: { column: "order_date", direction: "desc" },
-  searchableFields: ["order_number"],
+  searchableFields: ["order_number", "customer_name"],
 
   // ---------------------------------------------------------------------------
   // Detail View
@@ -182,15 +210,22 @@ export const orderEntity: EntityConfig<Order> = {
   // ---------------------------------------------------------------------------
   sections: [
     {
+      // hideOnCreate: links (e.g. Manage Allocations) build hrefs from
+      // data.id, which is undefined before the order exists.
       id: "quick-links",
       title: "Quick Actions",
       component: OrderQuickLinks,
+      hideOnCreate: true,
     },
     {
       id: "overview",
       title: "Overview",
       fields: [
         {
+          // Prefilled by sales/orders/new/page.tsx with the next ORD-YYYY-NNN
+          // suggestion from generate_next_order_number() (migration 00186).
+          // Stays editable; the orders_order_number_key UNIQUE constraint
+          // backstops concurrent suggestions.
           name: "order_number",
           label: "Order Number",
           type: "text",
@@ -217,11 +252,14 @@ export const orderEntity: EntityConfig<Order> = {
           colSpan: 6,
         },
         {
+          // Defaults to today on create (the answer ~95% of the time);
+          // editable for backdating. Sync function per buildDefaultValues.
           name: "order_date",
           label: "Order Date",
           type: "date",
           format: "date",
           required: true,
+          defaultValue: () => new Date().toISOString().split("T")[0],
           colSpan: 6,
         },
         {
@@ -239,6 +277,9 @@ export const orderEntity: EntityConfig<Order> = {
           colSpan: 4,
         },
         {
+          // Set by the orders BEFORE UPDATE trigger when status transitions
+          // to fulfilled (migration 00180) — the QBO invoice sync uses it as
+          // the invoice TxnDate, so it is never written client-side.
           name: "fulfilled_date",
           label: "Fulfilled Date",
           format: "date",
@@ -263,27 +304,36 @@ export const orderEntity: EntityConfig<Order> = {
       ],
     },
     {
+      // hideOnCreate: editor queries/persists rows keyed by order id, which
+      // doesn't exist yet (order creation is save-header-first, two-phase).
       id: "shipping-materials",
       title: "Shipping Materials",
       component: OrderShippingMaterialsSection,
       collapsible: true,
+      hideOnCreate: true,
     },
     {
+      // hideOnCreate: a brand-new order can't have change requests.
       id: "change-requests",
       title: "Change Requests",
       component: ChangeRequestReview,
       collapsible: true,
+      hideOnCreate: true,
     },
     {
+      // hideOnCreate: sync status only exists for persisted orders.
       id: "qbo-sync",
       title: "QuickBooks",
       component: createQBOSyncDisplay("order"),
+      hideOnCreate: true,
     },
     {
+      // hideOnCreate: no revisions before the first save.
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("orders"),
       collapsible: true,
+      hideOnCreate: true,
     },
   ],
 
@@ -303,6 +353,10 @@ export const orderEntity: EntityConfig<Order> = {
   kanbanConfig: {
     titleField: "order_number",
     cardFields: [
+      // customer_name comes from the order_list_details view — kanban cards
+      // read raw record fields (no relation resolution), so the view field
+      // is required here rather than a customer_id relation column.
+      { field: "customer_name", label: "Customer" },
       { field: "order_date", label: "Ordered", format: "date" },
       { field: "requested_date", label: "Requested", format: "date" },
     ],
@@ -327,6 +381,17 @@ export const orderEntity: EntityConfig<Order> = {
       type: "button",
       fromStates: ["confirmed"],
       toState: "scheduled",
+      // Collect the delivery date in a pre-transition dialog; written in the
+      // same UPDATE as the status flip (defaults to the requested date)
+      transitionFields: [
+        {
+          name: "scheduled_date",
+          label: "Scheduled Delivery Date",
+          type: "date",
+          required: true,
+          defaultValue: (order) => order.requested_date,
+        },
+      ],
     },
     {
       name: "start_picking",
@@ -345,12 +410,40 @@ export const orderEntity: EntityConfig<Order> = {
       toState: "packed",
     },
     {
+      // fulfilled_date is stamped by the orders BEFORE UPDATE trigger
+      // (migration 00180), atomic with this status flip — no client write.
       name: "fulfill",
       label: "Mark Fulfilled",
       icon: "truck",
       type: "button",
       fromStates: ["packed"],
       toState: "fulfilled",
+    },
+    {
+      // Duplicate Order / Reorder. Orders can't use the framework Duplicate
+      // action (EntityConfig.excludeOnDuplicate → prefilled /new form):
+      // line items live in the order_items child table, which is only
+      // editable post-create. This handler instead inserts a complete draft
+      // copy (header + items, unit prices re-resolved at current tier
+      // pricing via get_price_for_customer) and navigates to it. No
+      // fromStates: reordering fulfilled/cancelled orders is the point.
+      // See src/components/domain/order/reorder.ts.
+      name: "duplicate",
+      label: "Duplicate Order",
+      icon: "copy",
+      type: "dropdown",
+      confirm: true,
+      handler: async (order) => {
+        try {
+          const { id, orderNumber } = await duplicateOrder(createClient(), order.id);
+          toast.success(`Draft order ${orderNumber} created`);
+          // Entity configs run outside React (no client router); a full-page
+          // navigation also guarantees fresh queries for the new draft.
+          window.location.assign(`/sales/orders/${id}`);
+        } catch (err) {
+          toast.error(parseUnknownError(err).message);
+        }
+      },
     },
     {
       name: "cancel",
@@ -391,6 +484,9 @@ export const orderEntity: EntityConfig<Order> = {
       foreignKey: "order_id",
       showInDetail: true,
       detailTab: "Pick Lists",
+      // No /sales/pick-lists/new route — pick lists are generated from the
+      // order detail page's Pick List action.
+      hideAdd: true,
     },
     {
       name: "delivery",

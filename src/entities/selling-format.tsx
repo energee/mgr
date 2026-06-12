@@ -54,6 +54,7 @@ export const sellingFormatEntity: EntityConfig<SellingFormat> = {
   displayNamePlural: "Selling Formats",
   description: "How a container is grouped for sale — single, 4-pack, case, per keg.",
   domain: "inventory",
+  basePath: "/settings/selling-formats",
 
   // ---------------------------------------------------------------------------
   // List View

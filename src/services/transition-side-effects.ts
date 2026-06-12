@@ -17,7 +17,9 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { QueryClient } from "@tanstack/react-query";
 import type { Database } from "@/types/supabase";
+import { entityKeys } from "@/lib/query-keys";
 import {
   completeBatchConsumption,
   consumePackagingMaterials,
@@ -42,12 +44,19 @@ export type TransitionSideEffectResult = {
  * `toState`. Call this AFTER the state UPDATE has succeeded, passing only
  * the ids that actually transitioned. Never throws — failures are collected
  * into `result.error` as a toast-ready message.
+ *
+ * `queryClient` is optional: side effects that mutate a DIFFERENT table than
+ * the one being transitioned (e.g. pick_lists → orders status sync) use it to
+ * invalidate the other table's caches so its pages don't show a stale status
+ * for the 2-minute default staleTime. Callers that don't pass it still get
+ * the database writes; the cross-entity caches refresh on the next refetch.
  */
 export async function runTransitionSideEffects(
   supabase: Client,
   table: string,
   ids: string[],
-  toState: string
+  toState: string,
+  queryClient?: QueryClient
 ): Promise<TransitionSideEffectResult> {
   const result: TransitionSideEffectResult = { error: null, completedAllocations: 0 };
 
@@ -86,6 +95,49 @@ export async function runTransitionSideEffects(
     }
     if (failures.length > 0) {
       result.error = `Session completed, but material depletion failed: ${[...new Set(failures)].join("; ")}`;
+    }
+  }
+
+  // pick_lists → in_progress / completed: keep the parent order's status in
+  // step with picking work (audit S3 — previously the same fact had to be
+  // entered twice). Starting a pick list moves its order scheduled → picking;
+  // completing one moves it picking → packed. Both UPDATEs are status-guarded
+  // (.eq) so they are idempotent AND can never trip the server-side
+  // transition validator (migration 00143): e.g. a pick list generated while
+  // the order is still "confirmed" (order-quick-links allows this) matches 0
+  // rows — a harmless no-op instead of a confirmed → picking check_violation.
+  // order_id is looked up from the pick_lists rows because the registry only
+  // receives ids.
+  if (table === "pick_lists" && (toState === "in_progress" || toState === "completed")) {
+    const sync =
+      toState === "in_progress"
+        ? { from: "scheduled", to: "picking" }
+        : { from: "picking", to: "packed" };
+
+    const { data: lists, error: fetchError } = await supabase
+      .from("pick_lists")
+      .select("order_id")
+      .in("id", ids);
+
+    if (fetchError) {
+      result.error = `Pick list updated, but syncing the order status failed: ${fetchError.message}`;
+    } else {
+      const orderIds = [...new Set((lists ?? []).map((l) => l.order_id).filter(Boolean))];
+      if (orderIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from("orders")
+          .update({ status: sync.to })
+          .in("id", orderIds)
+          .eq("status", sync.from);
+
+        if (updateError) {
+          result.error = `Pick list updated, but syncing the order status failed: ${updateError.message}`;
+        } else {
+          // Orders were (possibly) touched — refresh their caches so list and
+          // detail pages reflect the synced status immediately.
+          void queryClient?.invalidateQueries({ queryKey: entityKeys.all("orders") });
+        }
+      }
     }
   }
 

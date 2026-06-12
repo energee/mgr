@@ -41,6 +41,7 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
   displayNamePlural: "Pricing Tiers",
   description: "Tier definitions for the pricing matrix",
   domain: "sales",
+  basePath: "/settings/pricing/tiers",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -127,6 +128,8 @@ export const pricingTierEntity: EntityConfig<PricingTier> = {
       foreignKey: "pricing_tier_id",
       showInDetail: true,
       detailTab: "Prices",
+      // Prices have no create route — managed via the /settings/pricing matrix.
+      hideAdd: true,
     },
     {
       name: "recipes",

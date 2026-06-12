@@ -8837,6 +8837,77 @@ export type Database = {
           },
         ]
       }
+      order_list_details: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          customer_name: string | null
+          delivery_id: string | null
+          fulfilled_date: string | null
+          id: string | null
+          is_export: boolean | null
+          notes: string | null
+          order_date: string | null
+          order_number: string | null
+          requested_date: string | null
+          scheduled_date: string | null
+          shipping_address: Json | null
+          status: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balance_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_revenue_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_with_order_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries_with_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_status_counts: {
         Row: {
           count: number | null
@@ -10044,6 +10115,9 @@ export type Database = {
         Returns: undefined
       }
       generate_lot_number: { Args: { p_date: string }; Returns: string }
+      // Hand-added for migration 00186 (generate_next_order_number) pending
+      // type regeneration — matches the generated Args/Returns shape.
+      generate_next_order_number: { Args: never; Returns: string }
       generate_pick_list: { Args: { p_order_id: string }; Returns: string }
       get_ai_schema_context: { Args: { p_domain?: string }; Returns: Json }
       get_enum_default: { Args: { p_enum_type: string }; Returns: string }
@@ -10237,6 +10311,12 @@ export type Database = {
           p_transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
         }
         Returns: string
+      }
+      // Hand-added for migration 00184 (revise_packaging_session) pending
+      // type regeneration — matches the generated Args/Returns shape.
+      revise_packaging_session: {
+        Args: { p_items: Json; p_reason?: string; p_session_id: string }
+        Returns: Json
       }
       ship_transfer_partial: {
         Args: { p_line_quantities: Json; p_transfer_id: string }

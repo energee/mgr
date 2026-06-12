@@ -46,6 +46,7 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
   displayNamePlural: "Sales Channels",
   description: "Sales channel categories for customer pricing",
   domain: "sales",
+  basePath: "/settings/sales-channels",
 
   // ---------------------------------------------------------------------------
   // List View
@@ -185,6 +186,8 @@ export const salesChannelEntity: EntityConfig<SalesChannel> = {
       foreignKey: "sales_channel_id",
       showInDetail: true,
       detailTab: "Prices",
+      // Prices have no create route — managed via the /settings/pricing matrix.
+      hideAdd: true,
     },
     {
       name: "customers",

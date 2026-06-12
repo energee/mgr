@@ -11,6 +11,9 @@
  * - Shows price source (tier name badge when auto-priced)
  * - Manual price override support
  * - Uses unified selling_format_id (containers + selling_formats model)
+ * - Qty/price edits on existing rows are buffered locally and committed on
+ *   blur/Enter (one write + one shipping-materials recalc per edit, not per
+ *   keystroke); invalid input reverts to the saved value
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -49,6 +52,10 @@ import { toast } from "sonner";
 import { orderKeys, finishedGoodKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners, formatVolumeLabel } from "@/hooks/use-catalog";
 import { useCalculateOrderMaterials } from "@/hooks/use-material-planning";
+import {
+  parseItemFieldEdit,
+  type EditableItemField,
+} from "@/components/domain/order/order-item-edit-utils";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
@@ -191,6 +198,14 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   // New item form state
   const [newItem, setNewItem] = useState<NewItemState>({ ...EMPTY_NEW_ITEM });
   const [showAddRow, setShowAddRow] = useState(false);
+
+  // Local buffer for existing-row qty/price edits, keyed by `${itemId}:${field}`.
+  // Raw strings are held while typing and committed on blur/Enter via
+  // commitItemEdit — one Supabase write (and one shipping-materials recalc)
+  // per edit instead of per keystroke, and a mid-edit refetch can no longer
+  // snap the controlled input back to the last-saved value. Mirrors the
+  // pendingPicks pattern in pick-list-items.tsx.
+  const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
 
   // Fetch order details including customer_id
   const { data: order } = useQuery({
@@ -380,6 +395,30 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       toast.error("Failed to update item");
     },
   });
+
+  // Buffer a keystroke for an existing row's qty/price input
+  const setPendingEdit = (itemId: string, field: EditableItemField, raw: string) => {
+    setPendingEdits((prev) => ({ ...prev, [`${itemId}:${field}`]: raw }));
+  };
+
+  // Commit a buffered qty/price edit on blur/Enter. Invalid input
+  // (empty/NaN/out-of-range) is dropped so the field reverts to the saved
+  // value; unchanged values skip the write entirely.
+  const commitItemEdit = (item: OrderItemRow, field: EditableItemField) => {
+    const key = `${item.id}:${field}`;
+    const raw = pendingEdits[key];
+    if (raw === undefined) return; // nothing typed since last commit
+    setPendingEdits((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    const parsed = parseItemFieldEdit(field, raw);
+    if (parsed === null) return; // revert to saved value
+    const current = field === "quantity" ? item.quantity : item.unit_price;
+    if (parsed === current) return; // no-op — avoid write + materials recalc
+    updateItem.mutate({ id: item.id, field, value: parsed });
+  };
 
   // Handle format change for existing items
   const handleFormatChange = async (itemId: string, formatId: string) => {
@@ -619,14 +658,12 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   <Input
                     type="number"
                     min={1}
-                    value={item.quantity}
-                    onChange={(e) =>
-                      updateItem.mutate({
-                        id: item.id,
-                        field: "quantity",
-                        value: parseInt(e.target.value) || 1,
-                      })
-                    }
+                    value={pendingEdits[`${item.id}:quantity`] ?? item.quantity}
+                    onChange={(e) => setPendingEdit(item.id, "quantity", e.target.value)}
+                    onBlur={() => commitItemEdit(item, "quantity")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitItemEdit(item, "quantity");
+                    }}
                     className="h-8 w-full"
                   />
                 )}
@@ -640,14 +677,12 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       type="number"
                       step="0.01"
                       min={0}
-                      value={item.unit_price || ""}
-                      onChange={(e) =>
-                        updateItem.mutate({
-                          id: item.id,
-                          field: "unit_price",
-                          value: parseFloat(e.target.value) || null,
-                        })
-                      }
+                      value={pendingEdits[`${item.id}:unit_price`] ?? item.unit_price ?? ""}
+                      onChange={(e) => setPendingEdit(item.id, "unit_price", e.target.value)}
+                      onBlur={() => commitItemEdit(item, "unit_price")}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitItemEdit(item, "unit_price");
+                      }}
                       className="h-8 w-full"
                       placeholder="0.00"
                     />

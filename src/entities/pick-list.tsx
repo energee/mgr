@@ -70,6 +70,13 @@ const pickListStateMachine: StateMachineConfig<PickListView> = {
     completed: { label: "Completed", color: "success" },
     cancelled: { label: "Cancelled", color: "error" },
   },
+  // Assignment must go through the assign action so its transitionFields
+  // dialog captures assigned_to — bulk/raw status flips into "assigned"
+  // are suppressed (an "assigned" pick list without an assignee is
+  // meaningless).
+  requiresAction: {
+    assigned: "assign",
+  },
 };
 
 const statusOptions = statesAsOptions(pickListStateMachine);
@@ -263,6 +270,18 @@ export const pickListEntity: EntityConfig<PickListView> = {
       type: "button",
       fromStates: ["draft"],
       toState: "assigned",
+      // Collect the assignee in a pre-transition dialog; written to the
+      // pick_lists base table in the same UPDATE as the status flip (same
+      // relation source as the editable assigned_to form field above)
+      transitionFields: [
+        {
+          name: "assigned_to",
+          label: "Assigned To",
+          type: "relation",
+          relation: { entity: "user_profile", displayField: "display_name" },
+          required: true,
+        },
+      ],
     },
     {
       name: "start_picking",

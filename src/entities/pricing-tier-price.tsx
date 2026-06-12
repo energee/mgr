@@ -42,6 +42,8 @@ export const pricingTierPriceEntity: EntityConfig<PricingTierPrice> = {
   displayNamePlural: "Pricing Tier Prices",
   description: "Pricing matrix cells: one price per tier x format x channel",
   domain: "sales",
+  // Inline-only: prices are managed via the pricing matrix at /settings/pricing.
+  basePath: null,
 
   // ---------------------------------------------------------------------------
   // List View

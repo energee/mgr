@@ -47,6 +47,8 @@ export const orderItemEntity: EntityConfig<OrderItem> = {
   displayNamePlural: "Order Items",
   description: "Line items on a sales order",
   domain: "sales",
+  // Inline-only: order items are managed on the order detail page.
+  basePath: null,
 
   // ---------------------------------------------------------------------------
   // List View

@@ -13,6 +13,8 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
 import { CustomerShippingPreferences } from "@/components/domain/order/customer-shipping-preferences";
 import { CustomerPalletConfigs } from "@/components/domain/order/customer-pallet-configs";
+import { CustomerOrdersRelation } from "@/components/domain/order/customer-orders-relation";
+import { CustomerAddressSection } from "@/components/domain/order/customer-address-section";
 
 // =============================================================================
 // Section Component Wrappers
@@ -60,7 +62,11 @@ export const customerSchema = z.object({
   contact_name: z.string().nullable().optional(),
   email: z.string().email().nullable().optional().or(z.literal("")),
   phone: z.string().nullable().optional(),
-  address: z.any().nullable().optional(), // JSONB
+  // JSONB billing address. Edited via the CustomerAddressSection custom
+  // section, which writes normalized keys (street/line2/city/state/zip/
+  // country) matching what QuickBooks export reads via mapAddress()
+  // (src/integrations/quickbooks/sync-utils.ts).
+  address: z.any().nullable().optional(),
   sales_channel_id: z.string().uuid().nullable().optional(),
   price_tier_id: z.string().uuid().nullable().optional(),
   notes: z.string().nullable().optional(),
@@ -239,6 +245,14 @@ export const customerEntity: EntityConfig<Customer> = {
       ],
     },
     {
+      // Billing address (customers.address JSONB) — custom section because
+      // the unified field grid has no JSONB editor. Synced to QuickBooks as
+      // BillAddr (see mapAddress in src/integrations/quickbooks/sync-utils.ts).
+      id: "billing-address",
+      title: "Billing Address",
+      component: CustomerAddressSection,
+    },
+    {
       id: "pricing",
       title: "Pricing",
       fields: [
@@ -397,14 +411,26 @@ export const customerEntity: EntityConfig<Customer> = {
   // ---------------------------------------------------------------------------
   relations: [
     {
+      // Custom component instead of the generic RelationTable: adds the
+      // "Reorder last" button (duplicates the most recent non-cancelled
+      // order as a new draft with prices re-resolved — see
+      // src/components/domain/order/reorder.ts) while keeping the standard
+      // Add link and row navigation.
       name: "orders",
       entity: "order",
       type: "hasMany",
       foreignKey: "customer_id",
       showInDetail: true,
       detailTab: "Orders",
+      component: CustomerOrdersRelation,
     },
   ],
+
+  // Framework Duplicate action (EntityDetailUnified): no identity fields
+  // beyond the framework baseline — name carries over for the user to tweak
+  // (a unique violation surfaces on the field at save time). Order-summary
+  // stats are display-only view columns and never carry over.
+  excludeOnDuplicate: [],
 
   // ---------------------------------------------------------------------------
   // Actions
