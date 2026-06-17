@@ -11,6 +11,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { entityKeys, packagingFormatKeys, kegKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,14 +57,14 @@ export function KegOwnerDepositsEditor({
   const { data: kegFormats, isLoading: loadingTypes } = useQuery({
     queryKey: packagingFormatKeys.kegFormats(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("packaging_formats")
-        .select("id, name, volume_bbl, deposit_amount")
-        .eq("is_active", true)
-        .eq("container_type", "keg")
-        .order("name");
-      if (error) throw error;
-      return data as KegSellingFormat[];
+      return await unwrap(
+        supabase
+          .from("packaging_formats")
+          .select("id, name, volume_bbl, deposit_amount")
+          .eq("is_active", true)
+          .eq("container_type", "keg")
+          .order("name"),
+      ) as KegSellingFormat[];
     },
   });
 
@@ -75,11 +76,12 @@ export function KegOwnerDepositsEditor({
       kegOwnerId
     ),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("keg_owner_deposits")
-        .select("*")
-        .eq("keg_owner_id", kegOwnerId);
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("keg_owner_deposits")
+          .select("*")
+          .eq("keg_owner_id", kegOwnerId),
+      );
 
       // Initialize local state from fetched data
       const depositMap: Record<string, string> = {};
@@ -129,21 +131,23 @@ export function KegOwnerDepositsEditor({
 
       // Perform deletes
       if (deletes.length > 0) {
-        const { error } = await supabase
-          .from("keg_owner_deposits")
-          .delete()
-          .in("id", deletes);
-        if (error) throw error;
+        await unwrap(
+          supabase
+            .from("keg_owner_deposits")
+            .delete()
+            .in("id", deletes),
+        );
       }
 
       // Perform upserts
       if (upserts.length > 0) {
-        const { error } = await supabase
-          .from("keg_owner_deposits")
-          .upsert(upserts, {
-            onConflict: "keg_owner_id,selling_format_id",
-          });
-        if (error) throw error;
+        await unwrap(
+          supabase
+            .from("keg_owner_deposits")
+            .upsert(upserts, {
+              onConflict: "keg_owner_id,selling_format_id",
+            }),
+        );
       }
     },
     onSuccess: () => {

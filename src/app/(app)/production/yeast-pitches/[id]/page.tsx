@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { resolveYeastLineageRoot } from "@/domain/yeast-lineage";
 import { yeastKeys, entityKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import type { YeastForm } from "@/domain/yeast-calculations";
 import { formatCurrency, formatDate } from "@/lib/format";
 
@@ -98,15 +99,15 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
   const { data: pitchDetail } = useQuery({
     queryKey: yeastKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("yeast_pitches_with_remaining")
-        .select(
-          "id, strain_name, strain_form, source_type, initial_viability, received_date, harvest_date"
-        )
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data as PitchDetail;
+      return await unwrap(
+        supabase
+          .from("yeast_pitches_with_remaining")
+          .select(
+            "id, strain_name, strain_form, source_type, initial_viability, received_date, harvest_date"
+          )
+          .eq("id", id)
+          .single()
+      ) as PitchDetail;
     },
   });
 
@@ -121,13 +122,13 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
     queryKey: yeastKeys.lineageSummary(rootId),
     queryFn: async () => {
       if (!rootId) return null;
-      const { data, error } = await supabase
-        .from("yeast_lineage_summary")
-        .select("*")
-        .eq("root_id", rootId)
-        .single();
-      if (error) throw error;
-      return data as LineageSummary;
+      return await unwrap(
+        supabase
+          .from("yeast_lineage_summary")
+          .select("*")
+          .eq("root_id", rootId)
+          .single()
+      ) as LineageSummary;
     },
     enabled: !!rootId,
   });
@@ -136,12 +137,13 @@ export default function YeastPitchDetailPage({ params }: YeastPitchDetailPagePro
   const { data: pitchEvents } = useQuery({
     queryKey: yeastKeys.events(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("yeast_pitch_events")
-        .select("id, batch_id, quantity_lbs, pitched_at")
-        .eq("pitch_id", id)
-        .order("pitched_at", { ascending: true });
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("yeast_pitch_events")
+          .select("id, batch_id, quantity_lbs, pitched_at")
+          .eq("pitch_id", id)
+          .order("pitched_at", { ascending: true })
+      );
 
       // Resolve batch names
       if (data && data.length > 0) {

@@ -46,6 +46,7 @@ import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
 import { useVolumeUnit } from "@/hooks/use-unit-preferences";
 import { convertVolume, formatVolume, UNIT_LABELS } from "@/domain/units";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -103,10 +104,9 @@ export default function DashboardPage() {
   const { data: batchCounts = DEFAULT_BATCH_COUNTS, isLoading: countsLoading } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "batch_status_counts")
-        .select("status, count");
-
-      if (error) throw error;
+      const data = await unwrap(
+        dynamicFrom(supabase, "batch_status_counts").select("status, count")
+      ) as unknown as Array<{ status: string; count: number }>;
 
       const counts = { ...DEFAULT_BATCH_COUNTS };
       for (const row of data ?? []) {
@@ -126,9 +126,10 @@ export default function DashboardPage() {
   const { data: activeBatches = [], isLoading: batchesLoading } = useQuery({
     queryKey: dashboardKeys.activeBatches(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batches")
-        .select(`
+      const data = await unwrap(
+        supabase
+          .from("batches")
+          .select(`
           id,
           batch_code,
           name,
@@ -137,11 +138,10 @@ export default function DashboardPage() {
           planned_start_date,
           recipes:recipe_id(name)
         `)
-        .not("status", "in", '("completed","cancelled")')
-        .order("planned_start_date", { ascending: false, nullsFirst: false })
-        .limit(10);
-
-      if (error) throw error;
+          .not("status", "in", '("completed","cancelled")')
+          .order("planned_start_date", { ascending: false, nullsFirst: false })
+          .limit(10)
+      );
 
       return (data || []).map((batch) => ({
         ...batch,
@@ -157,11 +157,9 @@ export default function DashboardPage() {
   const { data: vessels = [], isLoading: vesselsLoading } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "vessels_with_batch")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data as VesselStatus[];
+      return await unwrap(
+        dynamicFrom(supabase, "vessels_with_batch").select("*").order("name")
+      ) as unknown as VesselStatus[];
     },
     refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,

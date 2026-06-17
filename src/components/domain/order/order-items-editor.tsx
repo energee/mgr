@@ -19,6 +19,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { dynamicRpc } from "@/services/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,11 +115,10 @@ function useBrandAvailability() {
   return useQuery({
     queryKey: finishedGoodKeys.brandAvailability(),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const data = await unwrap(supabase
         .from("finished_goods_with_availability")
         .select("brand_id, selling_format_id, available_quantity")
-        .gt("available_quantity", 0);
-      if (error) throw error;
+        .gt("available_quantity", 0));
       const byBrand: Record<string, number> = {};
       const byBrandFormat: Record<string, number> = {};
       for (const row of data ?? []) {
@@ -141,14 +141,13 @@ function useAvailability(brandId: string | null, sellingFormatId: string | null)
     queryKey: finishedGoodKeys.availability(brandId ?? "", sellingFormatId ?? ""),
     queryFn: async () => {
       if (!brandId || !sellingFormatId) return [];
-      const { data, error } = await supabase
+      const data = await unwrap(supabase
         .from("finished_goods_with_availability")
         .select("id, lot_number, production_date, quantity, available_quantity")
         .eq("brand_id", brandId)
         .eq("selling_format_id", sellingFormatId)
         .gt("available_quantity", 0)
-        .order("production_date", { ascending: true });
-      if (error) throw error;
+        .order("production_date", { ascending: true }));
       return data ?? [];
     },
     enabled: !!brandId && !!sellingFormatId,
@@ -211,13 +210,11 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   const { data: order } = useQuery({
     queryKey: orderKeys.detail(orderId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      return await unwrap(supabase
         .from("orders")
         .select("id, customer_id")
         .eq("id", orderId)
-        .single();
-      if (error) throw error;
-      return data;
+        .single()) as { id: string; customer_id: string | null } | null;
     },
   });
 
@@ -234,13 +231,11 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   const { data: items, isLoading: itemsLoading } = useQuery({
     queryKey: orderKeys.items(orderId),
     queryFn: async () => {
-      const { data, error } = await supabase
+      return await unwrap(supabase
         .from("order_items")
         .select("*")
         .eq("order_id", orderId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data as OrderItemRow[];
+        .order("created_at", { ascending: true })) as OrderItemRow[];
     },
   });
 
@@ -337,15 +332,14 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
       const isKeg = kegFormatIds.has(item.format_id ?? "");
-      const { error } = await supabase.from("order_items").insert({
+      await unwrap(supabase.from("order_items").insert({
         order_id: orderId,
         brand_id: item.brand_id || null,
         selling_format_id: item.format_id || null,
         keg_owner_id: isKeg ? item.keg_owner_id || null : null,
         quantity: item.quantity,
         unit_price: item.unit_price || null,
-      });
-      if (error) throw error;
+      }));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
@@ -378,11 +372,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   // Update item mutation (single field)
   const updateItem = useMutation({
     mutationFn: async ({ id, field, value }: { id: string; field: string; value: unknown }) => {
-      const { error } = await supabase
+      await unwrap(supabase
         .from("order_items")
         .update({ [field]: value })
-        .eq("id", id);
-      if (error) throw error;
+        .eq("id", id));
     },
     onSuccess: (_data, { field }) => {
       queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
@@ -447,8 +440,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   // Delete item mutation
   const deleteItem = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("order_items").delete().eq("id", id);
-      if (error) throw error;
+      await unwrap(supabase.from("order_items").delete().eq("id", id));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });

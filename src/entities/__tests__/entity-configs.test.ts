@@ -148,18 +148,29 @@ describe("Entity configs: listColumns", () => {
     }
   });
 
-  it("every entity's defaultSort references a column in listColumns", () => {
+  // Phase 3 split: defaultSort now lives on the server-safe EntityCore and is
+  // consumed by both the React list view and the AI chat route. Line-item /
+  // join-row entities (order_item, po_line_item, session_line_item) have no
+  // standalone list page but the chat route still orders them by created_at.
+  // The std timestamp columns exist on every table; allow them even when not
+  // displayed. Entity-specific sort columns must still appear in listColumns
+  // so the React list view shows what it sorts by.
+  const TIMESTAMP_COLUMNS = new Set(["created_at", "updated_at"]);
+
+  it("every entity's defaultSort references a displayed column or a standard timestamp", () => {
     const violations: string[] = [];
     for (const entity of Array.from(entityRegistry.values())) {
       if (!entity.defaultSort) continue;
+      const col = entity.defaultSort.column as string;
+      if (TIMESTAMP_COLUMNS.has(col)) continue;
       const accessors = new Set(
         entity.listColumns
-          .map((col) => col.accessorKey)
+          .map((c) => c.accessorKey)
           .filter((k): k is string => typeof k === "string")
       );
-      if (!accessors.has(entity.defaultSort.column as string)) {
+      if (!accessors.has(col)) {
         violations.push(
-          `${entity.name}: defaultSort.column '${String(entity.defaultSort.column)}' is not in listColumns`
+          `${entity.name}: defaultSort.column '${col}' is not in listColumns`
         );
       }
     }

@@ -57,6 +57,7 @@ import type { Json } from "@/types/supabase";
 import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
 import { batchKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { usePrefillStore } from "@/contexts/prefill-store";
 
 type BatchLog = {
@@ -97,13 +98,13 @@ export default function BatchReadingsPage({
   const { data: batch, isLoading: batchLoading } = useQuery({
     queryKey: batchKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batches")
-        .select("id, batch_code, name, status, recipe_id")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("batches")
+          .select("id, batch_code, name, status, recipe_id")
+          .eq("id", id)
+          .single()
+      ) as unknown as { id: string; batch_code: string; name: string; status: string; recipe_id: string | null };
     },
   });
 
@@ -111,14 +112,14 @@ export default function BatchReadingsPage({
   const { data: readings, isLoading: readingsLoading } = useQuery({
     queryKey: batchKeys.readings(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batch_logs")
-        .select("*")
-        .eq("batch_id", id)
-        .eq("log_type", "measurement")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data as unknown) as BatchLog[];
+      return await unwrap(
+        supabase
+          .from("batch_logs")
+          .select("*")
+          .eq("batch_id", id)
+          .eq("log_type", "measurement")
+          .order("created_at", { ascending: false })
+      ) as unknown as BatchLog[];
     },
   });
 
@@ -133,17 +134,17 @@ export default function BatchReadingsPage({
   // Add Another") or close (plain save, via onSaved) — don't close it here.
   const addReading = useMutation({
     mutationFn: async (reading: BatchReading) => {
-      const { data, error } = await supabase
-        .from("batch_logs")
-        .insert({
-          batch_id: id,
-          log_type: "measurement",
-          data: reading as unknown as Json,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("batch_logs")
+          .insert({
+            batch_id: id,
+            log_type: "measurement",
+            data: reading as unknown as Json,
+          })
+          .select()
+          .single()
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: batchKeys.readings(id) });

@@ -62,6 +62,33 @@ export function formatDate(
   }
 }
 
+export type ValueFormat = "date" | "datetime" | "currency" | "number" | "percentage" | "json" | "unit";
+
+/** Format an unknown value for display in tables and detail views. */
+export function formatValue(value: unknown, format?: ValueFormat): string {
+  if (value === null || value === undefined) return "—";
+
+  switch (format) {
+    case "date":
+      return new Date(value as string).toLocaleDateString();
+    case "datetime":
+      return new Date(value as string).toLocaleString();
+    case "currency":
+      return `$${(value as number).toFixed(2)}`;
+    case "number":
+      return (value as number).toLocaleString();
+    case "percentage":
+      return `${value}%`;
+    case "json":
+      return JSON.stringify(value, null, 2);
+    case "unit":
+      return String(value);
+    default:
+      if (typeof value === "boolean") return value ? "Yes" : "No";
+      return String(value);
+  }
+}
+
 /** Parse a string to an integer, returning null for empty/whitespace strings. */
 export function parseIntOrNull(value: string): number | null {
   return value.trim() ? parseInt(value, 10) : null;

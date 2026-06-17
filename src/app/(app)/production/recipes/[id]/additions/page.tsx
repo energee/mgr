@@ -19,6 +19,7 @@ import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { recipeKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 /** Additive types managed via water chemistry calculations, excluded from this editor */
 const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
@@ -38,13 +39,13 @@ export default function RecipeAdditionsPage({
   const { data: recipe, isLoading: recipeLoading } = useQuery({
     queryKey: recipeKeys.detail(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipes")
-        .select("id, name, target_water_profile_id")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("recipes")
+          .select("id, name, target_water_profile_id")
+          .eq("id", id)
+          .single()
+      ) as unknown as { id: string; name: string; target_water_profile_id: string | null };
     },
   });
 
@@ -52,9 +53,10 @@ export default function RecipeAdditionsPage({
   const { data: additions, isLoading: additionsLoading } = useQuery({
     queryKey: recipeKeys.additions(id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_additions")
-        .select(`
+      return await unwrap(
+        supabase
+          .from("recipe_additions")
+          .select(`
           id,
           additive_id,
           amount,
@@ -71,10 +73,9 @@ export default function RecipeAdditionsPage({
             typical_unit
           )
         `)
-        .eq("recipe_id", id)
-        .order("position", { ascending: true });
-      if (error) throw error;
-      return data as unknown as (AdditionItem & { additives: AdditionItem["additive"] })[];
+          .eq("recipe_id", id)
+          .order("position", { ascending: true })
+      ) as unknown as (AdditionItem & { additives: AdditionItem["additive"] })[];
     },
   });
 
@@ -124,11 +125,12 @@ export default function RecipeAdditionsPage({
 
       // Delete existing non-water additions for this recipe
       if (existingNonWaterIds.length > 0) {
-        const { error: deleteError } = await supabase
-          .from("recipe_additions")
-          .delete()
-          .in("id", existingNonWaterIds);
-        if (deleteError) throw deleteError;
+        await unwrap(
+          supabase
+            .from("recipe_additions")
+            .delete()
+            .in("id", existingNonWaterIds)
+        );
       }
 
       // Insert new additions
@@ -143,10 +145,9 @@ export default function RecipeAdditionsPage({
           position: index,
         }));
 
-        const { error: insertError } = await supabase
-          .from("recipe_additions")
-          .insert(insertData);
-        if (insertError) throw insertError;
+        await unwrap(
+          supabase.from("recipe_additions").insert(insertData)
+        );
       }
     },
     onSuccess: () => {

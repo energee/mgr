@@ -10,7 +10,7 @@
  */
 
 import type { ReactNode } from "react";
-import { formatValue } from "@/lib/utils";
+import { formatValue } from "@/lib/format";
 import type { EntityConfig, UnifiedFieldDef } from "@/types/entity";
 import { getStateLabel } from "@/types/entity";
 import { UnitDisplay } from "@/components/ui/unit-input";

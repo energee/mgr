@@ -23,6 +23,7 @@ import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { catalogKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -137,29 +138,19 @@ export function BatchAdditionForm({
   const queryCatalog = async (table: CatalogTable) => {
     const queries: Record<CatalogTable, () => Promise<CatalogItem[]>> = {
       hops: async () => {
-        const { data, error } = await supabase.from("hops").select("id, name, type").eq("is_active", true).order("name");
-        if (error) throw error;
-        return (data ?? []) as CatalogItem[];
+        return (await unwrap(supabase.from("hops").select("id, name, type").eq("is_active", true).order("name")) ?? []) as CatalogItem[];
       },
       fruits: async () => {
-        const { data, error } = await supabase.from("fruits").select("id, name, type").eq("is_active", true).order("name");
-        if (error) throw error;
-        return (data ?? []) as CatalogItem[];
+        return (await unwrap(supabase.from("fruits").select("id, name, type").eq("is_active", true).order("name")) ?? []) as CatalogItem[];
       },
       adjuncts: async () => {
-        const { data, error } = await supabase.from("adjuncts").select("id, name, type").eq("is_active", true).order("name");
-        if (error) throw error;
-        return (data ?? []) as CatalogItem[];
+        return (await unwrap(supabase.from("adjuncts").select("id, name, type").eq("is_active", true).order("name")) ?? []) as CatalogItem[];
       },
       additives: async () => {
-        const { data, error } = await supabase.from("additives").select("id, name, type").eq("is_active", true).order("name");
-        if (error) throw error;
-        return (data ?? []) as CatalogItem[];
+        return (await unwrap(supabase.from("additives").select("id, name, type").eq("is_active", true).order("name")) ?? []) as CatalogItem[];
       },
       spices: async () => {
-        const { data, error } = await supabase.from("spices").select("id, name, type").eq("is_active", true).order("name");
-        if (error) throw error;
-        return (data ?? []) as CatalogItem[];
+        return (await unwrap(supabase.from("spices").select("id, name, type").eq("is_active", true).order("name")) ?? []) as CatalogItem[];
       },
     };
     return queries[table]();

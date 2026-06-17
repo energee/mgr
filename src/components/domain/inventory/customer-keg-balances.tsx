@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { kegKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,14 +51,13 @@ export function CustomerKegBalances({
   const { data: balances, isLoading, error } = useQuery({
     queryKey: kegKeys.customerBalances(customerId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("customer_keg_balances")
-        .select("*")
-        .eq("customer_id", customerId)
-        .order("keg_type_name");
-
-      if (error) throw error;
-      return data as CustomerKegBalance[];
+      return await unwrap(
+        supabase
+          .from("customer_keg_balances")
+          .select("*")
+          .eq("customer_id", customerId)
+          .order("keg_type_name"),
+      ) as CustomerKegBalance[];
     },
   });
 

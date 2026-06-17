@@ -61,6 +61,7 @@ import {
 } from "lucide-react";
 import type { ProductionShortfall } from "@/types/planning";
 import { dynamicRpc } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { CreateBatchFromShortfall } from "@/components/domain/purchasing/create-batch-from-shortfall";
 
 // =============================================================================
@@ -200,10 +201,11 @@ export default function ProductionTimelinePage() {
       endDate.toISOString(),
     ),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("batches_with_brew_info")
-        .select(
-          `
+      const data = await unwrap(
+        supabase
+          .from("batches_with_brew_info")
+          .select(
+            `
           id,
           batch_code,
           name,
@@ -220,13 +222,12 @@ export default function ProductionTimelinePage() {
             brands:brand_id (name)
           )
         `,
-        )
-        .in("status", ["planned", "fermenting", "conditioning", "packaging"])
-        .gte("planned_start_date", addDays(startDate, -30).toISOString())
-        .lte("planned_start_date", addDays(endDate, 30).toISOString())
-        .order("planned_start_date", { ascending: true });
-
-      if (error) throw error;
+          )
+          .in("status", ["planned", "fermenting", "conditioning", "packaging"])
+          .gte("planned_start_date", addDays(startDate, -30).toISOString())
+          .lte("planned_start_date", addDays(endDate, 30).toISOString())
+          .order("planned_start_date", { ascending: true })
+      );
 
       return (data || []).map((b) => {
         const recipe = b.recipes as {
@@ -257,15 +258,14 @@ export default function ProductionTimelinePage() {
   const { data: vessels = [] } = useQuery({
     queryKey: entityKeys.list("vessels"),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vessels")
-        .select("id, name, vessel_type, capacity_bbl, current_batch_id, status")
-        .in("vessel_type", ["fermenter", "unitank", "brite"])
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) throw error;
-      return (data || []) as VesselInfo[];
+      return await unwrap(
+        supabase
+          .from("vessels")
+          .select("id, name, vessel_type, capacity_bbl, current_batch_id, status")
+          .in("vessel_type", ["fermenter", "unitank", "brite"])
+          .eq("is_active", true)
+          .order("name")
+      ) as VesselInfo[];
     },
   });
 
@@ -273,14 +273,9 @@ export default function ProductionTimelinePage() {
   const { data: brands = [] } = useQuery({
     queryKey: entityKeys.list("brands"),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brands")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) throw error;
-      return data || [];
+      return await unwrap(
+        supabase.from("brands").select("id, name").eq("is_active", true).order("name")
+      );
     },
   });
 
@@ -301,9 +296,7 @@ export default function ProductionTimelinePage() {
         query = query.eq("brand_id", brandFilter);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      return await unwrap(query);
     },
   });
 
@@ -314,16 +307,13 @@ export default function ProductionTimelinePage() {
       horizonWeeks: weeksToShow + 2,
     }),
     queryFn: async () => {
-      const { data, error } = await dynamicRpc(
-        supabase,
-        "calculate_production_shortfalls",
-        {
+      const data = await unwrap(
+        dynamicRpc(supabase, "calculate_production_shortfalls", {
           p_include_drafts: true,
           p_horizon_weeks: weeksToShow + 2,
-        },
+        })
       );
-      if (error) throw error;
-      return (data || []) as ProductionShortfall[];
+      return (data || []) as unknown as ProductionShortfall[];
     },
   });
 

@@ -40,6 +40,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle } from "lucide-react";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import type { IngredientShortfall } from "@/domain/purchasing/demand-calculator";
 import { getCatalogTypeDisplay } from "@/domain/purchasing/demand-calculator";
 
@@ -81,13 +82,13 @@ export function UnassignedShortfallsCard({
   const { data: suppliers = [] } = useQuery({
     queryKey: supplierKeys.active(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("suppliers")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("suppliers")
+          .select("id, name")
+          .eq("is_active", true)
+          .order("name")
+      );
     },
   });
 

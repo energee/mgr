@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { dynamicFrom } from "@/services/types";
 import { yeastKeys, vesselKeys, batchKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
@@ -116,14 +117,14 @@ export function YeastHarvestDialog({
   const { data: brinks, isLoading: brinksLoading } = useQuery({
     queryKey: vesselKeys.brinks(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "vessels")
-        .select("id, name, capacity_bbl")
-        .eq("vessel_type", "brink")
-        .in("status", ["ready_for_use", "in_use"])
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data as { id: string; name: string; capacity_bbl: number | null }[];
+      return unwrap(
+        dynamicFrom(supabase, "vessels")
+          .select("id, name, capacity_bbl")
+          .eq("vessel_type", "brink")
+          .in("status", ["ready_for_use", "in_use"])
+          .eq("is_active", true)
+          .order("name")
+      ) as Promise<{ id: string; name: string; capacity_bbl: number | null }[]>;
     },
     enabled: open,
   });

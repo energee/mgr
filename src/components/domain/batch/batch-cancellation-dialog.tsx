@@ -20,6 +20,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { batchKeys, dashboardKeys, entityKeys, inventoryKeys } from "@/lib/query-keys";
 import { dynamicRpc } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Dialog,
   DialogContent,
@@ -144,15 +145,14 @@ export function BatchCancellationDialog({
   const terminateMutation = useMutation({
     mutationFn: async (values: TerminationFormValues) => {
       const rpcName = isArchive ? "archive_batch" : "cancel_batch";
-      const { data, error } = await dynamicRpc(supabase, rpcName, {
-        p_batch_id: batchId,
-        p_reason: values.reason,
-        p_loss_volume_bbl: isArchive ? (values.loss_volume_bbl || null) : null,
-        p_notes: values.notes || null,
-      });
-
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        dynamicRpc(supabase, rpcName, {
+          p_batch_id: batchId,
+          p_reason: values.reason,
+          p_loss_volume_bbl: isArchive ? (values.loss_volume_bbl || null) : null,
+          p_notes: values.notes || null,
+        })
+      );
     },
     onSuccess: (data) => {
       // Invalidate both the base table and view table for batches
@@ -164,7 +164,7 @@ export function BatchCancellationDialog({
       queryClient.invalidateQueries({ queryKey: inventoryKeys.allocations() });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all() });
 
-      const vesselReleased = data?.vessel_released;
+      const vesselReleased = (data as unknown as { vessel_released?: string } | null)?.vessel_released;
       const action = isArchive ? "archived" : "cancelled";
       toast.success(
         `Batch ${batchNumber} ${action}${vesselReleased ? `. ${vesselReleased} released.` : ""}`

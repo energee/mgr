@@ -16,6 +16,7 @@
 
 import { useQueries } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { dynamicOptionsKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { dynamicFrom } from "@/services/types";
@@ -73,8 +74,7 @@ export function useDynamicOptions(fields: DynamicOptionsField[]): DynamicOptions
           query = query.order(orderBy);
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
+        const data = await unwrap(query);
 
         const rows = data as unknown as Record<string, unknown>[] | null;
         return {

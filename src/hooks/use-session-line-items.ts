@@ -9,6 +9,7 @@
 import { useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { toast } from "sonner";
 import { sessionLineItemKeys } from "@/lib/query-keys";
 import { usePackagingFormats } from "@/hooks/use-catalog";
@@ -71,14 +72,15 @@ export function useSessionLineItems(sessionId: string) {
   const { data: items, isLoading } = useQuery({
     queryKey: sessionLineItemKeys.all(sessionId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("session_line_items")
-        .select(
-          "*, brands(name), selling_formats(name), keg_owners(name), batches(batch_code)"
-        )
-        .eq("session_id", sessionId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("session_line_items")
+          .select(
+            "*, brands(name), selling_formats(name), keg_owners(name), batches(batch_code)"
+          )
+          .eq("session_id", sessionId)
+          .order("created_at", { ascending: true })
+      );
 
       return data.map((item) => {
         const batchRaw = item.batches as unknown;
@@ -143,16 +145,17 @@ export function useLineItemMutations(sessionId: string) {
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
       const isKeg = kegFormatIds.has(item.format_id);
-      const { error } = await supabase.from("session_line_items").insert({
-        session_id: sessionId,
-        brand_id: item.brand_id,
-        selling_format_id: item.format_id || null,
-        keg_owner_id: isKeg ? item.keg_owner_id || null : null,
-        batch_id: item.batch_id || null,
-        planned_quantity: item.planned_quantity,
-        actual_quantity: item.actual_quantity,
-      });
-      if (error) throw error;
+      await unwrap(
+        supabase.from("session_line_items").insert({
+          session_id: sessionId,
+          brand_id: item.brand_id,
+          selling_format_id: item.format_id || null,
+          keg_owner_id: isKeg ? item.keg_owner_id || null : null,
+          batch_id: item.batch_id || null,
+          planned_quantity: item.planned_quantity,
+          actual_quantity: item.actual_quantity,
+        })
+      );
     },
     onSuccess: () => {
       invalidateItems();
@@ -173,11 +176,9 @@ export function useLineItemMutations(sessionId: string) {
       field: string;
       value: unknown;
     }) => {
-      const { error } = await supabase
-        .from("session_line_items")
-        .update({ [field]: value })
-        .eq("id", id);
-      if (error) throw error;
+      await unwrap(
+        supabase.from("session_line_items").update({ [field]: value }).eq("id", id)
+      );
     },
     onSuccess: invalidateItems,
     onError: () => {
@@ -187,11 +188,7 @@ export function useLineItemMutations(sessionId: string) {
 
   const deleteItem = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("session_line_items")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      await unwrap(supabase.from("session_line_items").delete().eq("id", id));
     },
     onSuccess: () => {
       invalidateItems();

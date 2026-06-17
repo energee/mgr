@@ -59,7 +59,7 @@ import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { runTransitionSideEffects } from "@/services/transition-side-effects";
-import { formatValue } from "@/lib/utils";
+import { formatValue } from "@/lib/format";
 import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
@@ -123,6 +123,7 @@ import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
 import type { UseFormReturn } from "react-hook-form";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 /**
  * Max number of `type: "button"` actions rendered as visible header buttons.
@@ -929,11 +930,12 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
     const loadingId = toast.loading(isCreateMode ? "Creating..." : "Saving...");
     try {
       if (isCreateMode) {
-        const { data: newRow, error } = await dynamicFrom(supabase, entity.table)
-          .insert(result.data)
-          .select()
-          .single();
-        if (error) throw error;
+        const newRow = await unwrap(
+          dynamicFrom(supabase, entity.table)
+            .insert(result.data)
+            .select()
+            .single()
+        ) as unknown as Record<string, unknown>;
         setFormErrors([]);
         toast.success(`${entity.displayName} created successfully`);
         const newId = (newRow as Record<string, unknown>).id as string;
@@ -960,12 +962,13 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
             throw new Error(lockResult.error);
           }
         } else {
-          const { error } = await dynamicFrom(supabase, entity.table)
-            .update(result.data)
-            .eq("id", id)
-            .select()
-            .single();
-          if (error) throw error;
+          await unwrap(
+            dynamicFrom(supabase, entity.table)
+              .update(result.data)
+              .eq("id", id)
+              .select()
+              .single()
+          );
         }
 
         setFormErrors([]);
@@ -2050,13 +2053,13 @@ function RelationTable({
         const sortField = relatedEntity.defaultSort?.column || "created_at";
         const sortAsc = relatedEntity.defaultSort?.direction === "asc";
 
-        const { data, error } = await dynamicFrom(supabase, relatedEntity.viewTable || relatedEntity.table)
-          .select(selectClause)
-          .eq(relation.foreignKey, parentId)
-          .order(sortField, { ascending: sortAsc })
-          .limit(50);
-
-        if (error) throw error;
+        const data = await unwrap(
+          dynamicFrom(supabase, relatedEntity.viewTable || relatedEntity.table)
+            .select(selectClause)
+            .eq(relation.foreignKey, parentId)
+            .order(sortField, { ascending: sortAsc })
+            .limit(50)
+        ) as unknown as Record<string, unknown>[];
         return data || [];
       } catch (err) {
         log.error(

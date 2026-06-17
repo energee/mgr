@@ -34,7 +34,7 @@ import { useMemo, useState, useCallback, type ReactNode } from "react";
 import type { EntityConfig, EntityColumnDef, EntityActionDef } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
-import { formatValue } from "@/lib/utils";
+import { formatValue } from "@/lib/format";
 import { getApplicableActions } from "@/lib/entity-actions";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { Button } from "@/components/ui/button";

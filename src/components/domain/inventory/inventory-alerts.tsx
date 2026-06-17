@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { inventoryKeys } from "@/lib/query-keys";
 import { dynamicRpc } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import {
   Card,
@@ -245,10 +246,7 @@ export function InventoryAlerts({
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: inventoryKeys.overview(),
     queryFn: async () => {
-      const { data, error } = await dynamicRpc(supabase, "get_inventory_overview");
-
-      if (error) throw error;
-      return data as InventoryOverview;
+      return await unwrap(dynamicRpc(supabase, "get_inventory_overview")) as unknown as InventoryOverview;
     },
     staleTime: CACHE_DURATIONS.STATIC_DATA,
   });

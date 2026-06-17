@@ -38,6 +38,7 @@ import { Link2, Plus, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { batchKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 
 type BrewLog = {
@@ -73,10 +74,11 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
   // Fetch existing links
   const { data: linkedBrewLogs = [], isLoading } = useQuery({
     queryKey: batchKeys.brewLogs(batchId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brew_log_batches")
-        .select(`
+    queryFn: async () =>
+      (await unwrap(
+        supabase
+          .from("brew_log_batches")
+          .select(`
           id,
           brew_log_id,
           batch_id,
@@ -89,23 +91,22 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
             status
           )
         `)
-        .eq("batch_id", batchId);
-      if (error) throw error;
-      return (data ?? []) as unknown as LinkedBrewLog[];
-    },
+          .eq("batch_id", batchId)
+      ) ?? []) as unknown as LinkedBrewLog[],
   });
 
   // Fetch available brew logs (completed, not already linked to this batch)
   const { data: availableBrewLogs = [] } = useQuery({
     queryKey: batchKeys.availableBrewLogs(batchId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brew_logs")
-        .select("id, brew_number, brew_date, status")
-        .eq("status", "completed")
-        .order("brew_date", { ascending: false })
-        .limit(50);
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("brew_logs")
+          .select("id, brew_number, brew_date, status")
+          .eq("status", "completed")
+          .order("brew_date", { ascending: false })
+          .limit(50)
+      );
 
       // Filter out already linked
       const linkedIds = linkedBrewLogs.map((l) => l.brew_log_id);
@@ -127,13 +128,14 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
       volumeBbl: number;
       linkNotes: string;
     }) => {
-      const { error } = await supabase.from("brew_log_batches").insert({
-        brew_log_id: brewLogId,
-        batch_id: batchId,
-        volume_bbl: volumeBbl,
-        notes: linkNotes || null,
-      });
-      if (error) throw error;
+      await unwrap(
+        supabase.from("brew_log_batches").insert({
+          brew_log_id: brewLogId,
+          batch_id: batchId,
+          volume_bbl: volumeBbl,
+          notes: linkNotes || null,
+        })
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(batchId) });
@@ -152,11 +154,12 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
   // Unlink mutation
   const unlinkMutation = useMutation({
     mutationFn: async (linkId: string) => {
-      const { error } = await supabase
-        .from("brew_log_batches")
-        .delete()
-        .eq("id", linkId);
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("brew_log_batches")
+          .delete()
+          .eq("id", linkId)
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(batchId) });

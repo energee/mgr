@@ -21,6 +21,7 @@ import { Check, Loader2 } from "lucide-react";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { AvatarUpload } from "@/components/domain/shared/avatar-upload";
 import { entityKeys, userKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Profile Section
@@ -36,25 +37,24 @@ function ProfileSection() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase
-        .from("user_profiles")
-        .select("id, display_name, email, avatar_url")
-        .eq("id", user.id)
-        .single();
-
-      if (error) throw error;
-      return data as { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
+      return await unwrap(
+        supabase
+          .from("user_profiles")
+          .select("id, display_name, email, avatar_url")
+          .eq("id", user.id)
+          .single()
+      ) as { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
     },
   });
 
   const updateProfile = useMutation({
     mutationFn: async (name: string) => {
-      const { error } = await supabase
-        .from("user_profiles")
-        .update({ display_name: name })
-        .eq("id", profile!.id);
-
-      if (error) throw error;
+      await unwrap(
+        supabase
+          .from("user_profiles")
+          .update({ display_name: name })
+          .eq("id", profile!.id)
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.current() });

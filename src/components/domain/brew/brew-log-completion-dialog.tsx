@@ -51,6 +51,7 @@ import { extractBrewMeasurements } from "@/domain/brew-events";
 import { useBrewMeasurementUnits } from "@/hooks/use-unit-preferences";
 import type { BrewEvent } from "@/types/domain";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -131,14 +132,13 @@ export function BrewLogCompletionDialog({
   // Fetch brew log with events for step 1
   const { data: brewLogFull } = useQuery({
     queryKey: brewLogKeys.detail(brewLogId),
-    queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "brew_logs")
-        .select("id, brew_number, status, events")
-        .eq("id", brewLogId)
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () =>
+      (await unwrap(
+        dynamicFrom(supabase, "brew_logs")
+          .select("id, brew_number, status, events")
+          .eq("id", brewLogId)
+          .single()
+      )) as unknown as { id: string; brew_number: string; status: string; events: unknown } | null,
     enabled: open,
   });
 
@@ -149,17 +149,17 @@ export function BrewLogCompletionDialog({
     queryKey: brewLogKeys.batchesForCompletion(brewLogId),
     queryFn: async () => {
       // Get brew_log_batches joined with batch info
-      const { data: links, error } = await dynamicFrom(supabase, "brew_log_batches")
-        .select(
-          `
+      const links = await unwrap(
+        dynamicFrom(supabase, "brew_log_batches")
+          .select(
+            `
           id,
           volume_bbl,
           batch_id
         `
-        )
-        .eq("brew_log_id", brewLogId);
-
-      if (error) throw error;
+          )
+          .eq("brew_log_id", brewLogId)
+      ) as unknown as Array<{ id: string; batch_id: string; volume_bbl: number | null }>;
       if (!links || links.length === 0) return [];
 
       // Fetch batch details from the view that includes vessel info
@@ -167,13 +167,13 @@ export function BrewLogCompletionDialog({
         (l: { batch_id: string }) => l.batch_id
       );
 
-      const { data: batches, error: batchError } = await dynamicFrom(supabase, "batches_with_brew_info")
-        .select(
-          "id, batch_code, name, status, volume_bbl, current_vessel_id, current_vessel_name"
-        )
-        .in("id", batchIds);
-
-      if (batchError) throw batchError;
+      const batches = await unwrap(
+        dynamicFrom(supabase, "batches_with_brew_info")
+          .select(
+            "id, batch_code, name, status, volume_bbl, current_vessel_id, current_vessel_name"
+          )
+          .in("id", batchIds)
+      ) as unknown as Array<{ id: string; batch_code: string; name: string; status: string; volume_bbl: number | null; current_vessel_id: string | null; current_vessel_name: string | null }>;
 
       // Combine link and batch data
       return links.map((link: { batch_id: string; volume_bbl: number | null }) => {
@@ -200,16 +200,15 @@ export function BrewLogCompletionDialog({
     AvailableVessel[]
   >({
     queryKey: vesselKeys.availableForCompletion(),
-    queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "vessels")
-        .select("id, name, vessel_type, capacity_bbl")
-        .eq("is_active", true)
-        .is("current_batch_id", null)
-        .in("vessel_type", ["fermenter", "unitank"])
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as AvailableVessel[];
-    },
+    queryFn: async () =>
+      (await unwrap(
+        dynamicFrom(supabase, "vessels")
+          .select("id, name, vessel_type, capacity_bbl")
+          .eq("is_active", true)
+          .is("current_batch_id", null)
+          .in("vessel_type", ["fermenter", "unitank"])
+          .order("name")
+      ) ?? []) as unknown as AvailableVessel[],
     enabled: open,
   });
 
@@ -297,30 +296,30 @@ export function BrewLogCompletionDialog({
           const volume = batch.link_volume_bbl ?? batch.volume_bbl ?? 0;
 
           // Use the atomic RPC function that creates transfer + updates batch
-          const { error } = await dynamicRpc(supabase, "start_batch_fermentation", {
-            p_batch_id: batch.id,
-            p_vessel_id: assignedVesselId,
-            p_volume_bbl: volume,
-            p_vessel_name: vesselName,
-          });
-
-          if (error) throw error;
+          await unwrap(
+            dynamicRpc(supabase, "start_batch_fermentation", {
+              p_batch_id: batch.id,
+              p_vessel_id: assignedVesselId,
+              p_volume_bbl: volume,
+              p_vessel_name: vesselName,
+            })
+          );
         } else if (batch.current_vessel_id) {
           // Vessel already assigned; just update batch status to fermenting
-          const { error } = await dynamicFrom(supabase, "batches")
-            .update({ status: "fermenting" })
-            .eq("id", batch.id);
-
-          if (error) throw error;
+          await unwrap(
+            dynamicFrom(supabase, "batches")
+              .update({ status: "fermenting" })
+              .eq("id", batch.id)
+          );
         }
       }
 
       // Mark brew log as completed
-      const { error: brewLogError } = await dynamicFrom(supabase, "brew_logs")
-        .update({ status: "completed" })
-        .eq("id", brewLogId);
-
-      if (brewLogError) throw brewLogError;
+      await unwrap(
+        dynamicFrom(supabase, "brew_logs")
+          .update({ status: "completed" })
+          .eq("id", brewLogId)
+      );
 
       // Invalidate caches
       queryClient.invalidateQueries({ queryKey: brewLogKeys.all() });

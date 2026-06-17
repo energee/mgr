@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { revisionKeys } from "@/lib/query-keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -427,16 +428,14 @@ export function RevisionHistory({
 
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntity(entityType, entityId),
-    queryFn: async () => {
-      const { data, error } = await dynamicFrom(createClient(), "entity_revisions")
-        .select("*")
-        .eq("entity_type", entityType)
-        .eq("entity_id", entityId)
-        .order("revision_number", { ascending: false });
-
-      if (error) throw error;
-      return data as Revision[];
-    },
+    queryFn: async () =>
+      await unwrap(
+        dynamicFrom(createClient(), "entity_revisions")
+          .select("*")
+          .eq("entity_type", entityType)
+          .eq("entity_id", entityId)
+          .order("revision_number", { ascending: false })
+      ) as unknown as Revision[],
   });
 
   const resolvedNames = useResolvedNames(revisions);
@@ -498,17 +497,15 @@ export function RevisionHistoryCompact({
 }) {
   const { data: revisions = [], isLoading } = useQuery({
     queryKey: revisionKeys.forEntityCompact(entityType, entityId),
-    queryFn: async () => {
-      const { data, error } = await dynamicFrom(createClient(), "entity_revisions")
-        .select("id, operation, changed_at, revision_number")
-        .eq("entity_type", entityType)
-        .eq("entity_id", entityId)
-        .order("revision_number", { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () =>
+      (await unwrap(
+        dynamicFrom(createClient(), "entity_revisions")
+          .select("id, operation, changed_at, revision_number")
+          .eq("entity_type", entityType)
+          .eq("entity_id", entityId)
+          .order("revision_number", { ascending: false })
+          .limit(limit)
+      )) as unknown as Array<{ id: string; operation: Revision["operation"]; changed_at: string; revision_number: number }>,
   });
 
   if (isLoading) {

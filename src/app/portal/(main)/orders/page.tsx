@@ -19,6 +19,7 @@ import { EmptyStateHint } from "@/components/universal/empty-state-hint";
 import Link from "next/link";
 import { orderEntity } from "@/entities/order";
 import { formatDate as sharedFormatDate } from "@/lib/format";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "-";
@@ -32,14 +33,14 @@ export default function PortalOrdersPage() {
   const { data: orders, isLoading } = useQuery({
     queryKey: portalKeys.orders(customerIds),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          "id, order_number, status, order_date, requested_date, order_items(id)"
-        )
-        .order("order_date", { ascending: false });
-      if (error) throw error;
-      return data;
+      return await unwrap(
+        supabase
+          .from("orders")
+          .select(
+            "id, order_number, status, order_date, requested_date, order_items(id)"
+          )
+          .order("order_date", { ascending: false })
+      );
     },
     enabled: customerIds.length > 0,
   });

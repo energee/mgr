@@ -45,6 +45,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FlaskConical, Pencil, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 /** Water chemistry additive types */
 const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
@@ -151,14 +152,13 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
   const { data: additions, isLoading: additionsLoading } = useQuery({
     queryKey: recipeKeys.additions(recipeId!),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recipe_additions")
-        .select(ADDITIONS_SELECT)
-        .eq("recipe_id", recipeId!)
-        .order("position", { ascending: true });
-
-      if (error) throw error;
-      return data as AdditionRow[];
+      return await unwrap(
+        supabase
+          .from("recipe_additions")
+          .select(ADDITIONS_SELECT)
+          .eq("recipe_id", recipeId!)
+          .order("position", { ascending: true })
+      ) as AdditionRow[];
     },
     enabled: !!recipeId,
   });
@@ -167,13 +167,13 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
   const { data: sourceWaterProfile } = useQuery({
     queryKey: entityKeys.detail("water_profiles", sourceWaterProfileId!),
     queryFn: async () => {
-      const { data: row, error } = await supabase
-        .from("water_profiles")
-        .select("name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, ph")
-        .eq("id", sourceWaterProfileId!)
-        .single();
-      if (error) throw error;
-      return row;
+      return await unwrap(
+        supabase
+          .from("water_profiles")
+          .select("name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, ph")
+          .eq("id", sourceWaterProfileId!)
+          .single()
+      ) as { name: string | null; calcium_ppm: number | null; magnesium_ppm: number | null; sodium_ppm: number | null; sulfate_ppm: number | null; chloride_ppm: number | null; bicarbonate_ppm: number | null; ph: number | null } | null;
     },
     enabled: !!sourceWaterProfileId,
   });
@@ -182,13 +182,13 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
   const { data: targetWaterProfile } = useQuery({
     queryKey: entityKeys.detail("water_profiles", targetWaterProfileId!),
     queryFn: async () => {
-      const { data: row, error } = await supabase
-        .from("water_profiles")
-        .select("name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, ph")
-        .eq("id", targetWaterProfileId!)
-        .single();
-      if (error) throw error;
-      return row;
+      return await unwrap(
+        supabase
+          .from("water_profiles")
+          .select("name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, ph")
+          .eq("id", targetWaterProfileId!)
+          .single()
+      ) as { name: string | null; calcium_ppm: number | null; magnesium_ppm: number | null; sodium_ppm: number | null; sulfate_ppm: number | null; chloride_ppm: number | null; bicarbonate_ppm: number | null; ph: number | null } | null;
     },
     enabled: !!targetWaterProfileId,
   });
@@ -252,11 +252,12 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
       // Delete existing water_salt/acid additions for this recipe
       const existingWaterIds = waterAdditions.map((a) => a.id);
       if (existingWaterIds.length > 0) {
-        const { error: deleteError } = await supabase
-          .from("recipe_additions")
-          .delete()
-          .in("id", existingWaterIds);
-        if (deleteError) throw deleteError;
+        await unwrap(
+          supabase
+            .from("recipe_additions")
+            .delete()
+            .in("id", existingWaterIds)
+        );
       }
 
       // Insert calculated salt additions
@@ -270,10 +271,11 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
         position: index,
       }));
 
-      const { error: insertError } = await supabase
-        .from("recipe_additions")
-        .insert(insertData);
-      if (insertError) throw insertError;
+      await unwrap(
+        supabase
+          .from("recipe_additions")
+          .insert(insertData)
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: recipeKeys.additions(recipeId!) });

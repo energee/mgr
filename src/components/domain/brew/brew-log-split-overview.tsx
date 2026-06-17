@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { brewLogKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,11 +65,12 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
   // Fetch linked batches
   const { data: linkedBatches, isLoading: batchesLoading } = useQuery({
     queryKey: brewLogKeys.batchSplitOverview(brewLogId),
-    queryFn: async () => {
-      const { data: links, error } = await supabase
-        .from("brew_log_batches")
-        .select(
-          `
+    queryFn: async () =>
+      (await unwrap(
+        supabase
+          .from("brew_log_batches")
+          .select(
+            `
           id,
           volume_bbl,
           notes,
@@ -81,12 +83,9 @@ export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
             recipe:recipes(name)
           )
         `
-        )
-        .eq("brew_log_id", brewLogId);
-
-      if (error) throw error;
-      return (links ?? []) as unknown as LinkedBatch[];
-    },
+          )
+          .eq("brew_log_id", brewLogId)
+      ) ?? []) as unknown as LinkedBatch[],
   });
 
   if (batchesLoading) {

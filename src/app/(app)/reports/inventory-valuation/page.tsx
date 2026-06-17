@@ -18,6 +18,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { formatCurrency } from "@/lib/format";
 import {
   Card,
@@ -138,16 +139,15 @@ export default function InventoryValuationPage() {
     queryFn: async () => {
       // Fetch lots with remaining quantities, joined to item details.
       // The view already calculates remaining_quantity from allocations.
-      const { data, error } = await supabase
-        .from("inventory_lots_with_quantities")
-        .select(
-          "id, inventory_item_id, remaining_quantity, unit, unit_cost, inventory_items(name, category)"
-        )
-        .gt("remaining_quantity", 0)
-        .lte("received_date", asOfDate);
-
-      if (error) throw error;
-      return (data ?? []) as unknown as RawMaterialLot[];
+      return await unwrap(
+        supabase
+          .from("inventory_lots_with_quantities")
+          .select(
+            "id, inventory_item_id, remaining_quantity, unit, unit_cost, inventory_items(name, category)"
+          )
+          .gt("remaining_quantity", 0)
+          .lte("received_date", asOfDate)
+      ) as unknown as RawMaterialLot[];
     },
   });
 
@@ -161,16 +161,15 @@ export default function InventoryValuationPage() {
   } = useQuery({
     queryKey: reportKeys.inventoryValuationFinishedGoods(asOfDate),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("finished_goods_with_availability")
-        .select(
-          "id, batch_id, brand_name, package_type_name, available_quantity, quantity"
-        )
-        .gt("available_quantity", 0)
-        .lte("production_date", asOfDate);
-
-      if (error) throw error;
-      return (data ?? []) as unknown as FinishedGoodRow[];
+      return await unwrap(
+        supabase
+          .from("finished_goods_with_availability")
+          .select(
+            "id, batch_id, brand_name, package_type_name, available_quantity, quantity"
+          )
+          .gt("available_quantity", 0)
+          .lte("production_date", asOfDate)
+      ) as unknown as FinishedGoodRow[];
     },
   });
 

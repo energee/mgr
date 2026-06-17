@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { packagingKeys } from "@/lib/query-keys";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { packagingSessionEntity } from "@/entities/packaging-session";
 import {
@@ -41,13 +42,14 @@ export function BatchPackagingHistory({ batchId }: { batchId: string }) {
   const { data: items, isLoading } = useQuery({
     queryKey: packagingKeys.historyForBatch(batchId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("session_line_items")
-        .select(
-          "id, session_id, selling_format_id, planned_quantity, actual_quantity, packaging_sessions(session_date, status), selling_formats(name)"
-        )
-        .eq("batch_id" as string, batchId);
-      if (error) throw error;
+      const data = await unwrap(
+        supabase
+          .from("session_line_items")
+          .select(
+            "id, session_id, selling_format_id, planned_quantity, actual_quantity, packaging_sessions(session_date, status), selling_formats(name)"
+          )
+          .eq("batch_id" as string, batchId)
+      );
       return (data ?? []).map((row) => {
         const session = row.packaging_sessions as unknown as {
           session_date: string;

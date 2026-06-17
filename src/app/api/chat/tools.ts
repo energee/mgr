@@ -24,7 +24,7 @@ import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 import { entityService } from "@/services/entity-service";
 import { inventoryService } from "@/services/inventory-service";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
-import { CHAT_ENTITY_MAP } from "./entity-map";
+import { coreRegistry } from "@/entities/cores";
 import { escapeLike } from "@/lib/utils";
 
 /** Execute an RPC call and throw on error. */
@@ -77,6 +77,13 @@ async function resolveBatch(
 }
 
 /**
+ * Sorted, comma-separated list of registry entity names. Built once at module
+ * load — `coreRegistry` is a top-level `const` so it's fully populated by the
+ * time this expression evaluates.
+ */
+const ENTITY_NAMES_LIST = Array.from(coreRegistry.keys()).sort().join(", ");
+
+/**
  * Create chat tools bound to an authenticated Supabase client.
  * Read tools query data directly. Navigation tools return a NavigationIntent
  * that the client renders as an action card — the user reviews and submits.
@@ -88,9 +95,10 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
     // =========================================================================
 
     searchEntity: tool({
-      // Entity list is derived from CHAT_ENTITY_MAP so the description can
-      // never drift from the entities the tool actually supports.
-      description: `Search any entity type. Available entities: ${Array.from(CHAT_ENTITY_MAP.keys()).join(", ")}. Use 'query' for text search across searchable fields. Use 'filters' for exact-match filtering (e.g. status, category).`,
+      // Entity list is derived from coreRegistry so the description can never
+      // drift from the entities the tool actually supports.
+      description:
+        `Search any entity type. Available entities: ${ENTITY_NAMES_LIST}. Use 'query' for text search across searchable fields. Use 'filters' for exact-match filtering (e.g. status, category).`,
       inputSchema: z.object({
         entityName: z
           .string()
@@ -112,10 +120,10 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           .describe("Max results to return"),
       }),
       execute: async ({ entityName, query: searchQuery, filters, limit }) => {
-        const entity = CHAT_ENTITY_MAP.get(entityName);
+        const entity = coreRegistry.get(entityName);
         if (!entity) {
           throw new Error(
-            `Unknown entity "${entityName}". Available entities: ${Array.from(CHAT_ENTITY_MAP.keys()).join(", ")}`
+            `Unknown entity "${entityName}". Available entities: ${Array.from(coreRegistry.keys()).join(", ")}`
           );
         }
 
@@ -143,10 +151,10 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         id: z.string().uuid().describe("The record UUID"),
       }),
       execute: async ({ entityName, id }) => {
-        const entity = CHAT_ENTITY_MAP.get(entityName);
+        const entity = coreRegistry.get(entityName);
         if (!entity) {
           throw new Error(
-            `Unknown entity "${entityName}". Available entities: ${Array.from(CHAT_ENTITY_MAP.keys()).join(", ")}`
+            `Unknown entity "${entityName}". Available entities: ${Array.from(coreRegistry.keys()).join(", ")}`
           );
         }
 

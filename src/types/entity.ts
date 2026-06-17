@@ -22,10 +22,30 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { ZodSchema } from "zod";
 
 // =============================================================================
-// Core Entity Configuration
+// Entity Configuration — Core / Presentation split
 // =============================================================================
+//
+// An entity definition has two halves:
+//
+//   EntityCore         — pure, serializable data. No React imports. Safe to
+//                        import from server route handlers, API routes, and
+//                        edge functions. Holds identity, the zod formSchema,
+//                        the state machine, relations, and AI metadata.
+//   EntityPresentation — the React/UI half: list columns, filters, detail
+//                        sections, actions, dialogs, kanban board config.
+//
+// `EntityConfig = EntityCore & EntityPresentation`, so every existing consumer
+// is unaffected. Per-entity files keep the two halves in separate modules
+// (`core.ts` / `presentation.tsx`) and assemble them with `createEntityConfig()`
+// in `src/entities/<name>/index.ts`.
 
-export type EntityConfig<T = Record<string, unknown>> = {
+/**
+ * Server-safe half of an entity definition: pure data, no React.
+ *
+ * `core.ts` modules only import `zod`, generated `Database` types, and the
+ * type-level helpers here — making them importable from server code.
+ */
+export type EntityCore<T = Record<string, unknown>> = {
   /** Unique identifier for this entity (e.g., 'batch', 'recipe') */
   name: string;
 
@@ -65,10 +85,47 @@ export type EntityConfig<T = Record<string, unknown>> = {
    */
   basePath?: string | null;
 
-  // ---------------------------------------------------------------------------
-  // List View Configuration
-  // ---------------------------------------------------------------------------
+  /** Default sort configuration */
+  defaultSort?: { column: keyof T & string; direction: "asc" | "desc" };
 
+  /** Searchable fields (for quick search) */
+  searchableFields?: (keyof T & string)[];
+
+  /**
+   * Header fields to show prominently. Pure field-name strings — consumed by
+   * the chat route to build entity context summaries, so it lives in core.
+   */
+  detailHeader?: {
+    title: keyof T & string;
+    subtitle?: keyof T & string;
+    badge?: keyof T & string;
+  };
+
+  /** Zod schema for form validation. The shared contract for forms and AI writes. */
+  formSchema: ZodSchema<Partial<T>>;
+
+  /** State machine (for stateful entities) */
+  stateMachine?: StateMachineConfig<T>;
+
+  /** Display configuration for enum/type fields (mirrors stateDisplay pattern) */
+  valueDisplay?: ValueDisplayConfig[];
+
+  /** Relationships to other entities */
+  relations?: EntityRelationDef[];
+
+  /** Example natural language queries for AI */
+  queryExamples?: string[];
+
+  /** Key fields for AI to understand */
+  keyFields?: (keyof T & string)[];
+}
+
+/**
+ * Client-only half of an entity definition: the list / detail / form UI.
+ *
+ * `presentation.tsx` modules may import React and client components freely.
+ */
+export type EntityPresentation<T = Record<string, unknown>> = {
   /** Columns to display in list view */
   listColumns: EntityColumnDef<T>[];
 
@@ -78,56 +135,11 @@ export type EntityConfig<T = Record<string, unknown>> = {
   /** Quick filter tabs above the toolbar (presets that set URL filters on click) */
   quickFilters?: QuickFilterDef[];
 
-  /** Default sort configuration */
-  defaultSort?: { column: keyof T & string; direction: "asc" | "desc" };
-
-  /** Searchable fields (for quick search) */
-  searchableFields?: (keyof T & string)[];
-
-  // ---------------------------------------------------------------------------
-  // Detail View Configuration
-  // ---------------------------------------------------------------------------
-
-  /** Header fields to show prominently */
-  detailHeader?: {
-    title: keyof T & string;
-    subtitle?: keyof T & string;
-    badge?: keyof T & string;
-  };
-
-  // ---------------------------------------------------------------------------
-  // Unified Detail/Edit View Configuration
-  // ---------------------------------------------------------------------------
-
   /** Unified sections for combined detail/edit view. */
   sections?: UnifiedSectionDef<T>[];
 
-  // ---------------------------------------------------------------------------
-  // Form Configuration
-  // ---------------------------------------------------------------------------
-
-  /** Zod schema for form validation */
-  formSchema: ZodSchema<Partial<T>>;
-
-  // ---------------------------------------------------------------------------
-  // State Machine (for stateful entities)
-  // ---------------------------------------------------------------------------
-
-  stateMachine?: StateMachineConfig<T>;
-
   /** Kanban board config. Requires stateMachine. */
   kanbanConfig?: KanbanConfig<T>;
-
-  // ---------------------------------------------------------------------------
-  // Value Display (for non-state enum fields)
-  // ---------------------------------------------------------------------------
-
-  /** Display configuration for enum/type fields (mirrors stateDisplay pattern) */
-  valueDisplay?: ValueDisplayConfig[];
-
-  // ---------------------------------------------------------------------------
-  // Actions & Dialogs
-  // ---------------------------------------------------------------------------
 
   /** Available actions for this entity */
   actions?: EntityActionDef<T>[];
@@ -154,19 +166,134 @@ export type EntityConfig<T = Record<string, unknown>> = {
   /** Dialog configurations for actions */
   dialogs?: Record<string, EntityDialogConfig<T>>;
 
-  // ---------------------------------------------------------------------------
-  // Relations
-  // ---------------------------------------------------------------------------
-
-  /** Relationships to other entities */
-  relations?: EntityRelationDef[];
-
   /**
-   * Key fields for AI context summaries. Not set by registry entity configs —
-   * populated only by the server-safe CHAT_ENTITY_MAP (src/app/api/chat/entity-map.ts),
-   * whose entries are typed as EntityConfig and read by the chat route.
+   * React components for relation tabs, keyed by relation name. The relation
+   * data itself lives in `EntityCore.relations` (server-safe); the matching
+   * component is supplied here so `core.ts` stays free of React imports.
+   * `createEntityConfig()` weaves each component onto its relation.
    */
-  keyFields?: (keyof T & string)[];
+  relationComponents?: Record<
+    string,
+    ComponentType<{ parentId: string; data?: Record<string, unknown> }>
+  >;
+}
+
+/**
+ * Full entity configuration — the assembled core + presentation. Universal
+ * components (EntityList, EntityDetail, EntityForm) render from this.
+ */
+export type EntityConfig<T = Record<string, unknown>> = EntityCore<T> &
+  EntityPresentation<T>;
+
+/**
+ * Fields `createEntityConfig()` fills with a default when a per-entity
+ * `core.ts` omits them, so the common case stays terse:
+ *
+ *   displayNamePlural → `${displayName}s`
+ *   searchableFields  → ["name"]
+ *   defaultSort       → { column: "name", direction: "asc" } — only when a
+ *                       "name" column exists in listColumns
+ *
+ * Entities opt out with explicit values — an irregular plural ("Batch" →
+ * "Batches"), a non-name sort column, or `searchableFields: []` to disable
+ * quick search. A nameless entity (no "name" column) that omits defaultSort
+ * keeps an undefined sort; it should set searchableFields explicitly.
+ */
+type DefaultableCoreField = "displayNamePlural" | "searchableFields" | "defaultSort";
+
+/**
+ * The core shape a per-entity `core.ts` passes to `createEntityConfig()`.
+ * Identical to `EntityCore` except the three defaultable fields may be
+ * omitted. A complete `EntityCore` is also assignable here.
+ */
+export type EntityCoreInput<T = Record<string, unknown>> = Omit<
+  EntityCore<T>,
+  DefaultableCoreField
+> &
+  Partial<Pick<EntityCore<T>, DefaultableCoreField>>;
+
+/**
+ * Apply the single `EntityCore` default that doesn't depend on the
+ * presentation half (`displayNamePlural` → `${displayName}s`) and return a
+ * complete `EntityCore<T>`. Server-safe: no React imports, no `listColumns`
+ * dependency. Used by both `createEntityConfig` (the React path) and
+ * `src/entities/cores.ts` (the server path that powers the AI chat route).
+ *
+ * `searchableFields` and `defaultSort` are intentionally left as the core
+ * authored them. Both are optional on `EntityCore`; defaulting them here
+ * would change behavior for join-row entities that lack a `name` column
+ * (`order_item`, `po_line_item`, `session_line_item`). The presentation-side
+ * defaults stay in `createEntityConfig` where `listColumns` is available.
+ */
+export function resolveServerCore<T>(core: EntityCoreInput<T>): EntityCore<T> {
+  return {
+    ...core,
+    displayNamePlural: core.displayNamePlural ?? `${core.displayName}s`,
+  };
+}
+
+/**
+ * Assemble an EntityConfig from its server-safe core and its presentation half.
+ * Every per-entity `index.ts` goes through this single seam. It supplies
+ * safe-field defaults (see `DefaultableCoreField`) and weaves any
+ * `relationComponents` onto their matching `core.relations` entry.
+ */
+export function createEntityConfig<T>(
+  core: EntityCoreInput<T>,
+  presentation: EntityPresentation<T>,
+): EntityConfig<T> {
+  const { relationComponents, ...presentationFields } = presentation;
+
+  const relations =
+    relationComponents && core.relations
+      ? core.relations.map((relation) =>
+          relationComponents[relation.name]
+            ? { ...relation, component: relationComponents[relation.name] }
+            : relation,
+        )
+      : core.relations;
+
+  // The name-sorted defaultSort is only safe when a "name" column actually
+  // exists. Nameless entities (join rows like session_line_item) that omit
+  // defaultSort keep an undefined sort rather than a broken one.
+  const hasNameColumn = presentationFields.listColumns.some(
+    (column) => column.accessorKey === "name",
+  );
+
+  return {
+    ...resolveServerCore(core),
+    searchableFields: core.searchableFields ?? (["name"] as (keyof T & string)[]),
+    defaultSort:
+      core.defaultSort ??
+      (hasNameColumn
+        ? ({ column: "name", direction: "asc" } as EntityCore<T>["defaultSort"])
+        : undefined),
+    relations,
+    ...presentationFields,
+  };
+}
+
+/**
+ * Build the standard destructive delete action. Every entity that supports
+ * deletion declares the same `{ name, icon, type, variant }` shape — this
+ * helper builds it so each `presentation.tsx` only states the noun and, on
+ * the rare soft-delete entity, the mode.
+ *
+ * @param noun Entity noun for the label, e.g. "Profile" → "Delete Profile".
+ * @param mode "hard" (default) issues a DELETE; "soft" sets is_active = false.
+ */
+export function deleteAction<T>(
+  noun: string,
+  mode: "hard" | "soft" = "hard",
+): EntityActionDef<T> {
+  return {
+    name: "delete",
+    label: `Delete ${noun}`,
+    icon: "trash",
+    type: "dropdown",
+    variant: "destructive",
+    deleteMode: mode,
+  };
 }
 
 // =============================================================================
@@ -767,7 +894,7 @@ export function registerEntity<T = Record<string, unknown>>(config: EntityConfig
  * via `basePath: null` (inline-only entities).
  */
 export function resolveEntityBasePath<T>(
-  entity: EntityConfig<T>,
+  entity: EntityCoreInput<T>,
   override?: string,
 ): string | null {
   if (override) return override;
@@ -804,7 +931,7 @@ export function formatStateLabel(state: string): string {
  * Falls back to formatted state name if not defined.
  */
 export function getStateLabel<T>(
-  entity: EntityConfig<T>,
+  entity: EntityCoreInput<T>,
   state: string | null | undefined
 ): string {
   if (!state) return "";
@@ -826,6 +953,19 @@ export function getTransitionFieldsAction<T>(
   return entity.actions?.find(
     (a) => a.toState === toState && !!a.transitionFields?.length
   );
+}
+
+/**
+ * Get the display color for a state from an entity config.
+ * Falls back to "default" if not defined.
+ */
+export function getStateColor<T>(
+  entity: EntityCoreInput<T>,
+  state: string | null | undefined
+): string {
+  if (!state) return "default";
+  const display = entity.stateMachine?.stateDisplay?.[state];
+  return display?.color || "default";
 }
 
 // =============================================================================
@@ -850,7 +990,7 @@ export function valuesAsOptions(
  * Returns the full display object (label and color).
  */
 export function getValueDisplay<T>(
-  entity: EntityConfig<T>,
+  entity: EntityCoreInput<T>,
   field: string,
   value: string | null | undefined
 ): { label: string; color?: "default" | "success" | "warning" | "error" | "info" } | undefined {
@@ -864,11 +1004,25 @@ export function getValueDisplay<T>(
  * Falls back to formatted value name if not defined.
  */
 export function getValueLabel<T>(
-  entity: EntityConfig<T>,
+  entity: EntityCoreInput<T>,
   field: string,
   value: string | null | undefined
 ): string {
   if (!value) return "";
   const display = getValueDisplay(entity, field, value);
   return display?.label || formatStateLabel(value);
+}
+
+/**
+ * Get the color for a value from an entity config.
+ * Falls back to "default" if not defined.
+ */
+export function getValueColor<T>(
+  entity: EntityCoreInput<T>,
+  field: string,
+  value: string | null | undefined
+): "default" | "success" | "warning" | "error" | "info" {
+  if (!value) return "default";
+  const display = getValueDisplay(entity, field, value);
+  return display?.color || "default";
 }

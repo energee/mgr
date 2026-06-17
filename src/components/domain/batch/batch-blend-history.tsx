@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { entityKeys, batchKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Table,
   TableBody,
@@ -51,6 +52,19 @@ type BlendDetailRow = {
   blended_at: string;
 }
 
+/** Row shape returned by the batches_with_blend_info view. */
+type BlendInfoRow = {
+  id: string;
+  blended_og: number | null;
+  blended_fg: number | null;
+  blended_abv: number | null;
+  blended_ibu: number | null;
+  blended_srm: number | null;
+  blend_source_recipes: string[] | null;
+  volume_blended_away_bbl: number | null;
+  available_volume_bbl: number | null;
+}
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -63,12 +77,12 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const { data: blends, isLoading } = useQuery({
     queryKey: entityKeys.related("batch_blends", "blend_batch_id", batchId),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "batch_blend_details")
-        .select("*")
-        .eq("blend_batch_id", batchId)
-        .order("blended_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return (await unwrap(
+        dynamicFrom(supabase, "batch_blend_details")
+          .select("*")
+          .eq("blend_batch_id", batchId)
+          .order("blended_at", { ascending: false })
+      )) as unknown as BlendDetailRow[] | null;
     },
   });
 
@@ -76,12 +90,12 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const { data: usedInBlends } = useQuery({
     queryKey: entityKeys.related("batch_blends", "source_batch_id", batchId),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "batch_blend_details")
-        .select("*")
-        .eq("source_batch_id", batchId)
-        .order("blended_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      return (await unwrap(
+        dynamicFrom(supabase, "batch_blend_details")
+          .select("*")
+          .eq("source_batch_id", batchId)
+          .order("blended_at", { ascending: false })
+      )) as unknown as BlendDetailRow[] | null;
     },
   });
 
@@ -89,12 +103,12 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const { data: blendInfo } = useQuery({
     queryKey: batchKeys.blendInfo(batchId),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "batches_with_blend_info")
-        .select("*")
-        .eq("id", batchId)
-        .single();
-      if (error) throw error;
-      return data;
+      return (await unwrap(
+        dynamicFrom(supabase, "batches_with_blend_info")
+          .select("*")
+          .eq("id", batchId)
+          .single()
+      )) as unknown as BlendInfoRow | null;
     },
   });
 
@@ -219,10 +233,10 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
               </div>
             )}
           </div>
-          {blendInfo.blend_source_recipes?.length > 0 && (
+          {(blendInfo.blend_source_recipes?.length ?? 0) > 0 && (
             <div className="text-sm">
               <span className="text-muted-foreground">Source Recipes:</span>{" "}
-              <span className="font-medium">{blendInfo.blend_source_recipes.join(", ")}</span>
+              <span className="font-medium">{blendInfo.blend_source_recipes?.join(", ")}</span>
             </div>
           )}
         </div>

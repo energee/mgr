@@ -24,6 +24,7 @@ import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency as formatCurrencyBase } from "@/lib/format";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 /** Sales dashboard uses whole-dollar formatting for cleaner high-level display. */
 const formatCurrency = (v: number | null | undefined) => formatCurrencyBase(v, 0);
@@ -132,10 +133,9 @@ export default function SalesDashboardPage() {
   const { data: orderCounts = DEFAULT_ORDER_COUNTS } = useQuery({
     queryKey: dashboardKeys.sales.orderCounts(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "order_status_counts")
-        .select("status, count");
-
-      if (error) throw error;
+      const data = await unwrap(
+        dynamicFrom(supabase, "order_status_counts").select("status, count")
+      ) as unknown as Array<{ status: string; count: number }>;
 
       const counts = { ...DEFAULT_ORDER_COUNTS };
       for (const row of data ?? []) {
@@ -156,30 +156,30 @@ export default function SalesDashboardPage() {
   const { data: recentOrders = [] } = useQuery({
     queryKey: dashboardKeys.sales.recentOrders(),
     queryFn: async () => {
-      const { data: orders, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
+      const orders = await unwrap(
+        supabase
+          .from("orders")
+          .select(`
           id,
           order_number,
           status,
           order_date,
           customers:customer_id(name)
         `)
-        .not("status", "eq", "cancelled")
-        .order("order_date", { ascending: false })
-        .limit(10);
-
-      if (ordersError) throw ordersError;
+          .not("status", "eq", "cancelled")
+          .order("order_date", { ascending: false })
+          .limit(10)
+      );
 
       // Fetch pre-aggregated totals only for displayed orders
       const orderIds = (orders || []).map((o) => o.id);
       let totals: { order_id: string; total_value: number }[] = [];
       if (orderIds.length > 0) {
-        const { data, error: totalsError } = await dynamicFrom(supabase, "order_totals")
-          .select("order_id, total_value")
-          .in("order_id", orderIds);
-        if (totalsError) throw totalsError;
-        totals = data ?? [];
+        totals = await unwrap(
+          dynamicFrom(supabase, "order_totals")
+            .select("order_id, total_value")
+            .in("order_id", orderIds)
+        ) as unknown as { order_id: string; total_value: number }[];
       }
 
       const totalMap = new Map<string, number>();
@@ -205,13 +205,12 @@ export default function SalesDashboardPage() {
   const { data: customerRevenue = [] } = useQuery({
     queryKey: dashboardKeys.sales.customerRevenue(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "customer_revenue_summary")
-        .select("customer_id, customer_name, sales_channel, order_count, total_revenue")
-        .order("total_revenue", { ascending: false })
-        .limit(MAX_QUERY_RESULTS);
-
-      if (error) throw error;
-      return (data || []) as CustomerRevenue[];
+      return await unwrap(
+        dynamicFrom(supabase, "customer_revenue_summary")
+          .select("customer_id, customer_name, sales_channel, order_count, total_revenue")
+          .order("total_revenue", { ascending: false })
+          .limit(MAX_QUERY_RESULTS)
+      ) as unknown as CustomerRevenue[];
     },
     refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,
@@ -222,13 +221,12 @@ export default function SalesDashboardPage() {
   const { data: productMix = [] } = useQuery({
     queryKey: dashboardKeys.sales.productMix(),
     queryFn: async () => {
-      const { data, error } = await dynamicFrom(supabase, "product_mix_by_brand")
-        .select("brand_id, brand_name, total_quantity, total_revenue")
-        .order("total_revenue", { ascending: false })
-        .limit(MAX_QUERY_RESULTS);
-
-      if (error) throw error;
-      return (data || []) as ProductMix[];
+      return await unwrap(
+        dynamicFrom(supabase, "product_mix_by_brand")
+          .select("brand_id, brand_name, total_quantity, total_revenue")
+          .order("total_revenue", { ascending: false })
+          .limit(MAX_QUERY_RESULTS)
+      ) as unknown as ProductMix[];
     },
     refetchInterval: POLLING_INTERVALS.NORMAL,
     refetchIntervalInBackground: false,

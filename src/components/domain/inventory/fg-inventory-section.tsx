@@ -9,6 +9,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { allocationEntity } from "@/entities/allocation";
@@ -40,14 +41,14 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
   const { data: binRows, isLoading: binsLoading } = useQuery({
     queryKey: finishedGoodKeys.binInventory(fgId),
     queryFn: async () => {
-      const { data: rows, error } = await supabase
-        .from("bin_inventory")
-        .select("quantity, bin_id, bins(name, location_id, locations(name))")
-        .eq("finished_good_id", fgId)
-        .gt("quantity", 0)
-        .order("quantity", { ascending: false });
-      if (error) throw error;
-      return rows;
+      return await unwrap(
+        supabase
+          .from("bin_inventory")
+          .select("quantity, bin_id, bins(name, location_id, locations(name))")
+          .eq("finished_good_id", fgId)
+          .gt("quantity", 0)
+          .order("quantity", { ascending: false }),
+      );
     },
   });
 
@@ -55,15 +56,16 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
   const { data: commitments, isLoading: commitmentsLoading } = useQuery({
     queryKey: finishedGoodKeys.commitments(fgId),
     queryFn: async () => {
-      const { data: rows, error } = await supabase
-        .from("allocations")
-        .select("id, quantity, status, destination_id, destination_type")
-        .eq("source_type", "finished_good")
-        .eq("source_id", fgId)
-        .in("destination_type", ["order"])
-        .in("status", ["planned", "completed"])
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+      const rows = await unwrap(
+        supabase
+          .from("allocations")
+          .select("id, quantity, status, destination_id, destination_type")
+          .eq("source_type", "finished_good")
+          .eq("source_id", fgId)
+          .in("destination_type", ["order"])
+          .in("status", ["planned", "completed"])
+          .order("created_at", { ascending: false }),
+      );
 
       // Fetch order numbers for display
       if (rows && rows.length > 0) {

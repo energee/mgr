@@ -17,6 +17,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import { dynamicFrom } from "@/services/types";
 import { orderKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,7 +86,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
   const { data: order, isLoading: orderLoading } = useQuery({
     queryKey: orderKeys.pickList(orderId, "order"),
     queryFn: async () => {
-      const { data, error } = await supabase
+      const data = (await unwrap(supabase
         .from("orders")
         .select(`
           id,
@@ -96,9 +97,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
           customers:customer_id(name)
         `)
         .eq("id", orderId)
-        .single();
-
-      if (error) throw error;
+        .single())) as unknown as { id: string; order_number: string; status: string; order_date: string; scheduled_date: string | null; customers: { name: string } | null };
 
       return {
         id: data.id,

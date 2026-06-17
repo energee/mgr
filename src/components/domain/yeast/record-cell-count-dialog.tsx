@@ -17,6 +17,7 @@ import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Dialog,
   DialogContent,
@@ -99,11 +100,11 @@ export function RecordCellCountDialog({
         updatePayload.received_date = values.measured_date;
       }
 
-      const { error } = await dynamicFrom(supabase, "yeast_pitches")
-        .update(updatePayload)
-        .eq("id", pitchId);
-
-      if (error) throw error;
+      await unwrap(
+        dynamicFrom(supabase, "yeast_pitches")
+          .update(updatePayload)
+          .eq("id", pitchId),
+      );
       return values;
     },
     onSuccess: (values) => {
