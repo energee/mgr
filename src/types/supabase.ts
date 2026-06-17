@@ -1064,7 +1064,7 @@ export type Database = {
         }
         Insert: {
           brew_date: string
-          brew_number: string
+          brew_number?: string
           brewer_id?: string | null
           created_at?: string | null
           events?: Json | null
@@ -2402,6 +2402,13 @@ export type Database = {
             foreignKeyName: "keg_transactions_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -2996,6 +3003,13 @@ export type Database = {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -3105,6 +3119,13 @@ export type Database = {
             columns: ["inventory_item_id"]
             isOneToOne: false
             referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_materials_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_list_details"
             referencedColumns: ["id"]
           },
           {
@@ -3529,6 +3550,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pick_lists_order_id_fkey"
             columns: ["order_id"]
@@ -7662,6 +7690,13 @@ export type Database = {
             foreignKeyName: "keg_transactions_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -8769,6 +8804,13 @@ export type Database = {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -8925,6 +8967,13 @@ export type Database = {
             foreignKeyName: "order_items_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -9056,6 +9105,13 @@ export type Database = {
           total_items: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pick_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pick_lists_order_id_fkey"
             columns: ["order_id"]
@@ -10115,8 +10171,6 @@ export type Database = {
         Returns: undefined
       }
       generate_lot_number: { Args: { p_date: string }; Returns: string }
-      // Hand-added for migration 00186 (generate_next_order_number) pending
-      // type regeneration — matches the generated Args/Returns shape.
       generate_next_order_number: { Args: never; Returns: string }
       generate_pick_list: { Args: { p_order_id: string }; Returns: string }
       get_ai_schema_context: { Args: { p_domain?: string }; Returns: Json }
@@ -10312,8 +10366,6 @@ export type Database = {
         }
         Returns: string
       }
-      // Hand-added for migration 00184 (revise_packaging_session) pending
-      // type regeneration — matches the generated Args/Returns shape.
       revise_packaging_session: {
         Args: { p_items: Json; p_reason?: string; p_session_id: string }
         Returns: Json
