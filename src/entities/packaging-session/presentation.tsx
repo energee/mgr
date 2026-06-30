@@ -10,6 +10,7 @@ import type { EntityPresentation } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { SessionLineItemsDisplay } from "@/components/domain/packaging/session-line-items-display";
 import { PackagingSessionMaterialsSection } from "@/components/domain/packaging/packaging-session-materials";
+import { localDateString } from "@/lib/format";
 import type { PackagingSession } from "./core";
 import { packagingSessionStateMachine, statusOptions } from "./core";
 
@@ -101,8 +102,8 @@ export const packagingSessionPresentation: EntityPresentation<PackagingSession> 
           label: "Session Date",
           type: "date",
           required: true,
-          // Defaults to today on the generic create form.
-          defaultValue: () => new Date().toISOString().split("T")[0],
+          // Defaults to today on the generic create form (local date).
+          defaultValue: () => localDateString(),
           colSpan: 6,
         },
         {

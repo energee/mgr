@@ -25,11 +25,8 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
-import {
-  duplicateOrder,
-  nextDuplicateOrderNumber,
-  localDateString,
-} from "../reorder";
+import { duplicateOrder, nextDuplicateOrderNumber } from "../reorder";
+import { localDateString } from "@/lib/format";
 import { orderEntity } from "@/entities/order";
 import { customerEntity } from "@/entities/customer";
 

@@ -17,6 +17,7 @@ import { OrderShippingMaterialsEditor } from "@/components/domain/order/order-sh
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { parseUnknownError } from "@/lib/errors";
+import { localDateString } from "@/lib/format";
 import { duplicateOrder } from "@/components/domain/order/reorder";
 import { orderCore, statusOptions } from "./core";
 import type { Order } from "./core";
@@ -140,8 +141,8 @@ export const orderPresentation: EntityPresentation<Order> = {
           type: "date",
           format: "date",
           required: true,
-          // Defaults to today — orders are almost always dated the day taken.
-          defaultValue: () => new Date().toISOString().split("T")[0],
+          // Defaults to today (local date — see localDateString).
+          defaultValue: () => localDateString(),
           colSpan: 6,
         },
         {

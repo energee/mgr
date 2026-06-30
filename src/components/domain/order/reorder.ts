@@ -28,6 +28,7 @@ import type { Database } from "@/types/supabase";
 import { createClient } from "@/lib/supabase/client";
 import { orderKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
+import { localDateString } from "@/lib/format";
 import { log } from "@/lib/client-logger";
 
 type Client = SupabaseClient<Database>;
@@ -76,12 +77,6 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
-/** Local calendar date as YYYY-MM-DD (orders.order_date is a date column). */
-export function localDateString(date = new Date()): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
 
 /**
  * Re-resolve a copied line item's unit price at current tier pricing via the

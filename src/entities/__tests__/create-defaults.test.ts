@@ -29,6 +29,7 @@ vi.mock("@/lib/supabase/client", () => ({
 import { orderEntity } from "@/entities/order";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { packagingSessionEntity } from "@/entities/packaging-session";
+import { localDateString } from "@/lib/format";
 
 type AnyEntity = EntityConfig<Record<string, unknown>>;
 type AnyField = UnifiedFieldDef<Record<string, unknown>>;
@@ -41,9 +42,9 @@ function findField(entity: AnyEntity, name: string): AnyField {
   throw new Error(`Field ${name} not found on ${entity.name}`);
 }
 
-/** Same expression the defaults use — local "today" in YYYY-MM-DD (UTC). */
+/** Same expression the defaults use — local "today" in YYYY-MM-DD. */
 function todayIso(): string {
-  return new Date().toISOString().split("T")[0];
+  return localDateString();
 }
 
 const cases: Array<{ entity: AnyEntity; fieldName: string }> = [

@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
 import { POLineItemsEditor } from "@/components/domain/purchasing/po-line-items-editor";
+import { localDateString } from "@/lib/format";
 import { purchaseOrderStateMachine, statusOptions } from "./core";
 import type { PurchaseOrder } from "./core";
 
@@ -107,8 +108,8 @@ export const purchaseOrderPresentation: EntityPresentation<PurchaseOrder> = {
           type: "date",
           format: "date",
           required: true,
-          // Defaults to today — POs are almost always dated the day they're cut.
-          defaultValue: () => new Date().toISOString().split("T")[0],
+          // Defaults to today — POs are almost always dated the day they're cut (local date).
+          defaultValue: () => localDateString(),
           colSpan: 6,
         },
         {
