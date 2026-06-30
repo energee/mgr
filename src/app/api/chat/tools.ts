@@ -21,6 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { formatStateLabel } from "@/types/entity";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
+import { batchTransitions } from "@/lib/schemas/batch";
 import { entityService } from "@/services/entity-service";
 import { inventoryService } from "@/services/inventory-service";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
@@ -1115,18 +1116,10 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
       execute: async ({ batchId, batchNumber, toState }) => {
         const batch = await resolveBatch(supabase, batchId, batchNumber);
 
-        // Mirrors batchTransitions from src/lib/schemas/batch.ts.
-        // Duplicated here because the batch entity config imports React
-        // client components, making it unavailable in this server route.
-        // Keep in sync with batchTransitions if batch states change.
-        const validTransitions: Record<string, string[]> = {
-          planned: ["fermenting"],
-          fermenting: ["conditioning"],
-          conditioning: ["packaging"],
-          packaging: ["completed"],
-        };
-
-        const allowed = validTransitions[batch.status] || [];
+        // Single source of truth: batchTransitions lives in the server-safe
+        // src/lib/schemas/batch.ts (zod only, no React), so import it directly
+        // instead of re-declaring the state machine here.
+        const allowed = batchTransitions[batch.status] || [];
         if (!allowed.includes(toState)) {
           throw new Error(
             `Cannot transition batch #${batch.batch_code} from "${batch.status}" to "${toState}". Valid transitions: ${allowed.join(", ") || "none"}`
