@@ -138,6 +138,7 @@ export const poLineItemCore: EntityCoreInput<POLineItem> = {
   defaultSort: { column: "created_at", direction: "desc" },
   description: "Purchase order line items for ingredients and materials",
   domain: "purchasing",
+  basePath: null,
 
   searchableFields: [],
 
@@ -162,6 +163,8 @@ export const poLineItemCore: EntityCoreInput<POLineItem> = {
       foreignKey: "po_line_item_id",
       showInDetail: true,
       detailTab: "Receives",
+      // po_receive is route-less (created via the PO receiving dialog).
+      hideAdd: true,
     },
   ],
 

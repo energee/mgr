@@ -7,14 +7,20 @@
  * - planned → EntityDetailUnified (editable)
  * - in_progress → PackagingDayView (custom real-time editor)
  * - completed/revised/cancelled → EntityDetailUnified (read-only)
+ *
+ * Intercepts the "revise" entity action (paired with
+ * stateMachine.requiresAction.revised) to open the RevisePackagingSession
+ * dialog — the only path that corrects actual quantities together with their
+ * finished-goods and material-depletion records (audit finding C2).
  */
 
-import { use } from "react";
+import { use, useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { packagingSessionEntity } from "@/entities/packaging-session";
 import { PackagingDayView } from "@/components/domain/packaging/packaging-day-view";
+import { RevisePackagingSession } from "@/components/domain/packaging/revise-packaging-session";
 import { entityKeys } from "@/lib/query-keys";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { Loader2 } from "lucide-react";
@@ -26,6 +32,7 @@ export default function PackagingSessionDetailPage({
 }) {
   const { id } = use(params);
   const supabase = createClient();
+  const [reviseOpen, setReviseOpen] = useState(false);
 
   // Fetch session status to determine which view to render
   const { data: session, isLoading } = useQuery({
@@ -41,6 +48,14 @@ export default function PackagingSessionDetailPage({
     },
   });
 
+  const handleAction = useCallback((actionName: string): boolean => {
+    if (actionName === "revise") {
+      setReviseOpen(true);
+      return true;
+    }
+    return false;
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -55,10 +70,18 @@ export default function PackagingSessionDetailPage({
   }
 
   return (
-    <EntityDetailPage
-      entity={packagingSessionEntity}
-      id={id}
-      basePath="/production/packaging"
-    />
+    <>
+      <EntityDetailPage
+        entity={packagingSessionEntity}
+        id={id}
+        basePath="/production/packaging"
+        onAction={handleAction}
+      />
+      <RevisePackagingSession
+        sessionId={id}
+        open={reviseOpen}
+        onOpenChange={setReviseOpen}
+      />
+    </>
   );
 }

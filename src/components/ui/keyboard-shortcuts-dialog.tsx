@@ -39,6 +39,7 @@ export function KeyboardShortcutsDialog({
       title: "Global",
       shortcuts: [
         { keys: ["?"], description: "Show this help dialog" },
+        { keys: [mod, "K"], description: "Open navigation palette" },
         { keys: ["/"], description: "Focus search input" },
         { keys: ["Esc"], description: "Close dialog / clear focus" },
         { keys: [mod, "."], description: "Toggle AI assistant" },

@@ -105,6 +105,7 @@ export const userProfileCore: EntityCoreInput<UserProfile> = {
   displayName: "User",
   description: "Team members with role assignments and activity tracking",
   domain: "system",
+  basePath: "/settings/users",
 
   defaultSort: { column: "display_name", direction: "asc" },
   searchableFields: ["display_name", "email"],

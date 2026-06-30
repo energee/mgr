@@ -49,6 +49,8 @@ export const pricingTierPriceCore: EntityCoreInput<PricingTierPrice> = {
   displayName: "Pricing Tier Price",
   description: "Pricing matrix cells: one price per tier x format x channel",
   domain: "sales",
+  // Inline-only: prices are managed via the pricing matrix at /settings/pricing.
+  basePath: null,
 
   // Explicit: sort by pricing_tier_id, not by name.
   defaultSort: { column: "pricing_tier_id", direction: "asc" },

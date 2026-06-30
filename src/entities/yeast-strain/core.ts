@@ -84,6 +84,7 @@ export const yeastStrainCore: EntityCoreInput<Yeast> = {
   defaultSort: { column: "name", direction: "asc" },
   description: "Yeast strains catalog with fermentation characteristics",
   domain: "production",
+  basePath: "/settings/yeasts",
 
   searchableFields: ["name", "manufacturer", "product_code", "description"],
 

@@ -9,9 +9,13 @@
  * - Reading type selector with units
  * - Real-time validation with warnings
  * - Timestamp with default to now
+ * - "Save & Add Another" keeps the form open (type/unit/timestamp preserved)
+ *   so cellar rounds can log gravity + temp + pH in one visit
+ * - Edit mode via `initialData` (prefilled, update semantics)
+ * - `embedded` renders without the Card wrapper for use inside dialogs
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
@@ -85,32 +89,61 @@ type BatchReadingFormProps = {
   batchId: string;
   onSubmit: (data: BatchReading) => Promise<void>;
   onCancel?: () => void;
+  /**
+   * Called after a plain Save (not "Save & Add Another") resolves —
+   * typically closes the form/dialog. "Save & Add Another" instead keeps
+   * the form open for the next metric.
+   */
+  onSaved?: () => void;
   isSubmitting?: boolean;
+  /**
+   * Existing reading to edit. Prefills all fields and switches the form to
+   * update semantics ("Update Reading", no "Save & Add Another").
+   */
+  initialData?: BatchReading;
+  /**
+   * Render the bare form without the Card wrapper/header — for embedding in
+   * a Dialog that supplies its own title and close affordance.
+   */
+  embedded?: boolean;
 }
 
 export function BatchReadingForm({
   onSubmit,
   onCancel,
+  onSaved,
   isSubmitting = false,
+  initialData,
+  embedded = false,
 }: BatchReadingFormProps) {
-  const [selectedType, setSelectedType] = useState<ReadingType>("gravity");
+  const isEditing = !!initialData;
+  const [selectedType, setSelectedType] = useState<ReadingType>(
+    initialData?.reading_type ?? "gravity"
+  );
   const [validationWarning, setValidationWarning] = useState<string | null>(null);
+  // Set by the "Save & Add Another" button just before submit fires
+  const addAnotherRef = useRef(false);
 
   const config = READING_TYPES[selectedType];
 
   const form = useForm<ReadingFormValues>({
     resolver: zodResolver(readingSchema),
     defaultValues: {
-      reading_type: "gravity",
-      value: "",
-      unit: config?.defaultUnit || "",
-      timestamp: getCurrentDateTimeLocal(),
-      notes: "",
+      reading_type: initialData?.reading_type ?? "gravity",
+      value: initialData?.value ?? "",
+      unit: initialData?.unit ?? (config?.defaultUnit || ""),
+      // Normalize to datetime-local precision ("YYYY-MM-DDTHH:mm")
+      timestamp: initialData?.timestamp?.slice(0, 16) || getCurrentDateTimeLocal(),
+      notes: initialData?.notes ?? "",
     },
   });
 
-  // Update default unit when type changes
+  // Update default unit when type changes. Skips the initial mount so an
+  // edit prefill (initialData) isn't immediately wiped.
+  const prevTypeRef = useRef(selectedType);
   useEffect(() => {
+    if (prevTypeRef.current === selectedType) return;
+    prevTypeRef.current = selectedType;
     const newConfig = READING_TYPES[selectedType];
     form.setValue("unit", newConfig.defaultUnit);
     form.setValue("value", "");
@@ -135,46 +168,42 @@ export function BatchReadingForm({
       return;
     }
 
-    await onSubmit({
+    const addAnother = addAnotherRef.current;
+    addAnotherRef.current = false;
+
+    try {
+      await onSubmit({
+        reading_type: values.reading_type,
+        value: values.value,
+        unit: values.unit,
+        timestamp: values.timestamp,
+        notes: values.notes,
+      });
+    } catch {
+      // Save failed — the caller surfaces the error toast. Keep the form
+      // populated so the entry isn't lost.
+      return;
+    }
+
+    if (!addAnother) {
+      // Plain save: the caller closes the form/dialog.
+      onSaved?.();
+      return;
+    }
+
+    // "Save & Add Another": keep the form open for the next metric of this
+    // cellar round. Preserve type/unit/timestamp; clear only value + notes.
+    form.reset({
       reading_type: values.reading_type,
-      value: values.value,
+      value: "",
       unit: values.unit,
       timestamp: values.timestamp,
-      notes: values.notes,
-    });
-
-    // Reset form with explicit initial values to avoid race condition with useEffect
-    const initialType: ReadingType = "gravity";
-    const initialConfig = READING_TYPES[initialType];
-    form.reset({
-      reading_type: initialType,
-      value: "",
-      unit: initialConfig.defaultUnit,
-      timestamp: getCurrentDateTimeLocal(),
       notes: "",
     });
-    setSelectedType(initialType);
   };
 
-  return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="text-xl">Add Reading</CardTitle>
-        {onCancel && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Close"
-            onClick={onCancel}
-            className="h-10 w-10"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
+  const formBody = (
+    <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             {/* Reading Type - Large buttons for touch */}
             <FormField
@@ -369,17 +398,62 @@ export function BatchReadingForm({
                   Cancel
                 </Button>
               )}
+              {!isEditing && (
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  className="h-12 sm:w-auto"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    addAnotherRef.current = true;
+                  }}
+                >
+                  {isSubmitting ? "Saving..." : "Save & Add Another"}
+                </Button>
+              )}
               <Button
                 type="submit"
                 className="h-12 sm:w-auto"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Saving..." : "Save Reading"}
+                {isSubmitting
+                  ? isEditing
+                    ? "Updating..."
+                    : "Saving..."
+                  : isEditing
+                    ? "Update Reading"
+                    : "Save Reading"}
               </Button>
             </div>
           </form>
         </Form>
-      </CardContent>
+  );
+
+  // Embedded: bare form for dialogs that provide their own title/close.
+  if (embedded) {
+    return formBody;
+  }
+
+  return (
+    <Card className="w-full">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <CardTitle className="text-xl">
+          {isEditing ? "Edit Reading" : "Add Reading"}
+        </CardTitle>
+        {onCancel && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Close"
+            onClick={onCancel}
+            className="h-10 w-10"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>{formBody}</CardContent>
     </Card>
   );
 }

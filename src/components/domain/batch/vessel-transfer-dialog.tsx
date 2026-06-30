@@ -16,6 +16,9 @@
  * - Smart state suggestions based on destination vessel type:
  *   - planned batch -> fermenter/unitank => suggest "fermenting"
  *   - fermenting batch -> brite tank => suggest "conditioning"
+ * - Implied loss capture: when the transferred volume is less than the
+ *   batch's remaining volume, prompts a RecordLossDialog to record the
+ *   difference as a loss allocation (feeds TTB losses)
  */
 
 import { useForm } from "react-hook-form";
@@ -44,13 +47,15 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { batchKeys, vesselKeys, entityKeys } from "@/lib/query-keys";
 import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
 import { getValueLabel } from "@/types/entity";
 import { vesselEntity } from "@/entities/vessel";
 import { isDuplicateTransfer } from "./vessel-transfer-utils";
+import { computeTransferLoss } from "@/domain/consumption-planning";
+import { RecordLossDialog } from "@/components/domain/shared/record-loss-dialog";
 
 const vesselTransferSchema = z.object({
   to_vessel_id: z.string().uuid("Please select a destination vessel"),
@@ -113,6 +118,10 @@ export function VesselTransferDialog({
 }: VesselTransferDialogProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
+
+  // Implied loss prompt (9.3): volume left behind when transferring less
+  // than the batch's remaining volume. Rendered after the transfer succeeds.
+  const [impliedLossBbl, setImpliedLossBbl] = useState<number | null>(null);
 
   // Fetch available vessels (ready_for_use, no current batch, exclude source)
   const { data: vessels, isLoading: vesselsLoading } = useQuery({
@@ -253,7 +262,7 @@ export function VesselTransferDialog({
       const destVessel = availableVessels?.find((v) => v.id === values.to_vessel_id);
       return { vesselName: destVessel?.name, vesselType: destVessel?.vessel_type };
     },
-    onSuccess: ({ vesselName, vesselType }) => {
+    onSuccess: ({ vesselName, vesselType }, values) => {
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
       queryClient.invalidateQueries({ queryKey: vesselKeys.all() });
       queryClient.invalidateQueries({ queryKey: vesselKeys.transfers() });
@@ -269,6 +278,13 @@ export function VesselTransferDialog({
         if (suggestedState) {
           onSuggestTransition(suggestedState, vesselName || "vessel");
         }
+      }
+
+      // Implied loss: volume left behind in the source vessel (9.3).
+      // Prompts a RecordLossDialog after this dialog closes.
+      const loss = computeTransferLoss(remainingVolume, values.volume_bbl);
+      if (loss > 0) {
+        setImpliedLossBbl(loss);
       }
 
       onSuccess?.();
@@ -289,6 +305,7 @@ export function VesselTransferDialog({
   const exceedsCapacity = !!(selectedVessel && watchedVolume > selectedVessel.capacity_bbl);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -414,5 +431,19 @@ export function VesselTransferDialog({
         </form>
       </DialogContent>
     </Dialog>
+
+    {impliedLossBbl !== null && (
+      <RecordLossDialog
+        batchId={batchId}
+        batchNumber={batchNumber}
+        suggestedVolumeBbl={impliedLossBbl}
+        context="Volume left behind at vessel transfer"
+        open={impliedLossBbl !== null}
+        onOpenChange={(o) => {
+          if (!o) setImpliedLossBbl(null);
+        }}
+      />
+    )}
+    </>
   );
 }

@@ -58,6 +58,13 @@ export const packagingSessionStateMachine: StateMachineConfig<PackagingSession> 
     revised: [],
     cancelled: [],
   },
+  // Reaching "revised" requires the interactive revise flow (quantity edits +
+  // finished-goods/material adjustments via revise_packaging_session, 00184) —
+  // suppresses the generic "Move to Revised" in favor of the "revise" action.
+  // A DB trigger blocks bare status UPDATEs into "revised" as the backstop.
+  requiresAction: {
+    revised: "revise",
+  },
   stateDisplay: {
     planned: { label: "Planned", color: "default" },
     in_progress: { label: "In Progress", color: "info" },
@@ -80,6 +87,7 @@ export const packagingSessionCore: EntityCoreInput<PackagingSession> = {
   displayName: "Packaging Session",
   description: "Track kegging, canning, and bottling runs",
   domain: "production",
+  basePath: "/production/packaging",
 
   // Explicit: sorted by most-recent session first.
   defaultSort: { column: "session_date", direction: "desc" },

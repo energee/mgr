@@ -56,6 +56,7 @@ export const containerCore: EntityCoreInput<Container> = {
   displayName: "Container",
   description: "Physical vessels — cans, bottles, kegs. Parent of selling formats.",
   domain: "inventory",
+  basePath: "/settings/containers",
 
   // searchableFields: ["name"] is the default — omitted.
 

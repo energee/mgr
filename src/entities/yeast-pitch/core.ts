@@ -106,6 +106,7 @@ export const yeastPitchCore: EntityCoreInput<YeastPitch> = {
   displayNamePlural: "Yeast Pitches",
   description: "Individual yeast pitches tracking lineage, viability, and usage",
   domain: "production",
+  basePath: "/production/yeast-pitches",
 
   // Explicit: sort by age ascending, not by name.
   defaultSort: { column: "days_old", direction: "asc" },
@@ -134,6 +135,7 @@ export const yeastPitchCore: EntityCoreInput<YeastPitch> = {
       type: "hasMany",
       foreignKey: "pitch_id",
       showInDetail: true,
+      hideAdd: true,
       detailTab: "Usage History",
     },
   ],

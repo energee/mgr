@@ -4,6 +4,8 @@
  * Purchase Order Detail Page
  *
  * Renders the PO detail view with custom action handlers for:
+ * - "Receive Items" — opens bulk-receive dialog to record po_receives rows
+ *   (quantities, lots, expiration) and flip the PO to partial/fulfilled
  * - "Accept into Inventory" — opens dialog to create inventory lots from po_receives
  * - "Calculate Landed Cost" — distributes shipping/tax across inventory lots
  */
@@ -15,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { calculateLandedCost } from "@/domain/purchasing/landed-cost";
+import { POReceiving } from "@/components/domain/purchasing/po-receiving";
 import { POAcceptInventoryDialog } from "@/components/domain/purchasing/po-accept-inventory-dialog";
 import { PoLandedCostBreakdown } from "@/components/domain/purchasing/po-landed-cost-breakdown";
 import { purchaseOrderKeys, entityKeys, landedCostKeys } from "@/lib/query-keys";
@@ -30,6 +33,7 @@ export default function PurchaseOrderDetailPage({
   const { id } = use(params);
   const queryClient = useQueryClient();
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [receivingOpen, setReceivingOpen] = useState(false);
 
   /** Fetch PO status to conditionally show the landed cost breakdown */
   const { data: poStatus } = useQuery({
@@ -48,6 +52,11 @@ export default function PurchaseOrderDetailPage({
 
   const handleAction = useCallback(
     (actionName: string): boolean => {
+      if (actionName === "receive_items") {
+        setReceivingOpen(true);
+        return true;
+      }
+
       if (actionName === "accept_into_inventory") {
         setAcceptDialogOpen(true);
         return true;
@@ -101,6 +110,11 @@ export default function PurchaseOrderDetailPage({
           <PoLandedCostBreakdown poId={id} />
         </div>
       )}
+      <POReceiving
+        poId={id}
+        open={receivingOpen}
+        onOpenChange={setReceivingOpen}
+      />
       <POAcceptInventoryDialog
         poId={id}
         open={acceptDialogOpen}

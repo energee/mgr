@@ -47,6 +47,8 @@ export const sessionLineItemCore: EntityCoreInput<SessionLineItem> = {
   defaultSort: { column: "created_at", direction: "desc" },
   description: "Products packaged in a session",
   domain: "production",
+  // Inline-only: line items are managed on the packaging session detail page.
+  basePath: null,
 
   // Explicit: no searchable text fields on this entity.
   searchableFields: [],

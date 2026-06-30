@@ -4,6 +4,8 @@
  * Production Dashboard
  *
  * Overview of production metrics:
+ * - Getting Started checklist (production + sales onboarding tracks)
+ * - "Today" attention panel (overdue batches, due POs, aging kegs, expiring lots)
  * - Batch status summary
  * - Active batches list
  * - Vessel utilization
@@ -14,7 +16,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
-import { dashboardKeys, onboardingKeys, planningKeys } from "@/lib/query-keys";
+import { dashboardKeys, planningKeys } from "@/lib/query-keys";
 import type { ProductionShortfall } from "@/types/planning";
 import Link from "next/link";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
@@ -22,7 +24,7 @@ import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { VESSEL_TYPES } from "@/entities/vessel";
 import { batchEntity } from "@/entities/batch";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { CheckCircle2, Circle, FlaskConical } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense, useMemo } from "react";
@@ -34,8 +36,10 @@ import {
   usePeriod,
   StatCardWithDelta,
   calculateDelta,
-  TrendChart,
+  TrendChartLazy,
   BatchActivityHeatmap,
+  TodayPanel,
+  GettingStartedChecklist,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
@@ -90,73 +94,6 @@ const DEFAULT_BATCH_COUNTS: BatchStatusCounts = {
 };
 
 // =============================================================================
-// Getting Started Checklist
-// =============================================================================
-
-/** Onboarding checklist shown when the brewery has minimal data. Hides once all steps are complete. */
-function GettingStartedChecklist() {
-  const supabase = createClient();
-
-  const { data: counts, isLoading } = useQuery({
-    queryKey: onboardingKeys.counts(),
-    queryFn: async () => {
-      const [locations, recipes, batches] = await Promise.all([
-        supabase.from("locations").select("*", { count: "exact", head: true }),
-        supabase.from("recipes").select("*", { count: "exact", head: true }),
-        supabase.from("batches").select("*", { count: "exact", head: true }),
-      ]);
-      return {
-        locations: locations.count ?? 0,
-        recipes: recipes.count ?? 0,
-        batches: batches.count ?? 0,
-      };
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  if (isLoading || !counts) return null;
-
-  const steps = [
-    { label: "Add your first location", href: "/settings/locations/new", done: counts.locations > 0 },
-    { label: "Create a recipe", href: "/production/recipes/new", done: counts.recipes > 0 },
-    { label: "Start your first batch", href: "/production/batches/new", done: counts.batches > 0 },
-  ];
-
-  const completedCount = steps.filter((s) => s.done).length;
-
-  // Hide when all steps are complete
-  if (completedCount === steps.length) return null;
-
-  return (
-    <DashboardSection title="Getting Started">
-      <div className="divide-y">
-        {steps.map((step) => (
-          <Link
-            key={step.href}
-            href={step.href}
-            className="flex items-center gap-3 py-2"
-          >
-            {step.done ? (
-              <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
-            ) : (
-              <Circle className="size-5 text-muted-foreground/40 shrink-0" />
-            )}
-            <span
-              className={`text-sm ${step.done ? "line-through text-muted-foreground" : ""}`}
-            >
-              {step.label}
-            </span>
-          </Link>
-        ))}
-      </div>
-      <p className="text-xs text-muted-foreground mt-3">
-        {completedCount} of {steps.length} complete
-      </p>
-    </DashboardSection>
-  );
-}
-
-// =============================================================================
 // Component
 // =============================================================================
 
@@ -164,7 +101,7 @@ export default function DashboardPage() {
   const supabase = createClient();
   const volumeUnit = useVolumeUnit();
 
-  const { data: batchCounts = DEFAULT_BATCH_COUNTS } = useQuery({
+  const { data: batchCounts = DEFAULT_BATCH_COUNTS, isLoading: countsLoading } = useQuery({
     queryKey: dashboardKeys.batchCounts(),
     queryFn: async () => {
       const data = await unwrap(
@@ -186,7 +123,7 @@ export default function DashboardPage() {
   });
 
   // Fetch active batches (not completed or cancelled)
-  const { data: activeBatches = [] } = useQuery({
+  const { data: activeBatches = [], isLoading: batchesLoading } = useQuery({
     queryKey: dashboardKeys.activeBatches(),
     queryFn: async () => {
       const data = await unwrap(
@@ -217,7 +154,7 @@ export default function DashboardPage() {
   });
 
   // Fetch vessel status — throws on error; a silent fallback to the base table would hide regressions in vessels_with_batch.
-  const { data: vessels = [] } = useQuery({
+  const { data: vessels = [], isLoading: vesselsLoading } = useQuery({
     queryKey: dashboardKeys.vessels(),
     queryFn: async () => {
       return await unwrap(
@@ -308,8 +245,15 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
-        <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
+        {countsLoading ? (
+          <Skeleton className="h-9 w-full max-w-md" />
+        ) : (
+          <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
+        )}
       </div>
+
+      {/* Today: morning attention list (hidden when nothing needs attention) */}
+      <TodayPanel />
 
       {/* Two-Column Layout */}
       <div className="grid gap-6 lg:grid-cols-5">
@@ -319,7 +263,14 @@ export default function DashboardPage() {
           viewAllHref="/production/batches"
           className="lg:col-span-3"
         >
-          {activeBatches.length === 0 ? (
+          {batchesLoading ? (
+            // Skeleton while fetching — avoids flashing the empty state + CTA
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
+              ))}
+            </div>
+          ) : activeBatches.length === 0 ? (
             <DashboardEmpty
               message="No active batches"
               icon={FlaskConical}
@@ -368,31 +319,45 @@ export default function DashboardPage() {
           viewAllHref="/production/vessels"
           className="lg:col-span-2"
         >
-          {/* Big utilization percentage */}
-          <div className="mb-5">
-            <span className="font-mono text-4xl font-semibold">{utilizationPercent}%</span>
-            <span className="text-muted-foreground ml-2 text-sm">
-              in use ({totalInUse}/{totalVessels})
-            </span>
-          </div>
-
-          {/* Per-Type Progress Bars */}
-          <div className="space-y-3">
-            {vesselsByType.map(({ type, label, total, inUse }) => (
-              <div key={type}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium">{label}</span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {inUse}/{total}
-                  </span>
-                </div>
-                <Progress
-                  value={total > 0 ? (inUse / total) * 100 : 0}
-                  className="h-[3px]"
-                />
+          {vesselsLoading ? (
+            // Skeleton while fetching — avoids flashing 0% utilization
+            <>
+              <Skeleton className="mb-5 h-10 w-40" />
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-7 w-full" />
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <>
+              {/* Big utilization percentage */}
+              <div className="mb-5">
+                <span className="font-mono text-4xl font-semibold">{utilizationPercent}%</span>
+                <span className="text-muted-foreground ml-2 text-sm">
+                  in use ({totalInUse}/{totalVessels})
+                </span>
+              </div>
+
+              {/* Per-Type Progress Bars */}
+              <div className="space-y-3">
+                {vesselsByType.map(({ type, label, total, inUse }) => (
+                  <div key={type}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium">{label}</span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {inUse}/{total}
+                      </span>
+                    </div>
+                    <Progress
+                      value={total > 0 ? (inUse / total) * 100 : 0}
+                      className="h-[3px]"
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </DashboardSection>
       </div>
 
@@ -526,7 +491,7 @@ function ProductionTrends() {
           <BatchActivityHeatmap />
         </DashboardSection>
         <DashboardSection title="Volume Brewed (weekly)">
-          <TrendChart
+          <TrendChartLazy
             data={weeklyVolumeData}
             xKey="date"
             type="bar"

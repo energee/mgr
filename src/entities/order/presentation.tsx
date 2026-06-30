@@ -14,6 +14,11 @@ import { OrderItemsEditor } from "@/components/domain/order/order-items-editor";
 import { ChangeRequestReview } from "@/components/domain/order/change-request-review";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
 import { OrderShippingMaterialsEditor } from "@/components/domain/order/order-shipping-materials-editor";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+import { parseUnknownError } from "@/lib/errors";
+import { localDateString } from "@/lib/format";
+import { duplicateOrder } from "@/components/domain/order/reorder";
 import { orderCore, statusOptions } from "./core";
 import type { Order } from "./core";
 
@@ -41,6 +46,12 @@ export const orderPresentation: EntityPresentation<Order> = {
     {
       accessorKey: "order_number",
       header: "Order #",
+      sortable: true,
+    },
+    {
+      // Server-side sortable/searchable via the order_list_details view.
+      accessorKey: "customer_name",
+      header: "Customer",
       sortable: true,
     },
     {
@@ -91,6 +102,8 @@ export const orderPresentation: EntityPresentation<Order> = {
       id: "quick-links",
       title: "Quick Actions",
       component: OrderQuickLinks,
+      // Links build hrefs from the persisted order id — none before first save.
+      hideOnCreate: true,
     },
     {
       id: "overview",
@@ -128,6 +141,8 @@ export const orderPresentation: EntityPresentation<Order> = {
           type: "date",
           format: "date",
           required: true,
+          // Defaults to today (local date — see localDateString).
+          defaultValue: () => localDateString(),
           colSpan: 6,
         },
         {
@@ -173,23 +188,31 @@ export const orderPresentation: EntityPresentation<Order> = {
       title: "Shipping Materials",
       component: OrderShippingMaterialsSection,
       collapsible: true,
+      // Editor persists rows keyed by order id, absent on a brand-new order.
+      hideOnCreate: true,
     },
     {
       id: "change-requests",
       title: "Change Requests",
       component: ChangeRequestReview,
       collapsible: true,
+      // A brand-new order can't have change requests.
+      hideOnCreate: true,
     },
     {
       id: "qbo-sync",
       title: "QuickBooks",
       component: createQBOSyncDisplay("order"),
+      // Sync status only exists for persisted orders.
+      hideOnCreate: true,
     },
     {
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("orders"),
       collapsible: true,
+      // No revisions before the first save.
+      hideOnCreate: true,
     },
   ],
 
@@ -199,6 +222,7 @@ export const orderPresentation: EntityPresentation<Order> = {
   kanbanConfig: {
     titleField: "order_number",
     cardFields: [
+      { field: "customer_name", label: "Customer" },
       { field: "order_date", label: "Ordered", format: "date" },
       { field: "requested_date", label: "Requested", format: "date" },
     ],
@@ -223,6 +247,17 @@ export const orderPresentation: EntityPresentation<Order> = {
       type: "button",
       fromStates: ["confirmed"],
       toState: "scheduled",
+      // Collect the delivery date in a pre-transition dialog; written in the
+      // same UPDATE as the status flip (defaults to the requested date).
+      transitionFields: [
+        {
+          name: "scheduled_date",
+          label: "Scheduled Delivery Date",
+          type: "date",
+          required: true,
+          defaultValue: (order) => order.requested_date,
+        },
+      ],
     },
     {
       name: "start_picking",
@@ -247,6 +282,27 @@ export const orderPresentation: EntityPresentation<Order> = {
       type: "button",
       fromStates: ["packed"],
       toState: "fulfilled",
+    },
+    {
+      // Duplicate Order / Reorder. Orders can't use the framework Duplicate
+      // path (line items live in the order_items child table, editable only
+      // post-create); this handler inserts a complete draft copy (header +
+      // items, prices re-resolved at current tier pricing) and navigates to
+      // it. No fromStates: reordering fulfilled/cancelled orders is the point.
+      name: "duplicate",
+      label: "Duplicate Order",
+      icon: "copy",
+      type: "dropdown",
+      confirm: true,
+      handler: async (order) => {
+        try {
+          const { id, orderNumber } = await duplicateOrder(createClient(), order.id);
+          toast.success(`Draft order ${orderNumber} created`);
+          window.location.assign(`/sales/orders/${id}`);
+        } catch (err) {
+          toast.error(parseUnknownError(err).message);
+        }
+      },
     },
     {
       name: "cancel",

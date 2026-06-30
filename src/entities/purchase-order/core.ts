@@ -73,6 +73,7 @@ export const purchaseOrderCore: EntityCoreInput<PurchaseOrder> = {
   displayName: "Purchase Order",
   description: "Purchase orders to suppliers for ingredients and materials",
   domain: "purchasing",
+  basePath: "/purchasing/pos",
 
   defaultSort: { column: "order_date", direction: "desc" },
   searchableFields: ["po_number"],

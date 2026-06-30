@@ -13,20 +13,27 @@
  *
  * A single shared query fetches batches-in-date-range, allocations, and finished goods.
  * Each tab derives its specific view from this shared data via useMemo.
+ *
+ * The pure aggregation math (proportional SKU cost allocation, period
+ * bucketing, cost/unit helpers) lives in src/lib/reports/cogs.ts so it can be
+ * unit-tested; this page only owns the queries and rendering.
  */
 
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import {
-  format,
-  subMonths,
-  startOfMonth,
-  endOfMonth,
-  parseISO,
-  startOfQuarter,
-} from "date-fns";
+  aggregateCostByKey,
+  aggregateUnitsByBatch,
+  buildSkuCostRows,
+  buildPeriodRows,
+  type CogsSkuRow,
+  type CogsAllocationRow,
+  type CogsFinishedGoodRow,
+  type SkuFinishedGoodRow,
+} from "@/lib/reports/cogs";
 import { formatCurrency, formatBbl } from "@/lib/format";
 import { fetchBatchIngredientDetail } from "@/domain/report-utils";
 import {
@@ -74,16 +81,9 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+// Chart is lazy-loaded so recharts stays out of the initial bundle — it only
+// renders in the By Period tab.
+import { CogsPeriodChartLazy } from "@/components/domain/reports/cogs-period-chart-lazy";
 
 // =============================================================================
 // Types
@@ -103,49 +103,11 @@ type CogsBatchRow = {
   status: string;
 }
 
-/** Cost grouped by brand + selling format (SKU) */
-type CogsSkuRow = {
-  sku_name: string;
-  brand_name: string;
-  format_name: string;
-  container_name: string;
-  batch_count: number;
-  total_units: number;
-  total_cost: number;
-  avg_cost_per_unit: number | null;
-  avg_cost_per_bbl: number | null;
-  batches: { id: string; batch_code: string; cost: number; units: number }[];
-}
-
-/** Cost breakdown by time period with ingredient category split */
-type CogsPeriodRow = {
-  period: string;
-  /** ISO date used for chronological sorting (not displayed). */
-  _sortKey: string;
-  total_cogs: number;
-  malt_cost: number;
-  hop_cost: number;
-  yeast_cost: number;
-  adjunct_cost: number;
-  other_cost: number;
-  batch_count: number;
-}
-
 /** Allocation row shape returned by the shared query */
-type AllocationRow = {
-  id: string;
-  destination_id: string | null;
-  quantity: number;
-  unit_cost: number | null;
-  source_id: string | null;
-  source_type: string | null;
-}
+type AllocationRow = CogsAllocationRow & { id: string }
 
 /** Finished goods row shape returned by the shared query */
-type FinishedGoodRow = {
-  batch_id: string | null;
-  quantity: number | null;
-}
+type FinishedGoodRow = CogsFinishedGoodRow
 
 /** Batch row shape returned by the shared query */
 type SharedBatchRow = {
@@ -168,39 +130,6 @@ const DEFAULT_FROM = format(
   "yyyy-MM-dd"
 );
 const DEFAULT_TO = format(endOfMonth(new Date()), "yyyy-MM-dd");
-
-/**
- * Aggregates numeric costs from allocations into a Map keyed by a caller-supplied
- * key function. Each allocation's line cost is `quantity * (unit_cost ?? 0)`.
- */
-function aggregateCostByKey<T extends { quantity: number; unit_cost: number | null }>(
-  allocations: T[],
-  keyFn: (alloc: T) => string | null
-): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const alloc of allocations) {
-    const key = keyFn(alloc);
-    if (!key) continue;
-    const lineCost = alloc.quantity * (alloc.unit_cost ?? 0);
-    map.set(key, (map.get(key) ?? 0) + lineCost);
-  }
-  return map;
-}
-
-/**
- * Aggregates quantity from finished goods rows by batch_id.
- * Returns a Map of batch_id -> total quantity.
- */
-function aggregateUnitsByBatch(
-  finishedGoods: FinishedGoodRow[]
-): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const fg of finishedGoods) {
-    if (!fg.batch_id) continue;
-    map.set(fg.batch_id, (map.get(fg.batch_id) ?? 0) + (fg.quantity ?? 0));
-  }
-  return map;
-}
 
 // =============================================================================
 // Component
@@ -367,117 +296,19 @@ export default function CogsReportPage() {
 
       if (allocErr) throw allocErr;
 
-      // Aggregate total cost per batch
-      const costByBatch = aggregateCostByKey(allocations ?? [], (a) => a.destination_id);
-
-      // Aggregate total FG units per batch (for proportional allocation)
-      const totalUnitsByBatch = new Map<string, number>();
-      for (const fg of fgRows) {
-        if (!fg.batch_id) continue;
-        totalUnitsByBatch.set(
-          fg.batch_id,
-          (totalUnitsByBatch.get(fg.batch_id) ?? 0) + (fg.quantity ?? 0)
-        );
-      }
-
-      const batchNumberMap = new Map<string, string>();
-      for (const b of batchInfo || []) {
-        batchNumberMap.set(b.id, b.batch_code);
-      }
-
-      // Group by SKU key (brand_name + format_name)
-      const skuMap = new Map<
-        string,
-        {
-          brand_name: string;
-          format_name: string;
-          container_name: string;
-          total_units: number;
-          total_cost: number;
-          batchSet: Set<string>;
-          batches: {
-            id: string;
-            batch_code: string;
-            cost: number;
-            units: number;
-          }[];
-        }
-      >();
-
-      for (const fg of fgRows) {
-        if (!fg.batch_id) continue;
-        const brand = fg.brands as { name: string } | null;
-        const sellingFormat = fg.selling_formats as {
+      // Pure proportional-allocation math lives in src/lib/reports/cogs.ts.
+      // Cast the joined brand/format objects to the lib's input shape.
+      const skuRows: SkuFinishedGoodRow[] = fgRows.map((fg) => ({
+        batch_id: fg.batch_id,
+        quantity: fg.quantity,
+        brands: fg.brands as { name: string } | null,
+        selling_formats: fg.selling_formats as {
           name: string;
           containers: { name: string } | null;
-        } | null;
-
-        const brandName = brand?.name ?? "Unknown";
-        const formatName = sellingFormat?.name ?? "Unknown";
-        const containerName = sellingFormat?.containers?.name ?? "";
-        const skuKey = `${brandName}||${formatName}`;
-
-        const batchTotalCost = costByBatch.get(fg.batch_id) ?? 0;
-        const batchTotalUnits = totalUnitsByBatch.get(fg.batch_id) ?? 0;
-        const fgQuantity = fg.quantity ?? 0;
-
-        // Proportional cost: (batch cost * fg units from this SKU) / total batch units
-        const proportionalCost =
-          batchTotalUnits > 0
-            ? (batchTotalCost * fgQuantity) / batchTotalUnits
-            : 0;
-
-        const existing = skuMap.get(skuKey) ?? {
-          brand_name: brandName,
-          format_name: formatName,
-          container_name: containerName,
-          total_units: 0,
-          total_cost: 0,
-          batchSet: new Set<string>(),
-          batches: [],
-        };
-
-        existing.total_units += fgQuantity;
-        existing.total_cost += proportionalCost;
-
-        if (!existing.batchSet.has(fg.batch_id)) {
-          existing.batchSet.add(fg.batch_id);
-          existing.batches.push({
-            id: fg.batch_id,
-            batch_code: batchNumberMap.get(fg.batch_id) ?? "??",
-            cost: proportionalCost,
-            units: fgQuantity,
-          });
-        } else {
-          // Update existing batch entry
-          const batchEntry = existing.batches.find(
-            (b) => b.id === fg.batch_id
-          );
-          if (batchEntry) {
-            batchEntry.cost += proportionalCost;
-            batchEntry.units += fgQuantity;
-          }
-        }
-
-        skuMap.set(skuKey, existing);
-      }
-
-      // Build result rows
-      const result: CogsSkuRow[] = Array.from(skuMap.values()).map((sku) => ({
-        sku_name: `${sku.brand_name} - ${sku.format_name}`,
-        brand_name: sku.brand_name,
-        format_name: sku.format_name,
-        container_name: sku.container_name,
-        batch_count: sku.batchSet.size,
-        total_units: sku.total_units,
-        total_cost: sku.total_cost,
-        avg_cost_per_unit:
-          sku.total_units > 0 ? sku.total_cost / sku.total_units : null,
-        avg_cost_per_bbl: null, // Not applicable at SKU level
-        batches: sku.batches,
+        } | null,
       }));
 
-      return result.sort((a, b) => b.total_cost - a.total_cost);
+      return buildSkuCostRows(skuRows, allocations ?? [], batchInfo ?? []);
     },
     enabled: activeTab === "by-sku",
   });
@@ -524,98 +355,8 @@ export default function CogsReportPage() {
         }
       }
 
-      // Build a map of batch_id -> created_at for period assignment
-      const batchDateMap = new Map<string, string>();
-      for (const b of batches) {
-        if (b.created_at) {
-          batchDateMap.set(b.id, b.created_at);
-        }
-      }
-
-      // Build period rows (keyed by display label, with _sortKey for ordering)
-      const periodMap = new Map<
-        string,
-        {
-          _sortKey: string;
-          total_cogs: number;
-          malt_cost: number;
-          hop_cost: number;
-          yeast_cost: number;
-          adjunct_cost: number;
-          other_cost: number;
-          batchSet: Set<string>;
-        }
-      >();
-
-      for (const alloc of allocations) {
-        if (!alloc.destination_id) continue;
-        const batchDate = batchDateMap.get(alloc.destination_id);
-        if (!batchDate) continue;
-
-        const date = parseISO(batchDate);
-        let periodKey: string;
-        let sortKey: string;
-        if (granularity === "quarterly") {
-          const qStart = startOfQuarter(date);
-          periodKey = `Q${Math.ceil((qStart.getMonth() + 1) / 3)} ${format(qStart, "yyyy")}`;
-          sortKey = format(qStart, "yyyy-MM");
-        } else {
-          periodKey = format(date, "MMM yyyy");
-          sortKey = format(startOfMonth(date), "yyyy-MM");
-        }
-
-        const lineCost = alloc.quantity * (alloc.unit_cost ?? 0);
-
-        // Determine category from inventory lot lookup
-        const category = alloc.source_id ? (categoryByLotId.get(alloc.source_id) ?? "") : "";
-
-        const existing = periodMap.get(periodKey) ?? {
-          _sortKey: sortKey,
-          total_cogs: 0,
-          malt_cost: 0,
-          hop_cost: 0,
-          yeast_cost: 0,
-          adjunct_cost: 0,
-          other_cost: 0,
-          batchSet: new Set<string>(),
-        };
-
-        existing.total_cogs += lineCost;
-        existing.batchSet.add(alloc.destination_id);
-
-        // Category values come from inventory_items.category in the database:
-        // "grain", "hops", "yeast", "adjunct", "packaging", "other"
-        if (category === "grain" || category === "malt") {
-          existing.malt_cost += lineCost;
-        } else if (category === "hops" || category === "hop") {
-          existing.hop_cost += lineCost;
-        } else if (category === "yeast") {
-          existing.yeast_cost += lineCost;
-        } else if (category === "adjunct") {
-          existing.adjunct_cost += lineCost;
-        } else {
-          existing.other_cost += lineCost;
-        }
-
-        periodMap.set(periodKey, existing);
-      }
-
-      // Convert to array and sort chronologically
-      const result: CogsPeriodRow[] = Array.from(periodMap.entries())
-        .map(([period, data]) => ({
-          period,
-          _sortKey: data._sortKey,
-          total_cogs: data.total_cogs,
-          malt_cost: data.malt_cost,
-          hop_cost: data.hop_cost,
-          yeast_cost: data.yeast_cost,
-          adjunct_cost: data.adjunct_cost,
-          other_cost: data.other_cost,
-          batch_count: data.batchSet.size,
-        }))
-        .sort((a, b) => a._sortKey.localeCompare(b._sortKey));
-
-      return result;
+      // Pure bucketing/category math lives in src/lib/reports/cogs.ts.
+      return buildPeriodRows(allocations, batches, categoryByLotId, granularity);
     },
     enabled: activeTab === "by-period" && !!sharedData,
   });
@@ -1393,51 +1134,7 @@ export default function CogsReportPage() {
                   No data for the selected date range
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={periodData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="period" />
-                    <YAxis
-                      tickFormatter={(v: number) =>
-                        `$${(v / 1000).toFixed(0)}k`
-                      }
-                    />
-                    <Tooltip
-                      formatter={(v) => formatCurrency(v as number)}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="malt_cost"
-                      name="Malts"
-                      stackId="a"
-                      fill="hsl(var(--chart-1))"
-                    />
-                    <Bar
-                      dataKey="hop_cost"
-                      name="Hops"
-                      stackId="a"
-                      fill="hsl(var(--chart-2))"
-                    />
-                    <Bar
-                      dataKey="yeast_cost"
-                      name="Yeast"
-                      stackId="a"
-                      fill="hsl(var(--chart-3))"
-                    />
-                    <Bar
-                      dataKey="adjunct_cost"
-                      name="Adjuncts"
-                      stackId="a"
-                      fill="hsl(var(--chart-4))"
-                    />
-                    <Bar
-                      dataKey="other_cost"
-                      name="Other"
-                      stackId="a"
-                      fill="hsl(var(--chart-5))"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <CogsPeriodChartLazy data={periodData} />
               )}
             </CardContent>
           </Card>

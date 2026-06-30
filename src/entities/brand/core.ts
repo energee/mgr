@@ -41,6 +41,7 @@ export const brandCore: EntityCoreInput<Brand> = {
   defaultSort: { column: "name", direction: "asc" },
   description: "Beer brands and products",
   domain: "production",
+  basePath: "/settings/brands",
 
   searchableFields: ["name", "variant", "description"],
 

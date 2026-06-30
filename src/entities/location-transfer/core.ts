@@ -99,6 +99,7 @@ export const locationTransferCore: EntityCoreInput<LocationTransferView> = {
   description:
     "Inventory movements between bins and locations for multi-site operations",
   domain: "inventory",
+  basePath: "/inventory/transfers",
 
   defaultSort: {
     column: "ship_date",
@@ -134,6 +135,8 @@ export const locationTransferCore: EntityCoreInput<LocationTransferView> = {
       foreignKey: "transfer_id",
       showInDetail: true,
       detailTab: "Lines",
+      // Lines are managed inline on the transfer detail page, not via a route.
+      hideAdd: true,
     },
   ],
 

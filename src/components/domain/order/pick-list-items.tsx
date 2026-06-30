@@ -5,14 +5,28 @@
  *
  * Displays items to pick with quantities, locations, and picking controls.
  * Sorted by location for efficient warehouse travel.
- * Supports marking items as picked with quantity tracking.
+ * Supports marking items as picked with quantity tracking, and once every
+ * line is fully picked on an in-progress list, offers a "Complete Pick List"
+ * button that transitions the list and runs the shared transition side
+ * effects (services/transition-side-effects.ts), which also move the parent
+ * order picking → packed.
+ *
+ * Built for hands-on warehouse use (audit F-38):
+ * - a keyboard-wedge scan field (shared/scan-input.tsx) matches scanned lot
+ *   numbers via resolvePickScan and marks the line picked, scrolling it
+ *   into view;
+ * - below the md breakpoint (useIsMobile) lines render as cards with a
+ *   large "Picked" button and +/- quantity steppers instead of the table;
+ * - on coarse-pointer devices (useIsTouch, e.g. tablets that keep the
+ *   table) the pick toggle and quantity inputs get enlarged hit areas.
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
-import { pickListKeys } from "@/lib/query-keys";
+import { entityKeys, pickListKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
+import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,9 +46,15 @@ import {
   CheckCircle2,
   Circle,
   Loader2,
+  Minus,
+  Plus,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { useIsMobile, useIsTouch } from "@/hooks/use-mobile";
+import { ScanInput } from "@/components/domain/shared/scan-input";
+import { resolvePickScan } from "./pick-list-scan";
 
 // =============================================================================
 // Types
@@ -75,8 +95,13 @@ export function PickListItems({ data }: PickListItemsProps) {
   const queryClient = useQueryClient();
   const pickListId = data.id;
   const isEditable = ["draft", "assigned", "in_progress"].includes(data.status);
+  const isMobile = useIsMobile();
+  const isTouch = useIsTouch();
 
   const [pendingPicks, setPendingPicks] = useState<Record<string, number>>({});
+  // Last line resolved from a lot-number scan — highlighted + scrolled into view
+  const [lastScanId, setLastScanId] = useState<string | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLElement>());
 
   // Fetch pick list items with related data
   const { data: items = [], isLoading } = useQuery<PickListItemRow[]>({
@@ -172,6 +197,57 @@ export function PickListItems({ data }: PickListItemsProps) {
     updatePickedMutation.mutate({ itemId: item.id, quantity: newQty });
   };
 
+  // Step the picked quantity by ±1 (mobile card steppers). Commits
+  // immediately — any unsaved typed value for the row is superseded.
+  const stepPick = (item: PickListItemRow, delta: number) => {
+    const current = pendingPicks[item.id] ?? item.quantity_picked;
+    const next = Math.min(
+      item.quantity_requested,
+      Math.max(0, current + delta)
+    );
+    if (next === current) return;
+    setPendingPicks((prev) => {
+      const rest = { ...prev };
+      delete rest[item.id];
+      return rest;
+    });
+    updatePickedMutation.mutate({ itemId: item.id, quantity: next });
+  };
+
+  // Keyboard-wedge scan: match the code against lot numbers, mark the first
+  // unpicked matching line fully picked, and bring its row into view.
+  const handleScan = (code: string) => {
+    const result = resolvePickScan(items, code);
+    if (result.kind === "not_found") {
+      toast.error(`No pick line matches "${code}"`);
+      return;
+    }
+    setLastScanId(result.item.id);
+    rowRefs.current
+      .get(result.item.id)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (result.kind === "already_picked") {
+      toast.info(`Lot ${result.item.lot_number} is already fully picked`);
+      return;
+    }
+    const { item } = result;
+    updatePickedMutation.mutate(
+      { itemId: item.id, quantity: item.quantity_requested },
+      {
+        onSuccess: () =>
+          toast.success(
+            `Picked ${item.quantity_requested} × lot ${item.lot_number}`
+          ),
+      }
+    );
+  };
+
+  // Register a row/card element for scan scroll-into-view
+  const registerRow = (id: string) => (el: HTMLElement | null) => {
+    if (el) rowRefs.current.set(id, el);
+    else rowRefs.current.delete(id);
+  };
+
   // Save a pending pick quantity
   const savePendingPick = (itemId: string) => {
     const quantity = pendingPicks[itemId];
@@ -218,6 +294,51 @@ export function PickListItems({ data }: PickListItemsProps) {
     },
     onError: (error) => {
       toast.error(`Failed to complete: ${error.message}`);
+    },
+  });
+
+  // Complete the pick list once every line is fully picked. Mirrors the
+  // batch detail page pattern (production/batches/[id]/page.tsx): a
+  // status-guarded UPDATE so a concurrent transition matches 0 rows instead
+  // of clobbering, then the shared transition side effects, which sync the
+  // parent order picking → packed and invalidate order caches.
+  const completePickListMutation = useMutation({
+    mutationFn: async () => {
+      const { data: updated, error } = await supabase
+        .from("pick_lists")
+        .update({ status: "completed" })
+        .eq("id", pickListId)
+        .eq("status", "in_progress")
+        .select("id");
+
+      if (error) throw error;
+      if (!updated || updated.length === 0)
+        throw new Error("Transition no longer valid — status may have changed");
+    },
+    onSuccess: async () => {
+      const sideEffects = await runTransitionSideEffects(
+        supabase,
+        "pick_lists",
+        [pickListId],
+        "completed",
+        queryClient
+      );
+      if (sideEffects.error) {
+        toast.error(sideEffects.error);
+      } else {
+        toast.success("Pick list completed");
+      }
+      // entityKeys cover the generic detail page (table + view) and lists;
+      // pickListKeys cover the order-page pick list panels.
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("pick_lists") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("pick_list_details") });
+      queryClient.invalidateQueries({ queryKey: pickListKeys.all() });
+    },
+    onError: (error) => {
+      toast.error(`Failed to complete pick list: ${error.message}`);
+      // Refetch so the UI reflects whichever state won the race
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("pick_lists") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("pick_list_details") });
     },
   });
 
@@ -272,6 +393,15 @@ export function PickListItems({ data }: PickListItemsProps) {
         </div>
       </div>
 
+      {/* Keyboard-wedge scan entry: scanners type the lot number + Enter */}
+      {isEditable && (
+        <ScanInput
+          onScan={handleScan}
+          placeholder="Scan or type a lot number…"
+          ariaLabel="Scan lot number"
+        />
+      )}
+
       {/* Actions */}
       {isEditable && completedCount < items.length && (
         <div className="flex justify-end">
@@ -279,6 +409,7 @@ export function PickListItems({ data }: PickListItemsProps) {
             variant="outline"
             onClick={() => completeAllMutation.mutate()}
             disabled={completeAllMutation.isPending}
+            className={cn(isMobile && "w-full", isTouch && "min-h-[44px]")}
           >
             {completeAllMutation.isPending && (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -288,81 +419,86 @@ export function PickListItems({ data }: PickListItemsProps) {
         </div>
       )}
 
-      {/* Items Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {isEditable && <TableHead className="w-[50px]">Pick</TableHead>}
-              <TableHead>Product</TableHead>
-              <TableHead>Lot #</TableHead>
-              <TableHead className="text-center">
-                <span className="flex items-center gap-1 justify-center">
-                  <MapPin className="h-4 w-4" />
-                  Location
-                </span>
-              </TableHead>
-              <TableHead className="text-right">Requested</TableHead>
-              <TableHead className="text-right">Picked</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => {
-              const isComplete = item.quantity_picked >= item.quantity_requested;
-              return (
-                <TableRow
-                  key={item.id}
-                  className={isComplete ? "bg-green-50 dark:bg-green-950/20" : ""}
-                >
-                  {isEditable && (
-                    <TableCell>
-                      <button
-                        onClick={() => markPicked(item)}
-                        className="p-1 hover:bg-muted rounded"
-                        disabled={updatePickedMutation.isPending}
-                      >
-                        {isComplete ? (
-                          <CheckCircle2 className="h-6 w-6 text-green-500" />
-                        ) : (
-                          <Circle className="h-6 w-6 text-muted-foreground" />
-                        )}
-                      </button>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <div className="font-medium">{item.brand_name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {item.package_name}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-mono text-sm">{item.lot_number}</div>
-                    {item.production_date && (
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(item.production_date).toLocaleDateString()}
+      {/* Every line picked on an in-progress list — offer completion here so
+          the picker doesn't have to find the status dropdown. Also syncs the
+          parent order to "packed" via transition side effects. */}
+      {data.status === "in_progress" && completedCount === items.length && (
+        <div className="flex justify-end">
+          <Button
+            onClick={() => completePickListMutation.mutate()}
+            disabled={completePickListMutation.isPending}
+            className={cn(isMobile && "w-full", isTouch && "min-h-[44px]")}
+          >
+            {completePickListMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+            )}
+            Complete Pick List
+          </Button>
+        </div>
+      )}
+
+      {/* Items — cards on phones, table on desktop/tablet */}
+      {isMobile ? (
+        <div className="space-y-3">
+          {items.map((item) => {
+            const isComplete =
+              item.quantity_picked >= item.quantity_requested;
+            const currentQty = pendingPicks[item.id] ?? item.quantity_picked;
+            return (
+              <Card
+                key={item.id}
+                ref={registerRow(item.id)}
+                className={cn(
+                  isComplete &&
+                    "border-green-500/40 bg-green-50 dark:bg-green-950/20",
+                  lastScanId === item.id && "ring-2 ring-primary"
+                )}
+              >
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-medium">{item.brand_name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {item.package_name}
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {item.location_name ? (
-                      <Badge variant="secondary" className="font-mono">
+                    </div>
+                    {item.location_name && (
+                      <Badge variant="secondary" className="shrink-0 font-mono">
+                        <MapPin className="mr-1 h-3 w-3" />
                         {item.location_name}
                       </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">--</span>
                     )}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {item.quantity_requested}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {isEditable ? (
-                      <div className="flex items-center justify-end gap-2">
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-mono">{item.lot_number}</span>
+                    {item.production_date && (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(item.production_date).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                  {isEditable ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 shrink-0"
+                          aria-label="Decrease picked quantity"
+                          onClick={() => stepPick(item, -1)}
+                          disabled={
+                            updatePickedMutation.isPending || currentQty <= 0
+                          }
+                        >
+                          <Minus className="h-5 w-5" />
+                        </Button>
                         <Input
                           type="number"
                           min={0}
                           max={item.quantity_requested}
-                          value={pendingPicks[item.id] ?? item.quantity_picked}
+                          value={currentQty}
                           onChange={(e) =>
                             setPendingPicks((prev) => ({
                               ...prev,
@@ -373,21 +509,180 @@ export function PickListItems({ data }: PickListItemsProps) {
                           onKeyDown={(e) => {
                             if (e.key === "Enter") savePendingPick(item.id);
                           }}
-                          className="w-20 text-right"
+                          aria-label="Picked quantity"
+                          className="h-11 flex-1 text-center text-lg"
                         />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-11 w-11 shrink-0"
+                          aria-label="Increase picked quantity"
+                          onClick={() => stepPick(item, 1)}
+                          disabled={
+                            updatePickedMutation.isPending ||
+                            currentQty >= item.quantity_requested
+                          }
+                        >
+                          <Plus className="h-5 w-5" />
+                        </Button>
+                        <span className="shrink-0 text-sm text-muted-foreground">
+                          / {item.quantity_requested}
+                        </span>
                       </div>
-                    ) : (
-                      <span className={isComplete ? "text-green-600 font-bold" : ""}>
-                        {item.quantity_picked}
+                      <Button
+                        variant={isComplete ? "outline" : "default"}
+                        className="min-h-[48px] w-full"
+                        onClick={() => markPicked(item)}
+                        disabled={updatePickedMutation.isPending}
+                      >
+                        {isComplete ? (
+                          <>
+                            <Circle className="mr-2 h-5 w-5" />
+                            Undo Pick
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="mr-2 h-5 w-5" />
+                            Picked
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Picked</span>
+                      <span
+                        className={cn(
+                          "font-medium",
+                          isComplete && "font-bold text-green-600"
+                        )}
+                      >
+                        {item.quantity_picked} / {item.quantity_requested}
                       </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {isEditable && <TableHead className="w-[50px]">Pick</TableHead>}
+                <TableHead>Product</TableHead>
+                <TableHead>Lot #</TableHead>
+                <TableHead className="text-center">
+                  <span className="flex items-center gap-1 justify-center">
+                    <MapPin className="h-4 w-4" />
+                    Location
+                  </span>
+                </TableHead>
+                <TableHead className="text-right">Requested</TableHead>
+                <TableHead className="text-right">Picked</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => {
+                const isComplete = item.quantity_picked >= item.quantity_requested;
+                return (
+                  <TableRow
+                    key={item.id}
+                    ref={registerRow(item.id)}
+                    className={cn(
+                      isComplete && "bg-green-50 dark:bg-green-950/20",
+                      lastScanId === item.id &&
+                        "ring-2 ring-inset ring-primary"
                     )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Card>
+                  >
+                    {isEditable && (
+                      <TableCell>
+                        <button
+                          onClick={() => markPicked(item)}
+                          aria-label={
+                            isComplete ? "Mark not picked" : "Mark picked"
+                          }
+                          className={cn(
+                            "p-1 hover:bg-muted rounded",
+                            // ≥44px hit area on coarse pointers (WCAG 2.5.5)
+                            isTouch && "p-2.5"
+                          )}
+                          disabled={updatePickedMutation.isPending}
+                        >
+                          {isComplete ? (
+                            <CheckCircle2 className="h-6 w-6 text-green-500" />
+                          ) : (
+                            <Circle className="h-6 w-6 text-muted-foreground" />
+                          )}
+                        </button>
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <div className="font-medium">{item.brand_name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {item.package_name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-mono text-sm">{item.lot_number}</div>
+                      {item.production_date && (
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(item.production_date).toLocaleDateString()}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {item.location_name ? (
+                        <Badge variant="secondary" className="font-mono">
+                          {item.location_name}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">--</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {item.quantity_requested}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {isEditable ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={item.quantity_requested}
+                            value={pendingPicks[item.id] ?? item.quantity_picked}
+                            onChange={(e) =>
+                              setPendingPicks((prev) => ({
+                                ...prev,
+                                [item.id]: Number(e.target.value),
+                              }))
+                            }
+                            onBlur={() => savePendingPick(item.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") savePendingPick(item.id);
+                            }}
+                            aria-label="Picked quantity"
+                            className={cn(
+                              "w-20 text-right",
+                              isTouch && "h-11 w-24"
+                            )}
+                          />
+                        </div>
+                      ) : (
+                        <span className={isComplete ? "text-green-600 font-bold" : ""}>
+                          {item.quantity_picked}
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
     </div>
   );
 }

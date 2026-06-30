@@ -6,6 +6,17 @@
  * Accepts a pre-selected batch and creates a brew log linked to it.
  * The batch must already exist (planned status). Recipe info is derived
  * from the batch, not selected in this dialog.
+ *
+ * The brew log is created already in_progress: the user has explicitly
+ * clicked "Start Brew Day", so no second "Start Brew" click is required.
+ * (The server-side state machine validates only status UPDATEs, not
+ * INSERTs, so inserting as in_progress is allowed. The draft state
+ * remains reachable via manual status edit for scheduled-ahead brews.)
+ *
+ * The brew number is optional: when left blank, the generate_brew_number()
+ * trigger (migration 00181) assigns BRW-YYYY-DDD server-side with a dedup
+ * suffix, so multiple brews on the same day never collide on the UNIQUE
+ * constraint.
  */
 
 import { useState, useEffect } from "react";
@@ -44,19 +55,6 @@ type StartBrewDayDialogProps = {
 };
 
 // =============================================================================
-// Helpers
-// =============================================================================
-
-function generateBrewNumber(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const dayOfYear = Math.floor(
-    (now.getTime() - new Date(year, 0, 0).getTime()) / 86400000
-  );
-  return `BRW-${year}-${String(dayOfYear).padStart(3, "0")}`;
-}
-
-// =============================================================================
 // Component
 // =============================================================================
 
@@ -91,29 +89,31 @@ export function StartBrewDayDialog({
     enabled: open,
   });
 
-  // Reset state when dialog opens
+  // Reset state when dialog opens (brew number left blank → auto-generated)
   useEffect(() => {
     if (open) {
       setBrewDate(new Date().toISOString().split("T")[0]);
-      setBrewNumber(generateBrewNumber());
+      setBrewNumber("");
     }
   }, [open]);
 
-  const isValid = brewNumber.trim().length > 0 && brewDate.length > 0;
+  const isValid = brewDate.length > 0;
 
   const handleSubmit = async () => {
     if (!isValid) return;
     setIsSubmitting(true);
 
     try {
-      // 1. Create brew log
+      // 1. Create brew log (empty brew_number → server trigger generates it).
+      // Inserted directly as in_progress — the user just clicked "Start Brew
+      // Day", so no second "Start Brew" click should be needed.
       const { data: brewLog, error: brewLogError } = await supabase
         .from("brew_logs")
         .insert({
           brew_number: brewNumber.trim(),
           brew_date: brewDate,
           brewer_id: currentUser?.id ?? null,
-          status: "draft",
+          status: "in_progress",
         })
         .select("id")
         .single();
@@ -204,16 +204,24 @@ export function StartBrewDayDialog({
             />
           </div>
 
-          {/* Brew number */}
+          {/* Brew number (optional — auto-generated server-side when blank) */}
           <div className="space-y-2">
-            <Label htmlFor="brew-number">Brew Number</Label>
+            <Label htmlFor="brew-number">
+              Brew Number{" "}
+              <span className="text-muted-foreground font-normal">
+                (optional)
+              </span>
+            </Label>
             <Input
               id="brew-number"
               type="text"
               value={brewNumber}
               onChange={(e) => setBrewNumber(e.target.value)}
-              placeholder="e.g., BRW-2024-001"
+              placeholder="Auto-generated (e.g., BRW-2026-163)"
             />
+            <p className="text-xs text-muted-foreground">
+              Leave blank to auto-generate a unique number from the brew date.
+            </p>
           </div>
         </div>
 

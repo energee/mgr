@@ -7,6 +7,7 @@
 
 import type { EntityPresentation } from "@/types/entity";
 import { deleteAction } from "@/types/entity";
+import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 import type { InventoryLot } from "./core";
 
 export const inventoryLotPresentation: EntityPresentation<InventoryLot> = {
@@ -152,14 +153,7 @@ export const inventoryLotPresentation: EntityPresentation<InventoryLot> = {
           label: "Unit",
           type: "select",
           required: true,
-          options: [
-            { value: "lb", label: "Pounds (lb)" },
-            { value: "oz", label: "Ounces (oz)" },
-            { value: "kg", label: "Kilograms (kg)" },
-            { value: "g", label: "Grams (g)" },
-            { value: "each", label: "Each" },
-            { value: "gal", label: "Gallons" },
-          ],
+          options: INVENTORY_UNIT_OPTIONS,
           colSpan: 4,
         },
       ],
@@ -228,4 +222,7 @@ export const inventoryLotPresentation: EntityPresentation<InventoryLot> = {
   // Actions
   // ---------------------------------------------------------------------------
   actions: [deleteAction("Inventory Lot")],
+
+  // Duplicate reuses item/qty/costs; lot identity + receipt link stay unique.
+  excludeOnDuplicate: ["lot_number", "po_receive_id", "received_date"],
 };

@@ -8,11 +8,17 @@
  * Packaging, and Cancel/Archive dialogs. State transitions (planned ->
  * fermenting, fermenting -> conditioning) are suggested via toast after
  * actions rather than being direct state-change buttons.
+ *
+ * Inventory loop wiring (audit Batch 9):
+ * - Start Brew Day chains into BrewConsumptionDialog, which plans FIFO
+ *   ingredient allocations (inventory_lot -> batch, status planned).
+ * - The Complete action is intercepted so those planned allocations are
+ *   flipped to completed alongside the status change (shared registry:
+ *   services/transition-side-effects.ts).
  */
 
 import { use, useRef, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -24,6 +30,8 @@ import { BatchCancellationDialog } from "@/components/domain/batch/batch-cancell
 import { BatchBlendDialog } from "@/components/domain/batch/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/batch/vessel-transfer-dialog";
 import { StartBrewDayDialog } from "@/components/domain/brew/start-brew-day-dialog";
+import { useBrewConsumptionFlow } from "@/components/domain/brew/use-brew-consumption-flow";
+import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-batch-dialog";
 import { AddToPackagingSessionDialog } from "@/components/domain/packaging/add-to-packaging-session-dialog";
 import { BatchPackagingHistory } from "@/components/domain/batch/batch-packaging-history";
@@ -66,17 +74,18 @@ export default function BatchDetailPage({
 
   const queryClient = useQueryClient();
   const supabase = createClient();
-  const router = useRouter();
 
-  // Fetch batch data for the dialogs (use view to get vessel info)
-  // The view includes target_og via b.* but generated types are stale; use type extension
+  // Fetch batch data for the dialogs (use view to get vessel info and
+  // actual_og, which the view computes from brew-log knockout measurements).
+  // Note: the batches table/view has NO target_og column — recipe targets
+  // come from the recipe query below.
   type BatchDetail = {
     id: string;
     batch_code: string;
     name: string;
     status: string;
     volume_bbl: number | null;
-    target_og: number | null;
+    actual_og: number | null;
     current_vessel_id: string | null;
     current_vessel_name: string | null;
     recipe_id: string | null;
@@ -87,11 +96,10 @@ export default function BatchDetailPage({
       const data = await unwrap(
         supabase
           .from("batches_with_brew_info")
-          .select("id, batch_code, name, status, volume_bbl, current_vessel_id, current_vessel_name, recipe_id")
+          .select("id, batch_code, name, status, volume_bbl, actual_og, current_vessel_id, current_vessel_name, recipe_id")
           .eq("id", id)
           .single()
       ) as unknown as BatchDetail | null;
-      // target_og is available in the view (via b.*) but not in generated types yet
       // Runtime-validate required fields before casting
       if (!data || typeof data.id !== "string") {
         throw new Error("Batch detail query returned invalid data");
@@ -99,6 +107,9 @@ export default function BatchDetailPage({
       return data;
     },
   });
+
+  // Brew log → consumption confirmation → navigate (shared flow, 9.1)
+  const { handleBrewLogCreated, consumptionDialog } = useBrewConsumptionFlow(batch ?? null);
 
   // Fetch linked brew logs for banner logic and breadcrumb
   // Uses a separate key from BrewLogLinker to avoid cache shape conflicts
@@ -118,18 +129,29 @@ export default function BatchDetailPage({
     },
   });
 
-  // Fetch recipe info (includes brand for packaging dialog)
-  const { data: recipe } = useQuery({
+  // Fetch recipe info: brand for the packaging dialogs, target_og and yeast
+  // strain links for the pitch-rate calculator in PitchYeastDialog.
+  // recipeBrand stays null for recipe-less batches (query disabled) and for
+  // recipes without a brand — the packaging dialogs handle that by showing
+  // an in-dialog brand picker instead of silently not opening.
+  const { data: recipe, isLoading: recipeLoading } = useQuery({
     queryKey: recipeKeys.detail(batch?.recipe_id ?? ""),
     queryFn: async () => {
       if (!batch?.recipe_id) return null;
       return await unwrap(
         supabase
           .from("recipes")
-          .select("id, name, brand_id, brands(id, name)")
+          .select("id, name, brand_id, target_og, brands(id, name), recipe_yeasts(yeast_id)")
           .eq("id", batch.recipe_id)
           .single()
-      ) as unknown as { id: string; name: string; brand_id: string | null; brands: { id: string; name: string } | null };
+      ) as unknown as {
+        id: string;
+        name: string;
+        brand_id: string | null;
+        target_og: number | null;
+        brands: { id: string; name: string } | null;
+        recipe_yeasts: { yeast_id: string }[] | null;
+      };
     },
     enabled: !!batch?.recipe_id,
   });
@@ -229,9 +251,54 @@ export default function BatchDetailPage({
     return null;
   }, [batch, linkedBrewLogs, id]);
 
+  /**
+   * Complete the batch and confirm its planned brew-day consumption:
+   * transitions status to completed (guarded on the loaded status so a
+   * concurrent change by another user matches 0 rows instead of clobbering),
+   * then runs the shared transition side effects
+   * (services/transition-side-effects.ts), which flip planned
+   * inventory_lot→batch allocations to completed so ingredient inventory is
+   * actually depleted.
+   */
+  const completeBatch = useCallback(async () => {
+    if (!batch) return;
+    const client = createClient();
+    const { data: updated, error } = await client
+      .from("batches")
+      .update({ status: "completed" })
+      .eq("id", id)
+      .eq("status", batch.status)
+      .select("id");
+    if (error) {
+      toast.error(`Failed to complete batch: ${error.message}`);
+      return;
+    }
+    if (!updated || updated.length === 0) {
+      toast.error("Transition no longer valid — status may have changed");
+      queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+      return;
+    }
+    const sideEffects = await runTransitionSideEffects(client, "batches", [id], "completed");
+    if (sideEffects.error) {
+      toast.error(sideEffects.error);
+    } else if (sideEffects.completedAllocations > 0) {
+      toast.success(`Batch completed — ${sideEffects.completedAllocations} ingredient allocation${sideEffects.completedAllocations === 1 ? "" : "s"} confirmed`);
+    } else {
+      toast.success("Batch completed");
+    }
+    queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+    queryClient.invalidateQueries({ queryKey: batchKeys.all() });
+  }, [id, queryClient, batch]);
+
   // Custom action handler for batch-specific actions.
   // Returns true when the action is handled by a dialog, false to let EntityDetail handle it.
   const handleAction = useCallback((actionName: string) => {
+    if (actionName === "complete") {
+      // Handled here (not the generic state transition) so planned
+      // brew-day consumption allocations are completed alongside the batch.
+      void completeBatch();
+      return true;
+    }
     if (actionName === "start_brew_day") {
       setShowStartBrewDay(true);
       return true;
@@ -262,7 +329,7 @@ export default function BatchDetailPage({
       return true;
     }
     return false;
-  }, []);
+  }, [completeBatch]);
 
   const handleDialogSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
@@ -274,9 +341,10 @@ export default function BatchDetailPage({
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
       queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-      router.push(`/production/brew-logs/${brewLogId}`);
+      // Shared flow: consumption confirmation (with recipe) or direct navigation.
+      handleBrewLogCreated(brewLogId);
     },
-    [queryClient, id, router]
+    [queryClient, id, handleBrewLogCreated]
   );
 
   /** Suggest a batch state transition via a toast confirmation. */
@@ -359,7 +427,10 @@ export default function BatchDetailPage({
             batchName={batch.name}
             batchStatus={batch.status}
             batchVolumeBbl={batch.volume_bbl}
-            recipeOg={batch.target_og}
+            // Prefer measured knockout OG (pitching happens post-knockout);
+            // fall back to the recipe's target.
+            recipeOg={batch.actual_og ?? recipe?.target_og}
+            recipeYeastIds={recipe?.recipe_yeasts?.map((ry) => ry.yeast_id)}
             onSuccess={handleDialogSuccess}
             onSuggestTransition={(state) => handleSuggestTransition(state)}
           />
@@ -418,25 +489,32 @@ export default function BatchDetailPage({
             onSuccess={handleBrewDayCreated}
           />
 
-          {showStartPackaging && recipeBrand && (
+          {consumptionDialog}
+
+          {/* Packaging dialogs: mount once the recipe query has settled so a
+              batch whose brand is still loading doesn't briefly show the
+              in-dialog brand picker. A null brand (no recipe, or recipe
+              without a brand) is handled inside the dialogs. */}
+          {showStartPackaging && !recipeLoading && (
             <PackagingBatchDialog
               open={showStartPackaging}
               onOpenChange={setShowStartPackaging}
               batchId={id}
               batchNumber={batch.batch_code}
-              brandId={recipeBrand.id}
-              brandName={recipeBrand.name}
+              brandId={recipeBrand?.id ?? null}
+              brandName={recipeBrand?.name ?? null}
+              volumeBbl={batch.volume_bbl}
             />
           )}
 
-          {showAddToSession && recipeBrand && (
+          {showAddToSession && !recipeLoading && (
             <AddToPackagingSessionDialog
               open={showAddToSession}
               onOpenChange={setShowAddToSession}
               batchId={id}
               batchNumber={batch.batch_code}
-              brandId={recipeBrand.id}
-              brandName={recipeBrand.name}
+              brandId={recipeBrand?.id ?? null}
+              brandName={recipeBrand?.name ?? null}
             />
           )}
         </>

@@ -10,6 +10,18 @@
  * summary; any remaining listColumns are progressively disclosed
  * by a per-card "Show more" toggle (audit F-085).
  *
+ * Rows are server-paginated by the parent (entity-data-table); when
+ * more rows exist a "Load more" button asks the parent to widen the
+ * fetch window (audit 4.3).
+ *
+ * Each card gets a trailing three-dot menu (≥40px hit area) exposing
+ * the record's applicable entity actions — state transitions and
+ * custom/button actions, filtered by the same getApplicableActions
+ * helper (lib/entity-actions) as the desktop actions column
+ * (audit 10.2). Transitions are dispatched
+ * through the parent's handleSingleTransition so the optimistic
+ * cache update + race guard are shared, not duplicated.
+ *
  * Expanded state is held at the list level (Set<rowId>) so it
  * survives parent re-renders triggered by parallel mutations or
  * filter updates. It is intentionally not persisted across
@@ -19,12 +31,19 @@
 
 import Link from "next/link";
 import { useMemo, useState, useCallback, type ReactNode } from "react";
-import type { EntityConfig, EntityColumnDef } from "@/types/entity";
+import type { EntityConfig, EntityColumnDef, EntityActionDef } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
 import { formatValue } from "@/lib/format";
+import { getApplicableActions } from "@/lib/entity-actions";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { Button } from "@/components/ui/button";
-import { Search, Inbox, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Search, Inbox, ChevronDown, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type EntityMobileCardListProps = {
@@ -40,6 +59,34 @@ type EntityMobileCardListProps = {
   onCreateClick?: () => void;
   /** Whether there are active search/filter criteria */
   hasActiveFilters: boolean;
+  /** Whether more rows exist on the server beyond those currently loaded */
+  hasMore?: boolean;
+  /** Whether the next page is currently being fetched */
+  isLoadingMore?: boolean;
+  /** Fetch the next page of rows (server pagination "Load more") */
+  onLoadMore?: () => void;
+  /**
+   * Fire a state transition for a record. Provided by entity-data-table's
+   * handleSingleTransition so the optimistic cache update + race guard are
+   * shared with the table/kanban views (audit 10.2).
+   */
+  onTransition?: (id: string, toState: string) => Promise<void>;
+  /** Page-level action override — return true if handled externally */
+  onAction?: (actionName: string, record: Record<string, unknown>) => boolean;
+  /** Open the shared delete-confirmation dialog for a record */
+  onDeleteAction?: (
+    record: Record<string, unknown>,
+    action: EntityActionDef<Record<string, unknown>>,
+  ) => void;
+  /**
+   * Open the shared action-confirmation dialog (EntityActionDef.confirm)
+   * for a record. Owned by entity-data-table (EntityActionConfirmDialog) so
+   * the desktop row menu and mobile cards share one dialog + dispatch path.
+   */
+  onConfirmAction?: (
+    record: Record<string, unknown>,
+    action: EntityActionDef<Record<string, unknown>>,
+  ) => void;
 }
 
 /**
@@ -71,6 +118,13 @@ export function EntityMobileCardList({
   showCreate,
   onCreateClick,
   hasActiveFilters,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
+  onTransition,
+  onAction,
+  onDeleteAction,
+  onConfirmAction,
 }: EntityMobileCardListProps) {
   // ---- Determine which field to use as the card title ----
   const titleField =
@@ -178,9 +232,25 @@ export function EntityMobileCardList({
             detailColumns={detailColumns}
             expanded={expandedIds.has(id)}
             onToggle={toggleExpanded}
+            onTransition={onTransition}
+            onAction={onAction}
+            onDeleteAction={onDeleteAction}
+            onConfirmAction={onConfirmAction}
           />
         );
       })}
+      {/* Server pagination: rows arrive one page at a time (audit 4.3) */}
+      {hasMore && onLoadMore && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-1 min-h-[44px]"
+          onClick={onLoadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? "Loading…" : "Load more"}
+        </Button>
+      )}
     </div>
   );
 }
@@ -188,9 +258,11 @@ export function EntityMobileCardList({
 /**
  * Single mobile card. Splits into:
  * - Link region (tap anywhere on the title/summary navigates to the detail page).
+ * - Optional three-dot actions menu, absolutely positioned over the top-right
+ *   corner as a SIBLING of the `<Link>` (valid HTML — interactive content
+ *   cannot nest inside `<a>`), with a ≥40px hit area (audit 10.2).
  * - Optional "Show more" toggle rendered as a sibling button BELOW the
- *   `<Link>` so the markup stays valid HTML (interactive content cannot
- *   nest inside `<a>`). Expanded state is owned by the parent list so it
+ *   `<Link>`. Expanded state is owned by the parent list so it
  *   survives re-renders.
  */
 function EntityMobileCard({
@@ -203,6 +275,10 @@ function EntityMobileCard({
   detailColumns,
   expanded,
   onToggle,
+  onTransition,
+  onAction,
+  onDeleteAction,
+  onConfirmAction,
 }: {
   row: Record<string, unknown>;
   entity: EntityConfig<Record<string, unknown>>;
@@ -213,18 +289,31 @@ function EntityMobileCard({
   detailColumns: EntityColumnDef<Record<string, unknown>>[];
   expanded: boolean;
   onToggle: (id: string) => void;
+  onTransition?: (id: string, toState: string) => Promise<void>;
+  onAction?: (actionName: string, record: Record<string, unknown>) => boolean;
+  onDeleteAction?: (
+    record: Record<string, unknown>,
+    action: EntityActionDef<Record<string, unknown>>,
+  ) => void;
+  onConfirmAction?: (
+    record: Record<string, unknown>,
+    action: EntityActionDef<Record<string, unknown>>,
+  ) => void;
 }) {
   const id = row.id as string;
   const title = row[titleField] ?? "Untitled";
   const statusValue = statusField ? (row[statusField] as string | undefined) : undefined;
   const hasExtras = detailColumns.length > 0;
   const extrasId = `card-extras-${id}`;
+  const actions = getApplicableActions(entity, row);
+  const hasMenu = actions.length > 0;
 
   return (
-    <div className="rounded-lg border bg-card transition-colors active:bg-accent/50">
+    <div className="relative rounded-lg border bg-card transition-colors active:bg-accent/50">
       <Link href={`${basePath}/${id}`} className="block p-3">
-        {/* Header row: title + status badge */}
-        <div className="flex items-center justify-between gap-2">
+        {/* Header row: title + status badge (right padding reserves space
+            for the absolutely-positioned actions menu) */}
+        <div className={cn("flex items-center justify-between gap-2", hasMenu && "pr-9")}>
           <span className="font-medium text-sm truncate">{String(title)}</span>
           {statusValue && (
             <StatusBadge
@@ -271,6 +360,62 @@ function EntityMobileCard({
           </div>
         )}
       </Link>
+
+      {/* Actions menu — sibling of the Link (NOT nested), absolutely
+          positioned over the card's top-right corner. stopPropagation keeps
+          the tap from bubbling into ancestors with click handlers; since the
+          button is not inside the <a>, it never triggers navigation. */}
+      {hasMenu && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0.5 top-0.5 size-10 text-muted-foreground"
+              aria-label={`Actions for ${String(title)}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {actions.map((action) => {
+              const disabledReason = action.disabledWhen?.(row);
+              return (
+                <AnimatedActionMenuItem
+                  key={action.name}
+                  icon={action.icon}
+                  label={action.label}
+                  variant={action.variant === "destructive" ? "destructive" : undefined}
+                  disabled={!!disabledReason}
+                  title={disabledReason || undefined}
+                  onClick={() => {
+                    if (disabledReason) return;
+                    if (action.name === "delete" && action.deleteMode && onDeleteAction) {
+                      onDeleteAction(row, action);
+                      return;
+                    }
+                    // Confirm gate runs BEFORE the onAction override so
+                    // page-intercepted actions are covered too.
+                    if (action.confirm && onConfirmAction) {
+                      onConfirmAction(row, action);
+                      return;
+                    }
+                    if (onAction && onAction(action.name, row)) {
+                      return;
+                    }
+                    if (action.toState && onTransition) {
+                      void onTransition(id, action.toState);
+                      return;
+                    }
+                    void action.handler?.(row);
+                  }}
+                />
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       {/* "Show more" toggle — sibling of the Link (NOT nested) so the
           markup remains valid HTML. A ≥44×44 px tap target keeps it
