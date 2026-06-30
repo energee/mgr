@@ -44,14 +44,13 @@ export const poReceiveCore: EntityCoreInput<POReceive> = {
   displayName: "PO Receive",
   description: "Partial receipts against purchase order line items",
   domain: "purchasing",
+  // Inline-only: receipts are recorded through the PO accept-inventory flow.
+  basePath: null,
 
   // Explicit: sort by received date descending, not by name.
   defaultSort: { column: "received_date", direction: "desc" },
   searchableFields: ["lot_number", "notes"],
 
-  detailHeader: {
-    title: "lot_number",
-  },
 
   formSchema: poReceiveSchema,
 

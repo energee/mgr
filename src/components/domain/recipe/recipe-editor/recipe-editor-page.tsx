@@ -26,11 +26,12 @@ import { KnockoutSection } from "./knockout-section";
 import { FermentationSection } from "./fermentation-section";
 import { RecipeSidebar } from "./recipe-sidebar";
 import { RecipeCloneDialog } from "@/components/domain/recipe/recipe-clone-dialog";
+import { preparePlanBatchPrefill } from "@/components/domain/recipe/plan-batch-from-recipe";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Copy, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, CalendarPlus, Copy, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useGravityUnit } from "@/hooks/use-unit-preferences";
@@ -148,6 +149,19 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
     [router]
   );
 
+  // Plan a batch from this recipe: stage recipe-derived defaults in the
+  // prefill store, then open the batch create form (which consumes them).
+  const handlePlanBatch = useCallback(async () => {
+    if (!recipe) return;
+    const url = await preparePlanBatchPrefill({
+      id: recipe.id,
+      name: recipe.name,
+      brand_id: recipe.brand_id,
+      batch_size_bbl: recipe.batch_size_bbl,
+    });
+    router.push(url);
+  }, [recipe, router]);
+
   if (isLoading) {
     return <RecipeEditorSkeleton />;
   }
@@ -197,6 +211,14 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
           </div>
           <div className="flex items-center gap-2">
             <SaveAllButton />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handlePlanBatch()}
+            >
+              <CalendarPlus className="h-4 w-4 mr-1" />
+              Plan Batch
+            </Button>
             <Button
               variant="outline"
               size="sm"

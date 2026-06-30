@@ -53,6 +53,13 @@ export const batchStateMachine: StateMachineConfig<Batch> = {
   states: [...batchStates],
   initialState: "planned",
   transitions: batchTransitions,
+  // Terminating a batch must run the cancel/archive flow (pages intercept via
+  // onAction → BatchCancellationDialog → cancel_batch/archive_batch RPCs that
+  // release the vessel and record the TTB loss). Suppresses bare status flips.
+  requiresAction: {
+    cancelled: "cancel",
+    archived: "archive",
+  },
   stateDisplay: {
     planned: { label: "Planned", color: "default" },
     fermenting: { label: "Fermenting", color: "info" },
@@ -79,6 +86,7 @@ export const batchCore: EntityCoreInput<Batch> = {
   displayNamePlural: "Batches",
   description: "Production batches from brewing through packaging",
   domain: "production",
+  basePath: "/production/batches",
 
   // Explicit: sorted by most-recent planned start first.
   defaultSort: { column: "planned_start_date", direction: "desc" },

@@ -34,6 +34,7 @@ import {
   AnimatedActionMenuItem,
   AnimatedLinkActionMenuItem,
 } from "@/components/universal/animated-action-menu-item";
+import { getApplicableActions } from "@/lib/entity-actions";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { memo } from "react";
 
@@ -231,13 +232,19 @@ export function buildSelectColumn<T>(): ColumnDef<T, unknown> {
 
 /**
  * Creates the row actions dropdown column (View, state transitions, custom actions).
+ *
+ * Actions with `confirm: true` are routed through `onConfirmRequired` instead
+ * of dispatching directly — the caller (entity-data-table) owns the shared
+ * EntityActionConfirmDialog and re-dispatches on confirm, mirroring the
+ * onDelete/setDeleteTarget plumbing.
  */
 export function buildActionsColumn<T>(
   entity: EntityConfig<T>,
   basePath: string,
   onAction?: (actionName: string, record: T) => boolean,
   onTransition?: (id: string, toState: string) => void,
-  onDelete?: (record: T, action: EntityActionDef<T>) => void
+  onDelete?: (record: T, action: EntityActionDef<T>) => void,
+  onConfirmRequired?: (record: T, action: EntityActionDef<T>) => void
 ): ColumnDef<T, unknown> {
   return {
     id: "actions",
@@ -258,21 +265,8 @@ export function buildActionsColumn<T>(
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <AnimatedLinkActionMenuItem icon="view" label="View" href={`${basePath}/${id}`} />
-            {entity.actions?.map((action) => {
-              if (action.showWhen && !action.showWhen(record)) return null;
-              if (action.fromStates) {
-                const stateField = entity.stateMachine?.stateField;
-                const currentState = stateField
-                  ? ((record as Record<string, unknown>)[
-                      stateField
-                    ] as string)
-                  : null;
-                if (
-                  !currentState ||
-                  !action.fromStates.includes(currentState)
-                )
-                  return null;
-              }
+            {/* showWhen/fromStates visibility shared with the mobile card menu */}
+            {getApplicableActions(entity, record).map((action) => {
               const disabledReason = action.disabledWhen?.(record);
               return (
                 <AnimatedActionMenuItem
@@ -286,6 +280,12 @@ export function buildActionsColumn<T>(
                     if (disabledReason) return;
                     if (action.name === "delete" && action.deleteMode && onDelete) {
                       onDelete(record, action);
+                      return;
+                    }
+                    // Confirm gate runs BEFORE the onAction override so
+                    // page-intercepted actions are covered too.
+                    if (action.confirm && onConfirmRequired) {
+                      onConfirmRequired(record, action);
                       return;
                     }
                     if (onAction && onAction(action.name, record)) {

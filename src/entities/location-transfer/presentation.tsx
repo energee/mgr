@@ -7,8 +7,28 @@
 
 import type { EntityPresentation } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { TransferLinesEditor } from "@/components/domain/inventory/transfer-lines-editor";
 import { locationTransferStateMachine, statusOptions } from "./core";
 import type { LocationTransferView } from "./core";
+
+// Wrapper adapting TransferLinesEditor to the relation component interface.
+// transfer_line is not a registered entity, so the generic RelationTable
+// cannot render it; this inline editor is the only insert path for lines.
+function TransferLinesRelation({
+  parentId,
+  data,
+}: {
+  parentId: string;
+  data?: Record<string, unknown>;
+}) {
+  return (
+    <TransferLinesEditor
+      transferId={parentId}
+      fromBinId={(data?.from_bin_id as string | null | undefined) ?? null}
+      status={(data?.status as string | null | undefined) ?? null}
+    />
+  );
+}
 
 export const locationTransferPresentation: EntityPresentation<LocationTransferView> = {
   // ---------------------------------------------------------------------------
@@ -195,4 +215,8 @@ export const locationTransferPresentation: EntityPresentation<LocationTransferVi
       confirm: true,
     },
   ],
+
+  relationComponents: {
+    transfer_lines: TransferLinesRelation,
+  },
 };

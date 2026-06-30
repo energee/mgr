@@ -94,6 +94,7 @@ export const deliveryCore: EntityCoreInput<DeliveryView> = {
   displayNamePlural: "Deliveries",
   description: "Groups transfers and order fulfillments into delivery runs",
   domain: "inventory",
+  basePath: "/inventory/deliveries",
 
   defaultSort: { column: "scheduled_date", direction: "desc" },
   searchableFields: ["delivery_number", "driver_name", "vehicle"],

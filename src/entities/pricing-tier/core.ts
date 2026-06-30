@@ -45,6 +45,7 @@ export const pricingTierCore: EntityCoreInput<PricingTier> = {
   displayName: "Pricing Tier",
   description: "Tier definitions for the pricing matrix",
   domain: "sales",
+  basePath: "/settings/pricing/tiers",
 
   // Explicit: tiers sort by their COGS upper bound, not by name.
   defaultSort: { column: "cogs_max", direction: "asc" },
@@ -61,6 +62,8 @@ export const pricingTierCore: EntityCoreInput<PricingTier> = {
       foreignKey: "pricing_tier_id",
       showInDetail: true,
       detailTab: "Prices",
+      // Prices have no create route — managed via the /settings/pricing matrix.
+      hideAdd: true,
     },
     {
       name: "recipes",

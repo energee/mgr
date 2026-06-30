@@ -62,6 +62,18 @@ export function formatDate(
   }
 }
 
+/**
+ * Local calendar date as YYYY-MM-DD, for `date` columns that store a calendar
+ * day (order_date, session_date, …). Built from local getters, NOT
+ * `toISOString()` — the latter is UTC and rolls to the next day in the evening
+ * for negative-offset (Americas) timezones.
+ */
+export function localDateString(date = new Date()): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export type ValueFormat = "date" | "datetime" | "currency" | "number" | "percentage" | "json" | "unit";
 
 /** Format an unknown value for display in tables and detail views. */

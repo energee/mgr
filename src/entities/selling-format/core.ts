@@ -48,6 +48,7 @@ export const sellingFormatCore: EntityCoreInput<SellingFormat> = {
   displayName: "Selling Format",
   description: "How a container is grouped for sale — single, 4-pack, case, per keg.",
   domain: "inventory",
+  basePath: "/settings/selling-formats",
 
   // searchableFields: ["name"] is the default — omitted.
 

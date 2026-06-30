@@ -38,6 +38,11 @@ const reports = [
     description: "COGS analysis by batch, SKU, and time period",
     href: "/reports/cogs",
   },
+  {
+    title: "Batch Trace",
+    description: "Trace a batch from ingredient lots to orders and customers",
+    href: "/reports/trace",
+  },
 ];
 
 export default function ReportsPage() {

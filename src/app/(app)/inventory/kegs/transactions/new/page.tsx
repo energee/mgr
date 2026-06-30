@@ -3,51 +3,42 @@
 /**
  * New Keg Transaction Page
  *
- * Supports URL parameters for pre-populating form fields:
- * - customer_id: Pre-select customer (for returns)
- * - transaction_type: Pre-select transaction type
- * - selling_format_id: Pre-select selling format
- * - order_id: Pre-select order (for ship transactions)
+ * URL-parameter pre-fill (customer_id, transaction_type, selling_format_id,
+ * order_id, packaging_session_id, ...) is handled generically by
+ * EntityDetailPage, which merges search params matching form fields into the
+ * create form's default values.
+ *
+ * from_state/to_state correctness does NOT depend on this page: the
+ * authoritative derivation lives in kegTransactionSchema's z.preprocess step
+ * (src/entities/keg-transaction.tsx), which fills states from
+ * TRANSACTION_TYPES at submit time for every entry point — including the bare
+ * /new page and mid-form type changes. The defaults below only pre-fill the
+ * state selects when a transaction_type arrives via URL, so the fields that
+ * ARE visible (e.g. for adjust/maintain/retire) agree with the pre-selected
+ * type from the start.
  */
 
+import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { kegTransactionEntity, TRANSACTION_TYPES } from "@/entities/keg-transaction";
 
 export default function NewKegTransactionPage() {
   const searchParams = useSearchParams();
-
-  // Build default values from URL parameters
-  const defaultValues: Record<string, unknown> = {};
-
-  const customerId = searchParams.get("customer_id");
-  if (customerId) {
-    defaultValues.customer_id = customerId;
-  }
-
   const transactionType = searchParams.get("transaction_type");
-  if (transactionType) {
-    defaultValues.transaction_type = transactionType;
 
-    // Auto-set from_state and to_state based on transaction type
-    const typeConfig = TRANSACTION_TYPES.find((t) => t.value === transactionType);
-    if (typeConfig) {
-      if (typeConfig.fromState) {
-        defaultValues.from_state = typeConfig.fromState;
-      }
-      defaultValues.to_state = typeConfig.toState;
+  const defaultValues = useMemo(() => {
+    const typeConfig = TRANSACTION_TYPES.find(
+      (t) => t.value === transactionType,
+    );
+    if (!typeConfig) return undefined;
+
+    const derived: Record<string, unknown> = { to_state: typeConfig.toState };
+    if (typeConfig.fromState) {
+      derived.from_state = typeConfig.fromState;
     }
-  }
-
-  const sellingFormatId = searchParams.get("selling_format_id");
-  if (sellingFormatId) {
-    defaultValues.selling_format_id = sellingFormatId;
-  }
-
-  const orderId = searchParams.get("order_id");
-  if (orderId) {
-    defaultValues.order_id = orderId;
-  }
+    return derived;
+  }, [transactionType]);
 
   return (
     <EntityDetailPage

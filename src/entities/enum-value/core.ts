@@ -90,6 +90,7 @@ export const enumValueCore: EntityCoreInput<EnumValue> = {
   displayName: "Status & Option",
   description: "Values that appear in dropdowns and status fields throughout the app",
   domain: "system",
+  basePath: "/settings/status-options",
 
   defaultSort: { column: "enum_type", direction: "asc" },
   searchableFields: ["enum_type", "value", "label", "description"],

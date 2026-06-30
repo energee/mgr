@@ -22,6 +22,25 @@ export const entityKeys = {
   list: (table: string, filters?: Record<string, unknown>) =>
     filters ? ([table, "list", filters] as const) : ([table, "list"] as const),
 
+  /**
+   * Server-paginated list query (entity-data-table).
+   * Keyed under `[table, "list", ...]` so `entityKeys.all(table)` invalidation
+   * still covers it. `page` captures everything that changes the fetched window:
+   * fetch mode (paged/mobile/board), offset/limit, server sort order, and the
+   * column projection.
+   */
+  pagedList: (
+    table: string,
+    filters: Record<string, unknown>,
+    page: {
+      mode: "paged" | "mobile" | "board";
+      from: number;
+      to: number;
+      order: readonly { column: string; ascending: boolean }[];
+      select: string;
+    },
+  ) => [table, "list", filters, "paged", page] as const,
+
   /** Detail query for a single record */
   detail: (table: string, id: string) => [table, id] as const,
 
@@ -29,9 +48,9 @@ export const entityKeys = {
   related: (table: string, foreignKey: string, parentId: string) =>
     [table, "by", foreignKey, parentId] as const,
 
-  /** Timeline view for a table */
-  timeline: (table: string, startDate: string) =>
-    [table, "list", "timeline", startDate] as const,
+  /** Timeline view for a table over a date range (both ends must be in the key so range changes refetch) */
+  timeline: (table: string, startDate: string, endDate: string) =>
+    [table, "list", "timeline", startDate, endDate] as const,
 
   /** Display values for relation fields (FK name resolution) */
   relationDisplay: (queries: { table: string; id: string }[]) =>
@@ -140,6 +159,10 @@ export const orderKeys = {
   detail: (id: string) => ["orders", id] as const,
   items: (id: string) => ["orders", id, "items"] as const,
   allocations: (id: string) => ["order-allocations", id] as const,
+  /** Per-lot planned/completed allocations with brand/format — used by the
+   *  allocation dialog's remaining-to-allocate math. Nested under
+   *  allocations(id) so invalidating the list also refreshes this. */
+  allocatedLots: (id: string) => ["order-allocations", id, "lots"] as const,
   pickList: (id: string, subKey?: string) =>
     subKey
       ? (["order-pick-list", id, subKey] as const)
@@ -165,12 +188,29 @@ export const changeRequestKeys = {
 export const inventoryKeys = {
   all: () => ["inventory"] as const,
   items: () => ["inventory", "items"] as const,
+  /** Per-item on-hand totals (sum of lot remaining quantities) for the items list. */
+  itemOnHand: () => ["inventory", "items", "on-hand"] as const,
   lots: () => ["inventory", "lots"] as const,
+  /** Lot options (incl. zero-remaining lots) for the guided count/adjust dialog. */
+  countLots: () => ["inventory", "lots", "count-options"] as const,
   allocations: () => ["allocations"] as const,
   summary: () => ["inventory", "summary"] as const,
   overview: () => ["inventory-overview"] as const,
   finishedGoods: () => ["finished-goods"] as const,
   finishedGoodsAvailable: () => ["finished-goods-available"] as const,
+};
+
+// =============================================================================
+// Consumption Keys (brew-day ingredient consumption, quick depletions)
+// =============================================================================
+
+export const consumptionKeys = {
+  /** FIFO-suggested brew-day consumption plan for a batch's recipe */
+  brewPlan: (recipeId: string, batchVolumeBbl: number | null) =>
+    ["consumption", "brew-plan", recipeId, batchVolumeBbl] as const,
+  /** Source options (finished goods or lots) for the quick depletion dialog */
+  depletionSources: (sourceType: string) =>
+    ["consumption", "depletion-sources", sourceType] as const,
 };
 
 // =============================================================================
@@ -280,6 +320,10 @@ export const reportKeys = {
     dateRange
       ? (["reports", "cogs", "by-period", granularity, dateRange] as const)
       : (["reports", "cogs", "by-period", granularity] as const),
+  /** Batch trace report — upstream/downstream hops for one batch */
+  trace: (batchId: string) => ["reports", "trace", batchId] as const,
+  /** Batch options for the trace report picker */
+  traceBatches: () => ["reports", "trace", "batches"] as const,
 };
 
 // =============================================================================
@@ -308,6 +352,13 @@ export const dashboardKeys = {
   },
   heatmap: {
     year: () => ["dashboard", "heatmap", "year"] as const,
+  },
+  /** "Today" attention panel — overdue batches, due POs, aging kegs, expiring lots */
+  today: {
+    overdueBatches: () => ["dashboard", "today", "overdue-batches"] as const,
+    duePOs: () => ["dashboard", "today", "due-pos"] as const,
+    agingKegs: () => ["dashboard", "today", "aging-kegs"] as const,
+    expiringLots: () => ["dashboard", "today", "expiring-lots"] as const,
   },
 };
 
@@ -350,6 +401,8 @@ export const supplierKeys = {
     filters ? (["suppliers", "list", filters] as const) : (["suppliers", "list"] as const),
   active: () => ["suppliers", "active"] as const,
   detail: (id: string) => ["suppliers", id] as const,
+  /** supplier_catalog rows for one supplier (Catalog Items tab) */
+  catalog: (supplierId: string) => ["suppliers", supplierId, "catalog"] as const,
 };
 
 // =============================================================================
@@ -374,6 +427,8 @@ export const yeastKeys = {
   all: () => ["yeast-pitches"] as const,
   detail: (id: string) => ["yeast-pitches", id] as const,
   available: () => ["yeast-pitches", "available"] as const,
+  /** Strain id → recommended_max_generations map (for generation warnings) */
+  strainMaxGenerations: () => ["yeast-strains", "max-generations"] as const,
   brinks: () => ["yeast-pitches", "brinks"] as const,
   brinksDetail: (vesselId: string) => ["yeast-pitches", "brinks", vesselId] as const,
   lineageRoot: (pitchId: string) => ["yeast-lineage-root", pitchId] as const,
@@ -616,6 +671,19 @@ export const transferKeys = {
       : (["transfers", "list"] as const),
   detail: (id: string) => ["transfers", id] as const,
   lines: (transferId: string) => ["transfers", transferId, "lines"] as const,
+  /**
+   * TransferLinesEditor's view of a transfer's lines (includes
+   * quantity_shipped). Nested under lines() so existing
+   * `invalidateQueries(transferKeys.lines(id))` calls cover it.
+   */
+  linesEdit: (transferId: string) =>
+    ["transfers", transferId, "lines", "edit"] as const,
+  /**
+   * Items physically present in a transfer's from-bin (finished goods +
+   * inventory lots), used to populate the line-item picker.
+   */
+  sourceItems: (binId: string) =>
+    ["transfers", "source-items", binId] as const,
 };
 
 // =============================================================================
@@ -728,6 +796,9 @@ export const mongodbKeys = {
 export const poReceiveKeys = {
   all: () => ["po-receives"] as const,
   unaccepted: (poId: string) => ["po-receives", "unaccepted", poId] as const,
+  /** Most-recent catalog→inventory-item/bin mappings from prior accepted
+   *  lots, used to prefill the accept dialog */
+  mappingDefaults: () => ["po-receives", "mapping-defaults"] as const,
 };
 
 // =============================================================================
@@ -735,7 +806,11 @@ export const poReceiveKeys = {
 // =============================================================================
 
 export const onboardingKeys = {
-  /** Counts of key entities for the getting-started checklist */
+  /**
+   * Counts of key entities for the getting-started checklist
+   * (production track: locations/recipes/batches; sales track:
+   * brands/containers/selling formats/pricing tiers/customers).
+   */
   counts: () => ["onboarding", "counts"] as const,
 };
 
@@ -749,4 +824,21 @@ export const emailKeys = {
     filters
       ? (["email", "send-history", filters] as const)
       : (["email", "send-history"] as const),
+};
+
+// =============================================================================
+// Global Search Keys (cmd+K command palette record search)
+// =============================================================================
+
+export const globalSearchKeys = {
+  /** All palette record-search queries */
+  all: () => ["global-search"] as const,
+
+  /**
+   * One record search: the debounced term plus the (permission-filtered) set
+   * of entity names searched, so users with different roles never share
+   * cached results.
+   */
+  results: (term: string, entityNames: readonly string[]) =>
+    ["global-search", term, entityNames] as const,
 };

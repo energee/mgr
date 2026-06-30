@@ -9,9 +9,14 @@
  * - Adjuncts
  * - Finings/clarifiers
  * - Spices
+ *
+ * Supports optional `initialValues` so callers (e.g. the batch additions
+ * page's planned-addition "Log" buttons) can open the form prefilled with
+ * type, catalog ingredient, quantity, and unit. Pass a React `key` when
+ * changing initialValues on a mounted form — defaults are read once.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
@@ -82,19 +87,34 @@ type CatalogItem = {
   type?: string;
 }
 
+/** Prefill values for the form (e.g. from a planned recipe addition). Timestamp always defaults to now. */
+export type BatchAdditionFormInitialValues = {
+  addition_type?: AdditionType;
+  /** Catalog item id (hops.id, fruits.id, ...) — NOT a recipe junction row id */
+  ingredient_id?: string;
+  ingredient_name?: string;
+  quantity?: number;
+  unit?: string;
+};
+
 type BatchAdditionFormProps = {
   batchId: string;
+  /** Optional prefill (read once as defaultValues; re-key the component to apply new values) */
+  initialValues?: BatchAdditionFormInitialValues;
   onSubmit: (data: BatchAddition) => Promise<void>;
   onCancel?: () => void;
   isSubmitting?: boolean;
 }
 
 export function BatchAdditionForm({
+  initialValues,
   onSubmit,
   onCancel,
   isSubmitting = false,
 }: BatchAdditionFormProps) {
-  const [selectedType, setSelectedType] = useState<AdditionType>("dry_hop");
+  const [selectedType, setSelectedType] = useState<AdditionType>(
+    initialValues?.addition_type ?? "dry_hop"
+  );
   const [ingredientOpen, setIngredientOpen] = useState(false);
   const supabase = createClient();
 
@@ -103,11 +123,11 @@ export function BatchAdditionForm({
   const form = useForm<AdditionFormValues>({
     resolver: zodResolver(additionSchema),
     defaultValues: {
-      addition_type: "dry_hop",
-      ingredient_id: "",
-      ingredient_name: "",
-      quantity: undefined,
-      unit: config?.defaultUnit || "oz",
+      addition_type: initialValues?.addition_type ?? "dry_hop",
+      ingredient_id: initialValues?.ingredient_id ?? "",
+      ingredient_name: initialValues?.ingredient_name ?? "",
+      quantity: initialValues?.quantity ?? undefined,
+      unit: initialValues?.unit ?? config?.defaultUnit ?? "oz",
       timestamp: getCurrentDateTimeLocal(),
       contact_time_hours: undefined,
       notes: "",
@@ -147,8 +167,12 @@ export function BatchAdditionForm({
     staleTime: CACHE_DURATIONS.STATIC_DATA,
   });
 
-  // Update defaults when type changes
+  // Update defaults when the user changes type. Skips the mount run so
+  // prefilled initialValues (ingredient, unit) aren't immediately wiped.
+  const prevTypeRef = useRef(selectedType);
   useEffect(() => {
+    if (prevTypeRef.current === selectedType) return;
+    prevTypeRef.current = selectedType;
     const newConfig = ADDITION_TYPES[selectedType];
     form.setValue("unit", newConfig.defaultUnit);
     form.setValue("ingredient_id", "");
@@ -372,6 +396,14 @@ export function BatchAdditionForm({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        {/* Prefilled recipe units (e.g. gal, tsp) may not be in
+                            UNIT_OPTIONS — render them so the value displays */}
+                        {field.value &&
+                          !UNIT_OPTIONS.some((u) => u.value === field.value) && (
+                            <SelectItem value={field.value}>
+                              {field.value}
+                            </SelectItem>
+                          )}
                         {UNIT_OPTIONS.map((unit) => (
                           <SelectItem key={unit.value} value={unit.value}>
                             {unit.label}

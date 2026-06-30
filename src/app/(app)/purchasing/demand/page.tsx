@@ -8,17 +8,25 @@
  * - Shortfalls grouped by supplier with editable quantities
  * - Per-supplier and bulk PO generation
  *
- * All page state (filters, quantity overrides, supplier assignments) is
- * ephemeral React state by design. Demand planning is recalculated from
- * current batch/inventory data on each page visit, so persisting user
- * edits is unnecessary -- the underlying data changes frequently and
- * stale overrides would be misleading.
+ * Filters and quantity overrides are ephemeral React state by design:
+ * demand is recalculated from current batch/inventory data on each visit,
+ * so stale quantity overrides would be misleading. Supplier assignments
+ * are different — they are knowledge ("this supplier supplies this item"),
+ * not a per-visit override, so assigning a supplier in
+ * UnassignedShortfallsCard persists to supplier_catalog as the preferred
+ * supplier by default (the card's "Remember" checkbox), letting the
+ * shortfall RPC auto-assign it on future visits. The local assignment Map
+ * remains as optimistic per-visit state (and the only state when
+ * "Remember" is unchecked).
  */
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { purchasingKeys } from "@/lib/query-keys";
+import { createClient } from "@/lib/supabase/client";
+import { materialPlanningKeys, purchasingKeys } from "@/lib/query-keys";
+import { parseUnknownError } from "@/lib/errors";
+import { setPreferredSupplier } from "@/domain/purchasing/supplier-catalog";
 import {
   calculateIngredientShortfalls,
   calculateIngredientDemand,
@@ -184,14 +192,39 @@ export default function IngredientDemandPage() {
   );
 
   const handleAssignSupplier = useCallback(
-    (catalogType: string, catalogId: string, supplierId: string, supplierName: string) => {
+    (
+      catalogType: string,
+      catalogId: string,
+      supplierId: string,
+      supplierName: string,
+      remember: boolean
+    ) => {
+      // Optimistic per-visit assignment (sole effect when remember is off)
       setSupplierAssignments((prev) => {
         const next = new Map(prev);
         next.set(`${catalogType}-${catalogId}`, { supplierId, supplierName });
         return next;
       });
+
+      if (!remember) return;
+
+      // Persist as preferred supplier in supplier_catalog so the shortfall
+      // RPC auto-assigns it on future visits; on refetch the server-computed
+      // preferred_supplier_id supersedes the local Map entry.
+      void setPreferredSupplier(createClient(), { supplierId, catalogType, catalogId })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: purchasingKeys.all() });
+          // Material shortfalls resolve suppliers from the same table
+          queryClient.invalidateQueries({ queryKey: materialPlanningKeys.all() });
+        })
+        .catch((error) => {
+          toast.error(
+            `Couldn't save preferred supplier: ${parseUnknownError(error).message}. ` +
+              "The assignment still applies to this visit."
+          );
+        });
     },
-    []
+    [queryClient]
   );
 
   const handleGeneratePO = useCallback(

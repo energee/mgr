@@ -8,6 +8,7 @@
 import type { EntityPresentation } from "@/types/entity";
 import type { POLineItem } from "./core";
 import { CATALOG_TYPES } from "./core";
+import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 
 export const poLineItemPresentation: EntityPresentation<POLineItem> = {
   // ---------------------------------------------------------------------------
@@ -91,8 +92,8 @@ export const poLineItemPresentation: EntityPresentation<POLineItem> = {
         {
           name: "unit",
           label: "Unit",
-          type: "text",
-          placeholder: "e.g., lb, oz, kg",
+          type: "select",
+          options: INVENTORY_UNIT_OPTIONS,
           required: true,
           colSpan: 4,
         },

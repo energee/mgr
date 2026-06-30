@@ -136,7 +136,7 @@ const TRANSACTION_TYPE_VALUES = TRANSACTION_TYPES.map((t) => t.value) as [KegTra
 // Zod Schema
 // =============================================================================
 
-export const kegTransactionSchema = z.object({
+const baseKegTransactionSchema = z.object({
   transaction_type: z.enum(TRANSACTION_TYPE_VALUES),
   selling_format_id: z.string().uuid("Select a selling format"),
   keg_owner_id: z.string().uuid().nullable().optional(),
@@ -178,6 +178,47 @@ export const kegTransactionSchema = z.object({
   }
 );
 
+/**
+ * Derive from_state/to_state from the selected transaction_type before
+ * validation. keg_transactions.to_state is NOT NULL with per-type CHECK
+ * constraints (00032), yet the form may hide the state selects — so we fill
+ * DB-valid states here for every entry point (e.g. the bare
+ * /inventory/kegs/transactions/new page) from TRANSACTION_TYPES.
+ */
+function deriveStatesFromType(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const data = raw as Record<string, unknown>;
+  const typeConfig = TRANSACTION_TYPES.find(
+    (t) => t.value === data.transaction_type,
+  );
+  if (!typeConfig) return raw;
+
+  if (typeConfig.value === "adjust") {
+    // `||` (not `??`) so an empty-string select value also falls back.
+    return { ...data, to_state: data.to_state || typeConfig.toState };
+  }
+
+  if (typeConfig.value === "maintain" || typeConfig.value === "retire") {
+    return { ...data, to_state: typeConfig.toState };
+  }
+
+  return {
+    ...data,
+    from_state: typeConfig.fromState,
+    to_state: typeConfig.toState,
+  };
+}
+
+/**
+ * Form schema with type→state derivation applied before validation, so the
+ * parsed output (inserted verbatim by entity-detail-unified) always carries
+ * DB-valid from_state/to_state even when the selects are hidden.
+ */
+export const kegTransactionSchema = z.preprocess(
+  deriveStatesFromType,
+  baseKegTransactionSchema,
+);
+
 export type KegTransactionFormValues = z.infer<typeof kegTransactionSchema>;
 
 // =============================================================================
@@ -192,6 +233,7 @@ export const kegTransactionCore: EntityCoreInput<KegTransaction> = {
   displayName: "Keg Transaction",
   description: "Immutable audit log for keg state transitions (inventory calculated from these records)",
   domain: "inventory",
+  basePath: "/inventory/kegs/transactions",
 
   // Explicit: sort by most-recent first, not by name.
   defaultSort: { column: "created_at", direction: "desc" },

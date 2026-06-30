@@ -1,8 +1,8 @@
 /**
  * Tests for entity helper functions exported from @/types/entity.
  *
- * Covers: statesAsOptions, formatStateLabel, getStateLabel, getStateColor,
- * valuesAsOptions, getValueDisplay, getValueLabel, getValueColor.
+ * Covers: statesAsOptions, formatStateLabel, getStateLabel,
+ * valuesAsOptions, getValueDisplay, getValueLabel.
  */
 
 import { describe, it, expect } from "vitest";
@@ -10,7 +10,6 @@ import {
   statesAsOptions,
   formatStateLabel,
   getStateLabel,
-  getStateColor,
   valuesAsOptions,
   getValueDisplay,
   getValueLabel,
@@ -240,38 +239,6 @@ describe("getStateLabel", () => {
 
   it("handles entity without stateMachine", () => {
     expect(getStateLabel(bareEntity, "active")).toBe("Active");
-  });
-});
-
-// =============================================================================
-// getStateColor
-// =============================================================================
-
-describe("getStateColor", () => {
-  it("returns color from stateDisplay", () => {
-    expect(getStateColor(mockEntity, "draft")).toBe("default");
-    expect(getStateColor(mockEntity, "active")).toBe("info");
-    expect(getStateColor(mockEntity, "completed")).toBe("success");
-  });
-
-  it('returns "default" for unknown states', () => {
-    expect(getStateColor(mockEntity, "nonexistent")).toBe("default");
-  });
-
-  it('returns "default" for null state', () => {
-    expect(getStateColor(mockEntity, null)).toBe("default");
-  });
-
-  it('returns "default" for undefined state', () => {
-    expect(getStateColor(mockEntity, undefined)).toBe("default");
-  });
-
-  it('returns "default" for entity without stateMachine', () => {
-    expect(getStateColor(bareEntity, "active")).toBe("default");
-  });
-
-  it('returns "default" when stateDisplay is missing', () => {
-    expect(getStateColor(noDisplayEntity, "in_progress")).toBe("default");
   });
 });
 

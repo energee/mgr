@@ -65,6 +65,11 @@ export const pickListStateMachine: StateMachineConfig<PickListView> = {
     completed: [],
     cancelled: [],
   },
+  // Assignment must go through the assign action so its transitionFields
+  // (assigned_to) are collected — suppresses the bare "Move to Assigned".
+  requiresAction: {
+    assigned: "assign",
+  },
   stateDisplay: {
     draft: { label: "Draft", color: "default" },
     assigned: { label: "Assigned", color: "info" },

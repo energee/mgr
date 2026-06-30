@@ -7,13 +7,17 @@
  * Features:
  * - Quick add form with catalog search
  * - Chronological additions history
- * - Recipe comparison (planned vs actual)
+ * - Recipe comparison (planned vs actual), with per-card "Log" buttons that
+ *   open the quick-add form prefilled from the planned recipe addition
  */
 
 import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { BatchAdditionForm } from "@/components/domain/batch/batch-addition-form";
+import {
+  BatchAdditionForm,
+  type BatchAdditionFormInitialValues,
+} from "@/components/domain/batch/batch-addition-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +30,10 @@ import {
   type AdditionType,
   ADDITION_TYPES,
 } from "@/domain/batch-additions";
-import { PlannedAdditions } from "@/components/domain/batch/planned-additions";
+import {
+  PlannedAdditions,
+  type PlannedAddition,
+} from "@/components/domain/batch/planned-additions";
 import { format } from "date-fns";
 import { batchKeys, batchAdditionKeys } from "@/lib/query-keys";
 import { unwrap } from "@/lib/supabase/query-helpers";
@@ -100,6 +107,16 @@ function mapTypeToCatalogTable(formType: AdditionType): string | null {
   return config.catalogTable ?? null;
 }
 
+/**
+ * Normalize recipe-junction units to the quick-add form's unit values.
+ * Recipe tables store e.g. "lbs" while the form uses "lb"; unknown units
+ * (gal, tsp, ...) pass through and the form renders them as an extra option.
+ */
+function normalizeRecipeUnit(unit: string): string {
+  const normalized = unit.toLowerCase();
+  return normalized === "lbs" ? "lb" : normalized;
+}
+
 export default function BatchAdditionsPage({
   params,
 }: {
@@ -109,6 +126,31 @@ export default function BatchAdditionsPage({
   const supabase = createClient();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  // Prefill for the quick-add form when logging a planned recipe addition.
+  // `key` (the recipe junction row id) re-mounts the form so new defaults apply.
+  const [formPrefill, setFormPrefill] = useState<{
+    key: string;
+    values: BatchAdditionFormInitialValues;
+  } | null>(null);
+
+  /** Open the quick-add form prefilled from a planned recipe addition card */
+  const handleLogPlanned = (planned: PlannedAddition) => {
+    setFormPrefill({
+      key: planned.id,
+      values: {
+        addition_type: planned.type,
+        // Catalog item id (hops.id, fruits.id, ...) so the logged row gets an
+        // exact catalog_id link for completion matching
+        ingredient_id: planned.catalogId,
+        ingredient_name: planned.name,
+        quantity: planned.amount,
+        unit: normalizeRecipeUnit(planned.unit),
+      },
+    });
+    setShowForm(true);
+    // Form renders at the top of the page — bring it into view
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Fetch batch details
   const { data: batch, isLoading: batchLoading } = useQuery({
@@ -174,6 +216,7 @@ export default function BatchAdditionsPage({
         queryKey: batchAdditionKeys.byBatch(id),
       });
       setShowForm(false);
+      setFormPrefill(null);
       toast.success("Addition recorded");
     },
     onError: (error) => {
@@ -216,7 +259,13 @@ export default function BatchAdditionsPage({
           <p className="text-muted-foreground">Fermentation Additions</p>
         </div>
         {!showForm && (
-          <Button size="lg" onClick={() => setShowForm(true)}>
+          <Button
+            size="lg"
+            onClick={() => {
+              setFormPrefill(null);
+              setShowForm(true);
+            }}
+          >
             <Plus className="h-5 w-5 mr-2" />
             Add
           </Button>
@@ -226,9 +275,14 @@ export default function BatchAdditionsPage({
       {/* Quick Add Form */}
       {showForm && (
         <BatchAdditionForm
+          key={formPrefill?.key ?? "blank"}
           batchId={id}
+          initialValues={formPrefill?.values}
           onSubmit={async (data) => { await addAddition.mutateAsync(data); }}
-          onCancel={() => setShowForm(false)}
+          onCancel={() => {
+            setShowForm(false);
+            setFormPrefill(null);
+          }}
           isSubmitting={addAddition.isPending}
         />
       )}
@@ -276,6 +330,7 @@ export default function BatchAdditionsPage({
         <PlannedAdditions
           recipeId={batch.recipe_id}
           actualAdditions={additions}
+          onLog={handleLogPlanned}
         />
       )}
 

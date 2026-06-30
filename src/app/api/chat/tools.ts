@@ -16,10 +16,12 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import { projectedReadyDate } from "@/domain/batch-schedule";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { formatStateLabel } from "@/types/entity";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
+import { batchTransitions } from "@/lib/schemas/batch";
 import { entityService } from "@/services/entity-service";
 import { inventoryService } from "@/services/inventory-service";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
@@ -94,6 +96,8 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
     // =========================================================================
 
     searchEntity: tool({
+      // Entity list is derived from coreRegistry so the description can never
+      // drift from the entities the tool actually supports.
       description:
         `Search any entity type. Available entities: ${ENTITY_NAMES_LIST}. Use 'query' for text search across searchable fields. Use 'filters' for exact-match filtering (e.g. status, category).`,
       inputSchema: z.object({
@@ -242,7 +246,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
     getVesselAvailability: tool({
       description:
-        "Get vessel utilization: which vessels are available, which are in use, and their current batch assignments.",
+        "Get vessel utilization: which vessels are available, which are in use with their current batch assignments, and the projected date each occupied vessel frees up (based on the batch's recipe schedule).",
       inputSchema: z.object({}),
       execute: async () => {
         const data = await query<
@@ -267,6 +271,36 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           (v) => v.status === "ready_for_use" && !v.current_batch_id
         );
         const inUse = data.filter((v) => v.current_batch_id);
+
+        // Projected free date per occupying batch: planned_start_date +
+        // fermentation_days + conditioning_days via the shared schedule math
+        // in src/domain/batch-schedule.ts (14/7-day fallbacks included).
+        // Null when the batch has no planned start date.
+        const projectedFreeByBatch = new Map<string, string | null>();
+        const occupyingBatchIds = inUse
+          .map((v) => v.current_batch_id)
+          .filter((id): id is string => id !== null);
+        if (occupyingBatchIds.length > 0) {
+          const batches = await query(
+            supabase
+              .from("batches")
+              .select(
+                "id, planned_start_date, recipes:recipe_id(fermentation_days, conditioning_days)"
+              )
+              .in("id", occupyingBatchIds),
+          );
+          for (const b of batches ?? []) {
+            const recipe = b.recipes as {
+              fermentation_days: number | null;
+              conditioning_days: number | null;
+            } | null;
+            projectedFreeByBatch.set(
+              b.id,
+              projectedReadyDate(b.planned_start_date, recipe),
+            );
+          }
+        }
+
         return {
           summary: {
             total: data.length,
@@ -285,6 +319,9 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
             type: v.vessel_type,
             capacity_bbl: v.capacity_bbl,
             batch_code: v.batch_code,
+            projected_free_date: v.current_batch_id
+              ? (projectedFreeByBatch.get(v.current_batch_id) ?? null)
+              : null,
           })),
         };
       },
@@ -313,20 +350,28 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
     getIngredientInventory: tool({
       description:
-        "Get raw ingredient inventory levels. Optionally filter by category (malt, hop, yeast, adjunct, chemical). Returns totals per item.",
+        "Get raw ingredient inventory levels. Optionally filter by category (malt, hop, yeast, adjunct, chemical) and/or by item name (partial match). Returns totals per item.",
       inputSchema: z.object({
         category: z
           .string()
           .optional()
           .describe("Filter by category: malt, hop, yeast, adjunct, chemical"),
+        itemName: z
+          .string()
+          .optional()
+          .describe(
+            "Filter by item name, case-insensitive partial match (e.g. 'citra')",
+          ),
       }),
-      execute: async ({ category }) => {
+      execute: async ({ category, itemName }) => {
         // Fetch active items, then lots from the view that accounts for
         // allocations (remaining_quantity = received - allocated).
         let itemsQ = dynamicFrom(supabase, "inventory_items")
           .select("id, name, category, unit, reorder_point")
           .eq("is_active", true);
         if (category) itemsQ = itemsQ.eq("category", category);
+        if (itemName)
+          itemsQ = itemsQ.ilike("name", `%${escapeLike(itemName)}%`);
 
         const items = await query<{ id: string; name: string; category: string; unit: string; reorder_point: number | null }[]>(itemsQ);
         if (!items?.length) return [];
@@ -853,7 +898,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
     searchYeastPitches: tool({
       description:
-        "Search yeast pitches with viability and strain details. Filter by status or strain name.",
+        "Search yeast pitches with viability and strain details. Filter by status or strain name. Each row includes the strain's recommended_max_generations and an over_recommended_generation flag for spotting tired yeast past its recommended repitch limit.",
       inputSchema: z.object({
         status: z
           .string()
@@ -866,9 +911,12 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         limit: z.number().optional().default(20).describe("Max results"),
       }),
       execute: async ({ status, strainName, limit }) => {
-        let q = dynamicFrom(supabase, "yeast_pitches_with_details")
+        // yeast_pitches_with_details was replaced by yeast_pitches_with_remaining
+        // (migration 00158); that view has no batch_code, so vessel_name is
+        // returned instead.
+        let q = dynamicFrom(supabase, "yeast_pitches_with_remaining")
           .select(
-            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_name, strain_code, strain_manufacturer, batch_code, location_name"
+            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_id, strain_name, strain_code, strain_manufacturer, vessel_name, location_name"
           )
           .order("created_at", { ascending: false })
           .limit(limit);
@@ -879,7 +927,42 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
-        return data;
+
+        // The view predates yeasts.recommended_max_generations (migration
+        // 00176) and doesn't expose it, so fetch it per strain and annotate
+        // each pitch with an over_recommended_generation flag.
+        const rows = (data ?? []) as Array<
+          Record<string, unknown> & {
+            strain_id: string | null;
+            generation: number | null;
+          }
+        >;
+        const strainIds = [
+          ...new Set(rows.map((r) => r.strain_id).filter((id) => id != null)),
+        ];
+        const maxGenByStrain = new Map<string, number | null>();
+        if (strainIds.length > 0) {
+          const { data: strains, error: strainsError } = await supabase
+            .from("yeasts")
+            .select("id, recommended_max_generations")
+            .in("id", strainIds);
+          if (strainsError) throw new Error(strainsError.message);
+          for (const s of strains ?? []) {
+            maxGenByStrain.set(s.id, s.recommended_max_generations);
+          }
+        }
+
+        return rows.map((r) => {
+          const maxGen = r.strain_id
+            ? (maxGenByStrain.get(r.strain_id) ?? null)
+            : null;
+          return {
+            ...r,
+            recommended_max_generations: maxGen,
+            over_recommended_generation:
+              maxGen != null && r.generation != null && r.generation >= maxGen,
+          };
+        });
       },
     }),
 
@@ -1033,18 +1116,10 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
       execute: async ({ batchId, batchNumber, toState }) => {
         const batch = await resolveBatch(supabase, batchId, batchNumber);
 
-        // Mirrors batchTransitions from src/lib/schemas/batch.ts.
-        // Duplicated here because the batch entity config imports React
-        // client components, making it unavailable in this server route.
-        // Keep in sync with batchTransitions if batch states change.
-        const validTransitions: Record<string, string[]> = {
-          planned: ["fermenting"],
-          fermenting: ["conditioning"],
-          conditioning: ["packaging"],
-          packaging: ["completed"],
-        };
-
-        const allowed = validTransitions[batch.status] || [];
+        // Single source of truth: batchTransitions lives in the server-safe
+        // src/lib/schemas/batch.ts (zod only, no React), so import it directly
+        // instead of re-declaring the state machine here.
+        const allowed = batchTransitions[batch.status] || [];
         if (!allowed.includes(toState)) {
           throw new Error(
             `Cannot transition batch #${batch.batch_code} from "${batch.status}" to "${toState}". Valid transitions: ${allowed.join(", ") || "none"}`

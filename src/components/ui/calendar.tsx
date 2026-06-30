@@ -1,5 +1,9 @@
 "use client"
 
+// shadcn wrapper around react-day-picker v9. Supports both caption layouts:
+// "label" (default) and "dropdown" (month/year selects — used by the shared
+// DatePicker in src/components/ui/date-picker.tsx for fast far-date jumps).
+
 import * as React from "react"
 import {
   ChevronDownIcon,

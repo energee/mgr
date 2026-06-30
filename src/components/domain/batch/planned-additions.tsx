@@ -9,15 +9,23 @@
  * - Spices (recipe_spices where timing IN fermentation, secondary)
  * - Other additions
  *
- * Shows checkmarks for additions that have been logged.
+ * Shows checkmarks for additions that have been logged (catalog-id exact
+ * match, with fuzzy name fallback for custom entries — see
+ * planned-addition-matching.ts) and, when `onLog` is provided, a per-card
+ * "Log" button so the parent can open the quick-add form prefilled.
  */
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Check, Circle, Leaf, Apple, Sparkles, Beaker } from "lucide-react";
 import type { AdditionType } from "@/domain/batch-additions";
+import {
+  isPlannedAdditionLogged,
+  type PlannedAddition,
+} from "@/components/domain/batch/planned-addition-matching";
 import { recipeKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
 
@@ -25,15 +33,8 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-type PlannedAddition = {
-  id: string;
-  type: AdditionType;
-  name: string;
-  amount: number;
-  unit: string;
-  timing?: string;
-  notes?: string;
-}
+// Re-export for consumers (e.g. the batch additions page's onLog handler)
+export type { PlannedAddition };
 
 /** Row from the batch_additions table */
 type BatchAdditionRow = {
@@ -48,6 +49,8 @@ type BatchAdditionRow = {
 type PlannedAdditionsProps = {
   recipeId: string;
   actualAdditions: BatchAdditionRow[];
+  /** When provided, un-logged cards render a "Log" button that invokes this with the planned addition */
+  onLog?: (addition: PlannedAddition) => void;
   className?: string;
 }
 
@@ -58,6 +61,7 @@ type PlannedAdditionsProps = {
 export function PlannedAdditions({
   recipeId,
   actualAdditions,
+  onLog,
   className,
 }: PlannedAdditionsProps) {
   const supabase = createClient();
@@ -72,7 +76,7 @@ export function PlannedAdditions({
         // Dry hops
         const { data: dryHops } = await supabase
           .from("recipe_hops")
-          .select("id, weight_oz, notes, hop:hops(name)")
+          .select("id, hop_id, weight_oz, notes, hop:hops(name)")
           .eq("recipe_id", recipeId)
           .eq("timing", "dry_hop");
 
@@ -81,6 +85,7 @@ export function PlannedAdditions({
             const hop = h.hop as { name: string } | null;
             additions.push({
               id: h.id,
+              catalogId: h.hop_id,
               type: "dry_hop",
               name: hop?.name || "Unknown hop",
               amount: h.weight_oz,
@@ -93,7 +98,7 @@ export function PlannedAdditions({
         // Fruits
         const { data: fruits } = await supabase
           .from("recipe_fruits")
-          .select("id, amount, unit, timing, notes, fruit:fruits(name)")
+          .select("id, fruit_id, amount, unit, timing, notes, fruit:fruits(name)")
           .eq("recipe_id", recipeId);
 
         if (fruits) {
@@ -101,6 +106,7 @@ export function PlannedAdditions({
             const fruit = f.fruit as { name: string } | null;
             additions.push({
               id: f.id,
+              catalogId: f.fruit_id,
               type: "fruit",
               name: fruit?.name || "Unknown fruit",
               amount: f.amount,
@@ -114,7 +120,7 @@ export function PlannedAdditions({
         // Spices (fermentation/secondary timing)
         const { data: spices } = await supabase
           .from("recipe_spices")
-          .select("id, amount, unit, timing, notes, spice:spices(name)")
+          .select("id, spice_id, amount, unit, timing, notes, spice:spices(name)")
           .eq("recipe_id", recipeId)
           .in("timing", ["fermentation", "secondary"]);
 
@@ -123,6 +129,7 @@ export function PlannedAdditions({
             const spice = s.spice as { name: string } | null;
             additions.push({
               id: s.id,
+              catalogId: s.spice_id,
               type: "spice",
               name: spice?.name || "Unknown spice",
               amount: s.amount,
@@ -136,7 +143,7 @@ export function PlannedAdditions({
         // Adjuncts (fermentation timing)
         const { data: adjuncts } = await supabase
           .from("recipe_adjuncts")
-          .select("id, weight_lbs, notes, adjunct:adjuncts(name)")
+          .select("id, adjunct_id, weight_lbs, notes, adjunct:adjuncts(name)")
           .eq("recipe_id", recipeId)
           .eq("timing", "fermentation");
 
@@ -145,6 +152,7 @@ export function PlannedAdditions({
             const adjunct = a.adjunct as { name: string } | null;
             additions.push({
               id: a.id,
+              catalogId: a.adjunct_id,
               type: "adjunct",
               name: adjunct?.name || "Unknown adjunct",
               amount: a.weight_lbs,
@@ -163,32 +171,9 @@ export function PlannedAdditions({
     enabled: !!recipeId,
   });
 
-  // Map display types to DB types for comparison
-  const displayToDb: Record<string, string[]> = {
-    dry_hop: ["hop"],
-    fruit: ["fruit"],
-    adjunct: ["adjunct"],
-    fining: ["other"],
-    spice: ["spice"],
-    other: ["other"],
-  };
-
-  // Check if an addition has been logged
-  const isAdditionLogged = (planned: PlannedAddition): boolean => {
-    return actualAdditions.some((row) => {
-      // Match by mapped type first
-      const dbTypes = displayToDb[planned.type] || [planned.type];
-      if (!dbTypes.includes(row.addition_type)) return false;
-
-      // If catalog_id matches the planned addition id, exact match
-      if (planned.id && row.catalog_id === planned.id) return true;
-
-      // Otherwise, use fuzzy name matching
-      const actualName = row.name.toLowerCase();
-      const plannedName = planned.name.toLowerCase();
-      return actualName.includes(plannedName) || plannedName.includes(actualName);
-    });
-  };
+  // Check if an addition has been logged (see planned-addition-matching.ts)
+  const isAdditionLogged = (planned: PlannedAddition): boolean =>
+    isPlannedAdditionLogged(planned, actualAdditions);
 
   // Get total planned vs completed
   const totalPlanned = plannedAdditions?.length || 0;
@@ -285,6 +270,18 @@ export function PlannedAdditions({
                     </p>
                   )}
                 </div>
+                {!isComplete && onLog && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-shrink-0"
+                    onClick={() => onLog(addition)}
+                    aria-label={`Log ${addition.name}`}
+                  >
+                    Log
+                  </Button>
+                )}
               </div>
             );
           })}

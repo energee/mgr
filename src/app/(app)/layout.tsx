@@ -13,6 +13,7 @@ import { AppSidebar } from "@/components/domain/shared/app-sidebar";
 import { AppHeader } from "@/components/domain/shared/app-header";
 import { AppProviders } from "@/components/domain/shared/app-providers";
 import { ChatLayout } from "@/components/domain/shared/chat-layout";
+import { CommandPalette } from "@/components/domain/shared/command-palette";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { dynamicFrom } from "@/services/types";
 
@@ -56,6 +57,8 @@ export default async function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <AppProviders roles={roles}>
+      {/* Global cmd+K navigation palette — mounted once for all app routes */}
+      <CommandPalette />
       <SidebarProvider>
         {/* Wrap in <aside> so screen-reader landmark navigation surfaces the
             sidebar alongside the existing <main> from SidebarInset (audit F-099). */}

@@ -30,6 +30,7 @@ export const waterProfileCore: EntityCoreInput<WaterProfile> = {
   defaultSort: { column: "name", direction: "asc" },
   description: "Source water chemistry profiles with mineral content",
   domain: "system",
+  basePath: "/settings/water-profiles",
 
   // "Water Profiles" plural and the name-sorted default come from
   // createEntityConfig(); search additionally covers the description.

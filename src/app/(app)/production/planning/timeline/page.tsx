@@ -30,6 +30,7 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { scheduleDays, projectedReadyDate } from "@/domain/batch-schedule";
 import { batchEntity } from "@/entities/batch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -185,15 +186,19 @@ export default function ProductionTimelinePage() {
   const [brandFilter, setBrandFilter] = useState<string>("_all");
   const [recipeFilter, setRecipeFilter] = useState<string>("_all");
 
-  // Calculate date range
-  const endDate = addWeeks(startDate, weeksToShow);
-  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  // Calculate date range (memoized so `days` is referentially stable across
+  // unrelated re-renders, e.g. query settles)
+  const { endDate, days } = useMemo(() => {
+    const end = addWeeks(startDate, weeksToShow);
+    return { endDate: end, days: eachDayOfInterval({ start: startDate, end }) };
+  }, [startDate, weeksToShow]);
 
   // Fetch batches with recipe info
   const { data: batches = [] } = useQuery({
     queryKey: entityKeys.timeline(
       "batches_with_brew_info",
       startDate.toISOString(),
+      endDate.toISOString(),
     ),
     queryFn: async () => {
       const data = await unwrap(
@@ -232,22 +237,18 @@ export default function ProductionTimelinePage() {
           conditioning_days: number;
           brands: { name: string };
         } | null;
-        const fermDays = recipe?.fermentation_days || 14;
-        const condDays = recipe?.conditioning_days || 7;
-        const startDt = b.planned_start_date
-          ? parseISO(b.planned_start_date)
-          : null;
+        // Shared schedule math (src/domain/batch-schedule.ts): 14/7-day
+        // fallbacks and planned start + ferm + cond ready-date projection.
+        const { fermentationDays, conditioningDays } = scheduleDays(recipe);
 
         return {
           ...b,
           recipe_name: recipe?.name,
           brand_id: recipe?.brand_id,
           brand_name: recipe?.brands?.name,
-          fermentation_days: fermDays,
-          conditioning_days: condDays,
-          estimated_ready_date: startDt
-            ? format(addDays(startDt, fermDays + condDays), "yyyy-MM-dd")
-            : null,
+          fermentation_days: fermentationDays,
+          conditioning_days: conditioningDays,
+          estimated_ready_date: projectedReadyDate(b.planned_start_date, recipe),
         } as TimelineBatch;
       });
     },
@@ -348,10 +349,12 @@ export default function ProductionTimelinePage() {
   const goToToday = () =>
     setStartDate(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-  // Scroll to today on mount
+  // Scroll to today on mount and when the window start moves. Keyed on
+  // startDate (not `days`) so query settles / range-length changes don't
+  // reset the user's scroll position.
   useEffect(() => {
     if (scrollContainerRef.current) {
-      const todayIndex = days.findIndex((d) => isToday(d));
+      const todayIndex = differenceInDays(new Date(), startDate);
       if (todayIndex > 0) {
         scrollContainerRef.current.scrollLeft = Math.max(
           0,
@@ -359,15 +362,15 @@ export default function ProductionTimelinePage() {
         );
       }
     }
-  }, [days, dayWidth]);
+  }, [startDate, dayWidth]);
 
   // Calculate batch position and width
   const getBatchStyle = (batch: TimelineBatch) => {
     if (!batch.planned_start_date) return null;
 
     const batchStart = parseISO(batch.planned_start_date);
-    const totalDays =
-      (batch.fermentation_days || 14) + (batch.conditioning_days || 7);
+    const { fermentationDays, conditioningDays } = scheduleDays(batch);
+    const totalDays = fermentationDays + conditioningDays;
 
     const startOffset = differenceInDays(batchStart, startDate);
     const duration = totalDays;

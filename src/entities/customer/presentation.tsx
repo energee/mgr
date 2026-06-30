@@ -13,6 +13,8 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
 import { CustomerShippingPreferences } from "@/components/domain/order/customer-shipping-preferences";
 import { CustomerPalletConfigs } from "@/components/domain/order/customer-pallet-configs";
+import { CustomerAddressSection } from "@/components/domain/order/customer-address-section";
+import { CustomerOrdersRelation } from "@/components/domain/order/customer-orders-relation";
 import { customerCore, customerTypeOptions } from "./core";
 import type { Customer } from "./core";
 
@@ -213,6 +215,11 @@ export const customerPresentation: EntityPresentation<Customer> = {
       ],
     },
     {
+      id: "billing-address",
+      title: "Billing Address",
+      component: CustomerAddressSection,
+    },
+    {
       id: "shipping-preferences",
       title: "Shipping Preferences",
       component: CustomerShippingPreferencesSection,
@@ -319,4 +326,12 @@ export const customerPresentation: EntityPresentation<Customer> = {
     },
     deleteAction("Customer"),
   ],
+
+  // Orders tab renders recent orders with a per-row Reorder action.
+  relationComponents: {
+    orders: CustomerOrdersRelation,
+  },
+
+  // Duplicate carries over reusable customer attributes.
+  excludeOnDuplicate: [],
 };

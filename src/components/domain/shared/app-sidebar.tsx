@@ -39,144 +39,14 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  AnimatedLayoutDashboard,
-  AnimatedFlask,
-  AnimatedDollarSign,
   AnimatedSettings,
   AnimatedHelpCircle,
-  AnimatedFileText,
-  AnimatedUsers,
   AnimatedChevronDown,
-  AnimatedClipboardList,
-  AnimatedBarChart3,
-  AnimatedTruck,
-  AnimatedShoppingCart,
-  AnimatedTrendingUp,
-  AnimatedPackage,
-  AnimatedPackageCheck,
-  AnimatedWarehouse,
-  AnimatedBuilding2,
-  AnimatedCalendarClock,
-  AnimatedArrowRightLeft,
-  AnimatedArrowLeft,
-  AnimatedContainer,
-  AnimatedBatches,
-  AnimatedUpload,
-  AnimatedDownload,
-  AnimatedGauge,
-  AnimatedChartLine,
-  AnimatedDroplet,
-  AnimatedLayers,
-  AnimatedFileStack,
-  AnimatedWaypoints,
-  AnimatedDrum,
-  AnimatedRoute,
-  AnimatedShip,
-  AnimatedFileCheck,
-  AnimatedCheckCheck,
-  AnimatedFolderOpen,
-  AnimatedShieldCheck,
-  AnimatedChartColumn,
-  AnimatedHandCoins,
-  AnimatedCircleDollarSign,
-  AnimatedTelescope,
-  AnimatedCog,
-  AnimatedBoxes,
 } from "@/components/icons/animated";
-import type { AnimatedIconHandle, AnimatedIconProps } from "@/components/icons/animated";
-
-type AnimatedIcon = React.ComponentType<AnimatedIconProps>;
-
-type NavItem = {
-  label: string;
-  href: string;
-  icon: AnimatedIcon;
-}
-
-type NavSection = {
-  label: string;
-  icon: AnimatedIcon;
-  items: NavItem[];
-}
-
-const navigation: NavSection[] = [
-  {
-    label: "Dashboards",
-    icon: AnimatedLayoutDashboard,
-    items: [
-      { label: "Production", href: "/dashboard", icon: AnimatedGauge },
-      { label: "Inventory", href: "/dashboard/inventory", icon: AnimatedPackage },
-      { label: "Sales", href: "/dashboard/sales", icon: AnimatedChartLine },
-    ],
-  },
-  {
-    label: "Production",
-    icon: AnimatedFlask,
-    items: [
-      { label: "Planning", href: "/production/planning", icon: AnimatedCalendarClock },
-      { label: "Backward Planning", href: "/production/planning/backward", icon: AnimatedArrowLeft },
-      { label: "Batches", href: "/production/batches", icon: AnimatedBatches },
-      { label: "Recipes", href: "/production/recipes", icon: AnimatedFileText },
-      { label: "Vessels", href: "/production/vessels", icon: AnimatedContainer },
-      { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: AnimatedArrowRightLeft },
-      { label: "Brew Logs", href: "/production/brew-logs", icon: AnimatedClipboardList },
-      { label: "Yeast Pitches", href: "/production/yeast-pitches", icon: AnimatedDroplet },
-    ],
-  },
-  {
-    label: "Packaging",
-    icon: AnimatedPackageCheck,
-    items: [
-      { label: "Sessions", href: "/production/packaging", icon: AnimatedLayers },
-    ],
-  },
-  {
-    label: "Inventory",
-    icon: AnimatedWarehouse,
-    items: [
-      { label: "Raw Materials", href: "/inventory/items", icon: AnimatedUpload },
-      { label: "Finished Goods", href: "/inventory/finished-goods", icon: AnimatedDownload },
-      { label: "Lots", href: "/inventory/lots", icon: AnimatedFileStack },
-      { label: "Allocations", href: "/inventory/allocations", icon: AnimatedWaypoints },
-      { label: "Kegs", href: "/inventory/kegs", icon: AnimatedDrum },
-      { label: "Bins", href: "/inventory/bins", icon: AnimatedBoxes },
-      { label: "Transfers", href: "/inventory/transfers", icon: AnimatedRoute },
-      { label: "Deliveries", href: "/inventory/deliveries", icon: AnimatedShip },
-    ],
-  },
-  {
-    label: "Purchasing",
-    icon: AnimatedTruck,
-    items: [
-      { label: "Material Planning", href: "/purchasing/material-planning", icon: AnimatedChartColumn },
-      { label: "Ingredient Demand", href: "/purchasing/demand", icon: AnimatedTrendingUp },
-      { label: "Suppliers", href: "/purchasing/suppliers", icon: AnimatedBuilding2 },
-      { label: "Purchase Orders", href: "/purchasing/pos", icon: AnimatedShoppingCart },
-    ],
-  },
-  {
-    label: "Sales",
-    icon: AnimatedDollarSign,
-    items: [
-      { label: "Orders", href: "/sales/orders", icon: AnimatedFileCheck },
-      { label: "Pick Lists", href: "/sales/pick-lists", icon: AnimatedCheckCheck },
-      { label: "Customers", href: "/sales/customers", icon: AnimatedUsers },
-    ],
-  },
-  {
-    label: "Reports",
-    icon: AnimatedBarChart3,
-    items: [
-      { label: "All Reports", href: "/reports", icon: AnimatedFolderOpen },
-      { label: "TTB Report", href: "/reports/ttb", icon: AnimatedShieldCheck },
-      { label: "Production Summary", href: "/reports/production-summary", icon: AnimatedChartColumn },
-      { label: "Inventory Valuation", href: "/reports/inventory-valuation", icon: AnimatedHandCoins },
-      { label: "Batch Cost", href: "/reports/batch-cost", icon: AnimatedCircleDollarSign },
-      { label: "Projections", href: "/reports/projections", icon: AnimatedTelescope },
-      { label: "COGS", href: "/reports/cogs", icon: AnimatedCog },
-    ],
-  },
-];
+import type { AnimatedIconHandle } from "@/components/icons/animated";
+// Navigation structure is shared with the cmd+K command palette.
+import { navigation } from "@/components/domain/shared/nav-items";
+import type { AnimatedIcon, NavSection } from "@/components/domain/shared/nav-items";
 
 function AnimatedNavLink({
   href,
@@ -250,8 +120,9 @@ export function AppSidebar() {
   const activeSection = navigation.find((s) =>
     s.items.some((item) => pathname.startsWith(item.href))
   );
-  const [openSection, setOpenSection] = useState<string | null>(
-    activeSection?.label ?? null
+  // Multiple sections can be open at once; start with the active route's section expanded.
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(activeSection ? [activeSection.label] : [])
   );
 
   return (
@@ -288,9 +159,14 @@ export function AppSidebar() {
         {navigation.map((section) => (
           <Collapsible
             key={section.label}
-            open={openSection === section.label}
+            open={openSections.has(section.label)}
             onOpenChange={(open) =>
-              setOpenSection(open ? section.label : null)
+              setOpenSections((prev) => {
+                const next = new Set(prev);
+                if (open) next.add(section.label);
+                else next.delete(section.label);
+                return next;
+              })
             }
             className="group/collapsible"
           >

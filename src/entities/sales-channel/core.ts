@@ -44,6 +44,7 @@ export const salesChannelCore: EntityCoreInput<SalesChannel> = {
   defaultSort: { column: "name", direction: "asc" },
   description: "Sales channel categories for customer pricing",
   domain: "sales",
+  basePath: "/settings/sales-channels",
 
   searchableFields: ["name", "code", "description"],
 
@@ -59,6 +60,8 @@ export const salesChannelCore: EntityCoreInput<SalesChannel> = {
       foreignKey: "sales_channel_id",
       showInDetail: true,
       detailTab: "Prices",
+      // Prices have no create route — managed via the /settings/pricing matrix.
+      hideAdd: true,
     },
     {
       name: "customers",

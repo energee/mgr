@@ -46,6 +46,7 @@ export const yeastPitchEventCore: EntityCoreInput<YeastPitchEvent> = {
   displayName: "Pitch Event",
   description: "Records of yeast being pitched to batches",
   domain: "production",
+  basePath: null,
 
   // Explicit: sort by pitch time descending, not by name.
   defaultSort: { column: "pitched_at", direction: "desc" },

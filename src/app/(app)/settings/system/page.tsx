@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { settingsKeys } from "@/lib/query-keys";
+import type { Json } from "@/types/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,23 +109,15 @@ const MONTH_OPTIONS = [
 // Hooks
 // =============================================================================
 
-type SystemSettingRow = {
-  key: string;
-  value: unknown;
-}
-
 function useSystemSettings() {
   const supabase = createClient();
 
   return useQuery({
     queryKey: settingsKeys.systemSettings(),
     queryFn: async () => {
-      // Type assertion for table not yet in generated types
-      const { data, error } = await (supabase as unknown as {
-        from: (table: string) => {
-          select: (cols: string) => Promise<{ data: SystemSettingRow[] | null; error: Error | null }>;
-        };
-      }).from("system_settings").select("key, value");
+      const { data, error } = await supabase
+        .from("system_settings")
+        .select("key, value");
 
       if (error) throw error;
 
@@ -144,23 +137,21 @@ function useUpdateSystemSettings() {
 
   return useMutation({
     mutationFn: async (updates: Record<string, unknown>) => {
-      // Type assertion for table not yet in generated types
-      const client = supabase as unknown as {
-        from: (table: string) => {
-          update: (data: { value: unknown }) => {
-            eq: (col: string, val: string) => Promise<{ error: Error | null }>;
-          };
-        };
-      };
-      // Update each setting - value column is JSONB, Supabase handles serialization
-      for (const [key, value] of Object.entries(updates)) {
-        const { error } = await client
-          .from("system_settings")
-          .update({ value })
-          .eq("key", key);
+      // Single bulk upsert on the UNIQUE `key` column instead of N sequential
+      // per-key updates. Only key/value are sent, so existing description/
+      // category values are untouched on conflict; value is JSONB and Supabase
+      // handles serialization.
+      const rows = Object.entries(updates).map(([key, value]) => ({
+        key,
+        value: value as Json,
+      }));
+      if (rows.length === 0) return;
 
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from("system_settings")
+        .upsert(rows, { onConflict: "key" });
+
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.systemSettings() });
