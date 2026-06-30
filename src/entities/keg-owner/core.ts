@@ -61,6 +61,7 @@ export const kegOwnerCore: EntityCoreInput<KegOwner> = {
   defaultSort: { column: "name", direction: "asc" },
   description: "Fleet providers that own kegs (e.g., Owned, Microstar, KegFleet)",
   domain: "inventory",
+  basePath: "/inventory/kegs/owners",
 
   searchableFields: ["name", "code", "contact_name"],
 

@@ -49,6 +49,7 @@ export const beerStyleCore: EntityCoreInput<BeerStyle> = {
   displayName: "Beer Style",
   description: "BJCP style guidelines and custom brewery styles",
   domain: "production",
+  basePath: "/settings/beer-styles",
 
   // Explicit: the list groups styles by category, not by name.
   defaultSort: { column: "category", direction: "asc" },

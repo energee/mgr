@@ -21,7 +21,7 @@ import { RotateCcw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { entityKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
-import { formatValue } from "@/lib/utils";
+import { formatValue } from "@/lib/format";
 import { resolveEntityBasePath } from "@/types/entity";
 import { orderEntity } from "@/entities/order";
 import { useReorderOrder } from "./reorder";

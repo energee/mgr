@@ -88,6 +88,7 @@ export const kegInventoryCore: EntityCoreInput<KegInventory> = {
   displayNamePlural: "Keg Inventory",
   description: "Calculated view of keg quantities by type, state, and location (derived from transactions)",
   domain: "inventory",
+  basePath: "/inventory/kegs",
 
   // Explicit: sort by state, not by name.
   defaultSort: { column: "state", direction: "asc" },

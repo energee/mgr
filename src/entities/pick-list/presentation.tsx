@@ -166,6 +166,17 @@ export const pickListPresentation: EntityPresentation<PickListView> = {
       type: "button",
       fromStates: ["draft"],
       toState: "assigned",
+      // Collect the assignee in a pre-transition dialog; written to the
+      // pick_lists base table in the same UPDATE as the status flip.
+      transitionFields: [
+        {
+          name: "assigned_to",
+          label: "Assigned To",
+          type: "relation",
+          relation: { entity: "user_profile", displayField: "display_name" },
+          required: true,
+        },
+      ],
     },
     {
       name: "start_picking",

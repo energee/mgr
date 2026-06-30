@@ -9,8 +9,22 @@ import type { EntityPresentation } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { POLineItemsEditor } from "@/components/domain/purchasing/po-line-items-editor";
 import { purchaseOrderStateMachine, statusOptions } from "./core";
 import type { PurchaseOrder } from "./core";
+
+// Wrapper adapting POLineItemsEditor ({ poId, readOnly }) to the relation
+// component interface ({ parentId, data }). Line items are editable only while
+// the PO is in draft; once submitted, the supplier-facing document is locked.
+function POLineItemsRelation({
+  parentId,
+  data,
+}: {
+  parentId: string;
+  data?: Record<string, unknown>;
+}) {
+  return <POLineItemsEditor poId={parentId} readOnly={data?.status !== "draft"} />;
+}
 
 export const purchaseOrderPresentation: EntityPresentation<PurchaseOrder> = {
   // ---------------------------------------------------------------------------
@@ -93,6 +107,8 @@ export const purchaseOrderPresentation: EntityPresentation<PurchaseOrder> = {
           type: "date",
           format: "date",
           required: true,
+          // Defaults to today — POs are almost always dated the day they're cut.
+          defaultValue: () => new Date().toISOString().split("T")[0],
           colSpan: 6,
         },
         {
@@ -152,12 +168,16 @@ export const purchaseOrderPresentation: EntityPresentation<PurchaseOrder> = {
       id: "qbo-sync",
       title: "QuickBooks",
       component: createQBOSyncDisplay("purchase_order"),
+      // Sync status only exists for persisted POs.
+      hideOnCreate: true,
     },
     {
       id: "revision-history",
       title: "Revision History",
       component: createRevisionHistoryDisplay("purchase_orders"),
       collapsible: true,
+      // No revisions before the first save.
+      hideOnCreate: true,
     },
   ],
 
@@ -182,20 +202,15 @@ export const purchaseOrderPresentation: EntityPresentation<PurchaseOrder> = {
       toState: "confirmed",
     },
     {
-      name: "mark_partial",
-      label: "Partial Receipt",
+      // Interception action: the detail page opens the POReceiving dialog,
+      // which captures quantities/lots/dates and computes partial vs fulfilled
+      // from received totals. Replaces the former bare mark_partial/fulfill
+      // buttons. Not offered from "submitted" (not a legal transition).
+      name: "receive_items",
+      label: "Receive Items",
       icon: "package",
       type: "button",
-      fromStates: ["confirmed"],
-      toState: "partial",
-    },
-    {
-      name: "fulfill",
-      label: "Mark Fulfilled",
-      icon: "check-circle",
-      type: "button",
       fromStates: ["confirmed", "partial"],
-      toState: "fulfilled",
     },
     {
       name: "close",
@@ -233,4 +248,11 @@ export const purchaseOrderPresentation: EntityPresentation<PurchaseOrder> = {
       confirm: true,
     },
   ],
+
+  relationComponents: {
+    line_items: POLineItemsRelation,
+  },
+
+  // Duplicate carries supplier/costs/notes; identity + dates stay unique.
+  excludeOnDuplicate: ["po_number", "order_date", "expected_date", "submitted_at"],
 };

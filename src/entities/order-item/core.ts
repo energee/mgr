@@ -51,6 +51,7 @@ export const orderItemCore: EntityCoreInput<OrderItem> = {
   defaultSort: { column: "created_at", direction: "desc" },
   description: "Line items on a sales order",
   domain: "sales",
+  basePath: null,
 
   // Explicit: order items have no name column, so searchable fields are limited.
   searchableFields: ["notes"],

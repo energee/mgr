@@ -63,12 +63,12 @@ export const vesselPresentation: EntityPresentation<Vessel> = {
       sortable: false,
       render: (_value, row) => {
         const viewRow = row as unknown as VesselWithBatch;
-        if (!viewRow.batch_name && !viewRow.batch_code) {
+        if (!viewRow.batch_name && !viewRow.batch_number) {
           return <span className="text-muted-foreground">Empty</span>;
         }
         return (
           <span className="font-medium">
-            {viewRow.batch_code || viewRow.batch_name}
+            {viewRow.batch_number || viewRow.batch_name}
           </span>
         );
       },
@@ -188,6 +188,11 @@ export const vesselPresentation: EntityPresentation<Vessel> = {
       ],
     },
   ],
+
+  // Framework Duplicate action (EntityDetailUnified): status is the state
+  // field (framework-excluded); name carries over for the user to renumber
+  // (e.g. "FV1" → "FV5") and type/capacity/location copy as-is.
+  excludeOnDuplicate: [],
 
   // ---------------------------------------------------------------------------
   // Actions

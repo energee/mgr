@@ -14,7 +14,10 @@ import type { EntityCoreInput, StateMachineConfig } from "@/types/entity";
 import { statesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-export type Order = Database["public"]["Tables"]["orders"]["Row"];
+export type Order = Database["public"]["Tables"]["orders"]["Row"] & {
+  // Joined from the order_list_details view for list/kanban/search display.
+  customer_name?: string | null;
+};
 
 // =============================================================================
 // Zod Schema
@@ -48,6 +51,11 @@ export const orderStateMachine: StateMachineConfig<Order> = {
     packed: ["fulfilled", "cancelled"],
     fulfilled: [],
     cancelled: [],
+  },
+  // Scheduling collects a delivery date via the schedule action dialog —
+  // suppresses the bare "Move to Scheduled" so the date is always captured.
+  requiresAction: {
+    scheduled: "schedule",
   },
   stateDisplay: {
     draft: { label: "Draft", color: "default" },
@@ -87,13 +95,15 @@ export const changeRequestStatusDisplay: Record<
 export const orderCore: EntityCoreInput<Order> = {
   name: "order",
   table: "orders",
+  // List/detail read from the view (joins customer_name for display + search).
+  viewTable: "order_list_details",
   displayName: "Order",
   description: "Sales orders from draft through fulfillment",
   domain: "sales",
 
   // Explicit: sorted by most-recent order first.
   defaultSort: { column: "order_date", direction: "desc" },
-  searchableFields: ["order_number"],
+  searchableFields: ["order_number", "customer_name"],
 
   stateMachine: orderStateMachine,
 
@@ -130,6 +140,8 @@ export const orderCore: EntityCoreInput<Order> = {
       foreignKey: "order_id",
       showInDetail: true,
       detailTab: "Pick Lists",
+      // pick_list has no create route — pick lists are generated, not added here.
+      hideAdd: true,
     },
     {
       name: "delivery",

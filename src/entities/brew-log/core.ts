@@ -49,7 +49,8 @@ const brewEventSchema = z.object({
 // =============================================================================
 
 export const brewLogSchema = z.object({
-  brew_number: z.string().min(1, "Brew number is required"),
+  // Optional on create: migration 00181 auto-generates brew_number when blank.
+  brew_number: z.string().optional(),
   brew_date: z.string().min(1, "Brew date is required"),
   brewer_id: z.string().uuid().nullable().optional(),
   status: z.string().default("draft"),

@@ -101,6 +101,8 @@ export const packagingSessionPresentation: EntityPresentation<PackagingSession> 
           label: "Session Date",
           type: "date",
           required: true,
+          // Defaults to today on the generic create form.
+          defaultValue: () => new Date().toISOString().split("T")[0],
           colSpan: 6,
         },
         {
@@ -158,6 +160,39 @@ export const packagingSessionPresentation: EntityPresentation<PackagingSession> 
       title: "Materials Required",
       component: PackagingSessionMaterialsSection,
       collapsible: true,
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+  actions: [
+    {
+      // Paired with stateMachine.requiresAction.revised. The detail page
+      // intercepts this via onAction and opens RevisePackagingSession; the
+      // status flip happens inside the revise_packaging_session RPC (00184).
+      name: "revise",
+      label: "Revise Quantities",
+      icon: "pencil",
+      type: "button",
+      fromStates: ["completed", "revised"],
+      toState: "revised",
+    },
+    {
+      // Navigation-only: jumps to the keg-transaction create page with the
+      // fill type and this session prefilled (searchParams merge into create
+      // defaults), linking fill transactions back to their session.
+      name: "record_keg_fills",
+      label: "Record Keg Fills",
+      icon: "external-link",
+      type: "dropdown",
+      fromStates: ["completed", "revised"],
+      handler: (session) => {
+        // Entity configs run outside React, so there is no client router here.
+        window.location.assign(
+          `/inventory/kegs/transactions/new?transaction_type=fill&packaging_session_id=${session.id}`
+        );
+      },
     },
   ],
 };

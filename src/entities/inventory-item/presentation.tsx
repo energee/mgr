@@ -8,6 +8,7 @@
 import type { EntityPresentation } from "@/types/entity";
 import { deleteAction, valuesAsOptions } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 import type { InventoryItem } from "./core";
 import { categoryDisplayConfig } from "./core";
 
@@ -108,15 +109,7 @@ export const inventoryItemPresentation: EntityPresentation<InventoryItem> = {
           label: "Unit of Measure",
           type: "select",
           required: true,
-          options: [
-            { value: "lb", label: "Pounds (lb)" },
-            { value: "oz", label: "Ounces (oz)" },
-            { value: "kg", label: "Kilograms (kg)" },
-            { value: "g", label: "Grams (g)" },
-            { value: "each", label: "Each" },
-            { value: "case", label: "Case" },
-            { value: "gal", label: "Gallons" },
-          ],
+          options: INVENTORY_UNIT_OPTIONS,
           colSpan: 6,
         },
         {
@@ -172,4 +165,7 @@ export const inventoryItemPresentation: EntityPresentation<InventoryItem> = {
   // Actions
   // ---------------------------------------------------------------------------
   actions: [deleteAction("Inventory Item")],
+
+  // Duplicate carries over reusable attributes; SKU stays unique per item.
+  excludeOnDuplicate: ["sku"],
 };

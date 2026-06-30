@@ -60,6 +60,7 @@ export const inventoryItemCore: EntityCoreInput<InventoryItem> = {
   displayName: "Inventory Item",
   description: "Raw materials, packaging, and supplies",
   domain: "inventory",
+  basePath: "/inventory/items",
 
   // defaultSort omitted — defaults to { column: "name", direction: "asc" }
   searchableFields: ["name", "sku"],

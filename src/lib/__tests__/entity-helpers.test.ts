@@ -13,6 +13,7 @@ import {
   valuesAsOptions,
   getValueDisplay,
   getValueLabel,
+  getValueColor,
 } from "@/types/entity";
 import type {
   EntityConfig,

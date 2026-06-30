@@ -166,4 +166,7 @@ export const supplierPresentation: EntityPresentation<Supplier> = {
       deleteMode: "hard",
     },
   ],
+
+  // Duplicate carries over reusable supplier attributes.
+  excludeOnDuplicate: [],
 };

@@ -54,6 +54,7 @@ export const inventoryLotCore: EntityCoreInput<InventoryLot> = {
   description:
     "Lot-level inventory tracking for raw materials with FIFO costing",
   domain: "inventory",
+  basePath: "/inventory/lots",
 
   defaultSort: { column: "received_date", direction: "desc" },
   searchableFields: ["lot_number", "location", "notes"],

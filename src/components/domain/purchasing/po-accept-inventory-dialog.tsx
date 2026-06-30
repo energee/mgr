@@ -36,6 +36,7 @@ import { useState, useCallback, useMemo, useEffect, useId } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicRpc } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   Dialog,
   DialogContent,

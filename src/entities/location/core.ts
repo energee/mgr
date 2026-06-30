@@ -68,6 +68,7 @@ export const locationCore: EntityCore<LocationWithPos> = {
   displayNamePlural: "Locations",
   description: "Physical facilities for production, storage, and sales",
   domain: "system",
+  basePath: "/settings/locations",
 
   defaultSort: { column: "name", direction: "asc" },
   searchableFields: ["name"],
