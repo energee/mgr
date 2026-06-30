@@ -59,3 +59,44 @@ describe("landed-cost derivation", () => {
     expect(body!).toMatch(/inventory_lots_with_landed_cost/);
   });
 });
+
+/** Latest migration text that (re)creates view `viewName`, or null. */
+function latestViewCreator(viewName: string): string | null {
+  const re = new RegExp(`CREATE (OR REPLACE )?VIEW ${viewName}\\b`);
+  let sql: string | null = null;
+  for (const f of migrationFiles()) {
+    const text = readFileSync(resolve(MIGRATIONS_DIR, f), "utf-8");
+    if (re.test(text)) sql = text;
+  }
+  return sql;
+}
+
+describe("calculate_landed_cost is a pure read (P0 #4 tail)", () => {
+  it("drops the UPDATE side-effect (no longer mutates inventory_lots.landed_cost)", () => {
+    const body = latestFunctionBody("calculate_landed_cost");
+    expect(body).not.toBeNull();
+    // The old definition wrote the stored column: `UPDATE inventory_lots il SET landed_cost = ...`.
+    expect(body!).not.toMatch(/UPDATE\s+inventory_lots/i);
+    expect(body!).not.toMatch(/SET\s+landed_cost\s*=/i);
+  });
+
+  it("computes landed_cost_per_unit inline from the PO overhead", () => {
+    const body = latestFunctionBody("calculate_landed_cost");
+    expect(body!).toMatch(/shipping_cost/);
+    expect(body!).toMatch(/\btax\b/);
+    expect(body!).toMatch(/landed_cost_per_unit/);
+  });
+
+  it("returns allocated_tax as its own column (tax-aware, not shipping-only)", () => {
+    const body = latestFunctionBody("calculate_landed_cost");
+    expect(body!).toMatch(/allocated_tax/);
+  });
+});
+
+describe("inventory_lots_with_quantities exposes derived landed cost", () => {
+  it("the latest definition sources from inventory_lots_with_landed_cost", () => {
+    const sql = latestViewCreator("inventory_lots_with_quantities");
+    expect(sql).not.toBeNull();
+    expect(sql!).toMatch(/FROM\s+inventory_lots_with_landed_cost/);
+  });
+});

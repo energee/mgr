@@ -10010,6 +10010,7 @@ export type Database = {
         Args: { p_po_id: string }
         Returns: {
           allocated_shipping: number
+          allocated_tax: number
           catalog_type: string
           landed_cost_per_unit: number
           line_item_id: string
