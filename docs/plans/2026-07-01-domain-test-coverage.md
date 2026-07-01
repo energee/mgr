@@ -65,7 +65,10 @@ from this file + `git log --oneline`.
   chat-context mocked `next/navigation.usePathname` + `@ai-sdk/react.useChat`. Quirks pinned: permissions
   `hasRole()` ignores PERMISSION_MAP (customer passes hasRole but can()=false) + memo is by array reference;
   chat-context "UUID" regex `/^[0-9a-f-]{36}$/i` accepts 36 dashes + rebuilds pageContext/transport every render.
-  All 4 context/hook modules throw when their hook is used outside the provider (pinned). **Next: full-suite gate + PR.**
+  All 4 context/hook modules throw when their hook is used outside the provider (pinned).
+  **DONE:** lint fixes for the new context/service tests (react-compiler immutability → module-level
+  capture in useEffect; unused fake-builder args → `_`-prefixed). Finish-line gate green:
+  `bun lint` (0/0), `bun typecheck` (0), `bun test` (109 files, 1921 tests). **PR: https://github.com/energee/mgr/pull/330**
 - Batch 4 (2026-07-01, session 3 cont.): **all 4 tractable Tier-2 modules done** (111 tests) —
   inventory-count-service `c2971496` (14), entity-service `5a39266b` (40), consumption-service `3f587c22` (36),
   prefill-store `4d7ed16b` (21). All services take `SupabaseClient` as a param → fake query-builder, no `vi.mock`.
