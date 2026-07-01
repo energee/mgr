@@ -46,10 +46,10 @@ from this file + `git log --oneline`.
 - [x] `yeast-lineage` — 12 tests (fake Supabase client) — `0b6d7445`
 ### ✅ Tier 1 COMPLETE
 ### Tier 2 (lower ROI / harder)
-- [ ] `contexts/prefill-store` — pure-ish store; test first of the Tier-2 set
-- [ ] `services/consumption-service` — Supabase I/O (mock client)
-- [ ] `services/entity-service` — Supabase I/O (mock client)
-- [ ] `services/inventory-count-service` — Supabase I/O (mock client)
+- [x] `contexts/prefill-store` — 21 tests (jsdom sessionStorage) — `4d7ed16b`
+- [x] `services/consumption-service` — 36 tests (fake Supabase builder) — `3f587c22`
+- [x] `services/entity-service` — 40 tests (fake Supabase builder; `transition()` already covered by `entity-transitions.test.ts`) — `5a39266b`
+- [x] `services/inventory-count-service` — 14 tests (fake Supabase builder) — `c2971496`
 - [ ] `contexts/permissions` — React context (render harness)
 - [ ] `contexts/portal` — React context (render harness)
 - [ ] `contexts/chat-context` — React context (render harness)
@@ -58,6 +58,16 @@ from this file + `git log --oneline`.
 - [~] `services/types` — **SKIP** unless `dynamicRpc` is tractably unit-testable (types only otherwise)
 
 ## Notes
+- Batch 4 (2026-07-01, session 3 cont.): **all 4 tractable Tier-2 modules done** (111 tests) —
+  inventory-count-service `c2971496` (14), entity-service `5a39266b` (40), consumption-service `3f587c22` (36),
+  prefill-store `4d7ed16b` (21). All services take `SupabaseClient` as a param → fake query-builder, no `vi.mock`.
+  entity-service's `transition()` was already covered by `entity-transitions.test.ts` (skipped). prefill-store
+  needed jsdom + a `Object.getPrototypeOf(sessionStorage)` spy workaround (documented in-file). Quirks pinned:
+  consumption-service reports `shortfall:0` for an unmatched ingredient (not the full required qty) and sets
+  allocation `quantity == volume_bbl` in `recordBatchLoss`; inventory-count-service reports `id:"unknown"` on a
+  lot-read NOT_FOUND; prefill-store's `write()` persists `setPrefill({})` instead of clearing (empty obj truthy).
+  **Remaining Tier 2:** 3 React-context modules (permissions/portal/chat-context — need render harness) +
+  ai/recipe-analyzer (LLM I/O, pure helpers only). Deferred to next session for cost reset.
 - Batch 3 (2026-07-01, session 3): **Tier 1 finished.** 3 new files green (37 tests) —
   order-number `ea05f46a` (5, RPC mocked), report-utils `51037d1e` (20, fake Supabase builder),
   yeast-lineage `0b6d7445` (12, fake Supabase client). Also ticked 3 already-covered freebies
