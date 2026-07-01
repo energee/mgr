@@ -50,14 +50,22 @@ from this file + `git log --oneline`.
 - [x] `services/consumption-service` — 36 tests (fake Supabase builder) — `3f587c22`
 - [x] `services/entity-service` — 40 tests (fake Supabase builder; `transition()` already covered by `entity-transitions.test.ts`) — `5a39266b`
 - [x] `services/inventory-count-service` — 14 tests (fake Supabase builder) — `c2971496`
-- [ ] `contexts/permissions` — React context (render harness)
-- [ ] `contexts/portal` — React context (render harness)
-- [ ] `contexts/chat-context` — React context (render harness)
-- [ ] `ai/recipe-analyzer` — LLM I/O; test only pure helpers, else BLOCKED
+- [x] `contexts/permissions` — 10 tests (createRoot+act harness) — `798d8bee`
+- [x] `contexts/portal` — 5 tests (createRoot+act harness) — `1666de21`
+- [x] `contexts/chat-context` — 19 tests (createRoot+act; usePathname/useChat mocked) — `ff23c66c`
+- [x] `ai/recipe-analyzer` — 8 tests (NOT LLM I/O — just 2 RPC wrappers; fake Supabase client) — `dfaa866b`
 - [~] `ai/prompts` — **SKIP** (string constants, no logic)
 - [~] `services/types` — **SKIP** unless `dynamicRpc` is tractably unit-testable (types only otherwise)
 
 ## Notes
+- Batch 5 (2026-07-01, final): **CHECKLIST COMPLETE.** 4 files (42 tests) — recipe-analyzer `dfaa866b` (8),
+  permissions `798d8bee` (10), portal `1666de21` (5), chat-context `ff23c66c` (19). `ai/recipe-analyzer`
+  turned out NOT to be LLM I/O — just two thin RPC wrappers → tested like order-number (fake client), written
+  inline (no agent). The 3 React contexts used the createRoot+act harness (no `@testing-library/react` in repo);
+  chat-context mocked `next/navigation.usePathname` + `@ai-sdk/react.useChat`. Quirks pinned: permissions
+  `hasRole()` ignores PERMISSION_MAP (customer passes hasRole but can()=false) + memo is by array reference;
+  chat-context "UUID" regex `/^[0-9a-f-]{36}$/i` accepts 36 dashes + rebuilds pageContext/transport every render.
+  All 4 context/hook modules throw when their hook is used outside the provider (pinned). **Next: full-suite gate + PR.**
 - Batch 4 (2026-07-01, session 3 cont.): **all 4 tractable Tier-2 modules done** (111 tests) —
   inventory-count-service `c2971496` (14), entity-service `5a39266b` (40), consumption-service `3f587c22` (36),
   prefill-store `4d7ed16b` (21). All services take `SupabaseClient` as a param → fake query-builder, no `vi.mock`.
