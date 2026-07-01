@@ -47,7 +47,6 @@ import type {
   PaginationState,
   RowSelectionState,
   VisibilityState,
-  Table as TanstackTable,
 } from "@tanstack/react-table";
 import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
 import { usePersistedPageSize } from "@/hooks/use-persisted-page-size";
@@ -94,18 +93,9 @@ import { DataTableAdvancedToolbar } from "@/components/data-table/data-table-adv
 import { DataTableFilterList } from "@/components/data-table/data-table-filter-list";
 import { DataTableSortList } from "@/components/data-table/data-table-sort-list";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -113,7 +103,6 @@ import {
   Inbox,
   LayoutList,
   Kanban as KanbanIcon,
-  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {

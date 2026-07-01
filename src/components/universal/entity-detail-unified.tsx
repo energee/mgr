@@ -51,7 +51,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePermissions } from "@/contexts/permissions";
 import { DOMAIN_WRITE_PERMISSIONS } from "@/lib/permissions";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, useWatch } from "react-hook-form";
@@ -59,7 +58,6 @@ import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { runTransitionSideEffects } from "@/services/transition-side-effects";
-import { formatValue } from "@/lib/format";
 import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
@@ -91,14 +89,6 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { StatusBadge } from "@/components/universal/status-badge";
 import {
   DropdownMenu,
