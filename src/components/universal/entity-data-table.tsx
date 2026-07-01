@@ -87,6 +87,7 @@ import { useKeyboardShortcuts, type KeyboardShortcut } from "@/hooks/use-keyboar
 import { useIsMobile, useIsTouch } from "@/hooks/use-mobile";
 import { generateId } from "@/lib/id";
 import { EntityMobileCardList } from "./entity-mobile-card-list";
+import { MobileFilterSheet } from "./entity-mobile-filter-sheet";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableAdvancedToolbar } from "@/components/data-table/data-table-advanced-toolbar";
@@ -1527,61 +1528,6 @@ function ListSearchInput({
         </div>
       )}
     </div>
-  );
-}
-
-// =============================================================================
-// MobileFilterSheet
-// =============================================================================
-
-/**
- * Mobile entry point for advanced filters + sorting (audit 10.3). The desktop
- * toolbar (DataTableAdvancedToolbar) only renders alongside the table view, so
- * below the mobile breakpoint this exposes the same DataTableFilterList /
- * DataTableSortList — bound to the same table instance and nuqs URL state —
- * inside a bottom sheet. The trigger shows an active-filter count badge.
- */
-function MobileFilterSheet<TData>({
-  table,
-  activeFilterCount,
-}: {
-  table: TanstackTable<TData>;
-  activeFilterCount: number;
-}) {
-  return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          className="relative ml-auto size-10 shrink-0"
-          aria-label={
-            activeFilterCount > 0
-              ? `Filters and sorting (${activeFilterCount} active)`
-              : "Filters and sorting"
-          }
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          {activeFilterCount > 0 && (
-            <Badge className="absolute -right-1.5 -top-1.5 h-4 min-w-4 rounded-full px-1 text-[10px]">
-              {activeFilterCount}
-            </Badge>
-          )}
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="max-h-[80svh] overflow-y-auto">
-        <SheetHeader className="text-left">
-          <SheetTitle>Filters &amp; sorting</SheetTitle>
-          <SheetDescription>
-            Changes apply to the list immediately.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="flex flex-col items-start gap-3 px-4 pb-6">
-          <DataTableFilterList table={table} />
-          <DataTableSortList table={table} />
-        </div>
-      </SheetContent>
-    </Sheet>
   );
 }
 
