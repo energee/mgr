@@ -590,8 +590,8 @@ function CalculatedAdditionsSection({
   );
 }
 
-/** Other additions section -- clarifiers, nutrients, etc. */
-function OtherAdditionsSection({
+/** Other additions section -- clarifiers, nutrients, etc. (exported for characterization tests) */
+export function OtherAdditionsSection({
   additions,
 }: {
   additions: AdditionRow[];
@@ -626,8 +626,8 @@ function OtherAdditionsSection({
   );
 }
 
-/** Shared table for displaying addition rows */
-function AdditionsTable({
+/** Shared table for displaying addition rows (exported for characterization tests) */
+export function AdditionsTable({
   additions,
   showTarget,
 }: {
