@@ -42,7 +42,7 @@ type Resp = { data: unknown; error: unknown };
 function makeQueryBuilder(response: Resp) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const builder: any = {};
-  const chain = (name: string) =>
+  const chain = (_name: string) =>
     vi.fn((..._args: unknown[]) => builder);
   builder.select = chain("select");
   builder.eq = chain("eq");

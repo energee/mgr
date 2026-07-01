@@ -324,8 +324,8 @@ describe("ChatProvider", () => {
     const transport = lastCallArgs?.transport;
 
     expect(transport).toBeInstanceOf(DefaultChatTransport);
-    expect((transport as any).api).toBe("/api/chat");
-    expect((transport as any).body).toEqual({
+    expect((transport as Record<string, unknown>).api).toBe("/api/chat");
+    expect((transport as Record<string, unknown>).body).toEqual({
       pageContext: {
         section: "production",
         entityType: "batch",

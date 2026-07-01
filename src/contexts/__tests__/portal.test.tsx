@@ -24,7 +24,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { Component, act, type ReactElement, type ReactNode } from "react";
+import { Component, act, useEffect, type ReactElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import {
@@ -69,7 +69,13 @@ function Probe() {
 /** Stashes the raw (non-serialized) hook return value for identity checks. */
 let captured: unknown = undefined;
 function CapturingProbe() {
-  captured = usePortalCustomer();
+  const ctx = usePortalCustomer();
+  // Capture in an effect, not during render (render-phase reassignment of an
+  // outer variable is flagged by the React Compiler lint rule). act() flushes
+  // effects, so `captured` is set by the time the test reads it.
+  useEffect(() => {
+    captured = ctx;
+  });
   return null;
 }
 

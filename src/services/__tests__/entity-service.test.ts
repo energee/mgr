@@ -96,7 +96,7 @@ function makeBuilder(result: QueryResult) {
 function makeSupabase(results: QueryResult[]) {
   let call = 0;
   const builders: ReturnType<typeof makeBuilder>[] = [];
-  const from = vi.fn((table: string) => {
+  const from = vi.fn((_table: string) => {
     const result = results[call] ?? results[results.length - 1];
     const made = makeBuilder(result);
     builders.push(made);

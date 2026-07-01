@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
-import { act, type ReactElement } from "react";
+import { act, useEffect, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { PermissionProvider, usePermissions } from "../permissions";
 import type { UserRole, Permission } from "@/lib/permissions";
@@ -42,12 +42,17 @@ afterEach(() => {
 });
 
 // Captures the live context value object so tests can assert on its shape,
-// derived data, and referential identity across re-renders.
-type Sink = { value: ReturnType<typeof usePermissions> | null };
+// derived data, and referential identity across re-renders. A module-level
+// variable (not a prop) is used so the effect write doesn't trip the React
+// Compiler immutability lint rule; act() flushes the effect, so `captured` is
+// populated by the time each test reads it.
+let captured: ReturnType<typeof usePermissions> | null = null;
 
-function Probe({ sink }: { sink: Sink }) {
+function Probe() {
   const ctx = usePermissions();
-  sink.value = ctx;
+  useEffect(() => {
+    captured = ctx;
+  });
   return (
     <div>
       <span data-testid="roles">{ctx.roles.join(",")}</span>
@@ -58,149 +63,140 @@ function Probe({ sink }: { sink: Sink }) {
 
 describe("PermissionProvider", () => {
   it("provides roles as-is and a permissions list derived via getPermissions", () => {
-    const sink: Sink = { value: null };
     const roles: UserRole[] = ["admin"];
     render(
       <PermissionProvider roles={roles}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    expect(sink.value?.roles).toEqual(["admin"]);
+    expect(captured?.roles).toEqual(["admin"]);
     // admin grants every permission in PERMISSION_MAP
-    expect(sink.value?.permissions).toEqual(
+    expect(captured?.permissions).toEqual(
       expect.arrayContaining<Permission>(["recipes:read", "recipes:write", "settings:manage", "users:manage"])
     );
-    expect(sink.value?.permissions.length).toBeGreaterThan(0);
+    expect(captured?.permissions.length).toBeGreaterThan(0);
   });
 
   it("restricts permissions for a read-only role (viewer)", () => {
-    const sink: Sink = { value: null };
     render(
       <PermissionProvider roles={["viewer"]}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    expect(sink.value?.can("recipes:read")).toBe(true);
-    expect(sink.value?.can("batches:read")).toBe(true);
-    expect(sink.value?.can("recipes:write")).toBe(false);
-    expect(sink.value?.can("settings:manage")).toBe(false);
-    expect(sink.value?.can("integrations:manage")).toBe(false);
+    expect(captured?.can("recipes:read")).toBe(true);
+    expect(captured?.can("batches:read")).toBe(true);
+    expect(captured?.can("recipes:write")).toBe(false);
+    expect(captured?.can("settings:manage")).toBe(false);
+    expect(captured?.can("integrations:manage")).toBe(false);
   });
 
   it("unions permissions across multiple roles", () => {
-    const sink: Sink = { value: null };
     // brewer alone doesn't grant orders:write; sales alone doesn't grant
     // recipes:write. Combined, both should be available.
     render(
       <PermissionProvider roles={["brewer", "sales"]}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    expect(sink.value?.can("recipes:write")).toBe(true);
-    expect(sink.value?.can("orders:write")).toBe(true);
-    expect(sink.value?.can("settings:manage")).toBe(false);
+    expect(captured?.can("recipes:write")).toBe(true);
+    expect(captured?.can("orders:write")).toBe(true);
+    expect(captured?.can("settings:manage")).toBe(false);
   });
 
   it("grants no permissions for the customer role (excluded from PERMISSION_MAP)", () => {
-    const sink: Sink = { value: null };
     render(
       <PermissionProvider roles={["customer"]}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    expect(sink.value?.permissions).toEqual([]);
-    expect(sink.value?.can("recipes:read")).toBe(false);
+    expect(captured?.permissions).toEqual([]);
+    expect(captured?.can("recipes:read")).toBe(false);
     // hasRole is a plain roles.includes() check, independent of PERMISSION_MAP,
     // so the customer role itself still reads back as true.
-    expect(sink.value?.hasRole("customer")).toBe(true);
+    expect(captured?.hasRole("customer")).toBe(true);
   });
 
   it("grants no permissions and no roles for an empty roles array", () => {
-    const sink: Sink = { value: null };
     render(
       <PermissionProvider roles={[]}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    expect(sink.value?.roles).toEqual([]);
-    expect(sink.value?.permissions).toEqual([]);
-    expect(sink.value?.hasRole("admin")).toBe(false);
-    expect(sink.value?.can("recipes:read")).toBe(false);
+    expect(captured?.roles).toEqual([]);
+    expect(captured?.permissions).toEqual([]);
+    expect(captured?.hasRole("admin")).toBe(false);
+    expect(captured?.can("recipes:read")).toBe(false);
   });
 
   it("hasRole checks membership in the roles prop, not derived permissions", () => {
-    const sink: Sink = { value: null };
     render(
       <PermissionProvider roles={["brewer"]}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    expect(sink.value?.hasRole("brewer")).toBe(true);
-    expect(sink.value?.hasRole("admin")).toBe(false);
-    expect(sink.value?.hasRole("viewer")).toBe(false);
+    expect(captured?.hasRole("brewer")).toBe(true);
+    expect(captured?.hasRole("admin")).toBe(false);
+    expect(captured?.hasRole("viewer")).toBe(false);
   });
 
   it("memoizes the context value by roles identity: same array reference across re-renders keeps the same value object", () => {
-    const sink: Sink = { value: null };
     const roles: UserRole[] = ["admin"];
     render(
       <PermissionProvider roles={roles}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
-    const firstValue = sink.value;
+    const firstValue = captured;
 
     // Re-render with an unrelated prop change but the exact same roles
     // array reference — useMemo's dependency array is [roles], so the
     // context value object identity should be preserved.
     rerender(
       <PermissionProvider roles={roles}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    expect(sink.value).toBe(firstValue);
+    expect(captured).toBe(firstValue);
   });
 
   it("quirk: a new array with identical contents still recomputes the value (useMemo compares by reference, not deep equality)", () => {
-    const sink: Sink = { value: null };
     render(
       <PermissionProvider roles={["admin"]}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
-    const firstValue = sink.value;
+    const firstValue = captured;
 
     // New array literal, same contents — useMemo sees a changed dependency
     // (Object.is on the array reference) and recomputes, even though the
     // resulting `permissions`/`can`/`hasRole` behave identically.
     rerender(
       <PermissionProvider roles={["admin"]}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    expect(sink.value).not.toBe(firstValue);
-    expect(sink.value?.roles).toEqual(firstValue?.roles);
-    expect(sink.value?.permissions).toEqual(firstValue?.permissions);
+    expect(captured).not.toBe(firstValue);
+    expect(captured?.roles).toEqual(firstValue?.roles);
+    expect(captured?.permissions).toEqual(firstValue?.permissions);
   });
 
   it("can() reflects a Set built once per memoized value — checking permissions works for every key in PERMISSION_MAP", () => {
-    const sink: Sink = { value: null };
     render(
       <PermissionProvider roles={["admin"]}>
-        <Probe sink={sink} />
+        <Probe />
       </PermissionProvider>
     );
 
-    for (const permission of sink.value!.permissions) {
-      expect(sink.value!.can(permission)).toBe(true);
+    for (const permission of captured!.permissions) {
+      expect(captured!.can(permission)).toBe(true);
     }
   });
 });
