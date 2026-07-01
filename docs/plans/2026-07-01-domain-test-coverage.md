@@ -39,9 +39,9 @@ from this file + `git log --oneline`.
 - [x] `consumption-planning` — 51 tests (pure FIFO/BOM/loss math) — `e1a9a8cf`
 - [x] `batch-schedule` — 18 tests (pure date/phase math) — `0bb5f6dd`
 - [ ] `sales/order-number`
-- [ ] `batch-readings`
-- [ ] `batch-additions`
-- [ ] `brew-events`
+- [x] `batch-readings` — already covered: 32 tests in `src/lib/__tests__/batch-readings.test.ts` (green)
+- [x] `batch-additions` — already covered: 8 tests in `src/lib/__tests__/batch-additions.test.ts` (green)
+- [x] `brew-events` — already covered: 39 tests in `src/lib/__tests__/brew-events.test.ts` (green)
 - [ ] `report-utils`
 - [ ] `yeast-lineage`
 ### Tier 2 (lower ROI / harder)
