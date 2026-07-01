@@ -9,6 +9,7 @@ import type { EntityPresentation } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { Badge } from "@/components/ui/badge";
 import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { SupplierCatalogSection } from "@/components/domain/purchasing/supplier-catalog-section";
 
 type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
 
@@ -166,6 +167,13 @@ export const supplierPresentation: EntityPresentation<Supplier> = {
       deleteMode: "hard",
     },
   ],
+
+  // ---------------------------------------------------------------------------
+  // Relation components — woven onto `core.relations` by createEntityConfig()
+  // ---------------------------------------------------------------------------
+  relationComponents: {
+    catalog_items: SupplierCatalogSection,
+  },
 
   // Duplicate carries over reusable supplier attributes.
   excludeOnDuplicate: [],

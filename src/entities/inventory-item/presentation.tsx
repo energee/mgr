@@ -8,6 +8,7 @@
 import type { EntityPresentation } from "@/types/entity";
 import { deleteAction, valuesAsOptions } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
+import { ItemOnHandCell } from "@/components/domain/inventory/item-on-hand-cell";
 import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 import type { InventoryItem } from "./core";
 import { categoryDisplayConfig } from "./core";
@@ -45,6 +46,15 @@ export const inventoryItemPresentation: EntityPresentation<InventoryItem> = {
       accessorKey: "unit",
       header: "Unit",
       sortable: true,
+    },
+    {
+      // Synthetic column: on-hand is aggregated from inventory_lots at render
+      // time by ItemOnHandCell (audit finding 27), so it is not sortable.
+      accessorKey: "id",
+      header: "On Hand",
+      render: (_value, row) => (
+        <ItemOnHandCell itemId={row.id} unit={row.unit} />
+      ),
     },
     {
       accessorKey: "reorder_point",
