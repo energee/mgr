@@ -98,18 +98,6 @@ export const recipeKeys = {
 };
 
 // =============================================================================
-// Recipe Variant Keys
-// =============================================================================
-
-export const recipeVariantKeys = {
-  all: () => ["recipe-variants"] as const,
-  byRecipe: (recipeId: string) => ["recipe-variants", "by-recipe", recipeId] as const,
-  detail: (id: string) => ["recipe-variants", "detail", id] as const,
-  costDetail: (id: string) => ["recipe-variants", "cost-detail", id] as const,
-  withCosts: (recipeId: string) => ["recipe-variants", "with-costs", recipeId] as const,
-};
-
-// =============================================================================
 // Batch Keys
 // =============================================================================
 
@@ -539,15 +527,6 @@ export const landedCostKeys = {
 };
 
 // =============================================================================
-// Chat Keys
-// =============================================================================
-
-export const chatKeys = {
-  all: () => ["chat"] as const,
-  messages: () => ["chat", "messages"] as const,
-};
-
-// =============================================================================
 // Brand Keys
 // =============================================================================
 
@@ -687,21 +666,6 @@ export const transferKeys = {
 };
 
 // =============================================================================
-// Delivery Keys
-// =============================================================================
-
-export const deliveryKeys = {
-  all: () => ["deliveries"] as const,
-  list: (filters?: Record<string, unknown>) =>
-    filters
-      ? (["deliveries", "list", filters] as const)
-      : (["deliveries", "list"] as const),
-  detail: (id: string) => ["deliveries", id] as const,
-  stops: (deliveryId: string) =>
-    ["deliveries", deliveryId, "stops"] as const,
-};
-
-// =============================================================================
 // Portal Keys (customer portal)
 // =============================================================================
 
@@ -728,15 +692,6 @@ export const finishedGoodKeys = {
   binInventory: (fgId: string) => ["finished-goods", fgId, "bins"] as const,
   commitments: (fgId: string) =>
     ["finished-goods", fgId, "commitments"] as const,
-};
-
-// =============================================================================
-// Permission Keys
-// =============================================================================
-
-export const permissionKeys = {
-  all: () => ["permissions"] as const,
-  current: () => ["permissions", "current"] as const,
 };
 
 // =============================================================================
@@ -812,18 +767,6 @@ export const onboardingKeys = {
    * brands/containers/selling formats/pricing tiers/customers).
    */
   counts: () => ["onboarding", "counts"] as const,
-};
-
-// =============================================================================
-// Email Keys
-// =============================================================================
-
-export const emailKeys = {
-  all: () => ["email"] as const,
-  sendHistory: (filters?: Record<string, unknown>) =>
-    filters
-      ? (["email", "send-history", filters] as const)
-      : (["email", "send-history"] as const),
 };
 
 // =============================================================================

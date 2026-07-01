@@ -63,6 +63,17 @@ export const supplierCore: EntityCore<Supplier> = {
       showInDetail: true,
       detailTab: "Orders",
     },
+    {
+      name: "catalog_items",
+      entity: "supplier_catalog",
+      type: "hasMany",
+      foreignKey: "supplier_id",
+      showInDetail: true,
+      detailTab: "Catalog Items",
+      // The `component` (SupplierCatalogSection) is supplied by
+      // presentation.tsx via `relationComponents` so this module stays
+      // free of React imports.
+    },
   ],
 
   queryExamples: [

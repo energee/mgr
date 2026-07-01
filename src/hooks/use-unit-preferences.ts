@@ -34,15 +34,6 @@ export type UnitPreferences = {
   retail_volume_unit: RetailVolumeUnit;
 }
 
-export type UserPreferences = UnitPreferences & {
-  id: string;
-  user_id: string;
-  theme: "light" | "dark" | "system";
-  date_format: string;
-  created_at: string;
-  updated_at: string;
-}
-
 // =============================================================================
 // Defaults
 // =============================================================================
@@ -101,35 +92,6 @@ export function useUnitPreferences() {
 }
 
 /**
- * Get full user preferences including theme and date format.
- */
-export function useUserPreferences() {
-  const supabase = createClient();
-
-  return useQuery({
-    queryKey: userKeys.full(),
-    queryFn: async (): Promise<UserPreferences | null> => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return null;
-
-      const { data, error } = await supabase
-        .from("user_preferences")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      if (error) return null;
-
-      return data as UserPreferences;
-    },
-    staleTime: CACHE_DURATIONS.USER_PREFERENCES,
-  });
-}
-
-/**
  * Update user's unit preferences.
  */
 export function useUpdateUnitPreferences() {
@@ -138,36 +100,6 @@ export function useUpdateUnitPreferences() {
 
   return useMutation({
     mutationFn: async (updates: Partial<UnitPreferences>) => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) throw new Error("Not authenticated");
-
-      await unwrap(
-        supabase
-          .from("user_preferences")
-          .update({ ...updates, updated_at: new Date().toISOString() })
-          .eq("user_id", user.id)
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userKeys.preferences() });
-    },
-  });
-}
-
-/**
- * Update full user preferences.
- */
-export function useUpdateUserPreferences() {
-  const queryClient = useQueryClient();
-  const supabase = createClient();
-
-  return useMutation({
-    mutationFn: async (
-      updates: Partial<Omit<UserPreferences, "id" | "user_id" | "created_at">>
-    ) => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -212,11 +144,6 @@ export function useTemperatureUnit(): TemperatureUnit {
 export function useGravityUnit(): GravityUnit {
   const { data } = useUnitPreferences();
   return data?.gravity_unit ?? "plato";
-}
-
-export function useRetailVolumeUnit(): RetailVolumeUnit {
-  const { data } = useUnitPreferences();
-  return data?.retail_volume_unit ?? "oz";
 }
 
 /**
