@@ -39,15 +39,24 @@ Ran `bun run knip` for ground-truth dead-code detection. Results triaged:
 
 ## Third pass — characterization test coverage (lever 1, partial)
 
-Render-level characterization tests so the blocked B1/B2/B3 merges become verifiable. Pattern: `createRoot`+`act` (repo idiom, no `@testing-library/react`); stub the dnd-kit `Sortable` wrapper / `UnitInput` / data hooks so tests target each component's own layout logic. Stopped early (cost) after B3 + the first B2 editor; the rest are deferred but the pattern is established and resumable.
+Render-level characterization tests so the blocked B1/B2/B3 merges become verifiable. Pattern: `createRoot`+`act` (repo idiom, no `@testing-library/react`); stub the dnd-kit `Sortable` wrapper / `UnitInput` / data hooks so tests target each component's own layout logic. **All editors now covered** — the last 8 were authored in parallel (8-agent fan-out, sonnet for controlled/medium editors + opus for the react-query+Supabase-heavy ones) and integrated through a serial green commit gate.
 
 - [x] **B3 coverage complete** — both read-only recipe displays:
   - `recipe-schedule-display` — 6 tests (mash/fermentation: empty states, type-label maps w/ raw fallback, footer totals incl. days→weeks rounding). Commit `e0ba691f`.
   - `recipe-additions-display` — 9 tests across all 4 sub-components (`AdditionsTable`, `OtherAdditionsSection`, `WaterChemistrySummary`, `CalculatedAdditionsSection` — the internal sub-components were exported for testing). Commits `890e73e1`, `8ba40e96`.
-- [x] **B2 coverage 1/4** — `mash-schedule-editor` — 4 tests (empty state, row-per-step name binding, footer total, steps-gated temperature reference). Commit `de0042b7`.
-- ⬜ **Deferred (cost):** B2 `fermentation-schedule`/`grain-bill`/`hop-schedule` editors; B1 `order`/`transfer`/`po`/`additions`/`session` line-item editors. Note: the actual B1/B2/B3 *merges* remain low/negative value per the analysis above — this coverage is primarily a regression safety net, not a merge mandate.
+- [x] **B2 coverage complete (4/4)** — the controlled recipe editors:
+  - `mash-schedule-editor` — 4 tests (empty state, row-per-step name binding, footer total, steps-gated temperature reference). Commit `de0042b7`.
+  - `fermentation-schedule-editor` — 5 tests (empty state, per-stage collapsible row w/ bound name/temp/duration, footer stage-count + day/week totals, default-collapsed notes).
+  - `grain-bill-editor` — 6 tests (empty state, per-item row/weight binding, total+percentage footer, Unknown-malt fallback, base-malt/zero-weight warnings present+absent).
+  - `hop-schedule-editor` — 5 tests (empty state, per-row weight binding, footer weight + Tinseth IBU totals, non-boil timing fallback, items-gated timing legend).
+- [x] **B1 coverage complete (5/5)** — the line-item editors (render-only; Supabase/react-query mocked, mutations not simulated):
+  - `additions-editor` — 6 tests (empty state, amount-input row binding, TYPE_LABELS badge map w/ raw fallback, Unknown additive, em-dash Target cell, pluralized footer count).
+  - `session-line-items-editor` — 6 tests (loading, empty, brand/batch/format row binding, footer totals, read-only format-label+keg-owner badge w/ em-dash fallback, mobile card layout swap).
+  - `po-line-items-editor` — 6 tests (loading, empty, Add-Item gating, type-label+name+price row w/ em-dash fallback, Subtotal footer, raw catalog_type fallback).
+  - `transfer-lines-editor` — 5 tests (loading, editable vs locked empty states, editable rows w/ quantity input, locked rows w/ Shipped column raw fallback).
+  - `order-items-editor` — 4 tests (loading, empty + Add-Item readOnly gating, rows-present render w/ per-row + footer order totals; editable-row combobox path deliberately out of scope for jsdom).
 
-Suite: 1528 → 1547 (+19 tests, 4 new files). No production behavior changed (the only runtime changes on this branch are the two S3 wirings and dead-code removals).
+Suite: 1547 → 1590 (+43 tests, 8 new files). No production behavior changed — these are pure test additions. The actual B1/B2/B3 *merges* remain low/negative value per the analysis above; this coverage is a regression safety net, not a merge mandate.
 
 **Second-pass conclusion:** the machine-verifiable safe-simplification surface is essentially exhausted. Remaining knip signal is false positives, intentional vendored completeness, or feature fragments the directive protects. Further net reduction requires either relaxing the no-removal constraint or adding test coverage to unblock B1–B3/B5.
 
