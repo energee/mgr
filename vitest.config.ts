@@ -15,11 +15,16 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      include: ["src/lib/**"],
+      include: [
+        "src/lib/**",
+        "src/domain/**",
+        "src/services/**",
+        "src/contexts/**",
+      ],
       exclude: ["src/lib/supabase/**"],
       // Harness gate: thresholds start permissive so the rule can be
-      // committed without first writing tests. Raise them as `src/lib`
-      // coverage grows. See docs/agents/quality.md for the trend log.
+      // committed without first writing tests. Raise them as coverage grows
+      // across the included dirs. See docs/agents/quality.md for the trend log.
       thresholds: {
         lines: 50,
         functions: 50,
