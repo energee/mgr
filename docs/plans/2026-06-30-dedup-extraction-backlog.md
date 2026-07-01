@@ -25,9 +25,20 @@ Legend: 🟢 low risk · 🟡 med · 🔴 high. LOC = rough net reduction.
 - [x] **B10 · Split + prune engine mono-files** 🟡 (~490) — split self-contained sub-components out of both engines (pure code moves, behavior-preserving by construction, verified green): `RelationTable` (~213 lines) → `entity-relation-table.tsx`, and `MobileFilterSheet` (~54 lines) → `entity-mobile-filter-sheet.tsx`. `entity-detail-unified.tsx` 2261→2048; `entity-data-table.tsx` 1630→1576. **Notes:** the mobile-card list was already extracted in Phase 3 (`entity-mobile-card-list.tsx`); neither engine exposes a "variant" flag prop, so there was no dead variant flag to prune. Commit `a9b26ed2`.
 - [ ] **B11 · Per-entity `index.ts` boilerplate** ⚪ OPTIONAL (~635) — 39 files of `createEntityConfig(...)` + `export *`. Central assembly would cut it, BUT contradicts the deliberate Phase-3 "structure over LOC" decision. User's call — do not do unless confirmed.
 
-## Sweep additions (from the duplication+blueprint workflow — appended on completion)
+## Sweep additions (second pass — machine-verified via `knip` v6)
 
-_(pending)_
+Ran `bun run knip` for ground-truth dead-code detection. Results triaged:
+
+- [x] **S1 · Remove orphaned `zustand` dependency** 🟢 — B6 removed the last real consumer; `knip` + grep confirm zero imports in `src/`/`supabase/` (only doc-comment mentions remain). Dropped from `package.json`; `bun install` removed 1 package. Verified green (typecheck + 1528 tests). Commit `06f3c089`.
+- [x] **S2 · Remove B10-fallout dead imports** 🟢 — `Sheet*`/`SlidersHorizontal`/`Badge`/`TanstackTable` (entity-data-table) + `Link`/`formatValue`/`Table*` (entity-detail-unified), left unused after the B10 split. Lint 17→0 warnings. Commit `03088ef4`.
+- **knip "unused exports" (204) — NOT actioned (unreliable here).** The list flags core, definitely-live symbols (`EntityDataTable`, `EntityDetailUnified`, every entity `*Schema`) because they are used internally via `z.infer`/consumed through the entity registry, which knip doesn't trace. B8 already removed the genuinely zero-importer exports via grep. Acting on this list wholesale = churn + regression risk for ~zero real dead code. Skipped by design.
+- **`src/components/ui/*` + `src/components/ai-elements/*` unused exports — intentionally kept.** Vendored/complete design-system surfaces (shadcn + Vercel ai-elements); unused sub-exports are expected, not dead code.
+- **⚠️ Unwired components (NOT deleted — flagged for decision).** `knip` "unused files" surfaced two components added by PR #324 (audit, 2026-06-30) that are built but wired into no page:
+  - `src/components/domain/purchasing/supplier-catalog-section.tsx` (589 lines) — a supplier detail "Catalog Items" tab.
+  - `src/components/domain/inventory/item-on-hand-cell.tsx` (62 lines) — an "On Hand" cell for the inventory items list.
+  Both were *created* (not orphaned) by #324 with only self-references. Likely pending-wiring or an oversight regression — NOT dead code, and protected by the no-feature-removal directive. Correct fix (if wanted) is wiring them, not deletion. Left untouched pending user decision.
+
+**Second-pass conclusion:** the machine-verifiable safe-simplification surface is essentially exhausted. Remaining knip signal is false positives, intentional vendored completeness, or feature fragments the directive protects. Further net reduction requires either relaxing the no-removal constraint or adding test coverage to unblock B1–B3/B5.
 
 ## Completion criteria
 All non-optional boxes checked; final `bun lint && bun run typecheck && bun run test` green; summary of LOC saved.
