@@ -37,6 +37,18 @@ Ran `bun run knip` for ground-truth dead-code detection. Results triaged:
   - `supplier-catalog-section.tsx` (589 lines) → the supplier detail **"Catalog Items"** tab. Added a `catalog_items` `hasMany` relation to `supplierCore.relations` (mirrors `purchase_orders`) + `relationComponents: { catalog_items: SupplierCatalogSection }` in `supplier/presentation.tsx` (mirrors keg-owner). Renders via `entity-detail-unified.tsx:1619`; component filters `supplier_catalog` by `supplier_id = parentId`.
   - `item-on-hand-cell.tsx` (62 lines) → an **"On Hand"** list column on the inventory-items list (audit finding 27). Added a synthetic (non-sortable) column to `inventory-item/presentation.tsx` rendering `<ItemOnHandCell itemId={row.id} unit={row.unit} />`.
 
+## Third pass — characterization test coverage (lever 1, partial)
+
+Render-level characterization tests so the blocked B1/B2/B3 merges become verifiable. Pattern: `createRoot`+`act` (repo idiom, no `@testing-library/react`); stub the dnd-kit `Sortable` wrapper / `UnitInput` / data hooks so tests target each component's own layout logic. Stopped early (cost) after B3 + the first B2 editor; the rest are deferred but the pattern is established and resumable.
+
+- [x] **B3 coverage complete** — both read-only recipe displays:
+  - `recipe-schedule-display` — 6 tests (mash/fermentation: empty states, type-label maps w/ raw fallback, footer totals incl. days→weeks rounding). Commit `e0ba691f`.
+  - `recipe-additions-display` — 9 tests across all 4 sub-components (`AdditionsTable`, `OtherAdditionsSection`, `WaterChemistrySummary`, `CalculatedAdditionsSection` — the internal sub-components were exported for testing). Commits `890e73e1`, `8ba40e96`.
+- [x] **B2 coverage 1/4** — `mash-schedule-editor` — 4 tests (empty state, row-per-step name binding, footer total, steps-gated temperature reference). Commit `de0042b7`.
+- ⬜ **Deferred (cost):** B2 `fermentation-schedule`/`grain-bill`/`hop-schedule` editors; B1 `order`/`transfer`/`po`/`additions`/`session` line-item editors. Note: the actual B1/B2/B3 *merges* remain low/negative value per the analysis above — this coverage is primarily a regression safety net, not a merge mandate.
+
+Suite: 1528 → 1547 (+19 tests, 4 new files). No production behavior changed (the only runtime changes on this branch are the two S3 wirings and dead-code removals).
+
 **Second-pass conclusion:** the machine-verifiable safe-simplification surface is essentially exhausted. Remaining knip signal is false positives, intentional vendored completeness, or feature fragments the directive protects. Further net reduction requires either relaxing the no-removal constraint or adding test coverage to unblock B1–B3/B5.
 
 ## Completion criteria
