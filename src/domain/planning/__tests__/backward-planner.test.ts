@@ -5,7 +5,7 @@
  * that mirrors the exact `.from().select()...` chains the module calls.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
 
 vi.mock("@/lib/client-logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -55,14 +55,27 @@ beforeEach(() => {
 // =============================================================================
 
 describe("formatPlanningDate", () => {
+  // These assertions depend on the ambient timezone: `new Date("YYYY-MM-DD")`
+  // parses as UTC midnight and `toLocaleDateString` renders in local time, so
+  // the "one day earlier" quirk only appears in TZs behind UTC. Pin the TZ so
+  // the quirk reproduces deterministically on any machine/CI (Node re-reads
+  // `process.env.TZ` at runtime for Date operations). Without this, CI (UTC)
+  // renders the same calendar day and these assertions fail.
+  const originalTZ = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = "America/New_York";
+  });
+  afterAll(() => {
+    if (originalTZ === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTZ;
+  });
+
   it("returns an em dash placeholder for null", () => {
     expect(formatPlanningDate(null)).toBe("—");
   });
 
-  // `new Date("YYYY-MM-DD")` parses as UTC midnight, so `toLocaleDateString`
-  // renders one calendar day earlier in timezones behind UTC (e.g. this
-  // suite's America/New_York environment). Characterizing that as-is: this
-  // is a real quirk of the current implementation, not a test bug.
+  // In a TZ behind UTC the UTC-midnight parse renders one calendar day
+  // earlier. Characterizing that as-is: a real quirk of the current impl.
   it("formats a valid date string as 'Mon D, YYYY' (UTC-midnight parse shifts a day behind UTC)", () => {
     expect(formatPlanningDate("2026-03-15")).toBe("Mar 14, 2026");
   });
