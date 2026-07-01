@@ -31,13 +31,13 @@ from this file + `git log --oneline`.
 - [x] `ttb-utils` — 12 tests — `acab047d`
 - [x] `units` — 12 tests — `2860fd68`
 - [x] `water-chemistry` — 10 tests — `8b7e64e1`
-- [ ] `allocation-calculations` — 13 exported fns (allocation/shortage/expiry math); pure, no Supabase
-- [ ] `purchasing/landed-cost` — RPC `calculate_landed_cost` + pure helpers `formatLandedCost`/`landedCostMarkup`
-- [ ] `purchasing/demand-calculator` — `dynamicRpc` + aggregation/shortfall math
-- [ ] `yeast-calculations`
-- [ ] `planning/backward-planner`
-- [ ] `consumption-planning`
-- [ ] `batch-schedule`
+- [x] `allocation-calculations` — already covered: 64 tests in `src/lib/__tests__/allocation-calculations.test.ts` (green)
+- [x] `purchasing/landed-cost` — 26 tests (pure helpers + async RPC, mocked) — `f939990d`
+- [x] `purchasing/demand-calculator` — 33 tests (pure helpers + async, mocked) — `dc80462a`
+- [x] `yeast-calculations` — already covered: 53 tests in `src/lib/__tests__/yeast-calculations.test.ts` (green)
+- [x] `planning/backward-planner` — 22 tests (pure helpers + async, mocked) — `c74035c4`
+- [x] `consumption-planning` — 51 tests (pure FIFO/BOM/loss math) — `e1a9a8cf`
+- [x] `batch-schedule` — 18 tests (pure date/phase math) — `0bb5f6dd`
 - [ ] `sales/order-number`
 - [ ] `batch-readings`
 - [ ] `batch-additions`
@@ -57,6 +57,14 @@ from this file + `git log --oneline`.
 - [~] `services/types` — **SKIP** unless `dynamicRpc` is tractably unit-testable (types only otherwise)
 
 ## Notes
-- Batch 1 (this session): 3/6 salvaged green (ttb/units/water-chemistry); `allocation` + `landed-cost`
+- Batch 2 (2026-07-01, session 2): 5 new files green (150 tests) — landed-cost `f939990d`,
+  demand-calculator `dc80462a`, backward-planner `c74035c4`, consumption-planning `e1a9a8cf`,
+  batch-schedule `0bb5f6dd`. Also discovered `allocation-calculations` (64) + `yeast-calculations` (53)
+  were **already covered** by pre-existing tests in `src/lib/__tests__/` (not co-located, so the ledger
+  missed them) — ticked, no new work. Two behavior quirks pinned as characterization (not bugs fixed):
+  (1) `backward-planner.formatPlanningDate` parses `YYYY-MM-DD` as UTC midnight → renders one day earlier
+  in non-UTC test TZ; (2) `backward-planner.getProductionRequirements` never applies finished-goods
+  inventory to TBD requirements, so a TBD item's shortage always == total_demand.
+- Batch 1 (session 1): 3/6 salvaged green (ttb/units/water-chemistry); `allocation` + `landed-cost`
   agents self-halted on the cost hook (wrote nothing); `demand-calculator` was killed mid-write.
 - When all boxes are done: final `bun lint && bun run typecheck && bun run test` green, then open a PR.
