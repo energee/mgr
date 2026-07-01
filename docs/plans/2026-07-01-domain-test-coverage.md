@@ -38,12 +38,13 @@ from this file + `git log --oneline`.
 - [x] `planning/backward-planner` — 22 tests (pure helpers + async, mocked) — `c74035c4`
 - [x] `consumption-planning` — 51 tests (pure FIFO/BOM/loss math) — `e1a9a8cf`
 - [x] `batch-schedule` — 18 tests (pure date/phase math) — `0bb5f6dd`
-- [ ] `sales/order-number`
+- [x] `sales/order-number` — 5 tests (RPC mocked) — `ea05f46a`
 - [x] `batch-readings` — already covered: 32 tests in `src/lib/__tests__/batch-readings.test.ts` (green)
 - [x] `batch-additions` — already covered: 8 tests in `src/lib/__tests__/batch-additions.test.ts` (green)
 - [x] `brew-events` — already covered: 39 tests in `src/lib/__tests__/brew-events.test.ts` (green)
-- [ ] `report-utils`
-- [ ] `yeast-lineage`
+- [x] `report-utils` — 20 tests (fake Supabase builder) — `51037d1e`
+- [x] `yeast-lineage` — 12 tests (fake Supabase client) — `0b6d7445`
+### ✅ Tier 1 COMPLETE
 ### Tier 2 (lower ROI / harder)
 - [ ] `contexts/prefill-store` — pure-ish store; test first of the Tier-2 set
 - [ ] `services/consumption-service` — Supabase I/O (mock client)
@@ -57,6 +58,15 @@ from this file + `git log --oneline`.
 - [~] `services/types` — **SKIP** unless `dynamicRpc` is tractably unit-testable (types only otherwise)
 
 ## Notes
+- Batch 3 (2026-07-01, session 3): **Tier 1 finished.** 3 new files green (37 tests) —
+  order-number `ea05f46a` (5, RPC mocked), report-utils `51037d1e` (20, fake Supabase builder),
+  yeast-lineage `0b6d7445` (12, fake Supabase client). Also ticked 3 already-covered freebies
+  (batch-readings 32 / batch-additions 8 / brew-events 39, all in `src/lib/__tests__/`, green).
+  Quirks pinned as characterization (not fixed): `yeast-lineage.resolveYeastLineageRoot` falls back
+  to client walk when RPC resolves `data:null`, has no cycle detection (unbounded loop on A→B→A),
+  and on a broken parent returns the *original leaf* `pitchId` not the last-resolved ancestor;
+  `report-utils.fetchBatchIngredientDetail` swallows the `inventory_lots` query error and can leak a
+  lot name across rows sharing a `source_id`; `order-number` does no shape check on the RPC result.
 - Batch 2 (2026-07-01, session 2): 5 new files green (150 tests) — landed-cost `f939990d`,
   demand-calculator `dc80462a`, backward-planner `c74035c4`, consumption-planning `e1a9a8cf`,
   batch-schedule `0bb5f6dd`. Also discovered `allocation-calculations` (64) + `yeast-calculations` (53)
