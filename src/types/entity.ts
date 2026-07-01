@@ -13,7 +13,6 @@
  *
  * Customization escape hatches:
  * - Custom cell renderers via `render` prop
- * - Custom dialog components via `dialogs[action].component`
  * - Custom detail sections via `sections[].component`
  */
 
@@ -162,9 +161,6 @@ export type EntityPresentation<T = Record<string, unknown>> = {
    * mode on purpose. See buildDuplicateDefaults in entity-detail-unified.tsx.
    */
   excludeOnDuplicate?: (keyof T & string)[];
-
-  /** Dialog configurations for actions */
-  dialogs?: Record<string, EntityDialogConfig<T>>;
 
   /**
    * React components for relation tabs, keyed by relation name. The relation
@@ -372,86 +368,13 @@ export type EntityFilterDef = {
 }
 
 // =============================================================================
-// Form Types
-// =============================================================================
-
-export type EntityFieldDef<T> = {
-  /** Field key */
-  name: keyof T & string;
-
-  /** Display label */
-  label: string;
-
-  /** Field type */
-  type:
-    | "text"
-    | "textarea"
-    | "number"
-    | "select"
-    | "multiselect"
-    | "combobox"
-    | "date"
-    | "datetime"
-    | "checkbox"
-    | "switch"
-    | "json"
-    | "relation"
-    | "unit";
-
-  /** Placeholder text */
-  placeholder?: string;
-
-  /** Help text */
-  description?: string;
-
-  /** Whether field is required */
-  required?: boolean;
-
-  /** Whether field is disabled */
-  disabled?: boolean;
-
-  /** Options for select/multiselect/combobox */
-  options?: { value: string; label: string }[];
-
-  /** Function to fetch options dynamically */
-  fetchOptions?: () => Promise<{ value: string; label: string }[]>;
-
-  /** Dynamic options from database table */
-  dynamicOptions?: {
-    table: string;
-    valueField: string;
-    labelField: string;
-    filter?: Record<string, unknown>;
-    orderBy?: string;
-  };
-
-  /** Related entity configuration (for relation type fields) */
-  relation?: {
-    entity: string;
-    displayField: string;
-  };
-
-  /** Default value */
-  defaultValue?: unknown;
-
-  /** Grid column span (1-12) */
-  colSpan?: number;
-
-  /** Conditional visibility */
-  showWhen?: (values: Partial<T>) => boolean;
-
-  /** Unit type for unit fields (volume, weight, temperature, gravity, retail_volume) */
-  unitType?: "volume" | "weight" | "temperature" | "gravity" | "retail_volume";
-}
-
-// =============================================================================
 // Unified Detail/Edit Types
 // =============================================================================
 
 /**
  * Unified field definition for the combined detail/edit view.
- * Each field knows how to render in both display (view) and input (edit) mode.
- * Merges the concepts of EntityFieldDisplay (view) and EntityFieldDef (edit).
+ * Each field knows how to render in both display (view) and input (edit) mode,
+ * merging what used to be separate view/edit field-definition types.
  */
 export type UnifiedFieldDef<T = Record<string, unknown>> = {
   /** Field key (maps to record property) */
@@ -699,7 +622,7 @@ export type TransitionFieldDef<T> = {
   /** Static options for type "select" */
   options?: { value: string; label: string }[];
 
-  /** Options fetched from an arbitrary table (same shape as EntityFieldDef.dynamicOptions) */
+  /** Options fetched from an arbitrary table (same shape as UnifiedFieldDef.dynamicOptions) */
   dynamicOptions?: {
     table: string;
     valueField: string;
@@ -708,7 +631,7 @@ export type TransitionFieldDef<T> = {
     orderBy?: string;
   };
 
-  /** Registry lookup for type "relation" (same shape as EntityFieldDef.relation) */
+  /** Registry lookup for type "relation" (same shape as UnifiedFieldDef.relation) */
   relation?: { entity: string; displayField: string };
 
   /** Block dialog submit until the field has a value */
@@ -782,41 +705,8 @@ export type EntityActionDef<T> = {
   /** Handler function */
   handler?: (data: T) => Promise<void> | void;
 
-  /** Opens a dialog instead of direct action */
-  dialog?: string;
-
   /** Delete mode: 'hard' issues DELETE, 'soft' sets is_active=false. Only used when name='delete'. */
   deleteMode?: "hard" | "soft";
-}
-
-// =============================================================================
-// Dialog Types
-// =============================================================================
-
-export type EntityDialogConfig<T> = {
-  /** Dialog title */
-  title: string;
-
-  /** Dialog description */
-  description?: string;
-
-  /** Confirm button label */
-  confirmLabel?: string;
-
-  /** Cancel button label */
-  cancelLabel?: string;
-
-  /** Button variant */
-  variant?: "default" | "destructive";
-
-  /** Require a reason/note */
-  requireReason?: boolean;
-
-  /** Custom form fields for dialog */
-  fields?: EntityFieldDef<Record<string, unknown>>[];
-
-  /** Custom component (overrides standard dialog) */
-  component?: ComponentType<{ data: T; onClose: () => void; onConfirm: (data: unknown) => void }>;
 }
 
 // =============================================================================

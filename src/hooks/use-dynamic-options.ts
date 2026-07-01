@@ -4,8 +4,8 @@
  * Handles both `dynamicOptions` (arbitrary table query) and `relation` type
  * fields (entity registry lookup). Returns a map of fieldName -> options[].
  *
- * Works with both EntityFieldDef and UnifiedFieldDef since they share the
- * same shape for the properties this hook cares about:
+ * Accepts a minimal subset of UnifiedFieldDef's shape for the properties
+ * this hook cares about:
  *   - name: string
  *   - dynamicOptions?: { table, valueField, labelField, filter?, orderBy? }
  *   - type?: string (checked for "relation")
@@ -22,7 +22,7 @@ import { CACHE_DURATIONS } from "@/lib/constants";
 import { dynamicFrom } from "@/services/types";
 import { log } from "@/lib/client-logger";
 
-// Minimal field shape accepted by the hook - covers both EntityFieldDef and UnifiedFieldDef
+// Minimal field shape accepted by the hook - a subset of UnifiedFieldDef
 type DynamicOptionsField = {
   name: string;
   type?: string;

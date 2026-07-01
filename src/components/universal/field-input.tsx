@@ -7,10 +7,9 @@
  *
  * Shared between EntityForm (legacy) and EntityDetailUnified (new).
  *
- * Accepts both EntityFieldDef and UnifiedFieldDef since they share the same
- * property names for edit-mode fields (name, label, type, required, colSpan,
- * placeholder, description, disabled, options, dynamicOptions, relation,
- * unitType).
+ * Accepts a minimal subset of UnifiedFieldDef's edit-mode properties (name,
+ * label, type, required, colSpan, placeholder, description, disabled,
+ * options, dynamicOptions, relation, unitType).
  *
  * Relation fields get an inline quick-create "+" button automatically when
  * the target entity is master data (see QUICK_CREATE_ENTITIES in
@@ -52,7 +51,7 @@ import { QuickCreateButton, isQuickCreateEntity } from "./quick-create-dialog";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================
-// Minimal field shape (compatible with both EntityFieldDef and UnifiedFieldDef)
+// Minimal field shape (compatible with UnifiedFieldDef)
 // =============================================================================
 
 type FieldDef = {
@@ -89,7 +88,7 @@ type FieldAriaProps = {
 // =============================================================================
 
 export type FieldInputProps = {
-  /** Field definition (EntityFieldDef or UnifiedFieldDef) */
+  /** Field definition (subset of UnifiedFieldDef) */
   field: FieldDef;
 
   /** Current field value */

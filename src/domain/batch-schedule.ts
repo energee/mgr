@@ -13,13 +13,13 @@
 import { addDays, format, parseISO } from "date-fns";
 
 /** Fallback fermentation duration when the recipe doesn't specify one. */
-export const DEFAULT_FERMENTATION_DAYS = 14;
+const DEFAULT_FERMENTATION_DAYS = 14;
 
 /** Fallback conditioning duration when the recipe doesn't specify one. */
-export const DEFAULT_CONDITIONING_DAYS = 7;
+const DEFAULT_CONDITIONING_DAYS = 7;
 
 /** The recipe fields that drive schedule math (snake_case to match DB rows). */
-export type RecipeScheduleDays = {
+type RecipeScheduleDays = {
   fermentation_days?: number | null;
   conditioning_days?: number | null;
 };
