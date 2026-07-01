@@ -414,7 +414,7 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
  * WaterChemistrySummary -- read-only table comparing source, target, and resulting
  * ion concentrations (ppm) plus the sulfate:chloride ratio.
  */
-function WaterChemistrySummary({
+export function WaterChemistrySummary({
   source,
   target,
   targetName,
@@ -522,8 +522,8 @@ function WaterChemistrySummary({
   );
 }
 
-/** Calculated salt additions with "Apply to Recipe" button */
-function CalculatedAdditionsSection({
+/** Calculated salt additions with "Apply to Recipe" button (exported for characterization tests) */
+export function CalculatedAdditionsSection({
   additions,
   onApply,
   isApplying,

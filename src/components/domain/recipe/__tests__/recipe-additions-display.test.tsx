@@ -25,10 +25,14 @@ import { createRoot, type Root } from "react-dom/client";
 // validation on import. These sub-components never touch the client, so stub
 // it to keep the import (and the test) free of Supabase/env setup.
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
+// CalculatedAdditionsSection reads the display volume unit via this hook.
+vi.mock("@/hooks/use-unit-preferences", () => ({ useVolumeUnit: () => "bbl" }));
 
 import {
   AdditionsTable,
   OtherAdditionsSection,
+  WaterChemistrySummary,
+  CalculatedAdditionsSection,
 } from "../recipe-additions-display";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -174,5 +178,100 @@ describe("OtherAdditionsSection", () => {
     expect(c.textContent).toContain("Whirlfloc");
     expect(c.textContent).toContain("Yeast Nutrient");
     expect(c.textContent).toContain("Mystery Add");
+  });
+});
+
+type WProfile = Parameters<typeof WaterChemistrySummary>[0]["target"];
+const wp = (o: Partial<WProfile>): WProfile => ({
+  calcium_ppm: 0,
+  magnesium_ppm: 0,
+  sodium_ppm: 0,
+  sulfate_ppm: 0,
+  chloride_ppm: 0,
+  bicarbonate_ppm: 0,
+  ...o,
+});
+
+describe("WaterChemistrySummary", () => {
+  it("renders source/target/result rows with rounded ppm, plus the SO4:Cl ratio and its description", () => {
+    const c = render(
+      <WaterChemistrySummary
+        source={{ ...wp({ calcium_ppm: 50.4 }), name: "Tap Water" }}
+        target={wp({ sulfate_ppm: 150, chloride_ppm: 75 })}
+        targetName="Hoppy Pale"
+        resulting={wp({ sulfate_ppm: 150, chloride_ppm: 75 })}
+      />,
+    );
+    expect(c.textContent).toContain("Ca²⁺"); // WATER_IONS calcium label
+    expect(c.textContent).toContain("Source");
+    expect(c.textContent).toContain("Target");
+    expect(c.textContent).toContain("Result");
+    expect(c.textContent).toContain("Tap Water"); // source name
+    expect(c.textContent).toContain("Hoppy Pale"); // target name
+    expect(c.textContent).toContain("50"); // Math.round(50.4)
+    // round1(150 / 75) = 2 → "2:1"; getRatioDescription(2) → "Hoppy"
+    expect(c.textContent).toContain("2:1");
+    expect(c.textContent).toContain("Hoppy");
+  });
+});
+
+type Salts = Parameters<typeof CalculatedAdditionsSection>[0]["additions"];
+const salts = (o: Partial<Salts>): Salts => ({
+  gypsum_g: 0,
+  calcium_chloride_g: 0,
+  epsom_salt_g: 0,
+  baking_soda_g: 0,
+  chalk_g: 0,
+  table_salt_g: 0,
+  magnesium_chloride_g: 0,
+  ...o,
+});
+
+describe("CalculatedAdditionsSection", () => {
+  const noop = () => {};
+
+  it("lists only non-zero salts with mapped names and 1-decimal grams, plus an Apply button", () => {
+    const c = render(
+      <CalculatedAdditionsSection
+        additions={salts({ gypsum_g: 5.25, epsom_salt_g: 2 })}
+        onApply={noop}
+        isApplying={false}
+        applySuccess={false}
+        totalVolumeGal={310}
+      />,
+    );
+    expect(c.textContent).toContain("Gypsum"); // SALT_ADDITIVE_MAP.gypsum_g
+    expect(c.textContent).toContain("5.3 g"); // (5.25).toFixed(1)
+    expect(c.textContent).toContain("Epsom Salt");
+    expect(c.textContent).toContain("2.0 g");
+    expect(c.textContent).not.toContain("Calcium Chloride"); // zero → omitted
+    expect(c.textContent).toContain("Apply to Recipe");
+  });
+
+  it("shows 'Applied' instead of the apply label when applySuccess is set", () => {
+    const c = render(
+      <CalculatedAdditionsSection
+        additions={salts({ gypsum_g: 1 })}
+        onApply={noop}
+        isApplying={false}
+        applySuccess
+        totalVolumeGal={310}
+      />,
+    );
+    expect(c.textContent).toContain("Applied");
+    expect(c.textContent).not.toContain("Apply to Recipe");
+  });
+
+  it("renders nothing when every salt is zero", () => {
+    const c = render(
+      <CalculatedAdditionsSection
+        additions={salts({})}
+        onApply={noop}
+        isApplying={false}
+        applySuccess={false}
+        totalVolumeGal={310}
+      />,
+    );
+    expect(c.textContent).not.toContain("Calculated Salt Additions");
   });
 });
