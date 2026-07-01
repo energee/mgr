@@ -1,25 +1,20 @@
 /**
  * API Utilities
  *
- * Re-exports all common API helpers for route handlers.
+ * Re-exports the common API helpers consumed by route handlers through the
+ * `@/lib/api` barrel. Helpers used only through their source module are
+ * imported directly from there (e.g. `@/lib/api/auth`).
  *
  * Usage:
- *   import { withAuth, successResponse, validateBody, ApiError } from "@/lib/api";
+ *   import { withPermission, successResponse, validateBody, ApiError } from "@/lib/api";
  */
 
 export { successResponse, errorResponse, paginatedResponse } from "./response";
-export type { PaginationMeta, SuccessBody, ErrorBody } from "./response";
 
-export { withAuth, withPermission } from "./auth";
-export type { AuthContext, PermissionContext } from "./auth";
+export { withPermission } from "./auth";
 
-export {
-  validateBody,
-  validateParams,
-  validateSearchParams,
-} from "./validation";
+export { validateBody, validateSearchParams } from "./validation";
 
-export { ApiError, handleApiError } from "./errors";
-export type { ApiErrorCode } from "./errors";
+export { ApiError } from "./errors";
 
-export { rateLimit, getClientIp } from "./rate-limit";
+export { rateLimit } from "./rate-limit";

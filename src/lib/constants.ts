@@ -26,39 +26,6 @@ export const CACHE_DURATIONS = {
 } as const;
 
 // =============================================================================
-// Pagination
-// =============================================================================
-
-export const PAGINATION = {
-  /** Default page size for lists */
-  DEFAULT_PAGE_SIZE: 25,
-
-  /** Maximum page size allowed */
-  MAX_PAGE_SIZE: 100,
-
-  /** Page size options for selectors */
-  PAGE_SIZE_OPTIONS: [10, 25, 50, 100] as const,
-} as const;
-
-// =============================================================================
-// Query Limits
-// =============================================================================
-
-export const QUERY_LIMITS = {
-  /** Default limit for relation queries */
-  RELATION_DEFAULT: 50,
-
-  /** Maximum records for dropdown searches */
-  DROPDOWN_MAX: 100,
-
-  /** Maximum records for autocomplete */
-  AUTOCOMPLETE_MAX: 20,
-
-  /** Batch log entries to load */
-  BATCH_LOGS: 100,
-} as const;
-
-// =============================================================================
 // Polling Intervals (in milliseconds)
 // =============================================================================
 
@@ -68,22 +35,4 @@ export const POLLING_INTERVALS = {
 
   /** Moderately-changing data like vessel utilization and summaries (2 minutes) */
   NORMAL: 2 * 60 * 1000,
-} as const;
-
-// =============================================================================
-// UI Timeouts
-// =============================================================================
-
-export const TIMEOUTS = {
-  /** Debounce delay for search inputs (ms) */
-  SEARCH_DEBOUNCE: 300,
-
-  /** Delay before showing loading indicators (ms) */
-  LOADING_DELAY: 200,
-
-  /** Toast notification duration (ms) */
-  TOAST_DURATION: 5000,
-
-  /** Auto-save interval (ms) */
-  AUTO_SAVE_INTERVAL: 30 * 1000,
 } as const;

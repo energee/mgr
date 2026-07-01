@@ -17,20 +17,8 @@ import type { ZodIssue } from "zod";
 /** Valid base table name from the generated Supabase schema. */
 export type TableName = keyof Database["public"]["Tables"];
 
-/** Valid view name from the generated Supabase schema. */
-export type ViewName = keyof Database["public"]["Views"];
-
-/** Either a base table or a view — used for entity configs with `viewTable`. */
-export type TableOrViewName = TableName | ViewName;
-
 /** Row type for a given table name. */
 export type TableRow<T extends TableName> = Database["public"]["Tables"][T]["Row"];
-
-/** Insert type for a given table name. */
-export type TableInsert<T extends TableName> = Database["public"]["Tables"][T]["Insert"];
-
-/** Update type for a given table name. */
-export type TableUpdate<T extends TableName> = Database["public"]["Tables"][T]["Update"];
 
 // =============================================================================
 // Service Result
