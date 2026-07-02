@@ -15,7 +15,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
-import { getTaxClassLabel, formatTtbBbl } from "@/domain/ttb-utils";
+import { getTaxClassLabel, formatTtbBbl, MONTHS } from "@/domain/ttb-utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -110,11 +110,6 @@ function getYearOptions(): number[] {
 }
 
 // Month names
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-
 // =============================================================================
 // Component
 // =============================================================================

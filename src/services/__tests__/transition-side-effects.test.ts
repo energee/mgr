@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Transition Side Effects — pick_lists → orders status sync tests
  *
