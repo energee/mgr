@@ -141,10 +141,15 @@ export function getCatalogTypeDisplay(catalogType: string): string {
 }
 
 /**
- * Format quantity with unit
+ * Format quantity with unit, e.g. `formatQuantityWithUnit(12345.6, "lb")` => "12,345.6 lb".
+ *
+ * Always formats using the "en-US" locale (this is a US-only product) — using
+ * the host's default ICU locale would make the output machine-dependent.
  */
 export function formatQuantityWithUnit(quantity: number, unit: string): string {
-  const formatted = quantity.toLocaleString(undefined, {
+  // Deterministic en-US formatting (US-only product; host-locale formatting
+  // made output machine-dependent).
+  const formatted = quantity.toLocaleString("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });

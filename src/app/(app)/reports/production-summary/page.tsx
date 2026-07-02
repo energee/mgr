@@ -14,6 +14,7 @@
 
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { MONTHS } from "@/domain/ttb-utils";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
 import { formatBbl } from "@/lib/format";
@@ -87,21 +88,6 @@ type ProductionBatchRow = {
 // =============================================================================
 // Constants
 // =============================================================================
-
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 // =============================================================================
 // Helper Functions

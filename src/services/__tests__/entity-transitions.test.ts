@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Entity State Transition Validation Tests
  *
