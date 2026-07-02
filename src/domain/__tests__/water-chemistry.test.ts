@@ -108,13 +108,11 @@ describe("calculateResultingProfile", () => {
   });
 
   it("adds gypsum's ion contribution on top of the source profile, rounded to 1 decimal", () => {
-    // 10g gypsum / 3gal -> factor 10/3 -- chosen so the raw (unrounded)
-    // products have more than 1 decimal place, so this test actually
-    // exercises round1() rather than passing vacuously on already-exact
-    // values. Raw calcium_ppm = 61.5 * 10/3 = 205.00000000000003 (rounds to
-    // 205); raw sulfate_ppm = 147.4 * 10/3 = 491.33333333333337 (rounds to
-    // 491.3). Literals below are the ROUNDED results, computed from
-    // SALT_CONTRIBUTIONS and round1's actual semantics (Math.round(v*10)/10).
+    // 10g gypsum / 3gal -> factor 10/3. Raw sulfate_ppm = 147.4 * (10/3)
+    // = 491.33333333333337, so the 491.3 literal below is what actually
+    // exercises round1() (calcium's raw 61.5 * (10/3) is exactly 205 in
+    // IEEE-754 -- no rounding needed there). Literals are the ROUNDED
+    // results per round1's semantics (Math.round(v*10)/10).
     const volumeGal = 3;
     const additions: SaltAdditions = { ...ZERO_ADDITIONS, gypsum_g: 10 };
     const result = calculateResultingProfile(ZERO_PROFILE, additions, volumeGal);

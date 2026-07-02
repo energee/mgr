@@ -18,13 +18,10 @@ export function setupRenderHarness() {
   let root: Root | null = null;
   let container: HTMLElement | null = null;
 
-  const unmount = () => {
+  const cleanup = () => {
     const r = root;
     root = null;
     if (r) act(() => r.unmount());
-  };
-  const cleanup = () => {
-    unmount();
     container?.remove();
     container = null;
   };
@@ -45,6 +42,7 @@ export function setupRenderHarness() {
       if (!root) throw new Error("rerender() called before render()");
       act(() => root!.render(el));
     },
-    unmount,
+    /** Unmounts AND removes the container (same as the afterEach cleanup). */
+    unmount: cleanup,
   };
 }

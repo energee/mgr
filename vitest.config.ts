@@ -6,8 +6,10 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
-    // Deterministic timezone for every test file (matches the primary dev
-    // machine; CI is UTC without this). Date-formatting tests must not
+    // Deterministic timezone for every test file (CI is UTC without this).
+    // A behind-UTC zone is load-bearing: backward-planner's tests
+    // characterize the "date-only string renders a day early" behavior,
+    // which does not reproduce under UTC. Date-formatting tests must not
     // depend on the host zone — pin here, not per-file. Note: runtime TZ
     // changes are honored on POSIX only; Windows is not a supported dev
     // platform for this suite.
@@ -27,7 +29,13 @@ export default defineConfig({
         "src/services/**",
         "src/contexts/**",
       ],
-      exclude: ["src/lib/supabase/**"],
+      // __tests__ covers shared fixture/helper files (e.g. purchasing
+      // fixtures.ts) — vitest only auto-excludes *.test.* files, and a
+      // 100%-covered fixture would prop up its directory's gate.
+      exclude: ["src/lib/supabase/**", "**/__tests__/**"],
+      // CI runs coverage on every push; html/clover output is never read
+      // there. json-summary keeps a machine-readable rollup for tooling.
+      reporter: ["text", "json-summary"],
       // Harness gate: per-directory floors set a few points under measured
       // coverage (2026-07-01) so a regression in ANY one directory fails the
       // gate — a single aggregate threshold let well-covered dirs subsidize
@@ -35,7 +43,10 @@ export default defineConfig({
       // See docs/agents/quality.md for the trend log. Enforced by CI
       // (test.yml) and `make check-coverage`.
       thresholds: {
-        // Applies to included files not matched by a glob below (currently none).
+        // NOTE: vitest's global thresholds always apply to ALL included
+        // files as one blended aggregate — the glob entries below are
+        // checked in ADDITION, not instead. Keep these at/below the
+        // aggregate (74/59/74/74 measured 2026-07-01).
         lines: 50,
         functions: 50,
         branches: 50,

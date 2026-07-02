@@ -27,31 +27,19 @@ import type { Database } from "@/types/supabase";
 export type FakeResponse = { data: unknown; error: unknown };
 export type QueuedResponse = FakeResponse | { rejectWith: unknown };
 
+// Only the methods current consumers chain. Add new ones as services need
+// them (a missing method fails loudly with a TypeError). Deliberately NOT
+// listing .throwOnError(): the real one changes await semantics to throw,
+// which a plain chain no-op would silently misrepresent.
 const CHAIN_METHODS = [
   "select",
   "eq",
-  "neq",
   "in",
-  "is",
-  "not",
-  "or",
   "gt",
-  "gte",
-  "lt",
-  "lte",
-  "like",
-  "ilike",
-  "contains",
-  "order",
-  "limit",
-  "range",
   "single",
-  "maybeSingle",
+  "limit",
   "insert",
   "update",
-  "upsert",
-  "delete",
-  "throwOnError",
 ] as const;
 
 /** Chainable, thenable fake query builder resolving (or rejecting) `response`. */

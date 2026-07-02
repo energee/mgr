@@ -28,15 +28,12 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useChat, type UseChatHelpers } from "@ai-sdk/react";
 import { setupRenderHarness } from "@/test/react-harness";
 
-const { pathnameState, chatState, transportCtorArgs, transportInstances } =
-  vi.hoisted(() => ({
-    pathnameState: { current: "/" },
-    chatState: { current: null as unknown as UseChatHelpers<UIMessage> },
-    /** Options objects passed to `new DefaultChatTransport(...)`, in call order. */
-    transportCtorArgs: [] as unknown[],
-    /** The constructed transport instances, index-aligned with transportCtorArgs. */
-    transportInstances: [] as unknown[],
-  }));
+const { pathnameState, chatState, transports } = vi.hoisted(() => ({
+  pathnameState: { current: "/" },
+  chatState: { current: null as unknown as UseChatHelpers<UIMessage> },
+  /** One record per `new DefaultChatTransport(...)` call, in call order. */
+  transports: [] as Array<{ args: unknown; instance: unknown }>,
+}));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathnameState.current,
@@ -48,13 +45,15 @@ vi.mock("@ai-sdk/react", () => ({
 
 // Keep the real `ai` module but swap DefaultChatTransport for a test class
 // that records its constructor options and instances, so tests can assert the
-// provider's wiring without touching third-party internals.
+// provider's wiring without touching third-party internals. Tradeoff: the
+// real class is never constructed at runtime here; drift in its constructor
+// contract is caught by tsc (the provider is compiled against the real
+// declarations), not by this test.
 vi.mock("ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("ai")>();
   class CapturingChatTransport {
     constructor(options: unknown) {
-      transportCtorArgs.push(options);
-      transportInstances.push(this);
+      transports.push({ args: options, instance: this });
     }
   }
   return { ...actual, DefaultChatTransport: CapturingChatTransport };
@@ -90,11 +89,15 @@ const { render, unmount } = setupRenderHarness();
 // document listener spy) into later tests; the module mocks above are
 // factory-based (not vi.spyOn) so their implementations survive it.
 afterEach(() => {
+  // Unmount BEFORE restoring spies: same-level afterEach hooks run LIFO, so
+  // the shared harness's cleanup (registered first) would otherwise run
+  // after restoreAllMocks, i.e. spies would be restored on a still-mounted
+  // tree.
+  unmount();
   vi.restoreAllMocks();
   vi.clearAllMocks();
   pathnameState.current = "/";
-  transportCtorArgs.length = 0;
-  transportInstances.length = 0;
+  transports.length = 0;
 });
 
 function Probe({ onRender }: { onRender: (v: ChatContextValue) => void }) {
@@ -310,7 +313,7 @@ describe("ChatProvider", () => {
     const transport = lastCallArgs?.transport;
 
     // The provider constructed the transport with exactly these options...
-    expect(transportCtorArgs.at(-1)).toStrictEqual({
+    expect(transports.at(-1)?.args).toStrictEqual({
       api: "/api/chat",
       body: {
         pageContext: {
@@ -322,6 +325,6 @@ describe("ChatProvider", () => {
     });
     // ...and passed that same instance to useChat.
     expect(transport).toBeInstanceOf(DefaultChatTransport);
-    expect(transport).toBe(transportInstances.at(-1));
+    expect(transport).toBe(transports.at(-1)?.instance);
   });
 });

@@ -15,10 +15,11 @@
  *
  * This file keeps its own local, sequential (call-ordered) fake Supabase
  * client rather than the shared table-keyed fake in
- * src/test/supabase-mock.ts, because several tests here assert on
- * per-builder spies (e.g. `builders[0].spies.eq`) tied to a specific
- * `.from()` call in sequence. New service tests that don't need that level
- * of per-call inspection should prefer the shared fake instead.
+ * src/test/supabase-mock.ts. The shared fake's `callsByTable[table][i]`
+ * offers equivalent call-ordered inspection; the honest reason not to
+ * migrate is churn -- every assertion here is written against
+ * `builders[i].spies.*`, and renaming all of them buys no behavior change.
+ * New service tests should use the shared fake.
  */
 
 import { describe, it, expect, vi } from "vitest";

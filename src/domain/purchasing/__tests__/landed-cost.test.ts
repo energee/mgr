@@ -162,6 +162,12 @@ describe("getLandedCostSummary", () => {
     // call history and any unconsumed mockResolvedValueOnce queue entries.
     vi.mocked(rpcMock).mockReset();
     vi.mocked(singleMock).mockReset();
+    // The static chain mocks keep their module-scope implementations, but
+    // their call history must not accumulate across tests (an assertion on
+    // fromMock/eqMock would otherwise pass off an earlier test's calls).
+    vi.mocked(fromMock).mockClear();
+    vi.mocked(selectMock).mockClear();
+    vi.mocked(eqMock).mockClear();
   });
 
   it("fetches PO shipping/tax and combines with line items into totals", async () => {

@@ -37,9 +37,12 @@ import {
   type PortalCustomer,
 } from "../portal";
 
-const { render, rerender } = setupRenderHarness();
+const { render, rerender, unmount } = setupRenderHarness();
 
 afterEach(() => {
+  // Unmount before restoring spies (same-level afterEach runs LIFO; the
+  // harness cleanup registered above would otherwise run after this hook).
+  unmount();
   vi.restoreAllMocks();
 });
 

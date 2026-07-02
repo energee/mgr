@@ -68,7 +68,7 @@ from this file + `git log --oneline`.
   All 4 context/hook modules throw when their hook is used outside the provider (pinned).
   **DONE:** lint fixes for the new context/service tests (react-compiler immutability → module-level
   capture in useEffect; unused fake-builder args → `_`-prefixed). Finish-line gate green:
-  `bun lint` (0/0), `bun typecheck` (0), `bun run test` (109 files, 1921 tests — NOT `bun test`,
+  `bun lint` (0/0), `bun typecheck` (0), `bun run test` (109 files, 1921 tests at that milestone; 1920 after the review-fix pass merged/trimmed tests — NOT `bun test`,
   which invokes Bun's native runner instead of vitest). **PR: https://github.com/energee/mgr/pull/330**
 - Batch 4 (2026-07-01, session 3 cont.): **all 4 tractable Tier-2 modules done** (111 tests) —
   inventory-count-service `c2971496` (14), entity-service `5a39266b` (40), consumption-service `3f587c22` (36),
