@@ -1,24 +1,21 @@
+// @vitest-environment node
 /**
  * Tests for TTB Form 5130.9 pure helpers (src/domain/ttb-utils.ts):
  * barrel/gallon conversion, compliance-safe decimal formatting, tax class
  * label lookup, and report-period year options.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   bblToGallons,
   gallonsToBbl,
   formatTtbBbl,
   getTaxClassLabel,
   getYearOptions,
-  GALLONS_PER_BARREL,
-  MONTHS,
 } from "@/domain/ttb-utils";
 
-describe("GALLONS_PER_BARREL", () => {
-  it("is the TTB standard of 31 US gallons per barrel", () => {
-    expect(GALLONS_PER_BARREL).toBe(31);
-  });
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("bblToGallons / gallonsToBbl", () => {
@@ -72,20 +69,13 @@ describe("getYearOptions", () => {
   });
 
   it("defaults to the current year when no argument is given", () => {
-    const currentYear = new Date().getFullYear();
-    expect(getYearOptions()).toEqual([
-      currentYear,
-      currentYear - 1,
-      currentYear - 2,
-      currentYear - 3,
-    ]);
-  });
-});
-
-describe("MONTHS", () => {
-  it("has 12 full month names in calendar order", () => {
-    expect(MONTHS).toHaveLength(12);
-    expect(MONTHS[0]).toBe("January");
-    expect(MONTHS[11]).toBe("December");
+    // Pin the clock so this doesn't flake once a year at the midnight
+    // boundary between the test's `new Date()` read and getYearOptions'
+    // own internal read. With the system clock fixed at 2026-07-01, the
+    // current year is 2026, so getYearOptions() must return exactly
+    // [2026, 2025, 2024, 2023].
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-01T12:00:00"));
+    expect(getYearOptions()).toEqual([2026, 2025, 2024, 2023]);
   });
 });

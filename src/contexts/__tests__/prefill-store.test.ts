@@ -84,7 +84,11 @@ describe("setPrefill / consume round trip", () => {
     expect(usePrefillStore.getState().openDialog).toBe("just-a-dialog");
 
     const consumed = usePrefillStore.getState().consume();
-    expect(consumed).toEqual({ prefillData: undefined, openDialog: "just-a-dialog" });
+    // toStrictEqual (not toEqual): JSON.stringify() drops the `prefillData:
+    // undefined` slot on write, so the parsed-back object has no `prefillData`
+    // key at all — toEqual would ignore that distinction, but toStrictEqual
+    // catches it.
+    expect(consumed).toStrictEqual({ openDialog: "just-a-dialog" });
     expect(usePrefillStore.getState().openDialog).toBeNull();
   });
 });
@@ -162,26 +166,33 @@ describe("malformed / unavailable storage (swallowed-error characterization)", (
   });
 
   it("read() swallows a throwing sessionStorage.getItem and returns EMPTY", () => {
-    vi.spyOn(storageProto, "getItem").mockImplementation(() => {
+    const getItemSpy = vi.spyOn(storageProto, "getItem").mockImplementation(() => {
       throw new Error("storage unavailable");
     });
     expect(() => usePrefillStore.getState().prefillData).not.toThrow();
     expect(usePrefillStore.getState().prefillData).toBeNull();
     expect(usePrefillStore.getState().openDialog).toBeNull();
+    // Guard against the spy silently failing to intercept (e.g. if jsdom ever
+    // makes `getItem` an own property rather than a prototype method) — in
+    // that case the assertions above would pass vacuously against a real,
+    // empty sessionStorage instead of exercising the throw path.
+    expect(getItemSpy).toHaveBeenCalled();
   });
 
   it("write() swallows a throwing sessionStorage.setItem without propagating", () => {
-    vi.spyOn(storageProto, "setItem").mockImplementation(() => {
+    const setItemSpy = vi.spyOn(storageProto, "setItem").mockImplementation(() => {
       throw new Error("quota exceeded");
     });
     expect(() => usePrefillStore.getState().setPrefill({ a: 1 })).not.toThrow();
     // The failed write leaves storage untouched.
     expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+    // Guard against the spy silently failing to intercept (see above).
+    expect(setItemSpy).toHaveBeenCalled();
   });
 
   it("quirk: consume() still returns the read snapshot even when the follow-up clear silently fails", () => {
     usePrefillStore.getState().setPrefill({ a: 1 }, "dlg");
-    vi.spyOn(storageProto, "removeItem").mockImplementation(() => {
+    const removeItemSpy = vi.spyOn(storageProto, "removeItem").mockImplementation(() => {
       throw new Error("storage unavailable");
     });
 
@@ -192,6 +203,8 @@ describe("malformed / unavailable storage (swallowed-error characterization)", (
     // entry is left behind in sessionStorage despite consume() having
     // returned it once already.
     expect(sessionStorage.getItem(STORAGE_KEY)).not.toBeNull();
+    // Guard against the spy silently failing to intercept (see above).
+    expect(removeItemSpy).toHaveBeenCalled();
   });
 });
 

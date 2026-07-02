@@ -9,56 +9,38 @@
  * shape/identity behavior of the memoized value, and what usePermissions()
  * does when called outside a provider.
  *
- * Follows the repo's render-test idiom (createRoot + act; no
- * @testing-library/react — see mash-schedule-editor.test.tsx).
+ * Follows the repo's render-test idiom via the shared createRoot + act
+ * harness (see src/test/react-harness.ts; no @testing-library/react).
  */
 
-import { describe, it, expect, afterEach } from "vitest";
-import { act, useEffect, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, beforeEach } from "vitest";
+import { useEffect } from "react";
+import { setupRenderHarness } from "@/test/react-harness";
 import { PermissionProvider, usePermissions } from "../permissions";
 import type { UserRole, Permission } from "@/lib/permissions";
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
-
-function rerender(el: ReactElement) {
-  act(() => root!.render(el));
-}
-
-afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
-});
+const { render, rerender } = setupRenderHarness();
 
 // Captures the live context value object so tests can assert on its shape,
 // derived data, and referential identity across re-renders. A module-level
 // variable (not a prop) is used so the effect write doesn't trip the React
 // Compiler immutability lint rule; act() flushes the effect, so `captured` is
-// populated by the time each test reads it.
+// populated by the time each test reads it. Reset before every test so a
+// test can never observe a value captured by its predecessor.
 let captured: ReturnType<typeof usePermissions> | null = null;
 
+beforeEach(() => {
+  captured = null;
+});
+
+// No test asserts on rendered DOM output — only on the captured context
+// value — so Probe renders nothing.
 function Probe() {
   const ctx = usePermissions();
   useEffect(() => {
     captured = ctx;
   });
-  return (
-    <div>
-      <span data-testid="roles">{ctx.roles.join(",")}</span>
-      <span data-testid="permissions">{ctx.permissions.join(",")}</span>
-    </div>
-  );
+  return null;
 }
 
 describe("PermissionProvider", () => {

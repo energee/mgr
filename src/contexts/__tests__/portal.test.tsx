@@ -12,43 +12,34 @@
  *     provider (the context default is `null`, and the hook guards with
  *     `if (!ctx) throw ...`)
  *
- * Follows the repo's render-test idiom (createRoot + act; no
- * @testing-library/react, per src/components/domain/recipe/__tests__/mash-schedule-editor.test.tsx).
+ * Follows the repo's render-test idiom via the shared createRoot + act
+ * harness (see src/test/react-harness.ts; no @testing-library/react).
  * PortalProvider is used via JSX rather than React.createElement: its props
  * type declares `children: ReactNode` as required, and TypeScript's
  * createElement overloads (unlike the JSX transform) don't merge a variadic
  * children argument into that required prop.
- * A tiny inline ErrorBoundary is used to observe the render-time throw from
- * the outside-provider case, since React (createRoot) unmounts the tree and
- * surfaces the error to the nearest boundary rather than to the caller.
+ * The outside-provider case follows the sibling idiom in
+ * permissions.test.tsx: React (createRoot) re-throws a synchronous
+ * render-time error out of act() when there is no error boundary in the
+ * tree, so the throw is observed directly via
+ * `expect(() => render(...)).toThrow(...)` rather than via an error
+ * boundary. React still logs the caught error to console.error, so that is
+ * spied on to keep the expected-failure path quiet.
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { Component, act, useEffect, type ReactElement, type ReactNode } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { useEffect } from "react";
 
+import { setupRenderHarness } from "@/test/react-harness";
 import {
   PortalProvider,
   usePortalCustomer,
   type PortalCustomer,
 } from "../portal";
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
+const { render, rerender } = setupRenderHarness();
 
 afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
   vi.restoreAllMocks();
 });
 
@@ -56,18 +47,13 @@ afterEach(() => {
 // Probes
 // ---------------------------------------------------------------------------
 
-/** Renders the hook's return value as text so assertions can read the DOM. */
-function Probe() {
-  const ctx = usePortalCustomer();
-  return (
-    <div data-testid="probe">
-      {JSON.stringify({ customers: ctx.customers, customerIds: ctx.customerIds })}
-    </div>
-  );
-}
-
 /** Stashes the raw (non-serialized) hook return value for identity checks. */
 let captured: unknown = undefined;
+
+beforeEach(() => {
+  captured = undefined;
+});
+
 function CapturingProbe() {
   const ctx = usePortalCustomer();
   // Capture in an effect, not during render (render-phase reassignment of an
@@ -79,20 +65,10 @@ function CapturingProbe() {
   return null;
 }
 
-class ErrorBoundary extends Component<
-  { children: ReactNode },
-  { error: Error | null }
-> {
-  state: { error: Error | null } = { error: null };
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-  render() {
-    if (this.state.error) {
-      return <div data-testid="boundary-error">{this.state.error.message}</div>;
-    }
-    return this.props.children;
-  }
+/** Calls the hook and renders nothing — used to observe the outside-provider throw. */
+function HookProbe() {
+  usePortalCustomer();
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,16 +104,12 @@ describe("PortalProvider", () => {
       { id: "c1", name: "Acme Brewing" },
       { id: "c2", name: "Big Barrel Co" },
     ];
-    const c = render(
+    render(
       <PortalProvider value={{ customers, customerIds: ["c1", "c2"] }}>
-        <Probe />
+        <CapturingProbe />
       </PortalProvider>
     );
-    const text = c.querySelector('[data-testid="probe"]')?.textContent ?? "";
-    expect(JSON.parse(text)).toEqual({
-      customers,
-      customerIds: ["c1", "c2"],
-    });
+    expect(captured).toEqual({ customers, customerIds: ["c1", "c2"] });
   });
 
   it("re-renders consumers when the provider is given a new value object", () => {
@@ -146,37 +118,31 @@ describe("PortalProvider", () => {
 
     render(
       <PortalProvider value={valueA}>
-        <Probe />
+        <CapturingProbe />
       </PortalProvider>
     );
-    expect(container!.querySelector('[data-testid="probe"]')?.textContent).toContain("c1");
+    expect(captured).toEqual(valueA);
 
-    act(() => {
-      root!.render(
-        <PortalProvider value={valueB}>
-          <Probe />
-        </PortalProvider>
-      );
-    });
-    expect(container!.querySelector('[data-testid="probe"]')?.textContent).toContain("c2");
+    rerender(
+      <PortalProvider value={valueB}>
+        <CapturingProbe />
+      </PortalProvider>
+    );
+    expect(captured).toEqual(valueB);
   });
 });
 
 describe("usePortalCustomer outside PortalProvider", () => {
   it("throws 'usePortalCustomer must be used within PortalProvider' (quirk: guard is `if (!ctx)`, not an identity check against the createContext default)", () => {
-    // React logs the caught render error to console.error even inside an
-    // error boundary; silence it so the expected-failure path stays quiet.
+    // React logs the caught render error to console.error even though the
+    // throw propagates out of act() with no boundary to swallow it; silence
+    // it so the expected-failure path stays quiet.
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const c = render(
-      <ErrorBoundary>
-        <Probe />
-      </ErrorBoundary>
-    );
+    expect(() => {
+      render(<HookProbe />);
+    }).toThrow("usePortalCustomer must be used within PortalProvider");
 
-    expect(c.querySelector('[data-testid="boundary-error"]')?.textContent).toBe(
-      "usePortalCustomer must be used within PortalProvider"
-    );
     expect(consoleErrorSpy).toHaveBeenCalled();
   });
 });

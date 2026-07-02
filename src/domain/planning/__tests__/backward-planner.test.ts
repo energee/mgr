@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for the backward-planning calculator: pin the pure
  * date/name formatters exactly, and pin the aggregation math (demand ->
@@ -5,7 +6,8 @@
  * that mirrors the exact `.from().select()...` chains the module calls.
  */
 
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { log } from "@/lib/client-logger";
 
 vi.mock("@/lib/client-logger", () => ({
   log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -19,7 +21,13 @@ type Resolved = { data: unknown; error: unknown };
 const tableResults = new Map<string, Resolved>();
 
 function makeBuilder(table: string) {
-  const result = tableResults.get(table) ?? { data: [], error: null };
+  const result = tableResults.get(table);
+  if (!result) {
+    // Fail loudly on an unconfigured/typo'd table instead of silently
+    // resolving to an empty success — a missing entry means a test forgot
+    // to stub a table the module actually queries.
+    throw new Error(`fake supabase: no result configured for table "${table}"`);
+  }
   const builder: Record<string, unknown> = {};
   const chain = () => builder;
   builder.select = chain;
@@ -57,18 +65,10 @@ beforeEach(() => {
 describe("formatPlanningDate", () => {
   // These assertions depend on the ambient timezone: `new Date("YYYY-MM-DD")`
   // parses as UTC midnight and `toLocaleDateString` renders in local time, so
-  // the "one day earlier" quirk only appears in TZs behind UTC. Pin the TZ so
-  // the quirk reproduces deterministically on any machine/CI (Node re-reads
-  // `process.env.TZ` at runtime for Date operations). Without this, CI (UTC)
-  // renders the same calendar day and these assertions fail.
-  const originalTZ = process.env.TZ;
-  beforeAll(() => {
-    process.env.TZ = "America/New_York";
-  });
-  afterAll(() => {
-    if (originalTZ === undefined) delete process.env.TZ;
-    else process.env.TZ = originalTZ;
-  });
+  // the "one day earlier" quirk only appears in TZs behind UTC. TZ is pinned
+  // suite-wide to America/New_York via `test.env` in vitest.config.ts, so the
+  // quirk reproduces deterministically on any machine/CI without per-file
+  // mutation of `process.env.TZ`.
 
   it("returns an em dash placeholder for null", () => {
     expect(formatPlanningDate(null)).toBe("—");
@@ -545,6 +545,91 @@ describe("getProductionRequirements", () => {
     ]);
   });
 
+  it("breaks equal-shortage ties by earliest requested date ascending, nulls sorted last", async () => {
+    setOrders([
+      {
+        id: "o-early",
+        order_number: "SO-EARLY",
+        customer_id: null,
+        status: "confirmed",
+        order_date: "2026-06-01",
+        requested_date: "2026-06-05",
+        scheduled_date: null,
+        customers: null,
+      },
+      {
+        id: "o-late",
+        order_number: "SO-LATE",
+        customer_id: null,
+        status: "confirmed",
+        order_date: "2026-06-01",
+        requested_date: "2026-06-15",
+        scheduled_date: null,
+        customers: null,
+      },
+      {
+        id: "o-null",
+        order_number: "SO-NULL",
+        customer_id: null,
+        status: "confirmed",
+        order_date: "2026-06-01",
+        requested_date: null,
+        scheduled_date: null,
+        customers: null,
+      },
+    ]);
+    setItems([
+      // Same shortage (7) as the other two items below - only the date
+      // (or absence of one) should determine order.
+      {
+        id: "oi-early",
+        order_id: "o-early",
+        brand_id: "b-early",
+        selling_format_id: "sf-x",
+        quantity: 7,
+        style_id: null,
+        tbd_notes: null,
+        brands: { name: "Early Brand" },
+        selling_formats: { name: "Keg" },
+        beer_styles: null,
+      },
+      {
+        id: "oi-late",
+        order_id: "o-late",
+        brand_id: "b-late",
+        selling_format_id: "sf-x",
+        quantity: 7,
+        style_id: null,
+        tbd_notes: null,
+        brands: { name: "Late Brand" },
+        selling_formats: { name: "Keg" },
+        beer_styles: null,
+      },
+      {
+        id: "oi-null",
+        order_id: "o-null",
+        brand_id: "b-null",
+        selling_format_id: "sf-x",
+        quantity: 7,
+        style_id: null,
+        tbd_notes: null,
+        brands: { name: "Null Date Brand" },
+        selling_formats: { name: "Keg" },
+        beer_styles: null,
+      },
+    ]);
+    tableResults.set("finished_goods_with_availability", { data: [], error: null });
+
+    const result = await getProductionRequirements();
+
+    expect(result.map((r) => r.shortage)).toEqual([7, 7, 7]);
+    expect(result.map((r) => r.brand_name)).toEqual([
+      "Early Brand",
+      "Late Brand",
+      "Null Date Brand",
+    ]);
+  });
+
   it("logs and continues (available_quantity stays 0) when the inventory query errors", async () => {
     setOrders([
       {
@@ -572,15 +657,20 @@ describe("getProductionRequirements", () => {
         beer_styles: null,
       },
     ]);
+    const inventoryError = new Error("inventory query failed");
     tableResults.set("finished_goods_with_availability", {
       data: null,
-      error: new Error("inventory query failed"),
+      error: inventoryError,
     });
 
     const result = await getProductionRequirements();
 
     expect(result[0].available_quantity).toBe(0);
     expect(result[0].shortage).toBe(20);
+    // Implementation branch is `log.error("Error fetching inventory:", invError)`
+    // (see backward-planner.ts) - pin that the failure is actually logged,
+    // not just silently swallowed.
+    expect(log.error).toHaveBeenCalledWith("Error fetching inventory:", inventoryError);
   });
 });
 

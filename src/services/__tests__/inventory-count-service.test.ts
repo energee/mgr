@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for src/services/inventory-count-service.ts
  * (recordInventoryCount).
@@ -12,13 +13,20 @@
  *
  * These tests pin *current* behavior (including quirks), not aspirational
  * behavior — see inline QUIRK notes.
+ *
+ * Note: for new tests, prefer the shared table-keyed fake in
+ * src/test/supabase-mock.ts (import from "@/test/supabase-mock"). The local
+ * `makeSupabase` below predates that helper and exposes per-chain-step spies
+ * (selectSpy/selectEqSpy/updateSpy/...) instead of the shared helper's
+ * `callsByTable` shape; migrating it would touch every assertion in this
+ * file for no behavior change, so it's left as-is. It still throws on any
+ * unqueued/unexpected table, matching the shared helper's fail-loud contract.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { recordInventoryCount } from "../inventory-count-service";
-import { buildCountIncreaseNote, appendLotNote } from "@/domain/inventory-count";
 
 type LotRow = { id: string; quantity: number; notes: string | null };
 
@@ -85,11 +93,14 @@ describe("recordInventoryCount", () => {
   });
 
   describe("shrinkage (kind: decrease)", () => {
-    beforeEach(() => {
+    // No test in this describe advances timers — a single fixed clock for
+    // the whole block is sufficient, so install/teardown once rather than
+    // per-test.
+    beforeAll(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-07-01T12:00:00.000Z"));
     });
-    afterEach(() => {
+    afterAll(() => {
       vi.useRealTimers();
     });
 
@@ -190,11 +201,14 @@ describe("recordInventoryCount", () => {
   });
 
   describe("found stock (kind: increase)", () => {
-    beforeEach(() => {
+    // No test in this describe advances timers — a single fixed clock for
+    // the whole block is sufficient, so install/teardown once rather than
+    // per-test.
+    beforeAll(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-07-01T12:00:00.000Z"));
     });
-    afterEach(() => {
+    afterAll(() => {
       vi.useRealTimers();
     });
 
@@ -215,13 +229,13 @@ describe("recordInventoryCount", () => {
       expect(selectSpy).toHaveBeenCalledWith("id, quantity, notes");
       expect(selectEqSpy).toHaveBeenCalledWith("id", "lot-1");
 
-      const expectedNote = buildCountIncreaseNote({
-        countedOn: "2026-07-01",
-        expectedQuantity: 10,
-        countedQuantity: 14,
-        notes: "found a case in the back",
-      });
-      const expectedNotes = appendLotNote("prior note", expectedNote);
+      // Literal expected note (not derived via buildCountIncreaseNote/
+      // appendLotNote — asserting against the same production helpers the
+      // service calls would be tautological). Hard-coded from the pinned
+      // system time (2026-07-01) and the fixture values above: delta = 14 -
+      // 10 = 4, prior notes = "prior note".
+      const expectedNotes =
+        "prior note\n[2026-07-01] Count adjustment: +4 (counted 14, expected 10) — found a case in the back";
 
       expect(fromSpy).toHaveBeenNthCalledWith(2, "inventory_lots");
       expect(updateSpy).toHaveBeenCalledWith({
@@ -295,9 +309,12 @@ describe("recordInventoryCount", () => {
     );
 
     it(
-      "QUIRK: when the lot update fails, the error is reported as inventory_lots " +
-        "even though the read already succeeded — RLS_DENIED example",
+      "returns RLS_DENIED with the raw message when the lot update is denied",
       async () => {
+        // Note: parseSupabaseError's 42501 branch (src/services/types.ts)
+        // discards the `table`/`id` context entirely — RLS_DENIED carries
+        // only { code, message }, so this test can't (and doesn't) assert
+        // which table the denial came from.
         const { supabase, updateSpy } = makeSupabase({
           selectResult: { data: { id: "lot-1", quantity: 10, notes: null }, error: null },
           updateResult: { error: { code: "42501", message: "not allowed" } },

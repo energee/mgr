@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Tests for the brewing water-chemistry calculations (sulfate:chloride
  * ratio, salt ion contributions, resulting-profile math) in
@@ -107,12 +108,18 @@ describe("calculateResultingProfile", () => {
   });
 
   it("adds gypsum's ion contribution on top of the source profile, rounded to 1 decimal", () => {
-    const volumeGal = 5;
+    // 10g gypsum / 3gal -> factor 10/3 -- chosen so the raw (unrounded)
+    // products have more than 1 decimal place, so this test actually
+    // exercises round1() rather than passing vacuously on already-exact
+    // values. Raw calcium_ppm = 61.5 * 10/3 = 205.00000000000003 (rounds to
+    // 205); raw sulfate_ppm = 147.4 * 10/3 = 491.33333333333337 (rounds to
+    // 491.3). Literals below are the ROUNDED results, computed from
+    // SALT_CONTRIBUTIONS and round1's actual semantics (Math.round(v*10)/10).
+    const volumeGal = 3;
     const additions: SaltAdditions = { ...ZERO_ADDITIONS, gypsum_g: 10 };
-    const factor = 10 / volumeGal;
     const result = calculateResultingProfile(ZERO_PROFILE, additions, volumeGal);
-    expect(result.calcium_ppm).toBe(SALT_CONTRIBUTIONS.gypsum.calcium * factor);
-    expect(result.sulfate_ppm).toBe(SALT_CONTRIBUTIONS.gypsum.sulfate * factor);
+    expect(result.calcium_ppm).toBe(205);
+    expect(result.sulfate_ppm).toBe(491.3);
     expect(result.chloride_ppm).toBe(0);
   });
 });

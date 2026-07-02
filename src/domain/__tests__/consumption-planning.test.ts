@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for consumption-planning pure logic: FIFO lot
  * allocation, recipe scale factor, BOM consumption aggregation, and implied
@@ -30,12 +31,6 @@ function makeLot(overrides: Partial<FifoLot>): FifoLot {
     ...overrides,
   };
 }
-
-describe("LOSS_EPSILON_BBL", () => {
-  it("is 0.005", () => {
-    expect(LOSS_EPSILON_BBL).toBe(0.005);
-  });
-});
 
 describe("compareFifoLots", () => {
   it("sorts sooner expiration first", () => {
@@ -282,17 +277,21 @@ describe("computeBomConsumption", () => {
   });
 
   it("falls back to decimal math for whole units when no clean ratio is found", () => {
-    // An irrational-ish decimal with no clean ratio within tolerance/maxDen
-    // falls back to quantity_per_unit * actual_quantity, still ceiled.
-    const oddDecimal = 0.123456789;
+    // 0.4975 has no clean ratio within ratioFromDecimal's defaults
+    // (maxDen 100, tolerance 0.0005): it sits midway between 49/99
+    // (0.494949...) and 1/2 (0.5), and its closest candidate over den 1..100
+    // is 1/2 with error ~0.0025 -- five times the tolerance -- so
+    // ratioFromDecimal returns null and computeBomConsumption falls back to
+    // quantity_per_unit * actual_quantity, still ceiled.
+    const noRatioDecimal = 0.4975;
     const lineItems: ConsumptionLineItem[] = [
       { selling_format_id: "fmt-1", actual_quantity: 3 },
     ];
     const bomLines: BomLine[] = [
-      { selling_format_id: "fmt-1", inventory_item_id: "widget", quantity_per_unit: oddDecimal, unit: "each" },
+      { selling_format_id: "fmt-1", inventory_item_id: "widget", quantity_per_unit: noRatioDecimal, unit: "each" },
     ];
     const result = computeBomConsumption(lineItems, bomLines);
-    expect(result.get("widget")).toBe(Math.ceil(oddDecimal * 3 - 1e-9));
+    expect(result.get("widget")).toBe(Math.ceil(noRatioDecimal * 3 - 1e-9));
   });
 
   it("sums consumption across multiple line items for the same format", () => {

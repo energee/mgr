@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for src/services/entity-service.ts.
  *
@@ -11,6 +12,13 @@
  * CRUD methods (list/getById/create/update/remove) plus the search-escaping
  * helper and, as a gap-filling addition, the `stateMachine.hooks.validate`
  * branch of transition() which the sibling file does not exercise.
+ *
+ * This file keeps its own local, sequential (call-ordered) fake Supabase
+ * client rather than the shared table-keyed fake in
+ * src/test/supabase-mock.ts, because several tests here assert on
+ * per-builder spies (e.g. `builders[0].spies.eq`) tied to a specific
+ * `.from()` call in sequence. New service tests that don't need that level
+ * of per-call inspection should prefer the shared fake instead.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -92,12 +100,18 @@ function makeBuilder(result: QueryResult) {
 
 /** Fake SupabaseClient whose `.from()` hands back a fresh builder for each
  *  call, consuming `results` in order (methods like transition() call
- *  `.from()` twice: once to read, once to write). */
+ *  `.from()` twice: once to read, once to write). Throws if `.from()` is
+ *  called more times than results were queued, rather than silently
+ *  recycling the last response — a test that under-queues should fail
+ *  loudly, not pass vacuously on stale data. */
 function makeSupabase(results: QueryResult[]) {
   let call = 0;
   const builders: ReturnType<typeof makeBuilder>[] = [];
   const from = vi.fn((_table: string) => {
-    const result = results[call] ?? results[results.length - 1];
+    if (call >= results.length) {
+      throw new Error(`fake supabase: no queued result for from() call #${call}`);
+    }
+    const result = results[call];
     const made = makeBuilder(result);
     builders.push(made);
     call++;
@@ -705,22 +719,30 @@ describe("entityService.transition — hooks.validate", () => {
     ...widgetEntity,
     stateMachine: {
       stateField: "status",
-      states: ["draft", "active"],
+      states: ["draft", "archived", "active"],
       initialState: "draft",
-      transitions: { draft: ["active"] },
+      // Two source states can structurally reach "active"; the hook adds a
+      // stricter business rule on top (only a fresh "draft" may
+      // auto-activate — reactivating from "archived" is blocked here).
+      transitions: { draft: ["active"], archived: ["active"] },
       hooks: {
         validate: {
-          // Blocks the transition unless the fetched row has a name.
-          active: (data: Widget) => (data.name ? null : "name is required before activation"),
+          // NOTE: validate hooks receive ONLY the projected state field.
+          // entity-service.ts fetches the current row via
+          // `.select(sm.stateField).eq("id", id).single()` (see
+          // entity-service.ts ~line 302) before running this hook, so
+          // `data` here is really just `{ status: "..." }` — no other
+          // column (e.g. `name`) is ever populated at this read, and
+          // inspecting one would be a no-op in production.
+          active: (data: Widget) =>
+            data.status === "draft" ? null : "must be in draft status to activate",
         },
       },
     },
   } as unknown as EntityConfig<Widget>;
 
   it("blocks the transition and never issues the write when the hook returns an error string", async () => {
-    const { supabase, from } = makeSupabase([
-      { data: { status: "draft" /* no name */ }, error: null },
-    ]);
+    const { supabase, from } = makeSupabase([{ data: { status: "archived" }, error: null }]);
 
     const result = await entityService.transition(supabase, widgetWithHook, TEST_ID, "active");
 
@@ -729,16 +751,16 @@ describe("entityService.transition — hooks.validate", () => {
     if (!result.success) {
       expect(result.error).toEqual({
         code: "INVALID_TRANSITION",
-        from: "draft",
+        from: "archived",
         to: "active",
-        message: "name is required before activation",
+        message: "must be in draft status to activate",
       });
     }
   });
 
   it("proceeds to the write when the hook returns null", async () => {
     const { supabase, from } = makeSupabase([
-      { data: { status: "draft", name: "Widget A" }, error: null },
+      { data: { status: "draft" }, error: null },
       { data: { id: TEST_ID, status: "active", name: "Widget A" }, error: null },
     ]);
 

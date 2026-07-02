@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Tests for the canonical unit conversion/formatting library
  * (src/domain/units.ts) — volume, retail volume, weight, temperature,

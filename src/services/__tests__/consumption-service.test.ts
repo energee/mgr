@@ -1,15 +1,15 @@
+// @vitest-environment node
+
 /**
  * Characterization tests for src/services/consumption-service.ts.
  *
  * All exported functions take a SupabaseClient as a parameter (never import
- * one at module scope), so no vi.mock() is needed — we hand each call a
- * lightweight fake query-builder client. The fake is table-keyed: each
- * `.from(table)` call shifts the next queued { data, error } response for
- * that table and returns a chainable object (select/eq/in/gt/single/limit/
- * update/insert all return the same builder; the builder itself is
- * thenable) so `await supabase.from(t).select(...).eq(...)` resolves to the
- * configured response regardless of the exact chain shape used by the
- * module under test.
+ * one at module scope), so no vi.mock() is needed — we hand each call the
+ * shared fake query-builder client from "@/test/supabase-mock" (makeSupabase/
+ * throwingSupabase). See that module's header for the fake's semantics:
+ * table-keyed FIFO response queues, chain methods recorded as vi.fn calls
+ * (assert query predicates via `callsByTable`), and `{ rejectWith }` queue
+ * entries to model an async-rejecting query for catch-block coverage.
  *
  * Pure FIFO/scale/conversion math lives in src/domain/consumption-planning.ts
  * (and src/domain/units.ts) and is characterized separately — these tests
@@ -18,9 +18,7 @@
  * query construction/branching, and insert-payload shaping.
  */
 
-import { describe, it, expect, vi } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/supabase";
+import { describe, it, expect } from "vitest";
 import {
   buildBrewConsumptionPlan,
   createPlannedConsumption,
@@ -31,68 +29,9 @@ import {
   type ConfirmedConsumptionPick,
   type PackagingDepletionLineItem,
 } from "@/services/consumption-service";
+import { makeSupabase, throwingSupabase, type FakeResponse } from "@/test/supabase-mock";
 
-type Client = SupabaseClient<Database>;
-type Resp = { data: unknown; error: unknown };
-
-// =============================================================================
-// Fake Supabase client
-// =============================================================================
-
-function makeQueryBuilder(response: Resp) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const builder: any = {};
-  const chain = (_name: string) =>
-    vi.fn((..._args: unknown[]) => builder);
-  builder.select = chain("select");
-  builder.eq = chain("eq");
-  builder.in = chain("in");
-  builder.gt = chain("gt");
-  builder.single = chain("single");
-  builder.limit = chain("limit");
-  builder.update = chain("update");
-  builder.insert = chain("insert");
-  builder.then = (resolve: (v: Resp) => unknown, reject?: (e: unknown) => unknown) =>
-    Promise.resolve(response).then(resolve, reject);
-  return builder;
-}
-
-/**
- * Builds a fake SupabaseClient. `responses` maps table name -> queue of
- * { data, error } results; each `.from(table)` call shifts the next queued
- * response for that table (in call order — safe even under Promise.all
- * concurrency since queues are per-table). Calling `.from()` for a table
- * with an empty/missing queue throws, which surfaces unexpected queries
- * loudly rather than hanging.
- */
-function makeSupabase(responses: Record<string, Resp[]>) {
-  const queues: Record<string, Resp[]> = {};
-  for (const [table, list] of Object.entries(responses)) queues[table] = [...list];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const callsByTable: Record<string, any[]> = {};
-
-  const fromSpy = vi.fn((table: string) => {
-    const queue = queues[table];
-    if (!queue || queue.length === 0) {
-      throw new Error(`fake supabase: no queued response for table "${table}"`);
-    }
-    const response = queue.shift() as Resp;
-    const builder = makeQueryBuilder(response);
-    (callsByTable[table] ??= []).push(builder);
-    return builder;
-  });
-
-  const supabase = { from: fromSpy } as unknown as Client;
-  return { supabase, fromSpy, callsByTable };
-}
-
-/** A client whose every `.from()` call throws synchronously (catch-block tests). */
-function throwingSupabase(message = "boom") {
-  const fromSpy = vi.fn(() => {
-    throw new Error(message);
-  });
-  return { supabase: { from: fromSpy } as unknown as Client, fromSpy };
-}
+type Resp = FakeResponse;
 
 const emptyOk: Resp = { data: [], error: null };
 
@@ -542,7 +481,7 @@ describe("completeBatchConsumption", () => {
 
 describe("consumePackagingMaterials", () => {
   it("idempotence guard: returns 0/[] without touching session_line_items when a tagged allocation already exists", async () => {
-    const { supabase, fromSpy } = makeSupabase({
+    const { supabase, fromSpy, callsByTable } = makeSupabase({
       allocations: [{ data: [{ id: "existing-1" }], error: null }],
     });
 
@@ -554,6 +493,14 @@ describe("consumePackagingMaterials", () => {
       invalidate: [],
     });
     expect(fromSpy.mock.calls.map((c) => c[0])).toEqual(["allocations"]);
+    // Pin the guard's filter, not just which table it queried.
+    const guard = callsByTable.allocations[0];
+    expect(guard.select).toHaveBeenCalledWith("id");
+    expect(guard.eq).toHaveBeenCalledWith(
+      "notes",
+      "Packaging session session-1 material consumption",
+    );
+    expect(guard.limit).toHaveBeenCalledWith(1);
   });
 
   it("returns a parsed error when the idempotence check errors", async () => {
@@ -563,10 +510,16 @@ describe("consumePackagingMaterials", () => {
 
     const result = await consumePackagingMaterials(supabase, "session-1");
     expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toEqual({
+      code: "UNKNOWN",
+      message: "check failed",
+      cause: { message: "check failed" },
+    });
   });
 
   it("fetches session_line_items when preloadedLineItems is not passed, and returns err on fetch failure", async () => {
-    const { supabase, fromSpy } = makeSupabase({
+    const { supabase, fromSpy, callsByTable } = makeSupabase({
       allocations: [{ data: [], error: null }],
       session_line_items: [{ data: null, error: { message: "li failed" } }],
     });
@@ -574,7 +527,21 @@ describe("consumePackagingMaterials", () => {
     const result = await consumePackagingMaterials(supabase, "session-1");
 
     expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toEqual({
+      code: "UNKNOWN",
+      message: "li failed",
+      cause: { message: "li failed" },
+    });
     expect(fromSpy.mock.calls.map((c) => c[0])).toEqual(["allocations", "session_line_items"]);
+    // The guard passed (no existing depletion) before proceeding to the line-item fetch.
+    const guard = callsByTable.allocations[0];
+    expect(guard.select).toHaveBeenCalledWith("id");
+    expect(guard.eq).toHaveBeenCalledWith(
+      "notes",
+      "Packaging session session-1 material consumption",
+    );
+    expect(guard.limit).toHaveBeenCalledWith(1);
   });
 
   it("returns 0/[] when there are no line items (fetched)", async () => {
@@ -620,6 +587,12 @@ describe("consumePackagingMaterials", () => {
 
     const result = await consumePackagingMaterials(supabase, "session-1", preloaded);
     expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toEqual({
+      code: "UNKNOWN",
+      message: "bom failed",
+      cause: { message: "bom failed" },
+    });
   });
 
   it("returns 0/[] when the BOM has no rows for the requested formats", async () => {
@@ -788,6 +761,12 @@ describe("consumePackagingMaterials", () => {
 
     const result = await consumePackagingMaterials(supabase, "session-1", preloaded);
     expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toEqual({
+      code: "UNKNOWN",
+      message: "insert failed",
+      cause: { message: "insert failed" },
+    });
   });
 
   it("catches a synchronous throw and returns a wrapped UNKNOWN error", async () => {
@@ -799,6 +778,23 @@ describe("consumePackagingMaterials", () => {
     expect((result.error as { message: string }).message).toContain(
       "Failed to deplete packaging materials",
     );
+  });
+
+  it("catches an async rejection from the guard query and returns the same wrapped error shape as a synchronous throw", async () => {
+    const { supabase } = makeSupabase({
+      allocations: [{ rejectWith: new Error("connection reset") }],
+    });
+
+    const result = await consumePackagingMaterials(supabase, "session-1");
+
+    expect(result).toEqual({
+      success: false,
+      error: {
+        code: "UNKNOWN",
+        message: "Failed to deplete packaging materials: connection reset",
+        cause: new Error("connection reset"),
+      },
+    });
   });
 });
 
@@ -845,6 +841,12 @@ describe("recordBatchLoss", () => {
       reasonCode: "spillage",
     });
     expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toEqual({
+      code: "UNKNOWN",
+      message: "loss insert failed",
+      cause: { message: "loss insert failed" },
+    });
   });
 
   it("catches a synchronous throw and returns a wrapped UNKNOWN error", async () => {
@@ -926,6 +928,12 @@ describe("recordQuickDepletion", () => {
       quantity: 1,
     });
     expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toEqual({
+      code: "UNKNOWN",
+      message: "depletion insert failed",
+      cause: { message: "depletion insert failed" },
+    });
   });
 
   it("catches a synchronous throw and returns a wrapped UNKNOWN error", async () => {

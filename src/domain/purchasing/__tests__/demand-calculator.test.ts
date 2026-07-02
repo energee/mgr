@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for demand-calculator.ts. Pins current behavior of
  * the pure display/formatting helpers and the Supabase-backed demand/shortfall
@@ -21,36 +22,32 @@ import {
   calculateIngredientShortfalls,
   getDemandSummary,
   type IngredientDemand,
-  type IngredientShortfall,
 } from "../demand-calculator";
+import { makeShortfall } from "./fixtures";
+
+/** Build an IngredientDemand with sensible defaults, overridable per-field. */
+const makeDemand = (overrides: Partial<IngredientDemand> = {}): IngredientDemand => ({
+  catalog_type: "malt",
+  catalog_id: "id-1",
+  catalog_name: "Pale Malt",
+  total_required: 100,
+  unit: "lb",
+  earliest_required_by: "2026-04-01",
+  batch_count: 2,
+  ...overrides,
+});
 
 describe("getCatalogTypeDisplay", () => {
-  it("maps malt to Malt", () => {
-    expect(getCatalogTypeDisplay("malt")).toBe("Malt");
-  });
-
-  it("maps hop to Hop", () => {
-    expect(getCatalogTypeDisplay("hop")).toBe("Hop");
-  });
-
-  it("maps yeast to Yeast", () => {
-    expect(getCatalogTypeDisplay("yeast")).toBe("Yeast");
-  });
-
-  it("maps adjunct to Adjunct", () => {
-    expect(getCatalogTypeDisplay("adjunct")).toBe("Adjunct");
-  });
-
-  it("maps sugar to Sugar", () => {
-    expect(getCatalogTypeDisplay("sugar")).toBe("Sugar");
-  });
-
-  it("maps spice to Spice", () => {
-    expect(getCatalogTypeDisplay("spice")).toBe("Spice");
-  });
-
-  it("maps fruit to Fruit", () => {
-    expect(getCatalogTypeDisplay("fruit")).toBe("Fruit");
+  it.each([
+    ["malt", "Malt"],
+    ["hop", "Hop"],
+    ["yeast", "Yeast"],
+    ["adjunct", "Adjunct"],
+    ["sugar", "Sugar"],
+    ["spice", "Spice"],
+    ["fruit", "Fruit"],
+  ])("maps %s to %s", (input, expected) => {
+    expect(getCatalogTypeDisplay(input)).toBe(expected);
   });
 
   it("falls back to the raw catalog_type for unknown values", () => {
@@ -62,7 +59,9 @@ describe("getCatalogTypeDisplay", () => {
   });
 
   it("is case-sensitive (does not normalize casing)", () => {
-    expect(getCatalogTypeDisplay("Malt")).toBe("Malt");
+    // Case-sensitive fallback returns the input verbatim ("HOP"); a
+    // hypothetical case-insensitive lookup would instead return "Hop".
+    expect(getCatalogTypeDisplay("HOP")).toBe("HOP");
   });
 });
 
@@ -100,9 +99,13 @@ describe("formatQuantityWithUnit", () => {
   });
 
   it("rounds a value with more than 2 fraction digits to 2", () => {
-    // 1.005 is not exactly representable in binary floating point (it's
-    // slightly above 1.005), so toLocaleString rounds up to 1.01 rather than
-    // down to 1 — pinning the actual JS float behavior, not idealized rounding.
+    // The IEEE-754 double for 1.005 is actually ~1.0049999999999998934 —
+    // slightly BELOW 1.005, not above it. toLocaleString doesn't round that
+    // exact binary value; it rounds the shortest decimal string that
+    // represents it ("1.005") half-up to "1.01". That's why this differs
+    // from exact-value rounding: (1.005).toFixed(2) === "1.00", because
+    // toFixed operates on the true binary value rather than the shortest
+    // decimal representation.
     expect(formatQuantityWithUnit(1.005, "lb")).toBe("1.01 lb");
   });
 });
@@ -110,17 +113,6 @@ describe("formatQuantityWithUnit", () => {
 describe("calculateIngredientDemand", () => {
   beforeEach(() => {
     vi.mocked(dynamicRpc).mockReset();
-  });
-
-  const makeDemand = (overrides: Partial<IngredientDemand> = {}): IngredientDemand => ({
-    catalog_type: "malt",
-    catalog_id: "id-1",
-    catalog_name: "Pale Malt",
-    total_required: 100,
-    unit: "lb",
-    earliest_required_by: "2026-04-01",
-    batch_count: 2,
-    ...overrides,
   });
 
   it("returns the RPC data cast to IngredientDemand[]", async () => {
@@ -178,27 +170,6 @@ describe("calculateIngredientShortfalls", () => {
     vi.mocked(dynamicRpc).mockReset();
   });
 
-  const makeShortfall = (overrides: Partial<IngredientShortfall> = {}): IngredientShortfall => ({
-    catalog_type: "malt",
-    catalog_id: "id-1",
-    catalog_name: "Pale Malt",
-    total_required: 100,
-    available_qty: 50,
-    on_order_qty: 0,
-    shortfall_qty: 50,
-    unit: "lb",
-    required_by_date: "2026-04-01",
-    order_by_date: "2026-03-15",
-    lead_time_days: 14,
-    preferred_supplier_id: "supplier-1",
-    preferred_supplier_name: "Supplier A",
-    min_order_qty: null,
-    unit_price: 1.5,
-    is_urgent: false,
-    batch_count: 1,
-    ...overrides,
-  });
-
   it("returns the RPC data cast to IngredientShortfall[]", async () => {
     const rows = [makeShortfall()];
     vi.mocked(dynamicRpc).mockResolvedValue({ data: rows, error: null });
@@ -250,38 +221,6 @@ describe("calculateIngredientShortfalls", () => {
 });
 
 describe("getDemandSummary", () => {
-  const makeDemand = (overrides: Partial<IngredientDemand> = {}): IngredientDemand => ({
-    catalog_type: "malt",
-    catalog_id: "id-1",
-    catalog_name: "Pale Malt",
-    total_required: 100,
-    unit: "lb",
-    earliest_required_by: "2026-04-01",
-    batch_count: 2,
-    ...overrides,
-  });
-
-  const makeShortfall = (overrides: Partial<IngredientShortfall> = {}): IngredientShortfall => ({
-    catalog_type: "malt",
-    catalog_id: "id-1",
-    catalog_name: "Pale Malt",
-    total_required: 100,
-    available_qty: 50,
-    on_order_qty: 0,
-    shortfall_qty: 50,
-    unit: "lb",
-    required_by_date: "2026-04-01",
-    order_by_date: "2026-03-15",
-    lead_time_days: 14,
-    preferred_supplier_id: "supplier-1",
-    preferred_supplier_name: "Supplier A",
-    min_order_qty: null,
-    unit_price: 1.5,
-    is_urgent: false,
-    batch_count: 1,
-    ...overrides,
-  });
-
   beforeEach(() => {
     vi.mocked(dynamicRpc).mockReset();
   });

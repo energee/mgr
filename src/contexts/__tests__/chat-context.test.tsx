@@ -13,25 +13,30 @@
  * `useChat` (@ai-sdk/react) is mocked so no network/LLM calls happen and the
  * `chat` object on context is a plain, inspectable stub. `next/navigation`'s
  * usePathname is mocked so pathname is controllable per test. `ai`'s
- * DefaultChatTransport is NOT mocked (its constructor has no side effects --
- * it only stores config); this lets us assert the provider wires up the real
- * transport with the expected api/body.
+ * DefaultChatTransport is replaced with a constructor-capturing test class
+ * (the rest of the `ai` module is kept real) so the transport-wiring test can
+ * assert the exact constructor options the provider passes, without reaching
+ * into the real transport's TypeScript-protected internals.
  *
- * Follows the repo's render-test idiom (createRoot + act; no
- * @testing-library/react) from
- * src/components/domain/recipe/__tests__/mash-schedule-editor.test.tsx.
+ * Follows the repo's render-test idiom via the shared createRoot + act
+ * harness (see src/test/react-harness.ts; no @testing-library/react).
  */
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { act } from "react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useChat, type UseChatHelpers } from "@ai-sdk/react";
+import { setupRenderHarness } from "@/test/react-harness";
 
-const { pathnameState, chatState } = vi.hoisted(() => ({
-  pathnameState: { current: "/" },
-  chatState: { current: null as unknown as UseChatHelpers<UIMessage> },
-}));
+const { pathnameState, chatState, transportCtorArgs, transportInstances } =
+  vi.hoisted(() => ({
+    pathnameState: { current: "/" },
+    chatState: { current: null as unknown as UseChatHelpers<UIMessage> },
+    /** Options objects passed to `new DefaultChatTransport(...)`, in call order. */
+    transportCtorArgs: [] as unknown[],
+    /** The constructed transport instances, index-aligned with transportCtorArgs. */
+    transportInstances: [] as unknown[],
+  }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathnameState.current,
@@ -40,6 +45,20 @@ vi.mock("next/navigation", () => ({
 vi.mock("@ai-sdk/react", () => ({
   useChat: vi.fn(() => chatState.current),
 }));
+
+// Keep the real `ai` module but swap DefaultChatTransport for a test class
+// that records its constructor options and instances, so tests can assert the
+// provider's wiring without touching third-party internals.
+vi.mock("ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("ai")>();
+  class CapturingChatTransport {
+    constructor(options: unknown) {
+      transportCtorArgs.push(options);
+      transportInstances.push(this);
+    }
+  }
+  return { ...actual, DefaultChatTransport: CapturingChatTransport };
+});
 
 import { ChatProvider, useChatContext } from "../chat-context";
 
@@ -63,28 +82,19 @@ function makeChat(): UseChatHelpers<UIMessage> {
   };
 }
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
+const { render, unmount } = setupRenderHarness();
 
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
-
-function unmount() {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
-}
-
+// File-specific teardown (the shared harness handles unmount/container
+// removal). restoreAllMocks undoes every vi.spyOn in one place so an
+// assertion failure mid-test can't leak a silenced console.error (or a
+// document listener spy) into later tests; the module mocks above are
+// factory-based (not vi.spyOn) so their implementations survive it.
 afterEach(() => {
-  unmount();
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   pathnameState.current = "/";
+  transportCtorArgs.length = 0;
+  transportInstances.length = 0;
 });
 
 function Probe({ onRender }: { onRender: (v: ChatContextValue) => void }) {
@@ -103,7 +113,7 @@ function renderProvider(onRender: (v: ChatContextValue) => void): HTMLElement {
 
 describe("useChatContext", () => {
   it("throws when called outside a ChatProvider", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     function Bad() {
       useChatContext();
       return null;
@@ -111,7 +121,6 @@ describe("useChatContext", () => {
     expect(() => render(<Bad />)).toThrow(
       "useChatContext must be used within ChatProvider",
     );
-    consoleError.mockRestore();
   });
 });
 
@@ -197,106 +206,82 @@ describe("ChatProvider", () => {
     expect(values[values.length - 1].isOpen).toBe(false);
   });
 
-  it("removes its keydown listener on unmount", () => {
+  it("removes exactly the keydown listener it added when unmounted", () => {
+    const addSpy = vi.spyOn(document, "addEventListener");
     const removeSpy = vi.spyOn(document, "removeEventListener");
-    const values: ChatContextValue[] = [];
-    renderProvider((v) => values.push(v));
+    renderProvider(() => {});
+
+    const keydownAdd = addSpy.mock.calls.find(([type]) => type === "keydown");
+    expect(keydownAdd).toBeDefined();
+    const handler = keydownAdd![1];
+
     unmount();
-    expect(removeSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
-    removeSpy.mockRestore();
+    expect(removeSpy).toHaveBeenCalledWith("keydown", handler);
   });
 
   describe("pageContext parsing (via mocked usePathname)", () => {
-    it("returns undefined for the root path", () => {
-      pathnameState.current = "/";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext).toBeUndefined();
-    });
-
-    it("returns undefined for an empty pathname", () => {
-      pathnameState.current = "";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext).toBeUndefined();
-    });
-
-    it("returns undefined when the first segment isn't a known section", () => {
-      pathnameState.current = "/unknown-section";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext).toBeUndefined();
-    });
-
-    it("recognizes a bare section with no entity segment", () => {
-      pathnameState.current = "/production";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext).toEqual({
-        section: "production",
-        entityType: undefined,
-        entityId: undefined,
+    function renderAndGetPageContext(
+      pathname: string,
+    ): ChatContextValue["pageContext"] {
+      pathnameState.current = pathname;
+      let latest: ChatContextValue | undefined;
+      renderProvider((v) => {
+        latest = v;
       });
-    });
+      return latest?.pageContext;
+    }
 
-    it("maps a known plural entity segment to its singular label", () => {
-      pathnameState.current = "/production/batches";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext).toEqual({
-        section: "production",
-        entityType: "batch",
-        entityId: undefined,
-      });
-    });
-
-    it("maps multi-word entity labels (e.g. beer-styles -> 'beer style')", () => {
-      pathnameState.current = "/settings/beer-styles";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext?.entityType).toBe(
-        "beer style",
-      );
-    });
-
-    it("leaves entityType undefined for an unrecognized entity segment under a known section", () => {
-      pathnameState.current = "/inventory/not-a-real-entity";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext).toEqual({
-        section: "inventory",
-        entityType: undefined,
-        entityId: undefined,
-      });
-    });
-
-    it("extracts a 3rd segment as entityId only when it is exactly 36 hex/dash characters", () => {
-      pathnameState.current =
-        "/production/batches/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext).toEqual({
-        section: "production",
-        entityType: "batch",
-        entityId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      });
-    });
-
-    it("does not treat a non-UUID-shaped 3rd segment as an entityId", () => {
-      pathnameState.current = "/production/batches/not-a-uuid";
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext?.entityId).toBeUndefined();
+    // toStrictEqual (not toEqual) so the explicitly-undefined keys that
+    // parsePageContext always returns (entityType/entityId) are pinned: a
+    // regression that drops those keys fails these tests.
+    it.each<[string, ChatContextValue["pageContext"]]>([
+      // root / empty / unknown first segment -> no page context at all
+      ["/", undefined],
+      ["", undefined],
+      ["/unknown-section", undefined],
+      // bare known section, no entity segment
+      [
+        "/production",
+        { section: "production", entityType: undefined, entityId: undefined },
+      ],
+      // known plural entity segment -> singular label
+      [
+        "/production/batches",
+        { section: "production", entityType: "batch", entityId: undefined },
+      ],
+      // multi-word entity label
+      [
+        "/settings/beer-styles",
+        { section: "settings", entityType: "beer style", entityId: undefined },
+      ],
+      // unrecognized entity segment under a known section
+      [
+        "/inventory/not-a-real-entity",
+        { section: "inventory", entityType: undefined, entityId: undefined },
+      ],
+      // 3rd segment is an entityId only when exactly 36 hex/dash characters
+      [
+        "/production/batches/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        {
+          section: "production",
+          entityType: "batch",
+          entityId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        },
+      ],
+      [
+        "/production/batches/not-a-uuid",
+        { section: "production", entityType: "batch", entityId: undefined },
+      ],
+    ])("derives pageContext from %j", (pathname, expected) => {
+      expect(renderAndGetPageContext(pathname)).toStrictEqual(expected);
     });
 
     it("quirk: the id check is `/^[0-9a-f-]{36}$/i`, not a real UUID validator -- 36 dashes alone pass it", () => {
       const thirtySixDashes = "-".repeat(36);
-      pathnameState.current = `/production/batches/${thirtySixDashes}`;
-      const values: ChatContextValue[] = [];
-      renderProvider((v) => values.push(v));
-      expect(values[values.length - 1].pageContext?.entityId).toBe(
-        thirtySixDashes,
-      );
+      expect(
+        renderAndGetPageContext(`/production/batches/${thirtySixDashes}`)
+          ?.entityId,
+      ).toBe(thirtySixDashes);
     });
 
     it("quirk: pageContext is a brand-new object every render, even for an unchanged pathname (not memoized)", () => {
@@ -319,18 +304,24 @@ describe("ChatProvider", () => {
 
     const mockedUseChat = vi.mocked(useChat);
     expect(mockedUseChat).toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastCallArgs = mockedUseChat.mock.calls.at(-1)?.[0] as any;
+    const lastCallArgs = mockedUseChat.mock.calls.at(-1)?.[0] as
+      | { transport?: unknown }
+      | undefined;
     const transport = lastCallArgs?.transport;
 
-    expect(transport).toBeInstanceOf(DefaultChatTransport);
-    expect((transport as Record<string, unknown>).api).toBe("/api/chat");
-    expect((transport as Record<string, unknown>).body).toEqual({
-      pageContext: {
-        section: "production",
-        entityType: "batch",
-        entityId: undefined,
+    // The provider constructed the transport with exactly these options...
+    expect(transportCtorArgs.at(-1)).toStrictEqual({
+      api: "/api/chat",
+      body: {
+        pageContext: {
+          section: "production",
+          entityType: "batch",
+          entityId: undefined,
+        },
       },
     });
+    // ...and passed that same instance to useChat.
+    expect(transport).toBeInstanceOf(DefaultChatTransport);
+    expect(transport).toBe(transportInstances.at(-1));
   });
 });

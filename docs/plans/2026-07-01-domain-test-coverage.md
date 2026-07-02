@@ -19,12 +19,12 @@ from this file + `git log --oneline`.
 5. Stop the batch before cost goes CRITICAL; tell the user to `/clear` + resume.
 
 ## Idiom (give each agent)
-- Plain **node-env** vitest — **NO** `// @vitest-environment jsdom` (pure logic, no DOM).
-- Template: `src/domain/__tests__/inventory-units.test.ts`. Supabase-mock template: `src/domain/purchasing/__tests__/po-generator.test.ts`.
+- Pure-logic files need `// @vitest-environment node` as line 1 — the vitest.config default is **jsdom**, so omitting the pragma does NOT give you node env.
+- Template: `src/domain/__tests__/inventory-units.test.ts`. Supabase mock: use the shared `src/test/supabase-mock.ts` (`makeSupabase`/`throwingSupabase`) — do not hand-roll per-file fakes.
 - If the module imports `@/lib/supabase/client` (often a lazy `getSupabase()`), mock it; also mock `@/lib/client-logger`.
 - Gate: `bun run test <file>` fully green **and** `bun run typecheck 2>&1 | grep "<file>"` prints nothing.
 - Shared-worktree safety: agent touches ONLY its test file; **never** git/branch/checkout/stash/commit; if not green in ≤3 tries, `rm` its own file and report BLOCKED.
-- React-context modules (`src/contexts/*.tsx`) need the render harness from `src/components/domain/recipe/__tests__/mash-schedule-editor.test.tsx` (createRoot + act, no @testing-library/react).
+- React-context modules (`src/contexts/*.tsx`) use the shared render harness `src/test/react-harness.ts` (`setupRenderHarness()` — createRoot + act with auto-cleanup, no @testing-library/react).
 
 ## Checklist
 ### Tier 1 (pure logic — highest ROI)
@@ -68,7 +68,8 @@ from this file + `git log --oneline`.
   All 4 context/hook modules throw when their hook is used outside the provider (pinned).
   **DONE:** lint fixes for the new context/service tests (react-compiler immutability → module-level
   capture in useEffect; unused fake-builder args → `_`-prefixed). Finish-line gate green:
-  `bun lint` (0/0), `bun typecheck` (0), `bun test` (109 files, 1921 tests). **PR: https://github.com/energee/mgr/pull/330**
+  `bun lint` (0/0), `bun typecheck` (0), `bun run test` (109 files, 1921 tests — NOT `bun test`,
+  which invokes Bun's native runner instead of vitest). **PR: https://github.com/energee/mgr/pull/330**
 - Batch 4 (2026-07-01, session 3 cont.): **all 4 tractable Tier-2 modules done** (111 tests) —
   inventory-count-service `c2971496` (14), entity-service `5a39266b` (40), consumption-service `3f587c22` (36),
   prefill-store `4d7ed16b` (21). All services take `SupabaseClient` as a param → fake query-builder, no `vi.mock`.

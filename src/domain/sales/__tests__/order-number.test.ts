@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for order-number.ts
  *

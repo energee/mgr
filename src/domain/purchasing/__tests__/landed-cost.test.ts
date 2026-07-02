@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for landed-cost.ts
  *
@@ -110,7 +111,11 @@ describe("landedCostMarkup", () => {
 
 describe("calculateLandedCost", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // mockReset() (not clearAllMocks/mockClear) discards any unconsumed
+    // mockResolvedValueOnce queued by a previous test, in addition to
+    // clearing call history -- otherwise a leftover once-value from a
+    // failing test can leak into the next test's first call.
+    vi.mocked(rpcMock).mockReset();
   });
 
   it("calls the calculate_landed_cost RPC with the given PO id", async () => {
@@ -153,7 +158,10 @@ describe("calculateLandedCost", () => {
 
 describe("getLandedCostSummary", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // See note in calculateLandedCost's beforeEach: mockReset() clears both
+    // call history and any unconsumed mockResolvedValueOnce queue entries.
+    vi.mocked(rpcMock).mockReset();
+    vi.mocked(singleMock).mockReset();
   });
 
   it("fetches PO shipping/tax and combines with line items into totals", async () => {

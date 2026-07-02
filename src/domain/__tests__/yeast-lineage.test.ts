@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for resolveYeastLineageRoot
  * (src/domain/yeast-lineage.ts): the RPC-first / parent-chain-fallback

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Characterization tests for the batch-schedule domain module
  * (src/domain/batch-schedule.ts): recipe schedule-day resolution, phase-end
