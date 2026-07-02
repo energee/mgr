@@ -34,8 +34,10 @@ jobs:
       - name: Lint
         run: bun lint
 
-      - name: Unit Tests
-        run: bun run test
+      - name: Unit Tests (coverage gate)
+        # --coverage enforces the thresholds in vitest.config.ts; a plain
+        # `bun run test` never applied them in CI.
+        run: bun run test:coverage
 
       - name: Build
         run: bun run build
