@@ -11,8 +11,8 @@
  * captures that scaffold once so each icon file only supplies its unique
  * SVG markup/variants via `renderSvg`.
  *
- * Two scaffold behaviors are known to diverge across the icon set and are
- * exposed as explicit options rather than silently normalized:
+ * Scaffold behaviors known to diverge across the icon set are exposed as
+ * explicit options rather than silently normalized:
  *   - `forwardMouseEvents`: most icons forward `onMouseEnter`/`onMouseLeave`
  *     to the caller only once a parent has taken control via ref
  *     (`"when-controlled"`, the default). `waves.tsx` and `truck.tsx`
@@ -20,6 +20,10 @@
  *   - `classNameStrategy`: most icons run `className` through `cn()`
  *     (`"cn"`, the default). `truck.tsx` passes it straight through
  *     (`"raw"`).
+ *   - `startSequence`/`stopSequence`: layers.tsx and the two
+ *     chart-*-increasing icons run custom animation sequences instead of
+ *     the generic `controls.start("animate")`/`controls.start("normal")`
+ *     (their variants don't even define those keys).
  * Every migrated icon file passes the option matching its pre-refactor
  * behavior exactly — this factory does not change any icon's runtime
  * behavior.
@@ -63,6 +67,22 @@ type CreateAnimatedIconOptions = {
   forwardMouseEvents?: "when-controlled" | "always";
   /** See module doc above. Defaults to the majority ("cn") behavior. */
   classNameStrategy?: "cn" | "raw";
+  /**
+   * Escape hatch for icons whose start animation is NOT the generic
+   * `controls.start("animate")` — layers.tsx sequentially awaits
+   * "firstState" then "secondState", and the two chart-*-increasing icons
+   * run a two-phase per-index stagger via `controls.start((i) => ...)`.
+   * Runs on BOTH the imperative `startAnimation()` handle and uncontrolled
+   * hover-enter, matching the pre-factory files (the custom sequence
+   * appeared verbatim in both paths).
+   */
+  startSequence?: (controls: AnimationControls) => void | Promise<void>;
+  /**
+   * Stop-side escape hatch — the chart-*-increasing icons reset with
+   * `controls.start("visible")`, not "normal". Runs on both the imperative
+   * `stopAnimation()` handle and uncontrolled hover-leave.
+   */
+  stopSequence?: (controls: AnimationControls) => void | Promise<void>;
 };
 
 export function createAnimatedIcon({
@@ -70,7 +90,16 @@ export function createAnimatedIcon({
   renderSvg,
   forwardMouseEvents = "when-controlled",
   classNameStrategy = "cn",
+  startSequence,
+  stopSequence,
 }: CreateAnimatedIconOptions) {
+  // Default sequences reproduce the generic scaffold shared by ~47 of the
+  // 50 icons; the escape hatches above override per icon.
+  const runStart = (controls: AnimationControls) =>
+    startSequence ? startSequence(controls) : controls.start("animate");
+  const runStop = (controls: AnimationControls) =>
+    stopSequence ? stopSequence(controls) : controls.start("normal");
+
   const Icon = forwardRef<IconHandle, IconProps>(
     ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
       const controls = useAnimation();
@@ -80,8 +109,8 @@ export function createAnimatedIcon({
         isControlledRef.current = true;
 
         return {
-          startAnimation: () => controls.start("animate"),
-          stopAnimation: () => controls.start("normal"),
+          startAnimation: () => void runStart(controls),
+          stopAnimation: () => void runStop(controls),
         };
       });
 
@@ -89,13 +118,13 @@ export function createAnimatedIcon({
         (e: MouseEvent<HTMLDivElement>) => {
           if (forwardMouseEvents === "always") {
             if (!isControlledRef.current) {
-              controls.start("animate");
+              void runStart(controls);
             }
             onMouseEnter?.(e);
           } else if (isControlledRef.current) {
             onMouseEnter?.(e);
           } else {
-            controls.start("animate");
+            void runStart(controls);
           }
         },
         [controls, onMouseEnter]
@@ -105,13 +134,13 @@ export function createAnimatedIcon({
         (e: MouseEvent<HTMLDivElement>) => {
           if (forwardMouseEvents === "always") {
             if (!isControlledRef.current) {
-              controls.start("normal");
+              void runStop(controls);
             }
             onMouseLeave?.(e);
           } else if (isControlledRef.current) {
             onMouseLeave?.(e);
           } else {
-            controls.start("normal");
+            void runStop(controls);
           }
         },
         [controls, onMouseLeave]

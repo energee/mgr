@@ -53,6 +53,21 @@ const ChartBarIncreasingIcon = createAnimatedIcon({
         />
       </svg>
   ),
+  // Custom two-phase stagger (variants only define visible/hidden, no
+  // "animate" key): fade the lines out per-index, then redraw them.
+  startSequence: async (controls) => {
+    await controls.start((i) => ({
+      pathLength: 0,
+      opacity: 0,
+      transition: { delay: i * 0.1, duration: 0.3 },
+    }));
+    await controls.start((i) => ({
+      pathLength: 1,
+      opacity: 1,
+      transition: { delay: i * 0.1, duration: 0.3 },
+    }));
+  },
+  stopSequence: (controls) => controls.start("visible"),
 });
 
 export { ChartBarIncreasingIcon };

@@ -54,6 +54,13 @@ const LayersIcon = createAnimatedIcon({
           />
         </svg>
   ),
+  // Custom two-step sequence (variants have no "animate" key): lift the
+  // layers to firstState, then settle back via secondState. Stop uses the
+  // default controls.start("normal").
+  startSequence: async (controls) => {
+    await controls.start("firstState");
+    await controls.start("secondState");
+  },
 });
 
 export { LayersIcon };

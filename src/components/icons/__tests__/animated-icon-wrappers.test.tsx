@@ -63,6 +63,9 @@ import {
   type SettingsIconHandle,
 } from "@/components/ui/settings";
 import { TruckIcon, type TruckIconHandle } from "@/components/ui/truck";
+import { LayersIcon, type LayersIconHandle } from "@/components/ui/layers";
+import { ChartBarIncreasingIcon } from "@/components/ui/chart-bar-increasing";
+import { ChartColumnIncreasingIcon } from "@/components/ui/chart-column-increasing";
 
 const { render } = setupRenderHarness();
 
@@ -188,5 +191,74 @@ describe("TruckIcon (divergent scaffold: forwards onMouseEnter/onMouseLeave unco
     unhover(div);
     expect(onMouseLeave).toHaveBeenCalledTimes(1);
     expect(mockStart).not.toHaveBeenCalled();
+  });
+});
+
+describe("LayersIcon (custom startSequence: firstState -> secondState)", () => {
+  it("imperative startAnimation runs the two-step sequence; stopAnimation resets to normal", async () => {
+    const ref = createRef<LayersIconHandle>();
+    render(createElement(LayersIcon, { ref }));
+
+    await act(async () => {
+      ref.current!.startAnimation();
+    });
+    expect(mockStart.mock.calls.map((c) => c[0])).toEqual([
+      "firstState",
+      "secondState",
+    ]);
+
+    mockStart.mockClear();
+    await act(async () => {
+      ref.current!.stopAnimation();
+    });
+    expect(mockStart.mock.calls.map((c) => c[0])).toEqual(["normal"]);
+  });
+
+  it("uncontrolled hover runs the same sequence, not a generic 'animate'", async () => {
+    const c = render(createElement(LayersIcon));
+    const div = c.firstElementChild!;
+
+    hover(div);
+    await act(async () => {});
+    expect(mockStart.mock.calls.map((call) => call[0])).toEqual([
+      "firstState",
+      "secondState",
+    ]);
+    expect(mockStart).not.toHaveBeenCalledWith("animate");
+  });
+});
+
+describe.each([
+  ["ChartBarIncreasingIcon", ChartBarIncreasingIcon],
+  ["ChartColumnIncreasingIcon", ChartColumnIncreasingIcon],
+])("%s (custom two-phase stagger + 'visible' reset)", (_name, Icon) => {
+  it("imperative startAnimation runs the hide-then-redraw stagger; stopAnimation resets to 'visible'", async () => {
+    const ref = createRef<LayersIconHandle>();
+    render(createElement(Icon, { ref }));
+
+    await act(async () => {
+      ref.current!.startAnimation();
+    });
+    expect(mockStart).toHaveBeenCalledTimes(2);
+    // Both phases are per-index variant resolvers, not named variants.
+    const [phase1, phase2] = mockStart.mock.calls.map((c) => c[0]);
+    expect(typeof phase1).toBe("function");
+    expect(typeof phase2).toBe("function");
+    expect(phase1(2)).toEqual({
+      pathLength: 0,
+      opacity: 0,
+      transition: { delay: 0.2, duration: 0.3 },
+    });
+    expect(phase2(2)).toEqual({
+      pathLength: 1,
+      opacity: 1,
+      transition: { delay: 0.2, duration: 0.3 },
+    });
+
+    mockStart.mockClear();
+    await act(async () => {
+      ref.current!.stopAnimation();
+    });
+    expect(mockStart.mock.calls.map((c) => c[0])).toEqual(["visible"]);
   });
 });
