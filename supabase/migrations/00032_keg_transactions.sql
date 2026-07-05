@@ -209,29 +209,27 @@ COMMENT ON VIEW keg_inventory IS 'Calculated keg inventory by type, state, and l
 -- 7. TRANSACTIONS WITH DETAILS VIEW
 -- =============================================================================
 
-CREATE VIEW keg_transactions_with_details
-WITH (security_invoker = true)
-AS
-SELECT
-  kt.*,
-  ktype.name AS keg_type_name,
-  ktype.code AS keg_type_code,
-  ktype.volume_bbl,
-  c.name AS customer_name,
-  o.order_number,
-  b.batch_number,
-  fg.name AS finished_good_name,
-  l.name AS location_name
-FROM keg_transactions kt
-LEFT JOIN keg_types ktype ON kt.keg_type_id = ktype.id
-LEFT JOIN customers c ON kt.customer_id = c.id
-LEFT JOIN orders o ON kt.order_id = o.id
-LEFT JOIN batches b ON kt.batch_id = b.id
-LEFT JOIN finished_goods fg ON kt.finished_good_id = fg.id
-LEFT JOIN locations l ON kt.location_id = l.id
-ORDER BY kt.created_at DESC;
-
-COMMENT ON VIEW keg_transactions_with_details IS 'Keg transactions with joined display names';
+-- HISTORICAL NO-OP: finished_goods has no `name` column (never did), so this
+-- CREATE VIEW failed on every environment. 00079 drops-if-exists and
+-- recreates the view with a corrected definition; 00155 reworks it again.
+-- Commented out so a from-scratch replay reproduces the live state. See PR #322.
+-- CREATE VIEW keg_transactions_with_details
+-- WITH (security_invoker = true)
+-- AS
+-- SELECT
+--   kt.*, ktype.name AS keg_type_name, ktype.code AS keg_type_code,
+--   ktype.volume_bbl, c.name AS customer_name, o.order_number,
+--   b.batch_number, fg.name AS finished_good_name, l.name AS location_name
+-- FROM keg_transactions kt
+-- LEFT JOIN keg_types ktype ON kt.keg_type_id = ktype.id
+-- LEFT JOIN customers c ON kt.customer_id = c.id
+-- LEFT JOIN orders o ON kt.order_id = o.id
+-- LEFT JOIN batches b ON kt.batch_id = b.id
+-- LEFT JOIN finished_goods fg ON kt.finished_good_id = fg.id
+-- LEFT JOIN locations l ON kt.location_id = l.id
+-- ORDER BY kt.created_at DESC;
+--
+-- COMMENT ON VIEW keg_transactions_with_details IS 'Keg transactions with joined display names';
 
 -- =============================================================================
 -- 8. INVENTORY SUMMARY VIEW
@@ -260,24 +258,23 @@ COMMENT ON VIEW keg_inventory_summary IS 'Summary of keg quantities by type and 
 -- 9. INVENTORY WITH DETAILS VIEW (for list display)
 -- =============================================================================
 
-CREATE VIEW keg_inventory_with_details
-WITH (security_invoker = true)
-AS
-SELECT
-  ki.*,
-  kt.name AS keg_type_name,
-  kt.code AS keg_type_code,
-  kt.volume_bbl,
-  l.name AS location_name,
-  b.batch_number,
-  fg.name AS finished_good_name
-FROM keg_inventory ki
-LEFT JOIN keg_types kt ON ki.keg_type_id = kt.id
-LEFT JOIN locations l ON ki.location_id = l.id
-LEFT JOIN batches b ON ki.batch_id = b.id
-LEFT JOIN finished_goods fg ON ki.finished_good_id = fg.id;
-
-COMMENT ON VIEW keg_inventory_with_details IS 'Keg inventory with joined display names';
+-- HISTORICAL NO-OP: same fg.name problem as section 7 — this CREATE VIEW
+-- failed on every environment; 00079 and 00155 drop-if-exists and recreate
+-- the view with corrected definitions. Commented out so a from-scratch
+-- replay reproduces the live state. See PR #322.
+-- CREATE VIEW keg_inventory_with_details
+-- WITH (security_invoker = true)
+-- AS
+-- SELECT
+--   ki.*, kt.name AS keg_type_name, kt.code AS keg_type_code, kt.volume_bbl,
+--   l.name AS location_name, b.batch_number, fg.name AS finished_good_name
+-- FROM keg_inventory ki
+-- LEFT JOIN keg_types kt ON ki.keg_type_id = kt.id
+-- LEFT JOIN locations l ON ki.location_id = l.id
+-- LEFT JOIN batches b ON ki.batch_id = b.id
+-- LEFT JOIN finished_goods fg ON ki.finished_good_id = fg.id;
+--
+-- COMMENT ON VIEW keg_inventory_with_details IS 'Keg inventory with joined display names';
 
 -- =============================================================================
 -- 10. SCHEMA REGISTRY

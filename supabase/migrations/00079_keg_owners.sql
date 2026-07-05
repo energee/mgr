@@ -141,7 +141,11 @@ DROP VIEW IF EXISTS keg_inventory_with_details CASCADE;
 -- Views that depend on keg_transactions directly
 DROP VIEW IF EXISTS keg_transactions_with_details CASCADE;
 
--- The keg_inventory TABLE itself (being replaced by a calculated VIEW)
+-- The keg_inventory TABLE itself (being replaced by a calculated VIEW).
+-- REPLAY FIX (PR #322): by this point keg_inventory is already a VIEW
+-- (00032 replaced the 00031 table), and DROP TABLE errors on a view even
+-- with IF EXISTS. Drop either relkind so the recreation below applies.
+DROP VIEW IF EXISTS keg_inventory CASCADE;
 DROP TABLE IF EXISTS keg_inventory CASCADE;
 
 -- =============================================================================

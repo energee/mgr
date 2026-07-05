@@ -49,6 +49,77 @@ jobs:
         run: bun pm audit --level high
         continue-on-error: true
 
+  integration-tests:
+    name: Integration Tests (RLS)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_ANON_KEY: placeholder-not-used-without-gotrue
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+          cache: true
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Create Supabase roles
+        run: |
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" <<'SQLEOF'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN;
+          CREATE ROLE authenticator NOLOGIN;
+          GRANT anon TO authenticator;
+          GRANT authenticated TO authenticator;
+          GRANT service_role TO authenticator;
+          SQLEOF
+
+      # auth schema/users/uid() shim, Supabase-default grants, and stubs for
+      # the out-of-band tables (containers, selling_formats) that 00160+
+      # reference but no migration creates. Must run before the chain.
+      - name: Bootstrap plain-Postgres Supabase shim
+        run: psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f src/__tests__/integration/_fixtures/bootstrap-plain-postgres.sql
+
+      # ON_ERROR_STOP is load-bearing: without it psql exits 0 on SQL errors
+      # and the tests run against a silently half-built schema.
+      - name: Apply migrations
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying $migration..."
+            psql -v ON_ERROR_STOP=1 -1 "$DATABASE_URL" -f "$migration"
+          done
+
+      - name: Seed role fixtures
+        run: psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f src/__tests__/integration/_fixtures/seed-roles.sql
+
+      - name: Run integration tests
+        run: bun run test:integration
+
   e2e-secrets-check:
     name: E2E Secrets Check
     runs-on: ubuntu-latest

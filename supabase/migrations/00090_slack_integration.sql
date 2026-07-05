@@ -10,7 +10,15 @@
 -- 1. Enable pg_net extension for async HTTP
 -- =============================================================================
 
-CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+-- Tolerate environments without the Supabase-bundled pg_net (plain-Postgres
+-- CI / local replays — see PR #322). net.http_post is only referenced inside
+-- plpgsql bodies, so nothing below needs the extension at creation time.
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pg_net unavailable (non-Supabase environment); Slack delivery disabled: %', SQLERRM;
+END $$;
 
 -- =============================================================================
 -- 2. Slack Settings Table (singleton)

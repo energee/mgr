@@ -14,6 +14,22 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
+-- 0. DRIFT SHIM (added retroactively — see PR #322)
+-- -----------------------------------------------------------------------------
+-- selling_format_id was added to these pre-existing tables directly in the
+-- live DB (no migration captured the ALTERs; the selling_formats table itself
+-- is out-of-band drift — see 00199). This file and later ones assume the
+-- column exists. FK actions mirror live. No-op on live.
+ALTER TABLE order_items        ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
+ALTER TABLE finished_goods     ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
+ALTER TABLE keg_transactions   ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
+ALTER TABLE session_line_items ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
+ALTER TABLE keg_owner_deposits ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
+ALTER TABLE packages           ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE RESTRICT;
+ALTER TABLE square_catalog_map ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
+ALTER TABLE square_draft_sales ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
+
+-- -----------------------------------------------------------------------------
 -- 1. Add completed_at to packaging_sessions
 -- -----------------------------------------------------------------------------
 ALTER TABLE packaging_sessions

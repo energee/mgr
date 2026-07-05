@@ -76,10 +76,15 @@ CREATE INDEX idx_keg_inventory_batch ON keg_inventory(batch_id) WHERE batch_id I
 -- 4. UPDATED_AT TRIGGER
 -- =============================================================================
 
-CREATE TRIGGER set_keg_inventory_updated_at
-  BEFORE UPDATE ON keg_inventory
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+-- HISTORICAL NO-OP: update_updated_at_column() never existed (the repo-wide
+-- helper is update_updated_at()), so this statement failed on every
+-- environment; no such trigger exists live, and keg_inventory becomes a view
+-- in 00032 regardless. Commented out so a from-scratch replay reproduces the
+-- live state. See PR #322.
+-- CREATE TRIGGER set_keg_inventory_updated_at
+--   BEFORE UPDATE ON keg_inventory
+--   FOR EACH ROW
+--   EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================================================
 -- 5. SUMMARY VIEW

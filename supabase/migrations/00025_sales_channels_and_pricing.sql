@@ -75,9 +75,18 @@ CREATE TABLE tier_prices (
   effective_to DATE,  -- NULL means currently active
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  -- Ensure unique price per tier/format/brand/style combination
-  UNIQUE(price_tier_id, format_id, COALESCE(brand_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(style_id, '00000000-0000-0000-0000-000000000000'::uuid))
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ensure unique price per tier/format/brand/style combination.
+-- (Expression uniqueness must be an index — a UNIQUE table constraint cannot
+-- contain COALESCE(); the original inline form was invalid SQL and this table
+-- never materialized as written. Dropped entirely by 00077.)
+CREATE UNIQUE INDEX uniq_tier_prices_combination ON tier_prices (
+  price_tier_id,
+  format_id,
+  COALESCE(brand_id, '00000000-0000-0000-0000-000000000000'::uuid),
+  COALESCE(style_id, '00000000-0000-0000-0000-000000000000'::uuid)
 );
 
 COMMENT ON TABLE tier_prices IS 'Specific prices for format/brand/style combinations within a price tier.';
@@ -196,24 +205,11 @@ CREATE POLICY tier_prices_access ON tier_prices FOR ALL USING (auth.uid() IS NOT
 -- 7. Schema Registry
 -- =============================================================================
 
-INSERT INTO _schema_registry (table_name, description, domain, is_primary_entity, key_fields, relationships, ui_hints)
-VALUES
-  ('sales_channels', 'Sales channel categories for customer pricing', 'sales', true,
-   '["name", "code"]'::jsonb,
-   '["price_tiers"]'::jsonb,
-   '{"icon": "store", "color": "blue"}'::jsonb),
-  ('price_tiers', 'Pricing tiers within sales channels', 'sales', true,
-   '["name", "sales_channel_id"]'::jsonb,
-   '["sales_channel", "tier_prices"]'::jsonb,
-   '{"icon": "layers", "color": "green"}'::jsonb),
-  ('tier_prices', 'Specific prices per format/brand/style within a tier', 'sales', false,
-   '["price_tier_id", "format_id"]'::jsonb,
-   '["price_tier", "package_type", "brand", "beer_style"]'::jsonb,
-   '{"icon": "dollar-sign", "color": "emerald"}'::jsonb)
-ON CONFLICT (table_name) DO UPDATE SET
-  description = EXCLUDED.description,
-  domain = EXCLUDED.domain,
-  key_fields = EXCLUDED.key_fields,
-  relationships = EXCLUDED.relationships,
-  ui_hints = EXCLUDED.ui_hints,
-  updated_at = NOW();
+-- HISTORICAL NO-OP: this INSERT referenced columns _schema_registry never had
+-- (is_primary_entity, ui_hints), so it failed on every environment and the
+-- rows do not exist in the live database. Commented out (rather than fixed)
+-- so a from-scratch replay reproduces the live state. See PR #322.
+-- INSERT INTO _schema_registry (table_name, description, domain, is_primary_entity, key_fields, relationships, ui_hints)
+-- VALUES
+--   ('sales_channels', ...), ('price_tiers', ...), ('tier_prices', ...)
+-- ON CONFLICT (table_name) DO UPDATE SET ...;

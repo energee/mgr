@@ -79,21 +79,25 @@ CREATE POLICY "keg_types_delete" ON keg_types
   USING ((SELECT auth.uid()) IS NOT NULL);
 
 -- B2: keg_inventory - shared inventory data, authenticated access only
-DROP POLICY IF EXISTS "keg_inventory_insert" ON keg_inventory;
-CREATE POLICY "keg_inventory_insert" ON keg_inventory
-  FOR INSERT TO authenticated
-  WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
-
-DROP POLICY IF EXISTS "keg_inventory_update" ON keg_inventory;
-CREATE POLICY "keg_inventory_update" ON keg_inventory
-  FOR UPDATE TO authenticated
-  USING ((SELECT auth.uid()) IS NOT NULL)
-  WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
-
-DROP POLICY IF EXISTS "keg_inventory_delete" ON keg_inventory;
-CREATE POLICY "keg_inventory_delete" ON keg_inventory
-  FOR DELETE TO authenticated
-  USING ((SELECT auth.uid()) IS NOT NULL);
+-- HISTORICAL NO-OP: keg_inventory has been a VIEW since 00032 and views
+-- cannot carry RLS policies — these statements failed on every environment
+-- (row security comes from the underlying keg_transactions). Commented out
+-- so a from-scratch replay reproduces the live state. See PR #322.
+-- DROP POLICY IF EXISTS "keg_inventory_insert" ON keg_inventory;
+-- CREATE POLICY "keg_inventory_insert" ON keg_inventory
+--   FOR INSERT TO authenticated
+--   WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+--
+-- DROP POLICY IF EXISTS "keg_inventory_update" ON keg_inventory;
+-- CREATE POLICY "keg_inventory_update" ON keg_inventory
+--   FOR UPDATE TO authenticated
+--   USING ((SELECT auth.uid()) IS NOT NULL)
+--   WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+--
+-- DROP POLICY IF EXISTS "keg_inventory_delete" ON keg_inventory;
+-- CREATE POLICY "keg_inventory_delete" ON keg_inventory
+--   FOR DELETE TO authenticated
+--   USING ((SELECT auth.uid()) IS NOT NULL);
 
 -- B3: keg_transactions - immutable audit log
 DROP POLICY IF EXISTS "keg_transactions_insert" ON keg_transactions;

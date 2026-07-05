@@ -1,389 +1,186 @@
 # RLS Policy Audit
 
-**Date:** 2026-02-26
-**Auditor:** Automated migration analysis
-**Scope:** All tables in `supabase/migrations/00001` through `00099`
+**Last updated:** 2026-05-20 (post-coverage-gap fixes, migrations 00193–00198)
+**Original audit:** 2026-02-26 (migrations 00001–00099)
+**Addendum:** 2026-05-19 (migrations 00100–00173)
+**Plan:** [`docs/plans/2026-05-19-rls-single-source-of-truth-plan.md`](../plans/2026-05-19-rls-single-source-of-truth-plan.md)
+**Companion:** [`docs/security/README.md`](./README.md) — operating rules for new schema and write paths.
+
+> This document is the **post-merge state** of public-schema RLS coverage on
+> branch `chore/rls-coverage-gaps`. The original 2026-02-26 audit text and the
+> 2026-05-19 addendum have been collapsed into the single dated coverage table
+> below; the resolution column records which migration closed each finding.
+>
+> Going forward, this table is updated **in the same PR** that introduces a
+> new table or changes an RLS policy. The integration test
+> `src/__tests__/integration/rls-coverage.test.ts` (Task 8) prevents
+> undocumented permissive policies from silently regressing the model.
 
 ---
 
-## Executive Summary
+## Authorization model (current)
 
-MGR has **93 active tables** (excluding 3 dropped tables: `breweries`, `user_breweries`, `settings`). All 93 tables have RLS enabled.
+Role-based via `user_has_permission(p_permission TEXT)`, introduced in
+`00097_permission_based_roles.sql`. The function checks `user_profiles.roles`
+(a `TEXT[]`) against a hardcoded permission map that mirrors `PERMISSION_MAP`
+in `src/lib/permissions.ts`.
 
-The system underwent a major RLS overhaul in migration `00092_permission_based_roles.sql`, which replaced simple `auth.uid() IS NOT NULL` policies with permission-based policies using `user_has_permission()`. This migration covers the vast majority of tables.
+**Domain pattern** (production, sales, inventory, customers, orders, …):
 
-However, **5 tables created before or concurrently with migration 00092 were excluded** from the permission-based system, and **2 tables created after 00092** have regressed to weaker policies.
-
-### Severity Breakdown
-
-| Severity | Count | Description |
-|----------|-------|-------------|
-| CRITICAL | 2 | Tables with `USING (true)` / `WITH CHECK (true)` on write operations |
-| HIGH | 1 | Table with `auth.uid() IS NOT NULL` instead of permission-based policies |
-| MEDIUM | 2 | Tables excluded from permission migration but with reasonable custom policies |
-| LOW | 2 | Audit log tables with intentional `WITH CHECK` for system inserts |
-| INFO | 1 | Stale `role IN ('admin', 'owner')` references in migration 00094 |
-
----
-
-## Policy Model Overview
-
-### Permission-Based Policies (post-00092)
-
-The current policy model uses a `user_has_permission(p_permission)` SQL function that checks `user_profiles.roles` against a hardcoded permission map. This mirrors the TypeScript `PERMISSION_MAP` in `src/lib/permissions.ts`.
-
-**Pattern for domain tables:**
 ```sql
--- SELECT: read permission required
 CREATE POLICY <table>_select ON <table> FOR SELECT
   USING (user_has_permission('<domain>:read'));
 
--- ALL (INSERT/UPDATE/DELETE): write permission required
 CREATE POLICY <table>_write ON <table> FOR ALL
-  USING (user_has_permission('<domain>:write'))
+  USING      (user_has_permission('<domain>:write'))
   WITH CHECK (user_has_permission('<domain>:write'));
 ```
 
-**Pattern for catalog/shared tables:**
+**Catalog pattern** (shared reference data, e.g. `hops`, `malts`, `brands`):
+
 ```sql
--- SELECT: any authenticated user
+-- read: any authenticated user
 CREATE POLICY <table>_select ON <table> FOR SELECT
   USING ((SELECT auth.uid()) IS NOT NULL);
 
--- ALL: settings:manage permission required
+-- write: settings:manage required
 CREATE POLICY <table>_write ON <table> FOR ALL
-  USING (user_has_permission('settings:manage'))
+  USING      (user_has_permission('settings:manage'))
   WITH CHECK (user_has_permission('settings:manage'));
 ```
 
-### Initplan Optimization
+The `(SELECT auth.uid())` wrapper is Supabase's init-plan optimization: it
+evaluates the function once per query instead of once per row.
 
-Most post-00013 policies use `(SELECT auth.uid())` instead of `auth.uid()` directly. This is the "initplan" pattern that ensures `auth.uid()` is evaluated once per query rather than once per row, improving performance significantly.
-
----
-
-## Table-by-Table Coverage
-
-### A. Production Domain — Recipes
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| recipes | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_yeasts | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_malts | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_hops | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_adjuncts | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_sugars | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_spices | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_fruits | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_additions | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_collaborators | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_variants | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_variant_hops | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_variant_adjuncts | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_variant_fruits | Yes | Permission | `recipes:read` | `recipes:write` | |
-| recipe_variant_spices | Yes | Permission | `recipes:read` | `recipes:write` | |
-
-### B. Production Domain — Batches
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| batches | Yes | Permission | `batches:read` | `batches:write` | |
-| batch_logs | Yes | Permission | `batches:read` | `batches:write` | |
-| brew_logs | Yes | Permission | `batches:read` | `batches:write` | |
-| brew_log_batches | Yes | Permission | `batches:read` | `batches:write` | |
-| batch_additions | Yes | Permission | `batches:read` | `batches:write` | |
-| batch_blends | Yes | Permission | `batches:read` | `batches:write` | |
-| yeast_pitches | Yes | Permission | `batches:read` | `batches:write` | |
-| packaging_sessions | Yes | Permission | `batches:read` | `batches:write` | |
-| session_line_items | Yes | Permission | `batches:read` | `batches:write` | |
-| packages | Yes | Permission | `batches:read` | `batches:write` | |
-
-### C. Production Domain — Vessels
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| locations | Yes | Permission | `vessels:read` | `vessels:write` | |
-| vessels | Yes | Permission | `vessels:read` | `vessels:write` | |
-| vessel_transfers | Yes | Permission | `vessels:read` | `vessels:write` | |
-| vessel_cleanings | Yes | Permission | `vessels:read` | `vessels:write` | |
-| location_transfers | Yes | Permission | `vessels:read` | `vessels:write` | |
-| transfer_lines | Yes | Permission | `vessels:read` | `vessels:write` | |
-
-### D. Sales Domain
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| orders | Yes | Permission + Customer | `orders:read` | `orders:write` | Also has `customer_orders_select` for portal |
-| order_items | Yes | Permission + Customer | `orders:read` | `orders:write` | Also has `customer_order_items_select` for portal |
-| customers | Yes | Permission | `customers:read` | `customers:write` | |
-| pick_lists | Yes | Permission | `orders:read` | `orders:write` | |
-| pick_list_items | Yes | Permission | `orders:read` | `orders:write` | |
-| deliveries | Yes | Permission | `orders:read` | `orders:write` | |
-
-### E. Inventory Domain
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| inventory_items | Yes | Permission | `inventory:read` | `inventory:write` | |
-| inventory_lots | Yes | Permission | `inventory:read` | `inventory:write` | |
-| finished_goods | Yes | Permission | `inventory:read` | `inventory:write` | |
-| allocations | Yes | Permission | `inventory:read` | `inventory:write` | |
-| bins | Yes | Permission | `inventory:read` | `inventory:write` | |
-| bin_inventory | Yes | Permission | `inventory:read` | `inventory:write` | |
-| bin_inventory_items | Yes | Permission | `inventory:read` | `inventory:write` | |
-| keg_types | Yes | Permission | `inventory:read` | `inventory:write` | |
-| keg_owners | Yes | Permission | `inventory:read` | `inventory:write` | |
-| keg_owner_deposits | Yes | Permission | `inventory:read` | `inventory:write` | |
-| keg_inventory | Yes | Catalog (pre-092) | `USING (true)` | `WITH CHECK (true)` | **CRITICAL: Not in 00092** |
-| keg_transactions | Yes | Catalog (pre-092) | `USING (true)` | `WITH CHECK (true)` (insert only) | **See note below** |
-
-### F. Purchasing Domain
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| suppliers | Yes | Permission | `purchasing:read` | `purchasing:write` | |
-| supplier_catalog | Yes | Permission | `purchasing:read` | `purchasing:write` | |
-| purchase_orders | Yes | Permission | `purchasing:read` | `purchasing:write` | |
-| po_line_items | Yes | Permission | `purchasing:read` | `purchasing:write` | |
-| po_receives | Yes | Permission | `purchasing:read` | `purchasing:write` | |
-
-### G. Integration Tables
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| square_settings | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-| square_catalog_map | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-| square_sync_log | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-| square_draft_sales | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-| slack_settings | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-| slack_notification_log | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-| qbo_sync_mappings | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-| qbo_sync_log | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-| qbo_account_mappings | Yes | Permission | `integrations:manage` | `integrations:manage` | |
-
-### H. Catalog / Shared Reference Tables
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| brands | Yes | Catalog | Any authenticated | `settings:manage` | |
-| enum_values | Yes | Catalog | Any authenticated | `settings:manage` | |
-| package_types | Yes | Catalog | Any authenticated | `settings:manage` | |
-| sales_channels | Yes | Catalog | Any authenticated | `settings:manage` | |
-| pricing_tiers | Yes | Catalog | Any authenticated | `settings:manage` | |
-| pricing_tier_prices | Yes | Catalog | Any authenticated | `settings:manage` | |
-| pricing_history | Yes | Catalog | Any authenticated | `settings:manage` | |
-| hops | Yes | Catalog | Any authenticated | `settings:manage` | |
-| malts | Yes | Catalog | Any authenticated | `settings:manage` | |
-| adjuncts | Yes | Catalog | Any authenticated | `settings:manage` | |
-| fruits | Yes | Catalog | Any authenticated | `settings:manage` | |
-| spices | Yes | Catalog | Any authenticated | `settings:manage` | |
-| sugars | Yes | Catalog | Any authenticated | `settings:manage` | |
-| yeasts | Yes | Catalog | Any authenticated | `settings:manage` | |
-| additives | Yes | Catalog | Any authenticated | `settings:manage` | |
-| water_profiles | Yes | Catalog | Any authenticated | `settings:manage` | |
-| beer_styles | Yes | Catalog | Any authenticated | `settings:manage` | |
-| price_tiers | Yes | Catalog | Any authenticated | `settings:manage` | (legacy, from 00025) |
-| tier_prices | Yes | Catalog | Any authenticated | `settings:manage` | (legacy, from 00025) |
-
-### I. System / Settings Tables
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| system_settings | Yes | Custom | Any authenticated (excludes `%api_key%`) | `settings:manage` | Has RESTRICTIVE `system_settings_hide_sensitive` policy for QBO tokens |
-
-### J. User Management Tables
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| user_profiles | Yes | Custom | Any authenticated | Own profile OR admin | Proper `is_admin_rls()` check; admin can insert/delete |
-| user_preferences | Yes | Custom | Own only (`auth.uid() = user_id`) | Own only | Correct per-user scoping |
-| notification_preferences | Yes | Custom | Own only (`user_id = auth.uid()`) | Own only | `FOR ALL USING` scoped to user |
-
-### K. Notification / Audit Tables
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| notifications | Yes | Custom | Own only (`user_id = auth.uid()`) | Insert: own only; Update/Delete: own only | Tightened in 00094 |
-| entity_revisions | Yes | Custom | Any authenticated | Insert: `changed_by = auth.uid()` | Immutable audit log, no UPDATE/DELETE |
-
-### L. Customer Portal Tables
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| customer_portal_users | Yes | Custom | Staff: has user_profile; Customer: own links | Staff: full; Customer: read only | **MEDIUM: Not in 00092** |
-| order_change_requests | Yes | Custom | Staff: has user_profile; Customer: own requests | Staff: insert/update; Customer: insert own | **MEDIUM: Not in 00092** |
-| order_change_request_items | Yes | Custom | Staff/Customer: scoped to parent CR | Staff/Customer: scoped to parent CR | **MEDIUM: Not in 00092** |
-
-### M. Tables NOT in 00092 Permission Migration (Post-00092 Creation)
-
-| Table | RLS Enabled | Policy Type | Read Policy | Write Policy | Notes |
-|-------|:-----------:|-------------|-------------|--------------|-------|
-| yeast_pitch_events | Yes | Simple auth | `auth.uid() IS NOT NULL` | `auth.uid() IS NOT NULL` | **HIGH: Should use `batches:read/write`** |
-| water_addition_profiles | Yes | Simple auth | `USING (true)` TO authenticated | `WITH CHECK (true)` TO authenticated | **CRITICAL: Should use catalog pattern** |
-
-### N. Legacy / Dropped Tables
-
-| Table | Status | Notes |
-|-------|--------|-------|
-| breweries | DROPPED (00002) | N/A |
-| user_breweries | DROPPED (00002) | N/A |
-| settings | DROPPED (00044) | N/A |
-| allocations_legacy | RENAMED (00010) | Read-only policy, no write |
-
-### O. Meta Tables
-
-| Table | RLS Enabled | Policy Type | Notes |
-|-------|:-----------:|-------------|-------|
-| _schema_registry | Yes | Read-only | `FOR SELECT USING (auth.uid() IS NOT NULL)` -- correct for metadata |
+**Documented permissive policies.** Catalog-pattern SELECTs and a handful of
+metadata / audit / directory tables are intentionally readable by any
+authenticated user. Every such policy carries an inline
+`COMMENT ON POLICY ... IS 'RLS-EXCEPTION: <reason>'` marker added in migration
+`00198_rls_exception_comments.sql`. The Task 8 integration test fails CI if a
+new permissive policy is introduced without one.
 
 ---
 
-## Critical Findings
+## Coverage summary
 
-### CRITICAL-1: `water_addition_profiles` has `WITH CHECK (true)` on all write operations
-
-**Migration:** `00096_water_addition_profiles.sql`
-**Current Policies:**
-```sql
-CREATE POLICY "Authenticated users can read water addition profiles"
-  ON water_addition_profiles FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated users can insert water addition profiles"
-  ON water_addition_profiles FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Authenticated users can update water addition profiles"
-  ON water_addition_profiles FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can delete water addition profiles"
-  ON water_addition_profiles FOR DELETE TO authenticated USING (true);
-```
-
-**Issue:** This table was created after the 00092 permission migration and uses the old `USING (true)` / `WITH CHECK (true)` pattern restricted only to the `authenticated` role. Any authenticated user can read, insert, update, and delete water addition profiles regardless of their roles.
-
-**Recommendation:** Replace with catalog-pattern policies:
-- SELECT: `(SELECT auth.uid()) IS NOT NULL`
-- ALL (write): `user_has_permission('settings:manage')`
-
-### CRITICAL-2: `keg_inventory` still has old-style permissive policies
-
-**Context:** `keg_inventory` was created in `00031_keg_inventory.sql` and was included in the 00092 migration's DROP/CREATE cycle as part of the INVENTORY domain. However, reviewing the 00092 migration more carefully, `keg_inventory` is **listed in the inventory domain array** in Section 5f.
-
-**Wait -- let me re-examine.** The 00092 migration lists:
-```sql
-'inventory_items','inventory_lots','finished_goods','allocations',
-'bins','bin_inventory','bin_inventory_items',
-'keg_types','keg_owners','keg_owner_deposits','keg_transactions'
-```
-
-`keg_inventory` is **NOT in this list**. It was missed from the permission migration.
-
-**Current effective policies (from 00060 fix or 00031 original):**
-```sql
-CREATE POLICY "keg_inventory_select" ON keg_inventory
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "keg_inventory_insert" ON keg_inventory
-  FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "keg_inventory_update" ON keg_inventory
-  FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "keg_inventory_delete" ON keg_inventory
-  FOR DELETE TO authenticated USING (true);
-```
-
-**Recommendation:** Add to inventory domain with `inventory:read` / `inventory:write` policies.
-
-### HIGH-1: `yeast_pitch_events` uses `auth.uid() IS NOT NULL` instead of permission-based
-
-**Migration:** `00095_yeast_workflow_unification.sql`
-**Current Policy:**
-```sql
-CREATE POLICY yeast_pitch_events_access ON yeast_pitch_events
-  FOR ALL TO authenticated
-  USING (auth.uid() IS NOT NULL)
-  WITH CHECK (auth.uid() IS NOT NULL);
-```
-
-**Issue:** Any authenticated user can perform any operation. This should be scoped to the batches domain since yeast_pitch_events relates to batch operations via yeast_pitches.
-
-**Recommendation:** Replace with:
-- SELECT: `user_has_permission('batches:read')`
-- ALL (write): `user_has_permission('batches:write')`
+| Status                | Count | Notes |
+|-----------------------|------:|-------|
+| Domain-pattern tables |  ~60  | Gated by `user_has_permission('<domain>:read/write')`. |
+| Catalog-pattern tables|  ~20  | Read = any authenticated; write = `settings:manage`. All carry `RLS-EXCEPTION` comments. |
+| Custom-policy tables  |   ~10 | `user_profiles`, `system_settings`, `notifications`, `customer_portal_users`, `entity_revisions`, portal/change-request tables, `allocations_legacy`. |
+| Open findings         |     0 | All CRITICAL / HIGH / MEDIUM items from the 2026-02-26 audit and 2026-05-19 addendum are closed (see resolution table below). |
 
 ---
 
-## Medium Findings
+## Resolution table — original audit + addendum findings
 
-### MEDIUM-1: `customer_portal_users` not in 00092 migration
+This collapses the original audit's Critical/High/Medium findings and the
+2026-05-19 addendum's regression list. Migrations `00193`–`00197` close the
+RLS gaps; `00198` adds inline `RLS-EXCEPTION:` comments for the documented
+permissive policies.
 
-This table was created in `00091_customer_portal_many_to_many.sql` and has custom policies that differentiate staff vs. customer access. These policies are reasonable for the portal use case but use the pattern `EXISTS (SELECT 1 FROM user_profiles WHERE id = (SELECT auth.uid()))` for staff checks, which only verifies the user has a profile (any role), not a specific permission.
-
-**Current policies are functionally acceptable** since portal user management is a staff operation, but ideally the write policies should check `user_has_permission('customers:write')`.
-
-### MEDIUM-2: `order_change_requests` and `order_change_request_items` not in 00092 migration
-
-These tables from `00089_change_request_tables.sql` (updated in 00091) have custom policies for both staff and customer access. Staff policies check `EXISTS (SELECT 1 FROM user_profiles ...)` which permits any staff user regardless of role. Customer policies are properly scoped to own requests.
-
-**Recommendation:** Staff policies should check `user_has_permission('orders:read')` / `user_has_permission('orders:write')` instead of just checking profile existence.
-
----
-
-## Low Findings
-
-### LOW-1: `notifications` INSERT was tightened but uses different pattern
-
-Migration 00094 changed notifications INSERT to `WITH CHECK (user_id = (SELECT auth.uid()))`. This is correct and more restrictive than the previous `WITH CHECK (true)`.
-
-### LOW-2: `entity_revisions` INSERT uses `changed_by = (SELECT auth.uid())`
-
-Migration 00094 tightened this. Correct behavior for an audit log.
+| Severity | Table | Original status | Required | Resolved by | Notes |
+|----------|-------|-----------------|----------|-------------|-------|
+| CRITICAL | `water_addition_profiles` | `USING (true)` / `WITH CHECK (true)` (00096) | Catalog pattern (read: any auth; write: `settings:manage`) | `00197` | Original audit CRITICAL-1. Tightened plus permissive SELECT documented in 00198. Live-DB-only table (no `CREATE TABLE` in any migration), so 00197 guards it with `to_regclass` and migrations-built databases skip it. |
+| CRITICAL | `keg_inventory` | `USING (true)` / `WITH CHECK (true)` (00031) | n/a — view, not a table | `00191` | Original audit CRITICAL-2. `keg_inventory` has been a VIEW since 00032 (recreated in 00079); 00191 re-captures it `WITH (security_invoker = true)`, so the underlying `kegs`/`keg_transactions` RLS applies. Views cannot carry policies. |
+| CRITICAL | `yeast_pitch_events` | `auth.uid() IS NOT NULL` (00095, regressed by 00158) | `batches:read` / `batches:write` | `00193` | Original audit HIGH-1; reopened by 00158 then closed by 00193. |
+| CRITICAL | `selling_format_materials` | `USING (true)` / `WITH CHECK (true)` (00160) | Catalog read; `settings:manage` write | `00194` | 2026-05-19 addendum. SELECT documented in 00198. |
+| CRITICAL | `brewery_shipping_defaults` | `USING (true)` / `WITH CHECK (true)` (00162) | Catalog read; `settings:manage` write | `00195` | 2026-05-19 addendum. SELECT documented in 00198. |
+| CRITICAL | `customer_shipping_materials` | `USING (true)` / `WITH CHECK (true)` (00162) | `customers:read` / `customers:write` | `00195` | 2026-05-19 addendum. |
+| CRITICAL | `customer_pallet_configs` | `USING (true)` / `WITH CHECK (true)` (00162) | `customers:read` / `customers:write` | `00195` | 2026-05-19 addendum. |
+| CRITICAL | `order_materials` | `USING (true)` / `WITH CHECK (true)` (00162) | `orders:read` / `orders:write` | `00195` | 2026-05-19 addendum. |
+| MEDIUM   | `customer_portal_users` | Staff: profile-exists only | Staff: `customers:read/write` | `00197` | Original audit MEDIUM-1. Staff policies replaced; customer self-read policy retained. |
+| MEDIUM   | `order_change_requests` | Staff: profile-exists only | Staff: `orders:read/write` | `00197` | Original audit MEDIUM-2. |
+| MEDIUM   | `order_change_request_items` | Staff: profile-exists only | Staff: `orders:read/write` | `00197` | Original audit MEDIUM-2. |
+| MEDIUM   | `mongodb_sync_log` | `FOR SELECT USING (true)` (00165) | `settings:manage` | `00196` | 2026-05-19 addendum. |
+| MEDIUM   | `mongodb_sync_mappings` | `FOR SELECT USING (true)` (00165) | `settings:manage` | `00196` | 2026-05-19 addendum. |
+| INFO     | `00130` / `00137` duplicate keg-owner-deposits | Byte-identical migration | Document the duplicate | `00130`/`00137` | Explanatory header comments added to both files; bodies retained because both are already applied to existing databases (re-application is idempotent via `DROP POLICY IF EXISTS`) (Task 7). |
 
 ---
 
-## Informational Findings
+## Permissive policies retained (with `RLS-EXCEPTION` markers in 00198)
 
-### INFO-1: Migration 00094 references `role IN ('admin', 'owner')` which is stale
+Each of the policies below is deliberately permissive at the row-filter level
+because the table itself is non-sensitive or because a separate boundary
+protects writes. All carry `COMMENT ON POLICY ... IS 'RLS-EXCEPTION: …'`
+added in `00198_rls_exception_comments.sql`.
 
-Migration `00094_audit_fixes.sql` was written before the 00092 multi-role migration and references `user_profiles.role IN ('admin', 'owner')`. After 00092, the `role` column was replaced by `roles TEXT[]`. However, since 00092 completely replaces these QBO policies with `user_has_permission('integrations:manage')`, the 00094 policies are effectively overwritten and this is not a runtime issue -- it only matters if migrations are replayed from scratch, where 00094 runs before 00092.
+| Table | Policy | Why permissive |
+|-------|--------|----------------|
+| `_schema_registry` | `schema_registry_read` | Self-documenting metadata for AI agents; seeded only by migrations. |
+| `additives`, `adjuncts`, `beer_styles`, `brands`, `enum_values`, `fruits`, `hops`, `malts`, `package_types`, `pricing_history`, `pricing_tier_prices`, `pricing_tiers`, `sales_channels`, `spices`, `sugars`, `water_profiles`, `yeasts` | `<table>_select` | Catalog reference data; companion `_write` policy gates writes by `settings:manage`. |
+| `selling_format_materials` | `selling_format_materials_select` | BOM reference data; companion `_write` gates writes by `settings:manage` (00194). |
+| `brewery_shipping_defaults` | `brewery_shipping_defaults_select` | Brewery-wide config; companion `_write` gates writes by `settings:manage` (00195). |
+| `water_addition_profiles` | `water_addition_profiles_select` | Catalog reference data; companion `_write` gates writes by `settings:manage` (00197, guarded — live-DB-only table). |
+| `entity_revisions` | `entity_revisions_select` | Immutable audit log; rows reference RLS-protected domain rows, so the audit row alone does not leak. Inserts constrained by `changed_by = auth.uid()` in 00102. |
+| `allocations_legacy` | `allocations_legacy_select` | Frozen legacy table (renamed in 00010); no write policy. |
+| `system_settings` | `system_settings_select` | RESTRICTIVE companion `system_settings_hide_sensitive` hides `is_sensitive_setting(key)` rows (API keys, OAuth tokens). |
+| `user_profiles` | `user_profiles_select` | Directory rows used for display-name rendering / audit attribution; PII columns are not stored. Writes restricted by `user_profiles_insert_admin`, `user_profiles_update`, `user_profiles_delete_admin`. |
+| `containers`, `selling_formats` | `<table>_select` | Catalog reference data (out-of-band tables captured in 00199); companion `_write` gates writes by `settings:manage`. Comments added in 00199. |
+| `email_settings` | `email_settings_select` | Singleton app-settings row read by the settings UI; no secrets stored. Companion `_write` gates writes by `settings:manage` (00199). |
 
-**Note:** If migrations are replayed sequentially, 00094's reference to `role` would fail since 00092 drops the `role` column. This would only be an issue in a fresh database setup.
+### Live gap found and closed during CI-harness work (00199)
 
-### INFO-2: `keg_transactions` is an immutable audit log
-
-`keg_transactions` was included in the 00092 inventory domain, so it has `inventory:read` SELECT and `inventory:write` ALL policies. The original migration (00032) intentionally had no UPDATE/DELETE policies. The 00092 migration added a `_write` ALL policy which technically allows updates/deletes for users with `inventory:write`. If immutability is important, consider adding a trigger or removing the write policy for UPDATE/DELETE.
-
-### INFO-3: `allocations_legacy` is read-only
-
-The legacy allocations table only has a SELECT policy (`(SELECT auth.uid()) IS NOT NULL`). This is correct since it should only be used for historical reference.
-
----
-
-## Summary of Required Fixes
-
-### Priority 1 (Critical) -- Tables missing permission-based policies
-
-| Table | Current | Required | Domain |
-|-------|---------|----------|--------|
-| `water_addition_profiles` | `USING (true)` / `WITH CHECK (true)` | Catalog pattern (read: any auth, write: `settings:manage`) | catalog |
-| `keg_inventory` | `USING (true)` / `WITH CHECK (true)` | `inventory:read` / `inventory:write` | inventory |
-
-### Priority 2 (High) -- Tables with auth-only instead of permission-based
-
-| Table | Current | Required | Domain |
-|-------|---------|----------|--------|
-| `yeast_pitch_events` | `auth.uid() IS NOT NULL` (FOR ALL) | `batches:read` / `batches:write` | production |
-
-### Priority 3 (Medium) -- Custom policies that could be tighter
-
-| Table | Current | Suggested |
-|-------|---------|-----------|
-| `customer_portal_users` | Staff: profile exists | Staff write: `user_has_permission('customers:write')` |
-| `order_change_requests` | Staff: profile exists | Staff: `user_has_permission('orders:read/write')` |
-| `order_change_request_items` | Staff: profile exists | Staff: `user_has_permission('orders:read/write')` |
+`email_settings` — an out-of-band table with no CREATE TABLE migration —
+carried two live policies `USING (true)` / `WITH CHECK (true)`, including
+**UPDATE**: any authenticated user could rewrite `supabase_project_url` /
+`app_url` and redirect notification email delivery. Invisible to earlier
+audits because they scanned migration-defined tables. `00199` drops both and
+installs the settings pattern (any-auth read, `settings:manage` write); the
+notification path is unaffected because its reader is `SECURITY DEFINER`.
 
 ---
 
-## Methodology
+## What's still out of scope
 
-This audit was performed by:
-1. Extracting all `CREATE TABLE`, `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY`, and `DROP POLICY` statements from all migration files (00001-00099).
-2. Tracing the final effective policy for each table by applying migrations in order, accounting for `DROP POLICY IF EXISTS` followed by `CREATE POLICY`.
-3. Cross-referencing with the permission model in `src/lib/permissions.ts`.
-4. Identifying tables created after the comprehensive 00092 permission migration that were not included in its scope.
-5. Checking for `WITH CHECK (true)`, `USING (true)`, and missing `(SELECT auth.uid())` initplan patterns.
+The plan deliberately deferred three surfaces (each needs its own follow-up
+plan):
+
+1. **`createAdminClient` audit across non-chat call sites.** 36 files in `src/`
+   call `createAdminClient`. Some are legitimate platform ops; others write
+   user-initiated data under service-role and bypass RLS. Until classified,
+   the SSoT claim is incomplete.
+2. **`SECURITY DEFINER` function audit.** 22 migrations contain
+   `SECURITY DEFINER`. Some are intentional bypasses; others may not contain
+   internal `user_has_permission(...)` checks.
+3. **Supabase Storage RLS** (avatar uploads via
+   `src/components/domain/shared/avatar-upload.tsx`) and **Realtime
+   authorization** (`src/contexts/notifications.tsx`). Separate access
+   models; separate audit.
+
+---
+
+## Methodology (this audit)
+
+1. Traced the final effective policy for every table in `public` by applying
+   migrations sequentially and recording each `DROP POLICY … / CREATE POLICY`
+   pair to compute the final state.
+2. Cross-referenced with `src/lib/permissions.ts` so the SQL permission
+   strings match the TypeScript permission map.
+3. Verified the catalog/domain assignment for every previously-permissive
+   table by inspecting the relevant `src/entities/*.tsx` config (the file
+   that drives the UI for that table).
+4. Confirmed coverage with two integration test suites:
+   - `rls-fail-closed.test.ts` — empty `roles[]` and missing
+     `user_profiles` row are denied across a representative sample of
+     domain tables.
+   - `rls-coverage.test.ts` — every permissive policy in `public` carries
+     a `COMMENT ON POLICY ... IS 'RLS-EXCEPTION: <reason>'` marker.
+
+---
+
+## Migration index for RLS-related work
+
+| Migration | What it does |
+|-----------|--------------|
+| `00097_permission_based_roles.sql` | Introduces `user_has_permission()` and rewrites most policies to the role-based pattern. |
+| `00102_audit_fixes.sql` | Tightens `entity_revisions_insert` to `changed_by = auth.uid()`. |
+| `00130_tighten_keg_owner_deposits_rls.sql` | Replaces `WITH CHECK (true)` on `keg_owner_deposits` with `inventory:read`/`inventory:write`. |
+| `00137_tighten_keg_owner_deposits_rls.sql` | No-op (byte-identical duplicate of 00130; retained to avoid migration-history rewrites). |
+| `00193_fix_yeast_pitch_events_rls.sql` | `batches:read` / `batches:write`. |
+| `00194_fix_selling_format_materials_rls.sql` | Catalog read; `settings:manage` write. |
+| `00195_fix_order_shipping_rls.sql` | Closes the four 00162 regressions. |
+| `00196_fix_mongodb_sync_rls.sql` | `settings:manage` for both `mongodb_sync_*` tables. |
+| `00197_fix_legacy_audit_findings_rls.sql` | Closes the remaining original-audit findings (`water_addition_profiles` — guarded, live-DB-only — and portal staff tightening; `keg_inventory` needs none, see resolution table). |
+| `00198_rls_exception_comments.sql` | Adds `RLS-EXCEPTION:` comments on every documented permissive policy. |
+| `00199_capture_selling_formats_containers.sql` | Captures the out-of-band `containers`/`selling_formats`/`email_settings` tables (RLS, policies, triggers), re-states the live qbo policy pairs, and closes the live `email_settings` UPDATE-`(true)` gap. |

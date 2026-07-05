@@ -376,6 +376,10 @@ $$;
 -- Step 6: Recreate dependent functions with batch_code
 -- =============================================================================
 
+-- PR #322: the earlier definition has a different OUT-parameter row type, so
+-- CREATE OR REPLACE alone fails ("cannot change return type"). Drop first.
+DROP FUNCTION IF EXISTS cogs_by_period(DATE, DATE);
+
 CREATE OR REPLACE FUNCTION cogs_by_period(
   p_start_date DATE,
   p_end_date DATE

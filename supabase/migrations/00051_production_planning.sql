@@ -14,6 +14,19 @@
 -- =============================================================================
 
 -- =============================================================================
+-- 0. DRIFT SHIM (added retroactively — see PR #322)
+-- =============================================================================
+-- order_items.brand_id and order_items.package_type_id were added directly
+-- in the live DB before this migration (no migration captured the ALTER),
+-- and everything below assumes they exist. No-op on live; required for a
+-- from-scratch replay. package_type_id is later dropped by 00080, matching
+-- the live end state.
+
+ALTER TABLE order_items
+  ADD COLUMN IF NOT EXISTS brand_id UUID REFERENCES brands(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS package_type_id UUID REFERENCES package_types(id) ON DELETE SET NULL;
+
+-- =============================================================================
 -- 1. YIELD CONVERSION HELPER FUNCTION
 -- =============================================================================
 -- Calculates units per BBL from package_type dimensions.
