@@ -2,6 +2,8 @@
  * Shared formatting utilities used across reports, dashboards, and domain components.
  */
 
+import { isToday, isYesterday } from "date-fns";
+
 const currencyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -60,6 +62,39 @@ export function formatDate(
   } catch {
     return "";
   }
+}
+
+/**
+ * Format a timestamp for compact "recent activity" lists:
+ *   today     → time-of-day (e.g. "2:14 PM")
+ *   yesterday → "Yesterday"
+ *   < 7 days  → weekday name (e.g. "Monday")
+ *   otherwise → short month + day (e.g. "Oct 12"), including future dates
+ *
+ * Locale is pinned to "en-US" to match the rest of this module and avoid
+ * SSR/CSR hydration mismatches from differing system locales. Calendar-day
+ * boundaries use date-fns isToday/isYesterday so near-midnight and DST
+ * comparisons bucket by calendar day, not elapsed milliseconds.
+ * Returns "" for null/undefined/invalid input so callers can pass raw row
+ * values without a cast.
+ */
+export function formatRelativeDate(
+  date: Date | string | number | null | undefined,
+): string {
+  if (date == null) return "";
+  const value = new Date(date);
+  if (Number.isNaN(value.getTime())) return "";
+
+  if (isToday(value)) {
+    return value.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  }
+  if (isYesterday(value)) return "Yesterday";
+
+  const diffDays = Math.floor((Date.now() - value.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays >= 0 && diffDays < 7) {
+    return value.toLocaleDateString("en-US", { weekday: "long" });
+  }
+  return value.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 /**
