@@ -47,10 +47,13 @@ bun-debug.log*
 .worktrees/
 
 # Claude agent working directory — ignore everything under .claude/ except the
-# project-level settings.json (Stop hook, etc.) which travels with the repo.
+# project-level settings.json (Stop hook, etc.) and the project-scoped expert
+# agents under agents/, both of which travel with the repo.
 # Per-developer overrides go in .claude/settings.local.json (still ignored).
 /.claude/*
 !/.claude/settings.json
+!/.claude/agents/
+!/.claude/agents/**
 
 # Supabase CLI auto-touches this on every invocation; keep it untracked.
 # Other files in supabase/.temp/ (project-ref, version stamps) are tracked
