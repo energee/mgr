@@ -37,11 +37,11 @@ import {
   StatCardWithDelta,
   calculateDelta,
   TrendChartLazy,
-  BatchActivityHeatmap,
   TodayPanel,
   GettingStartedChecklist,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
+import { BatchActivityHeatmapLazy } from "@/components/dashboard/batch-activity-heatmap-lazy";
 import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
 import { useVolumeUnit } from "@/hooks/use-unit-preferences";
 import { convertVolume, formatVolume, UNIT_LABELS } from "@/domain/units";
@@ -488,7 +488,7 @@ function ProductionTrends() {
       {/* Trend Charts */}
       <div className="grid gap-6 md:grid-cols-2">
         <DashboardSection title="Batches Scheduled">
-          <BatchActivityHeatmap />
+          <BatchActivityHeatmapLazy />
         </DashboardSection>
         <DashboardSection title="Volume Brewed (weekly)">
           <TrendChartLazy

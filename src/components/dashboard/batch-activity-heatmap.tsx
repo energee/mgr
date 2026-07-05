@@ -22,7 +22,11 @@ import {
   type Activity,
   type BlockElement,
 } from "react-activity-calendar";
-import "react-activity-calendar/tooltips.css";
+// NOTE: `react-activity-calendar/tooltips.css` is intentionally NOT imported
+// here — it lives in the dashboard layout so the styles ship with the route
+// CSS. This component loads via `next/dynamic` (batch-activity-heatmap-lazy),
+// and importing the CSS here would defer it to the lazy chunk, causing a
+// tooltip FOUC on first render (audit F-142 review).
 import { format, parseISO } from "date-fns";
 import { CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -119,7 +123,9 @@ export function BatchActivityHeatmap() {
   });
 
   if (isLoading && data.length === 0) {
-    return <Skeleton className="h-[248px] w-full rounded-lg" />;
+    // Matches the chunk-loading fallback in batch-activity-heatmap-lazy.tsx
+    // (and the rendered calendar's approximate height) to avoid CLS.
+    return <Skeleton className="h-[200px] w-full rounded-lg" />;
   }
 
   const hasAnyActivity = data.some((r) => r.count > 0 || r.completed > 0);
