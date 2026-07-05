@@ -126,6 +126,11 @@ export function TrendChart({
 
   const yAxisFormatter = formatValue || ((v: number) => v.toLocaleString());
 
+  // SR-only table date formatter: prefer the explicit tooltip date formatter
+  // (richer label like "Mon, May 14") so screen-reader users hear the full
+  // date, falling back to the x-axis short format.
+  const tableDateFormatter = formatTooltipDate || formatDate;
+
   // Shared tooltip label formatter (used by both chart types)
   const tooltipLabelFormatter = (_: ReactNode, payload: ReadonlyArray<TooltipPayload<ValueType, NameType>>) => {
     const firstPayload = payload?.[0]?.payload;
@@ -177,6 +182,13 @@ export function TrendChart({
             ))}
           </BarChart>
         </ChartContainer>
+        <ChartDataTableFallback
+          data={data}
+          xKey={xKey}
+          series={series}
+          formatValue={yAxisFormatter}
+          formatDate={tableDateFormatter}
+        />
       </figure>
     );
   }
@@ -220,6 +232,71 @@ export function TrendChart({
           ))}
         </AreaChart>
       </ChartContainer>
+      <ChartDataTableFallback
+        data={data}
+        xKey={xKey}
+        series={series}
+        formatValue={yAxisFormatter}
+        formatDate={tableDateFormatter}
+      />
     </figure>
+  );
+}
+
+/**
+ * Visually-hidden data-table mirror of the chart data so screen-reader users
+ * get the same information as sighted users. Lives inside the same <figure>
+ * as the chart (audit F-101). Rendered with `sr-only` so it never affects
+ * layout but shows up for assistive tech and "select all + copy" workflows.
+ *
+ * The date column is rendered through the same `formatDate` helper used by
+ * the x-axis/tooltip so SR users hear "May 14" instead of a raw ISO string.
+ */
+function ChartDataTableFallback({
+  data,
+  xKey,
+  series,
+  formatValue,
+  formatDate,
+}: {
+  data: Array<Record<string, unknown>>;
+  xKey: string;
+  series: TrendSeries[];
+  formatValue: (value: number) => string;
+  formatDate: (isoDate: string) => string;
+}) {
+  return (
+    <table className="sr-only">
+      <caption>Chart data ({series.map((s) => s.label).join(", ")})</caption>
+      <thead>
+        <tr>
+          <th scope="col">Date</th>
+          {series.map((s) => (
+            <th key={s.key} scope="col">
+              {s.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((row) => {
+          const raw = row[xKey];
+          const iso = raw == null ? "" : String(raw);
+          return (
+            <tr key={iso}>
+              <th scope="row">{iso ? formatDate(iso) : ""}</th>
+              {series.map((s) => {
+                const v = row[s.key];
+                return (
+                  <td key={s.key}>
+                    {typeof v === "number" ? formatValue(v) : String(v ?? "")}
+                  </td>
+                );
+              })}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
