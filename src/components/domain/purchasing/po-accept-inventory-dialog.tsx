@@ -45,7 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/ui/form-actions";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -66,7 +66,6 @@ import {
 } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Loader2,
   PackageCheck,
   AlertCircle,
   AlertTriangle,
@@ -679,30 +678,15 @@ export function POAcceptInventoryDialog({
         )}
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="min-h-[44px]"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={() => acceptMutation.mutate()}
-            disabled={!canSubmit || acceptMutation.isPending}
-            className="min-h-[44px]"
-          >
-            {acceptMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <PackageCheck className="h-4 w-4 mr-2" />
-                Accept Selected ({selectedReceives.length})
-              </>
-            )}
-          </Button>
+          <FormActions
+            submitLabel={`Accept Selected (${selectedReceives.length})`}
+            loadingLabel="Processing..."
+            submitIcon={<PackageCheck className="h-4 w-4 mr-2" />}
+            isLoading={acceptMutation.isPending}
+            submitDisabled={!canSubmit}
+            onCancel={onClose}
+            onSubmit={() => acceptMutation.mutate()}
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>
