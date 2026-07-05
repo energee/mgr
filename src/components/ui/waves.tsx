@@ -1,61 +1,18 @@
 "use client";
 
-import { motion, useAnimation } from "motion/react";
-import type { HTMLAttributes } from "react";
-import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
+// Animated icon built on the shared scaffold in create-animated-icon.tsx
+// (imperative start/stopAnimation handle, hover-to-animate, ref-controlled
+// event forwarding). This file only supplies the unique SVG + variants.
+import { motion } from "motion/react";
 
-import { cn } from "@/lib/utils";
+import { createAnimatedIcon } from "@/components/icons/create-animated-icon";
 
-export type WavesIconHandle = {
-  startAnimation: () => void;
-  stopAnimation: () => void;
-}
+export type { IconHandle as WavesIconHandle } from "@/components/icons/create-animated-icon";
 
-type WavesIconProps = HTMLAttributes<HTMLDivElement> & {
-  size?: number;
-}
-
-const WavesIcon = forwardRef<WavesIconHandle, WavesIconProps>(
-  ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
-    const controls = useAnimation();
-    const isControlledRef = useRef(false);
-
-    useImperativeHandle(ref, () => {
-      isControlledRef.current = true;
-      return {
-        startAnimation: () => controls.start("animate"),
-        stopAnimation: () => controls.start("normal"),
-      };
-    });
-
-    const handleMouseEnter = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isControlledRef.current) {
-          controls.start("animate");
-        }
-        onMouseEnter?.(e);
-      },
-      [controls, onMouseEnter]
-    );
-
-    const handleMouseLeave = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isControlledRef.current) {
-          controls.start("normal");
-        }
-        onMouseLeave?.(e);
-      },
-      [controls, onMouseLeave]
-    );
-
-    return (
-      <div
-        className={cn(className)}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        {...props}
-      >
-        <svg
+const WavesIcon = createAnimatedIcon({
+  displayName: "WavesIcon",
+  renderSvg: ({ controls, size }) => (
+    <svg
           fill="none"
           height={size}
           stroke="currentColor"
@@ -103,10 +60,8 @@ const WavesIcon = forwardRef<WavesIconHandle, WavesIconProps>(
             }}
           />
         </svg>
-      </div>
-    );
-  }
-);
+  ),
+  forwardMouseEvents: "always",
+});
 
-WavesIcon.displayName = "WavesIcon";
 export { WavesIcon };

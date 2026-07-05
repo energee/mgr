@@ -1,20 +1,14 @@
 "use client";
 
+// Animated icon built on the shared scaffold in create-animated-icon.tsx
+// (imperative start/stopAnimation handle, hover-to-animate, ref-controlled
+// event forwarding). This file only supplies the unique SVG + variants.
 import type { Transition } from "motion/react";
-import { motion, useAnimation } from "motion/react";
-import type { HTMLAttributes } from "react";
-import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
+import { motion } from "motion/react";
 
-import { cn } from "@/lib/utils";
+import { createAnimatedIcon } from "@/components/icons/create-animated-icon";
 
-export type GaugeIconHandle = {
-  startAnimation: () => void;
-  stopAnimation: () => void;
-}
-
-type GaugeIconProps = HTMLAttributes<HTMLDivElement> & {
-  size?: number;
-}
+export type { IconHandle as GaugeIconHandle } from "@/components/icons/create-animated-icon";
 
 const DEFAULT_TRANSITION: Transition = {
   type: "spring",
@@ -23,50 +17,10 @@ const DEFAULT_TRANSITION: Transition = {
   mass: 1,
 };
 
-const GaugeIcon = forwardRef<GaugeIconHandle, GaugeIconProps>(
-  ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
-    const controls = useAnimation();
-    const isControlledRef = useRef(false);
-
-    useImperativeHandle(ref, () => {
-      isControlledRef.current = true;
-
-      return {
-        startAnimation: () => controls.start("animate"),
-        stopAnimation: () => controls.start("normal"),
-      };
-    });
-
-    const handleMouseEnter = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (isControlledRef.current) {
-          onMouseEnter?.(e);
-        } else {
-          controls.start("animate");
-        }
-      },
-      [controls, onMouseEnter]
-    );
-
-    const handleMouseLeave = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (isControlledRef.current) {
-          onMouseLeave?.(e);
-        } else {
-          controls.start("normal");
-        }
-      },
-      [controls, onMouseLeave]
-    );
-
-    return (
-      <div
-        className={cn(className)}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        {...props}
-      >
-        <svg
+const GaugeIcon = createAnimatedIcon({
+  displayName: "GaugeIcon",
+  renderSvg: ({ controls, size }) => (
+    <svg
           fill="none"
           height={size}
           stroke="currentColor"
@@ -92,11 +46,7 @@ const GaugeIcon = forwardRef<GaugeIconHandle, GaugeIconProps>(
           />
           <path d="M3.34 19a10 10 0 1 1 17.32 0" />
         </svg>
-      </div>
-    );
-  }
-);
-
-GaugeIcon.displayName = "GaugeIcon";
+  ),
+});
 
 export { GaugeIcon };
