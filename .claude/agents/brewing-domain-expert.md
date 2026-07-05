@@ -41,3 +41,6 @@ Read `docs/knowledge/brewing-domain.md` first; that file is the source of truth 
 - `src/domain/water-chemistry.ts`
 - `src/domain/yeast-lineage.ts`
 - `docs/knowledge/brewing-domain.md`
+
+## Search tooling
+Use `mgrep` (semantic search CLI) to locate code by meaning ("where is gravity converted"); use literal `grep`/`rg` only for exact-string ref-counting (imports, symbol names). mgrep finds what grep can't spell.

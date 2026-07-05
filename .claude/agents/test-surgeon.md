@@ -101,3 +101,6 @@ Preferred modern form — replace the hand-rolled `let root`/`container`/`render
 import { setupRenderHarness } from "@/test/react-harness";
 const { render } = setupRenderHarness();
 ```
+
+## Search tooling
+Use `mgrep` (semantic search CLI) to locate code by meaning ("where is gravity converted"); use literal `grep`/`rg` only for exact-string ref-counting (imports, symbol names). mgrep finds what grep can't spell.

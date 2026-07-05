@@ -40,3 +40,6 @@ Owns the entity registry system end to end — adding, modifying, and wiring ent
 - `src/lib/query-keys.ts`
 - `src/app/api/chat/__tests__/core-registry.test.ts`
 - `src/entities/__tests__/entity-configs.test.ts`
+
+## Search tooling
+Use `mgrep` (semantic search CLI) to locate code by meaning ("where is gravity converted"); use literal `grep`/`rg` only for exact-string ref-counting (imports, symbol names). mgrep finds what grep can't spell.

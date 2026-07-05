@@ -21,3 +21,4 @@ Domain source of truth: `docs/knowledge/brewing-domain.md`, `docs/knowledge/enti
 - Query keys only via `src/lib/query-keys.ts`
 - One entity = one file in `src/entities/<name>.tsx`, registered in `index.ts`
 - knip/depcheck flag false positives (entity registry, `z.infer`) — verify before deleting
+- Search: `mgrep` to locate code by meaning; literal `grep`/`rg` only for exact-string ref-counting

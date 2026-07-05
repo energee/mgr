@@ -38,3 +38,6 @@ Owns the presentation layer's layering discipline. Optimizes for keeping the ent
 - `src/lib/data-table.ts`
 - `src/components/domain/recipe/` (largest domain example, ~8,500 LOC)
 - `src/components/icons/animated.tsx`
+
+## Search tooling
+Use `mgrep` (semantic search CLI) to locate code by meaning ("where is gravity converted"); use literal `grep`/`rg` only for exact-string ref-counting (imports, symbol names). mgrep finds what grep can't spell.
