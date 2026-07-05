@@ -19,12 +19,23 @@
 --
 -- Every category below explains WHY the policy bypasses role-based auth and
 -- which boundary still protects the data.
+--
+-- PR #322: every COMMENT below is guarded on the policy actually existing.
+-- Live has drifted out-of-band since the audit (package_types and
+-- water_addition_profiles were dropped entirely), so unconditional COMMENTs
+-- fail there; migrations-built databases still get full comment coverage.
+
 
 -- ----------------------------------------------------------------------------
 -- Self-documenting schema metadata
 -- ----------------------------------------------------------------------------
-COMMENT ON POLICY schema_registry_read ON _schema_registry IS
-  'RLS-EXCEPTION: self-documenting schema metadata table; any authenticated user may SELECT for AI agents and tooling. No write policy exists — rows are seeded only by migrations.';
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = '_schema_registry' AND policyname = 'schema_registry_read') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'schema_registry_read', '_schema_registry', 'RLS-EXCEPTION: self-documenting schema metadata table; any authenticated user may SELECT for AI agents and tooling. No write policy exists — rows are seeded only by migrations.');
+  ELSE
+    RAISE NOTICE 'policy schema_registry_read on _schema_registry absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
 
 -- ----------------------------------------------------------------------------
 -- Catalog / shared-reference tables (00097_permission_based_roles.sql §5k)
@@ -32,23 +43,125 @@ COMMENT ON POLICY schema_registry_read ON _schema_registry IS
 --   Write: `settings:manage` permission (separate `_write` policy on same table).
 -- These rows are non-PII reference data shared across the whole brewery.
 -- ----------------------------------------------------------------------------
-COMMENT ON POLICY additives_select           ON additives           IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY adjuncts_select            ON adjuncts            IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY beer_styles_select         ON beer_styles         IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY brands_select              ON brands              IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY enum_values_select         ON enum_values         IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY fruits_select              ON fruits              IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY hops_select                ON hops                IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY malts_select               ON malts               IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY package_types_select       ON package_types       IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY pricing_history_select     ON pricing_history     IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY pricing_tier_prices_select ON pricing_tier_prices IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY pricing_tiers_select       ON pricing_tiers       IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY sales_channels_select      ON sales_channels      IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY spices_select              ON spices              IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY sugars_select              ON sugars              IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY water_profiles_select      ON water_profiles      IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
-COMMENT ON POLICY yeasts_select              ON yeasts              IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'additives' AND policyname = 'additives_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'additives_select', 'additives', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy additives_select on additives absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'adjuncts' AND policyname = 'adjuncts_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'adjuncts_select', 'adjuncts', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy adjuncts_select on adjuncts absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'beer_styles' AND policyname = 'beer_styles_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'beer_styles_select', 'beer_styles', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy beer_styles_select on beer_styles absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'brands' AND policyname = 'brands_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'brands_select', 'brands', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy brands_select on brands absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'enum_values' AND policyname = 'enum_values_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'enum_values_select', 'enum_values', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy enum_values_select on enum_values absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'fruits' AND policyname = 'fruits_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'fruits_select', 'fruits', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy fruits_select on fruits absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'hops' AND policyname = 'hops_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'hops_select', 'hops', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy hops_select on hops absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'malts' AND policyname = 'malts_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'malts_select', 'malts', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy malts_select on malts absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'package_types' AND policyname = 'package_types_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'package_types_select', 'package_types', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy package_types_select on package_types absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'pricing_history' AND policyname = 'pricing_history_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'pricing_history_select', 'pricing_history', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy pricing_history_select on pricing_history absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'pricing_tier_prices' AND policyname = 'pricing_tier_prices_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'pricing_tier_prices_select', 'pricing_tier_prices', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy pricing_tier_prices_select on pricing_tier_prices absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'pricing_tiers' AND policyname = 'pricing_tiers_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'pricing_tiers_select', 'pricing_tiers', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy pricing_tiers_select on pricing_tiers absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'sales_channels' AND policyname = 'sales_channels_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'sales_channels_select', 'sales_channels', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy sales_channels_select on sales_channels absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'spices' AND policyname = 'spices_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'spices_select', 'spices', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy spices_select on spices absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'sugars' AND policyname = 'sugars_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'sugars_select', 'sugars', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy sugars_select on sugars absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'water_profiles' AND policyname = 'water_profiles_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'water_profiles_select', 'water_profiles', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy water_profiles_select on water_profiles absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'yeasts' AND policyname = 'yeasts_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'yeasts_select', 'yeasts', 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.');
+  ELSE
+    RAISE NOTICE 'policy yeasts_select on yeasts absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
 
 -- ----------------------------------------------------------------------------
 -- Catalog-pattern policies added by Tasks 3, 4, 6 (migrations 00194, 00195, 00197)
@@ -86,24 +199,44 @@ END $$;
 -- ----------------------------------------------------------------------------
 -- Audit log (immutable post-insert)
 -- ----------------------------------------------------------------------------
-COMMENT ON POLICY entity_revisions_select ON entity_revisions IS
-  'RLS-EXCEPTION: audit log readable by any authenticated user; row data references domain rows that are themselves RLS-protected, so the audit row alone does not leak business data. Inserts are constrained by changed_by = auth.uid() in entity_revisions_insert (migration 00102). No UPDATE / DELETE policies exist — rows are immutable.';
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'entity_revisions' AND policyname = 'entity_revisions_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'entity_revisions_select', 'entity_revisions', 'RLS-EXCEPTION: audit log readable by any authenticated user; row data references domain rows that are themselves RLS-protected, so the audit row alone does not leak business data. Inserts are constrained by changed_by = auth.uid() in entity_revisions_insert (migration 00102). No UPDATE / DELETE policies exist — rows are immutable.');
+  ELSE
+    RAISE NOTICE 'policy entity_revisions_select on entity_revisions absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
 
 -- ----------------------------------------------------------------------------
 -- Legacy / read-only retention
 -- ----------------------------------------------------------------------------
-COMMENT ON POLICY allocations_legacy_select ON allocations_legacy IS
-  'RLS-EXCEPTION: legacy table retained for historical reference (renamed in migration 00010). No write policy exists; data is frozen.';
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'allocations_legacy' AND policyname = 'allocations_legacy_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'allocations_legacy_select', 'allocations_legacy', 'RLS-EXCEPTION: legacy table retained for historical reference (renamed in migration 00010). No write policy exists; data is frozen.');
+  ELSE
+    RAISE NOTICE 'policy allocations_legacy_select on allocations_legacy absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
 
 -- ----------------------------------------------------------------------------
 -- System settings — read is permissive but a RESTRICTIVE companion policy
 -- (`system_settings_hide_sensitive`) hides keys matching is_sensitive_setting().
 -- ----------------------------------------------------------------------------
-COMMENT ON POLICY system_settings_select ON system_settings IS
-  'RLS-EXCEPTION: read is wholesale-permissive but the RESTRICTIVE companion policy system_settings_hide_sensitive filters out is_sensitive_setting(key) rows (API keys, OAuth tokens). Write is gated by settings:manage on system_settings_write.';
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'system_settings' AND policyname = 'system_settings_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'system_settings_select', 'system_settings', 'RLS-EXCEPTION: read is wholesale-permissive but the RESTRICTIVE companion policy system_settings_hide_sensitive filters out is_sensitive_setting(key) rows (API keys, OAuth tokens). Write is gated by settings:manage on system_settings_write.');
+  ELSE
+    RAISE NOTICE 'policy system_settings_select on system_settings absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;
 
 -- ----------------------------------------------------------------------------
 -- User directory — display names, roles, status for UI rendering
 -- ----------------------------------------------------------------------------
-COMMENT ON POLICY user_profiles_select ON user_profiles IS
-  'RLS-EXCEPTION: authenticated users may read user_profiles to render display names, roles, and active status across the app (assigned-to dropdowns, audit attribution, etc.). PII columns are not stored at the schema level (no addresses, phone). Insert/update/delete are restricted by user_profiles_insert_admin, user_profiles_update, and user_profiles_delete_admin.';
+DO $do$ BEGIN
+  IF EXISTS (SELECT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'user_profiles' AND policyname = 'user_profiles_select') THEN
+    EXECUTE format('COMMENT ON POLICY %I ON %I IS %L', 'user_profiles_select', 'user_profiles', 'RLS-EXCEPTION: authenticated users may read user_profiles to render display names, roles, and active status across the app (assigned-to dropdowns, audit attribution, etc.). PII columns are not stored at the schema level (no addresses, phone). Insert/update/delete are restricted by user_profiles_insert_admin, user_profiles_update, and user_profiles_delete_admin.');
+  ELSE
+    RAISE NOTICE 'policy user_profiles_select on user_profiles absent; skipping RLS-EXCEPTION comment';
+  END IF;
+END $do$;

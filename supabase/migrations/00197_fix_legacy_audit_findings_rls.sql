@@ -22,10 +22,10 @@
 -- ---------------------------------------------------------------------------
 -- water_addition_profiles — catalog pattern
 --
--- Guarded: this table exists only in the live database (created out-of-band;
--- no CREATE TABLE in any migration), so a fresh `supabase db reset` /
--- CI-from-migrations database does not have it. The DO block makes the
--- migration a no-op there while still tightening the live database.
+-- Guarded: this table was created out-of-band (no CREATE TABLE in any
+-- migration) and — verified 2026-07-05 — has since been DROPPED from the live
+-- database as well, so today the block no-ops everywhere. Kept for any
+-- environment where the table still exists.
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -57,50 +57,77 @@ END $$;
 -- self-access policies in place (named with "customer_" prefix; we touch
 -- only the staff-named ones below).
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS customer_portal_users_staff_select ON customer_portal_users;
-DROP POLICY IF EXISTS customer_portal_users_staff_write ON customer_portal_users;
-DROP POLICY IF EXISTS "Staff can view all customer portal users" ON customer_portal_users;
-DROP POLICY IF EXISTS "Staff can manage customer portal users" ON customer_portal_users;
-
-CREATE POLICY customer_portal_users_staff_select ON customer_portal_users
+-- Guarded (PR #322): this table does NOT exist on the live database — the
+-- customer-portal tables and water_addition_profiles were dropped out-of-band
+-- after the 2026-02-26 audit. The block applies on migrations-built databases
+-- (CI replay) and no-ops on live.
+DO $$
+BEGIN
+  IF to_regclass('public.customer_portal_users') IS NOT NULL THEN
+      EXECUTE $sql$DROP POLICY IF EXISTS customer_portal_users_staff_select ON customer_portal_users$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS customer_portal_users_staff_write ON customer_portal_users$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS "Staff can view all customer portal users" ON customer_portal_users$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS "Staff can manage customer portal users" ON customer_portal_users$sql$;
+      EXECUTE $sql$CREATE POLICY customer_portal_users_staff_select ON customer_portal_users
   FOR SELECT
-  USING (user_has_permission('customers:read'));
-
-CREATE POLICY customer_portal_users_staff_write ON customer_portal_users
+  USING (user_has_permission('customers:read'))$sql$;
+      EXECUTE $sql$CREATE POLICY customer_portal_users_staff_write ON customer_portal_users
   FOR ALL
   USING (user_has_permission('customers:write'))
-  WITH CHECK (user_has_permission('customers:write'));
+  WITH CHECK (user_has_permission('customers:write'))$sql$;
+  ELSE
+    RAISE NOTICE 'customer_portal_users does not exist; skipping (dropped out-of-band on live)';
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- order_change_requests — tighten staff side
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS order_change_requests_staff_select ON order_change_requests;
-DROP POLICY IF EXISTS order_change_requests_staff_write ON order_change_requests;
-DROP POLICY IF EXISTS "Staff can view all order change requests" ON order_change_requests;
-DROP POLICY IF EXISTS "Staff can manage order change requests" ON order_change_requests;
-
-CREATE POLICY order_change_requests_staff_select ON order_change_requests
+-- Guarded (PR #322): this table does NOT exist on the live database — the
+-- customer-portal tables and water_addition_profiles were dropped out-of-band
+-- after the 2026-02-26 audit. The block applies on migrations-built databases
+-- (CI replay) and no-ops on live.
+DO $$
+BEGIN
+  IF to_regclass('public.order_change_requests') IS NOT NULL THEN
+      EXECUTE $sql$DROP POLICY IF EXISTS order_change_requests_staff_select ON order_change_requests$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS order_change_requests_staff_write ON order_change_requests$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS "Staff can view all order change requests" ON order_change_requests$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS "Staff can manage order change requests" ON order_change_requests$sql$;
+      EXECUTE $sql$CREATE POLICY order_change_requests_staff_select ON order_change_requests
   FOR SELECT
-  USING (user_has_permission('orders:read'));
-
-CREATE POLICY order_change_requests_staff_write ON order_change_requests
+  USING (user_has_permission('orders:read'))$sql$;
+      EXECUTE $sql$CREATE POLICY order_change_requests_staff_write ON order_change_requests
   FOR ALL
   USING (user_has_permission('orders:write'))
-  WITH CHECK (user_has_permission('orders:write'));
+  WITH CHECK (user_has_permission('orders:write'))$sql$;
+  ELSE
+    RAISE NOTICE 'order_change_requests does not exist; skipping (dropped out-of-band on live)';
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- order_change_request_items — tighten staff side
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS order_change_request_items_staff_select ON order_change_request_items;
-DROP POLICY IF EXISTS order_change_request_items_staff_write ON order_change_request_items;
-DROP POLICY IF EXISTS "Staff can view all order change request items" ON order_change_request_items;
-DROP POLICY IF EXISTS "Staff can manage order change request items" ON order_change_request_items;
-
-CREATE POLICY order_change_request_items_staff_select ON order_change_request_items
+-- Guarded (PR #322): this table does NOT exist on the live database — the
+-- customer-portal tables and water_addition_profiles were dropped out-of-band
+-- after the 2026-02-26 audit. The block applies on migrations-built databases
+-- (CI replay) and no-ops on live.
+DO $$
+BEGIN
+  IF to_regclass('public.order_change_request_items') IS NOT NULL THEN
+      EXECUTE $sql$DROP POLICY IF EXISTS order_change_request_items_staff_select ON order_change_request_items$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS order_change_request_items_staff_write ON order_change_request_items$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS "Staff can view all order change request items" ON order_change_request_items$sql$;
+      EXECUTE $sql$DROP POLICY IF EXISTS "Staff can manage order change request items" ON order_change_request_items$sql$;
+      EXECUTE $sql$CREATE POLICY order_change_request_items_staff_select ON order_change_request_items
   FOR SELECT
-  USING (user_has_permission('orders:read'));
-
-CREATE POLICY order_change_request_items_staff_write ON order_change_request_items
+  USING (user_has_permission('orders:read'))$sql$;
+      EXECUTE $sql$CREATE POLICY order_change_request_items_staff_write ON order_change_request_items
   FOR ALL
   USING (user_has_permission('orders:write'))
-  WITH CHECK (user_has_permission('orders:write'));
+  WITH CHECK (user_has_permission('orders:write'))$sql$;
+  ELSE
+    RAISE NOTICE 'order_change_request_items does not exist; skipping (dropped out-of-band on live)';
+  END IF;
+END $$;
