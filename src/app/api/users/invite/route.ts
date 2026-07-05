@@ -6,9 +6,12 @@
  * Invites a new user by email. Creates an auth.users entry via Supabase's
  * inviteUserByEmail (which sends a magic-link email), then updates the
  * auto-created user_profiles row with the requested roles and invitation
- * metadata.
+ * metadata. Fails with 500 if the role assignment doesn't apply, since the
+ * invitee would otherwise sign in with default 'viewer' permissions.
  *
- * Requires the `users:manage` permission (admin only).
+ * Requires the `users:manage` permission (admin only). Roles are restricted
+ * to STAFF_ROLES; customer accounts are provisioned via the customer portal
+ * invite flow. Rate limited to 5 invites/minute/IP (sends real emails).
  */
 
 import { z } from "zod";
@@ -16,19 +19,23 @@ import {
   withPermission,
   validateBody,
   successResponse,
+  errorResponse,
   ApiError,
 } from "@/lib/api";
+import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
-import { ALL_ROLES } from "@/lib/permissions";
+import { STAFF_ROLES } from "@/lib/permissions";
 import { logger } from "@/lib/logger";
 import { SITE_URL } from "@/lib/env";
 
 const log = logger.child({ route: "/api/users/invite" });
 
+// Restrict to STAFF_ROLES — invites are for internal team members.
+// Customer accounts are provisioned through the customer portal flow.
 const inviteSchema = z.object({
   email: z.string().email("A valid email address is required"),
   roles: z
-    .array(z.enum(ALL_ROLES))
+    .array(z.enum(STAFF_ROLES))
     .min(1, "At least one role is required"),
   display_name: z.string().min(1).optional(),
 });
@@ -36,6 +43,24 @@ const inviteSchema = z.object({
 export const POST = withPermission(
   "users:manage",
   async (request, { user }) => {
+    // Rate limit: 5 invites per minute per IP — this endpoint sends real
+    // emails via Supabase Auth, so we mirror the customer-invite limits.
+    // Key is namespaced `user-invite:` so this endpoint doesn't share a
+    // bucket with the customer-invite route (which uses `invite:`).
+    const ip = getClientIp(request);
+    const rl = rateLimit(`user-invite:${ip}`, {
+      windowMs: 60_000,
+      maxRequests: 5,
+    });
+    if (!rl.success) {
+      return errorResponse(
+        "RATE_LIMITED",
+        "Too many invite requests. Please try again later.",
+        { retryAfterMs: rl.resetMs },
+        429,
+      );
+    }
+
     const { email, roles, display_name } = await validateBody(
       inviteSchema,
       request,
@@ -114,12 +139,21 @@ export const POST = withPermission(
       .eq("id", userId);
 
     if (updateError) {
+      // The auth user was created with default roles=['viewer'] and
+      // status='active' by the create_user_profile trigger. If we don't
+      // surface this failure, the invitee will sign in with the wrong
+      // permissions and the caller has no signal that the requested roles
+      // were not applied. Fail loudly so the operator can retry or repair
+      // the profile manually before the invitee signs in.
       log.error(
         { error: updateError.message, userId, email },
         "User invited but profile update failed",
       );
-      // Don't throw — the invite was sent successfully.
-      // The profile can be updated manually from the user detail page.
+      throw new ApiError(
+        "INTERNAL_ERROR",
+        `Invitation email sent, but assigning roles failed: ${updateError.message}. The user was created with default 'viewer' role — fix from the user detail page before they sign in.`,
+        500,
+      );
     }
 
     log.info({ invitedBy: user.id, userId, email, roles }, "User invite completed");
