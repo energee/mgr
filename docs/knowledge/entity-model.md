@@ -1,0 +1,18 @@
+# Entity Model & Permissions
+
+> **Purpose.** Shared reference knowledge about the system's business record types (entities), how they relate to each other, and who is allowed to see or change them. Written for a general audience — safe to read as-is by engineering tooling today and by an in-product chat assistant later. This file is the source of truth for these rules: when a domain rule changes, update it here first.
+
+## Entity inventory
+
+The system manages 39 distinct types of business records — brands, batches, recipes, orders, purchase orders, inventory items, vessels, kegs, pricing tiers, customers, suppliers, and more. The most important relationships between them:
+
+- A **brew log** records the brew day (mash through knockout). A **batch** is the fermentation-through-packaging record. One brew log can split into several batches, and several brew logs can blend into one batch — they are linked with a volume allocation for each link, not a strict one-to-one.
+- An **order** belongs to a customer and has many **order items**, each naming a brand, package type, and quantity (optionally tied to a specific batch or packaged product). Customers can submit **change requests** against their own pending orders; each change request has line-item-level add/modify/remove entries and needs staff approval.
+- A **purchase order** goes to a supplier and has many **PO line items** (one per ingredient/catalog item ordered); each line item can be received in multiple partial **receives**, and each receive can create a lot of raw-material inventory.
+- A **packaging session** groups the packaging work for a given day and has many **session line items**, each one recording a brand + package format + the batches it was filled from, with planned vs. actual quantities. Packaging sessions consume materials through `selling_format_materials` — there is no direct link table between a session and a material; the bill-of-materials relationship goes through the selling format instead, by design.
+- The **keg** cluster tracks physical keg fleet by owner (Owned, Microstar, third-party fleets): keg types have a per-owner deposit amount, keg transactions record fills/movements, and customer keg balances are derived from those transactions.
+- The **pricing tier** cluster is a matrix: each pricing tier (e.g. "Tier 1") has a price for every combination of package format and sales channel; every price change is written to an audit history automatically.
+
+## Permission model
+
+Every user has one or more roles — admin, production manager, brewer, sales, viewer, or customer — and what a role can see or change is defined by named permissions (e.g. "batches: view," "orders: edit") rather than the role name itself, so access can be tuned per area of the product (recipes, batches, orders, customers, inventory, purchasing, vessels, integrations, settings). Admins can do everything. Most staff roles can view broadly within their area and edit only what their role covers (e.g. brewers can edit batches and recipes but not orders; sales can edit orders and customers but not inventory). Shared reference data (brands, ingredient catalogs, pricing tiers) is viewable by any signed-in staff member but only editable by admins. Customers only see their own orders, their own change requests, and their own keg balances — never other customers' data or internal operational records. The product has a single organization — there is no multi-company or multi-location data separation; permission scoping is entirely role-based.
