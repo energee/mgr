@@ -284,29 +284,14 @@ CREATE POLICY pricing_history_access ON pricing_history
 -- Remove old entries
 DELETE FROM _schema_registry WHERE table_name IN ('price_tiers', 'tier_prices', 'tier_prices_with_status');
 
--- Add new entries
-INSERT INTO _schema_registry (table_name, description, domain, is_primary_entity, key_fields, relationships, ui_hints)
-VALUES
-  ('pricing_tiers', 'Pricing tier definitions for the pricing matrix', 'sales', true,
-   '["name", "sort_order"]'::jsonb,
-   '["pricing_tier_prices", "recipes"]'::jsonb,
-   '{"icon": "layers", "color": "green"}'::jsonb),
-  ('pricing_tier_prices', 'Pricing matrix cells: one row per tier x format x channel', 'sales', false,
-   '["pricing_tier_id", "package_format_id", "sales_channel_id"]'::jsonb,
-   '["pricing_tier", "package_type", "sales_channel"]'::jsonb,
-   '{"icon": "dollar-sign", "color": "emerald"}'::jsonb),
-  ('pricing_history', 'Trigger-managed audit trail for price changes', 'sales', false,
-   '["pricing_tier_price_id", "changed_at"]'::jsonb,
-   '["pricing_tier_price"]'::jsonb,
-   '{"icon": "history", "color": "gray"}'::jsonb)
-ON CONFLICT (table_name) DO UPDATE SET
-  description = EXCLUDED.description,
-  domain = EXCLUDED.domain,
-  is_primary_entity = EXCLUDED.is_primary_entity,
-  key_fields = EXCLUDED.key_fields,
-  relationships = EXCLUDED.relationships,
-  ui_hints = EXCLUDED.ui_hints,
-  updated_at = NOW();
+-- HISTORICAL NO-OP: this INSERT referenced columns _schema_registry never had
+-- (is_primary_entity, ui_hints), so it failed on every environment and the
+-- rows do not exist in the live database. Commented out (rather than fixed)
+-- so a from-scratch replay reproduces the live state. See PR #322.
+-- INSERT INTO _schema_registry (table_name, description, domain, is_primary_entity, key_fields, relationships, ui_hints)
+-- VALUES
+--   ('pricing_tiers', ...), ('pricing_tier_prices', ...), ('pricing_history', ...)
+-- ON CONFLICT (table_name) DO UPDATE SET ...;
 
 -- Update package_types entry to note show_in_pricing column
 UPDATE _schema_registry

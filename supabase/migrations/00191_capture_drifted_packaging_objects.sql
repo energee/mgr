@@ -95,6 +95,9 @@ WITH (security_invoker = true) AS
     finished_good_id
    FROM combined;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.keg_inventory_summary CASCADE;
 CREATE OR REPLACE VIEW public.keg_inventory_summary
 WITH (security_invoker = true) AS
  SELECT sf.id AS selling_format_id,
@@ -114,6 +117,10 @@ WITH (security_invoker = true) AS
   GROUP BY sf.id, c.name, c.volume_bbl
   ORDER BY c.volume_bbl DESC NULLS LAST;
 
+-- PR #322: on a from-scratch replay the pre-drift (keg_type_id-era) shape
+-- still exists here and OR REPLACE cannot rename view columns; on live this
+-- is a drop-and-recreate of the identical definition in one transaction.
+DROP VIEW IF EXISTS public.keg_turnover_metrics CASCADE;
 CREATE OR REPLACE VIEW public.keg_turnover_metrics
 WITH (security_invoker = true) AS
  WITH transaction_pairs AS (
@@ -148,6 +155,9 @@ WITH (security_invoker = true) AS
   GROUP BY sf.id, c.name, c.volume_bbl, tp.keg_owner_id, ko.name
   ORDER BY c.name;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.bin_contents CASCADE;
 CREATE OR REPLACE VIEW public.bin_contents
 WITH (security_invoker = true) AS
  SELECT bi.bin_id,
@@ -177,6 +187,9 @@ UNION ALL
      JOIN inventory_items ii ON ii.id = il.inventory_item_id
   WHERE bii.quantity > 0::numeric;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.customer_keg_balances CASCADE;
 CREATE OR REPLACE VIEW public.customer_keg_balances
 WITH (security_invoker = true) AS
  WITH balance_changes AS (
@@ -215,6 +228,9 @@ WITH (security_invoker = true) AS
  HAVING sum(bc.delta) <> 0
   ORDER BY cust.name, c.name;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.customer_keg_balance_summary CASCADE;
 CREATE OR REPLACE VIEW public.customer_keg_balance_summary
 WITH (security_invoker = true) AS
  SELECT customer_id,
@@ -226,6 +242,9 @@ WITH (security_invoker = true) AS
   GROUP BY customer_id, customer_name
   ORDER BY customer_name;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.keg_aging_report CASCADE;
 CREATE OR REPLACE VIEW public.keg_aging_report
 WITH (security_invoker = true) AS
  WITH shipped_kegs AS (
@@ -283,6 +302,9 @@ WITH (security_invoker = true) AS
   WHERE ckb.kegs_out > 0
   ORDER BY kb.days_out DESC, cust.name;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.customer_keg_transaction_history CASCADE;
 CREATE OR REPLACE VIEW public.customer_keg_transaction_history
 WITH (security_invoker = true) AS
  SELECT kt.id,
@@ -311,6 +333,9 @@ WITH (security_invoker = true) AS
   WHERE kt.customer_id IS NOT NULL AND (kt.transaction_type = ANY (ARRAY['ship'::keg_transaction_type, 'return'::keg_transaction_type]))
   ORDER BY kt.created_at DESC;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.finished_goods_with_availability CASCADE;
 CREATE OR REPLACE VIEW public.finished_goods_with_availability
 WITH (security_invoker = true) AS
  SELECT fg.id,
@@ -355,6 +380,9 @@ WITH (security_invoker = true) AS
      LEFT JOIN allocations a ON a.source_type = 'finished_good'::text AND a.source_id = fg.id
   GROUP BY fg.id, b.name, sf.name, c.name, c.type;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.finished_goods_supply_by_product CASCADE;
 CREATE OR REPLACE VIEW public.finished_goods_supply_by_product
 WITH (security_invoker = true) AS
  SELECT fg.brand_id,
@@ -368,6 +396,9 @@ WITH (security_invoker = true) AS
   WHERE fg.brand_id IS NOT NULL AND fg.selling_format_id IS NOT NULL
   GROUP BY fg.brand_id, fg.selling_format_id;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.finished_goods_with_ttb_class CASCADE;
 CREATE OR REPLACE VIEW public.finished_goods_with_ttb_class
 WITH (security_invoker = true) AS
  SELECT fg.id,
@@ -397,6 +428,9 @@ WITH (security_invoker = true) AS
      LEFT JOIN containers c ON c.id = sf.container_id
      JOIN brands b ON fg.brand_id = b.id;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.order_demand_by_product CASCADE;
 CREATE OR REPLACE VIEW public.order_demand_by_product
 WITH (security_invoker = true) AS
  SELECT oi.brand_id,
@@ -413,6 +447,9 @@ WITH (security_invoker = true) AS
   WHERE (o.status <> ALL (ARRAY['fulfilled'::text, 'cancelled'::text])) AND oi.brand_id IS NOT NULL AND oi.selling_format_id IS NOT NULL AND COALESCE(o.scheduled_date, o.requested_date) IS NOT NULL
   GROUP BY oi.brand_id, oi.selling_format_id, (date_trunc('week'::text, COALESCE(o.scheduled_date, o.requested_date)::timestamp with time zone));
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.packaging_formats CASCADE;
 CREATE OR REPLACE VIEW public.packaging_formats
 WITH (security_invoker = true) AS
  SELECT sf.id,
@@ -430,6 +467,9 @@ WITH (security_invoker = true) AS
    FROM selling_formats sf
      JOIN containers c ON c.id = sf.container_id;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.recipe_ingredients_normalized CASCADE;
 CREATE OR REPLACE VIEW public.recipe_ingredients_normalized
 WITH (security_invoker = true) AS
  SELECT rm.recipe_id,
@@ -497,6 +537,14 @@ UNION ALL
    FROM recipe_fruits rf
      JOIN fruits f ON f.id = rf.fruit_id;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+-- DRIFT SHIM (PR #322): recipes.target_water_profile_id was added directly in
+-- the live DB (no migration); the view below selects it. No-op on live.
+ALTER TABLE recipes
+  ADD COLUMN IF NOT EXISTS target_water_profile_id UUID REFERENCES water_profiles(id);
+
+DROP VIEW IF EXISTS public.recipes_with_estimates CASCADE;
 CREATE OR REPLACE VIEW public.recipes_with_estimates
 WITH (security_invoker = true) AS
  WITH grain_totals AS (
@@ -616,6 +664,9 @@ WITH (security_invoker = true) AS
      LEFT JOIN yeasts y ON y.id = r.yeast_id
      LEFT JOIN batch_counts bc ON bc.recipe_id = r.id;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.yeast_lineage_summary CASCADE;
 CREATE OR REPLACE VIEW public.yeast_lineage_summary
 WITH (security_invoker = true) AS
  WITH RECURSIVE lineage AS (
@@ -657,6 +708,9 @@ WITH (security_invoker = true) AS
      LEFT JOIN yeast_pitch_events e ON e.pitch_id = l.id
   GROUP BY l.root_id, y.name, root.cost;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.yeast_pitches_with_remaining CASCADE;
 CREATE OR REPLACE VIEW public.yeast_pitches_with_remaining
 WITH (security_invoker = true) AS
  SELECT yp.id,
@@ -731,6 +785,9 @@ WITH (security_invoker = true) AS
      LEFT JOIN vessels v ON yp.vessel_id = v.id
      LEFT JOIN locations l ON yp.location_id = l.id;
 
+-- PR #322: pre-drift view shapes on a from-scratch replay block OR REPLACE
+-- (column renames/drops); on live this recreates the identical definition.
+DROP VIEW IF EXISTS public.customers_with_order_summary CASCADE;
 CREATE OR REPLACE VIEW public.customers_with_order_summary
 WITH (security_invoker = true) AS
  WITH ot AS (
@@ -787,6 +844,9 @@ WITH (security_invoker = true) AS
      LEFT JOIN order_stats os ON os.customer_id = c.id
      LEFT JOIN customer_keg_balance_summary kb ON c.id = kb.customer_id;
 
+-- PR #322: pre-drift definition has a different OUT-parameter row type;
+-- OR REPLACE cannot change it, so drop first (identical recreation on live).
+DROP FUNCTION IF EXISTS public.calculate_production_shortfalls(boolean, integer);
 CREATE OR REPLACE FUNCTION public.calculate_production_shortfalls(p_include_drafts boolean DEFAULT true, p_horizon_weeks integer DEFAULT 8)
  RETURNS TABLE(brand_id uuid, brand_name text, selling_format_id uuid, selling_format_name text, demand_week date, demand_quantity integer, available_quantity integer, in_production_bbl numeric, in_production_units integer, shortfall_quantity integer, recommended_brew_start date, lead_time_days integer, recipe_id uuid, recipe_name text, is_urgent boolean)
  LANGUAGE plpgsql
@@ -834,6 +894,9 @@ BEGIN
   ORDER BY (d.demand_week - (COALESCE(pr.fermentation_days, 14) + COALESCE(pr.conditioning_days, 7) + v_packaging_buffer))::date <= CURRENT_DATE + 7 DESC, d.demand_week, d.brand_id;
 END; $function$;
 
+-- PR #322: pre-drift definition has a different OUT-parameter row type;
+-- OR REPLACE cannot change it, so drop first (identical recreation on live).
+DROP FUNCTION IF EXISTS public.get_ttb_inventory_summary(integer, integer);
 CREATE OR REPLACE FUNCTION public.get_ttb_inventory_summary(p_year integer, p_month integer)
  RETURNS TABLE(ttb_tax_class text, beginning_inventory_bbl numeric, ending_inventory_bbl numeric, in_process_beginning_bbl numeric, in_process_ending_bbl numeric)
  LANGUAGE sql
@@ -944,6 +1007,9 @@ AS $function$
   LEFT JOIN ip_ending ipe ON ipe.tax_class = tc.tax_class;
 $function$;
 
+-- PR #322: pre-drift definition has a different OUT-parameter row type;
+-- OR REPLACE cannot change it, so drop first (identical recreation on live).
+DROP FUNCTION IF EXISTS public.get_ttb_production_summary(integer, integer);
 CREATE OR REPLACE FUNCTION public.get_ttb_production_summary(p_year integer, p_month integer)
  RETURNS TABLE(ttb_tax_class text, beer_produced_bbl numeric, beer_packaged_bbl numeric, finished_goods_count bigint)
  LANGUAGE sql
@@ -994,6 +1060,9 @@ AS $function$
   LEFT JOIN fg_summary fs ON fs.tax_class = ac.tax_class;
 $function$;
 
+-- PR #322: pre-drift definition has a different OUT-parameter row type;
+-- OR REPLACE cannot change it, so drop first (identical recreation on live).
+DROP FUNCTION IF EXISTS public.get_ttb_removals_summary(integer, integer);
 CREATE OR REPLACE FUNCTION public.get_ttb_removals_summary(p_year integer, p_month integer)
  RETURNS TABLE(ttb_tax_class text, taxpaid_domestic_bbl numeric, taxpaid_export_bbl numeric, tax_free_samples_bbl numeric, losses_bbl numeric, destroyed_bbl numeric, adjustments_bbl numeric)
  LANGUAGE sql

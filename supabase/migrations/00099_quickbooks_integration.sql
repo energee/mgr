@@ -209,7 +209,9 @@ INSERT INTO _schema_registry (table_name, description, domain, key_fields, relat
 ON CONFLICT (table_name) DO UPDATE SET
   description = EXCLUDED.description,
   domain = EXCLUDED.domain,
-  entity_type = EXCLUDED.entity_type,
+  -- entity_type assignment removed in PR #322: _schema_registry has no such
+  -- column, so this statement had never executed anywhere; the live rows were
+  -- inserted out-of-band with this same content.
   key_fields = EXCLUDED.key_fields,
   relationships = EXCLUDED.relationships,
   query_examples = EXCLUDED.query_examples;

@@ -43,7 +43,10 @@ ON CONFLICT DO NOTHING;
 
 -- 3. Drop customers.user_id column (and its index)
 DROP INDEX IF EXISTS idx_customers_user_id;
-ALTER TABLE customers DROP COLUMN user_id;
+-- CASCADE (added in PR #322): the old portal policies still reference this
+-- column at this point; without CASCADE the DROP fails. Section 4 recreates
+-- every cascaded policy immediately below, so the end state is unchanged.
+ALTER TABLE customers DROP COLUMN user_id CASCADE;
 
 -- 4. Replace RLS policies that referenced customers.user_id
 

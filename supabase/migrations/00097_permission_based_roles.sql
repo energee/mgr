@@ -20,7 +20,11 @@ DROP POLICY IF EXISTS enum_values_delete ON enum_values;
 ALTER TABLE user_profiles ADD COLUMN roles TEXT[] NOT NULL DEFAULT '{viewer}';
 UPDATE user_profiles SET roles = ARRAY[role];
 ALTER TABLE user_profiles DROP CONSTRAINT chk_user_role;
-ALTER TABLE user_profiles DROP COLUMN role;
+-- CASCADE (added in PR #322): portal_users_staff_all (00095) referenced this
+-- column and blocked the DROP. The cascaded policy is intentionally NOT
+-- recreated here — live has no policies on customer_portal_users at this
+-- point in history; 00197 installs the permission-based replacements.
+ALTER TABLE user_profiles DROP COLUMN role CASCADE;
 DROP INDEX IF EXISTS idx_user_profiles_role;
 CREATE INDEX idx_user_profiles_roles ON user_profiles USING GIN (roles);
 
@@ -372,12 +376,20 @@ END $$;
 -- =============================================================================
 -- SECTION 5i: INTEGRATIONS (admin only)
 -- =============================================================================
+-- Existence guard (added in PR #322): the qbo_* tables are only created in
+-- 00099, two migrations later — historically these policy creations failed
+-- for them and the real qbo policies come from 00099/00102. Skipping missing
+-- tables reproduces that order on a from-scratch replay.
 DO $$ DECLARE _tbl TEXT; BEGIN
   FOR _tbl IN SELECT unnest(ARRAY[
     'square_settings','square_catalog_map','square_sync_log','square_draft_sales',
     'slack_settings','slack_notification_log',
     'qbo_account_mappings','qbo_sync_log','qbo_sync_mappings'
   ]) LOOP
+    IF to_regclass('public.'||_tbl) IS NULL THEN
+      RAISE NOTICE 'table % does not exist yet; policies come from a later migration', _tbl;
+      CONTINUE;
+    END IF;
     EXECUTE format('CREATE POLICY %I ON %I FOR SELECT USING (user_has_permission(''integrations:manage''))', _tbl||'_select', _tbl);
     EXECUTE format('CREATE POLICY %I ON %I FOR ALL USING (user_has_permission(''integrations:manage'')) WITH CHECK (user_has_permission(''integrations:manage''))', _tbl||'_write', _tbl);
   END LOOP;
