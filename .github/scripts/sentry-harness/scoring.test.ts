@@ -12,7 +12,7 @@ function makeIssue(partial: Partial<SentryIssue> & { issueId: string }): SentryI
     culprit: partial.culprit ?? "src/foo.ts",
     permalink: partial.permalink ?? "https://sentry.io/x",
     stackTrace: partial.stackTrace ?? "",
-    eventCount7d: partial.eventCount7d ?? 1,
+    eventCount14d: partial.eventCount14d ?? 1,
     firstSeen: partial.firstSeen ?? "2026-04-09T00:00:00Z",
     lastSeen: partial.lastSeen ?? NOW.toISOString(),
     level: partial.level ?? "error",
@@ -50,9 +50,9 @@ describe("recencyScore", () => {
 describe("normalizeFrequencies", () => {
   it("normalizes against the max in the batch", () => {
     const issues = [
-      makeIssue({ issueId: "1", eventCount7d: 100 }),
-      makeIssue({ issueId: "2", eventCount7d: 50 }),
-      makeIssue({ issueId: "3", eventCount7d: 25 }),
+      makeIssue({ issueId: "1", eventCount14d: 100 }),
+      makeIssue({ issueId: "2", eventCount14d: 50 }),
+      makeIssue({ issueId: "3", eventCount14d: 25 }),
     ];
     const result = normalizeFrequencies(issues);
     expect(result.get("1")).toBe(1.0);
@@ -62,8 +62,8 @@ describe("normalizeFrequencies", () => {
 
   it("returns 0 for all when max is 0", () => {
     const issues = [
-      makeIssue({ issueId: "1", eventCount7d: 0 }),
-      makeIssue({ issueId: "2", eventCount7d: 0 }),
+      makeIssue({ issueId: "1", eventCount14d: 0 }),
+      makeIssue({ issueId: "2", eventCount14d: 0 }),
     ];
     const result = normalizeFrequencies(issues);
     expect(result.get("1")).toBe(0);
@@ -78,7 +78,7 @@ describe("normalizeFrequencies", () => {
 describe("scoreIssues", () => {
   it("combines frequency (0.6) and recency (0.4)", () => {
     const issues = [
-      makeIssue({ issueId: "1", eventCount7d: 100, lastSeen: NOW.toISOString() }),
+      makeIssue({ issueId: "1", eventCount14d: 100, lastSeen: NOW.toISOString() }),
     ];
     const scored = scoreIssues(issues, NOW);
     expect(scored[0].score).toBeCloseTo(1.0, 5);
@@ -88,12 +88,12 @@ describe("scoreIssues", () => {
     const issues = [
       makeIssue({
         issueId: "freq",
-        eventCount7d: 100,
+        eventCount14d: 100,
         lastSeen: new Date(NOW.getTime() - 48 * 60 * 60 * 1000).toISOString(),
       }),
       makeIssue({
         issueId: "fresh",
-        eventCount7d: 10,
+        eventCount14d: 10,
         lastSeen: NOW.toISOString(),
       }),
     ];

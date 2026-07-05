@@ -13,18 +13,18 @@ describe("buildIssuesUrl", () => {
       org: "my-org",
       project: "my-proj",
       environment: "development",
-      statsPeriod: "7d",
+      statsPeriod: "24h",
       limit: 20,
     });
     expect(url).toContain("/api/0/projects/my-org/my-proj/issues/");
     expect(url).toContain("query=is%3Aunresolved+environment%3Adevelopment");
-    expect(url).toContain("statsPeriod=7d");
+    expect(url).toContain("statsPeriod=24h");
     expect(url).toContain("limit=20");
   });
 
-  it("defaults to 7d statsPeriod (matches SentryIssue.eventCount7d field) and 20 limit", () => {
+  it("defaults to 14d statsPeriod (matches SentryIssue.eventCount14d field) and 20 limit", () => {
     const url = buildIssuesUrl({ org: "o", project: "p", environment: "development" });
-    expect(url).toContain("statsPeriod=7d");
+    expect(url).toContain("statsPeriod=14d");
     expect(url).toContain("limit=20");
   });
 
@@ -100,7 +100,7 @@ describe("normalizeIssue", () => {
       issueId: "12345",
       shortId: "MGR-42",
       title: "TypeError: x is undefined",
-      eventCount7d: 342,
+      eventCount14d: 342,
       level: "error",
       environment: "development",
       stackTrace: "stack trace text",

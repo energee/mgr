@@ -57,8 +57,10 @@ export function buildIssuesUrl(opts: {
     : "is:unresolved";
   const params = new URLSearchParams({
     query,
-    // Default matches the `eventCount7d` field on SentryIssue; callers can override.
-    statsPeriod: opts.statsPeriod ?? "7d",
+    // Default matches the `eventCount14d` field on SentryIssue; callers can
+    // override. Sentry's project issues endpoint only accepts '', '24h', and
+    // '14d' — '7d' started returning 400s in June 2026.
+    statsPeriod: opts.statsPeriod ?? "14d",
     limit: String(opts.limit ?? 20),
     sort: "freq",
   });
@@ -117,7 +119,7 @@ export function normalizeIssue(
     culprit: raw.culprit,
     permalink: raw.permalink,
     stackTrace,
-    eventCount7d: Number.parseInt(raw.count, 10) || 0,
+    eventCount14d: Number.parseInt(raw.count, 10) || 0,
     firstSeen: raw.firstSeen,
     lastSeen: raw.lastSeen,
     level,

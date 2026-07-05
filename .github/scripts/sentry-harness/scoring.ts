@@ -25,9 +25,9 @@ export function recencyScore(lastSeenIso: string, now: Date = new Date()): numbe
 export function normalizeFrequencies(issues: SentryIssue[]): Map<string, number> {
   const result = new Map<string, number>();
   if (issues.length === 0) return result;
-  const max = Math.max(...issues.map((i) => i.eventCount7d));
+  const max = Math.max(...issues.map((i) => i.eventCount14d));
   for (const issue of issues) {
-    result.set(issue.issueId, max === 0 ? 0 : issue.eventCount7d / max);
+    result.set(issue.issueId, max === 0 ? 0 : issue.eventCount14d / max);
   }
   return result;
 }

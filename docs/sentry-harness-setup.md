@@ -96,4 +96,12 @@ use case.
 - **Duplicate PRs across runs** — this should not happen. If it does,
   check that open PRs use the exact branch format
   `sentry-fix/SENTRY-<numeric-issue-id>`; any variation will break
-  dedup.
+  dedup. Dedup also skips issues whose latest merged `sentry-fix/` PR
+  is newer than the issue's `lastSeen` — Sentry keeps issues
+  "unresolved" until resolved by hand, so a merged fix would otherwise
+  be re-picked every run. An issue that recurs after its fix merged
+  becomes eligible again.
+- **`400: Invalid stats_period`** — Sentry's project issues endpoint
+  only accepts `''`, `24h`, and `14d` for `statsPeriod` (it rejected
+  the harness's original `7d` starting June 2026). The default lives
+  in `buildIssuesUrl` in `.github/scripts/sentry-harness/sentry-api.ts`.

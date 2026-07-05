@@ -106,9 +106,17 @@ def main() -> int:
             intervention_class=intervention_class,
         )
 
+        # Sonnet by default: proposals are screened by typecheck+vitest, so a
+        # weaker model only lowers the win-rate, never correctness — and it
+        # sidesteps the Max-subscription rate-limit smoothing that stretched
+        # late campaign iterations to 20-35 min. Override for one campaign
+        # with AUTOHARNESS_CLAUDE_MODEL=opus (or any model id).
+        model = os.environ.get("AUTOHARNESS_CLAUDE_MODEL", "sonnet")
+
         cmd = [
             claude_bin,
             "--print",
+            "--model", model,
             "--output-format", "json",
             "--no-session-persistence",
             "--add-dir", str(target_root),
