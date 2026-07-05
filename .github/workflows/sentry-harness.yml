@@ -93,6 +93,10 @@ jobs:
           # silently with 9–19 permission_denials each because none of the
           # write/exec tools were allowed — Claude completed turns without
           # being able to apply, validate, or push the fix.
-          claude_args: '--allowed-tools "Bash,Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task,WebFetch"'
+          # Sonnet is sufficient here: the prompt pipeline is heavily gated
+          # (reproducing test, typecheck/test/lint, make check, /code-review
+          # pass) and has a diagnostic-PR fallback, so a lighter model trades
+          # nothing but is faster and cheaper across up to 5 matrix jobs/run.
+          claude_args: '--model claude-sonnet-5 --allowed-tools "Bash,Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task,WebFetch"'
           additional_permissions: |
             actions: read

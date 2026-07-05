@@ -9,7 +9,7 @@ const issue: SentryIssue = {
   culprit: "src/lib/foo.ts in handleBar",
   permalink: "https://sentry.io/organizations/x/issues/12345/",
   stackTrace: "TypeError: ...\n  at handleBar (src/lib/foo.ts:42)",
-  eventCount7d: 342,
+  eventCount14d: 342,
   firstSeen: "2026-04-14T09:00:00Z",
   lastSeen: "2026-04-16T14:00:00Z",
   level: "error",

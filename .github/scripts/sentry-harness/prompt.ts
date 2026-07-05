@@ -15,7 +15,7 @@ export function buildFixPrompt(issue: SentryIssue): string {
 - **Culprit**: ${issue.culprit}
 - **Environment**: ${issue.environment}
 - **Level**: ${issue.level}
-- **Events (7d)**: ${issue.eventCount7d}
+- **Events (14d)**: ${issue.eventCount14d}
 - **First seen**: ${issue.firstSeen}
 - **Last seen**: ${issue.lastSeen}
 - **Sentry link**: ${issue.permalink}
@@ -69,7 +69,7 @@ If after 3 attempts you cannot produce a working fix, OR the root cause is outsi
 \`\`\`markdown
 ## Sentry Fix: ${issue.title}
 
-**Issue:** [${issue.shortId}](${issue.permalink}) | **Events (7d):** ${issue.eventCount7d} | **First seen:** ${issue.firstSeen} | **Last seen:** ${issue.lastSeen}
+**Issue:** [${issue.shortId}](${issue.permalink}) | **Events (14d):** ${issue.eventCount14d} | **First seen:** ${issue.firstSeen} | **Last seen:** ${issue.lastSeen}
 
 ### Root Cause
 <deep analysis with file:line references>

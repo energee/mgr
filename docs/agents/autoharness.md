@@ -106,6 +106,12 @@ and demands `ANTHROPIC_API_KEY`. The shim swaps that for a plain
 (works with Max subscription), then unwraps the `structured_output` field
 from the `--output-format json` envelope.
 
+The shim runs **Sonnet by default** (`AUTOHARNESS_CLAUDE_MODEL` overrides,
+e.g. `AUTOHARNESS_CLAUDE_MODEL=opus autoharness optimize`). Proposals are
+screened by typecheck+vitest, so a lighter model only lowers the win-rate,
+never correctness — and it avoids the Max rate-limit smoothing that
+stretched late iterations to 20-35 min.
+
 The shim disallows `Edit Write NotebookEdit MultiEdit` tools so Claude can
 inspect the repo but cannot apply changes outside the structured output —
 autoharness owns the edit application.
