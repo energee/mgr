@@ -22,8 +22,12 @@ function requireEnv(name: string): string {
   return value;
 }
 
+// No --search here: GitHub's search API returns empty results under the
+// Actions GITHUB_TOKEN (observed in run 28745947348 — 0 hits vs. 11 real
+// sentry-fix PRs), silently disabling dedup. Fetch the plain PR list and
+// let the branch regex in dedup.ts pick out sentry-fix branches.
 function ghPrList<T>(args: string[]): T {
-  const result = spawnSync("gh", ["pr", "list", "--search", "head:sentry-fix/", ...args], {
+  const result = spawnSync("gh", ["pr", "list", ...args], {
     encoding: "utf8",
   });
   if (result.status !== 0) {
