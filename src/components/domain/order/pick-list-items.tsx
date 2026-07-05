@@ -475,7 +475,7 @@ export function PickListItems({ data }: PickListItemsProps) {
                     <span className="font-mono">{item.lot_number}</span>
                     {item.production_date && (
                       <span className="text-xs text-muted-foreground">
-                        {new Date(item.production_date).toLocaleDateString()}
+                        {new Date(item.production_date).toLocaleDateString("en-US")}
                       </span>
                     )}
                   </div>
@@ -629,7 +629,7 @@ export function PickListItems({ data }: PickListItemsProps) {
                       <div className="font-mono text-sm">{item.lot_number}</div>
                       {item.production_date && (
                         <div className="text-xs text-muted-foreground">
-                          {new Date(item.production_date).toLocaleDateString()}
+                          {new Date(item.production_date).toLocaleDateString("en-US")}
                         </div>
                       )}
                     </TableCell>

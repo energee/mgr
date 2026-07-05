@@ -76,15 +76,19 @@ export function localDateString(date = new Date()): string {
 
 export type ValueFormat = "date" | "datetime" | "currency" | "number" | "percentage" | "json" | "unit";
 
-/** Format an unknown value for display in tables and detail views. */
+/**
+ * Format an unknown value for display in tables and detail views.
+ * Date/datetime output pins the "en-US" locale so SSR and client render
+ * identically regardless of environment locale (MGR-7 hydration fix).
+ */
 export function formatValue(value: unknown, format?: ValueFormat): string {
   if (value === null || value === undefined) return "—";
 
   switch (format) {
     case "date":
-      return new Date(value as string).toLocaleDateString();
+      return new Date(value as string).toLocaleDateString("en-US");
     case "datetime":
-      return new Date(value as string).toLocaleString();
+      return new Date(value as string).toLocaleString("en-US");
     case "currency":
       return `$${(value as number).toFixed(2)}`;
     case "number":

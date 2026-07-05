@@ -143,7 +143,7 @@ export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
                   <div>
                     <span className="text-muted-foreground">Brew Date</span>
                     <span className="ml-2">
-                      {new Date(brew.brew_date).toLocaleDateString()}
+                      {new Date(brew.brew_date).toLocaleDateString("en-US")}
                     </span>
                   </div>
                   <div>

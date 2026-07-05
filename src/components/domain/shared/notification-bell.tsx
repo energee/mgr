@@ -27,6 +27,9 @@ import { log } from "@/lib/client-logger";
 // Helper Functions
 // =============================================================================
 
+// Deliberately distinct from formatRelativeDate in @/lib/format: the bell
+// dropdown uses this compact "Xm ago" style rather than calendar buckets
+// ("Today"/"Yesterday").
 function formatTimeAgo(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -39,7 +42,7 @@ function formatTimeAgo(date: Date): string {
   if (diffMin < 60) return `${diffMin}m ago`;
   if (diffHour < 24) return `${diffHour}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
-  return date.toLocaleDateString();
+  return date.toLocaleDateString("en-US");
 }
 
 function getPriorityColor(priority: Notification["priority"]): string {

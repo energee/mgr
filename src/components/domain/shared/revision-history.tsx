@@ -31,6 +31,9 @@ import {
 
 /**
  * Format a date as relative time (e.g., "2 hours ago", "3 days ago").
+ * Deliberately distinct from formatRelativeDate in @/lib/format: revision rows
+ * use this compact "X ago" style rather than calendar buckets
+ * ("Today"/"Yesterday").
  */
 function formatTimeAgo(date: Date): string {
   const now = new Date();
@@ -49,7 +52,7 @@ function formatTimeAgo(date: Date): string {
   } else if (diffDays < 30) {
     return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
   } else {
-    return date.toLocaleDateString();
+    return date.toLocaleDateString("en-US");
   }
 }
 

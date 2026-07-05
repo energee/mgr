@@ -99,7 +99,7 @@ export function BatchTransferTimeline({ data }: BatchTransferTimelineProps) {
               </TimelineDescription>
             </TimelineHeader>
             <TimelineTime dateTime={transfer.transferred_at}>
-              {new Date(transfer.transferred_at).toLocaleDateString(undefined, {
+              {new Date(transfer.transferred_at).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
