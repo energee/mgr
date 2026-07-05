@@ -4,13 +4,16 @@
 -- Tables and severities:
 --   water_addition_profiles    (CRITICAL-1) USING (true) / WITH CHECK (true)
 --     → catalog pattern (read any auth, write settings:manage)
---   keg_inventory              (CRITICAL-2) old-style USING (true)
---     → inventory:read / inventory:write
 --   customer_portal_users      (MEDIUM-1)   staff side too permissive
 --     → tighten staff side; preserve customer self-access
 --   order_change_requests      (MEDIUM-2)   staff side too permissive
 --     → tighten staff side; preserve customer self-access
 --   order_change_request_items (MEDIUM-2)   same as above
+--
+-- keg_inventory (original audit CRITICAL-2) needs no policy work: it has been
+-- a VIEW since 00032 (recreated in 00079, drift-captured in 00191 with
+-- security_invoker = true), so RLS on the underlying kegs/keg_transactions
+-- tables applies. Views cannot carry policies.
 --
 -- For customer-portal tables we add a staff-side gate via
 -- user_has_permission(); the existing customer-side policies (own-row
@@ -18,40 +21,34 @@
 
 -- ---------------------------------------------------------------------------
 -- water_addition_profiles — catalog pattern
+--
+-- Guarded: this table exists only in the live database (created out-of-band;
+-- no CREATE TABLE in any migration), so a fresh `supabase db reset` /
+-- CI-from-migrations database does not have it. The DO block makes the
+-- migration a no-op there while still tightening the live database.
 -- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS water_addition_profiles_select ON water_addition_profiles;
-DROP POLICY IF EXISTS water_addition_profiles_write ON water_addition_profiles;
-DROP POLICY IF EXISTS "Authenticated users can manage water_addition_profiles"
-  ON water_addition_profiles;
-DROP POLICY IF EXISTS water_addition_profiles_authenticated
-  ON water_addition_profiles;
+DO $$
+BEGIN
+  IF to_regclass('public.water_addition_profiles') IS NOT NULL THEN
+    EXECUTE $sql$DROP POLICY IF EXISTS water_addition_profiles_select ON water_addition_profiles$sql$;
+    EXECUTE $sql$DROP POLICY IF EXISTS water_addition_profiles_write ON water_addition_profiles$sql$;
+    EXECUTE $sql$DROP POLICY IF EXISTS "Authenticated users can manage water_addition_profiles" ON water_addition_profiles$sql$;
+    EXECUTE $sql$DROP POLICY IF EXISTS water_addition_profiles_authenticated ON water_addition_profiles$sql$;
 
-CREATE POLICY water_addition_profiles_select ON water_addition_profiles
-  FOR SELECT
-  USING ((SELECT auth.uid()) IS NOT NULL);
+    EXECUTE $sql$
+      CREATE POLICY water_addition_profiles_select ON water_addition_profiles
+        FOR SELECT
+        USING ((SELECT auth.uid()) IS NOT NULL)
+    $sql$;
 
-CREATE POLICY water_addition_profiles_write ON water_addition_profiles
-  FOR ALL
-  USING (user_has_permission('settings:manage'))
-  WITH CHECK (user_has_permission('settings:manage'));
-
--- ---------------------------------------------------------------------------
--- keg_inventory — inventory domain
--- ---------------------------------------------------------------------------
-DROP POLICY IF EXISTS keg_inventory_select ON keg_inventory;
-DROP POLICY IF EXISTS keg_inventory_write ON keg_inventory;
-DROP POLICY IF EXISTS "Authenticated users can view keg inventory" ON keg_inventory;
-DROP POLICY IF EXISTS "Authenticated users can manage keg inventory" ON keg_inventory;
-DROP POLICY IF EXISTS keg_inventory_authenticated ON keg_inventory;
-
-CREATE POLICY keg_inventory_select ON keg_inventory
-  FOR SELECT
-  USING (user_has_permission('inventory:read'));
-
-CREATE POLICY keg_inventory_write ON keg_inventory
-  FOR ALL
-  USING (user_has_permission('inventory:write'))
-  WITH CHECK (user_has_permission('inventory:write'));
+    EXECUTE $sql$
+      CREATE POLICY water_addition_profiles_write ON water_addition_profiles
+        FOR ALL
+        USING (user_has_permission('settings:manage'))
+        WITH CHECK (user_has_permission('settings:manage'))
+    $sql$;
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- customer_portal_users — tighten staff side

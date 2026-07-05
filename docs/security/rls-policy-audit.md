@@ -1,6 +1,6 @@
 # RLS Policy Audit
 
-**Last updated:** 2026-05-20 (post-coverage-gap fixes, migrations 00174–00179)
+**Last updated:** 2026-05-20 (post-coverage-gap fixes, migrations 00193–00198)
 **Original audit:** 2026-02-26 (migrations 00001–00099)
 **Addendum:** 2026-05-19 (migrations 00100–00173)
 **Plan:** [`docs/plans/2026-05-19-rls-single-source-of-truth-plan.md`](../plans/2026-05-19-rls-single-source-of-truth-plan.md)
@@ -56,7 +56,7 @@ evaluates the function once per query instead of once per row.
 metadata / audit / directory tables are intentionally readable by any
 authenticated user. Every such policy carries an inline
 `COMMENT ON POLICY ... IS 'RLS-EXCEPTION: <reason>'` marker added in migration
-`00179_rls_exception_comments.sql`. The Task 8 integration test fails CI if a
+`00198_rls_exception_comments.sql`. The Task 8 integration test fails CI if a
 new permissive policy is introduced without one.
 
 ---
@@ -75,43 +75,43 @@ new permissive policy is introduced without one.
 ## Resolution table — original audit + addendum findings
 
 This collapses the original audit's Critical/High/Medium findings and the
-2026-05-19 addendum's regression list. Migrations `00174`–`00178` close the
-RLS gaps; `00179` adds inline `RLS-EXCEPTION:` comments for the documented
+2026-05-19 addendum's regression list. Migrations `00193`–`00197` close the
+RLS gaps; `00198` adds inline `RLS-EXCEPTION:` comments for the documented
 permissive policies.
 
 | Severity | Table | Original status | Required | Resolved by | Notes |
 |----------|-------|-----------------|----------|-------------|-------|
-| CRITICAL | `water_addition_profiles` | `USING (true)` / `WITH CHECK (true)` (00096) | Catalog pattern (read: any auth; write: `settings:manage`) | `00178` | Original audit CRITICAL-1. Tightened plus permissive SELECT documented in 00179. |
-| CRITICAL | `keg_inventory` | `USING (true)` / `WITH CHECK (true)` (00031) | `inventory:read` / `inventory:write` | `00178` | Original audit CRITICAL-2. |
-| CRITICAL | `yeast_pitch_events` | `auth.uid() IS NOT NULL` (00095, regressed by 00158) | `batches:read` / `batches:write` | `00174` | Original audit HIGH-1; reopened by 00158 then closed by 00174. |
-| CRITICAL | `selling_format_materials` | `USING (true)` / `WITH CHECK (true)` (00160) | Catalog read; `settings:manage` write | `00175` | 2026-05-19 addendum. SELECT documented in 00179. |
-| CRITICAL | `brewery_shipping_defaults` | `USING (true)` / `WITH CHECK (true)` (00162) | Catalog read; `settings:manage` write | `00176` | 2026-05-19 addendum. SELECT documented in 00179. |
-| CRITICAL | `customer_shipping_materials` | `USING (true)` / `WITH CHECK (true)` (00162) | `customers:read` / `customers:write` | `00176` | 2026-05-19 addendum. |
-| CRITICAL | `customer_pallet_configs` | `USING (true)` / `WITH CHECK (true)` (00162) | `customers:read` / `customers:write` | `00176` | 2026-05-19 addendum. |
-| CRITICAL | `order_materials` | `USING (true)` / `WITH CHECK (true)` (00162) | `orders:read` / `orders:write` | `00176` | 2026-05-19 addendum. |
-| MEDIUM   | `customer_portal_users` | Staff: profile-exists only | Staff: `customers:read/write` | `00178` | Original audit MEDIUM-1. Staff policies replaced; customer self-read policy retained. |
-| MEDIUM   | `order_change_requests` | Staff: profile-exists only | Staff: `orders:read/write` | `00178` | Original audit MEDIUM-2. |
-| MEDIUM   | `order_change_request_items` | Staff: profile-exists only | Staff: `orders:read/write` | `00178` | Original audit MEDIUM-2. |
-| MEDIUM   | `mongodb_sync_log` | `FOR SELECT USING (true)` (00165) | `settings:manage` | `00177` | 2026-05-19 addendum. |
-| MEDIUM   | `mongodb_sync_mappings` | `FOR SELECT USING (true)` (00165) | `settings:manage` | `00177` | 2026-05-19 addendum. |
-| INFO     | `00130` / `00137` duplicate keg-owner-deposits | Byte-identical migration | Drop duplicate body | `00137` | Body replaced with no-op comment (Task 7). |
+| CRITICAL | `water_addition_profiles` | `USING (true)` / `WITH CHECK (true)` (00096) | Catalog pattern (read: any auth; write: `settings:manage`) | `00197` | Original audit CRITICAL-1. Tightened plus permissive SELECT documented in 00198. Live-DB-only table (no `CREATE TABLE` in any migration), so 00197 guards it with `to_regclass` and migrations-built databases skip it. |
+| CRITICAL | `keg_inventory` | `USING (true)` / `WITH CHECK (true)` (00031) | n/a — view, not a table | `00191` | Original audit CRITICAL-2. `keg_inventory` has been a VIEW since 00032 (recreated in 00079); 00191 re-captures it `WITH (security_invoker = true)`, so the underlying `kegs`/`keg_transactions` RLS applies. Views cannot carry policies. |
+| CRITICAL | `yeast_pitch_events` | `auth.uid() IS NOT NULL` (00095, regressed by 00158) | `batches:read` / `batches:write` | `00193` | Original audit HIGH-1; reopened by 00158 then closed by 00193. |
+| CRITICAL | `selling_format_materials` | `USING (true)` / `WITH CHECK (true)` (00160) | Catalog read; `settings:manage` write | `00194` | 2026-05-19 addendum. SELECT documented in 00198. |
+| CRITICAL | `brewery_shipping_defaults` | `USING (true)` / `WITH CHECK (true)` (00162) | Catalog read; `settings:manage` write | `00195` | 2026-05-19 addendum. SELECT documented in 00198. |
+| CRITICAL | `customer_shipping_materials` | `USING (true)` / `WITH CHECK (true)` (00162) | `customers:read` / `customers:write` | `00195` | 2026-05-19 addendum. |
+| CRITICAL | `customer_pallet_configs` | `USING (true)` / `WITH CHECK (true)` (00162) | `customers:read` / `customers:write` | `00195` | 2026-05-19 addendum. |
+| CRITICAL | `order_materials` | `USING (true)` / `WITH CHECK (true)` (00162) | `orders:read` / `orders:write` | `00195` | 2026-05-19 addendum. |
+| MEDIUM   | `customer_portal_users` | Staff: profile-exists only | Staff: `customers:read/write` | `00197` | Original audit MEDIUM-1. Staff policies replaced; customer self-read policy retained. |
+| MEDIUM   | `order_change_requests` | Staff: profile-exists only | Staff: `orders:read/write` | `00197` | Original audit MEDIUM-2. |
+| MEDIUM   | `order_change_request_items` | Staff: profile-exists only | Staff: `orders:read/write` | `00197` | Original audit MEDIUM-2. |
+| MEDIUM   | `mongodb_sync_log` | `FOR SELECT USING (true)` (00165) | `settings:manage` | `00196` | 2026-05-19 addendum. |
+| MEDIUM   | `mongodb_sync_mappings` | `FOR SELECT USING (true)` (00165) | `settings:manage` | `00196` | 2026-05-19 addendum. |
+| INFO     | `00130` / `00137` duplicate keg-owner-deposits | Byte-identical migration | Document the duplicate | `00130`/`00137` | Explanatory header comments added to both files; bodies retained because both are already applied to existing databases (re-application is idempotent via `DROP POLICY IF EXISTS`) (Task 7). |
 
 ---
 
-## Permissive policies retained (with `RLS-EXCEPTION` markers in 00179)
+## Permissive policies retained (with `RLS-EXCEPTION` markers in 00198)
 
 Each of the policies below is deliberately permissive at the row-filter level
 because the table itself is non-sensitive or because a separate boundary
 protects writes. All carry `COMMENT ON POLICY ... IS 'RLS-EXCEPTION: …'`
-added in `00179_rls_exception_comments.sql`.
+added in `00198_rls_exception_comments.sql`.
 
 | Table | Policy | Why permissive |
 |-------|--------|----------------|
 | `_schema_registry` | `schema_registry_read` | Self-documenting metadata for AI agents; seeded only by migrations. |
 | `additives`, `adjuncts`, `beer_styles`, `brands`, `enum_values`, `fruits`, `hops`, `malts`, `package_types`, `pricing_history`, `pricing_tier_prices`, `pricing_tiers`, `sales_channels`, `spices`, `sugars`, `water_profiles`, `yeasts` | `<table>_select` | Catalog reference data; companion `_write` policy gates writes by `settings:manage`. |
-| `selling_format_materials` | `selling_format_materials_select` | BOM reference data; companion `_write` gates writes by `settings:manage` (00175). |
-| `brewery_shipping_defaults` | `brewery_shipping_defaults_select` | Brewery-wide config; companion `_write` gates writes by `settings:manage` (00176). |
-| `water_addition_profiles` | `water_addition_profiles_select` | Catalog reference data; companion `_write` gates writes by `settings:manage` (00178). |
+| `selling_format_materials` | `selling_format_materials_select` | BOM reference data; companion `_write` gates writes by `settings:manage` (00194). |
+| `brewery_shipping_defaults` | `brewery_shipping_defaults_select` | Brewery-wide config; companion `_write` gates writes by `settings:manage` (00195). |
+| `water_addition_profiles` | `water_addition_profiles_select` | Catalog reference data; companion `_write` gates writes by `settings:manage` (00197, guarded — live-DB-only table). |
 | `entity_revisions` | `entity_revisions_select` | Immutable audit log; rows reference RLS-protected domain rows, so the audit row alone does not leak. Inserts constrained by `changed_by = auth.uid()` in 00102. |
 | `allocations_legacy` | `allocations_legacy_select` | Frozen legacy table (renamed in 00010); no write policy. |
 | `system_settings` | `system_settings_select` | RESTRICTIVE companion `system_settings_hide_sensitive` hides `is_sensitive_setting(key)` rows (API keys, OAuth tokens). |
@@ -165,9 +165,9 @@ plan):
 | `00102_audit_fixes.sql` | Tightens `entity_revisions_insert` to `changed_by = auth.uid()`. |
 | `00130_tighten_keg_owner_deposits_rls.sql` | Replaces `WITH CHECK (true)` on `keg_owner_deposits` with `inventory:read`/`inventory:write`. |
 | `00137_tighten_keg_owner_deposits_rls.sql` | No-op (byte-identical duplicate of 00130; retained to avoid migration-history rewrites). |
-| `00174_fix_yeast_pitch_events_rls.sql` | `batches:read` / `batches:write`. |
-| `00175_fix_selling_format_materials_rls.sql` | Catalog read; `settings:manage` write. |
-| `00176_fix_order_shipping_rls.sql` | Closes the four 00162 regressions. |
-| `00177_fix_mongodb_sync_rls.sql` | `settings:manage` for both `mongodb_sync_*` tables. |
-| `00178_fix_legacy_audit_findings_rls.sql` | Closes the remaining original-audit findings (`water_addition_profiles`, `keg_inventory`, portal staff tightening). |
-| `00179_rls_exception_comments.sql` | Adds `RLS-EXCEPTION:` comments on every documented permissive policy. |
+| `00193_fix_yeast_pitch_events_rls.sql` | `batches:read` / `batches:write`. |
+| `00194_fix_selling_format_materials_rls.sql` | Catalog read; `settings:manage` write. |
+| `00195_fix_order_shipping_rls.sql` | Closes the four 00162 regressions. |
+| `00196_fix_mongodb_sync_rls.sql` | `settings:manage` for both `mongodb_sync_*` tables. |
+| `00197_fix_legacy_audit_findings_rls.sql` | Closes the remaining original-audit findings (`water_addition_profiles` — guarded, live-DB-only — and portal staff tightening; `keg_inventory` needs none, see resolution table). |
+| `00198_rls_exception_comments.sql` | Adds `RLS-EXCEPTION:` comments on every documented permissive policy. |

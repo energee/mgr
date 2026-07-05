@@ -2,7 +2,7 @@
  * RLS Policy Coverage — Tasks 2–6 of the RLS coverage-gap plan.
  *
  * Schema-level assertions: for each table whose policy was tightened in
- * migrations 00174–00178, this test queries `pg_policies` and verifies that
+ * migrations 00193–00197, this test queries `pg_policies` and verifies that
  * the SELECT and write policies exist with `user_has_permission(...)` (or
  * the catalog-pattern `auth.uid() IS NOT NULL`) in the qual/with_check,
  * and that no `USING (true)` / `WITH CHECK (true)` policies remain.
@@ -26,6 +26,12 @@ interface Expectation {
   selectQualContains: string;
   writeQualContains: string;
   writeCheckContains: string;
+  /**
+   * True for tables that exist only in the live database (created out-of-band,
+   * no CREATE TABLE in any migration). A migrations-built CI database does not
+   * have them, so the expectation passes vacuously when the table is absent.
+   */
+  liveDbOnly?: boolean;
 }
 
 const EXPECTATIONS: Expectation[] = [
@@ -81,18 +87,16 @@ const EXPECTATIONS: Expectation[] = [
     writeQualContains: "settings:manage",
     writeCheckContains: "settings:manage",
   },
-  // Task 6 — legacy audit findings
+  // Task 6 — legacy audit findings.
+  // (keg_inventory is intentionally absent: it has been a VIEW since 00032 —
+  // drift-captured in 00191 with security_invoker = true — so the underlying
+  // kegs/keg_transactions RLS applies and no policy can exist on it.)
   {
     table: "water_addition_profiles",
     selectQualContains: "auth.uid",
     writeQualContains: "settings:manage",
     writeCheckContains: "settings:manage",
-  },
-  {
-    table: "keg_inventory",
-    selectQualContains: "inventory:read",
-    writeQualContains: "inventory:write",
-    writeCheckContains: "inventory:write",
+    liveDbOnly: true,
   },
 ];
 
@@ -103,10 +107,21 @@ afterAll(async () => {
 describe("RLS policy coverage — Tasks 2–6", () => {
   it.each(EXPECTATIONS)(
     "$table has properly scoped SELECT and write policies",
-    async ({ table, selectQualContains, writeQualContains, writeCheckContains }) => {
+    async ({ table, selectQualContains, writeQualContains, writeCheckContains, liveDbOnly }) => {
       // admin can read pg_policies — it's a system view, not RLS-gated, but
       // we use admin to be explicit about the test identity.
       await withRoleClient("admin", async (db) => {
+        if (liveDbOnly) {
+          const { rows: reg } = await db.query<{ oid: string | null }>(
+            `SELECT to_regclass('public.' || quote_ident($1))::text AS oid`,
+            [table],
+          );
+          if (reg[0]?.oid === null) {
+            // Live-DB-only table absent here (migration 00197 guards it with
+            // to_regclass); nothing to assert against.
+            return;
+          }
+        }
         const { rows } = await db.query<{
           policyname: string;
           cmd: string;

@@ -36,7 +36,7 @@ Every table in `public` either (a) has a role-based RLS policy gated by `user_ha
 
 ## Migration numbering decision
 
-Tasks 2–6 each create a new migration file. To avoid number collisions when multiple sub-agents run in parallel, **migration numbers are assigned serially by the human/agent merging tasks** (e.g., `00174`, `00175`, …); sub-agents draft their migration as `00XXX_<description>.sql` and the merger renumbers in commit order. Timestamp migrations (`YYYYMMDDHHMMSS_*`) are reserved for `supabase db pull` artifacts and NOT used for hand-written migrations.
+Tasks 2–6 each create a new migration file. To avoid number collisions when multiple sub-agents run in parallel, **migration numbers are assigned serially by the human/agent merging tasks** (e.g., `00193`, `00194`, …); sub-agents draft their migration as `00XXX_<description>.sql` and the merger renumbers in commit order. Timestamp migrations (`YYYYMMDDHHMMSS_*`) are reserved for `supabase db pull` artifacts and NOT used for hand-written migrations.
 
 ## Approach
 

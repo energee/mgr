@@ -1,4 +1,4 @@
--- Migration: 00179_rls_exception_comments
+-- Migration: 00198_rls_exception_comments
 --
 -- Documents every deliberately-permissive RLS policy in `public` with an
 -- inline `COMMENT ON POLICY ... IS 'RLS-EXCEPTION: <reason>'` marker.
@@ -51,7 +51,7 @@ COMMENT ON POLICY water_profiles_select      ON water_profiles      IS 'RLS-EXCE
 COMMENT ON POLICY yeasts_select              ON yeasts              IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy.';
 
 -- ----------------------------------------------------------------------------
--- Catalog-pattern policies added by Tasks 3, 4, 6 (migrations 00175, 00176, 00178)
+-- Catalog-pattern policies added by Tasks 3, 4, 6 (migrations 00194, 00195, 00197)
 -- Same rationale as the §5k catalog tables: shared reference data; writes
 -- still flow through the role-gated companion policy.
 -- ----------------------------------------------------------------------------
@@ -63,7 +63,7 @@ BEGIN
        AND tablename='selling_format_materials'
        AND policyname='selling_format_materials_select'
   ) THEN
-    EXECUTE $cmt$COMMENT ON POLICY selling_format_materials_select ON selling_format_materials IS 'RLS-EXCEPTION: BOM reference data; any authenticated staff member may read. Write is gated by settings:manage on the companion _write policy (migration 00175).'$cmt$;
+    EXECUTE $cmt$COMMENT ON POLICY selling_format_materials_select ON selling_format_materials IS 'RLS-EXCEPTION: BOM reference data; any authenticated staff member may read. Write is gated by settings:manage on the companion _write policy (migration 00194).'$cmt$;
   END IF;
   IF EXISTS (
     SELECT 1 FROM pg_policies
@@ -71,7 +71,7 @@ BEGIN
        AND tablename='brewery_shipping_defaults'
        AND policyname='brewery_shipping_defaults_select'
   ) THEN
-    EXECUTE $cmt$COMMENT ON POLICY brewery_shipping_defaults_select ON brewery_shipping_defaults IS 'RLS-EXCEPTION: brewery-wide shipping defaults; any authenticated user may read. Write is gated by settings:manage on the companion _write policy (migration 00176).'$cmt$;
+    EXECUTE $cmt$COMMENT ON POLICY brewery_shipping_defaults_select ON brewery_shipping_defaults IS 'RLS-EXCEPTION: brewery-wide shipping defaults; any authenticated user may read. Write is gated by settings:manage on the companion _write policy (migration 00195).'$cmt$;
   END IF;
   IF EXISTS (
     SELECT 1 FROM pg_policies
@@ -79,7 +79,7 @@ BEGIN
        AND tablename='water_addition_profiles'
        AND policyname='water_addition_profiles_select'
   ) THEN
-    EXECUTE $cmt$COMMENT ON POLICY water_addition_profiles_select ON water_addition_profiles IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy (migration 00178).'$cmt$;
+    EXECUTE $cmt$COMMENT ON POLICY water_addition_profiles_select ON water_addition_profiles IS 'RLS-EXCEPTION: catalog/reference table; write is gated by settings:manage on the companion _write policy (migration 00197).'$cmt$;
   END IF;
 END $$;
 
