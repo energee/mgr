@@ -12,6 +12,7 @@
  * - Summary cards: avg cost/batch, avg cost/BBL, total production cost
  * - Cost breakdown table per batch (batch #, recipe, brand, volume, costs)
  * - Expandable ingredient-level detail per batch
+ * - CSV export of the cost breakdown table (ExportMenu)
  *
  * Data sources:
  * - allocations (destination_type = 'batch') for actual ingredient costs
@@ -56,6 +57,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
+import { ExportMenu } from "@/components/reports/export-menu";
 import Link from "next/link";
 
 // =============================================================================
@@ -262,6 +264,26 @@ export default function BatchCostAnalysisPage() {
   }, [batchCostData]);
 
   // -------------------------------------------------------------------------
+  // CSV export rows (mirrors the visible cost breakdown table)
+  // -------------------------------------------------------------------------
+  const exportRows = useMemo(
+    () =>
+      (batchCostData ?? []).map((b) => ({
+        "Batch Code": b.batch_code,
+        Recipe: b.recipe_name,
+        Brand: b.brand_name,
+        "Volume (BBL)": b.volume_bbl,
+        "Ingredient Cost": Number(b.ingredient_cost.toFixed(2)),
+        "Cost / BBL":
+          b.cost_per_bbl !== null ? Number(b.cost_per_bbl.toFixed(2)) : null,
+        "Cost Source": b.has_allocation_costs
+          ? "Allocations"
+          : "Recipe estimate",
+      })),
+    [batchCostData]
+  );
+
+  // -------------------------------------------------------------------------
   // Handlers
   // -------------------------------------------------------------------------
   function toggleExpand(batchId: string) {
@@ -288,6 +310,11 @@ export default function BatchCostAnalysisPage() {
             Ingredient cost breakdown per production batch
           </p>
         </div>
+        <ExportMenu
+          filename={`batch-cost-${fromDate}-to-${toDate}.csv`}
+          rows={exportRows}
+          disabled={isLoading}
+        />
       </div>
 
       {/* Date Range */}

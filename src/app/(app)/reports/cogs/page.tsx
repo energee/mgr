@@ -17,6 +17,8 @@
  * The pure aggregation math (proportional SKU cost allocation, period
  * bucketing, cost/unit helpers) lives in src/lib/reports/cogs.ts so it can be
  * unit-tested; this page only owns the queries and rendering.
+ *
+ * The header ExportMenu downloads a CSV of whichever tab's table is active.
  */
 
 import React, { useState, useMemo } from "react";
@@ -81,6 +83,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
+import { ExportMenu } from "@/components/reports/export-menu";
 // Chart is lazy-loaded so recharts stays out of the initial bundle — it only
 // renders in the By Period tab.
 import { CogsPeriodChartLazy } from "@/components/domain/reports/cogs-period-chart-lazy";
@@ -483,6 +486,81 @@ export default function CogsReportPage() {
   }, [periodData]);
 
   // ---------------------------------------------------------------------------
+  // CSV export: mirrors whichever tab's table is currently visible
+  // ---------------------------------------------------------------------------
+
+  const exportConfig = useMemo(() => {
+    const range = `${fromDate}-to-${toDate}`;
+    if (activeTab === "by-sku") {
+      return {
+        filename: `cogs-by-sku-${range}.csv`,
+        loading: skuLoading,
+        rows: (skuData ?? []).map((s) => ({
+          SKU: s.sku_name,
+          Brand: s.brand_name,
+          Format: s.container_name
+            ? `${s.format_name} (${s.container_name})`
+            : s.format_name,
+          Batches: s.batch_count,
+          "Total Units": s.total_units,
+          "Total Cost": Number(s.total_cost.toFixed(2)),
+          "Avg Cost/Unit":
+            s.avg_cost_per_unit !== null
+              ? Number(s.avg_cost_per_unit.toFixed(4))
+              : null,
+        })),
+      };
+    }
+    if (activeTab === "by-period") {
+      return {
+        filename: `cogs-by-period-${granularity}-${range}.csv`,
+        loading: periodLoading,
+        rows: (periodData ?? []).map((p) => ({
+          Period: p.period,
+          "Total COGS": Number(p.total_cogs.toFixed(2)),
+          Malts: Number(p.malt_cost.toFixed(2)),
+          Hops: Number(p.hop_cost.toFixed(2)),
+          Yeast: Number(p.yeast_cost.toFixed(2)),
+          Adjuncts: Number(p.adjunct_cost.toFixed(2)),
+          Other: Number(p.other_cost.toFixed(2)),
+          Batches: p.batch_count,
+        })),
+      };
+    }
+    return {
+      filename: `cogs-by-batch-${range}.csv`,
+      loading: sharedLoading,
+      rows: (batchCostData ?? []).map((b) => ({
+        "Batch Code": b.batch_code,
+        Name: b.name,
+        Recipe: b.recipe_name,
+        "Volume (BBL)": b.volume_bbl,
+        "Ingredient Cost": Number(b.total_ingredient_cost.toFixed(2)),
+        "Units Packaged": b.units_packaged,
+        "COGS/Unit":
+          b.cogs_per_unit !== null
+            ? Number(b.cogs_per_unit.toFixed(4))
+            : null,
+        "COGS/BBL":
+          b.cost_per_bbl !== null
+            ? Number(b.cost_per_bbl.toFixed(2))
+            : null,
+      })),
+    };
+  }, [
+    activeTab,
+    fromDate,
+    toDate,
+    granularity,
+    skuData,
+    skuLoading,
+    periodData,
+    periodLoading,
+    batchCostData,
+    sharedLoading,
+  ]);
+
+  // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------
 
@@ -521,6 +599,11 @@ export default function CogsReportPage() {
             Analyze production costs by batch, SKU, or time period
           </p>
         </div>
+        <ExportMenu
+          filename={exportConfig.filename}
+          rows={exportConfig.rows}
+          disabled={exportConfig.loading}
+        />
       </div>
 
       {/* Date Range */}
