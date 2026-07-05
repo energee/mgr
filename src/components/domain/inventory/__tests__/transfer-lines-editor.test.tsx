@@ -16,9 +16,8 @@
  * Combobox is never mounted (showAddRow starts false), so it needs no stub.
  */
 
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { setupRenderHarness } from "@/test/react-harness";
 
 // Mutable fixtures driving each useQuery branch. Hoisted so the vi.mock factory
 // (itself hoisted above imports) can close over them.
@@ -52,28 +51,12 @@ vi.mock("@tanstack/react-query", () => ({
 
 import { TransferLinesEditor } from "../transfer-lines-editor";
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
+const { render } = setupRenderHarness();
 
 beforeEach(() => {
   // Reset to the loading default; each test opts into its own state.
   fixtures.lines = { data: undefined, isLoading: true, isPending: true };
   fixtures.source = { data: [], isLoading: false, isPending: false };
-});
-
-afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
 });
 
 const setLines = (data: unknown) => {

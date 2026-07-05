@@ -6,10 +6,10 @@
  *   footer buttons, and renders month/year dropdowns (captionLayout="dropdown")
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { format } from "date-fns";
+import { setupRenderHarness } from "@/test/react-harness";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -97,16 +97,10 @@ function Harness({ value }: { value?: string }) {
   );
 }
 
-let container: HTMLDivElement;
-let root: Root;
+const { render: mount } = setupRenderHarness();
 
 async function render(value?: string) {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  await act(async () => {
-    root.render(<Harness value={value} />);
-  });
+  const container = mount(<Harness value={value} />);
   return container.querySelector("button") as HTMLButtonElement;
 }
 
@@ -148,13 +142,6 @@ function findFooterButton(label: string) {
 describe("DatePicker popover panel", () => {
   beforeEach(() => {
     commits.length = 0;
-  });
-
-  afterEach(async () => {
-    await act(async () => {
-      root.unmount();
-    });
-    document.body.removeChild(container);
   });
 
   it("shows the formatted value on the trigger button", async () => {

@@ -18,7 +18,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { describe, it, expect, vi } from "vitest";
 import { createElement, act, useState } from "react";
-import { createRoot } from "react-dom/client";
+import { setupRenderHarness } from "@/test/react-harness";
 
 // ---------------------------------------------------------------------------
 // Source paths for structural tests
@@ -35,9 +35,7 @@ const APP_PROVIDERS_SRC = resolve(
 // ---------------------------------------------------------------------------
 
 // Prevents env-var validation in @/lib/env from throwing at import time
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: vi.fn(() => ({})),
-}));
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 
 // Prevents @sentry/nextjs initialisation errors in jsdom
 vi.mock("@/lib/client-logger", () => ({
@@ -88,28 +86,7 @@ describe("MGR-8 regression — structural: QueryClientProvider wraps Notificatio
 // Layer 2: Behavioral tests (runtime rendering)
 // ---------------------------------------------------------------------------
 
-async function renderIntoContainer(node: React.ReactNode): Promise<{
-  container: HTMLDivElement;
-  cleanup: () => Promise<void>;
-}> {
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(node as React.ReactElement);
-  });
-
-  return {
-    container,
-    cleanup: async () => {
-      await act(async () => {
-        root.unmount();
-      });
-      document.body.removeChild(container);
-    },
-  };
-}
+const { render: renderIntoContainer } = setupRenderHarness();
 
 function ContextDisplay() {
   const ctx = useNotifications();
@@ -142,8 +119,8 @@ function ActionTester() {
 }
 
 describe("MGR-8 regression — behavioral: NotificationsProvider guard renders safely without QueryClientProvider", () => {
-  it("renders children without crashing when no QueryClientProvider is in the tree", async () => {
-    const { container, cleanup } = await renderIntoContainer(
+  it("renders children without crashing when no QueryClientProvider is in the tree", () => {
+    const container = renderIntoContainer(
       createElement(
         NotificationsProvider,
         null,
@@ -151,46 +128,34 @@ describe("MGR-8 regression — behavioral: NotificationsProvider guard renders s
       )
     );
 
-    try {
-      expect(container.querySelector('[data-testid="child"]')).not.toBeNull();
-      expect(container.querySelector('[data-testid="child"]')?.textContent).toBe("rendered");
-    } finally {
-      await cleanup();
-    }
+    expect(container.querySelector('[data-testid="child"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="child"]')?.textContent).toBe("rendered");
   });
 
-  it("provides empty fallback context values outside QueryClientProvider", async () => {
-    const { container, cleanup } = await renderIntoContainer(
+  it("provides empty fallback context values outside QueryClientProvider", () => {
+    const container = renderIntoContainer(
       createElement(NotificationsProvider, null, createElement(ContextDisplay, null))
     );
 
-    try {
-      expect(container.querySelector('[data-testid="count"]')?.textContent).toBe("0");
-      expect(container.querySelector('[data-testid="loading"]')?.textContent).toBe("false");
-      expect(container.querySelector('[data-testid="notifications-length"]')?.textContent).toBe("0");
-    } finally {
-      await cleanup();
-    }
+    expect(container.querySelector('[data-testid="count"]')?.textContent).toBe("0");
+    expect(container.querySelector('[data-testid="loading"]')?.textContent).toBe("false");
+    expect(container.querySelector('[data-testid="notifications-length"]')?.textContent).toBe("0");
   });
 
   it("no-op action handlers resolve without throwing", async () => {
-    const { container, cleanup } = await renderIntoContainer(
+    const container = renderIntoContainer(
       createElement(NotificationsProvider, null, createElement(ActionTester, null))
     );
 
-    try {
-      const clickAndWait = async (testId: string, expected: string) => {
-        await act(async () => {
-          (container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement)?.click();
-        });
-        expect(container.querySelector('[data-testid="action-result"]')?.textContent).toBe(expected);
-      };
+    const clickAndWait = async (testId: string, expected: string) => {
+      await act(async () => {
+        (container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement)?.click();
+      });
+      expect(container.querySelector('[data-testid="action-result"]')?.textContent).toBe(expected);
+    };
 
-      await clickAndWait("mark-read", "markAsRead-ok");
-      await clickAndWait("mark-all", "markAllAsRead-ok");
-      await clickAndWait("dismiss", "dismiss-ok");
-    } finally {
-      await cleanup();
-    }
+    await clickAndWait("mark-read", "markAsRead-ok");
+    await clickAndWait("mark-all", "markAllAsRead-ok");
+    await clickAndWait("dismiss", "dismiss-ok");
   });
 });

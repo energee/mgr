@@ -17,9 +17,8 @@
  * not-loading result — so the test targets the editor's own layout logic.
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, vi } from "vitest";
+import { setupRenderHarness } from "@/test/react-harness";
 import type { HopScheduleItem } from "../hop-schedule-editor";
 import { getHopUtilizationFactor } from "../recipe-editor/recipe-estimate-calc";
 
@@ -41,23 +40,7 @@ vi.mock("@/components/ui/sortable", () => ({
 
 import { HopScheduleEditor } from "../hop-schedule-editor";
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
-
-afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
-});
+const { render } = setupRenderHarness();
 
 const noop = () => {};
 
@@ -147,11 +130,7 @@ describe("HopScheduleEditor", () => {
     );
     expect(withHops.textContent).toContain("Added during lautering");
     expect(withHops.textContent).toContain("Added during fermentation");
-    act(() => root!.unmount());
-    container?.remove();
-    root = null;
-    container = null;
-
+    // render() self-cleans (unmounts the prior tree) before mounting the next.
     const empty = render(<HopScheduleEditor items={[]} onChange={noop} />);
     expect(empty.textContent).not.toContain("Added during lautering");
   });
