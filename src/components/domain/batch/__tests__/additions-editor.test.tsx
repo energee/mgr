@@ -16,9 +16,8 @@
  * targets the editor's own layout logic.
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, vi } from "vitest";
+import { setupRenderHarness } from "@/test/react-harness";
 import type { AdditionItem } from "../additions-editor";
 
 vi.mock("@/hooks/use-catalog", () => ({
@@ -34,23 +33,7 @@ vi.mock("@/components/ui/sortable", () => ({
 
 import { AdditionsEditor } from "../additions-editor";
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
-
-afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
-});
+const { render } = setupRenderHarness();
 
 const noop = () => {};
 
@@ -134,11 +117,7 @@ describe("AdditionsEditor", () => {
     expect(one.querySelector("tfoot")?.textContent).toContain("1 addition");
     expect(one.querySelector("tfoot")?.textContent).not.toContain("1 additions");
 
-    act(() => root!.unmount());
-    container?.remove();
-    root = null;
-    container = null;
-
+    // render() self-cleans (unmounts the prior tree) before mounting the next.
     const two = render(
       <AdditionsEditor items={[item({ additive_id: "a1" }), item({ additive_id: "a2" })]} onChange={noop} />,
     );

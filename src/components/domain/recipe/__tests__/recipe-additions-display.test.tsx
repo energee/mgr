@@ -17,9 +17,8 @@
  * @testing-library/react). No mocking needed: both components are pure.
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, vi } from "vitest";
+import { setupRenderHarness } from "@/test/react-harness";
 
 // The module imports the Supabase client at top level, which runs env
 // validation on import. These sub-components never touch the client, so stub
@@ -53,23 +52,7 @@ const row = (o: Partial<Row>): Row => ({
   ...o,
 });
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
-
-afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
-});
+const { render } = setupRenderHarness();
 
 describe("AdditionsTable", () => {
   it("renders name, mapped type label, amount+unit, and description; no Target column for non-water additions", () => {

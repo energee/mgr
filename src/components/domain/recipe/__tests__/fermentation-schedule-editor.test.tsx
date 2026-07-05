@@ -17,9 +17,8 @@
  * being pinned.
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, vi } from "vitest";
+import { setupRenderHarness } from "@/test/react-harness";
 import type { FermentationStage } from "../fermentation-schedule-editor";
 
 vi.mock("@/hooks/use-unit-preferences", () => ({
@@ -40,23 +39,7 @@ vi.mock("@/components/ui/sortable", () => ({
 
 import { FermentationScheduleEditor } from "../fermentation-schedule-editor";
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
-
-afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
-});
+const { render } = setupRenderHarness();
 
 const noop = () => {};
 const nameValues = (c: HTMLElement) =>
@@ -109,11 +92,7 @@ describe("FermentationScheduleEditor", () => {
     expect(singularFooter?.textContent).not.toContain("1 stages");
     expect(singularFooter?.textContent).toContain("Total: 14 days (2 weeks)");
 
-    act(() => root!.unmount());
-    container?.remove();
-    root = null;
-    container = null;
-
+    // render() self-cleans (unmounts the prior tree) before mounting the next.
     const twoStages: FermentationStage[] = [
       { id: "st1", stage: "primary", name: "Primary", temp_f: 68, duration_days: 7, position: 0 },
       { id: "st2", stage: "conditioning", name: "Conditioning", temp_f: 68, duration_days: 14, position: 1 },

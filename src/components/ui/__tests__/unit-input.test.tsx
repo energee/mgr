@@ -7,9 +7,9 @@
  *   changes while unfocused, and on display-unit changes even while focused
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, useEffect, useState } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { setupRenderHarness } from "@/test/react-harness";
 import type { UnitType } from "@/domain/units";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -48,23 +48,15 @@ function Harness({ unitType }: { unitType: UnitType }) {
   );
 }
 
-let container: HTMLDivElement;
-let root: Root;
+const { render: mount, rerender: rerenderHarness } = setupRenderHarness();
 
 async function render(unitType: UnitType) {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  await act(async () => {
-    root.render(<Harness unitType={unitType} />);
-  });
+  const container = mount(<Harness unitType={unitType} />);
   return container.querySelector("input") as HTMLInputElement;
 }
 
 async function rerender(unitType: UnitType) {
-  await act(async () => {
-    root.render(<Harness unitType={unitType} />);
-  });
+  rerenderHarness(<Harness unitType={unitType} />);
 }
 
 async function typeText(input: HTMLInputElement, text: string) {
@@ -87,13 +79,6 @@ beforeEach(() => {
     gravity_unit: "plato",
     retail_volume_unit: "oz",
   };
-});
-
-afterEach(async () => {
-  await act(async () => {
-    root.unmount();
-  });
-  document.body.removeChild(container);
 });
 
 // ---------------------------------------------------------------------------

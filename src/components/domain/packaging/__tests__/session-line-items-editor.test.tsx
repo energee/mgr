@@ -19,8 +19,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { setupRenderHarness } from "@/test/react-harness";
 import type { LineItemRow } from "@/hooks/use-session-line-items";
 
 let mockItems: LineItemRow[] | undefined = [];
@@ -80,22 +79,9 @@ vi.mock("../add-line-item-row", () => ({
 
 import { SessionLineItemsEditor } from "../session-line-items-editor";
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
+const { render } = setupRenderHarness();
 
 afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
   // Reset mock state between tests.
   mockItems = [];
   mockIsLoading = false;

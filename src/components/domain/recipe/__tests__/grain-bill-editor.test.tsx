@@ -17,9 +17,8 @@
  * logic.
  */
 
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, vi } from "vitest";
+import { setupRenderHarness } from "@/test/react-harness";
 import type { GrainBillItem } from "../grain-bill-editor";
 
 vi.mock("@/hooks/use-unit-preferences", () => ({
@@ -38,23 +37,7 @@ vi.mock("@/components/ui/sortable", () => ({
 
 import { GrainBillEditor } from "../grain-bill-editor";
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
-
-afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
-});
+const { render } = setupRenderHarness();
 
 const noop = () => {};
 
