@@ -3,8 +3,9 @@
 /**
  * ExportMenu
  *
- * Standardized export dropdown for report pages (audit F-110). Previously
- * only the TTB report had export controls; the other five had none.
+ * Standardized export dropdown for report pages (audit F-110). Used by the
+ * batch-cost, cogs, inventory-valuation, production-summary, and projections
+ * report pages; the TTB report keeps its bespoke multi-export dropdown.
  *
  * Wraps the existing `toCSV` + `downloadCSV` helpers from
  * `src/lib/report-export.ts` so every consumer gets the same CSV escape

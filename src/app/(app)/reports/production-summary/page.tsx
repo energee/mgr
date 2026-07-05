@@ -5,7 +5,7 @@
  *
  * Displays aggregate production metrics for a selected date range:
  * - Summary cards: total batches, total BBL produced, average days in tank
- * - Production by brand table
+ * - Production by brand table (exportable to CSV via the header ExportMenu)
  * - Production by style breakdown
  *
  * Data is fetched from the batches table (joined with recipes and brands)
@@ -49,6 +49,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ExportMenu } from "@/components/reports/export-menu";
 import Link from "next/link";
 import {
   startOfMonth,
@@ -316,6 +317,21 @@ export default function ProductionSummaryPage() {
   const monthName = MONTHS[month - 1];
 
   // ---------------------------------------------------------------------------
+  // CSV export rows (mirrors the Production by Brand table, the page's
+  // primary breakdown)
+  // ---------------------------------------------------------------------------
+  const exportRows = useMemo(
+    () =>
+      brandProduction.map((row) => ({
+        Brand: row.label,
+        "# Batches": row.batchCount,
+        "Total BBL": Number(row.totalBbl.toFixed(2)),
+        "Avg BBL / Batch": Number(row.avgBblPerBatch.toFixed(2)),
+      })),
+    [brandProduction]
+  );
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
@@ -336,6 +352,11 @@ export default function ProductionSummaryPage() {
             Monthly production volumes by brand and style
           </p>
         </div>
+        <ExportMenu
+          filename={`production-summary-${year}-${String(month).padStart(2, "0")}.csv`}
+          rows={exportRows}
+          disabled={isLoading}
+        />
       </div>
 
       {/* Period Selection */}

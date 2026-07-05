@@ -10,7 +10,8 @@
  * Features:
  * - Horizon selector (30, 60, 90 days)
  * - Summary cards: total ingredients, at-risk items, batches + orders in window
- * - Combined view sorted by worst shortfall
+ * - Combined view sorted by worst shortfall (exportable to CSV via the
+ *   header ExportMenu)
  * - By-batch and by-order breakdowns
  */
 
@@ -46,6 +47,7 @@ import {
   ShoppingCart,
   AlertTriangle,
 } from "lucide-react";
+import { ExportMenu } from "@/components/reports/export-menu";
 import Link from "next/link";
 
 // =============================================================================
@@ -447,6 +449,22 @@ export default function IngredientProjectionsPage() {
   );
 
   // ---------------------------------------------------------------------------
+  // CSV export rows (mirrors the Combined ingredients table)
+  // ---------------------------------------------------------------------------
+  const exportRows = useMemo(
+    () =>
+      (projectionData?.ingredients ?? []).map((ing) => ({
+        Ingredient: ing.name,
+        Category: ing.category,
+        Needed: Number(ing.neededQty.toFixed(2)),
+        "On Hand": Number(ing.onHandQty.toFixed(2)),
+        Shortfall: Number(ing.shortfall.toFixed(2)),
+        Unit: ing.unit,
+      })),
+    [projectionData]
+  );
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
@@ -466,6 +484,11 @@ export default function IngredientProjectionsPage() {
             Forward-looking ingredient needs from planned batches and confirmed orders
           </p>
         </div>
+        <ExportMenu
+          filename={`ingredient-projections-${horizonDays}d.csv`}
+          rows={exportRows}
+          disabled={isLoading}
+        />
       </div>
 
       {/* Horizon Selector */}
