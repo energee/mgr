@@ -161,7 +161,7 @@ function FermentationStatus({
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Latest Reading</span>
             <span className="text-xs">
-              {new Date(fermentation.latest_reading.recorded_at).toLocaleDateString()}
+              {new Date(fermentation.latest_reading.recorded_at).toLocaleDateString("en-US")}
             </span>
           </div>
         )}
@@ -169,7 +169,7 @@ function FermentationStatus({
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Planned Start</span>
             <span className="text-xs">
-              {new Date(fermentation.planned_start).toLocaleDateString()}
+              {new Date(fermentation.planned_start).toLocaleDateString("en-US")}
             </span>
           </div>
         )}
