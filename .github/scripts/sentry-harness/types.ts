@@ -6,7 +6,7 @@ export type SentryIssue = {
   culprit: string;
   permalink: string;
   stackTrace: string;
-  eventCount7d: number;
+  eventCount14d: number;
   firstSeen: string;
   lastSeen: string;
   level: "fatal" | "error" | "warning" | "info" | "debug";
