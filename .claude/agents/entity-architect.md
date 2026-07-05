@@ -1,6 +1,6 @@
 ---
 name: entity-architect
-description: Use when creating or modifying anything under src/entities/ (core.ts/presentation.tsx/index.ts triads), the entity registry (src/entities/index.ts, src/entities/cores.ts), or entity route pages under src/app/(app)/**. MUST BE USED for new-entity additions and entity schema/config changes.
+description: Use when creating or modifying anything under src/entities/ (core.ts/presentation.tsx/index.ts triads), the entity registry (src/entities/index.ts, src/entities/cores.ts), entity route pages under src/app/(app)/**, or the src/services/ orchestration layer (entity-service, transition side effects, inventory/consumption services). MUST BE USED for new-entity additions and entity schema/config changes.
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
@@ -19,6 +19,7 @@ Owns the entity registry system end to end — adding, modifying, and wiring ent
 - If cached queries are needed, hand-write a key factory in `src/lib/query-keys.ts` (~30 existing factories, e.g. `batchKeys`) — there is no generic per-entity factory.
 - List/mobile-card action visibility flows through `getApplicableActions()` in `src/lib/entity-actions.ts`. **`entity-detail-unified.tsx` deliberately does not use this helper** — it keeps `fromStates`-gated actions visible when state can't be read, diverging on purpose (comment at `src/lib/entity-actions.ts:9-11`). Don't assume action-visibility logic is unified across list and detail.
 - `knip`'s "unused exports" list flags core, definitely-live symbols (`EntityDataTable`, `EntityDetailUnified`, every entity `*Schema`) because they're consumed only via the entity registry or `z.infer`, which it doesn't trace. Only grep-verified zero-importer exports are safe to remove; acting on knip's raw list is churn/regression risk.
+- **Services layer** (`src/services/`): the orchestration tier between entity configs and the DB. `entity-service.ts` is the shared CRUD module (Supabase client always the first arg, returns `ServiceResult<T>` with typed errors + invalidation hints, React-free so hooks/route handlers/AI tools all share it). `transition-side-effects.ts` is a central `(table, toState)` registry of post-transition effects — it exists because the batch-completion effect was once duplicated in only 2 of 4 transition paths, silently skipping ingredient consumption from the bulk bar and detail dropdown. Any new UI path that performs a state transition MUST call `runTransitionSideEffects`, and effects must be idempotent (multiple UI paths can race). Pure math stays in `src/domain/` (e.g. `consumption-planning.ts`); services own only the Supabase reads/writes.
 - Historical incident: commit `93f944a3` ("QA pass — category mismatch") had to fix `inventory_items` category `'hops'` → `'hop'` across four places at once (entity config, seed data, tests, migration `00151`) because a hand-typed string literal drifted from the DB enum. Cross-check hand-typed `z.enum([...])` literals against option-array values and the DB enum whenever either changes.
 
 ## Review checklist
@@ -38,6 +39,8 @@ Owns the entity registry system end to end — adding, modifying, and wiring ent
 - `src/types/entity.ts`
 - `src/lib/entity-actions.ts`
 - `src/lib/query-keys.ts`
+- `src/services/entity-service.ts`
+- `src/services/transition-side-effects.ts`
 - `src/app/api/chat/__tests__/core-registry.test.ts`
 - `src/entities/__tests__/entity-configs.test.ts`
 
