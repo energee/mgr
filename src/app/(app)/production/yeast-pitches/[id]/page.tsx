@@ -15,6 +15,7 @@
  */
 
 import { use, useState, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -23,7 +24,6 @@ import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { yeastPitchEntity } from "@/entities/yeast-pitch";
 import type { EntityConfig } from "@/types/entity";
 import { YeastLineageDisplay } from "@/components/domain/yeast/yeast-lineage-display";
-import { YeastViabilityChart } from "@/components/domain/yeast/yeast-viability-chart";
 import { RecordCellCountDialog } from "@/components/domain/yeast/record-cell-count-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -41,6 +41,31 @@ import { yeastKeys, entityKeys } from "@/lib/query-keys";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import type { YeastForm } from "@/domain/yeast-calculations";
 import { formatCurrency, formatDate } from "@/lib/format";
+
+// Code-split the recharts-heavy viability chart off this page's initial
+// bundle (mirrors the dashboard chart splits, audit F-142). It sits below the
+// fold and only renders when a received date is present, so deferring it is a
+// pure win. `ssr: false` because recharts measures the DOM on mount. The
+// fallback mirrors the chart's Card chrome (280px canvas) to avoid CLS.
+const YeastViabilityChart = dynamic(
+  () =>
+    import("@/components/domain/yeast/yeast-viability-chart").then(
+      (mod) => mod.YeastViabilityChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Viability Decay</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[280px] w-full" />
+        </CardContent>
+      </Card>
+    ),
+  },
+);
 
 // =============================================================================
 // Types

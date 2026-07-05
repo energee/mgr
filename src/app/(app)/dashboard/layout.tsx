@@ -6,6 +6,9 @@
  */
 
 import type { Metadata } from "next";
+// Imported here (not in BatchActivityHeatmap) so tooltip styles ship with the
+// route CSS instead of the lazy heatmap chunk, avoiding a FOUC (audit F-142).
+import "react-activity-calendar/tooltips.css";
 
 export const metadata: Metadata = {
   title: "Dashboard",
