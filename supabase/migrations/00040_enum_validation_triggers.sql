@@ -104,10 +104,14 @@ CREATE TRIGGER validate_packaging_session_status
   EXECUTE FUNCTION validate_enum_value('packaging_session_status', 'status');
 
 -- keg_inventory.state -> keg_state
-CREATE TRIGGER validate_keg_state
-  BEFORE INSERT OR UPDATE OF state ON keg_inventory
-  FOR EACH ROW
-  EXECUTE FUNCTION validate_enum_value('keg_state', 'state');
+-- HISTORICAL NO-OP: keg_inventory has been a VIEW since 00032, and views
+-- cannot have row-level triggers — this statement failed on every
+-- environment. Commented out so a from-scratch replay reproduces the live
+-- state. See PR #322.
+-- CREATE TRIGGER validate_keg_state
+--   BEFORE INSERT OR UPDATE OF state ON keg_inventory
+--   FOR EACH ROW
+--   EXECUTE FUNCTION validate_enum_value('keg_state', 'state');
 
 -- keg_transactions.transaction_type -> keg_transaction_type
 CREATE TRIGGER validate_keg_transaction_type

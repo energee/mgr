@@ -14,6 +14,10 @@
 -- The landed_cost_per_unit is unchanged (unit_price + both allocations).
 -- =============================================================================
 
+-- PR #322: the earlier definition has a different OUT-parameter row type, so
+-- CREATE OR REPLACE alone fails ("cannot change return type"). Drop first.
+DROP FUNCTION IF EXISTS calculate_landed_cost(UUID);
+
 CREATE OR REPLACE FUNCTION calculate_landed_cost(p_po_id UUID)
 RETURNS TABLE (
   lot_id UUID,

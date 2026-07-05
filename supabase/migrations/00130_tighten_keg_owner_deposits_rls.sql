@@ -20,6 +20,12 @@ DROP POLICY IF EXISTS "Authenticated users can update keg owner deposits" ON keg
 DROP POLICY IF EXISTS "Authenticated users can delete keg owner deposits" ON keg_owner_deposits;
 DROP POLICY IF EXISTS keg_owner_deposits_select ON keg_owner_deposits;
 DROP POLICY IF EXISTS keg_owner_deposits_write ON keg_owner_deposits;
+-- PR #322: the granular names below were missing from this drop list, so the
+-- header's idempotence claim did not hold and re-running (00137 after 00130)
+-- failed on "already exists".
+DROP POLICY IF EXISTS keg_owner_deposits_insert ON keg_owner_deposits;
+DROP POLICY IF EXISTS keg_owner_deposits_update ON keg_owner_deposits;
+DROP POLICY IF EXISTS keg_owner_deposits_delete ON keg_owner_deposits;
 
 -- Ensure RLS is enabled
 ALTER TABLE keg_owner_deposits ENABLE ROW LEVEL SECURITY;

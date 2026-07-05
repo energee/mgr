@@ -18,6 +18,15 @@ COMMENT ON COLUMN keg_types.show_in_pricing
 -- 2. Merge package_format_id + keg_type_id into format_id (pricing_tier_prices)
 -- =============================================================================
 
+-- DRIFT SHIM (added retroactively — see PR #322): keg_type_id was added to
+-- pricing_tier_prices and pricing_history directly in the live DB after
+-- 00077 (no migration captured the ALTER); this file assumes it exists and
+-- drops it below. No-op on live; required for a from-scratch replay.
+ALTER TABLE pricing_tier_prices
+  ADD COLUMN IF NOT EXISTS keg_type_id UUID REFERENCES keg_types(id);
+ALTER TABLE pricing_history
+  ADD COLUMN IF NOT EXISTS keg_type_id UUID;
+
 -- Add unified column
 ALTER TABLE pricing_tier_prices
   ADD COLUMN format_id UUID;

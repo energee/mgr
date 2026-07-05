@@ -25,8 +25,11 @@ CREATE INDEX IF NOT EXISTS idx_finished_goods_batch_id ON public.finished_goods 
 CREATE INDEX IF NOT EXISTS idx_finished_goods_brand_id ON public.finished_goods (brand_id);
 
 -- keg_inventory
-CREATE INDEX IF NOT EXISTS idx_keg_inventory_batch_id ON public.keg_inventory (batch_id);
-CREATE INDEX IF NOT EXISTS idx_keg_inventory_location_id ON public.keg_inventory (location_id);
+-- HISTORICAL NO-OP: keg_inventory has been a VIEW since 00032; indexes on
+-- views are impossible, so these failed on every environment. Commented out
+-- so a from-scratch replay reproduces the live state. See PR #322.
+-- CREATE INDEX IF NOT EXISTS idx_keg_inventory_batch_id ON public.keg_inventory (batch_id);
+-- CREATE INDEX IF NOT EXISTS idx_keg_inventory_location_id ON public.keg_inventory (location_id);
 
 -- keg_transactions
 CREATE INDEX IF NOT EXISTS idx_keg_transactions_batch_id ON public.keg_transactions (batch_id);

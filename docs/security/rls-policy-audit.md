@@ -116,6 +116,18 @@ added in `00198_rls_exception_comments.sql`.
 | `allocations_legacy` | `allocations_legacy_select` | Frozen legacy table (renamed in 00010); no write policy. |
 | `system_settings` | `system_settings_select` | RESTRICTIVE companion `system_settings_hide_sensitive` hides `is_sensitive_setting(key)` rows (API keys, OAuth tokens). |
 | `user_profiles` | `user_profiles_select` | Directory rows used for display-name rendering / audit attribution; PII columns are not stored. Writes restricted by `user_profiles_insert_admin`, `user_profiles_update`, `user_profiles_delete_admin`. |
+| `containers`, `selling_formats` | `<table>_select` | Catalog reference data (out-of-band tables captured in 00199); companion `_write` gates writes by `settings:manage`. Comments added in 00199. |
+| `email_settings` | `email_settings_select` | Singleton app-settings row read by the settings UI; no secrets stored. Companion `_write` gates writes by `settings:manage` (00199). |
+
+### Live gap found and closed during CI-harness work (00199)
+
+`email_settings` — an out-of-band table with no CREATE TABLE migration —
+carried two live policies `USING (true)` / `WITH CHECK (true)`, including
+**UPDATE**: any authenticated user could rewrite `supabase_project_url` /
+`app_url` and redirect notification email delivery. Invisible to earlier
+audits because they scanned migration-defined tables. `00199` drops both and
+installs the settings pattern (any-auth read, `settings:manage` write); the
+notification path is unaffected because its reader is `SECURITY DEFINER`.
 
 ---
 
@@ -171,3 +183,4 @@ plan):
 | `00196_fix_mongodb_sync_rls.sql` | `settings:manage` for both `mongodb_sync_*` tables. |
 | `00197_fix_legacy_audit_findings_rls.sql` | Closes the remaining original-audit findings (`water_addition_profiles` — guarded, live-DB-only — and portal staff tightening; `keg_inventory` needs none, see resolution table). |
 | `00198_rls_exception_comments.sql` | Adds `RLS-EXCEPTION:` comments on every documented permissive policy. |
+| `00199_capture_selling_formats_containers.sql` | Captures the out-of-band `containers`/`selling_formats`/`email_settings` tables (RLS, policies, triggers), re-states the live qbo policy pairs, and closes the live `email_settings` UPDATE-`(true)` gap. |

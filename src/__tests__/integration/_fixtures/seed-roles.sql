@@ -5,23 +5,13 @@
 -- can sign in without storing secrets.
 --
 -- Apply AFTER all migrations on a fresh test DB:
---   psql "$DATABASE_URL" -f seed-roles.sql
+--   psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f seed-roles.sql
+--
+-- On plain (non-Supabase) Postgres, `bootstrap-plain-postgres.sql` must have
+-- been applied BEFORE the migrations — it provides auth.users, auth.uid(),
+-- and the Supabase-default grants this file and the chain depend on.
 --
 -- IMPORTANT: This file is for CI/test use only. Never run against production.
-
--- ---------------------------------------------------------------------------
--- Helper: ensure auth schema basics exist for plain-postgres environments
--- (the real Supabase stack already has these; no-ops if already present)
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS auth.users (
-  id             UUID PRIMARY KEY,
-  email          TEXT UNIQUE NOT NULL,
-  encrypted_password TEXT,
-  email_confirmed_at TIMESTAMPTZ DEFAULT now(),
-  created_at     TIMESTAMPTZ DEFAULT now(),
-  updated_at     TIMESTAMPTZ DEFAULT now(),
-  raw_user_meta_data JSONB DEFAULT '{}'
-);
 
 -- ---------------------------------------------------------------------------
 -- Deterministic test user UUIDs

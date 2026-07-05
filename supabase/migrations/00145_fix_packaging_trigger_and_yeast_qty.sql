@@ -27,113 +27,117 @@ COMMENT ON COLUMN recipe_yeasts.quantity IS 'Number of yeast packages required p
 
 DROP VIEW IF EXISTS recipe_ingredients_normalized CASCADE;
 
-CREATE VIEW recipe_ingredients_normalized
-WITH (security_invoker = true)
-AS
--- Malts
-SELECT
-  rm.recipe_id,
-  'malt' as catalog_type,
-  rm.malt_id as catalog_id,
-  m.name as catalog_name,
-  rm.weight_lbs as quantity,
-  'lb' as unit
-FROM recipe_malts rm
-JOIN malts m ON m.id = rm.malt_id
-
-UNION ALL
-
--- Hops
-SELECT
-  rh.recipe_id,
-  'hop' as catalog_type,
-  rh.hop_id as catalog_id,
-  h.name as catalog_name,
-  rh.weight_oz as quantity,
-  'oz' as unit
-FROM recipe_hops rh
-JOIN hops h ON h.id = rh.hop_id
-
-UNION ALL
-
--- Adjuncts
-SELECT
-  ra.recipe_id,
-  'adjunct' as catalog_type,
-  ra.adjunct_id as catalog_id,
-  a.name as catalog_name,
-  ra.weight_lbs as quantity,
-  'lb' as unit
-FROM recipe_adjuncts ra
-JOIN adjuncts a ON a.id = ra.adjunct_id
-
-UNION ALL
-
--- Sugars
-SELECT
-  rs.recipe_id,
-  'sugar' as catalog_type,
-  rs.sugar_id as catalog_id,
-  s.name as catalog_name,
-  CASE rs.unit
-    WHEN 'oz' THEN rs.amount / 16.0
-    WHEN 'g' THEN rs.amount / 453.592
-    WHEN 'kg' THEN rs.amount * 2.205
-    ELSE rs.amount
-  END as quantity,
-  'lb' as unit
-FROM recipe_sugars rs
-JOIN sugars s ON s.id = rs.sugar_id
-
-UNION ALL
-
--- Spices
-SELECT
-  rsp.recipe_id,
-  'spice' as catalog_type,
-  rsp.spice_id as catalog_id,
-  sp.name as catalog_name,
-  CASE rsp.unit
-    WHEN 'g' THEN rsp.amount / 28.3495
-    WHEN 'lb' THEN rsp.amount * 16.0
-    ELSE rsp.amount
-  END as quantity,
-  'oz' as unit
-FROM recipe_spices rsp
-JOIN spices sp ON sp.id = rsp.spice_id
-
-UNION ALL
-
--- Fruits
-SELECT
-  rf.recipe_id,
-  'fruit' as catalog_type,
-  rf.fruit_id as catalog_id,
-  f.name as catalog_name,
-  CASE rf.unit
-    WHEN 'oz' THEN rf.amount / 16.0
-    WHEN 'g' THEN rf.amount / 453.592
-    WHEN 'kg' THEN rf.amount * 2.205
-    ELSE rf.amount
-  END as quantity,
-  'lb' as unit
-FROM recipe_fruits rf
-JOIN fruits f ON f.id = rf.fruit_id
-
-UNION ALL
-
--- Yeasts (use actual quantity column instead of hardcoded 1)
-SELECT
-  ry.recipe_id,
-  'yeast' as catalog_type,
-  ry.yeast_id as catalog_id,
-  y.name as catalog_name,
-  ry.quantity::decimal as quantity,
-  'pk' as unit
-FROM recipe_yeasts ry
-JOIN yeasts y ON y.id = ry.yeast_id;
-
-COMMENT ON VIEW recipe_ingredients_normalized IS 'Normalized view of all recipe ingredients across all types (malts, hops, adjuncts, sugars, spices, fruits, yeasts) with consistent units. Yeast uses packs (pk) from the recipe_yeasts.quantity column.';
+-- HISTORICAL NO-OP (commented out in PR #322): this CREATE VIEW referenced
+-- rs.unit / rs.amount, but recipe_sugars has weight_lbs (never unit/amount),
+-- so it failed on every environment. The DROP above DID run (00150's comments
+-- document the fallout); the live view definition is captured in 00191.
+-- CREATE VIEW recipe_ingredients_normalized
+-- WITH (security_invoker = true)
+-- AS
+-- -- Malts
+-- SELECT
+--   rm.recipe_id,
+--   'malt' as catalog_type,
+--   rm.malt_id as catalog_id,
+--   m.name as catalog_name,
+--   rm.weight_lbs as quantity,
+--   'lb' as unit
+-- FROM recipe_malts rm
+-- JOIN malts m ON m.id = rm.malt_id
+--
+-- UNION ALL
+--
+-- -- Hops
+-- SELECT
+--   rh.recipe_id,
+--   'hop' as catalog_type,
+--   rh.hop_id as catalog_id,
+--   h.name as catalog_name,
+--   rh.weight_oz as quantity,
+--   'oz' as unit
+-- FROM recipe_hops rh
+-- JOIN hops h ON h.id = rh.hop_id
+--
+-- UNION ALL
+--
+-- -- Adjuncts
+-- SELECT
+--   ra.recipe_id,
+--   'adjunct' as catalog_type,
+--   ra.adjunct_id as catalog_id,
+--   a.name as catalog_name,
+--   ra.weight_lbs as quantity,
+--   'lb' as unit
+-- FROM recipe_adjuncts ra
+-- JOIN adjuncts a ON a.id = ra.adjunct_id
+--
+-- UNION ALL
+--
+-- -- Sugars
+-- SELECT
+--   rs.recipe_id,
+--   'sugar' as catalog_type,
+--   rs.sugar_id as catalog_id,
+--   s.name as catalog_name,
+--   CASE rs.unit
+--     WHEN 'oz' THEN rs.amount / 16.0
+--     WHEN 'g' THEN rs.amount / 453.592
+--     WHEN 'kg' THEN rs.amount * 2.205
+--     ELSE rs.amount
+--   END as quantity,
+--   'lb' as unit
+-- FROM recipe_sugars rs
+-- JOIN sugars s ON s.id = rs.sugar_id
+--
+-- UNION ALL
+--
+-- -- Spices
+-- SELECT
+--   rsp.recipe_id,
+--   'spice' as catalog_type,
+--   rsp.spice_id as catalog_id,
+--   sp.name as catalog_name,
+--   CASE rsp.unit
+--     WHEN 'g' THEN rsp.amount / 28.3495
+--     WHEN 'lb' THEN rsp.amount * 16.0
+--     ELSE rsp.amount
+--   END as quantity,
+--   'oz' as unit
+-- FROM recipe_spices rsp
+-- JOIN spices sp ON sp.id = rsp.spice_id
+--
+-- UNION ALL
+--
+-- -- Fruits
+-- SELECT
+--   rf.recipe_id,
+--   'fruit' as catalog_type,
+--   rf.fruit_id as catalog_id,
+--   f.name as catalog_name,
+--   CASE rf.unit
+--     WHEN 'oz' THEN rf.amount / 16.0
+--     WHEN 'g' THEN rf.amount / 453.592
+--     WHEN 'kg' THEN rf.amount * 2.205
+--     ELSE rf.amount
+--   END as quantity,
+--   'lb' as unit
+-- FROM recipe_fruits rf
+-- JOIN fruits f ON f.id = rf.fruit_id
+--
+-- UNION ALL
+--
+-- -- Yeasts (use actual quantity column instead of hardcoded 1)
+-- SELECT
+--   ry.recipe_id,
+--   'yeast' as catalog_type,
+--   ry.yeast_id as catalog_id,
+--   y.name as catalog_name,
+--   ry.quantity::decimal as quantity,
+--   'pk' as unit
+-- FROM recipe_yeasts ry
+-- JOIN yeasts y ON y.id = ry.yeast_id;
+--
+-- COMMENT ON VIEW recipe_ingredients_normalized IS 'Normalized view of all recipe ingredients across all types (malts, hops, adjuncts, sugars, spices, fruits, yeasts) with consistent units. Yeast uses packs (pk) from the recipe_yeasts.quantity column.';
 
 -- Recreate calculate_ingredient_shortfalls if it depends on the view
 -- (The function references recipe_ingredients_normalized via FROM)

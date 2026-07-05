@@ -25,9 +25,21 @@ CREATE INDEX IF NOT EXISTS idx_finished_goods_session_line_item_id ON public.fin
 CREATE INDEX IF NOT EXISTS idx_inventory_lots_po_receive_id ON public.inventory_lots (po_receive_id);
 
 -- keg_inventory
-CREATE INDEX IF NOT EXISTS idx_keg_inventory_finished_good_id ON public.keg_inventory (finished_good_id);
+-- HISTORICAL NO-OP: keg_inventory has been a VIEW since 00032; indexes on
+-- views are impossible, so this failed on every environment. Commented out
+-- so a from-scratch replay reproduces the live state. See PR #322.
+-- CREATE INDEX IF NOT EXISTS idx_keg_inventory_finished_good_id ON public.keg_inventory (finished_good_id);
 
 -- keg_transactions
+-- DRIFT SHIM (added retroactively — see PR #322): from_location_id,
+-- to_location_id, and packaging_session_id were added to keg_transactions
+-- directly in the live DB (no migration captured the ALTER); the indexes
+-- below assume they exist. No-op on live.
+ALTER TABLE public.keg_transactions
+  ADD COLUMN IF NOT EXISTS from_location_id UUID REFERENCES locations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS to_location_id UUID REFERENCES locations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS packaging_session_id UUID REFERENCES packaging_sessions(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_keg_transactions_finished_good_id ON public.keg_transactions (finished_good_id);
 CREATE INDEX IF NOT EXISTS idx_keg_transactions_from_location_id ON public.keg_transactions (from_location_id);
 CREATE INDEX IF NOT EXISTS idx_keg_transactions_packaging_session_id ON public.keg_transactions (packaging_session_id);

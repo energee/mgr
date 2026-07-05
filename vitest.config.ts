@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
@@ -22,6 +22,9 @@ export default defineConfig({
       ".github/scripts/**/*.test.ts",
     ],
     exclude: [
+      // Spread the defaults: a bare `exclude` REPLACES them, un-ignoring
+      // node_modules/dist for the include globs above.
+      ...configDefaults.exclude,
       // Integration tests require a live Postgres instance; they run under
       // bun run test:integration (vitest.integration.config.ts), not here.
       "src/__tests__/integration/**",
