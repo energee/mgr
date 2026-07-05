@@ -219,7 +219,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
                     {availableBrewLogs.map((bl) => (
                       <SelectItem key={bl.id} value={bl.id}>
                         {bl.brew_number} (
-                        {new Date(bl.brew_date).toLocaleDateString()})
+                        {new Date(bl.brew_date).toLocaleDateString("en-US")})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -287,7 +287,7 @@ export function BrewLogLinker({ batchId, batchName }: BrewLogLinkerProps) {
                     <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {new Date(link.brew_log.brew_date).toLocaleDateString()}
+                    {new Date(link.brew_log.brew_date).toLocaleDateString("en-US")}
                   </div>
                   {link.notes && (
                     <div className="text-sm text-muted-foreground mt-1">

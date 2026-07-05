@@ -336,12 +336,12 @@ function SquareIntegrationCard() {
                 <div className="flex gap-4 text-xs text-muted-foreground mt-1">
                   {status?.lastCatalogSync && (
                     <span suppressHydrationWarning>
-                      Catalog: {new Date(status.lastCatalogSync).toLocaleString()}
+                      Catalog: {new Date(status.lastCatalogSync).toLocaleString("en-US")}
                     </span>
                   )}
                   {status?.lastInventorySync && (
                     <span suppressHydrationWarning>
-                      Inventory: {new Date(status.lastInventorySync).toLocaleString()}
+                      Inventory: {new Date(status.lastInventorySync).toLocaleString("en-US")}
                     </span>
                   )}
                 </div>
@@ -380,7 +380,7 @@ function SquareIntegrationCard() {
                   {status.recentSyncs.slice(0, 5).map((sync: { id: string; syncType: string; itemsSynced: number; itemsFailed: number; startedAt: string }) => (
                     <div key={sync.id} className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground" suppressHydrationWarning>
-                        {sync.syncType.replace("_", " ")} — {new Date(sync.startedAt).toLocaleString()}
+                        {sync.syncType.replace("_", " ")} — {new Date(sync.startedAt).toLocaleString("en-US")}
                       </span>
                       <span>
                         {sync.itemsSynced} synced

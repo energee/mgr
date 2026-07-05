@@ -131,7 +131,7 @@ export function BatchYeastSection({ data }: BatchYeastSectionProps) {
             </TableCell>
             <TableCell>
               {row.pitched_at
-                ? new Date(row.pitched_at).toLocaleDateString()
+                ? new Date(row.pitched_at).toLocaleDateString("en-US")
                 : "\u2014"}
             </TableCell>
           </TableRow>

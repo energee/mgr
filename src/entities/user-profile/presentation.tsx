@@ -90,14 +90,14 @@ export const userProfilePresentation: EntityPresentation<UserProfile> = {
         if (user.days_since_active === 0) return "Today";
         if (user.days_since_active === 1) return "Yesterday";
         if (user.days_since_active != null) return `${user.days_since_active} days ago`;
-        return new Date(String(value)).toLocaleDateString();
+        return new Date(String(value)).toLocaleDateString("en-US");
       },
     },
     {
       accessorKey: "created_at",
       header: "Joined",
       sortable: true,
-      render: (value) => value ? new Date(String(value)).toLocaleDateString() : "—",
+      render: (value) => value ? new Date(String(value)).toLocaleDateString("en-US") : "—",
     },
   ],
 

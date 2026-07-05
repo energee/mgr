@@ -450,7 +450,7 @@ export function OrderAllocation({
                           <div className="font-medium">{fg.lot_number}</div>
                           {fg.production_date && (
                             <div className="text-xs text-muted-foreground">
-                              {new Date(fg.production_date).toLocaleDateString()}
+                              {new Date(fg.production_date).toLocaleDateString("en-US")}
                             </div>
                           )}
                         </div>

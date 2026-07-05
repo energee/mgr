@@ -180,7 +180,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                     </TableCell>
                     <TableCell><UnitDisplay value={Number(blend.volume_bbl)} unitType="volume" /></TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(blend.blended_at).toLocaleDateString()}
+                      {new Date(blend.blended_at).toLocaleDateString("en-US")}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -282,7 +282,7 @@ export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
                     </TableCell>
                     <TableCell><UnitDisplay value={Number(blend.volume_bbl)} unitType="volume" /></TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(blend.blended_at).toLocaleDateString()}
+                      {new Date(blend.blended_at).toLocaleDateString("en-US")}
                     </TableCell>
                   </TableRow>
                 ))}

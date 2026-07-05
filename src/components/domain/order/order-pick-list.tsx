@@ -294,7 +294,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
               <div className="flex items-center gap-1 font-medium">
                 <Calendar className="h-4 w-4" />
                 {order?.order_date
-                  ? new Date(order.order_date).toLocaleDateString()
+                  ? new Date(order.order_date).toLocaleDateString("en-US")
                   : "—"}
               </div>
             </div>
@@ -303,7 +303,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
               <div className="flex items-center gap-1 font-medium">
                 <Calendar className="h-4 w-4" />
                 {order?.scheduled_date
-                  ? new Date(order.scheduled_date).toLocaleDateString()
+                  ? new Date(order.scheduled_date).toLocaleDateString("en-US")
                   : "—"}
               </div>
             </div>
@@ -388,7 +388,7 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
                     <div className="font-mono text-sm">{item.lot_number}</div>
                     {item.production_date && (
                       <div className="text-xs text-muted-foreground">
-                        {new Date(item.production_date).toLocaleDateString()}
+                        {new Date(item.production_date).toLocaleDateString("en-US")}
                       </div>
                     )}
                   </TableCell>
