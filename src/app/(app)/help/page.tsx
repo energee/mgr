@@ -4,43 +4,75 @@
  * Help Page
  *
  * Browsable, searchable user guide rendered from the shared help-content module.
+ * Content is rendered as markdown via Streamdown (audit F-053) so help authors
+ * can use proper formatting (bold, lists, links, code) instead of the previous
+ * fragile (/path)-only mini-parser.
+ *
+ * Backwards-compat: bare `(/path)` mentions are auto-promoted to markdown links
+ * so existing entries continue to render as clickable links.
  */
 
-import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Link from "next/link";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Streamdown } from "streamdown";
+import type { Components } from "streamdown";
 import { helpSections } from "@/lib/help-content";
 
 /**
- * Converts text content into React nodes, turning paths like (/some/path)
- * into clickable Next.js Links.
+ * Convert legacy `(/path)` mentions in help content into proper markdown
+ * link syntax `[/path](/path)`. Lets the existing content render with
+ * clickable links under Streamdown without rewriting every entry.
+ *
+ * Skip matches that already look like markdown link tails to avoid
+ * double-wrapping when help-content.ts is migrated entry-by-entry.
  */
-function linkifyContent(text: string): ReactNode[] {
-  const parts = text.split(/(\(\/[a-z0-9/-]+\))/g);
-  return parts.map((part, i) => {
-    const match = part.match(/^\((\/[a-z0-9/-]+)\)$/);
-    if (match) {
-      const path = match[1];
+function promoteLegacyPathMentions(content: string): string {
+  return content.replace(/(\]\()?\((\/[a-z0-9/-]+)\)/g, (match, mdTail, path) => {
+    if (mdTail) return match; // already inside `](…)` — leave alone
+    return `[${path}](${path})`;
+  });
+}
+
+/**
+ * Custom anchor renderer for Streamdown.
+ *
+ * Streamdown's default (via `rehype-harden`) forces `target="_blank"` and
+ * `rel="noreferrer"` on every link. For the help page that is wrong for
+ * internal app paths (`/inventory`, `/recipes`, etc.) — those should
+ * navigate in-app via Next.js `<Link>` without opening a new tab. External
+ * links keep `target="_blank"` and gain `rel="noopener noreferrer"` for
+ * reverse-tabnabbing safety.
+ */
+const helpMarkdownComponents: Components = {
+  a: ({ href, children, ...rest }) => {
+    const url = typeof href === "string" ? href : "";
+    const isInternal = url.startsWith("/") && !url.startsWith("//");
+    if (isInternal) {
+      // Strip any target/rel rehype-harden may have injected so internal
+      // navigation stays in the same tab.
+      const { target: _t, rel: _r, node: _n, ...safe } = rest as Record<string, unknown>;
+      void _t; void _r; void _n;
       return (
-        <Link
-          key={i}
-          href={path}
-          className="text-primary underline underline-offset-2 hover:text-primary/80"
-        >
-          ({path})
+        <Link href={url} {...(safe as Record<string, unknown>)}>
+          {children}
         </Link>
       );
     }
-    return part;
-  });
-}
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" {...rest}>
+        {children}
+      </a>
+    );
+  },
+};
 
 export default function HelpPage() {
   const [search, setSearch] = useState("");
@@ -170,8 +202,10 @@ export default function HelpPage() {
                 />
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="px-4 pb-4 pt-1 text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                  {linkifyContent(section.content)}
+                <div className="px-4 pb-4 pt-1 text-sm text-muted-foreground leading-relaxed prose prose-sm max-w-none dark:prose-invert prose-a:text-primary prose-headings:text-foreground prose-strong:text-foreground prose-code:text-foreground">
+                  <Streamdown components={helpMarkdownComponents}>
+                    {promoteLegacyPathMentions(section.content)}
+                  </Streamdown>
                 </div>
               </CollapsibleContent>
             </div>
