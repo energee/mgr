@@ -1,63 +1,18 @@
 "use client";
 
-import { motion, useAnimation } from "motion/react";
-import type { HTMLAttributes } from "react";
-import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
+// Animated icon built on the shared scaffold in create-animated-icon.tsx
+// (imperative start/stopAnimation handle, hover-to-animate, ref-controlled
+// event forwarding). This file only supplies the unique SVG + variants.
+import { motion } from "motion/react";
 
-import { cn } from "@/lib/utils";
+import { createAnimatedIcon } from "@/components/icons/create-animated-icon";
 
-export type CogIconHandle = {
-  startAnimation: () => void;
-  stopAnimation: () => void;
-}
+export type { IconHandle as CogIconHandle } from "@/components/icons/create-animated-icon";
 
-type CogIconProps = HTMLAttributes<HTMLDivElement> & {
-  size?: number;
-}
-
-const CogIcon = forwardRef<CogIconHandle, CogIconProps>(
-  ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
-    const controls = useAnimation();
-    const isControlledRef = useRef(false);
-
-    useImperativeHandle(ref, () => {
-      isControlledRef.current = true;
-
-      return {
-        startAnimation: () => controls.start("animate"),
-        stopAnimation: () => controls.start("normal"),
-      };
-    });
-
-    const handleMouseEnter = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (isControlledRef.current) {
-          onMouseEnter?.(e);
-        } else {
-          controls.start("animate");
-        }
-      },
-      [controls, onMouseEnter]
-    );
-
-    const handleMouseLeave = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (isControlledRef.current) {
-          onMouseLeave?.(e);
-        } else {
-          controls.start("normal");
-        }
-      },
-      [controls, onMouseLeave]
-    );
-    return (
-      <div
-        className={cn(className)}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        {...props}
-      >
-        <motion.svg
+const CogIcon = createAnimatedIcon({
+  displayName: "CogIcon",
+  renderSvg: ({ controls, size }) => (
+    <motion.svg
           animate={controls}
           fill="none"
           height={size}
@@ -93,11 +48,7 @@ const CogIcon = forwardRef<CogIconHandle, CogIconProps>(
           <path d="m17 3.34-1 1.73" />
           <path d="m11 13.73-4 6.93" />
         </motion.svg>
-      </div>
-    );
-  }
-);
-
-CogIcon.displayName = "CogIcon";
+  ),
+});
 
 export { CogIcon };

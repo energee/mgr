@@ -1,18 +1,14 @@
 "use client";
 
+// Animated icon built on the shared scaffold in create-animated-icon.tsx
+// (imperative start/stopAnimation handle, hover-to-animate, ref-controlled
+// event forwarding). This file only supplies the unique SVG + variants.
 import type { Variants } from "motion/react";
-import { motion, useAnimation } from "motion/react";
-import type { HTMLAttributes } from "react";
-import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
+import { motion } from "motion/react";
 
-export type TruckIconHandle = {
-  startAnimation: () => void;
-  stopAnimation: () => void;
-}
+import { createAnimatedIcon } from "@/components/icons/create-animated-icon";
 
-type TruckIconProps = HTMLAttributes<HTMLDivElement> & {
-  size?: number;
-}
+export type { IconHandle as TruckIconHandle } from "@/components/icons/create-animated-icon";
 
 const TRUCK_VARIANTS: Variants = {
   normal: { x: 0, y: 0 },
@@ -59,48 +55,10 @@ const SPEED_LINE_VARIANTS: Variants = {
   }),
 };
 
-const TruckIcon = forwardRef<TruckIconHandle, TruckIconProps>(
-  ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
-    const controls = useAnimation();
-    const isControlledRef = useRef(false);
-
-    useImperativeHandle(ref, () => {
-      isControlledRef.current = true;
-
-      return {
-        startAnimation: () => controls.start("animate"),
-        stopAnimation: () => controls.start("normal"),
-      };
-    });
-
-    const handleMouseEnter = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isControlledRef.current) {
-          controls.start("animate");
-        }
-        onMouseEnter?.(e);
-      },
-      [controls, onMouseEnter]
-    );
-
-    const handleMouseLeave = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isControlledRef.current) {
-          controls.start("normal");
-        }
-        onMouseLeave?.(e);
-      },
-      [controls, onMouseLeave]
-    );
-
-    return (
-      <div
-        className={className}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        {...props}
-      >
-        <svg
+const TruckIcon = createAnimatedIcon({
+  displayName: "TruckIcon",
+  renderSvg: ({ controls, size }) => (
+    <svg
           className="overflow-visible"
           fill="none"
           height={size}
@@ -176,11 +134,9 @@ const TruckIcon = forwardRef<TruckIconHandle, TruckIconProps>(
             </motion.g>
           </motion.g>
         </svg>
-      </div>
-    );
-  }
-);
-
-TruckIcon.displayName = "TruckIcon";
+  ),
+  forwardMouseEvents: "always",
+  classNameStrategy: "raw",
+});
 
 export { TruckIcon };
