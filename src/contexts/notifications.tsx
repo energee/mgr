@@ -131,6 +131,7 @@ function NotificationsProviderInner({ children }: NotificationsProviderProps) {
     },
     // Refetch periodically as backup to realtime
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 
   // Set up realtime subscription
