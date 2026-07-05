@@ -14,7 +14,7 @@
  * - Real-time updates
  */
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { BatchReadingForm } from "@/components/domain/batch/batch-reading-form";
@@ -86,11 +86,16 @@ export default function BatchReadingsPage({
         ? temperatureUnit
         : undefined;
 
-  // Consume prefill store once on initial render to auto-show form from AI
-  const [showForm, setShowForm] = useState(() => {
+  // Default false so SSR and client hydration agree; open form after hydration
+  // if the AI prefill store (backed by sessionStorage) has data
+  // (SENTRY-7477285482).
+  const [showForm, setShowForm] = useState(false);
+  useEffect(() => {
     const { prefillData } = usePrefillStore.getState().consume();
-    return !!prefillData;
-  });
+    if (!prefillData) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only read from sessionStorage-backed store
+    setShowForm(true);
+  }, []);
   const [editingLog, setEditingLog] = useState<BatchLog | null>(null);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
 
