@@ -12,6 +12,8 @@
  *
  * Values are calculated as remaining_quantity * unit_cost (raw materials)
  * and available_quantity * unit_cost estimate (finished goods).
+ *
+ * The header ExportMenu downloads a CSV of whichever tab's table is active.
  */
 
 import { useState, useMemo } from "react";
@@ -48,6 +50,7 @@ import {
   Package,
   Warehouse,
 } from "lucide-react";
+import { ExportMenu } from "@/components/reports/export-menu";
 import Link from "next/link";
 
 // =============================================================================
@@ -126,6 +129,10 @@ function capitalize(s: string): string {
 export default function InventoryValuationPage() {
   const supabase = createClient();
   const [asOfDate, setAsOfDate] = useState(getTodayString());
+  // Controlled so the header ExportMenu can export the visible tab's table.
+  const [activeTab, setActiveTab] = useState<"raw-materials" | "finished-goods">(
+    "raw-materials"
+  );
 
   // ---------------------------------------------------------------------------
   // Raw Materials Query
@@ -369,6 +376,37 @@ export default function InventoryValuationPage() {
     return map;
   }, [rawMaterialRows]);
 
+  // ---------------------------------------------------------------------------
+  // CSV export: mirrors whichever tab's table is currently visible
+  // ---------------------------------------------------------------------------
+  const exportConfig = useMemo(() => {
+    if (activeTab === "finished-goods") {
+      return {
+        filename: `inventory-valuation-finished-goods-${asOfDate}.csv`,
+        loading: fgLoading,
+        rows: finishedGoodRows.map((r) => ({
+          Brand: r.brandName,
+          "Package Type": r.packageType,
+          Quantity: r.quantity,
+          "Unit Cost Est.": Number(r.unitCostEstimate.toFixed(4)),
+          "Total Value": Number(r.totalValue.toFixed(2)),
+        })),
+      };
+    }
+    return {
+      filename: `inventory-valuation-raw-materials-${asOfDate}.csv`,
+      loading: rawLoading,
+      rows: rawMaterialRows.map((r) => ({
+        Item: r.itemName,
+        Category: capitalize(r.category),
+        "Qty on Hand": Number(r.totalQuantity.toFixed(2)),
+        Unit: r.unit,
+        "Avg Unit Cost": Number(r.avgUnitCost.toFixed(4)),
+        "Total Value": Number(r.totalValue.toFixed(2)),
+      })),
+    };
+  }, [activeTab, asOfDate, fgLoading, finishedGoodRows, rawLoading, rawMaterialRows]);
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
@@ -386,6 +424,11 @@ export default function InventoryValuationPage() {
             Current inventory value by category
           </p>
         </div>
+        <ExportMenu
+          filename={exportConfig.filename}
+          rows={exportConfig.rows}
+          disabled={exportConfig.loading}
+        />
       </div>
 
       {/* As-of Date Selector */}
@@ -498,7 +541,10 @@ export default function InventoryValuationPage() {
       </div>
 
       {/* Tabbed Detail Tables */}
-      <Tabs defaultValue="raw-materials">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+      >
         <TabsList>
           <TabsTrigger value="raw-materials">
             Raw Materials ({rawMaterialRows.length})
