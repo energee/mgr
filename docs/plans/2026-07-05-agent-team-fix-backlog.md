@@ -42,6 +42,15 @@ All candidates were verified by reading both sides of the duplication; explorers
 
 Fixes **#1** and **#2** (top LOC value, low risk). #3 awaits a formula decision; #4–#6 are future small-batch work.
 
-## Results
+## Results (2026-07-05 campaign)
 
-_(appended at campaign end)_
+| Fix | PR | LOC delta | Gate |
+|---|---|---|---|
+| #1 animated-icon factory | [#335](https://github.com/energee/mgr/pull/335) | **−2,064** (1,133+/3,197−) | BEHAVIOR-PRESERVING: yes (after one repair round — 3 icons with custom `startSequence`/`stopSequence` animation sequences initially no-opped by the generic factory; caught by review, fixed via escape hatch, +4 sequence tests) |
+| #2 test-harness migration | [#334](https://github.com/energee/mgr/pull/334) | **−295** (85+/380−) | BEHAVIOR-PRESERVING: yes (1,937 tests identical before/after) |
+
+- **Total: −2,359 net LOC** (~1.5% of src) across two PRs; suite grew to 1,957 tests (+20 icon smoke/sequence tests)
+- Worktree prune (Phase 0): 0 of 48 candidates safely removable — 35 hold unmerged work, 12 dirty, 1 out-of-scope; E2BIG mitigated per-command instead
+- New follow-up candidate: `form-actions.test.tsx` harness migration (reuses one container across sequential renders; needs test-body rewrite)
+- Fix #3 (gravity-formula divergence) still awaits a product decision on which formula wins
+- Post-merge: re-run the jscpd baseline to confirm duplicated-lines % drops below 4.61%
