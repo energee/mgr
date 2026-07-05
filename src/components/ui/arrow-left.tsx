@@ -1,20 +1,14 @@
 "use client";
 
+// Animated icon built on the shared scaffold in create-animated-icon.tsx
+// (imperative start/stopAnimation handle, hover-to-animate, ref-controlled
+// event forwarding). This file only supplies the unique SVG + variants.
 import type { Variants } from "motion/react";
-import { motion, useAnimation } from "motion/react";
-import type { HTMLAttributes } from "react";
-import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
+import { motion } from "motion/react";
 
-import { cn } from "@/lib/utils";
+import { createAnimatedIcon } from "@/components/icons/create-animated-icon";
 
-export type ArrowLeftIconHandle = {
-  startAnimation: () => void;
-  stopAnimation: () => void;
-}
-
-type ArrowLeftIconProps = HTMLAttributes<HTMLDivElement> & {
-  size?: number;
-}
+export type { IconHandle as ArrowLeftIconHandle } from "@/components/icons/create-animated-icon";
 
 const PATH_VARIANTS: Variants = {
   normal: { d: "M19 12H5" },
@@ -37,50 +31,10 @@ const SECONDARY_PATH_VARIANTS: Variants = {
   },
 };
 
-const ArrowLeftIcon = forwardRef<ArrowLeftIconHandle, ArrowLeftIconProps>(
-  ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
-    const controls = useAnimation();
-    const isControlledRef = useRef(false);
-
-    useImperativeHandle(ref, () => {
-      isControlledRef.current = true;
-
-      return {
-        startAnimation: () => controls.start("animate"),
-        stopAnimation: () => controls.start("normal"),
-      };
-    });
-
-    const handleMouseEnter = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (isControlledRef.current) {
-          onMouseEnter?.(e);
-        } else {
-          controls.start("animate");
-        }
-      },
-      [controls, onMouseEnter]
-    );
-
-    const handleMouseLeave = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        if (isControlledRef.current) {
-          onMouseLeave?.(e);
-        } else {
-          controls.start("normal");
-        }
-      },
-      [controls, onMouseLeave]
-    );
-
-    return (
-      <div
-        className={cn(className)}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        {...props}
-      >
-        <svg
+const ArrowLeftIcon = createAnimatedIcon({
+  displayName: "ArrowLeftIcon",
+  renderSvg: ({ controls, size }) => (
+    <svg
           fill="none"
           height={size}
           stroke="currentColor"
@@ -102,11 +56,7 @@ const ArrowLeftIcon = forwardRef<ArrowLeftIconHandle, ArrowLeftIconProps>(
             variants={SECONDARY_PATH_VARIANTS}
           />
         </svg>
-      </div>
-    );
-  }
-);
-
-ArrowLeftIcon.displayName = "ArrowLeftIcon";
+  ),
+});
 
 export { ArrowLeftIcon };
