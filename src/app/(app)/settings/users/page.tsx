@@ -2,6 +2,11 @@
  * User Management Page
  *
  * List all users with role and activity information.
+ *
+ * Users are created exclusively by invitation (audit F-058): the entity
+ * list's create button opens `UserInviteDialog`, which POSTs to
+ * /api/users/invite and sends a magic-link email. There is no
+ * /settings/users/new route.
  */
 
 "use client";
@@ -13,6 +18,8 @@ import { EntityList } from "@/components/universal/entity-list";
 import { userProfileEntity } from "@/entities/user-profile";
 import { entityKeys } from "@/lib/query-keys";
 import type { EntityConfig } from "@/types/entity";
+import { UserInviteDialog } from "@/components/domain/shared/user-invite-dialog";
+import { usePermissions } from "@/contexts/permissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +38,9 @@ type DeleteTarget = {
 
 export default function UsersSettingsPage() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -53,9 +62,15 @@ export default function UsersSettingsPage() {
 
   return (
     <>
+      {/* Audit F-058: the list's create button opens the invite dialog
+          instead of navigating to a create route — users are provisioned
+          exclusively via /api/users/invite (magic-link email). The button
+          is hidden for users without `users:manage`, matching the API. */}
       <EntityList
         entity={userProfileEntity as unknown as EntityConfig<Record<string, unknown>>}
         basePath="/settings/users"
+        showCreate={can("users:manage")}
+        onCreateClick={() => setInviteOpen(true)}
         onAction={(actionName, record) => {
           if (actionName === "delete") {
             const r = record as Record<string, unknown>;
@@ -68,6 +83,8 @@ export default function UsersSettingsPage() {
           return false;
         }}
       />
+
+      <UserInviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
 
       <AlertDialog
         open={!!deleteTarget}
