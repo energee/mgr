@@ -26,10 +26,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { yeastKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
@@ -205,28 +204,12 @@ export function RecordCellCountDialog({
 
           {/* Footer */}
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="min-h-[44px]"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={mutation.isPending}
-              className="min-h-[44px]"
-            >
-              {mutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Record"
-              )}
-            </Button>
+            <FormActions
+              submitLabel="Record"
+              loadingLabel="Saving..."
+              isLoading={mutation.isPending}
+              onCancel={() => onOpenChange(false)}
+            />
           </DialogFooter>
         </form>
       </DialogContent>

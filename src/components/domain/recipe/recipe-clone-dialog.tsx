@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import {
   Form,
@@ -40,7 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Copy } from "lucide-react";
+import { Copy } from "lucide-react";
 import { toast } from "sonner";
 import { recipeKeys } from "@/lib/query-keys";
 import { useBrands } from "@/hooks/use-catalog";
@@ -272,31 +272,13 @@ export function RecipeCloneDialog({
           />
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="min-h-[44px]"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={cloneMutation.isPending}
-              className="min-h-[44px]"
-            >
-              {cloneMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Cloning...
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Clone Recipe
-                </>
-              )}
-            </Button>
+            <FormActions
+              submitLabel="Clone Recipe"
+              loadingLabel="Cloning..."
+              submitIcon={<Copy className="h-4 w-4 mr-2" />}
+              isLoading={cloneMutation.isPending}
+              onCancel={() => onOpenChange(false)}
+            />
           </DialogFooter>
         </form>
         </Form>

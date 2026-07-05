@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -414,32 +414,15 @@ export function BatchBlendDialog({
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              className="min-h-[44px]"
-              disabled={blendMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={blendMutation.isPending || selections.size === 0}
-              className="min-h-[44px]"
-            >
-              {blendMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Blending...
-                </>
-              ) : (
-                <>
-                  <GitMerge className="h-4 w-4 mr-2" />
-                  Add to Blend ({selections.size})
-                </>
-              )}
-            </Button>
+            <FormActions
+              submitLabel={`Add to Blend (${selections.size})`}
+              loadingLabel="Blending..."
+              submitIcon={<GitMerge className="h-4 w-4 mr-2" />}
+              isLoading={blendMutation.isPending}
+              submitDisabled={selections.size === 0}
+              cancelDisabled={blendMutation.isPending}
+              onCancel={handleClose}
+            />
           </DialogFooter>
         </form>
       </DialogContent>
