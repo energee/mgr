@@ -252,20 +252,9 @@ export function calculatePitchingRate(
 // Gravity Conversions
 // =============================================================================
 
-/**
- * Convert specific gravity to Plato.
- */
-export function sgToPlato(sg: number): number {
-  // Simplified formula (accurate for normal brewing range)
-  return (-1 * 616.868 + 1111.14 * sg - 630.272 * sg ** 2 + 135.997 * sg ** 3);
-}
-
-/**
- * Convert Plato to specific gravity.
- */
-export function platoToSg(plato: number): number {
-  return 1 + plato / (258.6 - (plato / 258.2) * 227.1);
-}
+// Canonical implementations live in `@/domain/units`. Re-exported here so
+// existing consumers of the yeast API (e.g. pitch-yeast-dialog) keep working.
+export { sgToPlato, platoToSg } from "@/domain/units";
 
 // =============================================================================
 // Generation and Lineage
