@@ -321,38 +321,47 @@ enforced, and concurrent update conflicts are handled."
 
 ---
 
-### Task 8: Allocation Calculation Tests
+### Task 8: Allocation Calculation Tests — SUPERSEDED by PR #291
 
-Test that allocation-based inventory calculations are correct. Focus on the view logic: `available_quantity = fg.quantity - SUM(allocated)`.
+> **Status:** Superseded. The speculative `src/domain/allocation-calculations.ts`
+> module (originally created as `src/lib/allocation-calculations.ts`, relocated by
+> PR #317) was never wired into any consumer and has been deleted along with its
+> test file by PR #291 (F-112). Allocation availability is computed in SQL views
+> (`available_quantity = fg.quantity - SUM(allocated)`), not in a standalone TS
+> module. If allocation TS-layer coverage is needed in the future, add tests
+> against the service that consumes the view results
+> (`src/services/inventory-service.ts`) instead of recreating the deleted module.
 
-**Files:**
-- Create: `src/lib/__tests__/allocation-calculations.test.ts`
-- Read: `src/services/inventory-service.ts` (to find testable functions)
+~~Test that allocation-based inventory calculations are correct. Focus on the view logic: `available_quantity = fg.quantity - SUM(allocated)`.~~
 
-**Step 1: Read inventory service for testable logic**
+~~**Files:**~~
+- ~~Create: `src/lib/__tests__/allocation-calculations.test.ts`~~
+- ~~Read: `src/services/inventory-service.ts` (to find testable functions)~~
 
-Identify pure functions that calculate availability, check over-allocation, or aggregate allocations. If all logic is in SQL views, write tests for the TypeScript layer that processes the query results.
+~~**Step 1: Read inventory service for testable logic**~~
 
-**Step 2: Write tests**
+~~Identify pure functions that calculate availability, check over-allocation, or aggregate allocations. If all logic is in SQL views, write tests for the TypeScript layer that processes the query results.~~
 
-Test at minimum:
-- Available quantity calculation (total - allocated)
-- Over-allocation detection (available < requested)
-- Zero-quantity edge case
-- Multiple allocations against same source
-- Allocation status filtering (only planned + completed count)
+~~**Step 2: Write tests**~~
 
-**Step 3: Run tests**
+~~Test at minimum:~~
+- ~~Available quantity calculation (total - allocated)~~
+- ~~Over-allocation detection (available < requested)~~
+- ~~Zero-quantity edge case~~
+- ~~Multiple allocations against same source~~
+- ~~Allocation status filtering (only planned + completed count)~~
 
-Run: `bun test src/lib/__tests__/allocation-calculations.test.ts`
-Expected: All tests pass
+~~**Step 3: Run tests**~~
 
-**Step 4: Commit**
+~~Run: `bun test src/lib/__tests__/allocation-calculations.test.ts`~~
+~~Expected: All tests pass~~
 
-```bash
-git add src/lib/__tests__/allocation-calculations.test.ts
-git commit -m "test: add allocation calculation tests for inventory integrity"
-```
+~~**Step 4: Commit**~~
+
+~~```bash~~
+~~git add src/lib/__tests__/allocation-calculations.test.ts~~
+~~git commit -m "test: add allocation calculation tests for inventory integrity"~~
+~~```~~
 
 ---
 
