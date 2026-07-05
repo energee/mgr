@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, escapeLike } from "@/lib/utils";
+import { formatRelativeDate } from "@/lib/format";
 import { dynamicFrom } from "@/services/types";
 import { unwrap } from "@/lib/supabase/query-helpers";
 
@@ -90,27 +91,6 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const PAGE_SIZE = 20;
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  } else if (diffDays === 1) {
-    return "Yesterday";
-  } else if (diffDays < 7) {
-    return date.toLocaleDateString([], { weekday: "long" });
-  } else {
-    return date.toLocaleDateString([], { month: "short", day: "numeric" });
-  }
-}
 
 // =============================================================================
 // Component
@@ -461,8 +441,11 @@ export default function NotificationsPage() {
                           {TYPE_LABELS[notification.type] || notification.type}
                         </Badge>
                       </div>
+                      {/* suppressHydrationWarning: the "today" bucket renders a
+                          time-of-day, which differs between server and client
+                          timezones even with the locale pinned. */}
                       <span className="text-xs text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
-                        {formatDate(notification.created_at)}
+                        {formatRelativeDate(notification.created_at)}
                       </span>
                     </div>
                     {notification.message && (
