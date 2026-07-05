@@ -11,6 +11,18 @@
 export type HelpSection = {
   id: string;
   title: string;
+  /**
+   * Help body. Authored as GitHub-flavored markdown. Rendered on the /help
+   * page via Streamdown (audit F-053) — supports headings, bold, italic,
+   * lists, inline code, code blocks, and links. Internal app links use
+   * standard `[label](/path)` syntax; bare `(/path)` mentions are also
+   * auto-promoted to links for backwards-compat with pre-F-053 entries.
+   *
+   * The same string is fed verbatim to the AI assistant via
+   * `getHelpContentForSystemPrompt()`. Plain prose, bullets, and inline
+   * links remain coherent in both contexts; avoid renderer-only constructs
+   * (HTML, tables) unless they read well as raw text too.
+   */
   content: string;
 }
 
@@ -258,6 +270,12 @@ Set up the AI assistant:
 /**
  * Generate a condensed version of the help content for the AI system prompt.
  * Keeps token usage reasonable (~1.5-2k tokens).
+ *
+ * Markdown contract (audit F-053): `HelpSection.content` is now authored as
+ * GitHub-flavored markdown. The string is forwarded verbatim — modern LLMs
+ * read markdown natively, so bullets, bold, and inline links stay coherent
+ * in the system prompt. Consumed by `getAppGuide` in
+ * `src/app/api/chat/tools.ts`.
  */
 export function getHelpContentForSystemPrompt(): string {
   const lines = [
