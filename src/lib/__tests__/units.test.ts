@@ -337,8 +337,8 @@ describe("Format Functions", () => {
     });
 
     it("respects custom decimal places in plato mode", () => {
-      const result = formatGravityFromSg(1.048, "plato", 0);
-      expect(result).toMatch(/^\d+°P$/);
+      // SG 1.048 → ~11.9°P, rounds to 12 at 0 decimals
+      expect(formatGravityFromSg(1.048, "plato", 0)).toBe("12°P");
     });
   });
 
@@ -372,21 +372,6 @@ describe("Format Functions", () => {
 
     it("returns dash for Infinity", () => {
       expect(formatTemperatureRange(Infinity, 72, "f")).toBe("\u2014");
-    });
-  });
-
-  describe("formatGravityFromSg", () => {
-    it("formats SG in sg display unit", () => {
-      expect(formatGravityFromSg(1.048, "sg")).toBe("1.048");
-    });
-
-    it("formats SG converted to Plato", () => {
-      const result = formatGravityFromSg(1.048, "plato");
-      expect(result).toContain("\u00b0P");
-    });
-
-    it("returns dash for null", () => {
-      expect(formatGravityFromSg(null, "sg")).toBe("\u2014");
     });
   });
 
