@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { yeastKeys, batchKeys } from "@/lib/query-keys";
 import {
@@ -495,28 +495,13 @@ export function PitchYeastDialog({
 
           {/* 7. Footer */}
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="min-h-[44px]"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={pitchMutation.isPending || !sortedPitches.length || isOverdrawing}
-              className="min-h-[44px]"
-            >
-              {pitchMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Pitching...
-                </>
-              ) : (
-                "Pitch Yeast"
-              )}
-            </Button>
+            <FormActions
+              submitLabel="Pitch Yeast"
+              loadingLabel="Pitching..."
+              isLoading={pitchMutation.isPending}
+              submitDisabled={!sortedPitches.length || isOverdrawing}
+              onCancel={() => onOpenChange(false)}
+            />
           </DialogFooter>
         </form>
       </DialogContent>

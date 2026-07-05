@@ -35,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/ui/form-actions";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -45,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import { batchKeys, vesselKeys, entityKeys } from "@/lib/query-keys";
@@ -402,31 +402,14 @@ export function VesselTransferDialog({
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="min-h-[44px]"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={transferMutation.isPending || !availableVessels?.length || exceedsCapacity}
-              className="min-h-[44px]"
-            >
-              {transferMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Transferring...
-                </>
-              ) : (
-                <>
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                  Transfer
-                </>
-              )}
-            </Button>
+            <FormActions
+              submitLabel="Transfer"
+              loadingLabel="Transferring..."
+              submitIcon={<ArrowRight className="h-4 w-4 mr-2" />}
+              isLoading={transferMutation.isPending}
+              submitDisabled={!availableVessels?.length || exceedsCapacity}
+              onCancel={() => onOpenChange(false)}
+            />
           </DialogFooter>
         </form>
       </DialogContent>
