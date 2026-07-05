@@ -26,7 +26,9 @@
  * - Create mode: when id is undefined, starts in edit mode with INSERT on save
  *   (relation tabs are hidden — there is no parent record to relate to yet).
  *   Any pending prefill-store payload (src/contexts/prefill-store.ts) is
- *   consumed once on mount and merged under the page's explicit
+ *   consumed once after hydration (usePrefillHydration — sessionStorage is
+ *   client-only, so a render-time read would cause a hydration mismatch,
+ *   SENTRY-7477285482) and merged under the page's explicit
  *   `defaultValues`, so Duplicate/"Brew again"/AI-chat flows pre-fill the
  *   form on every create route. After a successful create, entities listed
  *   in POST_CREATE_TAB land on a specific tab of the new record (e.g. orders
@@ -63,6 +65,7 @@ import { parseUnknownError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { useEntityRecord } from "@/hooks/use-entity-record";
 import { usePrefillStore } from "@/contexts/prefill-store";
+import { usePrefillHydration } from "@/hooks/use-prefill-hydration";
 import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
@@ -474,7 +477,31 @@ function useRelationDisplayValues<T>(
 // Main Component
 // =============================================================================
 
-export function EntityDetailUnified<T = Record<string, unknown>>({
+/**
+ * Public entry point. In create mode it drains the prefill store — set by the
+ * framework Duplicate action (see runAction below), domain flows like "Brew
+ * again", or the AI chat panel — via `usePrefillHydration` and renders nothing
+ * until that client-only (sessionStorage-backed) read has happened, so SSR and
+ * client hydration agree (SENTRY-7477285482) and react-hook-form initializes
+ * with the prefill in its defaultValues. Detail/edit mode never consumes and
+ * renders synchronously, exactly as before. Pages that drain the store
+ * themselves (e.g. batches/new, packaging/new) do so before this child mounts,
+ * so the consume here is a no-op there.
+ */
+export function EntityDetailUnified<T = Record<string, unknown>>(
+  props: EntityDetailUnifiedProps<T>
+) {
+  const isCreateMode = !props.id;
+  const { ready, defaultValues: storePrefill } = usePrefillHydration({
+    enabled: isCreateMode,
+  });
+
+  if (!ready) return null;
+
+  return <EntityDetailUnifiedInner {...props} storePrefill={storePrefill ?? null} />;
+}
+
+function EntityDetailUnifiedInner<T = Record<string, unknown>>({
   entity,
   id,
   basePath,
@@ -484,7 +511,11 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   defaultValues,
   disabledFields,
   onFieldChange,
-}: EntityDetailUnifiedProps<T>) {
+  storePrefill,
+}: EntityDetailUnifiedProps<T> & {
+  /** Create-mode prefill drained from the store by the wrapper above. */
+  storePrefill: Record<string, unknown> | null;
+}) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const supabase = createClient();
@@ -553,17 +584,11 @@ export function EntityDetailUnified<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // react-hook-form setup
   // ---------------------------------------------------------------------------
-  // Create-mode prefill: consume any pending prefill-store payload exactly
-  // once on mount — set by the framework Duplicate action (see runAction
-  // below), domain flows like "Brew again", or the AI chat panel. Pages that
-  // drain the store themselves (e.g. batches/new, packaging/new) consume it
-  // during their own render, before this child runs, so this is a no-op
-  // there. Explicit `defaultValues` (including URL-param prefill merged by
+  // Create-mode prefill: `storePrefill` is drained from the prefill store by
+  // the EntityDetailUnified wrapper (after hydration — the store is
+  // sessionStorage-backed, so a render-time read would mismatch SSR).
+  // Explicit `defaultValues` (including URL-param prefill merged by
   // EntityDetailPage) win over store prefill.
-  const [storePrefill] = useState<Record<string, unknown> | null>(() =>
-    isCreateMode ? usePrefillStore.getState().consume().prefillData : null
-  );
-
   const formDefaults = useMemo(
     () =>
       buildDefaultValues(sections, {
