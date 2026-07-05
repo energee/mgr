@@ -6,17 +6,14 @@
  * quick-create correctly.
  */
 
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, vi } from "vitest";
+import { setupRenderHarness } from "@/test/react-harness";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
 // Prevents env-var validation in @/lib/env from throwing at import time
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: vi.fn(() => ({})),
-}));
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 
 // Prevents @sentry/nextjs initialisation errors in jsdom
 vi.mock("@/lib/client-logger", () => ({
@@ -147,38 +144,22 @@ describe("buildQuickCreateDefaults", () => {
 // FieldInput relation-case wiring
 // ---------------------------------------------------------------------------
 
-let container: HTMLDivElement;
-let root: Root;
+const { render: mount } = setupRenderHarness();
 
 async function renderRelationField(
   field: AnyRecord,
   opts?: { disableQuickCreate?: boolean }
 ) {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  await act(async () => {
-    root.render(
-      <FieldInput
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        field={field as any}
-        value={null}
-        onChange={() => {}}
-        disableQuickCreate={opts?.disableQuickCreate}
-      />
-    );
-  });
-  return container;
+  return mount(
+    <FieldInput
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      field={field as any}
+      value={null}
+      onChange={() => {}}
+      disableQuickCreate={opts?.disableQuickCreate}
+    />
+  );
 }
-
-afterEach(async () => {
-  if (root) {
-    await act(async () => {
-      root.unmount();
-    });
-  }
-  container?.remove();
-});
 
 describe("FieldInput relation quick-create attachment", () => {
   it("auto-attaches the '+' button for master-data target entities", async () => {

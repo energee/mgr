@@ -6,17 +6,15 @@
  * the unit-case fallback used when a field has type "unit" but no unitType.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, useEffect, useState } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { setupRenderHarness } from "@/test/react-harness";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
 // Prevents env-var validation in @/lib/env from throwing at import time
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: vi.fn(() => ({})),
-}));
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 
 // Prevents @sentry/nextjs initialisation errors in jsdom
 vi.mock("@/lib/client-logger", () => ({
@@ -50,16 +48,10 @@ function Harness({ type, unitType }: { type: string; unitType?: undefined }) {
   );
 }
 
-let container: HTMLDivElement;
-let root: Root;
+const { render: mount } = setupRenderHarness();
 
 async function render(type: string) {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  await act(async () => {
-    root.render(<Harness type={type} />);
-  });
+  const container = mount(<Harness type={type} />);
   return container.querySelector("input") as HTMLInputElement;
 }
 
@@ -76,13 +68,6 @@ async function typeText(input: HTMLInputElement, text: string) {
 
 beforeEach(() => {
   commits.length = 0;
-});
-
-afterEach(async () => {
-  await act(async () => {
-    root.unmount();
-  });
-  document.body.removeChild(container);
 });
 
 // ---------------------------------------------------------------------------

@@ -19,8 +19,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { setupRenderHarness } from "@/test/react-harness";
 
 // Hoisted, mutable fixture the mocked useQuery reads from. Using vi.hoisted so
 // the mock factory (hoisted above imports) can safely close over it.
@@ -60,22 +59,9 @@ function setLineItems(data: Row[] | undefined, isLoading = false) {
   fixture.lineItems = { data, isLoading, isPending: false };
 }
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
+const { render } = setupRenderHarness();
 
 afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
   setLineItems([]);
 });
 

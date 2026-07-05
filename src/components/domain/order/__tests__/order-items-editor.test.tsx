@@ -19,9 +19,8 @@
  *     the loading/empty/rows layout logic under test).
  */
 
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { setupRenderHarness } from "@/test/react-harness";
 
 // Mutable fixture the react-query mock reads. Hoisted so the (hoisted)
 // vi.mock factory can close over it without a TDZ error.
@@ -87,26 +86,10 @@ const hasAddItemButton = (c: HTMLElement) =>
     b.textContent?.includes("Add Item"),
   );
 
-let root: Root | null = null;
-let container: HTMLElement | null = null;
-
-function render(el: ReactElement): HTMLElement {
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => root!.render(el));
-  return container;
-}
+const { render } = setupRenderHarness();
 
 beforeEach(() => {
   h.itemsState = { data: undefined, isLoading: false };
-});
-
-afterEach(() => {
-  if (root) act(() => root!.unmount());
-  container?.remove();
-  root = null;
-  container = null;
 });
 
 describe("OrderItemsEditor", () => {
