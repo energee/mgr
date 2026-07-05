@@ -11,18 +11,17 @@
  *   (same convention as CreateBatchFromShortfall); both stay editable.
  */
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { batchEntity } from "@/entities/batch";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { usePrefillHydration } from "@/hooks/use-prefill-hydration";
 import type { UseFormReturn } from "react-hook-form";
 
 export default function NewBatchPage() {
-  const [defaultValues] = useState(() => {
-    const { prefillData } = usePrefillStore.getState().consume();
-    return prefillData ?? undefined;
-  });
+  // Prefill lives in sessionStorage (client-only), so it must be consumed
+  // after hydration; render nothing until it is known (SENTRY-7477285482).
+  const { ready, defaultValues } = usePrefillHydration();
 
   // When recipe_id changes, derive name and volume_bbl from the recipe.
   // Fires only on user edits (not on prefilled defaults), so values staged
@@ -56,6 +55,8 @@ export default function NewBatchPage() {
     },
     [],
   );
+
+  if (!ready) return null;
 
   return (
     <EntityDetailPage

@@ -17,7 +17,7 @@
  *   services/transition-side-effects.ts).
  */
 
-import { use, useRef, useState, useCallback, useMemo } from "react";
+import { use, useEffect, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -48,29 +48,29 @@ export default function BatchDetailPage({
 }) {
   const { id } = use(params);
 
-  // useRef instead of useState lazy-init: React strict mode fires initializers twice,
-  // which would double-consume the store. This ref-guard runs exactly once.
-  const prefillRef = useRef<string | null | undefined>(undefined);
-  if (prefillRef.current === undefined) {
-    prefillRef.current = usePrefillStore.getState().consume().openDialog ?? null;
-  }
-  const prefillDialog = prefillRef.current;
-  const [showPitchYeast, setShowPitchYeast] = useState(
-    prefillDialog === "pitch_yeast"
-  );
-  const [showHarvestYeast, setShowHarvestYeast] = useState(
-    prefillDialog === "harvest_yeast"
-  );
-  const [showCancellation, setShowCancellation] = useState(
-    prefillDialog === "cancel" || prefillDialog === "archive"
-  );
-  const [showBlend, setShowBlend] = useState(prefillDialog === "blend");
-  const [showTransfer, setShowTransfer] = useState(
-    prefillDialog === "transfer" || prefillDialog === "transfer_vessel"
-  );
+  // All dialog states default to false so SSR and client hydration agree.
+  // The prefill store reads sessionStorage (client-only), so consuming it
+  // during render causes a hydration mismatch (SENTRY-7477285482). We defer
+  // it to useEffect, which only runs after hydration.
+  const [showPitchYeast, setShowPitchYeast] = useState(false);
+  const [showHarvestYeast, setShowHarvestYeast] = useState(false);
+  const [showCancellation, setShowCancellation] = useState(false);
+  const [showBlend, setShowBlend] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const [showStartBrewDay, setShowStartBrewDay] = useState(false);
   const [showStartPackaging, setShowStartPackaging] = useState(false);
   const [showAddToSession, setShowAddToSession] = useState(false);
+
+  useEffect(() => {
+    const { openDialog } = usePrefillStore.getState().consume();
+    if (!openDialog) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only read from sessionStorage-backed store
+    if (openDialog === "pitch_yeast") setShowPitchYeast(true);
+    else if (openDialog === "harvest_yeast") setShowHarvestYeast(true);
+    else if (openDialog === "cancel" || openDialog === "archive") setShowCancellation(true);
+    else if (openDialog === "blend") setShowBlend(true);
+    else if (openDialog === "transfer" || openDialog === "transfer_vessel") setShowTransfer(true);
+  }, []);
 
   const queryClient = useQueryClient();
   const supabase = createClient();

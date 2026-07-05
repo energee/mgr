@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { EntityDetailPage } from "@/components/universal/entity-detail-page";
 import { packagingSessionEntity } from "@/entities/packaging-session";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { usePrefillHydration } from "@/hooks/use-prefill-hydration";
 
 export default function NewPackagingSessionPage() {
-  const [defaultValues] = useState(() => {
-    const { prefillData } = usePrefillStore.getState().consume();
-    return prefillData ?? undefined;
-  });
+  // Prefill lives in sessionStorage (client-only), so it must be consumed
+  // after hydration; render nothing until it is known (SENTRY-7477285482).
+  const { ready, defaultValues } = usePrefillHydration();
+
+  if (!ready) return null;
 
   return (
     <EntityDetailPage
