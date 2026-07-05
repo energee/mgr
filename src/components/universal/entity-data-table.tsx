@@ -9,7 +9,7 @@
  * Architecture:
  * - Entity configs are translated to Dice UI columns via data-table-adapter
  * - Filters are managed by DataTableFilterList via nuqs URL state
- * - Sorting is managed by TanStack Table state (DataTableSortList reads/writes via table)
+ * - Sorting is URL-synced via nuqs (audit F-082); DataTableSortList reads/writes via table
  * - Data is fetched from Supabase with filters, search, sorting AND pagination
  *   applied server-side (manualFiltering/manualSorting/manualPagination):
  *   - "paged" mode (desktop table): `.order()` + `.range()` per page
@@ -63,8 +63,8 @@ import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
 import { getStateLabel, getTransitionFieldsAction, entityRegistry } from "@/types/entity";
 import type { EntityColumnDef } from "@/types/entity";
-import type { ExtendedColumnFilter } from "@/types/data-table";
-import { getFiltersStateParser } from "@/lib/parsers";
+import type { ExtendedColumnFilter, ExtendedColumnSort } from "@/types/data-table";
+import { getFiltersStateParser, getSortingStateParser } from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { EntityKanban } from "@/components/universal/entity-kanban";
 import { EntityDeleteDialog, EntityBulkDeleteDialog } from "./entity-delete-dialog";
@@ -517,7 +517,8 @@ export function EntityDataTable<T = Record<string, unknown>>({
         : [],
     [entity.defaultSort]
   );
-  const [sorting, setSorting] = useState<SortingState>(defaultSorting);
+  // NOTE: sorting state is URL-synced and lives below (after the columns
+  // memo it derives its allowlist from) — see "URL-synced sort state".
   // Debounced search value (the input itself lives in ListSearchInput so
   // per-keystroke re-renders don't re-render the whole table)
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -602,6 +603,48 @@ export function EntityDataTable<T = Record<string, unknown>>({
     parseAsStringEnum(["and", "or"]).withDefault("and")
   );
 
+  // ---------------------------------------------------------------------------
+  // URL-synced sort state (audit F-082) — sorted lists are bookmarkable and
+  // survive reload/share. Mirrors the urlFilters pattern above: sortable
+  // column ids are derived from the columns memo and passed to the parser as
+  // an allowlist, so an invalid/unsortable column id arriving via URL fails
+  // parsing and nuqs falls back to the entity default silently (orderSpec
+  // below additionally filters against orderableColumnIds before building
+  // the server-side ORDER BY, so a bad id can never reach PostgREST).
+  // nuqs clears `?sort=` whenever the value equals the default
+  // (clearOnDefault, via the parser's eq), keeping URLs clean.
+  // ---------------------------------------------------------------------------
+  const sortableColumnIds = useMemo(
+    () =>
+      columns
+        .filter((c) => c.enableSorting !== false)
+        .map((c) => c.id)
+        .filter(Boolean) as string[],
+    [columns]
+  );
+
+  const [urlSorting, setUrlSorting] = useQueryState(
+    "sort",
+    getSortingStateParser<T>(sortableColumnIds).withDefault(
+      defaultSorting as ExtendedColumnSort<T>[]
+    )
+  );
+  const sorting: SortingState = urlSorting;
+  /**
+   * TanStack-compatible setter bridging onSortingChange to nuqs: accepts both
+   * the value and updater-function forms. An empty next state writes `null`,
+   * which removes `?sort=` and falls back to the entity default.
+   */
+  const setSorting = useCallback(
+    (updater: SortingState | ((prev: SortingState) => SortingState)) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      void setUrlSorting(
+        next.length > 0 ? (next as ExtendedColumnSort<T>[]) : null
+      );
+    },
+    [sorting, setUrlSorting]
+  );
+
   // Reset row selection and pagination when filters or search change — with
   // server pagination a stale pageIndex would show an empty page, and rows
   // selected under the old criteria may not appear anywhere in the new result
@@ -660,11 +703,21 @@ export function EntityDataTable<T = Record<string, unknown>>({
           filterId: generateId({ length: 8 }),
         })) as ExtendedColumnFilter<T>[]
       );
-      if (defaultFilter.sort) {
+      // Only apply the default quick filter's sort override if the user
+      // hasn't arrived with an explicit sort (i.e. no `?sort=` in the URL,
+      // so urlSorting still equals the entity default). A bookmarked or
+      // shared sort wins over the quick-filter preset.
+      const hasExplicitSort =
+        sorting.length !== defaultSorting.length ||
+        sorting.some(
+          (s, i) =>
+            s.id !== defaultSorting[i]?.id || s.desc !== defaultSorting[i]?.desc
+        );
+      if (defaultFilter.sort && !hasExplicitSort) {
         setSorting([{ id: defaultFilter.sort.column, desc: defaultFilter.sort.direction === "desc" }]);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits urlFilters to avoid re-running after default is applied; hasAppliedDefault guard ensures single execution
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits urlFilters/sorting to avoid re-running after the default is applied; hasAppliedDefault guard ensures single execution
   }, [quickFilters]);
 
   const handleQuickFilterChange = useCallback(
@@ -700,14 +753,18 @@ export function EntityDataTable<T = Record<string, unknown>>({
       }));
       setUrlFilters([...preserved, ...newFilters] as ExtendedColumnFilter<T>[]);
 
-      // Apply sort override if defined, otherwise revert to default
+      // Apply sort override if defined, otherwise revert to default. The
+      // override writes through to `?sort=` like any user sort (reverting to
+      // the default clears the param via clearOnDefault) — an explicit tab
+      // switch is a deliberate sort choice, so it replaces whatever sort the
+      // URL held rather than fighting it.
       if (qf.sort) {
         setSorting([{ id: qf.sort.column, desc: qf.sort.direction === "desc" }]);
       } else {
         setSorting(defaultSorting);
       }
     },
-    [quickFilters, urlFilters, setUrlFilters, defaultSorting]
+    [quickFilters, urlFilters, setUrlFilters, defaultSorting, setSorting]
   );
 
   // ---------------------------------------------------------------------------
