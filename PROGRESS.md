@@ -5,16 +5,18 @@
 
 ## Current state
 
-- **Reflects**: `main` at `9eeb3da` (feat(bom): whole-unit math and intuitive BOM/receive UX, #254) — 2026-05-12
-- **Last verified**: 2026-05-04 (see `docs/agents/quality.md` trend log)
-  - `make check-fast` — clean (lint + typecheck)
-  - `make check-db` — clean (security_invoker / RLS / auth.users — all history-aware)
-  - `bun run test` — **1018 / 1018** pass
-  - `bun run test .github/scripts/sentry-harness/prompt.test.ts` — **6 / 6** pass
-  - `bun run build` — not exercised in this session (sandbox blocks Turbopack port binding); should run clean in a normal terminal
-- **Diverged from `main`**: yes (harness scaffolding)
+- **Reflects**: `feat/integrations-expert-agent` at `37539de1` (PR #336, open) — 2026-07-05. Branch base is `43fa9967` (#335); `origin/main` has since moved to `5f67f3b6` (#337)
+- **Last verified**: 2026-07-05 — docs-only session (agent files, CLAUDE.md, backlog doc); no code paths touched, so lint/typecheck/test not re-run. Suite last known green at **1,957 tests** after the 2026-07-05 dedup campaign (see `docs/plans/2026-07-05-agent-team-fix-backlog.md`)
+- **Diverged from `main`**: yes — PR #336 commit plus this session's review fixes (uncommitted)
+- **Gap notice**: this file went un-updated between 2026-05-12 and 2026-07-05. The "Completed (historical)" and "Deferred" sections below are a May 2026 snapshot — re-verify before acting on them.
 
-## Completed (this branch)
+## Completed (this branch — `feat/integrations-expert-agent`, PR #336)
+
+- [x] **integrations-expert agent** added (`.claude/agents/integrations-expert.md`); entity-architect + data-layer-expert scopes extended; CLAUDE.md agent table updated (`37539de1`)
+- [x] **xhigh 10-angle review of PR #336** — 15 verified findings (14 CONFIRMED / 1 PLAUSIBLE). Top: the doc's claim that `system_settings_hide_sensitive` conceals integration API keys is false (`is_sensitive_setting()` covers only the 3 `qbo_*` token keys — see Known issues); the "wire the 00100 RPCs" guidance would silently break QBO OAuth (they're SECURITY INVOKER and UPDATE-only); `notify_all_users` anchored to the superseded `00090` body (00191 added email dispatch); `(auth)`↔`(app)` staff-auth-surface mix-up
+- [x] **Review fixes applied on-branch (uncommitted)**: entity API routes (`api/{batches,orders,customers,recipes,users}`) assigned to entity-architect; `api/auth` + `update-password` to data-layer-expert; explicit "no expert owner" table row (`api/{dev,health}`; `chat` deferred to `ai-features-expert`, Phase 4A); services bullet trimmed to invariants + module-header pointer; stale "~30" query-key factory counts corrected (43 actual → "dozens"); backlog fix #7 added (transfer-route side-effects bypass)
+
+## Completed (historical — Sentry fixes + harness rollout, May 2026)
 
 - [x] **SENTRY-7479939863 — Error: No QueryClient set, use QueryClientProvider to set one** (Sentry fix, MGR-8)
   `NotificationsProvider` called `useQueryClient()` unconditionally at render time (line 80 of `src/contexts/notifications.tsx`), which throws immediately if no `QueryClientProvider` ancestor exists. The error was captured from the `polish` git worktree at `GET /` (localhost:3002). The fix adds an outer guard component that reads `QueryClientContext` directly via `useContext` (which returns `undefined` safely instead of throwing when no provider is present). If no QueryClient is found, the guard renders children with a stable no-op `EMPTY_NOTIFICATIONS` context and logs a production error for observability; in the normal path it delegates to the original inner implementation unchanged. Three Vitest tests at `src/contexts/__tests__/notifications.test.tsx` cover the no-QueryClient render, empty context defaults, and no-op action handlers. All 41 test files (1105 tests) pass; typecheck and lint clean.
@@ -73,7 +75,7 @@
 
 ## In progress
 
-_(none known)_
+- **PR #336** (this branch) — open. This session's edits fixed the routing-gap findings, but 14 of the 15 review findings are still unaddressed in the PR's own text (doc corrections in `integrations-expert.md`, the `webhook API routes` table row, the stale `One entity = one file` convention line, the stale `customers.user_id` RLS bullet, `middleware.ts` → `src/proxy.ts`).
 
 ## Deferred
 
@@ -91,6 +93,8 @@ Open work that's logged but not currently being executed. Pull from this list wh
 
 ## Recent history
 
+- **2026-07-05** — Big merge day: #331 Sentry-harness restore (automation tiered to Sonnet), #295 user-invite dialog + hardened invite API, #332 ExportMenu wired into five report pages, #322 RLS coverage-gap completion (10/10 tasks), #334 react-harness test migration (−295 LOC), #333 expert-agent team + knowledge base + fix backlog, #335 animated-icon factory (−2,064 LOC), #337 guards for 00197/00198 against out-of-band table drops. #336 (integrations-expert agent) opened + given a 10-angle verified review (15 findings)
+- **2026-06-30** — #328 dedup/simplification merged: dead-code removal, engine-file splits, prefill-store zustand→sessionStorage, two orphaned components wired; characterization coverage for recipe displays + schedule editors (#329/#330). Full detail: `docs/plans/2026-06-30-dedup-extraction-backlog.md`
 - **2026-05-12** — #254 BOM whole-unit math + intuitive BOM/receive UX
 - **2026-05-04..** — Sentry-harness hardening: #257 grants Claude Code the required toolset; #256 streams Claude Code Action output to job log; #255 reads org/project from `vars` to avoid output redaction
 - **2026-05-04** — Migration `00156_security_invoker_corrections` applied to production via `bun run db:migrate -- --include-all` (9 legacy views + `recent_vessel_cleanings` rebuild now live)
@@ -100,9 +104,13 @@ Open work that's logged but not currently being executed. Pull from this list wh
 
 ## Known issues
 
+- **Integration API keys readable by any authenticated user** — `is_sensitive_setting()` (00099) hides only the 3 `qbo_*` token keys; `square_api_key`, `square-webhook_api_key`, `slack_api_key`, `quickbooks_api_key`, `mongodb_api_key` (and `anthropic_api_key`) in `system_settings` are exposed to every logged-in client via the permissive SELECT policy (00097:402-403). Surfaced by the PR #336 review — needs a real fix (extend `is_sensitive_setting` to match `%_api_key` or an explicit list), not just doc edits.
 - `make` warnings about `xcrun_db` permission errors only appear inside Claude Code's sandbox; normal terminals don't show them.
 - `make check` cannot be exercised end-to-end inside the agent sandbox because Turbopack `next build` requires port binding. Verified piecewise: `make check-fast`, `bun run test`, `make check-db`.
 
 ## Next steps
 
-Pick from **Deferred** based on priority. No active in-flight work.
+1. Address the remaining 14 PR #336 review findings, commit this session's uncommitted fixes, merge #336
+2. Fix the `is_sensitive_setting` API-key exposure (Known issues) — small migration, high value
+3. Backlog (`docs/plans/2026-07-05-agent-team-fix-backlog.md`): #7 transfer-route side-effects bypass; #3 gravity-formula divergence awaits a product decision; #4–#6 small-batch
+4. Older **Deferred** items below are a May 2026 snapshot — re-verify before pulling
