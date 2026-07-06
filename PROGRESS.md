@@ -5,16 +5,19 @@
 
 ## Current state
 
-- **Reflects**: `feat/integrations-expert-agent` at `37539de1` (PR #336, open) — 2026-07-05. Branch base is `43fa9967` (#335); `origin/main` has since moved to `5f67f3b6` (#337)
-- **Last verified**: 2026-07-05 — docs-only session (agent files, CLAUDE.md, backlog doc); no code paths touched, so lint/typecheck/test not re-run. Suite last known green at **1,957 tests** after the 2026-07-05 dedup campaign (see `docs/plans/2026-07-05-agent-team-fix-backlog.md`)
-- **Diverged from `main`**: yes — PR #336 commit plus this session's review fixes (uncommitted)
+- **Reflects**: `feat/integrations-expert-agent` rebased onto `origin/main` `ea713bb9` (the #336 squash-merge) — 2026-07-05 (second session). **PR #336 merged mid-session** with only its original commit; the follow-up commits live in **[PR #338](https://github.com/energee/mgr/pull/338)**
+- **Last verified**: 2026-07-05 — lint + typecheck clean, suite green at **1,959 tests** (+2: transition call-site enforcement). Migration `00200` applied to live and verified (`is_sensitive_setting` returns true for all six `*_api_key` keys, false for non-secrets)
+- **Diverged from `main`**: yes — five follow-up commits in PR #338: `04609164` (routing-gap review fixes), `9dad496b` (remaining 14 review findings), `03fd5aa9` (00200 RLS fix, applied live), `0d6ceb41` (backlog #7), plus this docs refresh
 - **Gap notice**: this file went un-updated between 2026-05-12 and 2026-07-05. The "Completed (historical)" and "Deferred" sections below are a May 2026 snapshot — re-verify before acting on them.
 
-## Completed (this branch — `feat/integrations-expert-agent`, PR #336)
+## Completed (this branch — `feat/integrations-expert-agent`; #336 merged, follow-ups in PR #338)
 
 - [x] **integrations-expert agent** added (`.claude/agents/integrations-expert.md`); entity-architect + data-layer-expert scopes extended; CLAUDE.md agent table updated (`37539de1`)
 - [x] **xhigh 10-angle review of PR #336** — 15 verified findings (14 CONFIRMED / 1 PLAUSIBLE). Top: the doc's claim that `system_settings_hide_sensitive` conceals integration API keys is false (`is_sensitive_setting()` covers only the 3 `qbo_*` token keys — see Known issues); the "wire the 00100 RPCs" guidance would silently break QBO OAuth (they're SECURITY INVOKER and UPDATE-only); `notify_all_users` anchored to the superseded `00090` body (00191 added email dispatch); `(auth)`↔`(app)` staff-auth-surface mix-up
-- [x] **Review fixes applied on-branch (uncommitted)**: entity API routes (`api/{batches,orders,customers,recipes,users}`) assigned to entity-architect; `api/auth` + `update-password` to data-layer-expert; explicit "no expert owner" table row (`api/{dev,health}`; `chat` deferred to `ai-features-expert`, Phase 4A); services bullet trimmed to invariants + module-header pointer; stale "~30" query-key factory counts corrected (43 actual → "dozens"); backlog fix #7 added (transfer-route side-effects bypass)
+- [x] **Review fixes applied on-branch**: entity API routes (`api/{batches,orders,customers,recipes,users}`) assigned to entity-architect; `api/auth` + `update-password` to data-layer-expert; explicit "no expert owner" table row (`api/{dev,health}`; `chat` deferred to `ai-features-expert`, Phase 4A); services bullet trimmed to invariants + module-header pointer; stale "~30" query-key factory counts corrected (43 actual → "dozens"); backlog fix #7 added (transfer-route side-effects bypass) (`04609164`)
+- [x] **Remaining 14 review findings fixed in doc text** (`9dad496b`): integrations-expert — API keys not RLS-hidden (pre-00200), qbo tokens bypass the api-key route, email's `email_settings`/`dispatch_email_notification` dependency, `square_draft_sales` reframed as replay drift (live column dropped), 00100 RPCs must NOT be wired (INVOKER/UPDATE-only), `mapAddress` is tested, `notify_all_users` anchored to 00191, four email templates, broader name-resolution risks; data-layer-expert — staff gate is `(app)/layout.tsx`, portal RLS via `customer_portal_users` junction, `src/proxy.ts` replaces root `middleware.ts`; CLAUDE.md — integrations route dirs named, entity triad convention; all agents — redundant Search tooling section dropped
+- [x] **00200_extend_sensitive_settings.sql** (`03fd5aa9`): `is_sensitive_setting()` extended with `%_api_key` LIKE — closes the Known-issues API-key exposure. Applied to live via `db push --include-all` + verified; agent docs updated to post-00200 state
+- [x] **Backlog #7 — transfer-route side-effects bypass** (`0d6ceb41`): `POST /api/batches/[id]/transfer` now calls `runTransitionSideEffects` (was silently skipping `completeBatchConsumption` on `packaging → completed`); new `src/services/__tests__/transition-call-sites.test.ts` walks all API routes for future bypasses (red → green; suite 1,957 → 1,959)
 
 ## Completed (historical — Sentry fixes + harness rollout, May 2026)
 
@@ -75,7 +78,7 @@
 
 ## In progress
 
-- **PR #336** (this branch) — open. This session's edits fixed the routing-gap findings, but 14 of the 15 review findings are still unaddressed in the PR's own text (doc corrections in `integrations-expert.md`, the `webhook API routes` table row, the stale `One entity = one file` convention line, the stale `customers.user_id` RLS bullet, `middleware.ts` → `src/proxy.ts`).
+- **[PR #338](https://github.com/energee/mgr/pull/338)** (this branch) — open, ready to merge. PR #336 was squash-merged mid-session with only its original commit; #338 carries all 15 review-finding fixes, the 00200 API-key RLS migration (already applied to live), and backlog #7 (transfer-route side effects + enforcement test).
 
 ## Deferred
 
@@ -104,13 +107,13 @@ Open work that's logged but not currently being executed. Pull from this list wh
 
 ## Known issues
 
-- **Integration API keys readable by any authenticated user** — `is_sensitive_setting()` (00099) hides only the 3 `qbo_*` token keys; `square_api_key`, `square-webhook_api_key`, `slack_api_key`, `quickbooks_api_key`, `mongodb_api_key` (and `anthropic_api_key`) in `system_settings` are exposed to every logged-in client via the permissive SELECT policy (00097:402-403). Surfaced by the PR #336 review — needs a real fix (extend `is_sensitive_setting` to match `%_api_key` or an explicit list), not just doc edits.
+- ~~Integration API keys readable by any authenticated user~~ — **FIXED 2026-07-05** by `00200_extend_sensitive_settings.sql` (`is_sensitive_setting()` now also matches `%_api_key`; applied to live and verified). Was: only the 3 `qbo_*` token keys were hidden from the permissive SELECT policy (00097:402-403).
 - `make` warnings about `xcrun_db` permission errors only appear inside Claude Code's sandbox; normal terminals don't show them.
 - `make check` cannot be exercised end-to-end inside the agent sandbox because Turbopack `next build` requires port binding. Verified piecewise: `make check-fast`, `bun run test`, `make check-db`.
 
 ## Next steps
 
-1. Address the remaining 14 PR #336 review findings, commit this session's uncommitted fixes, merge #336
-2. Fix the `is_sensitive_setting` API-key exposure (Known issues) — small migration, high value
-3. Backlog (`docs/plans/2026-07-05-agent-team-fix-backlog.md`): #7 transfer-route side-effects bypass; #3 gravity-formula divergence awaits a product decision; #4–#6 small-batch
+1. Merge PR #338 (all review findings + 00200 + backlog #7, rebased onto main, gates green)
+2. Backlog (`docs/plans/2026-07-05-agent-team-fix-backlog.md`): #3 gravity-formula divergence awaits a product decision; #4–#6 small-batch
+3. Migration-replay drift: from-scratch replay still recreates `square_draft_sales.keg_type_id NOT NULL` + its stale UNIQUE index (00091, never dropped by a migration) — fold into the next replay-repair pass
 4. Older **Deferred** items below are a May 2026 snapshot — re-verify before pulling
