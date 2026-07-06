@@ -43,6 +43,3 @@ BEHAVIOR-PRESERVING: yes|no|uncertain
 - `docs/plans/2026-06-30-dedup-extraction-backlog.md`
 - `docs/plans/2026-06-30-codebase-audit.md`
 - `docs/plans/2026-06-30-migration-reconciliation-10.md`
-
-## Search tooling
-Use `mgrep` (semantic search CLI) to locate code by meaning ("where is gravity converted"); use literal `grep`/`rg` only for exact-string ref-counting (imports, symbol names). mgrep finds what grep can't spell.
