@@ -41,7 +41,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -53,7 +55,7 @@ import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
 import { getValueLabel } from "@/types/entity";
 import { vesselEntity } from "@/entities/vessel";
-import { isDuplicateTransfer } from "./vessel-transfer-utils";
+import { isDuplicateTransfer, groupVesselsForTransfer } from "./vessel-transfer-utils";
 import { computeTransferLoss } from "@/domain/consumption-planning";
 import { RecordLossDialog } from "@/components/domain/shared/record-loss-dialog";
 
@@ -264,6 +266,9 @@ export function VesselTransferDialog({
     },
     onSuccess: ({ vesselName, vesselType }, values) => {
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
+      // The batches LIST is keyed on the view, not ["batches"] — without this
+      // the row's vessel column stays stale after a transfer from the list.
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("batches_with_brew_info") });
       queryClient.invalidateQueries({ queryKey: vesselKeys.all() });
       queryClient.invalidateQueries({ queryKey: vesselKeys.transfers() });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("vessel_transfers") });
@@ -343,13 +348,24 @@ export function VesselTransferDialog({
                     No vessels available
                   </div>
                 ) : (
-                  availableVessels?.map((vessel) => (
-                    <SelectItem key={vessel.id} value={vessel.id}>
-                      <span className="font-medium">{vessel.name}</span>
-                      <span className="text-muted-foreground ml-2">
-                        ({getValueLabel(vesselEntity, "vessel_type", vessel.vessel_type)} &middot; <UnitDisplay value={vessel.capacity_bbl} unitType="volume" />)
-                      </span>
-                    </SelectItem>
+                  // Grouped by vessel type with the batch's expected next
+                  // stage first (fermenting → brites), so the right tank is
+                  // at the top instead of buried in an any-tank list.
+                  groupVesselsForTransfer(availableVessels ?? [], batchStatus).map((group) => (
+                    <SelectGroup key={group.vesselType}>
+                      <SelectLabel>
+                        {getValueLabel(vesselEntity, "vessel_type", group.vesselType)}
+                        {group.preferred ? " · suggested" : ""}
+                      </SelectLabel>
+                      {group.vessels.map((vessel) => (
+                        <SelectItem key={vessel.id} value={vessel.id}>
+                          <span className="font-medium">{vessel.name}</span>
+                          <span className="text-muted-foreground ml-2">
+                            (<UnitDisplay value={vessel.capacity_bbl} unitType="volume" />)
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))
                 )}
               </SelectContent>
@@ -362,6 +378,9 @@ export function VesselTransferDialog({
             {selectedVessel && (
               <p className="text-sm text-muted-foreground">
                 Capacity: <UnitDisplay value={selectedVessel.capacity_bbl} unitType="volume" />
+                {watchedVolume > 0 && selectedVessel.capacity_bbl > 0 && !exceedsCapacity && (
+                  <> &middot; fills {Math.round((watchedVolume / selectedVessel.capacity_bbl) * 100)}%</>
+                )}
               </p>
             )}
           </div>
