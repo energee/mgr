@@ -270,6 +270,24 @@ describe("runTransitionSideEffects: batches → completed", () => {
     expect(reconcileBatchLoss).toHaveBeenCalledWith(mock.client, BATCH_B);
   });
 
+  it("releases the completed batches' vessels (empty + dirty, matching cancel/archive RPCs)", async () => {
+    const mock = createMockSupabase({ data: [], error: null });
+    vi.mocked(completeBatchConsumption).mockResolvedValue({
+      success: true,
+      data: 0,
+      invalidate: [],
+    });
+    vi.mocked(reconcileBatchLoss).mockResolvedValue({ success: true, data: 0, invalidate: [] });
+
+    await runTransitionSideEffects(mock.client, "batches", [BATCH_A, BATCH_B], "completed");
+
+    expect(mock.from).toHaveBeenCalledWith("vessels");
+    expect(mock.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "dirty", current_batch_id: null })
+    );
+    expect(mock.updateIn).toHaveBeenCalledWith("current_batch_id", [BATCH_A, BATCH_B]);
+  });
+
   it("surfaces reconciliation failures without dropping the allocations count", async () => {
     const mock = createMockSupabase({ data: [], error: null });
     vi.mocked(completeBatchConsumption).mockResolvedValue({

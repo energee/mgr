@@ -82,6 +82,10 @@ export async function runTransitionSideEffects(
   //    'reconciliation' loss allocation (feeds the TTB losses line).
   //    Idempotent via the reconciliation note guard; skips while any of the
   //    batch's packaging sessions is still open.
+  // 3. Release the batches' vessels (empty + dirty, same semantics as the
+  //    cancel/archive RPCs, 00042/00069). Without this a batch completed in
+  //    a brite tank occupied it forever, hiding the tank from every transfer
+  //    destination list. Idempotent: re-running matches 0 rows.
   if (table === "batches" && toState === "completed") {
     const consumptionFailures: string[] = [];
     const reconcileFailures: string[] = [];
@@ -99,6 +103,15 @@ export async function runTransitionSideEffects(
         reconcileFailures.push(formatServiceError(rec.error));
       }
     }
+    const { error: vesselError } = await supabase
+      .from("vessels")
+      .update({ status: "dirty", current_batch_id: null, updated_at: new Date().toISOString() })
+      .in("current_batch_id", ids);
+    if (!vesselError) {
+      void queryClient?.invalidateQueries({ queryKey: entityKeys.all("vessels") });
+      void queryClient?.invalidateQueries({ queryKey: entityKeys.all("vessels_with_batch") });
+    }
+
     const parts: string[] = [];
     if (consumptionFailures.length > 0) {
       parts.push(
@@ -107,6 +120,9 @@ export async function runTransitionSideEffects(
     }
     if (reconcileFailures.length > 0) {
       parts.push(`loss reconciliation failed: ${[...new Set(reconcileFailures)].join("; ")}`);
+    }
+    if (vesselError) {
+      parts.push(`releasing the vessel failed: ${vesselError.message}`);
     }
     if (parts.length > 0) {
       result.error = `Batch completed, but ${parts.join("; ")}`;
