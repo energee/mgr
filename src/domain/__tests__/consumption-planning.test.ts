@@ -13,6 +13,9 @@ import {
   computeBomConsumption,
   computeTransferLoss,
   computePackagingLoss,
+  computeBatchLossReconciliation,
+  computeUnitFillVolumeBbl,
+  reconciliationThresholdBbl,
   LOSS_EPSILON_BBL,
   type FifoLot,
   type BomLine,
@@ -495,5 +498,105 @@ describe("computePackagingLoss", () => {
 
   it("returns an empty map for empty input", () => {
     expect(computePackagingLoss([]).size).toBe(0);
+  });
+});
+
+describe("computeUnitFillVolumeBbl", () => {
+  it("multiplies container volume_bbl by unit count", () => {
+    expect(
+      computeUnitFillVolumeBbl({ unit_count: 24, container: { volume_bbl: 0.01 } })
+    ).toBeCloseTo(0.24);
+  });
+
+  it("defaults a missing unit count to 1", () => {
+    expect(computeUnitFillVolumeBbl({ unit_count: null, container: { volume_bbl: 0.5 } })).toBe(0.5);
+  });
+
+  it("falls back to volume_oz when volume_bbl is missing (cans/bottles)", () => {
+    // 992 oz = 0.25 bbl (31 gal x 128 oz per bbl)
+    expect(
+      computeUnitFillVolumeBbl({
+        unit_count: 2,
+        container: { volume_bbl: null, volume_oz: 992 },
+      })
+    ).toBeCloseTo(0.5);
+  });
+
+  it("prefers volume_bbl over volume_oz when both are present", () => {
+    expect(
+      computeUnitFillVolumeBbl({
+        unit_count: 1,
+        container: { volume_bbl: 0.5, volume_oz: 992 },
+      })
+    ).toBe(0.5);
+  });
+
+  it("returns null when no usable volume exists", () => {
+    expect(computeUnitFillVolumeBbl({ unit_count: 1, container: null })).toBeNull();
+    expect(
+      computeUnitFillVolumeBbl({ unit_count: 1, container: { volume_bbl: null } })
+    ).toBeNull();
+    expect(
+      computeUnitFillVolumeBbl({ unit_count: 1, container: { volume_bbl: 0, volume_oz: 0 } })
+    ).toBeNull();
+    expect(
+      computeUnitFillVolumeBbl({ unit_count: 1, container: { volume_bbl: -1, volume_oz: -1 } })
+    ).toBeNull();
+  });
+});
+
+describe("computeBatchLossReconciliation", () => {
+  const base = { blendInBbl: 0, blendOutBbl: 0, packagedBbl: 0, attributedBbl: 0 };
+
+  it("returns produced minus packaged minus attributed removals", () => {
+    expect(
+      computeBatchLossReconciliation({ ...base, producedBbl: 10, packagedBbl: 6, attributedBbl: 1 })
+    ).toBeCloseTo(3);
+  });
+
+  it("subtracts volume blended out to other batches from the baseline", () => {
+    expect(
+      computeBatchLossReconciliation({
+        ...base,
+        producedBbl: 10,
+        blendOutBbl: 4,
+        packagedBbl: 5,
+      })
+    ).toBeCloseTo(1);
+  });
+
+  it("reconciles blend-only batches via blend inflow (no brew logs)", () => {
+    expect(
+      computeBatchLossReconciliation({ ...base, producedBbl: null, blendInBbl: 8, packagedBbl: 7 })
+    ).toBeCloseTo(1);
+  });
+
+  it("returns the signed remainder when packaged exceeds the baseline", () => {
+    // Negative = data-entry problem or post-knockout additions; caller decides.
+    expect(
+      computeBatchLossReconciliation({ ...base, producedBbl: 10, packagedBbl: 11 })
+    ).toBeCloseTo(-1);
+  });
+
+  it("returns null when there is no production baseline to reconcile against", () => {
+    expect(computeBatchLossReconciliation({ ...base, producedBbl: null })).toBeNull();
+    expect(computeBatchLossReconciliation({ ...base, producedBbl: NaN })).toBeNull();
+    expect(computeBatchLossReconciliation({ ...base, producedBbl: 0 })).toBeNull();
+    // Blended fully away -> baseline 0 -> nothing left to reconcile.
+    expect(
+      computeBatchLossReconciliation({ ...base, producedBbl: 5, blendOutBbl: 5 })
+    ).toBeNull();
+  });
+});
+
+describe("reconciliationThresholdBbl", () => {
+  it("floors at 0.05 bbl for small batches", () => {
+    expect(reconciliationThresholdBbl(1)).toBe(0.05);
+    expect(reconciliationThresholdBbl(10)).toBe(0.05);
+  });
+
+  it("scales at 0.5% of the baseline for larger batches", () => {
+    expect(reconciliationThresholdBbl(20)).toBeCloseTo(0.1);
+    expect(reconciliationThresholdBbl(100)).toBeCloseTo(0.5);
   });
 });

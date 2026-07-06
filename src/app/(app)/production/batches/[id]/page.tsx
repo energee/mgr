@@ -35,6 +35,7 @@ import { runTransitionSideEffects } from "@/services/transition-side-effects";
 import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-batch-dialog";
 import { AddToPackagingSessionDialog } from "@/components/domain/packaging/add-to-packaging-session-dialog";
 import { BatchPackagingHistory } from "@/components/domain/batch/batch-packaging-history";
+import { BatchLossSummary } from "@/components/domain/batch/batch-loss-summary";
 import { NextStepBanner } from "@/components/domain/shared/next-step-banner";
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { batchKeys, recipeKeys, packagingKeys } from "@/lib/query-keys";
@@ -278,13 +279,18 @@ export default function BatchDetailPage({
       queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
       return;
     }
-    const sideEffects = await runTransitionSideEffects(client, "batches", [id], "completed");
+    const sideEffects = await runTransitionSideEffects(client, "batches", [id], "completed", queryClient);
     if (sideEffects.error) {
       toast.error(sideEffects.error);
-    } else if (sideEffects.completedAllocations > 0) {
-      toast.success(`Batch completed — ${sideEffects.completedAllocations} ingredient allocation${sideEffects.completedAllocations === 1 ? "" : "s"} confirmed`);
     } else {
-      toast.success("Batch completed");
+      const details: string[] = [];
+      if (sideEffects.completedAllocations > 0) {
+        details.push(`${sideEffects.completedAllocations} ingredient allocation${sideEffects.completedAllocations === 1 ? "" : "s"} confirmed`);
+      }
+      if (sideEffects.reconciledLossBbl > 0) {
+        details.push(`${sideEffects.reconciledLossBbl.toFixed(2)} bbl recorded as loss (packaged vs produced)`);
+      }
+      toast.success(details.length > 0 ? `Batch completed — ${details.join("; ")}` : "Batch completed");
     }
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
     queryClient.invalidateQueries({ queryKey: batchKeys.all() });
@@ -417,6 +423,8 @@ export default function BatchDetailPage({
       />
 
       <BatchPackagingHistory batchId={id} />
+
+      <BatchLossSummary batchId={id} status={batch?.status ?? null} />
 
       {batch && batch.id && batch.batch_code && (
         <>

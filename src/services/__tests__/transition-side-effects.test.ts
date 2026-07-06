@@ -21,6 +21,7 @@ import type { Database } from "@/types/supabase";
 // importing the module under test never touches a real client.
 vi.mock("../consumption-service", () => ({
   completeBatchConsumption: vi.fn(),
+  reconcileBatchLoss: vi.fn(),
   consumePackagingMaterials: vi.fn(),
 }));
 
@@ -225,5 +226,67 @@ describe("runTransitionSideEffects: registry matching", () => {
 
     expect(result.error).toBeNull();
     expect(mock.from).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// batches → completed (consumption + loss reconciliation)
+// =============================================================================
+
+import {
+  completeBatchConsumption,
+  reconcileBatchLoss,
+} from "../consumption-service";
+
+const BATCH_A = "00000000-0000-0000-0000-0000000000ba";
+const BATCH_B = "00000000-0000-0000-0000-0000000000bb";
+
+describe("runTransitionSideEffects: batches → completed", () => {
+  it("confirms consumption and reconciles packaged-vs-produced loss per batch", async () => {
+    const mock = createMockSupabase({ data: [], error: null });
+    vi.mocked(completeBatchConsumption).mockResolvedValue({
+      success: true,
+      data: 2,
+      invalidate: [],
+    });
+    vi.mocked(reconcileBatchLoss).mockResolvedValue({
+      success: true,
+      data: 1.5,
+      invalidate: [],
+    });
+
+    const result = await runTransitionSideEffects(
+      mock.client,
+      "batches",
+      [BATCH_A, BATCH_B],
+      "completed"
+    );
+
+    expect(result.error).toBeNull();
+    expect(result.completedAllocations).toBe(4);
+    expect(result.reconciledLossBbl).toBeCloseTo(3);
+    expect(completeBatchConsumption).toHaveBeenCalledTimes(2);
+    expect(reconcileBatchLoss).toHaveBeenCalledWith(mock.client, BATCH_A);
+    expect(reconcileBatchLoss).toHaveBeenCalledWith(mock.client, BATCH_B);
+  });
+
+  it("surfaces reconciliation failures without dropping the allocations count", async () => {
+    const mock = createMockSupabase({ data: [], error: null });
+    vi.mocked(completeBatchConsumption).mockResolvedValue({
+      success: true,
+      data: 1,
+      invalidate: [],
+    });
+    vi.mocked(reconcileBatchLoss).mockResolvedValue({
+      success: false,
+      error: { code: "UNKNOWN", message: "insert denied" },
+    });
+
+    const result = await runTransitionSideEffects(mock.client, "batches", [BATCH_A], "completed");
+
+    expect(result.error).toContain("loss reconciliation");
+    expect(result.error).toContain("insert denied");
+    expect(result.completedAllocations).toBe(1);
+    expect(result.reconciledLossBbl).toBe(0);
   });
 });

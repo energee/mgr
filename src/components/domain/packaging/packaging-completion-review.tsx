@@ -64,7 +64,7 @@ import {
   consumePackagingMaterials,
   type PackagingDepletionLineItem,
 } from "@/services/consumption-service";
-import { computePackagingLoss } from "@/domain/consumption-planning";
+import { computePackagingLoss, computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
 import {
   packagingBatchCandidates,
   latestGravitySg,
@@ -356,7 +356,7 @@ export function PackagingCompletionReview({
         .select(
           `batch_id, selling_format_id, planned_quantity, actual_quantity,
            batch:batches(batch_code),
-           selling_format:selling_formats(unit_count, container:containers(volume_bbl))`
+           selling_format:selling_formats(unit_count, container:containers(volume_bbl, volume_oz))`
         )
         .eq("session_id", sessionId);
       if (error) throw error;
@@ -370,7 +370,7 @@ export function PackagingCompletionReview({
         batch: { batch_code: string } | null;
         selling_format: {
           unit_count: number | null;
-          container: { volume_bbl: number | null } | null;
+          container: { volume_bbl: number | null; volume_oz: number | null } | null;
         } | null;
       };
       const rows = (data ?? []) as unknown as LossRow[];
@@ -382,11 +382,11 @@ export function PackagingCompletionReview({
 
       const codeByBatch = new Map<string, string>();
       const lossLines = rows.map((row) => {
-        const unitVolume =
-          row.selling_format?.container?.volume_bbl != null
-            ? row.selling_format.container.volume_bbl *
-              (row.selling_format.unit_count ?? 1)
-            : null;
+        // Shared domain math — includes the volume_oz fallback, so can/bottle
+        // lines (volume_bbl is keg-only) are no longer silently skipped.
+        const unitVolume = row.selling_format
+          ? computeUnitFillVolumeBbl(row.selling_format)
+          : null;
         if (row.batch_id && row.batch?.batch_code) {
           codeByBatch.set(row.batch_id, row.batch.batch_code);
         }

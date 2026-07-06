@@ -25,6 +25,8 @@ import {
   completeBatchConsumption,
   consumePackagingMaterials,
   recordBatchLoss,
+  reconcileBatchLoss,
+  getBatchLossSummary,
   recordQuickDepletion,
   type ConfirmedConsumptionPick,
   type PackagingDepletionLineItem,
@@ -948,5 +950,215 @@ describe("recordQuickDepletion", () => {
     expect(result.success).toBe(false);
     if (result.success) return;
     expect((result.error as { message: string }).message).toContain("Failed to record depletion");
+  });
+});
+
+// =============================================================================
+// getBatchLossSummary / reconcileBatchLoss
+// =============================================================================
+
+/**
+ * produced 10 (two brews), blend out 2 / in 0 -> baseline 8; packaged 6
+ * (24 units x 992 oz = 0.25 bbl via the volume_oz fallback); attributed 0.5
+ * (a transfer-prompt loss; the finished_good row is excluded) -> unattributed 1.5.
+ */
+const lossTables = (): Record<string, Resp[]> => ({
+  brew_log_batches: [{ data: [{ volume_bbl: 6 }, { volume_bbl: 4 }], error: null }],
+  batch_blends: [
+    { data: [{ volume_bbl: 2 }], error: null }, // out (source_batch_id)
+    { data: [], error: null }, // in (blend_batch_id)
+  ],
+  allocations: [
+    {
+      data: [
+        { volume_bbl: 0.5, notes: "spillage at transfer", destination_type: "loss" },
+        { volume_bbl: null, notes: null, destination_type: "finished_good" },
+      ],
+      error: null,
+    },
+    { data: null, error: null }, // insert (writer only)
+  ],
+  session_line_items: [
+    {
+      data: [
+        {
+          actual_quantity: 24,
+          selling_format: { unit_count: 1, container: { volume_bbl: null, volume_oz: 992 } },
+          session: { status: "completed" },
+        },
+        // null actuals and missing formats are skipped, not counted
+        {
+          actual_quantity: null,
+          selling_format: { unit_count: 1, container: { volume_bbl: 0.1, volume_oz: null } },
+          session: { status: "completed" },
+        },
+        { actual_quantity: 50, selling_format: null, session: { status: "completed" } },
+      ],
+      error: null,
+    },
+  ],
+});
+
+describe("getBatchLossSummary", () => {
+  it("computes the packaged-vs-produced identity with blends, oz fallback, and attribution", async () => {
+    const { supabase } = makeSupabase(lossTables());
+
+    const result = await getBatchLossSummary(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.producedBbl).toBeCloseTo(10);
+    expect(result.data.baselineBbl).toBeCloseTo(8);
+    expect(result.data.packagedBbl).toBeCloseTo(6);
+    expect(result.data.attributedBbl).toBeCloseTo(0.5);
+    expect(result.data.unattributedBbl).toBeCloseTo(1.5);
+    expect(result.data.hasOpenSessions).toBe(false);
+    expect(result.data.reconciled).toBe(false);
+  });
+
+  it("returns a null unattributed remainder when there is no production baseline", async () => {
+    const { supabase } = makeSupabase({
+      brew_log_batches: [{ data: [], error: null }],
+      batch_blends: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      allocations: [{ data: [], error: null }],
+      session_line_items: [{ data: [], error: null }],
+    });
+
+    const result = await getBatchLossSummary(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.unattributedBbl).toBeNull();
+  });
+
+  it("returns a parsed error when a read fails", async () => {
+    const { supabase } = makeSupabase({
+      brew_log_batches: [{ data: null, error: { message: "boom" } }],
+    });
+
+    const result = await getBatchLossSummary(supabase, "batch-1");
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("reconcileBatchLoss", () => {
+  it("auto-records the unattributed remainder with the reconciliation reason code", async () => {
+    const { supabase, callsByTable } = makeSupabase(lossTables());
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data).toBeCloseTo(1.5);
+    const inserted = callsByTable.allocations[1].insert.mock.calls[0][0];
+    expect(inserted).toMatchObject({
+      source_type: "batch",
+      source_id: "batch-1",
+      destination_type: "loss",
+      status: "completed",
+      reason_code: "reconciliation",
+    });
+    expect(inserted.volume_bbl).toBeCloseTo(1.5);
+    expect(inserted.notes).toContain("Completion loss reconciliation");
+  });
+
+  it("is idempotent: skips when a reconciliation allocation already exists", async () => {
+    const tables = lossTables();
+    tables.allocations = [
+      {
+        data: [
+          {
+            volume_bbl: 1.5,
+            notes: "Completion loss reconciliation — produced 10 bbl",
+            destination_type: "loss",
+          },
+        ],
+        error: null,
+      },
+    ];
+    const { supabase, callsByTable } = makeSupabase(tables);
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result).toEqual({ success: true, data: 0, invalidate: [] });
+    expect(callsByTable.allocations).toHaveLength(1); // guard select only, no insert
+  });
+
+  it("skips while any packaging session for the batch is still open", async () => {
+    const tables = lossTables();
+    tables.session_line_items = [
+      {
+        data: [
+          {
+            actual_quantity: null,
+            selling_format: { unit_count: 1, container: { volume_bbl: 0.1, volume_oz: null } },
+            session: { status: "in_progress" },
+          },
+        ],
+        error: null,
+      },
+    ];
+    const { supabase, callsByTable } = makeSupabase(tables);
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result).toEqual({ success: true, data: 0, invalidate: [] });
+    expect(callsByTable.allocations).toHaveLength(1);
+  });
+
+  it("skips when there is no production baseline (no brew logs, no blend inflow)", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      brew_log_batches: [{ data: [], error: null }],
+      batch_blends: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      allocations: [{ data: [], error: null }],
+      session_line_items: [{ data: [], error: null }],
+    });
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result).toEqual({ success: true, data: 0, invalidate: [] });
+    expect(callsByTable.allocations).toHaveLength(1);
+  });
+
+  it("does not record remainders below the reconciliation threshold", async () => {
+    const tables = lossTables();
+    // packaged 7.97 of an 8 bbl baseline (with 0.5 attributed the remainder
+    // is negative) -> use no attribution and packaged 7.97: remainder 0.03 < 0.05.
+    tables.allocations = [{ data: [], error: null }];
+    tables.session_line_items = [
+      {
+        data: [
+          {
+            actual_quantity: 79.7,
+            selling_format: { unit_count: 1, container: { volume_bbl: 0.1, volume_oz: null } },
+            session: { status: "completed" },
+          },
+        ],
+        error: null,
+      },
+    ];
+    const { supabase, callsByTable } = makeSupabase(tables);
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result).toEqual({ success: true, data: 0, invalidate: [] });
+    expect(callsByTable.allocations).toHaveLength(1);
+  });
+
+  it("propagates read errors", async () => {
+    const { supabase } = makeSupabase({
+      brew_log_batches: [{ data: null, error: { message: "boom" } }],
+    });
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result.success).toBe(false);
   });
 });

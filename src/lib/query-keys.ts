@@ -124,6 +124,7 @@ export const batchKeys = {
   transfers: (id: string) => ["batches", id, "transfers"] as const,
   remainingVolume: (id: string, fromVesselId?: string | null) =>
     ["batches", id, "remaining-volume", fromVesselId ?? "_initial"] as const,
+  lossSummary: (id: string) => ["batches", id, "loss-summary"] as const,
 };
 
 // =============================================================================
