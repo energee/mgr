@@ -622,6 +622,7 @@ export const packagingFormatKeys = {
 export const vesselKeys = {
   all: () => ["vessels"] as const,
   available: () => ["vessels", "available"] as const,
+  cellar: () => ["vessels", "cellar"] as const,
   availableForCompletion: () => ["vessels", "available", "completion"] as const,
   transfers: () => ["vessel_transfers"] as const,
   brinks: () => ["vessels", "brinks"] as const,
