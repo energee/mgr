@@ -4,8 +4,7 @@
  * Validates the target against batchTransitions, applies an optimistic-locked
  * UPDATE, then runs the central transition side-effect registry (e.g.
  * batches → completed confirms planned ingredient consumption). Response is
- * the updated batch row plus a `side_effects` summary; a side-effect failure
- * does not roll back the transition (mirrors the UI transition paths).
+ * the updated batch row plus a `side_effects` summary.
  */
 import { z } from "zod";
 import {

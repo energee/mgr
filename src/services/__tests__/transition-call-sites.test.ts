@@ -36,17 +36,10 @@ function sideEffectTables(): string[] {
 }
 
 /** All route.ts files under src/app/api, recursively. */
-function apiRouteFiles(dir: string = API_ROOT): string[] {
-  const files: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...apiRouteFiles(full));
-    } else if (entry.name === "route.ts") {
-      files.push(full);
-    }
-  }
-  return files;
+function apiRouteFiles(): string[] {
+  return readdirSync(API_ROOT, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile() && e.name === "route.ts")
+    .map((e) => join(e.parentPath, e.name));
 }
 
 /** Does this source perform `.from("<table>") ... .update({ status ...` ? */
