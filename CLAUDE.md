@@ -7,9 +7,10 @@
 ## Expert agents — consult before working in their areas
 | Touching | Use agent |
 |---|---|
-| `src/entities/`, entity registry, new entities | `entity-architect` |
-| `src/lib/supabase/`, `query-keys.ts`, migrations, RLS | `data-layer-expert` |
+| `src/entities/`, entity registry, new entities, `src/services/` orchestration | `entity-architect` |
+| `src/lib/supabase/`, `query-keys.ts`, migrations, RLS, auth/portal routes | `data-layer-expert` |
 | `src/domain/` calculations (units, BOM, TTB, yeast, water) | `brewing-domain-expert` |
+| `src/integrations/` (Square, QuickBooks, Slack, email, MongoDB), webhook API routes | `integrations-expert` |
 | `src/components/` | `ui-systems-expert` |
 | Writing/repairing tests, pre-refactor coverage | `test-surgeon` |
 | Reviewing any refactor/dedup diff (read-only gate) | `refactor-reviewer` |
