@@ -264,6 +264,9 @@ export function VesselTransferDialog({
     },
     onSuccess: ({ vesselName, vesselType }, values) => {
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
+      // The batches LIST is keyed on the view, not ["batches"] — without this
+      // the row's vessel column stays stale after a transfer from the list.
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("batches_with_brew_info") });
       queryClient.invalidateQueries({ queryKey: vesselKeys.all() });
       queryClient.invalidateQueries({ queryKey: vesselKeys.transfers() });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("vessel_transfers") });
