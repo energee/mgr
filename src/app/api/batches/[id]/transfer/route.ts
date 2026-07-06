@@ -1,3 +1,11 @@
+/**
+ * POST /api/batches/[id]/transfer — transition a batch to a new status.
+ *
+ * Validates the target against batchTransitions, applies an optimistic-locked
+ * UPDATE, then runs the central transition side-effect registry (e.g.
+ * batches → completed confirms planned ingredient consumption). Response is
+ * the updated batch row plus a `side_effects` summary.
+ */
 import { z } from "zod";
 import {
   withPermission,
@@ -7,6 +15,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { batchStates, batchTransitions } from "@/lib/schemas/batch";
+import { runTransitionSideEffects } from "@/services/transition-side-effects";
 
 const transitionSchema = z.object({
   to_status: z.enum(batchStates),
@@ -57,5 +66,15 @@ export const POST = withPermission("batches:write", async (request, { supabase, 
     throw error;
   }
 
-  return successResponse(data);
+  // Post-transition side effects (registry: src/services/transition-side-effects.ts).
+  // Never throws; failures surface in the response instead of silently skipping.
+  const sideEffects = await runTransitionSideEffects(supabase, "batches", [id], to_status);
+
+  return successResponse({
+    ...data,
+    side_effects: {
+      error: sideEffects.error,
+      completed_allocations: sideEffects.completedAllocations,
+    },
+  });
 });
