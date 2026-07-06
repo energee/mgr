@@ -35,6 +35,9 @@ import {
   recipeScaleFactor,
   convertIngredientQuantity,
   computeBomConsumption,
+  computeBatchLossReconciliation,
+  computeUnitFillVolumeBbl,
+  reconciliationThresholdBbl,
   type FifoLot,
   type FifoPick,
 } from "@/domain/consumption-planning";
@@ -529,6 +532,199 @@ export async function recordBatchLoss(
     return err({
       code: "UNKNOWN",
       message: `Failed to record loss: ${e instanceof Error ? e.message : String(e)}`,
+      cause: e,
+    });
+  }
+}
+
+/**
+ * Notes prefix that marks a batch's auto-recorded completion reconciliation
+ * allocation. Doubles as the idempotence guard (same pattern as
+ * consumePackagingMaterials' session-note guard): a completed batch→loss
+ * allocation whose notes start with this means reconciliation already ran.
+ */
+const RECONCILIATION_NOTE_PREFIX = "Completion loss reconciliation";
+
+/**
+ * Reconcile a batch's total loss at completion, making packaged volume the
+ * source of truth: whatever wort was produced but neither packaged nor
+ * already on the loss ledger is auto-recorded as a loss allocation
+ * (feeds the TTB losses line, same shape as recordBatchLoss).
+ *
+ *   unrecorded = produced wort − packaged − already-recorded losses
+ *
+ * - produced: SUM(brew_log_batches.volume_bbl) — knockout volume. Batches
+ *   with no brew logs return 0 (no baseline, nothing recorded).
+ * - packaged: SUM(actual_quantity × unit_count × container volume) over the
+ *   batch's session line items; lines missing actuals/volume are skipped.
+ * - recorded: completed batch→loss allocations (transfer prompts, packaging
+ *   prompts, prior reconciliation) — subtracting them prevents double counts.
+ *
+ * Returns the recorded loss volume in bbl (0 when nothing to record).
+ */
+/** Per-batch loss accounting anchored to packaged-vs-produced-wort. */
+export type BatchLossSummary = {
+  /** Knockout volume: SUM(brew_log_batches.volume_bbl). */
+  producedBbl: number;
+  /** Volume blended into / out of this batch (batch_blends). */
+  blendInBbl: number;
+  blendOutBbl: number;
+  /** produced + blend in − blend out; null-equivalent when <= 0. */
+  baselineBbl: number;
+  /** SUM(actual units × unit fill volume) across the batch's line items. */
+  packagedBbl: number;
+  /** SUM of completed batch-sourced removal allocations (excl. finished goods). */
+  attributedBbl: number;
+  /** Baseline − packaged − attributed; null when there is no baseline. */
+  unattributedBbl: number | null;
+  /** True while any of the batch's packaging sessions is not yet completed. */
+  hasOpenSessions: boolean;
+  /** True once a completion reconciliation allocation exists. */
+  reconciled: boolean;
+};
+
+/**
+ * Read a batch's loss accounting: produced wort (± blends) vs packaged vs
+ * attributed removals. Single source for both the batch-detail loss display
+ * and the completion auto-reconciliation — keep it that way (parallel
+ * reimplementations of volume identities are this domain's signature bug).
+ */
+export async function getBatchLossSummary(
+  supabase: Client,
+  batchId: string
+): Promise<ServiceResult<BatchLossSummary>> {
+  try {
+    const { data: brews, error: brewError } = await supabase
+      .from("brew_log_batches")
+      .select("volume_bbl")
+      .eq("batch_id", batchId);
+    if (brewError) return err(parseSupabaseError(brewError, { table: "brew_log_batches" }));
+    const producedBbl = (brews ?? []).reduce((sum, b) => sum + Number(b.volume_bbl ?? 0), 0);
+
+    // Blends move volume between batches outside both the brew-log and
+    // packaging sums (00055) — without these terms a blended-away source
+    // batch books phantom loss and a blend-only batch can never reconcile.
+    const { data: blendsOut, error: outError } = await supabase
+      .from("batch_blends")
+      .select("volume_bbl")
+      .eq("source_batch_id", batchId);
+    if (outError) return err(parseSupabaseError(outError, { table: "batch_blends" }));
+    const { data: blendsIn, error: inError } = await supabase
+      .from("batch_blends")
+      .select("volume_bbl")
+      .eq("blend_batch_id", batchId);
+    if (inError) return err(parseSupabaseError(inError, { table: "batch_blends" }));
+    const blendOutBbl = (blendsOut ?? []).reduce((sum, b) => sum + Number(b.volume_bbl ?? 0), 0);
+    const blendInBbl = (blendsIn ?? []).reduce((sum, b) => sum + Number(b.volume_bbl ?? 0), 0);
+    const baselineBbl = producedBbl + blendInBbl - blendOutBbl;
+
+    // All completed batch-sourced removals count as attributed volume —
+    // transfer/packaging loss prompts, samples, taproom, destruction — not
+    // just destination 'loss', or those removals would be re-counted as
+    // unattributed loss. finished_good rows are excluded: packaged volume is
+    // summed from session_line_items (and 00183 leaves their volume_bbl null).
+    const { data: removals, error: removalError } = await supabase
+      .from("allocations")
+      .select("volume_bbl, notes, destination_type")
+      .eq("source_type", "batch")
+      .eq("source_id", batchId)
+      .eq("status", "completed");
+    if (removalError) return err(parseSupabaseError(removalError, { table: "allocations" }));
+    const removalRows = removals ?? [];
+    const reconciled = removalRows.some((r) => r.notes?.startsWith(RECONCILIATION_NOTE_PREFIX));
+    const attributedBbl = removalRows.reduce(
+      (sum, r) =>
+        r.destination_type === "finished_good" ? sum : sum + Number(r.volume_bbl ?? 0),
+      0
+    );
+
+    const { data: lines, error: lineError } = await supabase
+      .from("session_line_items")
+      .select(
+        "actual_quantity, selling_format:selling_formats(unit_count, container:containers(volume_bbl, volume_oz)), session:packaging_sessions(status)"
+      )
+      .eq("batch_id", batchId);
+    if (lineError) return err(parseSupabaseError(lineError, { table: "session_line_items" }));
+    type PackagedLine = {
+      actual_quantity: number | null;
+      selling_format: {
+        unit_count: number | null;
+        container: { volume_bbl: number | null; volume_oz: number | null } | null;
+      } | null;
+      session: { status: string | null } | null;
+    };
+    const packagedLines = (lines ?? []) as unknown as PackagedLine[];
+    const hasOpenSessions = packagedLines.some(
+      (l) => l.session && l.session.status !== "completed"
+    );
+    const packagedBbl = packagedLines.reduce((sum, line) => {
+      const unitVolume = line.selling_format
+        ? computeUnitFillVolumeBbl(line.selling_format)
+        : null;
+      if (line.actual_quantity == null || unitVolume == null) return sum;
+      return sum + line.actual_quantity * unitVolume;
+    }, 0);
+
+    const unattributedBbl = computeBatchLossReconciliation({
+      producedBbl,
+      blendInBbl,
+      blendOutBbl,
+      packagedBbl,
+      attributedBbl,
+    });
+
+    return ok({
+      producedBbl,
+      blendInBbl,
+      blendOutBbl,
+      baselineBbl,
+      packagedBbl,
+      attributedBbl,
+      unattributedBbl,
+      hasOpenSessions,
+      reconciled,
+    });
+  } catch (e) {
+    return err({
+      code: "UNKNOWN",
+      message: `Failed to load batch loss summary: ${e instanceof Error ? e.message : String(e)}`,
+      cause: e,
+    });
+  }
+}
+
+export async function reconcileBatchLoss(
+  supabase: Client,
+  batchId: string
+): Promise<ServiceResult<number>> {
+  try {
+    const summaryResult = await getBatchLossSummary(supabase, batchId);
+    if (!summaryResult.success) return summaryResult;
+    const s = summaryResult.data;
+
+    // Already reconciled (note-prefix guard, same belt-and-braces as
+    // consumePackagingMaterials): racing UI paths become no-ops.
+    if (s.reconciled) return ok(0);
+    // A still-open session means actuals aren't final — reconciling now
+    // would book the unpackaged remainder as loss. Skip; no guard row was
+    // written, so completing the session and re-completing retries.
+    if (s.hasOpenSessions) return ok(0);
+    if (s.unattributedBbl == null) return ok(0);
+    if (s.unattributedBbl < reconciliationThresholdBbl(s.baselineBbl)) return ok(0);
+
+    const round = (n: number) => Math.round(n * 1000) / 1000;
+    const result = await recordBatchLoss(supabase, {
+      batchId,
+      volumeBbl: s.unattributedBbl,
+      reasonCode: "reconciliation",
+      notes: `${RECONCILIATION_NOTE_PREFIX} — produced ${round(s.producedBbl)} bbl (blend in ${round(s.blendInBbl)}, out ${round(s.blendOutBbl)}), packaged ${round(s.packagedBbl)} bbl, previously attributed ${round(s.attributedBbl)} bbl`,
+    });
+    if (!result.success) return result;
+    return ok(s.unattributedBbl);
+  } catch (e) {
+    return err({
+      code: "UNKNOWN",
+      message: `Failed to reconcile batch loss: ${e instanceof Error ? e.message : String(e)}`,
       cause: e,
     });
   }

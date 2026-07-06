@@ -235,6 +235,80 @@ export function computeTransferLoss(
   return loss > LOSS_EPSILON_BBL ? loss : 0;
 }
 
+/** Fluid ounces per barrel: 31 US gallons x 128 oz. */
+const OZ_PER_BARREL = 31 * 128;
+
+/** Container volume fields needed for fill-volume math. */
+export type FillVolumeContainer = {
+  volume_bbl: number | null;
+  volume_oz?: number | null;
+} | null;
+
+/**
+ * Per-selling-unit fill volume in BBL: container volume x unit_count.
+ * Prefers containers.volume_bbl but falls back to volume_oz / 3968 —
+ * volume_bbl is only required for kegs (00199 constraint), so can/bottle
+ * containers routinely carry only volume_oz. Returns null when neither
+ * volume is usable. Authoritative source — never the packaging_formats
+ * view's volume_bbl (its checked-in definition is stale).
+ */
+export function computeUnitFillVolumeBbl(row: {
+  unit_count: number | null;
+  container: FillVolumeContainer;
+}): number | null {
+  const bbl = row.container?.volume_bbl;
+  const oz = row.container?.volume_oz;
+  const containerBbl = bbl != null && bbl > 0 ? bbl : oz != null && oz > 0 ? oz / OZ_PER_BARREL : null;
+  if (containerBbl == null) return null;
+  return containerBbl * (row.unit_count ?? 1);
+}
+
+/**
+ * Actual total loss reconciliation at batch completion, anchored to
+ * packaged-vs-produced-wort (packaging is the source of truth for loss):
+ *
+ *   unattributed = (produced wort + blend in − blend out)
+ *                  − packaged − already-attributed removals
+ *
+ * Returns the SIGNED remainder — negative means packaged/attributed volume
+ * exceeds the production baseline (data-entry problem or post-knockout
+ * additions like fruit/dilution); callers decide whether to record, using
+ * reconciliationThresholdBbl. Returns null when there is no production
+ * baseline at all (no brew logs and no blend inflow) — nothing to reconcile.
+ *
+ * NOTE: the wort (knockout) anchor is a deliberate product choice — total
+ * brewhouse-to-package accountability — so fermentation shrinkage lands in
+ * this number. See docs/knowledge/brewing-domain.md before changing anchors.
+ */
+export function computeBatchLossReconciliation(params: {
+  /** Knockout volume: SUM(brew_log_batches.volume_bbl) for the batch. */
+  producedBbl: number | null | undefined;
+  /** Volume blended INTO this batch (batch_blends.blend_batch_id = batch). */
+  blendInBbl: number;
+  /** Volume blended OUT to other batches (batch_blends.source_batch_id = batch). */
+  blendOutBbl: number;
+  /** SUM(actual units x unit fill volume) across the batch's session line items. */
+  packagedBbl: number;
+  /** SUM of completed batch-sourced removal allocations (loss, samples, taproom, …). */
+  attributedBbl: number;
+}): number | null {
+  const { producedBbl, blendInBbl, blendOutBbl, packagedBbl, attributedBbl } = params;
+  const produced = producedBbl != null && Number.isFinite(producedBbl) ? producedBbl : 0;
+  const baseline = produced + blendInBbl - blendOutBbl;
+  if (baseline <= 0) return null;
+  return baseline - packagedBbl - attributedBbl;
+}
+
+/**
+ * Minimum remainder worth auto-recording as a reconciliation loss:
+ * max(0.05 bbl, 0.5% of the production baseline). Coarser than
+ * LOSS_EPSILON_BBL because brew_log_batches.volume_bbl is DECIMAL(8,2) —
+ * per-link quantization alone can accumulate past the epsilon.
+ */
+export function reconciliationThresholdBbl(baselineBbl: number): number {
+  return Math.max(0.05, 0.005 * baselineBbl);
+}
+
 /** A packaging line item with the data needed for loss volume math. */
 export type PackagingLossLine = {
   batch_id: string | null;

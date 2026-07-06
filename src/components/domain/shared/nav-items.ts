@@ -82,6 +82,7 @@ export const navigation: NavSection[] = [
       { label: "Backward Planning", href: "/production/planning/backward", icon: AnimatedArrowLeft },
       { label: "Batches", href: "/production/batches", icon: AnimatedBatches },
       { label: "Recipes", href: "/production/recipes", icon: AnimatedFileText },
+      { label: "Cellar", href: "/production/cellar", icon: AnimatedWarehouse },
       { label: "Vessels", href: "/production/vessels", icon: AnimatedContainer },
       { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: AnimatedArrowRightLeft },
       { label: "Brew Logs", href: "/production/brew-logs", icon: AnimatedClipboardList },

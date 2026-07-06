@@ -23,6 +23,7 @@ import { entityKeys } from "@/lib/query-keys";
 import {
   completeBatchConsumption,
   consumePackagingMaterials,
+  reconcileBatchLoss,
 } from "./consumption-service";
 import { formatServiceError } from "./types";
 
@@ -37,6 +38,12 @@ export type TransitionSideEffectResult = {
    * `batches → completed` entry (callers may use it for a success toast).
    */
   completedAllocations: number;
+  /**
+   * Volume (bbl) auto-recorded as completion loss reconciliation — produced
+   * wort minus packaged minus attributed removals. Only populated by the
+   * `batches → completed` entry.
+   */
+  reconciledLossBbl: number;
 };
 
 /**
@@ -58,26 +65,71 @@ export async function runTransitionSideEffects(
   toState: string,
   queryClient?: QueryClient
 ): Promise<TransitionSideEffectResult> {
-  const result: TransitionSideEffectResult = { error: null, completedAllocations: 0 };
+  const result: TransitionSideEffectResult = {
+    error: null,
+    completedAllocations: 0,
+    reconciledLossBbl: 0,
+  };
 
   // Registry — one entry per (table, toState) pair with side effects.
   //
-  // batches → completed: flip the batch's planned brew-day ingredient
-  // allocations (inventory_lot → batch) to completed so inventory is
-  // actually depleted (audit Batch 9). Idempotent: re-running matches 0
-  // planned rows.
+  // batches → completed:
+  // 1. Flip the batch's planned brew-day ingredient allocations
+  //    (inventory_lot → batch) to completed so inventory is actually
+  //    depleted (audit Batch 9). Idempotent: re-running matches 0 rows.
+  // 2. Reconcile total loss anchored to packaged-vs-produced-wort: produced
+  //    volume neither packaged nor already attributed is auto-recorded as a
+  //    'reconciliation' loss allocation (feeds the TTB losses line).
+  //    Idempotent via the reconciliation note guard; skips while any of the
+  //    batch's packaging sessions is still open.
+  // 3. Release the batches' vessels (empty + dirty, same semantics as the
+  //    cancel/archive RPCs, 00042/00069). Without this a batch completed in
+  //    a brite tank occupied it forever, hiding the tank from every transfer
+  //    destination list. Idempotent: re-running matches 0 rows.
   if (table === "batches" && toState === "completed") {
-    const failures: string[] = [];
+    const consumptionFailures: string[] = [];
+    const reconcileFailures: string[] = [];
     for (const id of ids) {
       const res = await completeBatchConsumption(supabase, id);
       if (res.success) {
         result.completedAllocations += res.data;
       } else {
-        failures.push(formatServiceError(res.error));
+        consumptionFailures.push(formatServiceError(res.error));
+      }
+      const rec = await reconcileBatchLoss(supabase, id);
+      if (rec.success) {
+        result.reconciledLossBbl += rec.data;
+      } else {
+        reconcileFailures.push(formatServiceError(rec.error));
       }
     }
-    if (failures.length > 0) {
-      result.error = `Batch completed, but confirming ingredient consumption failed: ${[...new Set(failures)].join("; ")}`;
+    const { error: vesselError } = await supabase
+      .from("vessels")
+      .update({ status: "dirty", current_batch_id: null, updated_at: new Date().toISOString() })
+      .in("current_batch_id", ids);
+    if (!vesselError) {
+      void queryClient?.invalidateQueries({ queryKey: entityKeys.all("vessels") });
+      void queryClient?.invalidateQueries({ queryKey: entityKeys.all("vessels_with_batch") });
+    }
+
+    const parts: string[] = [];
+    if (consumptionFailures.length > 0) {
+      parts.push(
+        `confirming ingredient consumption failed: ${[...new Set(consumptionFailures)].join("; ")}`
+      );
+    }
+    if (reconcileFailures.length > 0) {
+      parts.push(`loss reconciliation failed: ${[...new Set(reconcileFailures)].join("; ")}`);
+    }
+    if (vesselError) {
+      parts.push(`releasing the vessel failed: ${vesselError.message}`);
+    }
+    if (parts.length > 0) {
+      result.error = `Batch completed, but ${parts.join("; ")}`;
+    }
+    if (result.reconciledLossBbl > 0) {
+      // New loss allocations affect the allocations list and TTB report.
+      void queryClient?.invalidateQueries({ queryKey: entityKeys.all("allocations") });
     }
   }
 

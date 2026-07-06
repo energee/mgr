@@ -53,6 +53,9 @@ export const REASON_CODES = [
   { value: "spillage", label: "Spillage" },
   { value: "theft", label: "Theft" },
   { value: "count_adjustment", label: "Count Adjustment" },
+  // Auto-inserted by reconcileBatchLoss at batch completion (packaged vs
+  // produced wort). Keep value in sync with the service's insert literal.
+  { value: "reconciliation", label: "Completion Reconciliation" },
   { value: "other", label: "Other" },
 ];
 

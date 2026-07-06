@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { usePackagingFormats } from "@/hooks/use-catalog";
 import { entityKeys, packagingKeys } from "@/lib/query-keys";
+import { computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
 
 export type BatchOption = {
   id: string;
@@ -59,23 +60,13 @@ export function useKegFormatIds(): Set<string> {
 export type FillVolumeRow = {
   id: string;
   unit_count: number | null;
-  container: { volume_bbl: number | null } | null;
+  container: { volume_bbl: number | null; volume_oz?: number | null } | null;
 };
 
-/**
- * Per-selling-unit fill volume in BBL: containers.volume_bbl × unit_count.
- * Same math as packaging-completion-review's implied-loss calculation — the
- * authoritative source, used instead of the packaging_formats view's
- * volume_bbl (whose checked-in definition is stale). Returns null when the
- * container volume is missing or non-positive.
- */
-export function computeUnitFillVolumeBbl(
-  row: Pick<FillVolumeRow, "unit_count" | "container">
-): number | null {
-  const containerBbl = row.container?.volume_bbl;
-  if (containerBbl == null || containerBbl <= 0) return null;
-  return containerBbl * (row.unit_count ?? 1);
-}
+// Pure fill-volume math lives in the domain layer (with the volume_oz
+// fallback for can/bottle containers whose volume_bbl is unset); re-exported
+// here for existing hook consumers.
+export { computeUnitFillVolumeBbl };
 
 /**
  * Suggested planned quantity: floor(batch volume ÷ per-unit fill volume).
@@ -105,7 +96,7 @@ export function useSellingFormatFillVolumes(): Map<string, number> {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("selling_formats")
-        .select("id, unit_count, container:containers(volume_bbl)");
+        .select("id, unit_count, container:containers(volume_bbl, volume_oz)");
       if (error) throw error;
       // Supabase infers the containers join as an array; it is many-to-one
       return (data ?? []) as unknown as FillVolumeRow[];
