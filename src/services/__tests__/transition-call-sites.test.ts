@@ -55,7 +55,7 @@ describe("Transition side-effect call sites (API routes)", () => {
 
   it("sanity: registry tables parsed and API routes found", () => {
     expect(tables).toEqual(
-      expect.arrayContaining(["batches", "packaging_sessions", "pick_lists"])
+      expect.arrayContaining(["batches", "packaging_sessions", "pick_lists", "orders"])
     );
     expect(routes.length).toBeGreaterThan(0);
   });
