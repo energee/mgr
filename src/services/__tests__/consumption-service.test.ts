@@ -498,10 +498,9 @@ describe("consumePackagingMaterials", () => {
     // Pin the guard's filter, not just which table it queried.
     const guard = callsByTable.allocations[0];
     expect(guard.select).toHaveBeenCalledWith("id");
-    expect(guard.eq).toHaveBeenCalledWith(
-      "notes",
-      "Packaging session session-1 material consumption",
-    );
+    // Guard keys on the stable idempotency_key column, not the mutable notes
+    // string (audit #15).
+    expect(guard.eq).toHaveBeenCalledWith("idempotency_key", "pkg_session:session-1");
     expect(guard.limit).toHaveBeenCalledWith(1);
   });
 
@@ -539,10 +538,9 @@ describe("consumePackagingMaterials", () => {
     // The guard passed (no existing depletion) before proceeding to the line-item fetch.
     const guard = callsByTable.allocations[0];
     expect(guard.select).toHaveBeenCalledWith("id");
-    expect(guard.eq).toHaveBeenCalledWith(
-      "notes",
-      "Packaging session session-1 material consumption",
-    );
+    // Guard keys on the stable idempotency_key column, not the mutable notes
+    // string (audit #15).
+    expect(guard.eq).toHaveBeenCalledWith("idempotency_key", "pkg_session:session-1");
     expect(guard.limit).toHaveBeenCalledWith(1);
   });
 
@@ -673,6 +671,8 @@ describe("consumePackagingMaterials", () => {
     const insertedRows = callsByTable.allocations[1].insert.mock.calls[0][0];
     expect(insertedRows).toHaveLength(3);
     expect(insertedRows.every((r: { notes: string }) => r.notes === "Packaging session session-42 material consumption")).toBe(true);
+    // Every row carries the stable idempotency_key the guard now matches on (audit #15).
+    expect(insertedRows.every((r: { idempotency_key: string }) => r.idempotency_key === "pkg_session:session-42")).toBe(true);
     expect(insertedRows.every((r: { status: string }) => r.status === "completed")).toBe(true);
     expect(insertedRows[0]).toMatchObject({ destination_id: "batch-A", source_id: "lot-cap-1", quantity: 10 });
     expect(insertedRows[1]).toMatchObject({ destination_id: "batch-A", source_id: "lot-cap-2", quantity: 6 });
@@ -971,8 +971,8 @@ const lossTables = (): Record<string, Resp[]> => ({
   allocations: [
     {
       data: [
-        { volume_bbl: 0.5, notes: "spillage at transfer", destination_type: "loss" },
-        { volume_bbl: null, notes: null, destination_type: "finished_good" },
+        { volume_bbl: 0.5, reason_code: null, destination_type: "loss" },
+        { volume_bbl: null, reason_code: null, destination_type: "finished_good" },
       ],
       error: null,
     },
@@ -1131,7 +1131,8 @@ describe("reconcileBatchLoss", () => {
         data: [
           {
             volume_bbl: 1.5,
-            notes: "Completion loss reconciliation — produced 10 bbl",
+            // Guard now keys on the structured reason_code, not the notes prefix (audit #15).
+            reason_code: "reconciliation",
             destination_type: "loss",
           },
         ],
