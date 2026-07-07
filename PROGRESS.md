@@ -5,6 +5,17 @@
 
 ## Current state
 
+- **2026-07-07 (data-layer P2 integrity session)**: worktree `.claude/worktrees/p2-integrity`, branches off `origin/main` `9b4f2fec`. **Seven focused PRs opened (NOT merged), migrations `00206`–`00212` applied live and verified**, following the 2026-07-06 audit backlog (`docs/plans/2026-07-06-audit-fix-backlog.md`). #343 (item #9, `00205` + live-drift CI) was still **open/unmerged** at session start, so each branch carries `00205`–`0021x` as untracked local files to history-match live for `db push`; PROGRESS + the live-catalog snapshot stay #343's until it merges.
+  - **[#345](https://github.com/energee/mgr/pull/345)** — #13 `chk_fg_entry_point` relaxed (H8, `00206`)
+  - **[#344](https://github.com/energee/mgr/pull/344)** — #11 `keg_inventory` netting (H4, `00207`) — regroup on format/owner/state/location; new `keg_filled_contents` for Square; netting proven 50→70→**50**
+  - **[#346](https://github.com/energee/mgr/pull/346)** — #21 `get_inventory_overview` rewrite off dropped `package_types`/`catalog_type`/`bin_inventory` (`00208`); invoked live, returns
+  - **[#347](https://github.com/energee/mgr/pull/347)** — #22 `start_batch_fermentation` recreated off dropped `batches.fermenter` → `vessels.current_batch_id` (`00209`)
+  - **[#348](https://github.com/energee/mgr/pull/348)** — #16 vessel integrity M3/M4/M5 (`00210`): idempotency_key + partial unique index, double-booking guard, `empties_source`; guards proven via rolled-back tests
+  - **[#349](https://github.com/energee/mgr/pull/349)** — #15 allocation ledger hardening M11/M13 (`00211`): entity_revisions trigger, `created_by` default, block completed-deletes, adjustment `reason_code` CHECK
+  - **[#350](https://github.com/energee/mgr/pull/350)** — #12 availability guard H7 (`00212`): BEFORE INSERT/UPDATE, `FOR UPDATE` row lock, exempts `destination_type='adjustment'`; oversell blocked / exact allowed / adjustment exempt proven
+  - **Design decisions (user-chosen this session):** #16 → client idempotency key + `empties_source` column; #12 → block oversell, exempt count-corrections; #15 → allocations-focused scope.
+  - **Deliberately NOT done (product-decision / other-agent — flagged, not auto-continued):** #10 (change-request rebuild), #17 (order-item price validation, entity-architect), #19 (planned-batch ordering), #20 (portal rebuild). Also `bun run test` = **2025** green throughout; lint + typecheck clean per PR.
+  - **Ops caveat:** ~56 git worktrees now trip sandbox `E2BIG` on plain commands — ran git/supabase/bun with sandbox bypass all session; durable fix is pruning stale `fix-pr-*` worktrees (memory: `project_sandbox_e2big_worktrees`).
 - **Reflects**: `feat/integrations-expert-agent` rebased onto `origin/main` `ea713bb9` (the #336 squash-merge) — 2026-07-05 (second session). **PR #336 merged mid-session** with only its original commit; the follow-up commits live in **[PR #338](https://github.com/energee/mgr/pull/338)**
 - **Last verified**: 2026-07-05 — lint + typecheck clean, suite green at **1,959 tests** (+2: transition call-site enforcement). Migration `00200` applied to live and verified (`is_sensitive_setting` returns true for all six `*_api_key` keys, false for non-secrets)
 - **Diverged from `main`**: yes — five follow-up commits in PR #338: `04609164` (routing-gap review fixes), `9dad496b` (remaining 14 review findings), `03fd5aa9` (00200 RLS fix, applied live), `0d6ceb41` (backlog #7), plus this docs refresh
