@@ -27,10 +27,15 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
 
 ## P2 — Live drift & integrity
 
-- [ ] **9. Restore server-side enforcement on live** (C2) — owner: `data-layer-expert`
-  Re-apply `validate_state_transition()`, pick-list triggers, `cancel_pick_list_allocations`; add drift detection (compare live catalog vs migrations in CI).
+- [x] **9. Restore server-side enforcement on live** (C2) — owner: `data-layer-expert` — **DONE (migration 00205, applied live 2026-07-07)**
+  Migration `00205_restore_server_side_enforcement.sql` re-asserts: `validate_state_transition()` + the 8 `trg_validate_*_status` triggers, `cancel_pick_list_allocations()`/`set_pick_list_timestamps()` + their triggers, the advisory-lock number generators (`generate_next_number`/`generate_next_po_number`/`generate_lot_number`/`generate_delivery_number` + the `finished_goods_lot_number` UNIQUE) and `calculate_ingredient_shortfalls` (on_order_qty), plus two app-used functions dropped in the same drift (`get_yeast_lineage_root`, `get_unaccepted_po_receives`). `get_state_transitions()` was re-synced to the current entity state machines (the live 00167 map was stale: it lacked orders' `picking`/`packed` and used non-existent delivery states). Drift detection shipped: `scripts/check-live-drift.sh` + `supabase/live-catalog.snapshot.txt` + `.github/workflows/live-drift.yml` (needs read-only `SUPABASE_DB_URL` secret).
+  The live diff was **broader than C2 described** — a cluster of 00100–00143-era objects was missing. Deferred (documented in 00205's header, NOT restored): `apply_change_request` (#10), `project_*`/`margin_by_channel` (#19, unused), QBO token RPCs (no app caller). Two need a schema-aware rewrite (they reference dropped columns/tables, so restoring the chain body would re-break) — see items 21/22 below.
   Stranded-reservation release: **verified moot 2026-07-07** — live has zero finished_good→order allocations of ANY status (39 orders, 9 fulfilled/cancelled; the FG-allocation flow was never used in production, so H1's "0 completed" was "0 total"). Re-check at #342 deploy: `SELECT count(*) FROM allocations a JOIN orders o ON o.id=a.destination_id WHERE a.destination_type='order' AND a.source_type='finished_good' AND a.status='planned' AND o.status IN ('fulfilled','cancelled');`
   Period-attribution note: TTB removals (00203) bucket by `allocations.created_at`, not `completed_at` — fine for the normal flow; revisit here if attribution matters.
+- [ ] **21. `get_inventory_overview()` is broken live** (found while doing #9) — owner: `data-layer-expert`
+  Live def == chain (00155) but JOINs the dropped `package_types` table (errors on invoke) AND its return shape no longer matches the `InventoryOverview` TS type (`inventory-service.ts`, `inventory-alerts.tsx`). Not drift — a pre-existing chain bug. Needs a `selling_formats` rewrite that also matches the TS shape (`brand_name`/`package_type_name`/`committed_quantity`/`low_stock_items`).
+- [ ] **22. `start_batch_fermentation()` is broken live** (found while doing #9) — owner: `data-layer-expert`
+  Missing on live; the chain body (00024) `UPDATE batches SET fermenter=...`, but `batches.fermenter` was dropped (vessel assignment now lives on `vessels.current_batch_id` + `vessel_transfers`). The brew-log completion dialog's "start fermentation" RPC path errors. Rewrite to the current vessel model, or drop the RPC and route through the existing `current_vessel_id` fallback the dialog already has.
 - [ ] **10. Change-request feature: rebuild, simplified** (C3) — DECIDED 2026-07-06, folded into #20 phase 1
   Rebuild tables against the current selling-formats schema. **Drop the auto-apply RPC** (`apply_change_request` broke twice on schema drift): requests are stored structured, "approve" = staff applies the edit via the normal order editor and marks the request applied. Remove the approve-route RPC call; keep the audit record.
 - [ ] **11. `keg_inventory` netting** (H4) — owner: `data-layer-expert`
@@ -65,7 +70,7 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
 ## Test-infrastructure debt (enables everything above)
 
 - [ ] **pgTAP (or equivalent) DB-layer test harness** — triggers, RPCs, views, CHECKs are where all three criticals live and have zero coverage.
-- [ ] **Live-drift CI check** — diff live catalog (functions/triggers/tables) against migration chain; would have caught C2/C3 and the pricing RPC drift.
+- [x] **Live-drift CI check** — **DONE (with #9)**: `scripts/check-live-drift.sh` diffs the live catalog (functions + signatures + body hashes, triggers, tables) against `supabase/live-catalog.snapshot.txt`; `.github/workflows/live-drift.yml` runs it daily + on migration-touching PRs. Needs a read-only `SUPABASE_DB_URL` repo secret. Regenerate the snapshot (`--update`) in any PR that intentionally changes the catalog.
 - [ ] **Multi-user RLS round-trip tests** — real JWTs, not policy-text assertions.
 - [ ] **View↔consumer unit-parity tests** — SQL estimate formulas vs TS ports (`recipes_with_estimates` vs `recipe-estimate-calc`, `batches_with_brew_info.actual_og` units).
 
