@@ -28,7 +28,9 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
 ## P2 — Live drift & integrity
 
 - [ ] **9. Restore server-side enforcement on live** (C2) — owner: `data-layer-expert`
-  Re-apply `validate_state_transition()`, pick-list triggers, `cancel_pick_list_allocations`; add drift detection (compare live catalog vs migrations in CI); release the currently-stranded planned reservations.
+  Re-apply `validate_state_transition()`, pick-list triggers, `cancel_pick_list_allocations`; add drift detection (compare live catalog vs migrations in CI).
+  Stranded-reservation release: **verified moot 2026-07-07** — live has zero finished_good→order allocations of ANY status (39 orders, 9 fulfilled/cancelled; the FG-allocation flow was never used in production, so H1's "0 completed" was "0 total"). Re-check at #342 deploy: `SELECT count(*) FROM allocations a JOIN orders o ON o.id=a.destination_id WHERE a.destination_type='order' AND a.source_type='finished_good' AND a.status='planned' AND o.status IN ('fulfilled','cancelled');`
+  Period-attribution note: TTB removals (00203) bucket by `allocations.created_at`, not `completed_at` — fine for the normal flow; revisit here if attribution matters.
 - [ ] **10. Change-request feature: rebuild, simplified** (C3) — DECIDED 2026-07-06, folded into #20 phase 1
   Rebuild tables against the current selling-formats schema. **Drop the auto-apply RPC** (`apply_change_request` broke twice on schema drift): requests are stored structured, "approve" = staff applies the edit via the normal order editor and marks the request applied. Remove the approve-route RPC call; keep the audit record.
 - [ ] **11. `keg_inventory` netting** (H4) — owner: `data-layer-expert`
