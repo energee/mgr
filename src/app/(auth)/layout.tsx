@@ -1,7 +1,8 @@
 /**
  * Auth Layout
  *
- * Split-screen layout for login/signup/forgot-password pages.
+ * Split-screen layout for login/forgot-password pages (signup was removed —
+ * accounts are invite-only, audit C1/M16).
  * Redirects logged-in users to the app (recovery flow uses /update-password
  * outside this group so the recovery session isn't bounced away).
  */

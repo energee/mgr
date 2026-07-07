@@ -8,7 +8,7 @@
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import type { UserRole } from "@/lib/permissions";
+import { isPortalUser, type UserRole } from "@/lib/permissions";
 import { AppSidebar } from "@/components/domain/shared/app-sidebar";
 import { AppHeader } from "@/components/domain/shared/app-header";
 import { AppProviders } from "@/components/domain/shared/app-providers";
@@ -39,7 +39,9 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   // Cast needed: generated types don't include the `roles` column yet
   const roles = ((profile as Record<string, unknown> | null)?.roles ?? ["viewer"]) as UserRole[];
 
-  if (roles.length === 1 && roles[0] === "customer") {
+  // Any role set containing 'customer' belongs in the portal (audit C1:
+  // requiring exactly ['customer'] let mixed role sets into the staff app).
+  if (isPortalUser(roles)) {
     redirect("/portal/orders");
   }
 

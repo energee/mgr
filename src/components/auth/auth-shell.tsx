@@ -1,8 +1,8 @@
 /**
  * Auth Shell
  *
- * Split-screen wrapper used by auth pages (login, signup, forgot-password,
- * update-password). Left panel: MGR branding. Right panel: form content.
+ * Split-screen wrapper used by auth pages (login, forgot-password,
+ * update-password; signup removed — invite-only). Left panel: MGR branding. Right panel: form content.
  * On mobile the left panel is hidden.
  */
 

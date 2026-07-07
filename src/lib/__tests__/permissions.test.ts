@@ -2,13 +2,16 @@
  * Comprehensive tests for the permission system.
  *
  * Covers: hasPermission, getPermissions, getRolesForPermission,
- * PERMISSION_MAP structure, STAFF_ROLES, and ALL_ROLES constants.
+ * isPortalUser, shouldAssignCustomerRole, PERMISSION_MAP structure,
+ * STAFF_ROLES, and ALL_ROLES constants.
  */
 import { describe, it, expect } from "vitest";
 import {
   hasPermission,
   getPermissions,
   getRolesForPermission,
+  isPortalUser,
+  shouldAssignCustomerRole,
   PERMISSION_MAP,
   STAFF_ROLES,
   ALL_ROLES,
@@ -467,5 +470,66 @@ describe("STAFF_ROLES and ALL_ROLES", () => {
     expect(
       (STAFF_ROLES as readonly string[]).includes("customer")
     ).toBe(false);
+  });
+});
+
+// =============================================================================
+// isPortalUser — app-shell portal redirect predicate (audit C1)
+// =============================================================================
+
+describe("isPortalUser", () => {
+  it("true for exactly ['customer']", () => {
+    expect(isPortalUser(["customer"])).toBe(true);
+  });
+
+  it("true whenever customer appears in a mixed role set (fail-closed)", () => {
+    expect(isPortalUser(["customer", "viewer"])).toBe(true);
+    expect(isPortalUser(["admin", "customer"])).toBe(true);
+    expect(isPortalUser(["viewer", "customer", "sales"])).toBe(true);
+  });
+
+  it("false for every pure staff role set", () => {
+    for (const role of STAFF_ROLES) {
+      expect(isPortalUser([role]), `${role} alone is staff`).toBe(false);
+    }
+    expect(isPortalUser([...STAFF_ROLES])).toBe(false);
+  });
+
+  it("false for an empty role set", () => {
+    expect(isPortalUser([])).toBe(false);
+  });
+});
+
+// =============================================================================
+// shouldAssignCustomerRole — portal-invite role-set decision (audit C1)
+// =============================================================================
+
+describe("shouldAssignCustomerRole", () => {
+  it("true for a missing profile (null/undefined)", () => {
+    expect(shouldAssignCustomerRole(null)).toBe(true);
+    expect(shouldAssignCustomerRole(undefined)).toBe(true);
+  });
+
+  it("true for an empty role set", () => {
+    expect(shouldAssignCustomerRole([])).toBe(true);
+  });
+
+  it("true for the untouched signup default ['viewer']", () => {
+    expect(shouldAssignCustomerRole(["viewer"])).toBe(true);
+  });
+
+  it("false for every non-viewer staff role (never clobbers staff)", () => {
+    for (const role of STAFF_ROLES.filter((r) => r !== "viewer")) {
+      expect(shouldAssignCustomerRole([role]), `${role} must be preserved`).toBe(false);
+    }
+  });
+
+  it("false for multi-role sets, even ones containing viewer", () => {
+    expect(shouldAssignCustomerRole(["viewer", "brewer"])).toBe(false);
+    expect(shouldAssignCustomerRole(["admin", "viewer"])).toBe(false);
+  });
+
+  it("false when already ['customer'] (idempotent no-op path)", () => {
+    expect(shouldAssignCustomerRole(["customer"])).toBe(false);
   });
 });
