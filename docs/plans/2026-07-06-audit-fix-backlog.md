@@ -53,6 +53,8 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
 - [ ] **17. Order item price validation** (M10) — owner: `entity-architect`
   Fix add-path `|| null` coercion (reuse edit-path parser); DB CHECK `unit_price >= 0`; stop the auto-price effect overwriting explicit $0.
 - [ ] **18. Remaining mediums** — M1/M2 (recipe editor ↔ view formula parity; single source of truth), M7 (revise RPC whole-unit ceiling), M8 (per-batch vs session ceiling — pick one semantic), M14 (FG edit outbound guard), M15 (count optimistic lock + FG counts).
+  - [x] **M15a — count-increase lost-update race**: `recordInventoryCount` now compare-and-swaps on the pre-image `inventory_lots.quantity` (no `version` column exists on that table), returning `CONFLICT` on a stale write. App-only, no migration. (PR: `fix-audit-m15-count-lock`)
+  - [ ] **M15b — FG cycle-count workflow**: deferred. FG increases still require destructive `finished_goods.quantity` edits; a non-destructive FG stocktake is a new UI surface (ui-systems lane) + count-session UX (see audit "No stocktake" gap), not a bug fix.
 
 ## P3 — Product decisions / feature builds (from requirement verdicts)
 
