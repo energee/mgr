@@ -17,27 +17,7 @@
  * DB-backed test if one is ever introduced.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync } from "fs";
-import { resolve } from "path";
-
-const MIGRATIONS_DIR = resolve(__dirname, "../../../supabase/migrations");
-
-/** Returns the body of the latest CREATE OR REPLACE of `fnName`, or null. */
-function latestFunctionBody(fnName: string): string | null {
-  const files = readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
-    .sort(); // lexical sort == apply order for zero-padded prefixes
-  const re = new RegExp(
-    `CREATE OR REPLACE FUNCTION ${fnName}\\b[\\s\\S]*?\\$\\$([\\s\\S]*?)\\$\\$`,
-  );
-  let body: string | null = null;
-  for (const f of files) {
-    const sql = readFileSync(resolve(MIGRATIONS_DIR, f), "utf-8");
-    const m = sql.match(re);
-    if (m) body = m[1]; // keep overwriting; last (highest-sorted) wins
-  }
-  return body;
-}
+import { latestFunctionBody } from "./sql-def-helpers";
 
 describe("analyze_batch_performance fermentation block", () => {
   const body = latestFunctionBody("analyze_batch_performance");

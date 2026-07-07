@@ -1016,6 +1016,64 @@ describe("getBatchLossSummary", () => {
     expect(result.data.reconciled).toBe(false);
   });
 
+  it("counts revised-session line items toward packagedBbl and excludes cancelled ones (M6)", async () => {
+    const tables = lossTables();
+    tables.session_line_items = [
+      {
+        data: [
+          // revised: the revise RPC (00184) rewrote actuals to final
+          // quantities before flipping the status — counts as packaged.
+          {
+            actual_quantity: 24,
+            selling_format: { unit_count: 1, container: { volume_bbl: null, volume_oz: 992 } },
+            session: { status: "revised" },
+          },
+          // cancelled: the packaging never happened — excluded, and terminal.
+          {
+            actual_quantity: 100,
+            selling_format: { unit_count: 1, container: { volume_bbl: 0.25, volume_oz: null } },
+            session: { status: "cancelled" },
+          },
+        ],
+        error: null,
+      },
+    ];
+    const { supabase } = makeSupabase(tables);
+
+    const result = await getBatchLossSummary(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.packagedBbl).toBeCloseTo(6); // revised line only
+    // revised/cancelled are terminal — neither marks the batch as open (H5).
+    expect(result.data.hasOpenSessions).toBe(false);
+    expect(result.data.unattributedBbl).toBeCloseTo(1.5);
+  });
+
+  it("treats only planned/in_progress sessions as open and never counts their actuals", async () => {
+    const tables = lossTables();
+    tables.session_line_items = [
+      {
+        data: [
+          {
+            actual_quantity: 10,
+            selling_format: { unit_count: 1, container: { volume_bbl: 0.25, volume_oz: null } },
+            session: { status: "planned" },
+          },
+        ],
+        error: null,
+      },
+    ];
+    const { supabase } = makeSupabase(tables);
+
+    const result = await getBatchLossSummary(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.hasOpenSessions).toBe(true);
+    expect(result.data.packagedBbl).toBe(0);
+  });
+
   it("returns a null unattributed remainder when there is no production baseline", async () => {
     const { supabase } = makeSupabase({
       brew_log_batches: [{ data: [], error: null }],
@@ -1108,6 +1166,65 @@ describe("reconcileBatchLoss", () => {
 
     expect(result).toEqual({ success: true, data: 0, invalidate: [] });
     expect(callsByTable.allocations).toHaveLength(1);
+  });
+
+  it("reconciles a batch whose sessions were revised — revised is terminal, not open (H5)", async () => {
+    const tables = lossTables();
+    tables.session_line_items = [
+      {
+        data: [
+          {
+            actual_quantity: 24,
+            selling_format: { unit_count: 1, container: { volume_bbl: null, volume_oz: 992 } },
+            session: { status: "revised" },
+          },
+        ],
+        error: null,
+      },
+    ];
+    const { supabase, callsByTable } = makeSupabase(tables);
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    // Revised actuals count as packaged (6 bbl) → 1.5 bbl remainder recorded.
+    expect(result.data).toBeCloseTo(1.5);
+    const inserted = callsByTable.allocations[1].insert.mock.calls[0][0];
+    expect(inserted).toMatchObject({ reason_code: "reconciliation", status: "completed" });
+    expect(inserted.volume_bbl).toBeCloseTo(1.5);
+  });
+
+  it("neither blocks on nor counts a cancelled session's line items (H5/M6)", async () => {
+    const tables = lossTables();
+    tables.session_line_items = [
+      {
+        data: [
+          {
+            actual_quantity: 24,
+            selling_format: { unit_count: 1, container: { volume_bbl: null, volume_oz: 992 } },
+            session: { status: "completed" },
+          },
+          // If this cancelled line counted, packaged would be 8 bbl and the
+          // remainder −0.5 (below threshold) — no reconciliation would fire.
+          {
+            actual_quantity: 8,
+            selling_format: { unit_count: 1, container: { volume_bbl: 0.25, volume_oz: null } },
+            session: { status: "cancelled" },
+          },
+        ],
+        error: null,
+      },
+    ];
+    const { supabase, callsByTable } = makeSupabase(tables);
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data).toBeCloseTo(1.5);
+    const inserted = callsByTable.allocations[1].insert.mock.calls[0][0];
+    expect(inserted.volume_bbl).toBeCloseTo(1.5);
   });
 
   it("skips when there is no production baseline (no brew logs, no blend inflow)", async () => {

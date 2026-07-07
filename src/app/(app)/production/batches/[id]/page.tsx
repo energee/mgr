@@ -77,7 +77,8 @@ export default function BatchDetailPage({
   const supabase = createClient();
 
   // Fetch batch data for the dialogs (use view to get vessel info and
-  // actual_og, which the view computes from brew-log knockout measurements).
+  // actual_og, which the view computes from brew-log knockout measurements
+  // and converts to SG in-view — migration 00204).
   // Note: the batches table/view has NO target_og column — recipe targets
   // come from the recipe query below.
   type BatchDetail = {

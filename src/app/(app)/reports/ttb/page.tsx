@@ -9,13 +9,27 @@
  * Uses database functions:
  * - get_ttb_report(year, month) - Full report data by tax class
  * - get_ttb_production_summary(year, month) - Production details
+ *
+ * Every row is checked against the form's two accounting identities
+ * (validateRowBalance / validateEndingInventory from @/domain/ttb-utils);
+ * failures render a visible warning so a non-balancing report is never
+ * silently filed.
  */
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
-import { getTaxClassLabel, formatTtbBbl, MONTHS } from "@/domain/ttb-utils";
+import {
+  getTaxClassLabel,
+  formatTtbBbl,
+  MONTHS,
+  calculateTotals,
+  validateRowBalance,
+  validateEndingInventory,
+  EMPTY_TOTALS,
+  type TTBReportRow,
+} from "@/domain/ttb-utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,26 +68,8 @@ import { log } from "@/lib/client-logger";
 // Types
 // =============================================================================
 
-type TTBReportRow = {
-  report_year: number;
-  report_month: number;
-  report_period: string;
-  ttb_tax_class: string;
-  beginning_inventory_bbl: number;
-  beer_produced_bbl: number;
-  beer_received_bbl: number;
-  total_available_bbl: number;
-  taxpaid_domestic_bbl: number;
-  taxpaid_export_bbl: number;
-  tax_free_samples_bbl: number;
-  losses_bbl: number;
-  destroyed_bbl: number;
-  adjustments_bbl: number;
-  total_removals_bbl: number;
-  ending_inventory_bbl: number;
-  in_process_beginning_bbl: number;
-  in_process_ending_bbl: number;
-}
+// TTBReportRow imported from @/domain/ttb-utils (single source of truth for
+// the get_ttb_report row shape).
 
 type BatchSummary = {
   id: string;
@@ -201,47 +197,34 @@ export default function TTBReportPage() {
   const isLoading = reportLoading || batchLoading;
   const monthName = MONTHS[month - 1];
 
-  // Calculate totals from report data
-  const totals = reportData?.reduce(
-    (acc, row) => ({
-      beginningInventory: acc.beginningInventory + (row.beginning_inventory_bbl || 0),
-      beerProduced: acc.beerProduced + (row.beer_produced_bbl || 0),
-      totalAvailable: acc.totalAvailable + (row.total_available_bbl || 0),
-      taxpaidDomestic: acc.taxpaidDomestic + (row.taxpaid_domestic_bbl || 0),
-      taxpaidExport: acc.taxpaidExport + (row.taxpaid_export_bbl || 0),
-      taxFreeSamples: acc.taxFreeSamples + (row.tax_free_samples_bbl || 0),
-      losses: acc.losses + (row.losses_bbl || 0),
-      destroyed: acc.destroyed + (row.destroyed_bbl || 0),
-      totalRemovals: acc.totalRemovals + (row.total_removals_bbl || 0),
-      endingInventory: acc.endingInventory + (row.ending_inventory_bbl || 0),
-      inProcessEnding: acc.inProcessEnding + (row.in_process_ending_bbl || 0),
-    }),
-    {
-      beginningInventory: 0,
-      beerProduced: 0,
-      totalAvailable: 0,
-      taxpaidDomestic: 0,
-      taxpaidExport: 0,
-      taxFreeSamples: 0,
-      losses: 0,
-      destroyed: 0,
-      totalRemovals: 0,
-      endingInventory: 0,
-      inProcessEnding: 0,
+  // Calculate totals from report data (falls back to legacy batch sums when
+  // get_ttb_report is unavailable).
+  const totals = reportData
+    ? calculateTotals(reportData)
+    : {
+        ...EMPTY_TOTALS,
+        beerProduced: batchData?.completedVolume || 0,
+        inProcessEnding: batchData?.inProgressVolume || 0,
+      };
+
+  // TTB Form 5130.9 accounting-identity checks. A failing row means the
+  // report disagrees with its own math (e.g. removals not deducted from
+  // ending inventory) and must be reviewed before filing.
+  const identityFailures = (reportData ?? []).flatMap((row) => {
+    const label = getTaxClassLabel(row.ttb_tax_class);
+    const failures: string[] = [];
+    if (!validateRowBalance(row)) {
+      failures.push(
+        `${label}: total available (${formatTtbBbl(row.total_available_bbl)}) ≠ beginning inventory + beer produced + beer received`
+      );
     }
-  ) || {
-    beginningInventory: 0,
-    beerProduced: batchData?.completedVolume || 0,
-    totalAvailable: 0,
-    taxpaidDomestic: 0,
-    taxpaidExport: 0,
-    taxFreeSamples: 0,
-    losses: 0,
-    destroyed: 0,
-    totalRemovals: 0,
-    endingInventory: 0,
-    inProcessEnding: batchData?.inProgressVolume || 0,
-  };
+    if (!validateEndingInventory(row)) {
+      failures.push(
+        `${label}: ending inventory (${formatTtbBbl(row.ending_inventory_bbl)}) ≠ total available − total removals`
+      );
+    }
+    return failures;
+  });
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -377,6 +360,24 @@ export default function TTBReportPage() {
           <AlertTitle>Error Loading Report</AlertTitle>
           <AlertDescription>
             {reportError instanceof Error ? reportError.message : "Failed to load TTB report data"}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {identityFailures.length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Report fails TTB accounting identity checks</AlertTitle>
+          <AlertDescription>
+            <p>
+              These figures do not balance — review the source data before
+              filing Form 5130.9.
+            </p>
+            <ul className="list-disc pl-5 mt-1">
+              {identityFailures.map((msg) => (
+                <li key={msg}>{msg}</li>
+              ))}
+            </ul>
           </AlertDescription>
         </Alert>
       )}
