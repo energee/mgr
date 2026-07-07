@@ -156,7 +156,8 @@ async function suggestOneBatchCompletion(
     .eq("log_type", "measurement");
   const latestSg = latestGravitySg((logs ?? []) as unknown as GravityLogLike[]);
 
-  // Brew-derived OG (view column; not stored on batches), for actual_abv.
+  // Brew-derived OG in SG (view column, converted Plato->SG in-view per
+  // migration 00204; not stored on batches), for actual_abv.
   const { data: brewInfo } = await supabase
     .from("batches_with_brew_info")
     .select("actual_og")

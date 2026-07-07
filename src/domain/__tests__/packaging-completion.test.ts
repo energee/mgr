@@ -131,10 +131,17 @@ describe("latestGravitySg", () => {
 });
 
 describe("suggestFgAbv", () => {
+  // UNIT CONTRACT: `actualOg` is SPECIFIC GRAVITY (1.0xx), never Plato.
+  // Production sources it from batches_with_brew_info.actual_og, which
+  // converts the volume-weighted Plato knockout average to SG in the view
+  // itself (migration 00204) — the view is the single conversion point, so
+  // suggestFgAbv performs no unit conversion and would happily compute a
+  // ~1508 "ABV" if fed a raw Plato value (the pre-00204 audit bug, H3).
+  // The SG fixtures below (1.052 etc.) encode that contract deliberately.
   it("suggests both FG and ABV when the batch has neither", () => {
     const suggestion = suggestFgAbv({
       latestSg: 1.012,
-      actualOg: 1.052,
+      actualOg: 1.052, // SG by contract (see block comment above)
       existingFg: null,
       existingAbv: null,
     });
