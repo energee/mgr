@@ -9,6 +9,13 @@
  * paths, so completing a batch from the bulk bar or the generic detail
  * dropdown silently skipped ingredient consumption.
  *
+ * Covered (table, toState) pairs:
+ * - batches → completed: ingredient consumption, loss reconciliation, vessel release
+ * - packaging_sessions → completed: packaging-material BOM depletion
+ * - pick_lists → in_progress / completed: parent order status sync
+ * - orders → fulfilled: complete FG→order reservations + stamp TTB removal volume
+ * - orders → cancelled: release still-planned FG→order reservations
+ *
  * Adding a new side effect: extend the registry switch in
  * `runTransitionSideEffects` with a `(table, toState)` match and document
  * what the effect does. Effects must be idempotent — multiple UI paths can
@@ -19,7 +26,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Database } from "@/types/supabase";
-import { entityKeys } from "@/lib/query-keys";
+import { entityKeys, inventoryKeys, orderKeys } from "@/lib/query-keys";
+import { computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
 import {
   completeBatchConsumption,
   consumePackagingMaterials,
@@ -189,6 +197,150 @@ export async function runTransitionSideEffects(
           // detail pages reflect the synced status immediately.
           void queryClient?.invalidateQueries({ queryKey: entityKeys.all("orders") });
         }
+      }
+    }
+  }
+
+  // orders → fulfilled: complete the orders' still-planned finished-goods
+  // reservations (allocations finished_good → order, inserted `planned` by
+  // the allocation dialog and generate_pick_list), stamping completed_at and
+  // the removed volume in bbl — allocation quantity × per-unit fill of the
+  // source finished good (FG → selling_format → container, via
+  // computeUnitFillVolumeBbl). Completed removal volume is what the TTB
+  // report counts as "removed for sale"; before this entry existed the
+  // reservations stayed planned forever and TTB removals were permanently
+  // zero (audit H1).
+  //
+  // Deliberately ledger-only stock: finished_goods.quantity is NEVER
+  // decremented here. quantity records what was packaged; the availability
+  // views derive available stock as quantity − planned/completed allocations
+  // (00010), so decrementing on fulfillment would double-count the removal,
+  // and TTB ending inventory derives as production − removals. See
+  // docs/knowledge/entity-model.md ("finished goods stock is ledger-style").
+  //
+  // Idempotent: every UPDATE is guarded on status='planned' (same pattern as
+  // completeBatchConsumption) — a racing second path matches 0 rows. Volume
+  // is written in the same UPDATE as the status flip so no completed row
+  // ever transiently lacks its volume. Reservations whose finished good has
+  // no usable container volume are still completed (the shipment already
+  // physically happened — same philosophy as consumePackagingMaterials'
+  // shortfall reporting) with volume_bbl NULL and a non-fatal warning.
+  if (table === "orders" && toState === "fulfilled") {
+    const { data: planned, error: readError } = await supabase
+      .from("allocations")
+      .select("id, source_id, quantity")
+      .eq("destination_type", "order")
+      .in("destination_id", ids)
+      .eq("source_type", "finished_good")
+      .eq("status", "planned");
+
+    if (readError) {
+      result.error = `Order fulfilled, but completing its inventory reservations failed: ${readError.message}`;
+    } else if ((planned ?? []).length > 0) {
+      const rows = planned ?? [];
+
+      // Per-unit fill volume per source finished good.
+      const fgIds = [...new Set(rows.map((r) => r.source_id).filter((id): id is string => !!id))];
+      const unitFillByFg = new Map<string, number>();
+      let volumeLookupError: string | null = null;
+      if (fgIds.length > 0) {
+        const { data: fgs, error: fgError } = await supabase
+          .from("finished_goods")
+          .select(
+            "id, selling_format:selling_formats(unit_count, container:containers(volume_bbl, volume_oz))"
+          )
+          .in("id", fgIds);
+        if (fgError) {
+          volumeLookupError = fgError.message;
+        } else {
+          type FinishedGoodVolumeRow = {
+            id: string;
+            selling_format: {
+              unit_count: number | null;
+              container: { volume_bbl: number | null; volume_oz: number | null } | null;
+            } | null;
+          };
+          for (const fg of (fgs ?? []) as unknown as FinishedGoodVolumeRow[]) {
+            const unitVol = fg.selling_format
+              ? computeUnitFillVolumeBbl(fg.selling_format)
+              : null;
+            if (unitVol != null) unitFillByFg.set(fg.id, unitVol);
+          }
+        }
+      }
+
+      const completedAt = new Date().toISOString();
+      let missingVolume = 0;
+      const updateFailures: string[] = [];
+      for (const row of rows) {
+        const unitVol = row.source_id ? unitFillByFg.get(row.source_id) : undefined;
+        const volumeBbl = unitVol != null ? Number(row.quantity) * unitVol : null;
+        if (volumeBbl == null) missingVolume += 1;
+        const { error: updateError } = await supabase
+          .from("allocations")
+          .update({ status: "completed", completed_at: completedAt, volume_bbl: volumeBbl })
+          .eq("id", row.id)
+          .eq("status", "planned");
+        if (updateError) updateFailures.push(updateError.message);
+      }
+
+      const parts: string[] = [];
+      if (updateFailures.length > 0) {
+        parts.push(
+          `completing ${updateFailures.length} reservation(s) failed: ${[...new Set(updateFailures)].join("; ")}`
+        );
+      }
+      if (volumeLookupError) {
+        parts.push(
+          `looking up container volumes failed (${volumeLookupError}) — reservations were completed without volume, so TTB removals will under-report`
+        );
+      } else if (missingVolume > 0) {
+        parts.push(
+          `${missingVolume} reservation(s) have no container volume data and were completed without volume — TTB removals will under-report until the container volume is backfilled`
+        );
+      }
+      if (parts.length > 0) {
+        result.error = `Order fulfilled, but ${parts.join("; ")}`;
+      }
+
+      // Completed removals feed the allocations list, TTB report, and each
+      // order's allocation panel. (entityKeys.all("allocations") is the same
+      // ["allocations"] root inventoryKeys.allocations() returns.)
+      void queryClient?.invalidateQueries({ queryKey: entityKeys.all("allocations") });
+      for (const orderId of ids) {
+        void queryClient?.invalidateQueries({ queryKey: orderKeys.allocations(orderId) });
+      }
+    }
+  }
+
+  // orders → cancelled: release the orders' still-planned finished-goods
+  // reservations so the reserved stock becomes available again (audit M12 —
+  // the UI blocks editing allocations once the order is cancelled, so a
+  // leaked planned reservation was unfixable from the app). Completed
+  // allocations are untouched: volume already removed for a partially
+  // shipped order stays removed. Single status-guarded UPDATE → idempotent,
+  // and the allocations server-side state machine (00143) allows
+  // planned → cancelled.
+  if (table === "orders" && toState === "cancelled") {
+    const { error: releaseError } = await supabase
+      .from("allocations")
+      .update({ status: "cancelled" })
+      .eq("destination_type", "order")
+      .in("destination_id", ids)
+      .eq("source_type", "finished_good")
+      .eq("status", "planned");
+
+    if (releaseError) {
+      result.error = `Order cancelled, but releasing its inventory reservations failed: ${releaseError.message}`;
+    } else {
+      // Released reservations change derived finished-goods availability.
+      void queryClient?.invalidateQueries({ queryKey: entityKeys.all("allocations") });
+      void queryClient?.invalidateQueries({ queryKey: inventoryKeys.finishedGoods() });
+      void queryClient?.invalidateQueries({
+        queryKey: inventoryKeys.finishedGoodsAvailable(),
+      });
+      for (const orderId of ids) {
+        void queryClient?.invalidateQueries({ queryKey: orderKeys.allocations(orderId) });
       }
     }
   }

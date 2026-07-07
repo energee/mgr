@@ -51,7 +51,12 @@ type BatchPerformanceResult = {
     target_abv: number | null;
   };
   actuals: {
-    og: string | null;
+    /**
+     * SG (1.0xx) since migration 00204 (the SQL converts the Plato knockout
+     * measurement); number from current DBs, string tolerated for older
+     * cached responses.
+     */
+    og: number | string | null;
     fg: number | null;
     abv: number | null;
   };

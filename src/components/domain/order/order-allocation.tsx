@@ -179,7 +179,13 @@ export function OrderAllocation({
   const { data: brands } = useBrands();
   const { data: packagingFormats } = usePackagingFormats();
 
-  // Create allocations mutation with duplicate prevention
+  // Create allocations mutation with duplicate prevention.
+  //
+  // Lifecycle of the `planned` rows inserted here: they reserve stock (the
+  // availability views subtract planned + completed allocations) until the
+  // order transitions — `orders → fulfilled` completes them and stamps the
+  // removed volume for TTB, `orders → cancelled` releases them (see
+  // src/services/transition-side-effects.ts).
   const allocateMutation = useMutation({
     mutationFn: async (entries: AllocationEntry[]) => {
       const validEntries = entries.filter((e) => e.quantity > 0);

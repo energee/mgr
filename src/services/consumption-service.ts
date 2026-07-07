@@ -571,13 +571,24 @@ export type BatchLossSummary = {
   blendOutBbl: number;
   /** produced + blend in − blend out; null-equivalent when <= 0. */
   baselineBbl: number;
-  /** SUM(actual units × unit fill volume) across the batch's line items. */
+  /**
+   * SUM(actual units × unit fill volume) across line items of the batch's
+   * completed/revised sessions. Revised sessions count because the revise
+   * RPC (00184) rewrites line-item actuals to the corrected final
+   * quantities before flipping the status; cancelled/planned/in_progress
+   * sessions are excluded — their actuals never happened or aren't final.
+   */
   packagedBbl: number;
   /** SUM of completed batch-sourced removal allocations (excl. finished goods). */
   attributedBbl: number;
   /** Baseline − packaged − attributed; null when there is no baseline. */
   unattributedBbl: number | null;
-  /** True while any of the batch's packaging sessions is not yet completed. */
+  /**
+   * True while any of the batch's packaging sessions is still open
+   * (planned/in_progress). completed, revised, and cancelled are all
+   * terminal (00184) — treating revised/cancelled as open would block loss
+   * reconciliation forever, since batches → completed is its only trigger.
+   */
   hasOpenSessions: boolean;
   /** True once a completion reconciliation allocation exists. */
   reconciled: boolean;
@@ -654,10 +665,21 @@ export async function getBatchLossSummary(
       session: { status: string | null } | null;
     };
     const packagedLines = (lines ?? []) as unknown as PackagedLine[];
+    // Session-status semantics (packaging_sessions state machine + 00184):
+    // planned/in_progress are the only OPEN statuses (actuals not final —
+    // defer reconciliation); completed/revised are the terminal statuses
+    // whose line items hold final actual quantities (revise rewrites actuals
+    // in place, so revised lines ARE the corrected packaged volume);
+    // cancelled is terminal but its line items never happened.
+    const OPEN_SESSION_STATUSES = ["planned", "in_progress"];
+    const PACKAGED_SESSION_STATUSES = ["completed", "revised"];
     const hasOpenSessions = packagedLines.some(
-      (l) => l.session && l.session.status !== "completed"
+      (l) => l.session != null && OPEN_SESSION_STATUSES.includes(l.session.status ?? "")
     );
     const packagedBbl = packagedLines.reduce((sum, line) => {
+      if (!line.session || !PACKAGED_SESSION_STATUSES.includes(line.session.status ?? "")) {
+        return sum;
+      }
       const unitVolume = line.selling_format
         ? computeUnitFillVolumeBbl(line.selling_format)
         : null;
