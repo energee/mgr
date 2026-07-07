@@ -5,6 +5,10 @@
  *
  * Simplified magic-link-only login for brewery customers.
  * Sends an OTP code via email, then verifies it to sign in.
+ *
+ * Invite-only: `shouldCreateUser: false` — the portal never self-registers
+ * accounts (audit C1/M16). Portal users are provisioned exclusively via the
+ * staff customer-invite flow (/api/customers/[id]/invite).
  */
 
 import { useRef, useState, type FormEvent } from "react";
@@ -34,6 +38,9 @@ export function PortalLoginForm() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
+        // Invite-only portal: never create an auth user for an unknown email
+        // (self-registration granted the staff 'viewer' role — audit C1/M16).
+        shouldCreateUser: false,
         emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=/portal/orders`,
       },
     });

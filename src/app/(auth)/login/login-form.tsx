@@ -254,12 +254,9 @@ export function LoginForm() {
         </>
       )}
 
-      <p className="text-center text-sm text-muted-foreground">
-        Don&apos;t have an account?{" "}
-        <Link href="/signup" className="underline hover:text-foreground">
-          Sign up
-        </Link>
-      </p>
+      {/* No self-serve signup: accounts are invite-only (audit C1/M16).
+          Staff are invited from the users admin; customers via the portal
+          invite flow. */}
     </form>
   );
 }
