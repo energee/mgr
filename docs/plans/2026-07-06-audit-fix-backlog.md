@@ -37,8 +37,9 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
   Make fill/ship legs net against pools (strip batch/FG from the negative leg's grouping, or restructure the view); backfill/verify against physical fleet count.
 - [ ] **12. Server-side availability guard** (H7) — owner: `data-layer-expert`
   Trigger or RPC-level check that allocations cannot exceed availability (with row locking); decide policy for intentional negative (count corrections).
-- [ ] **13. `chk_fg_entry_point` conflict** (H8) — owner: `data-layer-expert`
+- [x] **13. `chk_fg_entry_point` conflict** (H8) — owner: `data-layer-expert` — **PR (branch `fix-audit-h8-fg-entrypoint`), 00206 applied live**
   Relax the CHECK or require batch on session line items; unblock batch-less session completion and manual FG-with-batch creation.
+  DONE 2026-07-07: dropped `chk_fg_entry_point` (00206). All four batch_id/session_line_item_id combinations are now legitimate (batch-less session lines → session-only FGs; manual FG-with-batch → batch-only FGs), so no weaker CHECK is meaningful. Column comments document the independent-optional-provenance semantics. Live impact zero (1 FG row, external).
 - [ ] **14. Pricing model** (H10, M9) — DECIDED 2026-07-06: dual model is intentional
   Wholesale orders price by **customer tier × sales channel** (matrix cell); taproom/Square prices by **product tier** — different channels, both by design. Remaining work: (a) M9 — require `price_tier_id` + `sales_channel_id` before a customer can be portal-invited / auto-priced, fix the customer-form copy about "default tier"; (b) bring live `get_price_for_customer` into the migration chain (drift item #4); (c) document the dual model in `docs/knowledge/entity-model.md`.
 - [ ] **15. Ledger audit-trail hardening** (M11, M13, plus audit-doc gaps) — owner: `data-layer-expert`
