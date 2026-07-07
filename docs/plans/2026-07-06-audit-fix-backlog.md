@@ -33,8 +33,9 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
   Period-attribution note: TTB removals (00203) bucket by `allocations.created_at`, not `completed_at` — fine for the normal flow; revisit here if attribution matters.
 - [ ] **10. Change-request feature: rebuild, simplified** (C3) — DECIDED 2026-07-06, folded into #20 phase 1
   Rebuild tables against the current selling-formats schema. **Drop the auto-apply RPC** (`apply_change_request` broke twice on schema drift): requests are stored structured, "approve" = staff applies the edit via the normal order editor and marks the request applied. Remove the approve-route RPC call; keep the audit record.
-- [ ] **11. `keg_inventory` netting** (H4) — owner: `data-layer-expert`
+- [x] **11. `keg_inventory` netting** (H4) — owner: `data-layer-expert` — **PR (branch `fix-audit-p2-integrity`), 00207 applied live**
   Make fill/ship legs net against pools (strip batch/FG from the negative leg's grouping, or restructure the view); backfill/verify against physical fleet count.
+  DONE 2026-07-07: `keg_inventory` regrouped on (selling_format, keg_owner, state, location); batch/FG dropped from the pool + `keg_inventory_with_details` display. New `keg_filled_contents` view (filled kegs by brand) preserves the Square catalog/inventory sync's brand breakdown. Netting proven (receive 50→fill 10→ship 10 = 50, was 70). Live impact zero (1 keg_transaction). **Follow-up:** ship writer records no contents, so `keg_filled_contents` isn't ship-netted — full outbound netting needs the ship writer to carry contents forward.
 - [ ] **12. Server-side availability guard** (H7) — owner: `data-layer-expert`
   Trigger or RPC-level check that allocations cannot exceed availability (with row locking); decide policy for intentional negative (count corrections).
 - [ ] **13. `chk_fg_entry_point` conflict** (H8) — owner: `data-layer-expert`

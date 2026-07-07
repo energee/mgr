@@ -95,10 +95,13 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       throw new Error(`Failed to query bin inventory: ${invError.message}`);
     }
 
-    // 3. Get draft kegs at POS locations (filled kegs)
+    // 3. Get draft kegs at POS locations (filled kegs). keg_inventory (00207)
+    // nets by physical keg identity and no longer carries contents; filled-keg
+    // brand breakdown comes from keg_filled_contents (already filled-only), which
+    // carries finished_good_id for the same finished_goods/brands embedding.
     const locationIds = locations.map((l) => l.id);
     const { data: draftKegs, error: kegError } = await admin
-      .from("keg_inventory")
+      .from("keg_filled_contents")
       .select(
         `
         selling_format_id,
@@ -113,7 +116,6 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       `
       )
       .in("location_id", locationIds)
-      .eq("state", "filled")
       .gt("quantity", 0);
 
     if (kegError) {
