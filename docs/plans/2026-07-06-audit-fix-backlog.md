@@ -52,7 +52,7 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
   Create the missing `idx_vessel_transfers_unique_per_batch` (or equivalent); double-booking guard in `handle_vessel_transfer()`; partial-transfer semantics (don't free source on partial moves).
 - [ ] **17. Order item price validation** (M10) — owner: `entity-architect`
   Fix add-path `|| null` coercion (reuse edit-path parser); DB CHECK `unit_price >= 0`; stop the auto-price effect overwriting explicit $0.
-- [ ] **18. Remaining mediums** — M1/M2 (recipe editor ↔ view formula parity; single source of truth), M7 (revise RPC whole-unit ceiling), M8 (per-batch vs session ceiling — pick one semantic), M14 (FG edit outbound guard), M15 (count optimistic lock + FG counts).
+- [ ] **18. Remaining mediums** — M1/M2 (recipe editor ↔ view formula parity; single source of truth), M7 (revise RPC whole-unit ceiling), M8 (per-batch vs session ceiling — pick one semantic), ~~M14 (FG edit outbound guard)~~ **DONE 2026-07-07 (00216, applied live): BEFORE UPDATE trigger `guard_finished_good_outbound` blocks reducing `finished_goods.quantity` below active allocations — twin of 00212, block-hard (corrections go through an adjustment allocation)**, ~~M15 (count optimistic lock + FG counts)~~ **DONE (M15a → #352 quantity-CAS)**.
 
 ## P3 — Product decisions / feature builds (from requirement verdicts)
 
