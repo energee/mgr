@@ -248,9 +248,13 @@ export type FillVolumeContainer = {
  * Per-selling-unit fill volume in BBL: container volume x unit_count.
  * Prefers containers.volume_bbl but falls back to volume_oz / 3968 —
  * volume_bbl is only required for kegs (00199 constraint), so can/bottle
- * containers routinely carry only volume_oz. Returns null when neither
- * volume is usable. Authoritative source — never the packaging_formats
- * view's volume_bbl (its checked-in definition is stale).
+ * containers routinely carry only volume_oz. containers.volume_oz is
+ * per-unit (one container, never a case total — canonical since migration
+ * 00202), so multiplying by unit_count is always correct. Returns null when
+ * neither volume is usable. Authoritative source — never the
+ * packaging_formats view's volume_bbl (its checked-in definition is stale).
+ * The TTB SQL summaries (00203) implement this same contract:
+ * COALESCE(volume_bbl, volume_oz / 3968.0) x unit_count.
  */
 export function computeUnitFillVolumeBbl(row: {
   unit_count: number | null;
