@@ -93,10 +93,24 @@ Highest tracked on main is **00218**; next new migration is **00219**. Verify th
 
 ---
 
+## Milestone D — Inbound: debit bins from Square sales
+*Depends on: C1 (bin ↔ Square location) + B1 (`sellable_inventory`) + A (keg bin-tracking, for keg pours). Owner: integrations-expert + data-layer-expert.*
+
+**Current state:** the `payment.completed` webhook (`src/app/api/square/webhook/route.ts`) already ingests sales. Packaged goods create a completed `taproom_sale` **allocation** against a finished good chosen by FIFO across **all** stock (`finished_goods_with_availability`), **not bin-scoped**; draft/keg lines are **staged in `square_draft_sales` with no debit**. Signature verify + replay-window + `event_id` dedup (`square_sync_log` unique constraint) are already solid and must be preserved.
+
+- **D0. Spike — `bin_inventory` vs the allocation ledger.** Determine whether a `taproom_sale` allocation already flows to the physical `bin_inventory` count (trigger?) or the two are independent, and define the canonical rule: a Square sale (a) decrements `bin_inventory` directly, (b) writes an allocation a trigger applies to the bin, or (c) both with a double-count guard. *Acceptance:* documented rule; no double-count path. **Start immediately (read-only).**
+- **D1. Resolve sale → bin.** In the packaged branch, resolve the Square location to its POS bin (via C1's `bins.square_location_id`) and pick the finished good **within that bin** (FIFO by production date over `bin_inventory` ⋈ FG), replacing today's global lookup. *Acceptance:* a sale at a Square location targets that bin's stock; unit test with a mocked order + mapped bin.
+- **D2. Debit `bin_inventory`.** Decrement the resolved bin's FG quantity by the sold qty (per D0's rule), keeping the existing `event_id` dedup + `square_sync_log`. *Acceptance:* bin count drops by the sale qty; idempotent on Square retry; `bun test`.
+- **D3. Oversell policy.** Decide sale-qty > bin-qty handling — clamp-to-zero + flag, allow negative, or reject (mirror the #357 outbound-guard call). *Acceptance:* chosen policy enforced + tested.
+- **D4. Keg pour depletion.** Apply `square_draft_sales` pours as **volume depletion** against the tapped filled keg in the mapped bin (needs Milestone A keg bin-tracking + a "remaining oz in tapped keg" concept). Keg flips to `empty` (keg transaction) when remaining oz hits zero. *Acceptance:* a pour reduces the tapped keg's remaining volume; empties at zero; documented.
+- **D5. Settlement of staged draft sales.** Pre-D4 `square_draft_sales` rows stay as an audit trail; a one-time settlement is out of scope for v1. *Acceptance:* note recorded.
+
+---
+
 ## Parallelism & sequencing
-- **Sequence:** PR #344 merge → **A** → **B** (after B0 spike) → **C**. B0 spike can start immediately (read-only).
-- **Within a milestone:** type-regen + UI tasks parallelize behind their migration. A5 (keg UI) parallels A4. C3/C4 parallel each other; C6 waits on C1/C3/C4.
-- **Independent now:** B0 spike, and C4 (pricing generalization is behavior-preserving and can be prepped/tested against the current routes before C5).
+- **Sequence:** PR #344 merge → **A** → **B** (after B0 spike) → **C** → **D** (after C1 + B1; D4 also needs A). B0 and D0 spikes can start immediately (read-only).
+- **Within a milestone:** type-regen + UI tasks parallelize behind their migration. A5 (keg UI) parallels A4. C3/C4 parallel each other; C6 waits on C1/C3/C4. D1–D3 (packaged debit) parallel D4 (keg pours).
+- **Independent now:** B0 + D0 spikes, and C4 (pricing generalization is behavior-preserving and can be prepped/tested against the current routes before C5).
 
 ## Out of scope (v1)
 - Square per-location **price overrides** (single price now).
@@ -105,3 +119,19 @@ Highest tracked on main is **00218**; next new migration is **00219**. Verify th
 
 ## Approval gate
 Per the two-phase process: **stop here for approval.** On approval, Phase 2 executes per-task with `tsc --noEmit` + relevant tests after each, migrations applied only in this branch/worktree, and the live-drift snapshot regenerated + verified after each migration lands live.
+
+---
+
+## Continuation prompt (paste into a fresh session to resume)
+
+> I'm resuming the Square POS bin-sync + keg-bin-tracking work. The Phase-1 plan is on branch **`feat/square-pos-bin-sync`** at **`docs/plans/2026-07-07-square-pos-bin-sync.md`** (Milestones A–D, decisions locked). Read that plan first.
+>
+> **Before Phase-2 code, do the two read-only spikes and report findings back to me:**
+> 1. **B0** — does filling a keg *deplete* the source `finished_goods` row (and its `bin_inventory`), or only reference it? (Trace `create_finished_goods_from_packaging`, `record_keg_transaction`, and what changes in `bin_inventory` on fill.) This decides whether `sellable_inventory = bin_inventory ∪ keg_filled_contents` double-counts.
+> 2. **D0** — is `bin_inventory` decremented by a `taproom_sale` allocation today (trigger?), or is it an independent physical count? This decides how a Square sale debits the bin without double-counting.
+>
+> **Blockers / dependencies to resolve first:**
+> - **PR #344** (`fix-audit-p2-integrity`, migration 00207) is a **hard dependency** (it creates `keg_filled_contents` + rewrites `keg_inventory`, which Milestone A extends). It's open and carries an extra commit `5cf07031 "add corrected live-catalog snapshot…"` that a prior session did not author — confirm who made it, then finish merging #344.
+> - **PR #348** (`fix-audit-vessel-integrity`, migration 00210) is held; decision made = **"free the source vessel on full-remainder loss"** (implement in `src/components/domain/batch/vessel-transfer-dialog.tsx` + `record-loss-dialog.tsx` — free the vessel when a recorded loss brings the source to 0). Not yet built.
+>
+> Then propose the Phase-2 execution order (I expect: resolve #344 → Milestone A → B → C → D), and confirm the open decisions (D3 oversell policy; A6 backfill) with me before writing migrations. Follow repo rules: `bun lint && bun typecheck && bun test` before any commit; migrations `00219+`; regenerate + verify the live-drift snapshot after each migration lands live; expert agents per `CLAUDE.md`.
