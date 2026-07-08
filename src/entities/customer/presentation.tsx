@@ -172,7 +172,8 @@ export const customerPresentation: EntityPresentation<Customer> = {
           name: "sales_channel_id",
           label: "Sales Channel",
           type: "relation",
-          description: "Determines default pricing tier",
+          description:
+            "With the price tier, sets wholesale auto-pricing (tier × channel). Both are required.",
           relation: {
             entity: "sales_channel",
             displayField: "name",
@@ -181,9 +182,10 @@ export const customerPresentation: EntityPresentation<Customer> = {
         },
         {
           name: "price_tier_id",
-          label: "Price Tier Override",
+          label: "Price Tier",
           type: "relation",
-          description: "Override default tier pricing (optional)",
+          description:
+            "With the sales channel, sets wholesale auto-pricing. Both are required — there is no per-channel default.",
           relation: {
             entity: "pricing_tier",
             displayField: "name",
