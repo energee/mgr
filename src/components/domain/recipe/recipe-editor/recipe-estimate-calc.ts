@@ -4,6 +4,12 @@
  * Ports the SQL formulas from `recipes_with_estimates` view (migration 00098)
  * to TypeScript for live sidebar updates in the recipe editor.
  *
+ * IBU note: the gravity-adjusted Tinseth utilization below is the canonical
+ * formula (audit M1/M2). Migration 00218 mirrors it into the SQL view via the
+ * `hop_utilization_factor()` helper, so the sidebar estimate and the stored
+ * `recipes_with_estimates.est_ibu` agree — kept in lockstep by a parity test
+ * (getHopUtilizationFactor fixtures ↔ the helper's live rollback test).
+ *
  * Formulas:
  * - OG:  1 + (totalPoints * efficiency / 100) / batchGal / 1000
  * - FG:  1 + (OG - 1) * (1 - attenuation / 100)
