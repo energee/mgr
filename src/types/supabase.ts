@@ -154,6 +154,7 @@ export type Database = {
           destination_id: string | null
           destination_type: string
           id: string
+          idempotency_key: string | null
           lot_number: string | null
           notes: string | null
           quantity: number
@@ -177,6 +178,7 @@ export type Database = {
           destination_id?: string | null
           destination_type: string
           id?: string
+          idempotency_key?: string | null
           lot_number?: string | null
           notes?: string | null
           quantity: number
@@ -200,6 +202,7 @@ export type Database = {
           destination_id?: string | null
           destination_type?: string
           id?: string
+          idempotency_key?: string | null
           lot_number?: string | null
           notes?: string | null
           quantity?: number
@@ -857,6 +860,13 @@ export type Database = {
             foreignKeyName: "bin_inventory_items_inventory_lot_id_fkey"
             columns: ["inventory_lot_id"]
             isOneToOne: false
+            referencedRelation: "inventory_lots_with_landed_cost"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bin_inventory_items_inventory_lot_id_fkey"
+            columns: ["inventory_lot_id"]
+            isOneToOne: false
             referencedRelation: "inventory_lots_with_quantities"
             referencedColumns: ["id"]
           },
@@ -869,6 +879,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
+          is_default_fg: boolean
           location_id: string
           name: string
           notes: string | null
@@ -880,6 +891,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          is_default_fg?: boolean
           location_id: string
           name: string
           notes?: string | null
@@ -891,6 +903,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          is_default_fg?: boolean
           location_id?: string
           name?: string
           notes?: string | null
@@ -3381,6 +3394,7 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           created_by: string | null
+          default_bin_id: string | null
           id: string
           notes: string | null
           session_date: string | null
@@ -3391,6 +3405,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
+          default_bin_id?: string | null
           id?: string
           notes?: string | null
           session_date?: string | null
@@ -3401,13 +3416,29 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
+          default_bin_id?: string | null
           id?: string
           notes?: string | null
           session_date?: string | null
           status?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "packaging_sessions_default_bin_id_fkey"
+            columns: ["default_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_sessions_default_bin_id_fkey"
+            columns: ["default_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pick_list_items: {
         Row: {
@@ -6156,6 +6187,13 @@ export type Database = {
             foreignKeyName: "transfer_lines_inventory_lot_id_fkey"
             columns: ["inventory_lot_id"]
             isOneToOne: false
+            referencedRelation: "inventory_lots_with_landed_cost"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_lines_inventory_lot_id_fkey"
+            columns: ["inventory_lot_id"]
+            isOneToOne: false
             referencedRelation: "inventory_lots_with_quantities"
             referencedColumns: ["id"]
           },
@@ -6340,8 +6378,10 @@ export type Database = {
         Row: {
           batch_id: string
           created_at: string | null
+          empties_source: boolean
           from_vessel_id: string | null
           id: string
+          idempotency_key: string | null
           notes: string | null
           to_vessel_id: string
           transferred_at: string
@@ -6351,8 +6391,10 @@ export type Database = {
         Insert: {
           batch_id: string
           created_at?: string | null
+          empties_source?: boolean
           from_vessel_id?: string | null
           id?: string
+          idempotency_key?: string | null
           notes?: string | null
           to_vessel_id: string
           transferred_at?: string
@@ -6362,8 +6404,10 @@ export type Database = {
         Update: {
           batch_id?: string
           created_at?: string | null
+          empties_source?: boolean
           from_vessel_id?: string | null
           id?: string
+          idempotency_key?: string | null
           notes?: string | null
           to_vessel_id?: string
           transferred_at?: string
@@ -7319,6 +7363,7 @@ export type Database = {
           cancellation_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
+          completed_at: string | null
           created_at: string | null
           current_vessel_id: string | null
           current_vessel_name: string | null
@@ -7351,6 +7396,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          completed_at?: string | null
           created_at?: string | null
           current_vessel_id?: never
           current_vessel_name?: never
@@ -7383,6 +7429,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          completed_at?: string | null
           created_at?: string | null
           current_vessel_id?: never
           current_vessel_name?: never
@@ -8210,6 +8257,40 @@ export type Database = {
           },
         ]
       }
+      inventory_lots_with_landed_cost: {
+        Row: {
+          created_at: string | null
+          expiration_date: string | null
+          id: string | null
+          inventory_item_id: string | null
+          landed_cost: number | null
+          location: string | null
+          lot_number: string | null
+          notes: string | null
+          po_receive_id: string | null
+          quantity: number | null
+          received_date: string | null
+          unit: string | null
+          unit_cost: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_lots_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_lots_po_receive_id_fkey"
+            columns: ["po_receive_id"]
+            isOneToOne: false
+            referencedRelation: "po_receives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_lots_with_quantities: {
         Row: {
           allocated_quantity: number | null
@@ -8372,7 +8453,29 @@ export type Database = {
           quantity: number | null
           selling_format_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brand_packaging_summary"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "product_mix_by_brand"
+            referencedColumns: ["brand_id"]
+          },
+        ]
       }
       keg_inventory: {
         Row: {
@@ -10000,6 +10103,7 @@ export type Database = {
           is_urgent: boolean
           lead_time_days: number
           min_order_qty: number
+          on_order_qty: number
           order_by_date: string
           preferred_supplier_id: string
           preferred_supplier_name: string
@@ -10176,7 +10280,12 @@ export type Database = {
         Returns: undefined
       }
       generate_lot_number: { Args: { p_date: string }; Returns: string }
+      generate_next_number: {
+        Args: { p_column: string; p_prefix?: string; p_table: string }
+        Returns: string
+      }
       generate_next_order_number: { Args: never; Returns: string }
+      generate_next_po_number: { Args: never; Returns: string }
       generate_pick_list: { Args: { p_order_id: string }; Returns: string }
       get_ai_schema_context: { Args: { p_domain?: string }; Returns: Json }
       get_enum_default: { Args: { p_enum_type: string }; Returns: string }
@@ -10322,7 +10431,27 @@ export type Database = {
         }[]
       }
       get_ttb_tax_class: { Args: { container_type: string }; Returns: string }
+      get_unaccepted_po_receives: {
+        Args: { p_po_id: string }
+        Returns: {
+          catalog_id: string
+          catalog_type: string
+          expiration_date: string
+          lot_number: string
+          po_line_item_id: string
+          quantity: number
+          receive_id: string
+          received_date: string
+          unit: string
+          unit_price: number
+        }[]
+      }
       get_user_role: { Args: { p_user_id?: string }; Returns: string }
+      get_yeast_lineage_root: { Args: { p_pitch_id: string }; Returns: string }
+      hop_utilization_factor: {
+        Args: { p_boil_time_min: number; p_gravity: number; p_timing: string }
+        Returns: number
+      }
       is_admin: { Args: { p_user_id?: string }; Returns: boolean }
       is_admin_rls: { Args: { p_user_id: string }; Returns: boolean }
       is_sensitive_setting: { Args: { setting_key: string }; Returns: boolean }
@@ -10380,6 +10509,15 @@ export type Database = {
         Returns: string
       }
       slugify: { Args: { input: string }; Returns: string }
+      start_batch_fermentation: {
+        Args: {
+          p_batch_id: string
+          p_vessel_id: string
+          p_vessel_name: string
+          p_volume_bbl: number
+        }
+        Returns: undefined
+      }
       suggest_recipe_improvements: {
         Args: { p_recipe_id: string }
         Returns: Json
@@ -10392,6 +10530,10 @@ export type Database = {
       user_has_permission: { Args: { p_permission: string }; Returns: boolean }
       user_has_role: { Args: { p_role: string }; Returns: boolean }
       validate_user_roles: { Args: { p_roles: string[] }; Returns: boolean }
+      whole_unit_material_qty: {
+        Args: { p_qpu: number; p_units: number }
+        Returns: number
+      }
     }
     Enums: {
       cleaning_type:

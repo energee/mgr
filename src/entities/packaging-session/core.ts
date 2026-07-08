@@ -39,6 +39,11 @@ export const packagingSessionSchema = z.object({
   session_date: z.string().min(1, "Session date is required"),
   status: z.string().default("planned"),
   notes: z.string().nullable().optional(),
+  // Non-keg finished goods from this session are placed in this bin by the
+  // 00219 place_finished_good_in_bin trigger. Blank falls back to the location's
+  // is_default_fg bin (and, failing that, no placement — the brewer is never
+  // hard-blocked).
+  default_bin_id: z.string().uuid().nullable().optional(),
 });
 
 export type PackagingSessionFormValues = z.infer<typeof packagingSessionSchema>;

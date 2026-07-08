@@ -77,6 +77,11 @@ export const binSchema = z.object({
   capacity: z.coerce.number().min(0, "Capacity must be positive").nullable().optional(),
   notes: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
+  // Marks this bin as the location's default finished-goods bin: the fallback
+  // placement target for the 00219 place_finished_good_in_bin trigger when a
+  // packaging session has no default_bin_id. At most one per location (enforced
+  // by the bins_one_default_fg_per_location partial-unique index).
+  is_default_fg: z.boolean().default(false),
 });
 
 export type BinFormValues = z.infer<typeof binSchema>;
