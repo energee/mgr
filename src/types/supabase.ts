@@ -2240,6 +2240,7 @@ export type Database = {
           created_by_name: string | null
           customer_id: string | null
           finished_good_id: string | null
+          from_bin_id: string | null
           from_location_id: string | null
           from_state: Database["public"]["Enums"]["keg_state"] | null
           id: string
@@ -2249,6 +2250,7 @@ export type Database = {
           packaging_session_id: string | null
           quantity: number
           selling_format_id: string | null
+          to_bin_id: string | null
           to_location_id: string | null
           to_state: Database["public"]["Enums"]["keg_state"]
           transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
@@ -2259,6 +2261,7 @@ export type Database = {
           created_by_name?: string | null
           customer_id?: string | null
           finished_good_id?: string | null
+          from_bin_id?: string | null
           from_location_id?: string | null
           from_state?: Database["public"]["Enums"]["keg_state"] | null
           id?: string
@@ -2268,6 +2271,7 @@ export type Database = {
           packaging_session_id?: string | null
           quantity: number
           selling_format_id?: string | null
+          to_bin_id?: string | null
           to_location_id?: string | null
           to_state: Database["public"]["Enums"]["keg_state"]
           transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
@@ -2278,6 +2282,7 @@ export type Database = {
           created_by_name?: string | null
           customer_id?: string | null
           finished_good_id?: string | null
+          from_bin_id?: string | null
           from_location_id?: string | null
           from_state?: Database["public"]["Enums"]["keg_state"] | null
           id?: string
@@ -2287,6 +2292,7 @@ export type Database = {
           packaging_session_id?: string | null
           quantity?: number
           selling_format_id?: string | null
+          to_bin_id?: string | null
           to_location_id?: string | null
           to_state?: Database["public"]["Enums"]["keg_state"]
           transaction_type?: Database["public"]["Enums"]["keg_transaction_type"]
@@ -2388,6 +2394,20 @@ export type Database = {
             columns: ["finished_good_id"]
             isOneToOne: false
             referencedRelation: "finished_goods_with_ttb_class"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
             referencedColumns: ["id"]
           },
           {
@@ -2493,6 +2513,20 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "selling_formats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
             referencedColumns: ["id"]
           },
           {
@@ -8447,6 +8481,7 @@ export type Database = {
       }
       keg_filled_contents: {
         Row: {
+          bin_id: string | null
           brand_id: string | null
           finished_good_id: string | null
           location_id: string | null
@@ -8479,6 +8514,7 @@ export type Database = {
       }
       keg_inventory: {
         Row: {
+          bin_id: string | null
           id: string | null
           keg_owner_id: string | null
           location_id: string | null
@@ -8506,6 +8542,8 @@ export type Database = {
       }
       keg_inventory_with_details: {
         Row: {
+          bin_id: string | null
+          bin_name: string | null
           id: string | null
           keg_owner_code: string | null
           keg_owner_id: string | null
@@ -10481,25 +10519,47 @@ export type Database = {
         }
         Returns: number
       }
-      record_keg_transaction: {
-        Args: {
-          p_batch_id?: string
-          p_created_by_name?: string
-          p_customer_id?: string
-          p_finished_good_id?: string
-          p_from_location_id?: string
-          p_from_state: Database["public"]["Enums"]["keg_state"]
-          p_notes?: string
-          p_order_id?: string
-          p_packaging_session_id?: string
-          p_quantity: number
-          p_selling_format_id: string
-          p_to_location_id?: string
-          p_to_state: Database["public"]["Enums"]["keg_state"]
-          p_transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
-        }
-        Returns: string
-      }
+      record_keg_transaction:
+        | {
+            Args: {
+              p_batch_id?: string
+              p_created_by_name?: string
+              p_customer_id?: string
+              p_finished_good_id?: string
+              p_from_location_id?: string
+              p_from_state: Database["public"]["Enums"]["keg_state"]
+              p_notes?: string
+              p_order_id?: string
+              p_packaging_session_id?: string
+              p_quantity: number
+              p_selling_format_id: string
+              p_to_location_id?: string
+              p_to_state: Database["public"]["Enums"]["keg_state"]
+              p_transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_batch_id?: string
+              p_created_by_name?: string
+              p_customer_id?: string
+              p_finished_good_id?: string
+              p_from_bin_id?: string
+              p_from_location_id?: string
+              p_from_state: Database["public"]["Enums"]["keg_state"]
+              p_notes?: string
+              p_order_id?: string
+              p_packaging_session_id?: string
+              p_quantity: number
+              p_selling_format_id: string
+              p_to_bin_id?: string
+              p_to_location_id?: string
+              p_to_state: Database["public"]["Enums"]["keg_state"]
+              p_transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
+            }
+            Returns: string
+          }
       revise_packaging_session: {
         Args: { p_items: Json; p_reason?: string; p_session_id: string }
         Returns: Json

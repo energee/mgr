@@ -78,7 +78,7 @@ FUNC|notify_batch_terminated()|52cfcc834b37e5fe52e2296bc9055894
 FUNC|packaging_session_before_update()|8e932b9407940972b16c9fdb03585c8a
 FUNC|place_finished_good_in_bin()|ae4e858d41ca7ed39e5daddbbf841d65
 FUNC|prevent_completed_allocation_delete()|06dc744313b05d0b23d94d3c4047139e
-FUNC|record_keg_transaction(p_transaction_type keg_transaction_type, p_selling_format_id uuid, p_quantity integer, p_from_state keg_state, p_to_state keg_state, p_from_location_id uuid, p_to_location_id uuid, p_order_id uuid, p_customer_id uuid, p_packaging_session_id uuid, p_batch_id uuid, p_finished_good_id uuid, p_notes text, p_created_by_name text)|b46d3b4a6c32dc53ebeb7640ad938871
+FUNC|record_keg_transaction(p_transaction_type keg_transaction_type, p_selling_format_id uuid, p_quantity integer, p_from_state keg_state, p_to_state keg_state, p_from_location_id uuid, p_to_location_id uuid, p_order_id uuid, p_customer_id uuid, p_packaging_session_id uuid, p_batch_id uuid, p_finished_good_id uuid, p_notes text, p_created_by_name text, p_from_bin_id uuid, p_to_bin_id uuid)|83aebf35de59859e5065793c60bfe3ee
 FUNC|revise_packaging_session(p_session_id uuid, p_items jsonb, p_reason text)|ad20494c755d5daf33f75ca0f889e998
 FUNC|set_batch_completed_at()|c18cf601085fb6aa686c21dc8115ac40
 FUNC|set_keg_transaction_states()|75d5dec952085dbfae7cad70fc19ff03
