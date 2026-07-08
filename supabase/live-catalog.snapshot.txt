@@ -188,6 +188,7 @@ TABLE|slack_settings
 TABLE|spices
 TABLE|square_catalog_map
 TABLE|square_draft_sales
+TABLE|square_locations
 TABLE|square_settings
 TABLE|square_sync_log
 TABLE|sugars

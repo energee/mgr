@@ -115,31 +115,6 @@ export const locationPresentation: EntityPresentation<LocationWithPos> = {
         },
       ],
     },
-    {
-      id: "pos",
-      title: "POS Integration",
-      fields: [
-        {
-          name: "square_location_id",
-          label: "Square Location ID",
-          type: "text",
-          placeholder: "e.g., LXXXXXXXXXXXXXXXXX",
-          description: "The Square Location ID from your Square Dashboard",
-          colSpan: 6,
-        },
-        {
-          name: "pos_bin_id",
-          label: "POS Inventory Bin",
-          type: "relation",
-          relation: {
-            entity: "bin",
-            displayField: "name",
-          },
-          description: "Finished goods in this bin will sync to Square at this location",
-          colSpan: 6,
-        },
-      ],
-    },
   ],
 
   // ---------------------------------------------------------------------------

@@ -3,10 +3,18 @@
  *
  * POST: Push catalog (brands + selling format variations) to Square.
  *
- * 1. Queries POS-configured locations (those with both square_location_id and pos_bin_id)
- * 2. Gathers packaged FG from bin_inventory at POS bins
- * 3. Gathers draft kegs (filled state) at POS locations
- * 4. Resolves taproom prices for all active brands
+ * Bin-driven (Milestone C5): Square POS configuration lives on the BIN, not the
+ * location (00222 dropped locations.square_location_id / locations.pos_bin_id and
+ * the locations_with_pos view). A bin is a POS sync target IFF it has BOTH
+ * bins.square_location_id and bins.pos_sales_channel_id set.
+ *
+ * 1. Queries POS-configured bins (both columns set)
+ * 2. Reads sellable stock (packaged FG + filled kegs, unified) from the
+ *    sellable_inventory view (00221) for those bins
+ * 3. Enriches brand + selling-format metadata (the view exposes only ids)
+ * 4. Prices each variation via its bin's pos_sales_channel_id (one
+ *    resolveChannelPrices call per DISTINCT channel — the common single-channel
+ *    setup makes exactly one call)
  * 5. Builds SquareSyncProduct array and pushes to Square
  * 6. Cleans up stale catalog items no longer in inventory
  * 7. Logs sync result
@@ -17,23 +25,8 @@ import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, updateSquareSettings } from "@/integrations/square/client";
 import { pushCatalog, deleteStaleItems } from "@/integrations/square/catalog";
-import { resolveTaproomPrices } from "@/integrations/square/pricing";
+import { resolveChannelPrices } from "@/integrations/square/pricing";
 import type { SquareSyncProduct, SquareSyncVariation } from "@/integrations/square/types";
-import { logger } from "@/lib/logger";
-
-// Supabase nested join shapes (not reflected in generated types)
-type BrandJoin = {
-  id: string;
-  name: string;
-  description: string | null;
-}
-
-type FGWithBrand = {
-  id: string;
-  brand_id: string;
-  selling_format_id: string | null;
-  brands: BrandJoin;
-}
 
 export const POST = withPermission("integrations:manage", async (_request, { user }) => {
   const client = await getSquareClient();
@@ -50,92 +43,86 @@ export const POST = withPermission("integrations:manage", async (_request, { use
   const startedAt = new Date().toISOString();
 
   try {
-    // 1. Get POS-configured locations
-    const { data: locations, error: locError } = await admin
-      .from("locations")
-      .select("id, name, square_location_id, pos_bin_id")
+    // 1. Get POS-configured bins (both square_location_id and pos_sales_channel_id
+    //    set => a Square POS sync target). Replaces the old POS-on-location model.
+    const { data: posBins, error: binsError } = await admin
+      .from("bins")
+      .select("id, square_location_id, pos_sales_channel_id")
       .not("square_location_id", "is", null)
-      .not("pos_bin_id", "is", null);
+      .not("pos_sales_channel_id", "is", null);
 
-    if (locError) {
-      throw new Error(`Failed to query locations: ${locError.message}`);
+    if (binsError) {
+      throw new Error(`Failed to query POS bins: ${binsError.message}`);
     }
 
-    if (!locations || locations.length === 0) {
+    if (!posBins || posBins.length === 0) {
       return errorResponse(
         "CONFIGURATION_ERROR",
-        "No locations configured with Square location ID and POS bin",
+        "No bins configured with a Square location and POS sales channel",
         undefined,
         400
       );
     }
 
-    const posBinIds = locations.map((l) => l.pos_bin_id!);
+    const posBinIds = posBins.map((b) => b.id);
+    // bin -> pricing channel (both non-null by the query filter) and bin ordering
+    // for the deterministic multi-channel tie-break below.
+    const binChannel = new Map<string, string>();
+    const binOrder = new Map<string, number>();
+    posBins.forEach((b, i) => {
+      binChannel.set(b.id, b.pos_sales_channel_id!);
+      binOrder.set(b.id, i);
+    });
 
-    // 2. Get bin inventory for POS bins (packaged goods)
-    const { data: inventory, error: invError } = await admin
-      .from("bin_inventory")
-      .select(
-        `
-        bin_id,
-        finished_good_id,
-        quantity,
-        finished_goods!inner(
-          id,
-          brand_id,
-          selling_format_id,
-          brands(id, name, description)
-        )
-      `
-      )
+    // 2. Read sellable stock across the POS bins from the unified read model
+    //    (packaged finished goods in bins + filled-keg contents, double-count
+    //    guard baked in). Single query replacing the old bin_inventory +
+    //    keg_filled_contents dance.
+    const { data: stock, error: stockError } = await admin
+      .from("sellable_inventory")
+      .select("bin_id, brand_id, selling_format_id, quantity")
       .in("bin_id", posBinIds)
       .gt("quantity", 0);
 
-    if (invError) {
-      throw new Error(`Failed to query bin inventory: ${invError.message}`);
+    if (stockError) {
+      throw new Error(`Failed to query sellable inventory: ${stockError.message}`);
     }
 
-    // 3. Get draft kegs at POS locations (filled kegs). keg_inventory (00207)
-    // nets by physical keg identity and no longer carries contents; filled-keg
-    // brand breakdown comes from keg_filled_contents (already filled-only), which
-    // exposes brand_id directly. Read brand_id here rather than embedding
-    // finished_goods(brands(...)): keg_filled_contents is an aggregate/GROUP BY
-    // view, so PostgREST can't infer a to-one relationship through it — an embed
-    // would error and, because this query is optional (catch below), silently
-    // drop every filled keg from the catalog. Brand name/description come from a
-    // separate brands query (the view exposes only brand_id). Mirrors the
-    // sibling inventory sync route.
-    const locationIds = locations.map((l) => l.id);
-    const { data: draftKegs, error: kegError } = await admin
-      .from("keg_filled_contents")
-      .select("selling_format_id, location_id, quantity, brand_id")
-      .in("location_id", locationIds)
-      .gt("quantity", 0);
-
-    if (kegError) {
-      // Draft keg query is optional; log and continue
-      logger.error("Failed to query keg inventory: %s", kegError.message);
-    }
-
-    // Brand name/description for the filled kegs (the view exposes only brand_id).
-    const kegBrandIds = [
-      ...new Set((draftKegs ?? []).map((k) => k.brand_id).filter((id): id is string => !!id)),
+    // 3. Enrich brand + selling-format metadata (the view exposes only ids).
+    const brandIds = [
+      ...new Set((stock ?? []).map((s) => s.brand_id).filter((v): v is string => !!v)),
     ];
-    const kegBrands = new Map<string, { name: string; description: string | null }>();
-    if (kegBrandIds.length > 0) {
+    const formatIds = [
+      ...new Set((stock ?? []).map((s) => s.selling_format_id).filter((v): v is string => !!v)),
+    ];
+
+    const brandInfo = new Map<string, { name: string; description: string | null }>();
+    if (brandIds.length > 0) {
       const { data: brandRows, error: brandError } = await admin
         .from("brands")
         .select("id, name, description")
-        .in("id", kegBrandIds);
+        .in("id", brandIds);
       if (brandError) {
-        logger.error("Failed to query keg brands: %s", brandError.message);
+        throw new Error(`Failed to query brands: ${brandError.message}`);
       }
       for (const b of brandRows ?? []) {
-        kegBrands.set(b.id, { name: b.name, description: b.description });
+        brandInfo.set(b.id, { name: b.name, description: b.description });
       }
     }
 
-    // 4. Build unique brand + variation combinations
+    let formatNames: Record<string, string> = {};
+    if (formatIds.length > 0) {
+      const { data: sfData } = await admin
+        .from("selling_formats")
+        .select("id, name")
+        .in("id", formatIds);
+      if (sfData) {
+        formatNames = Object.fromEntries(sfData.map((sf) => [sf.id, sf.name]));
+      }
+    }
+
+    // 4. Build unique brand + variation combinations, and record each variation's
+    //    pricing channel.
     //    Map: brandId -> { brand info, variations: Map<sellingFormatId, variation> }
     const brandMap = new Map<
       string,
@@ -147,95 +134,69 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       }
     >();
 
-    // Process packaged goods from bin inventory
-    for (const item of inventory ?? []) {
-      const fg = item.finished_goods as unknown as FGWithBrand | null;
-      if (!fg?.brand_id || !fg?.brands) continue;
+    // variation pricing channel: `${brandId}-${varKey}` -> { channelId, binIndex }
+    const variationChannel = new Map<string, { channelId: string; binIndex: number }>();
 
-      const { brands: brand } = fg;
-
-      if (!brandMap.has(fg.brand_id)) {
-        brandMap.set(fg.brand_id, {
-          brandId: fg.brand_id,
-          brandName: brand.name,
-          description: brand.description ?? undefined,
-          variations: new Map(),
-        });
-      }
-
-      if (fg.selling_format_id) {
-        const varKey = `fmt-${fg.selling_format_id}`;
-        if (!brandMap.get(fg.brand_id)!.variations.has(varKey)) {
-          brandMap.get(fg.brand_id)!.variations.set(varKey, {
-            sellingFormatId: fg.selling_format_id,
-            name: fg.selling_format_id, // placeholder, will be enriched with price
-          });
-        }
-      }
-    }
-
-    // Process draft kegs
-    for (const keg of draftKegs ?? []) {
-      const brandId = keg.brand_id;
-      if (!brandId) continue;
-      const brand = kegBrands.get(brandId);
+    for (const item of stock ?? []) {
+      if (!item.brand_id || !item.selling_format_id || !item.bin_id) continue;
+      const brand = brandInfo.get(item.brand_id);
       if (!brand) continue;
 
-      if (!brandMap.has(brandId)) {
-        brandMap.set(brandId, {
-          brandId,
+      if (!brandMap.has(item.brand_id)) {
+        brandMap.set(item.brand_id, {
+          brandId: item.brand_id,
           brandName: brand.name,
           description: brand.description ?? undefined,
           variations: new Map(),
         });
       }
 
-      const sellingFormatId = keg.selling_format_id as string;
-      if (sellingFormatId) {
-        const varKey = `fmt-${sellingFormatId}`;
-        if (!brandMap.get(brandId)!.variations.has(varKey)) {
-          brandMap.get(brandId)!.variations.set(varKey, {
-            sellingFormatId,
-            name: sellingFormatId, // placeholder
-          });
-        }
+      const varKey = `fmt-${item.selling_format_id}`;
+      if (!brandMap.get(item.brand_id)!.variations.has(varKey)) {
+        brandMap.get(item.brand_id)!.variations.set(varKey, {
+          sellingFormatId: item.selling_format_id,
+          name: item.selling_format_id, // placeholder, enriched from formatNames
+        });
+      }
+
+      // Price this variation from the channel of the earliest-ordered POS bin that
+      // stocks it. When all POS bins share a channel (the common case) this is
+      // unambiguous; the bin-order tie-break only matters for mixed-channel setups.
+      // ponytail: v1 Square catalog is single-price-per-variation. Per-location
+      // price overrides are deferred, so a variation stocked at bins on DIFFERENT
+      // channels deterministically takes the first channel by bin order.
+      const chanKey = `${item.brand_id}-${varKey}`;
+      const binIndex = binOrder.get(item.bin_id) ?? Number.MAX_SAFE_INTEGER;
+      const existing = variationChannel.get(chanKey);
+      if (!existing || binIndex < existing.binIndex) {
+        variationChannel.set(chanKey, {
+          channelId: binChannel.get(item.bin_id)!,
+          binIndex,
+        });
       }
     }
 
     const activeBrandIds = [...brandMap.keys()];
 
-    // 5. Resolve taproom prices
-    const prices = await resolveTaproomPrices(activeBrandIds);
-
-    // Build price lookup: brandId -> varKey -> priceCents
-    const priceLookup = new Map<string, Map<string, number>>();
-    for (const p of prices) {
-      if (!priceLookup.has(p.brandId)) {
-        priceLookup.set(p.brandId, new Map());
+    // 5. Resolve prices for each DISTINCT POS channel (one call per channel; the
+    //    common single-channel setup makes exactly one call). Replaces the old
+    //    hardcoded taproom-channel lookup.
+    //    channelId -> brandId -> varKey -> priceCents
+    const distinctChannels = [...new Set(posBins.map((b) => b.pos_sales_channel_id!))];
+    const channelPriceLookup = new Map<string, Map<string, Map<string, number>>>();
+    for (const channelId of distinctChannels) {
+      const prices = await resolveChannelPrices(activeBrandIds, channelId);
+      const brandLookup = new Map<string, Map<string, number>>();
+      for (const p of prices) {
+        if (!brandLookup.has(p.brandId)) {
+          brandLookup.set(p.brandId, new Map());
+        }
+        brandLookup.get(p.brandId)!.set(`fmt-${p.sellingFormatId}`, p.priceCents);
       }
-      priceLookup.get(p.brandId)!.set(`fmt-${p.sellingFormatId}`, p.priceCents);
+      channelPriceLookup.set(channelId, brandLookup);
     }
 
-    // 6. Fetch selling_formats names for variation display names
-    const sellingFormatIds = new Set<string>();
-    for (const brand of brandMap.values()) {
-      for (const [, variation] of brand.variations) {
-        sellingFormatIds.add(variation.sellingFormatId);
-      }
-    }
-
-    let formatNames: Record<string, string> = {};
-    if (sellingFormatIds.size > 0) {
-      const { data: sfData } = await admin
-        .from("selling_formats")
-        .select("id, name")
-        .in("id", [...sellingFormatIds]);
-      if (sfData) {
-        formatNames = Object.fromEntries(sfData.map((sf) => [sf.id, sf.name]));
-      }
-    }
-
-    // 7. Load existing catalog mappings for Square IDs and versions
+    // 6. Load existing catalog mappings for Square IDs and versions
     const { data: existingMaps } = await admin
       .from("square_catalog_map")
       .select("*");
@@ -257,7 +218,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       }
     }
 
-    // 8. Build SquareSyncProduct array
+    // 7. Build SquareSyncProduct array
     const products: SquareSyncProduct[] = [];
 
     for (const brand of brandMap.values()) {
@@ -266,8 +227,12 @@ export const POST = withPermission("integrations:manage", async (_request, { use
 
       for (const [varKey, variation] of brand.variations) {
         const varMapping = mapLookup.get(`var-${brand.brandId}-${varKey}`);
-        const brandPrices = priceLookup.get(brand.brandId);
-        const priceCents = brandPrices?.get(varKey) ?? 0;
+
+        // Price from the channel of the bin(s) that stock this variation.
+        const chan = variationChannel.get(`${brand.brandId}-${varKey}`);
+        const priceCents = chan
+          ? channelPriceLookup.get(chan.channelId)?.get(brand.brandId)?.get(varKey) ?? 0
+          : 0;
 
         // Resolve display name from selling_formats
         const displayName = formatNames[variation.sellingFormatId] ?? "Unknown Format";
@@ -291,24 +256,25 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       });
     }
 
-    // 9. Push catalog to Square
+    // 8. Push catalog to Square
     const syncResult = await pushCatalog(client, products);
 
-    // 10. Clean up stale items
+    // 9. Clean up stale items
     const deletedCount = await deleteStaleItems(client, activeBrandIds);
 
-    // 11. Update last_catalog_sync_at
+    // 10. Update last_catalog_sync_at
     const completedAt = new Date().toISOString();
     await updateSquareSettings({
       last_catalog_sync_at: completedAt,
     });
 
-    // 12. Log to square_sync_log
+    // 11. Log to square_sync_log
     await admin.from("square_sync_log").insert({
       sync_type: "catalog_push",
       items_synced: syncResult.itemsSynced,
       items_failed: syncResult.itemsFailed,
       details: {
+        posBinCount: posBins.length,
         productsCount: products.length,
         variationsCount: products.reduce((sum, p) => sum + p.variations.length, 0),
         staleDeleted: deletedCount,
