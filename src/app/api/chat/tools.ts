@@ -989,7 +989,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
       execute: async ({ state, kegTypeName, locationName, limit }) => {
         let q = dynamicFrom(supabase, "keg_inventory_with_details")
           .select(
-            "id, keg_type_name, volume_bbl, keg_owner_name, state, location_name, quantity, batch_code, finished_good_name"
+            "id, keg_type_name, volume_bbl, keg_owner_name, state, location_name, quantity"
           )
           .order("keg_type_name")
           .limit(limit);

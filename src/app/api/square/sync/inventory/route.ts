@@ -31,10 +31,6 @@ type FGWithSellingFormat = {
   selling_formats: SellingFormatJoin | null;
 }
 
-type FGBrandOnly = {
-  brand_id: string;
-}
-
 export const POST = withPermission("integrations:manage", async (_request, { user }) => {
   const client = await getSquareClient();
   if (!client) {
@@ -179,19 +175,14 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         }
       }
 
-      // 3c. Query keg inventory (filled kegs) at this location
+      // 3c. Query filled-keg contents at this location. keg_inventory (00207)
+      // nets by physical keg identity and no longer carries batch/brand, so
+      // filled-keg brand breakdown comes from keg_filled_contents, which exposes
+      // brand_id directly (no finished_goods join needed).
       const { data: kegItems, error: kegError } = await admin
-        .from("keg_inventory")
-        .select(
-          `
-          selling_format_id,
-          quantity,
-          finished_good_id,
-          finished_goods(brand_id)
-        `
-        )
+        .from("keg_filled_contents")
+        .select("selling_format_id, quantity, brand_id")
         .eq("location_id", location.id)
-        .eq("state", "filled")
         .gt("quantity", 0);
 
       if (kegError) {
@@ -203,8 +194,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         // Aggregate kegs by brand + selling_format using nested Map
         const kegAggregated = new Map<string, Map<string, number>>();
         for (const keg of kegItems ?? []) {
-          const fg = keg.finished_goods as unknown as FGBrandOnly | null;
-          const brandId = fg?.brand_id;
+          const brandId = keg.brand_id;
           if (!brandId || !keg.selling_format_id || !keg.quantity) continue;
 
           if (!kegAggregated.has(brandId)) kegAggregated.set(brandId, new Map());
