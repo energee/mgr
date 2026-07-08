@@ -498,10 +498,9 @@ describe("consumePackagingMaterials", () => {
     // Pin the guard's filter, not just which table it queried.
     const guard = callsByTable.allocations[0];
     expect(guard.select).toHaveBeenCalledWith("id");
-    expect(guard.eq).toHaveBeenCalledWith(
-      "notes",
-      "Packaging session session-1 material consumption",
-    );
+    // Guard keys on the stable idempotency_key column, not the mutable notes
+    // string (audit #15).
+    expect(guard.eq).toHaveBeenCalledWith("idempotency_key", "pkg_session:session-1");
     expect(guard.limit).toHaveBeenCalledWith(1);
   });
 
@@ -539,10 +538,9 @@ describe("consumePackagingMaterials", () => {
     // The guard passed (no existing depletion) before proceeding to the line-item fetch.
     const guard = callsByTable.allocations[0];
     expect(guard.select).toHaveBeenCalledWith("id");
-    expect(guard.eq).toHaveBeenCalledWith(
-      "notes",
-      "Packaging session session-1 material consumption",
-    );
+    // Guard keys on the stable idempotency_key column, not the mutable notes
+    // string (audit #15).
+    expect(guard.eq).toHaveBeenCalledWith("idempotency_key", "pkg_session:session-1");
     expect(guard.limit).toHaveBeenCalledWith(1);
   });
 
@@ -673,6 +671,8 @@ describe("consumePackagingMaterials", () => {
     const insertedRows = callsByTable.allocations[1].insert.mock.calls[0][0];
     expect(insertedRows).toHaveLength(3);
     expect(insertedRows.every((r: { notes: string }) => r.notes === "Packaging session session-42 material consumption")).toBe(true);
+    // Every row carries the stable idempotency_key the guard now matches on (audit #15).
+    expect(insertedRows.every((r: { idempotency_key: string }) => r.idempotency_key === "pkg_session:session-42")).toBe(true);
     expect(insertedRows.every((r: { status: string }) => r.status === "completed")).toBe(true);
     expect(insertedRows[0]).toMatchObject({ destination_id: "batch-A", source_id: "lot-cap-1", quantity: 10 });
     expect(insertedRows[1]).toMatchObject({ destination_id: "batch-A", source_id: "lot-cap-2", quantity: 6 });
@@ -971,8 +971,8 @@ const lossTables = (): Record<string, Resp[]> => ({
   allocations: [
     {
       data: [
-        { volume_bbl: 0.5, notes: "spillage at transfer", destination_type: "loss" },
-        { volume_bbl: null, notes: null, destination_type: "finished_good" },
+        { volume_bbl: 0.5, idempotency_key: null, destination_type: "loss" },
+        { volume_bbl: null, idempotency_key: null, destination_type: "finished_good" },
       ],
       error: null,
     },
@@ -1131,7 +1131,9 @@ describe("reconcileBatchLoss", () => {
         data: [
           {
             volume_bbl: 1.5,
-            notes: "Completion loss reconciliation — produced 10 bbl",
+            // Guard keys on the stable idempotency_key system column, not the
+            // user-editable reason_code/notes (audit #15).
+            idempotency_key: "batch_reconcile:batch-1",
             destination_type: "loss",
           },
         ],
@@ -1144,6 +1146,33 @@ describe("reconcileBatchLoss", () => {
 
     expect(result).toEqual({ success: true, data: 0, invalidate: [] });
     expect(callsByTable.allocations).toHaveLength(1); // guard select only, no insert
+  });
+
+  it("does NOT treat a user-picked reason_code='reconciliation' as the guard — only the idempotency_key counts (audit #15)", async () => {
+    // A manual batch-loss row that happens to carry reason_code='reconciliation'
+    // (a selectable "Completion Reconciliation" option) but no idempotency_key
+    // must not spoof the guard, or legitimate auto-reconciliation is suppressed.
+    const tables = lossTables();
+    tables.allocations = [
+      {
+        data: [
+          { volume_bbl: 0.5, idempotency_key: null, destination_type: "loss" },
+          { volume_bbl: null, idempotency_key: null, destination_type: "finished_good" },
+        ],
+        error: null,
+      },
+      { data: null, error: null }, // insert (writer only) — proves it still fires
+    ];
+    const { supabase, callsByTable } = makeSupabase(tables);
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data).toBeCloseTo(1.5); // reconciliation still recorded
+    const inserted = callsByTable.allocations[1].insert.mock.calls[0][0];
+    expect(inserted.idempotency_key).toBe("batch_reconcile:batch-1");
+    expect(inserted.reason_code).toBe("reconciliation");
   });
 
   it("skips while any packaging session for the batch is still open", async () => {
