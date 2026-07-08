@@ -1,14 +1,22 @@
 /**
  * Square Inventory Sync
  *
- * POST: Push inventory counts to Square for all POS-configured locations.
+ * POST: Push inventory counts to Square for every POS-configured bin.
  *
- * For each location with square_location_id + pos_bin_id:
- * 1. Queries bin_inventory for the POS bin
- * 2. Converts case quantities to selling units (inner packs or individual units)
+ * Bin-driven (Milestone C5): Square POS configuration lives on the BIN, not the
+ * location (00222 dropped locations.square_location_id / locations.pos_bin_id).
+ * A bin is a POS sync target IFF it has BOTH bins.square_location_id and
+ * bins.pos_sales_channel_id set. Square inventory is per-location, so each bin's
+ * counts are scoped to that bin's square_location_id.
+ *
+ * For each POS-configured bin:
+ * 1. Reads sellable stock (packaged FG + filled kegs, unified) from the
+ *    sellable_inventory view (00221)
+ * 2. Converts packaged case quantities to selling units (× unit_count); filled
+ *    kegs (source='keg') are already per-keg and pushed as-is
  * 3. Looks up Square variation IDs from square_catalog_map
- * 4. Pushes physical counts to Square
- * 5. Logs sync result
+ * 4. Pushes physical counts to Square scoped to the bin's square_location_id
+ * 5. Logs sync result (square_sync_log.location_id = the view's location uuid)
  */
 
 import { withPermission } from "@/lib/api/auth";
@@ -16,20 +24,7 @@ import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, updateSquareSettings } from "@/integrations/square/client";
 import { pushInventoryCounts } from "@/integrations/square/inventory";
-import type { SquareSyncInventory, SquareSyncResult } from "@/integrations/square/types";
-
-// Supabase nested join shapes (not reflected in generated types)
-type SellingFormatJoin = {
-  id: string;
-  unit_count: number | null;
-}
-
-type FGWithSellingFormat = {
-  id: string;
-  brand_id: string;
-  selling_format_id: string;
-  selling_formats: SellingFormatJoin | null;
-}
+import type { SquareSyncInventory } from "@/integrations/square/types";
 
 export const POST = withPermission("integrations:manage", async (_request, { user }) => {
   const client = await getSquareClient();
@@ -46,21 +41,25 @@ export const POST = withPermission("integrations:manage", async (_request, { use
   const startedAt = new Date().toISOString();
 
   try {
-    // 1. Get POS-configured locations
-    const { data: locations, error: locError } = await admin
-      .from("locations")
-      .select("id, name, square_location_id, pos_bin_id")
+    // 1. Get POS-configured bins (both square_location_id and pos_sales_channel_id
+    //    set => a Square POS sync target). Replaces the old POS-on-location model.
+    const { data: posBins, error: binsError } = await admin
+      .from("bins")
+      .select("id, name, square_location_id")
       .not("square_location_id", "is", null)
-      .not("pos_bin_id", "is", null);
+      .not("pos_sales_channel_id", "is", null)
+      // Stable total order (id is the non-null unique PK) — deterministic bin
+      // processing/log order across syncs.
+      .order("id");
 
-    if (locError) {
-      throw new Error(`Failed to query locations: ${locError.message}`);
+    if (binsError) {
+      throw new Error(`Failed to query POS bins: ${binsError.message}`);
     }
 
-    if (!locations || locations.length === 0) {
+    if (!posBins || posBins.length === 0) {
       return errorResponse(
         "CONFIGURATION_ERROR",
-        "No locations configured with Square location ID and POS bin",
+        "No bins configured with a Square location and POS sales channel",
         undefined,
         400
       );
@@ -88,82 +87,105 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       }
     }
 
-    // 3. Process each location
-    const locationResults: Array<{
-      locationId: string;
-      locationName: string;
-      result: SquareSyncResult;
+    // 3. Read sellable stock across all POS bins from the unified read model
+    //    (packaged finished goods in bins + filled-keg contents, double-count
+    //    guard baked in). Single query replacing the old bin_inventory +
+    //    keg_filled_contents dance.
+    const posBinIds = posBins.map((b) => b.id);
+    const { data: stock, error: stockError } = await admin
+      .from("sellable_inventory")
+      .select("bin_id, location_id, brand_id, selling_format_id, quantity, source")
+      .in("bin_id", posBinIds)
+      .gt("quantity", 0);
+
+    if (stockError) {
+      throw new Error(`Failed to query sellable inventory: ${stockError.message}`);
+    }
+
+    // 4. unit_count per format — packaged bin_inventory is in CASES; convert to
+    //    selling units (× unit_count). Filled kegs (source='keg') are already
+    //    per-keg and are pushed as-is, matching the prior location-based behavior.
+    const rows = stock ?? [];
+    const formatIds = [
+      ...new Set(rows.map((r) => r.selling_format_id).filter((v): v is string => !!v)),
+    ];
+    const unitCounts = new Map<string, number>();
+    if (formatIds.length > 0) {
+      const { data: sfData, error: sfError } = await admin
+        .from("selling_formats")
+        .select("id, unit_count")
+        .in("id", formatIds);
+      if (sfError) {
+        throw new Error(`Failed to query selling formats: ${sfError.message}`);
+      }
+      for (const f of sfData ?? []) {
+        unitCounts.set(f.id, f.unit_count ?? 1);
+      }
+    }
+
+    // Group stock rows by bin.
+    const stockByBin = new Map<string, typeof rows>();
+    for (const r of rows) {
+      if (!r.bin_id) continue;
+      if (!stockByBin.has(r.bin_id)) stockByBin.set(r.bin_id, []);
+      stockByBin.get(r.bin_id)!.push(r);
+    }
+
+    // 5. Process each POS bin
+    const binResults: Array<{
+      binId: string;
+      binName: string;
+      squareLocationId: string;
+      locationId: string | null;
+      itemsSynced: number;
+      itemsFailed: number;
+      errors: Array<{ itemId: string; error: string }>;
     }> = [];
 
     let totalSynced = 0;
     let totalFailed = 0;
     const allErrors: Array<{ itemId: string; error: string }> = [];
 
-    for (const location of locations) {
-      const squareLocationId = location.square_location_id!;
-      const posBinId = location.pos_bin_id!;
+    for (const bin of posBins) {
+      const squareLocationId = bin.square_location_id!;
+      const binRows = stockByBin.get(bin.id) ?? [];
 
-      // 3a. Query bin inventory for this POS bin with selling format details
-      const { data: binItems, error: binError } = await admin
-        .from("bin_inventory")
-        .select(
-          `
-          bin_id,
-          finished_good_id,
-          quantity,
-          finished_goods!inner(
-            id,
-            brand_id,
-            selling_format_id,
-            selling_formats(
-              id,
-              unit_count
-            )
-          )
-        `
-        )
-        .eq("bin_id", posBinId)
-        .gt("quantity", 0);
+      // The view's location_id for this bin (all rows share it, since a bin has one
+      // location). Used for square_sync_log.location_id, which FKs locations(id) —
+      // a real location uuid, NOT the Square location id.
+      const locationId = binRows.find((r) => r.location_id)?.location_id ?? null;
 
-      if (binError) {
-        allErrors.push({
-          itemId: location.id,
-          error: `Failed to query bin inventory for ${location.name}: ${binError.message}`,
-        });
-        continue;
-      }
-
-      // 3b. Convert to SquareSyncInventory
-      const counts: SquareSyncInventory[] = [];
-
-      // Aggregate by brand + selling format (multiple FGs may share the same brand+format)
-      // Use nested Map to avoid string-parsing UUIDs
+      // Aggregate by brand + selling_format, converting packaged cases -> selling
+      // units. A selling_format's container is either keg or not, so a given
+      // selling_format_id is entirely packaged or entirely keg — no source mixing
+      // per (brand, format), so the per-row conversion is unambiguous.
       const aggregated = new Map<string, Map<string, number>>();
+      for (const r of binRows) {
+        if (!r.brand_id || !r.selling_format_id || r.quantity == null) continue;
 
-      for (const item of binItems ?? []) {
-        const fg = item.finished_goods as unknown as FGWithSellingFormat | null;
-        if (!fg?.brand_id || !fg?.selling_format_id) continue;
+        const units =
+          r.source === "packaged"
+            ? r.quantity * (unitCounts.get(r.selling_format_id) ?? 1)
+            : r.quantity;
 
-        const { brand_id: brandId, selling_format_id: formatId, selling_formats: sellingFormat } = fg;
-
-        // Convert cases to selling units using unit_count from the selling format
-        const sellingUnits = item.quantity * (sellingFormat?.unit_count ?? 1);
-
-        if (!aggregated.has(brandId)) aggregated.set(brandId, new Map());
-        const brandAgg = aggregated.get(brandId)!;
-        brandAgg.set(formatId, (brandAgg.get(formatId) ?? 0) + sellingUnits);
+        if (!aggregated.has(r.brand_id)) aggregated.set(r.brand_id, new Map());
+        const brandAgg = aggregated.get(r.brand_id)!;
+        brandAgg.set(r.selling_format_id, (brandAgg.get(r.selling_format_id) ?? 0) + units);
       }
 
+      const counts: SquareSyncInventory[] = [];
+      const binErrors: Array<{ itemId: string; error: string }> = [];
       for (const [brandId, formatMap] of aggregated) {
         for (const [formatId, quantity] of formatMap) {
-          const lookupKey = `brand-${brandId}-fmt-${formatId}`;
-          const squareVariationId = variationLookup.get(lookupKey);
+          const squareVariationId = variationLookup.get(`brand-${brandId}-fmt-${formatId}`);
 
           if (!squareVariationId) {
-            allErrors.push({
+            const e = {
               itemId: `${brandId}/${formatId}`,
-              error: `No Square catalog mapping for brand ${brandId} / format ${formatId} at ${location.name}`,
-            });
+              error: `No Square catalog mapping for brand ${brandId} / format ${formatId} at bin ${bin.name}`,
+            };
+            binErrors.push(e);
+            allErrors.push(e);
             continue;
           }
 
@@ -175,86 +197,54 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         }
       }
 
-      // 3c. Query filled-keg contents at this location. keg_inventory (00207)
-      // nets by physical keg identity and no longer carries batch/brand, so
-      // filled-keg brand breakdown comes from keg_filled_contents, which exposes
-      // brand_id directly (no finished_goods join needed).
-      const { data: kegItems, error: kegError } = await admin
-        .from("keg_filled_contents")
-        .select("selling_format_id, quantity, brand_id")
-        .eq("location_id", location.id)
-        .gt("quantity", 0);
-
-      if (kegError) {
-        allErrors.push({
-          itemId: location.id,
-          error: `Failed to query keg inventory for ${location.name}: ${kegError.message}`,
-        });
-      } else {
-        // Aggregate kegs by brand + selling_format using nested Map
-        const kegAggregated = new Map<string, Map<string, number>>();
-        for (const keg of kegItems ?? []) {
-          const brandId = keg.brand_id;
-          if (!brandId || !keg.selling_format_id || !keg.quantity) continue;
-
-          if (!kegAggregated.has(brandId)) kegAggregated.set(brandId, new Map());
-          const brandAgg = kegAggregated.get(brandId)!;
-          brandAgg.set(keg.selling_format_id, (brandAgg.get(keg.selling_format_id) ?? 0) + keg.quantity);
-        }
-
-        for (const [brandId, kegMap] of kegAggregated) {
-          for (const [formatId, quantity] of kegMap) {
-            const lookupKey = `brand-${brandId}-fmt-${formatId}`;
-            const squareVariationId = variationLookup.get(lookupKey);
-
-            if (!squareVariationId) {
-              allErrors.push({
-                itemId: `${brandId}/${formatId}`,
-                error: `No Square catalog mapping for brand ${brandId} / format ${formatId} at ${location.name}`,
-              });
-              continue;
-            }
-
-            counts.push({
-              squareVariationId,
-              squareLocationId,
-              quantity,
-            });
-          }
-        }
-      }
-
-      // 3d. Push counts for this location
+      // Push counts for this bin.
+      let itemsSynced = 0;
+      let itemsFailed = 0;
+      const pushErrors: Array<{ itemId: string; error: string }> = [];
       if (counts.length > 0) {
         const result = await pushInventoryCounts(client, counts);
-        locationResults.push({
-          locationId: location.id,
-          locationName: location.name,
-          result,
-        });
+        itemsSynced = result.itemsSynced;
+        itemsFailed = result.itemsFailed;
+        pushErrors.push(...result.errors);
         totalSynced += result.itemsSynced;
         totalFailed += result.itemsFailed;
         allErrors.push(...result.errors);
       }
+
+      // Record a result row when the bin pushed anything OR hit a mapping error,
+      // so unmapped-format errors are durable in square_sync_log even when other
+      // bins succeeded (previously they reached only the HTTP response).
+      if (counts.length > 0 || binErrors.length > 0) {
+        binResults.push({
+          binId: bin.id,
+          binName: bin.name,
+          squareLocationId,
+          locationId,
+          itemsSynced,
+          itemsFailed: itemsFailed + binErrors.length,
+          errors: [...pushErrors, ...binErrors],
+        });
+      }
     }
 
-    // 4. Update last_inventory_sync_at
+    // 6. Update last_inventory_sync_at
     const completedAt = new Date().toISOString();
     await updateSquareSettings({
       last_inventory_sync_at: completedAt,
     });
 
-    // 5. Log to square_sync_log (one entry per location)
-    for (const lr of locationResults) {
+    // 7. Log to square_sync_log (one entry per bin that pushed counts or errored)
+    for (const br of binResults) {
       await admin.from("square_sync_log").insert({
         sync_type: "inventory_push",
-        location_id: lr.locationId,
-        items_synced: lr.result.itemsSynced,
-        items_failed: lr.result.itemsFailed,
+        location_id: br.locationId,
+        items_synced: br.itemsSynced,
+        items_failed: br.itemsFailed,
         details: {
-          locationName: lr.locationName,
-          errors:
-            lr.result.errors.length > 0 ? lr.result.errors : undefined,
+          binId: br.binId,
+          binName: br.binName,
+          squareLocationId: br.squareLocationId,
+          errors: br.errors.length > 0 ? br.errors : undefined,
           triggeredBy: user.id,
         },
         started_at: startedAt,
@@ -262,8 +252,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       });
     }
 
-    // If no locations produced counts, log a single entry
-    if (locationResults.length === 0) {
+    // If no bins produced counts, log a single entry
+    if (binResults.length === 0) {
       await admin.from("square_sync_log").insert({
         sync_type: "inventory_push",
         items_synced: 0,
@@ -282,12 +272,13 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       success: allErrors.length === 0,
       totalSynced,
       totalFailed,
-      locationsProcessed: locationResults.length,
-      locations: locationResults.map((lr) => ({
-        locationId: lr.locationId,
-        locationName: lr.locationName,
-        itemsSynced: lr.result.itemsSynced,
-        itemsFailed: lr.result.itemsFailed,
+      binsProcessed: binResults.length,
+      bins: binResults.map((br) => ({
+        binId: br.binId,
+        binName: br.binName,
+        squareLocationId: br.squareLocationId,
+        itemsSynced: br.itemsSynced,
+        itemsFailed: br.itemsFailed,
       })),
       errors: allErrors,
     });

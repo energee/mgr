@@ -114,6 +114,21 @@ export const packagingSessionPresentation: EntityPresentation<PackagingSession> 
           colSpan: 6,
         },
         {
+          name: "default_bin_id",
+          label: "Default FG Bin",
+          type: "select",
+          relation: { entity: "bin", displayField: "name" },
+          dynamicOptions: {
+            table: "bins",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "name",
+            filter: { is_active: true },
+          },
+          description: "Finished goods from this session are placed in this bin. Leave blank to use the location's default FG bin.",
+          colSpan: 6,
+        },
+        {
           name: "created_at",
           label: "Created",
           format: "datetime",
