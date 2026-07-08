@@ -40,8 +40,10 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
   Rebuild tables against the current selling-formats schema. **Drop the auto-apply RPC** (`apply_change_request` broke twice on schema drift): requests are stored structured, "approve" = staff applies the edit via the normal order editor and marks the request applied. Remove the approve-route RPC call; keep the audit record.
 - [ ] **11. `keg_inventory` netting** (H4) — owner: `data-layer-expert`
   Make fill/ship legs net against pools (strip batch/FG from the negative leg's grouping, or restructure the view); backfill/verify against physical fleet count.
-- [ ] **12. Server-side availability guard** (H7) — owner: `data-layer-expert`
+- [x] **12. Server-side availability guard** (H7) — owner: `data-layer-expert` — **PR (branch `fix-audit-availability-guard`), 00212 applied live**
   Trigger or RPC-level check that allocations cannot exceed availability (with row locking); decide policy for intentional negative (count corrections).
+  DONE 2026-07-07 (00212, decision: block; exempt adjustments). `guard_allocation_availability()` BEFORE INSERT/UPDATE on allocations: for inventory_lot/finished_good sources, locks the source row (`FOR UPDATE`) and rejects a depletion exceeding `stock − Σ active allocations`. Exempts `destination_type='adjustment'` (count corrections) and inactive statuses; skips batch/external sources. Proven via rolled-back tests (oversell blocked, exact-available allowed, adjustment exempt).
+- [ ] **13. `chk_fg_entry_point` conflict** (H8) — owner: `data-layer-expert`
 - [x] **13. `chk_fg_entry_point` conflict** (H8) — owner: `data-layer-expert` — **PR (branch `fix-audit-h8-fg-entrypoint`), 00206 applied live**
   Relax the CHECK or require batch on session line items; unblock batch-less session completion and manual FG-with-batch creation.
   DONE 2026-07-07: dropped `chk_fg_entry_point` (00206). All four batch_id/session_line_item_id combinations are now legitimate (batch-less session lines → session-only FGs; manual FG-with-batch → batch-only FGs), so no weaker CHECK is meaningful. Column comments document the independent-optional-provenance semantics. Live impact zero (1 FG row, external).
