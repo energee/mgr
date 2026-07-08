@@ -39,6 +39,8 @@ export type KegTransaction = {
   to_state: KegState | null;
   from_location_id: string | null;
   to_location_id: string | null;
+  from_bin_id: string | null;
+  to_bin_id: string | null;
   order_id: string | null;
   customer_id: string | null;
   packaging_session_id: string | null;
@@ -145,6 +147,9 @@ const baseKegTransactionSchema = z.object({
   to_state: z.enum(KEG_STATE_VALUES).nullable().optional(),
   from_location_id: z.string().uuid().nullable().optional(),
   to_location_id: z.string().uuid().nullable().optional(),
+  // Bin dimension (00220): on-premise bin the kegs left/entered; NULL = off-premise.
+  from_bin_id: z.string().uuid().nullable().optional(),
+  to_bin_id: z.string().uuid().nullable().optional(),
   order_id: z.string().uuid().nullable().optional(),
   customer_id: z.string().uuid().nullable().optional(),
   packaging_session_id: z.string().uuid().nullable().optional(),

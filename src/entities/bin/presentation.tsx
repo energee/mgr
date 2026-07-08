@@ -126,6 +126,14 @@ export const binPresentation: EntityPresentation<Bin> = {
           colSpan: 6,
         },
         {
+          name: "is_default_fg",
+          label: "Default finished-goods bin",
+          type: "switch",
+          description: "New finished goods land here when their packaging session has no bin set. At most one per location.",
+          defaultValue: false,
+          colSpan: 6,
+        },
+        {
           name: "notes",
           label: "Notes",
           type: "textarea",

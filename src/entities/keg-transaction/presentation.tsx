@@ -170,6 +170,22 @@ export const kegTransactionPresentation: EntityPresentation<KegTransaction> = {
           relation: { entity: "location", displayField: "name" },
           colSpan: 6,
         },
+        {
+          name: "from_bin_id",
+          label: "From Bin",
+          type: "relation",
+          relation: { entity: "bin", displayField: "name" },
+          description: "On-premise bin the kegs left (blank = off-premise)",
+          colSpan: 6,
+        },
+        {
+          name: "to_bin_id",
+          label: "To Bin",
+          type: "relation",
+          relation: { entity: "bin", displayField: "name" },
+          description: "On-premise bin the kegs entered (blank = off-premise)",
+          colSpan: 6,
+        },
       ],
     },
     {

@@ -154,6 +154,7 @@ export type Database = {
           destination_id: string | null
           destination_type: string
           id: string
+          idempotency_key: string | null
           lot_number: string | null
           notes: string | null
           quantity: number
@@ -177,6 +178,7 @@ export type Database = {
           destination_id?: string | null
           destination_type: string
           id?: string
+          idempotency_key?: string | null
           lot_number?: string | null
           notes?: string | null
           quantity: number
@@ -200,6 +202,7 @@ export type Database = {
           destination_id?: string | null
           destination_type?: string
           id?: string
+          idempotency_key?: string | null
           lot_number?: string | null
           notes?: string | null
           quantity?: number
@@ -857,6 +860,13 @@ export type Database = {
             foreignKeyName: "bin_inventory_items_inventory_lot_id_fkey"
             columns: ["inventory_lot_id"]
             isOneToOne: false
+            referencedRelation: "inventory_lots_with_landed_cost"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bin_inventory_items_inventory_lot_id_fkey"
+            columns: ["inventory_lot_id"]
+            isOneToOne: false
             referencedRelation: "inventory_lots_with_quantities"
             referencedColumns: ["id"]
           },
@@ -869,9 +879,12 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
+          is_default_fg: boolean
           location_id: string
           name: string
           notes: string | null
+          pos_sales_channel_id: string | null
+          square_location_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -880,9 +893,12 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          is_default_fg?: boolean
           location_id: string
           name: string
           notes?: string | null
+          pos_sales_channel_id?: string | null
+          square_location_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -891,9 +907,12 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          is_default_fg?: boolean
           location_id?: string
           name?: string
           notes?: string | null
+          pos_sales_channel_id?: string | null
+          square_location_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -905,10 +924,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "bins_location_id_fkey"
-            columns: ["location_id"]
+            foreignKeyName: "bins_pos_sales_channel_id_fkey"
+            columns: ["pos_sales_channel_id"]
             isOneToOne: false
-            referencedRelation: "locations_with_pos"
+            referencedRelation: "sales_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -2227,6 +2246,7 @@ export type Database = {
           created_by_name: string | null
           customer_id: string | null
           finished_good_id: string | null
+          from_bin_id: string | null
           from_location_id: string | null
           from_state: Database["public"]["Enums"]["keg_state"] | null
           id: string
@@ -2236,6 +2256,7 @@ export type Database = {
           packaging_session_id: string | null
           quantity: number
           selling_format_id: string | null
+          to_bin_id: string | null
           to_location_id: string | null
           to_state: Database["public"]["Enums"]["keg_state"]
           transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
@@ -2246,6 +2267,7 @@ export type Database = {
           created_by_name?: string | null
           customer_id?: string | null
           finished_good_id?: string | null
+          from_bin_id?: string | null
           from_location_id?: string | null
           from_state?: Database["public"]["Enums"]["keg_state"] | null
           id?: string
@@ -2255,6 +2277,7 @@ export type Database = {
           packaging_session_id?: string | null
           quantity: number
           selling_format_id?: string | null
+          to_bin_id?: string | null
           to_location_id?: string | null
           to_state: Database["public"]["Enums"]["keg_state"]
           transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
@@ -2265,6 +2288,7 @@ export type Database = {
           created_by_name?: string | null
           customer_id?: string | null
           finished_good_id?: string | null
+          from_bin_id?: string | null
           from_location_id?: string | null
           from_state?: Database["public"]["Enums"]["keg_state"] | null
           id?: string
@@ -2274,6 +2298,7 @@ export type Database = {
           packaging_session_id?: string | null
           quantity?: number
           selling_format_id?: string | null
+          to_bin_id?: string | null
           to_location_id?: string | null
           to_state?: Database["public"]["Enums"]["keg_state"]
           transaction_type?: Database["public"]["Enums"]["keg_transaction_type"]
@@ -2378,17 +2403,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "keg_transactions_from_location_id_fkey"
-            columns: ["from_location_id"]
+            foreignKeyName: "keg_transactions_from_bin_id_fkey"
+            columns: ["from_bin_id"]
             isOneToOne: false
-            referencedRelation: "locations"
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "keg_transactions_from_location_id_fkey"
             columns: ["from_location_id"]
             isOneToOne: false
-            referencedRelation: "locations_with_pos"
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
           {
@@ -2483,17 +2515,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "keg_transactions_to_location_id_fkey"
-            columns: ["to_location_id"]
+            foreignKeyName: "keg_transactions_to_bin_id_fkey"
+            columns: ["to_bin_id"]
             isOneToOne: false
-            referencedRelation: "locations"
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "keg_transactions_to_location_id_fkey"
             columns: ["to_location_id"]
             isOneToOne: false
-            referencedRelation: "locations_with_pos"
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -2612,8 +2651,6 @@ export type Database = {
           is_primary: boolean | null
           location_type: string
           name: string
-          pos_bin_id: string | null
-          square_location_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2624,8 +2661,6 @@ export type Database = {
           is_primary?: boolean | null
           location_type?: string
           name: string
-          pos_bin_id?: string | null
-          square_location_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2636,26 +2671,9 @@ export type Database = {
           is_primary?: boolean | null
           location_type?: string
           name?: string
-          pos_bin_id?: string | null
-          square_location_id?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "locations_pos_bin_id_fkey"
-            columns: ["pos_bin_id"]
-            isOneToOne: false
-            referencedRelation: "bins"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "locations_pos_bin_id_fkey"
-            columns: ["pos_bin_id"]
-            isOneToOne: false
-            referencedRelation: "bins_with_summary"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       malts: {
         Row: {
@@ -3381,6 +3399,7 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           created_by: string | null
+          default_bin_id: string | null
           id: string
           notes: string | null
           session_date: string | null
@@ -3391,6 +3410,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
+          default_bin_id?: string | null
           id?: string
           notes?: string | null
           session_date?: string | null
@@ -3401,13 +3421,29 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
+          default_bin_id?: string | null
           id?: string
           notes?: string | null
           session_date?: string | null
           status?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "packaging_sessions_default_bin_id_fkey"
+            columns: ["default_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_sessions_default_bin_id_fkey"
+            columns: ["default_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pick_list_items: {
         Row: {
@@ -3473,13 +3509,6 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pick_list_items_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
           {
@@ -5781,13 +5810,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "square_draft_sales_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "square_draft_sales_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
@@ -5837,6 +5859,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      square_locations: {
+        Row: {
+          name: string | null
+          square_location_id: string
+          status: string | null
+          synced_at: string | null
+        }
+        Insert: {
+          name?: string | null
+          square_location_id: string
+          status?: string | null
+          synced_at?: string | null
+        }
+        Update: {
+          name?: string | null
+          square_location_id?: string
+          status?: string | null
+          synced_at?: string | null
+        }
+        Relationships: []
       }
       square_settings: {
         Row: {
@@ -5911,13 +5954,6 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "square_sync_log_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
         ]
@@ -6150,6 +6186,13 @@ export type Database = {
             columns: ["inventory_lot_id"]
             isOneToOne: false
             referencedRelation: "inventory_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_lines_inventory_lot_id_fkey"
+            columns: ["inventory_lot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_lots_with_landed_cost"
             referencedColumns: ["id"]
           },
           {
@@ -6567,13 +6610,6 @@ export type Database = {
             referencedRelation: "locations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "vessels_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
-            referencedColumns: ["id"]
-          },
         ]
       }
       water_profiles: {
@@ -6805,13 +6841,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "yeast_pitches_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "yeast_pitches_parent_pitch_id_fkey"
             columns: ["parent_pitch_id"]
             isOneToOne: false
@@ -6999,13 +7028,6 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vessels_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
         ]
@@ -7325,6 +7347,7 @@ export type Database = {
           cancellation_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
+          completed_at: string | null
           created_at: string | null
           current_vessel_id: string | null
           current_vessel_name: string | null
@@ -7357,6 +7380,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          completed_at?: string | null
           created_at?: string | null
           current_vessel_id?: never
           current_vessel_name?: never
@@ -7389,6 +7413,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          completed_at?: string | null
           created_at?: string | null
           current_vessel_id?: never
           current_vessel_name?: never
@@ -7544,13 +7569,6 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bins_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
         ]
@@ -8216,6 +8234,40 @@ export type Database = {
           },
         ]
       }
+      inventory_lots_with_landed_cost: {
+        Row: {
+          created_at: string | null
+          expiration_date: string | null
+          id: string | null
+          inventory_item_id: string | null
+          landed_cost: number | null
+          location: string | null
+          lot_number: string | null
+          notes: string | null
+          po_receive_id: string | null
+          quantity: number | null
+          received_date: string | null
+          unit: string | null
+          unit_cost: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_lots_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_lots_po_receive_id_fkey"
+            columns: ["po_receive_id"]
+            isOneToOne: false
+            referencedRelation: "po_receives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_lots_with_quantities: {
         Row: {
           allocated_quantity: number | null
@@ -8372,16 +8424,40 @@ export type Database = {
       }
       keg_filled_contents: {
         Row: {
+          bin_id: string | null
           brand_id: string | null
           finished_good_id: string | null
           location_id: string | null
           quantity: number | null
           selling_format_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brand_packaging_summary"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "product_mix_by_brand"
+            referencedColumns: ["brand_id"]
+          },
+        ]
       }
       keg_inventory: {
         Row: {
+          bin_id: string | null
           id: string | null
           keg_owner_id: string | null
           location_id: string | null
@@ -8409,6 +8485,8 @@ export type Database = {
       }
       keg_inventory_with_details: {
         Row: {
+          bin_id: string | null
+          bin_name: string | null
           id: string | null
           keg_owner_code: string | null
           keg_owner_id: string | null
@@ -8521,38 +8599,6 @@ export type Database = {
           {
             foreignKeyName: "location_transfers_to_bin_id_fkey"
             columns: ["to_bin_id"]
-            isOneToOne: false
-            referencedRelation: "bins_with_summary"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      locations_with_pos: {
-        Row: {
-          address: Json | null
-          created_at: string | null
-          id: string | null
-          is_active: boolean | null
-          is_primary: boolean | null
-          location_type: string | null
-          name: string | null
-          pos_bin_id: string | null
-          pos_bin_name: string | null
-          pos_bin_type: string | null
-          square_location_id: string | null
-          updated_at: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "locations_pos_bin_id_fkey"
-            columns: ["pos_bin_id"]
-            isOneToOne: false
-            referencedRelation: "bins"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "locations_pos_bin_id_fkey"
-            columns: ["pos_bin_id"]
             isOneToOne: false
             referencedRelation: "bins_with_summary"
             referencedColumns: ["id"]
@@ -9503,6 +9549,18 @@ export type Database = {
           },
         ]
       }
+      sellable_inventory: {
+        Row: {
+          bin_id: string | null
+          brand_id: string | null
+          finished_good_id: string | null
+          location_id: string | null
+          quantity: number | null
+          selling_format_id: string | null
+          source: string | null
+        }
+        Relationships: []
+      }
       square_settings_safe: {
         Row: {
           created_at: string | null
@@ -9836,13 +9894,6 @@ export type Database = {
             referencedRelation: "locations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "vessels_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
-            referencedColumns: ["id"]
-          },
         ]
       }
       yeast_lineage_summary: {
@@ -9903,13 +9954,6 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yeast_pitches_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations_with_pos"
             referencedColumns: ["id"]
           },
           {
@@ -10006,6 +10050,7 @@ export type Database = {
           is_urgent: boolean
           lead_time_days: number
           min_order_qty: number
+          on_order_qty: number
           order_by_date: string
           preferred_supplier_id: string
           preferred_supplier_name: string
@@ -10182,7 +10227,12 @@ export type Database = {
         Returns: undefined
       }
       generate_lot_number: { Args: { p_date: string }; Returns: string }
+      generate_next_number: {
+        Args: { p_column: string; p_prefix?: string; p_table: string }
+        Returns: string
+      }
       generate_next_order_number: { Args: never; Returns: string }
+      generate_next_po_number: { Args: never; Returns: string }
       generate_pick_list: { Args: { p_order_id: string }; Returns: string }
       get_ai_schema_context: { Args: { p_domain?: string }; Returns: Json }
       get_enum_default: { Args: { p_enum_type: string }; Returns: string }
@@ -10328,7 +10378,27 @@ export type Database = {
         }[]
       }
       get_ttb_tax_class: { Args: { container_type: string }; Returns: string }
+      get_unaccepted_po_receives: {
+        Args: { p_po_id: string }
+        Returns: {
+          catalog_id: string
+          catalog_type: string
+          expiration_date: string
+          lot_number: string
+          po_line_item_id: string
+          quantity: number
+          receive_id: string
+          received_date: string
+          unit: string
+          unit_price: number
+        }[]
+      }
       get_user_role: { Args: { p_user_id?: string }; Returns: string }
+      get_yeast_lineage_root: { Args: { p_pitch_id: string }; Returns: string }
+      hop_utilization_factor: {
+        Args: { p_boil_time_min: number; p_gravity: number; p_timing: string }
+        Returns: number
+      }
       is_admin: { Args: { p_user_id?: string }; Returns: boolean }
       is_admin_rls: { Args: { p_user_id: string }; Returns: boolean }
       is_sensitive_setting: { Args: { setting_key: string }; Returns: boolean }
@@ -10364,6 +10434,7 @@ export type Database = {
           p_created_by_name?: string
           p_customer_id?: string
           p_finished_good_id?: string
+          p_from_bin_id?: string
           p_from_location_id?: string
           p_from_state: Database["public"]["Enums"]["keg_state"]
           p_notes?: string
@@ -10371,6 +10442,7 @@ export type Database = {
           p_packaging_session_id?: string
           p_quantity: number
           p_selling_format_id: string
+          p_to_bin_id?: string
           p_to_location_id?: string
           p_to_state: Database["public"]["Enums"]["keg_state"]
           p_transaction_type: Database["public"]["Enums"]["keg_transaction_type"]
@@ -10386,6 +10458,15 @@ export type Database = {
         Returns: string
       }
       slugify: { Args: { input: string }; Returns: string }
+      start_batch_fermentation: {
+        Args: {
+          p_batch_id: string
+          p_vessel_id: string
+          p_vessel_name: string
+          p_volume_bbl: number
+        }
+        Returns: undefined
+      }
       suggest_recipe_improvements: {
         Args: { p_recipe_id: string }
         Returns: Json
@@ -10398,6 +10479,10 @@ export type Database = {
       user_has_permission: { Args: { p_permission: string }; Returns: boolean }
       user_has_role: { Args: { p_role: string }; Returns: boolean }
       validate_user_roles: { Args: { p_roles: string[] }; Returns: boolean }
+      whole_unit_material_qty: {
+        Args: { p_qpu: number; p_units: number }
+        Returns: number
+      }
     }
     Enums: {
       cleaning_type:

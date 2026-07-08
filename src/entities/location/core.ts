@@ -16,10 +16,11 @@ import { valuesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
 type Location = Database["public"]["Tables"]["locations"]["Row"];
-export type LocationWithPos = Location & Pick<
-  Database["public"]["Views"]["locations_with_pos"]["Row"],
-  "pos_bin_name" | "pos_bin_type"
->;
+// Square POS config moved to the bin in 00222 (bins.square_location_id /
+// pos_sales_channel_id); the locations_with_pos view and locations'
+// square_location_id/pos_bin_id columns were dropped. Kept as an alias for
+// back-compat with existing imports.
+export type LocationWithPos = Location;
 
 // =============================================================================
 // Zod Schema
@@ -30,8 +31,6 @@ export const locationSchema = z.object({
   location_type: z.string().min(1, "Location type is required"),
   is_primary: z.boolean().default(false),
   is_active: z.boolean().default(true),
-  square_location_id: z.string().nullable().optional(),
-  pos_bin_id: z.string().uuid().nullable().optional(),
 });
 
 export type LocationFormValues = z.infer<typeof locationSchema>;
@@ -63,7 +62,7 @@ export const LOCATION_TYPES = valuesAsOptions(locationTypeDisplayConfig);
 export const locationCore: EntityCore<LocationWithPos> = {
   name: "location",
   table: "locations",
-  viewTable: "locations_with_pos",
+  viewTable: "locations",
   displayName: "Location",
   displayNamePlural: "Locations",
   description: "Physical facilities for production, storage, and sales",
@@ -88,5 +87,5 @@ export const locationCore: EntityCore<LocationWithPos> = {
     "Show all warehouses",
   ],
 
-  keyFields: ["name", "location_type", "is_primary", "is_active", "square_location_id"],
+  keyFields: ["name", "location_type", "is_primary", "is_active"],
 };
