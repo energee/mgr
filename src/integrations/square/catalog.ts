@@ -60,6 +60,14 @@ export function buildCatalogObjects(products: SquareSyncProduct[]) {
  *  2. Call Square batchUpsertCatalogObjects
  *  3. Map returned IDs back to brands/selling formats
  *  4. Upsert into square_catalog_map
+ *
+ * C7 (no location dimension in v1): square_catalog_map is keyed only by
+ * (brand_id, selling_format_id, object_type) — there is deliberately NO
+ * square_location_id column. A brand/variation maps to ONE Square catalog
+ * object shared across all Square locations, because v1 uses a single price per
+ * variation (see resolveChannelPrices). Per-location price overrides (future)
+ * would require a per-location catalog object, i.e. adding a location dimension
+ * to this table and keying the map by it.
  */
 export async function pushCatalog(
   client: SquareClient,

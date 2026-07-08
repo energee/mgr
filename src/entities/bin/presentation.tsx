@@ -144,6 +144,43 @@ export const binPresentation: EntityPresentation<Bin> = {
       ],
     },
     {
+      id: "pos",
+      title: "Point of Sale (Square)",
+      fields: [
+        {
+          name: "square_location_id",
+          label: "Square Location",
+          type: "select",
+          // No square_location entity to link to; dynamicOptions supplies the
+          // picker (name -> square_location_id). Detail view shows the raw id.
+          dynamicOptions: {
+            table: "square_locations",
+            valueField: "square_location_id",
+            labelField: "name",
+            orderBy: "name",
+          },
+          description:
+            "Set BOTH this and the sales channel to make this bin sync its sellable stock to Square. Refresh the list under Settings → Integrations → Square.",
+          colSpan: 6,
+        },
+        {
+          name: "pos_sales_channel_id",
+          label: "POS Sales Channel",
+          type: "select",
+          relation: { entity: "sales_channel", displayField: "name" },
+          dynamicOptions: {
+            table: "sales_channels",
+            valueField: "id",
+            labelField: "name",
+            orderBy: "name",
+            filter: { is_active: true },
+          },
+          description: "Catalog prices pushed for this bin use this channel's pricing.",
+          colSpan: 6,
+        },
+      ],
+    },
+    {
       id: "contents_summary",
       title: "Contents Summary",
       fields: [
