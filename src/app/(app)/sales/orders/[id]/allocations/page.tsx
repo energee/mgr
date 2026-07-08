@@ -158,7 +158,9 @@ export default function OrderAllocationsPage({
     },
     onError: (error) => {
       log.error("Delete error:", error);
-      toast.error("Failed to remove allocation");
+      // Surface the DB message (e.g. the completed-allocation delete guard, 00211)
+      // rather than a generic failure, so the user learns why it was blocked.
+      toast.error(error instanceof Error ? error.message : "Failed to remove allocation");
     },
   });
 
