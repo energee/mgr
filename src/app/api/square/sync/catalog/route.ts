@@ -95,30 +95,44 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       throw new Error(`Failed to query bin inventory: ${invError.message}`);
     }
 
-    // 3. Get draft kegs at POS locations (filled kegs)
+    // 3. Get draft kegs at POS locations (filled kegs). keg_inventory (00207)
+    // nets by physical keg identity and no longer carries contents; filled-keg
+    // brand breakdown comes from keg_filled_contents (already filled-only), which
+    // exposes brand_id directly. Read brand_id here rather than embedding
+    // finished_goods(brands(...)): keg_filled_contents is an aggregate/GROUP BY
+    // view, so PostgREST can't infer a to-one relationship through it — an embed
+    // would error and, because this query is optional (catch below), silently
+    // drop every filled keg from the catalog. Brand name/description come from a
+    // separate brands query (the view exposes only brand_id). Mirrors the
+    // sibling inventory sync route.
     const locationIds = locations.map((l) => l.id);
     const { data: draftKegs, error: kegError } = await admin
-      .from("keg_inventory")
-      .select(
-        `
-        selling_format_id,
-        location_id,
-        quantity,
-        finished_good_id,
-        finished_goods(
-          id,
-          brand_id,
-          brands(id, name, description)
-        )
-      `
-      )
+      .from("keg_filled_contents")
+      .select("selling_format_id, location_id, quantity, brand_id")
       .in("location_id", locationIds)
-      .eq("state", "filled")
       .gt("quantity", 0);
 
     if (kegError) {
       // Draft keg query is optional; log and continue
       logger.error("Failed to query keg inventory: %s", kegError.message);
+    }
+
+    // Brand name/description for the filled kegs (the view exposes only brand_id).
+    const kegBrandIds = [
+      ...new Set((draftKegs ?? []).map((k) => k.brand_id).filter((id): id is string => !!id)),
+    ];
+    const kegBrands = new Map<string, { name: string; description: string | null }>();
+    if (kegBrandIds.length > 0) {
+      const { data: brandRows, error: brandError } = await admin
+        .from("brands")
+        .select("id, name, description")
+        .in("id", kegBrandIds);
+      if (brandError) {
+        logger.error("Failed to query keg brands: %s", brandError.message);
+      }
+      for (const b of brandRows ?? []) {
+        kegBrands.set(b.id, { name: b.name, description: b.description });
+      }
     }
 
     // 4. Build unique brand + variation combinations
@@ -162,14 +176,14 @@ export const POST = withPermission("integrations:manage", async (_request, { use
 
     // Process draft kegs
     for (const keg of draftKegs ?? []) {
-      const fg = keg.finished_goods as unknown as FGWithBrand | null;
-      if (!fg?.brand_id || !fg?.brands) continue;
+      const brandId = keg.brand_id;
+      if (!brandId) continue;
+      const brand = kegBrands.get(brandId);
+      if (!brand) continue;
 
-      const { brands: brand } = fg;
-
-      if (!brandMap.has(fg.brand_id)) {
-        brandMap.set(fg.brand_id, {
-          brandId: fg.brand_id,
+      if (!brandMap.has(brandId)) {
+        brandMap.set(brandId, {
+          brandId,
           brandName: brand.name,
           description: brand.description ?? undefined,
           variations: new Map(),
@@ -179,8 +193,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       const sellingFormatId = keg.selling_format_id as string;
       if (sellingFormatId) {
         const varKey = `fmt-${sellingFormatId}`;
-        if (!brandMap.get(fg.brand_id)!.variations.has(varKey)) {
-          brandMap.get(fg.brand_id)!.variations.set(varKey, {
+        if (!brandMap.get(brandId)!.variations.has(varKey)) {
+          brandMap.get(brandId)!.variations.set(varKey, {
             sellingFormatId,
             name: sellingFormatId, // placeholder
           });

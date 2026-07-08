@@ -8364,10 +8364,18 @@ export type Database = {
           },
         ]
       }
+      keg_filled_contents: {
+        Row: {
+          brand_id: string | null
+          finished_good_id: string | null
+          location_id: string | null
+          quantity: number | null
+          selling_format_id: string | null
+        }
+        Relationships: []
+      }
       keg_inventory: {
         Row: {
-          batch_id: string | null
-          finished_good_id: string | null
           id: string | null
           keg_owner_id: string | null
           location_id: string | null
@@ -8395,10 +8403,6 @@ export type Database = {
       }
       keg_inventory_with_details: {
         Row: {
-          batch_code: string | null
-          batch_id: string | null
-          finished_good_id: string | null
-          finished_good_name: string | null
           id: string | null
           keg_owner_code: string | null
           keg_owner_id: string | null

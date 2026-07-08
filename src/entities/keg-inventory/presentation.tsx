@@ -44,12 +44,6 @@ export const kegInventoryPresentation: EntityPresentation<KegInventory> = {
       sortable: true,
       render: (value: unknown) => (value ? String(value) : "—"),
     },
-    {
-      accessorKey: "batch_code",
-      header: "Batch",
-      sortable: false,
-      render: (value: unknown) => (value ? String(value) : "—"),
-    },
   ],
 
   listFilters: [
@@ -74,8 +68,6 @@ export const kegInventoryPresentation: EntityPresentation<KegInventory> = {
         { name: "state", label: "State", editable: false },
         { name: "quantity", label: "Quantity", editable: false },
         { name: "location_name", label: "Location", editable: false },
-        { name: "batch_code", label: "Batch", editable: false },
-        { name: "finished_good_name", label: "Finished Good", editable: false },
       ],
     },
   ],
