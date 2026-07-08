@@ -34,15 +34,14 @@ export type KegInventory = {
   state: KegState;
   location_id: string | null;
   quantity: number;
-  batch_id: string | null;
-  finished_good_id: string | null;
-  // Convenience display fields populated by the view from selling_formats/containers
+  // Convenience display fields populated by the view from selling_formats/containers.
+  // Batch/brand contents are intentionally absent: keg_inventory nets by physical
+  // keg identity (format/owner/state/location), so a pool row can span batches.
+  // For filled-keg brand breakdown, query keg_filled_contents (00207).
   keg_type_name?: string;
   keg_owner_name?: string;
   volume_bbl?: number;
   location_name?: string;
-  batch_code?: string;
-  finished_good_name?: string;
 };
 
 // =============================================================================
@@ -69,8 +68,6 @@ export const kegInventorySchema = z.object({
   state: z.enum(["empty", "filled", "shipped", "returned_dirty", "cleaning", "maintenance", "retired"]),
   location_id: z.string().uuid().nullable().optional(),
   quantity: z.number().int(),
-  batch_id: z.string().uuid().nullable().optional(),
-  finished_good_id: z.string().uuid().nullable().optional(),
 });
 
 export type KegInventoryFormValues = z.infer<typeof kegInventorySchema>;
