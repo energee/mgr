@@ -377,13 +377,17 @@ export async function consumePackagingMaterials(
   try {
     // Idempotence guard: depletion can be triggered both by the completion
     // dialog and by the transition side-effect registry (bulk bar, generic
-    // dropdown). Every insert below tags notes with the session id, so an
-    // existing tagged allocation means this session was already depleted.
+    // dropdown). Every insert below carries a stable idempotency_key tagged
+    // with the session id (00215), so an existing keyed allocation means this
+    // session was already depleted. Keying on idempotency_key — a system
+    // column — instead of the user-editable `notes` string keeps the guard
+    // reliable if those notes are ever hand-edited (audit #15). dynamicFrom:
+    // idempotency_key is not in the generated types yet.
+    const idempotencyKey = `pkg_session:${sessionId}`;
     const sessionNote = `Packaging session ${sessionId} material consumption`;
-    const { data: existing, error: existingError } = await supabase
-      .from("allocations")
+    const { data: existing, error: existingError } = await dynamicFrom(supabase, "allocations")
       .select("id")
-      .eq("notes", sessionNote)
+      .eq("idempotency_key", idempotencyKey)
       .limit(1);
     if (existingError) return err(parseSupabaseError(existingError, { table: "allocations" }));
     if (existing && existing.length > 0) {
@@ -444,7 +448,9 @@ export async function consumePackagingMaterials(
     const allItemIds = [...new Set(bomLines.map((b) => b.inventory_item_id))];
     const lotsByItem = await fetchAvailableLots(supabase, allItemIds);
 
-    const inserts: AllocationInsert[] = [];
+    // idempotency_key isn't in the generated types yet (00215) — tag it on here
+    // and insert via dynamicFrom below.
+    const inserts: (AllocationInsert & { idempotency_key: string })[] = [];
     const shortfallByItem = new Map<string, number>();
     const now = new Date().toISOString();
 
@@ -467,6 +473,7 @@ export async function consumePackagingMaterials(
             completed_at: now,
             lot_number: pick.lot_number,
             notes: sessionNote,
+            idempotency_key: idempotencyKey,
           });
         }
         if (shortfall > 0) {
@@ -476,7 +483,7 @@ export async function consumePackagingMaterials(
     }
 
     if (inserts.length > 0) {
-      const { error: insertError } = await supabase.from("allocations").insert(inserts);
+      const { error: insertError } = await dynamicFrom(supabase, "allocations").insert(inserts);
       if (insertError) return err(parseSupabaseError(insertError, { table: "allocations" }));
     }
 
@@ -511,10 +518,18 @@ export async function recordBatchLoss(
     volumeBbl: number;
     reasonCode: string;
     notes?: string | null;
+    /**
+     * Optional stable idempotence key (`allocations.idempotency_key`, 00215).
+     * The completion auto-reconciliation sets it so its guard keys on this
+     * system column, never on the user-editable reason_code/notes (audit #15).
+     * Manual losses omit it.
+     */
+    idempotencyKey?: string;
   }
 ): Promise<ServiceResult<null>> {
   try {
-    const { error } = await supabase.from("allocations").insert({
+    // dynamicFrom: idempotency_key (00215) isn't in the generated types yet.
+    const { error } = await dynamicFrom(supabase, "allocations").insert({
       source_type: "batch",
       source_id: params.batchId,
       destination_type: "loss",
@@ -525,6 +540,7 @@ export async function recordBatchLoss(
       completed_at: new Date().toISOString(),
       reason_code: params.reasonCode,
       notes: params.notes ?? null,
+      ...(params.idempotencyKey ? { idempotency_key: params.idempotencyKey } : {}),
     });
     if (error) return err(parseSupabaseError(error, { table: "allocations" }));
     return ok(null);
@@ -539,11 +555,19 @@ export async function recordBatchLoss(
 
 /**
  * Notes prefix that marks a batch's auto-recorded completion reconciliation
- * allocation. Doubles as the idempotence guard (same pattern as
- * consumePackagingMaterials' session-note guard): a completed batch→loss
- * allocation whose notes start with this means reconciliation already ran.
+ * allocation, for a human-readable ledger entry. Display only — idempotence
+ * keys on the stable `idempotency_key` system column (see `reconciliationKey`),
+ * never on this string or the reason_code (both user-editable; audit #15).
  */
 const RECONCILIATION_NOTE_PREFIX = "Completion loss reconciliation";
+
+/**
+ * Stable idempotence key for a batch's completion auto-reconciliation loss
+ * allocation (`allocations.idempotency_key`, 00215). One reconciliation row per
+ * batch; the guard keys on this system column so neither a hand-edited note nor
+ * a manually-picked `reason_code='reconciliation'` can spoof or defeat it.
+ */
+const reconciliationKey = (batchId: string) => `batch_reconcile:${batchId}`;
 
 /**
  * Reconcile a batch's total loss at completion, making packaged volume the
@@ -634,15 +658,25 @@ export async function getBatchLossSummary(
     // just destination 'loss', or those removals would be re-counted as
     // unattributed loss. finished_good rows are excluded: packaged volume is
     // summed from session_line_items (and 00183 leaves their volume_bbl null).
-    const { data: removals, error: removalError } = await supabase
-      .from("allocations")
-      .select("volume_bbl, notes, destination_type")
+    // dynamicFrom: idempotency_key (00215) isn't in the generated types yet.
+    const { data: removals, error: removalError } = await dynamicFrom(supabase, "allocations")
+      .select("volume_bbl, destination_type, idempotency_key")
       .eq("source_type", "batch")
       .eq("source_id", batchId)
       .eq("status", "completed");
     if (removalError) return err(parseSupabaseError(removalError, { table: "allocations" }));
-    const removalRows = removals ?? [];
-    const reconciled = removalRows.some((r) => r.notes?.startsWith(RECONCILIATION_NOTE_PREFIX));
+    type RemovalRow = {
+      volume_bbl: number | null;
+      destination_type: string | null;
+      idempotency_key: string | null;
+    };
+    const removalRows = (removals ?? []) as RemovalRow[];
+    // Idempotence keys on the reconciliation's stable idempotency_key (a system
+    // column, 00215) — never the user-editable reason_code/notes — so neither a
+    // hand-edited note nor a manually-picked reason_code='reconciliation' can
+    // spoof (false positive) or, on edit, defeat (false negative) the guard
+    // (audit #15).
+    const reconciled = removalRows.some((r) => r.idempotency_key === reconciliationKey(batchId));
     const attributedBbl = removalRows.reduce(
       (sum, r) =>
         r.destination_type === "finished_good" ? sum : sum + Number(r.volume_bbl ?? 0),
@@ -724,8 +758,8 @@ export async function reconcileBatchLoss(
     if (!summaryResult.success) return summaryResult;
     const s = summaryResult.data;
 
-    // Already reconciled (note-prefix guard, same belt-and-braces as
-    // consumePackagingMaterials): racing UI paths become no-ops.
+    // Already reconciled (idempotency_key guard, same belt-and-braces as
+    // consumePackagingMaterials): racing UI paths no-op.
     if (s.reconciled) return ok(0);
     // A still-open session means actuals aren't final — reconciling now
     // would book the unpackaged remainder as loss. Skip; no guard row was
@@ -739,6 +773,7 @@ export async function reconcileBatchLoss(
       batchId,
       volumeBbl: s.unattributedBbl,
       reasonCode: "reconciliation",
+      idempotencyKey: reconciliationKey(batchId),
       notes: `${RECONCILIATION_NOTE_PREFIX} — produced ${round(s.producedBbl)} bbl (blend in ${round(s.blendInBbl)}, out ${round(s.blendOutBbl)}), packaged ${round(s.packagedBbl)} bbl, previously attributed ${round(s.attributedBbl)} bbl`,
     });
     if (!result.success) return result;
