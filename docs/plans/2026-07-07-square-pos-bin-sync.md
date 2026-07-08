@@ -135,3 +135,32 @@ Per the two-phase process: **stop here for approval.** On approval, Phase 2 exec
 > - **PR #348** (`fix-audit-vessel-integrity`, migration 00210) is held; decision made = **"free the source vessel on full-remainder loss"** (implement in `src/components/domain/batch/vessel-transfer-dialog.tsx` + `record-loss-dialog.tsx` — free the vessel when a recorded loss brings the source to 0). Not yet built.
 >
 > Then propose the Phase-2 execution order (I expect: resolve #344 → Milestone A → B → C → D), and confirm the open decisions (D3 oversell policy; A6 backfill) with me before writing migrations. Follow repo rules: `bun lint && bun typecheck && bun test` before any commit; migrations `00219+`; regenerate + verify the live-drift snapshot after each migration lands live; expert agents per `CLAUDE.md`.
+
+---
+
+## Phase-2 continuation prompt (spikes DONE — paste into a fresh session to resume EXECUTION)
+
+> Resume the Square POS bin-sync feature — **Phase 2 (execution)**. Branch **`feat/square-pos-bin-sync`**, plan **`docs/plans/2026-07-07-square-pos-bin-sync.md`**, tracking **PR #360**, status in **`PROGRESS.md`** (read the `2026-07-08` entry). Read the plan + that entry first.
+>
+> **Spikes are DONE — findings locked (do NOT re-derive):**
+> - **B0:** nothing writes `bin_inventory` (no trigger/RPC/app-write/seed; only a version-bump trigger; live = 0 rows). Kegs are never in `bin_inventory`. **Union rule** → `sellable_inventory = (bin_inventory JOIN fg JOIN selling_formats JOIN containers WHERE container.type <> 'keg') UNION ALL keg_filled_contents`. The `<> 'keg'` filter is the entire double-count guard.
+> - **D0:** `finished_goods_with_availability.available = fg.quantity − Σ(planned+completed allocations)` (00191), independent of the physical `bin_inventory` count. A `taproom_sale` allocation does NOT debit `bin_inventory`. **D2 must explicitly decrement** the resolved bin; the allocation stays as the audit/TTB ledger (no double-count — only one path writes `bin_inventory`).
+>
+> **CONFIRM THESE TWO before writing any migration:**
+> 1. **PR #344 merge** — conflicts are only 2 non-code files (backlog doc + `live-catalog.snapshot.txt`); `00207` + all code merge clean; `5cf07031` is a benign snapshot-only commit (authored by claude[bot], co-author Ted). Resolve (take main's snapshot + merged doc) and merge to main? (Unblocks Milestone A.)
+> 2. **D3 oversell** — sale qty > bin qty: **clamp-to-zero + flag** (rec, mirrors #357) / allow-negative / reject.
+> (**A6 = NULL / no backfill** already decided.)
+>
+> **Execution order:** #344 merge → **A0** → A → B → C → D. C4 (pricing generalization, behavior-preserving) preppable in parallel; PR #348 independent.
+>
+> **Migration renumbering (A0 inserted before the original plan):** A0 = **`00219`**, A = `00220`, B = `00221`, C = `00222` (verify head after #344's `00207` lands — it fills the 00207 gap so the top stays 00218 → next-free 00219).
+>
+> **Milestone A0 (NEW prerequisite — build FIRST; it's what populates `bin_inventory`):**
+> - Migration `00219_bin_placement.sql`: add `packaging_sessions.default_bin_id uuid REFERENCES bins(id)` + `bins.is_default_fg boolean` with partial-unique index `(location_id) WHERE is_default_fg`.
+> - `AFTER INSERT ON finished_goods` trigger `place_finished_good_in_bin()` — **non-keg FGs only** (guard `container.type <> 'keg'`), **same-transaction** INSERT into `bin_inventory` (atomic → cannot orphan; also fires on `revise_packaging_session`'s FG inserts). Bin resolution order: `session_line_items.target_bin_id` (future/NULL now) → `packaging_sessions.default_bin_id` → location's `bins.is_default_fg` → else `RAISE`. `ON CONFLICT (finished_good_id, bin_id) DO NOTHING`. **DECIDED: on a missing session bin, fall back to the location-default bin — never hard-block the brewer; session-level grain.**
+> - Extend `revise_packaging_session` to mirror `fg.quantity` deltas onto the production bin's `bin_inventory.quantity` (same txn). Reversibility of full teardown is free via existing `bin_inventory … ON DELETE CASCADE`.
+> - Owners: data-layer-expert (migration/trigger/revise-mirror) + entity-architect/ui-systems-expert (packaging-session bin picker; `is_default_fg` toggle on the bin entity). test-surgeon: characterization for the trigger (placement, keg-skip, fallback, RAISE-on-no-bin) + the revise mirror.
+>
+> Then **A** (keg bin dimension, `00220` — `from_bin_id`/`to_bin_id` on `keg_transactions`, extend `record_keg_transaction`, surface `bin_id` on `keg_inventory`/`keg_filled_contents`), **B** (`sellable_inventory` view, `00221`, per the B0 union rule), **C** (bin POS config + `square_locations` + channel pricing + rewrite sync routes off `sellable_inventory`, `00222`), **D** (webhook: resolve Square location→bin, debit `bin_inventory` per D0/D3, keg pours per D4).
+>
+> **Repo rules:** `bun lint && bun typecheck && bun test` before every commit; regenerate `src/types/supabase.ts` after each migration; regenerate + verify the live-drift snapshot after each migration lands live; expert agents per `CLAUDE.md`; **NEVER Co-Authored-By**.
