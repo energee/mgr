@@ -187,10 +187,18 @@ export function VesselTransferDialog({
   // Prevents the auto-fill from overwriting user input on query refetch.
   const volumeTouchedRef = useRef(false);
 
-  // Reset touched flag when dialog closes, so next open gets auto-fill
+  // Idempotency key for the current transfer submission (M3): one key per
+  // dialog-open, so a double-click / retry reuses it and collides on the
+  // idx_vessel_transfers_idempotency_key unique index (23505) instead of
+  // inserting a duplicate row. Regenerated when the dialog closes.
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
+
+  // Reset per-open state when the dialog closes: re-enable auto-fill and mint a
+  // fresh idempotency key so the next open is a new logical submission.
   useEffect(() => {
     if (!open) {
       volumeTouchedRef.current = false;
+      idempotencyKeyRef.current = crypto.randomUUID();
     }
   }, [open]);
 
@@ -204,17 +212,18 @@ export function VesselTransferDialog({
   // Transfer mutation
   const transferMutation = useMutation({
     mutationFn: async (values: VesselTransferFormValues) => {
-      // Pre-check: UX convenience to catch accidental double-submits.
-      // Note: the DB unique index (idx_vessel_transfers_unique_per_batch)
-      // provides the actual constraint; this check avoids a less-friendly
-      // constraint violation error in the common case.
+      // Pre-check: friendly UX guard for a repeat transfer to the same vessel
+      // within a short window. The hard DB guarantee against an exact double-
+      // submit is the idempotency_key unique index (idx_vessel_transfers_
+      // idempotency_key, 00210); this time-window check just surfaces a clearer
+      // message first for a user re-transferring shortly after.
       let preCheckQuery = supabase
         .from("vessel_transfers")
         .select("id, transferred_at")
         .eq("batch_id", batchId)
         .eq("to_vessel_id", values.to_vessel_id);
 
-      // Match the DB unique index which includes from_vessel_id
+      // Scope the lookup to the same source too, matching the transfer identity.
       if (fromVesselId) {
         preCheckQuery = preCheckQuery.eq("from_vessel_id", fromVesselId);
       } else {
@@ -247,12 +256,18 @@ export function VesselTransferDialog({
           volume_bbl: values.volume_bbl,
           transferred_at: new Date().toISOString(),
           notes: values.notes || null,
+          // M3: dedup double-submit (see idempotencyKeyRef).
+          idempotency_key: idempotencyKeyRef.current,
+          // M5: a full move (transferring all remaining volume) frees the source
+          // vessel; a partial/split move leaves it occupied.
+          empties_source: values.volume_bbl >= remainingVolume,
         });
 
       if (transferError) {
-        // Friendly message for unique constraint violations
+        // idempotency_key unique-index collision = this submission was already
+        // recorded (double-click / retry).
         if (transferError.code === "23505") {
-          throw new Error("A transfer with these exact details already exists.");
+          throw new Error("This transfer was already recorded.");
         }
         throw transferError;
       }

@@ -6340,8 +6340,10 @@ export type Database = {
         Row: {
           batch_id: string
           created_at: string | null
+          empties_source: boolean
           from_vessel_id: string | null
           id: string
+          idempotency_key: string | null
           notes: string | null
           to_vessel_id: string
           transferred_at: string
@@ -6351,8 +6353,10 @@ export type Database = {
         Insert: {
           batch_id: string
           created_at?: string | null
+          empties_source?: boolean
           from_vessel_id?: string | null
           id?: string
+          idempotency_key?: string | null
           notes?: string | null
           to_vessel_id: string
           transferred_at?: string
@@ -6362,8 +6366,10 @@ export type Database = {
         Update: {
           batch_id?: string
           created_at?: string | null
+          empties_source?: boolean
           from_vessel_id?: string | null
           id?: string
+          idempotency_key?: string | null
           notes?: string | null
           to_vessel_id?: string
           transferred_at?: string
