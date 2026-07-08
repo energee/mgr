@@ -49,7 +49,11 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       .from("bins")
       .select("id, square_location_id, pos_sales_channel_id")
       .not("square_location_id", "is", null)
-      .not("pos_sales_channel_id", "is", null);
+      .not("pos_sales_channel_id", "is", null)
+      // Stable total order (id is the non-null unique PK) so the multi-channel
+      // price tie-break below is deterministic across syncs. created_at is
+      // nullable/non-unique and can't guarantee a total order.
+      .order("id");
 
     if (binsError) {
       throw new Error(`Failed to query POS bins: ${binsError.message}`);
@@ -220,6 +224,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
 
     // 7. Build SquareSyncProduct array
     const products: SquareSyncProduct[] = [];
+    // Variations whose channel has no price row -> pushed at $0. Collected and
+    // surfaced (log + response) rather than silently shipping free product.
+    const unpricedVariations: string[] = [];
 
     for (const brand of brandMap.values()) {
       const itemMapping = mapLookup.get(`brand-${brand.brandId}`);
@@ -227,15 +234,19 @@ export const POST = withPermission("integrations:manage", async (_request, { use
 
       for (const [varKey, variation] of brand.variations) {
         const varMapping = mapLookup.get(`var-${brand.brandId}-${varKey}`);
+        const displayName = formatNames[variation.sellingFormatId] ?? "Unknown Format";
 
         // Price from the channel of the bin(s) that stock this variation.
         const chan = variationChannel.get(`${brand.brandId}-${varKey}`);
-        const priceCents = chan
-          ? channelPriceLookup.get(chan.channelId)?.get(brand.brandId)?.get(varKey) ?? 0
-          : 0;
-
-        // Resolve display name from selling_formats
-        const displayName = formatNames[variation.sellingFormatId] ?? "Unknown Format";
+        const resolvedPrice = chan
+          ? channelPriceLookup.get(chan.channelId)?.get(brand.brandId)?.get(varKey)
+          : undefined;
+        // No price configured for this variation on its channel -> Square would
+        // show $0. Push it (behavior-preserving) but flag it loudly.
+        if (resolvedPrice == null || resolvedPrice === 0) {
+          unpricedVariations.push(`${brand.brandName} / ${displayName}`);
+        }
+        const priceCents = resolvedPrice ?? 0;
 
         variations.push({
           sellingFormatId: variation.sellingFormatId,
@@ -259,8 +270,12 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     // 8. Push catalog to Square
     const syncResult = await pushCatalog(client, products);
 
-    // 9. Clean up stale items
-    const deletedCount = await deleteStaleItems(client, activeBrandIds);
+    // 9. Clean up stale items. Guard the empty active set: deleteStaleItems treats
+    //    [] as "delete the ENTIRE catalog", and the bin-driven model makes a
+    //    transient all-empty state reachable (POS bins configured but momentarily
+    //    holding no sellable stock). Skip cleanup rather than wipe everything.
+    const deletedCount =
+      activeBrandIds.length > 0 ? await deleteStaleItems(client, activeBrandIds) : 0;
 
     // 10. Update last_catalog_sync_at
     const completedAt = new Date().toISOString();
@@ -278,6 +293,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         productsCount: products.length,
         variationsCount: products.reduce((sum, p) => sum + p.variations.length, 0),
         staleDeleted: deletedCount,
+        unpricedVariations: unpricedVariations.length > 0 ? unpricedVariations : undefined,
         errors: syncResult.errors.length > 0 ? syncResult.errors : undefined,
         triggeredBy: user.id,
       },
@@ -291,6 +307,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       itemsFailed: syncResult.itemsFailed,
       staleDeleted: deletedCount,
       productsCount: products.length,
+      unpricedVariations,
       errors: syncResult.errors,
     });
   } catch (err) {

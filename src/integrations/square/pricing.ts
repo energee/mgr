@@ -1,39 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { dollarsToCents } from "./utils";
-import { logger } from "@/lib/logger";
-
-type AdminClient = Awaited<ReturnType<typeof createAdminClient>>;
 
 type ChannelPrice = {
   brandId: string;
   sellingFormatId: string;
   priceCents: number;
-}
-
-/**
- * Resolve the UUID of the `taproom` sales channel.
- *
- * Kept as a small helper so callers that specifically want taproom pricing
- * (e.g. the catalog sync route, until Milestone C5 wires per-POS-bin channels)
- * can resolve the channel id once and pass it to {@link resolveChannelPrices}.
- *
- * Returns `null` (and logs) when the channel row is missing.
- */
-export async function resolveTaproomChannelId(
-  admin: AdminClient
-): Promise<string | null> {
-  const { data: taproomChannel, error: channelError } = await admin
-    .from("sales_channels")
-    .select("id")
-    .eq("code", "taproom")
-    .single();
-
-  if (channelError || !taproomChannel) {
-    logger.error("Taproom sales channel not found: %s", channelError?.message ?? "no data");
-    return null;
-  }
-
-  return taproomChannel.id;
 }
 
 /**
@@ -135,25 +106,4 @@ export async function resolveChannelPrices(
   }
 
   return results;
-}
-
-/**
- * Resolve taproom-channel prices for the given brands.
- *
- * Thin wrapper over {@link resolveChannelPrices}: looks up the taproom sales
- * channel id, then delegates. Preserved for callers that want taproom pricing
- * without knowing the channel UUID; returns `[]` if the channel is missing
- * (matching the prior behavior of this function).
- */
-export async function resolveTaproomPrices(
-  brandIds: string[]
-): Promise<ChannelPrice[]> {
-  if (brandIds.length === 0) return [];
-
-  const admin = await createAdminClient();
-
-  const taproomChannelId = await resolveTaproomChannelId(admin);
-  if (!taproomChannelId) return [];
-
-  return resolveChannelPrices(brandIds, taproomChannelId);
 }

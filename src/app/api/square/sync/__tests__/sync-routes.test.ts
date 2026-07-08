@@ -100,6 +100,7 @@ function makeAdmin(tables: TableData) {
         in: () => builder,
         gt: () => builder,
         eq: () => builder,
+        order: () => builder,
         single: () => Promise.resolve(result),
         insert: (row: unknown) => {
           inserted.push({ table, row });
@@ -236,6 +237,56 @@ describe("catalog sync (bin-driven)", () => {
       expect.objectContaining({ last_catalog_sync_at: expect.any(String) })
     );
   });
+
+  it("does NOT wipe the catalog when POS bins are configured but hold no stock", async () => {
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
+        error: null,
+      },
+      sellable_inventory: { data: [], error: null }, // configured bin, zero stock
+      square_catalog_map: { data: [], error: null },
+      square_sync_log: { data: null, error: null },
+    });
+    mockedPushCatalog.mockResolvedValue(SYNC_RESULT(0));
+    mockedDeleteStaleItems.mockResolvedValue(0);
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(200);
+    // Empty active-brand set must NOT reach deleteStaleItems, which treats [] as
+    // "delete the ENTIRE catalog" — a transient empty bin would otherwise nuke it.
+    expect(mockedDeleteStaleItems).not.toHaveBeenCalled();
+  });
+
+  it("flags a variation as unpriced (would push $0) when its channel has no price row", async () => {
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
+        error: null,
+      },
+      sellable_inventory: {
+        data: [{ bin_id: "bin-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5 }],
+        error: null,
+      },
+      brands: { data: [{ id: "brand-1", name: "Brand One", description: null }], error: null },
+      selling_formats: { data: [{ id: "fmt-1", name: "16oz 4-Pack" }], error: null },
+      square_catalog_map: { data: [], error: null },
+      square_sync_log: { data: null, error: null },
+    });
+    mockedResolveChannelPrices.mockResolvedValue([]); // no price rows on the channel
+    mockedPushCatalog.mockResolvedValue(SYNC_RESULT(1));
+    mockedDeleteStaleItems.mockResolvedValue(0);
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.unpricedVariations).toEqual(["Brand One / 16oz 4-Pack"]);
+    // and it's durable in the sync log, not just the response
+    const log = inserted.find((i) => i.table === "square_sync_log")!.row as {
+      details: { unpricedVariations?: string[] };
+    };
+    expect(log.details.unpricedVariations).toEqual(["Brand One / 16oz 4-Pack"]);
+  });
 });
 
 // =============================================================================
@@ -354,5 +405,12 @@ describe("inventory sync (bin-driven)", () => {
       expect.objectContaining({ itemId: "brand-1/fmt-1" }),
     ]);
     expect(mockedPushInventoryCounts).not.toHaveBeenCalled();
+    // F4: the mapping error is durably logged per-bin, not just in the response.
+    const log = inserted.find((i) => i.table === "square_sync_log")!.row as {
+      details: { errors?: Array<{ itemId: string }> };
+    };
+    expect(log.details.errors).toEqual([
+      expect.objectContaining({ itemId: "brand-1/fmt-1" }),
+    ]);
   });
 });

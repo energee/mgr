@@ -24,10 +24,13 @@
 --   NEW TABLE -- square_locations: Square POS locations pulled from the Square API
 --   (live refresh arrives in Milestone C3). Until then, this migration seeds it
 --   from any pre-existing location-level POS config so existing setups show a
---   location row before the first live refresh. RLS mirrors square_settings /
---   square_catalog_map exactly: integrations:manage for both read and write (that
---   is the CURRENT live policy on the square_* tables since 00097 replaced 00091's
---   auth.uid() policies -- see 00097 lines 383-396; integrations:manage = admin).
+--   location row before the first live refresh. RLS: staff READ (any authenticated
+--   user -- the per-bin POS-config picker in the UI must list Square locations),
+--   integrations:manage (= admin) WRITE. The WRITE side matches the admin-only
+--   write on square_settings / square_catalog_map (00097 replaced 00091's
+--   auth.uid() policies); READ is intentionally BROADER than those tables so
+--   non-admin staff can populate the picker -- square_locations holds only
+--   non-sensitive Square location ids/names, no secrets.
 --
 --   DATA MIGRATION + DROP (destructive, so migrate FIRST):
 --     1. For every locations row that was a POS target (square_location_id AND

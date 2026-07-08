@@ -24,7 +24,7 @@ import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, updateSquareSettings } from "@/integrations/square/client";
 import { pushInventoryCounts } from "@/integrations/square/inventory";
-import type { SquareSyncInventory, SquareSyncResult } from "@/integrations/square/types";
+import type { SquareSyncInventory } from "@/integrations/square/types";
 
 export const POST = withPermission("integrations:manage", async (_request, { user }) => {
   const client = await getSquareClient();
@@ -47,7 +47,10 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       .from("bins")
       .select("id, name, square_location_id")
       .not("square_location_id", "is", null)
-      .not("pos_sales_channel_id", "is", null);
+      .not("pos_sales_channel_id", "is", null)
+      // Stable total order (id is the non-null unique PK) — deterministic bin
+      // processing/log order across syncs.
+      .order("id");
 
     if (binsError) {
       throw new Error(`Failed to query POS bins: ${binsError.message}`);
@@ -134,7 +137,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       binName: string;
       squareLocationId: string;
       locationId: string | null;
-      result: SquareSyncResult;
+      itemsSynced: number;
+      itemsFailed: number;
+      errors: Array<{ itemId: string; error: string }>;
     }> = [];
 
     let totalSynced = 0;
@@ -169,15 +174,18 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       }
 
       const counts: SquareSyncInventory[] = [];
+      const binErrors: Array<{ itemId: string; error: string }> = [];
       for (const [brandId, formatMap] of aggregated) {
         for (const [formatId, quantity] of formatMap) {
           const squareVariationId = variationLookup.get(`brand-${brandId}-fmt-${formatId}`);
 
           if (!squareVariationId) {
-            allErrors.push({
+            const e = {
               itemId: `${brandId}/${formatId}`,
               error: `No Square catalog mapping for brand ${brandId} / format ${formatId} at bin ${bin.name}`,
-            });
+            };
+            binErrors.push(e);
+            allErrors.push(e);
             continue;
           }
 
@@ -189,19 +197,33 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         }
       }
 
-      // Push counts for this bin
+      // Push counts for this bin.
+      let itemsSynced = 0;
+      let itemsFailed = 0;
+      const pushErrors: Array<{ itemId: string; error: string }> = [];
       if (counts.length > 0) {
         const result = await pushInventoryCounts(client, counts);
+        itemsSynced = result.itemsSynced;
+        itemsFailed = result.itemsFailed;
+        pushErrors.push(...result.errors);
+        totalSynced += result.itemsSynced;
+        totalFailed += result.itemsFailed;
+        allErrors.push(...result.errors);
+      }
+
+      // Record a result row when the bin pushed anything OR hit a mapping error,
+      // so unmapped-format errors are durable in square_sync_log even when other
+      // bins succeeded (previously they reached only the HTTP response).
+      if (counts.length > 0 || binErrors.length > 0) {
         binResults.push({
           binId: bin.id,
           binName: bin.name,
           squareLocationId,
           locationId,
-          result,
+          itemsSynced,
+          itemsFailed: itemsFailed + binErrors.length,
+          errors: [...pushErrors, ...binErrors],
         });
-        totalSynced += result.itemsSynced;
-        totalFailed += result.itemsFailed;
-        allErrors.push(...result.errors);
       }
     }
 
@@ -211,18 +233,18 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       last_inventory_sync_at: completedAt,
     });
 
-    // 7. Log to square_sync_log (one entry per bin that produced counts)
+    // 7. Log to square_sync_log (one entry per bin that pushed counts or errored)
     for (const br of binResults) {
       await admin.from("square_sync_log").insert({
         sync_type: "inventory_push",
         location_id: br.locationId,
-        items_synced: br.result.itemsSynced,
-        items_failed: br.result.itemsFailed,
+        items_synced: br.itemsSynced,
+        items_failed: br.itemsFailed,
         details: {
           binId: br.binId,
           binName: br.binName,
           squareLocationId: br.squareLocationId,
-          errors: br.result.errors.length > 0 ? br.result.errors : undefined,
+          errors: br.errors.length > 0 ? br.errors : undefined,
           triggeredBy: user.id,
         },
         started_at: startedAt,
@@ -255,8 +277,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         binId: br.binId,
         binName: br.binName,
         squareLocationId: br.squareLocationId,
-        itemsSynced: br.result.itemsSynced,
-        itemsFailed: br.result.itemsFailed,
+        itemsSynced: br.itemsSynced,
+        itemsFailed: br.itemsFailed,
       })),
       errors: allErrors,
     });

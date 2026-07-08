@@ -1,14 +1,12 @@
 /**
  * Square pricing resolution tests.
  *
- * Characterizes the C4 parameterization of taproom pricing into a
- * channel-parameterized resolver:
+ * Characterizes the C4 channel-parameterized price resolver:
  *   - resolveChannelPrices(brandIds, salesChannelId) reads a specific channel.
- *   - resolveTaproomPrices(brandIds) is a thin wrapper that resolves the
- *     taproom channel id then delegates.
  *
- * Parity guarantee: passing the taproom channel id to resolveChannelPrices
- * reproduces exactly what resolveTaproomPrices returns (today's prices).
+ * Parity guarantee (C4 acceptance): passing the taproom channel id reproduces
+ * today's taproom prices byte-for-byte — asserted by the exact-cents case in
+ * the "resolveChannelPrices" block below.
  *
  * Supabase is mocked at @/lib/supabase/server per the repo idiom
  * (see src/lib/__tests__/api-routes.test.ts). The mock builder is faithful
@@ -33,11 +31,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { createAdminClient } from "@/lib/supabase/server";
-import {
-  resolveChannelPrices,
-  resolveTaproomPrices,
-  resolveTaproomChannelId,
-} from "@/integrations/square/pricing";
+import { resolveChannelPrices } from "@/integrations/square/pricing";
 
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 
@@ -45,7 +39,6 @@ const mockedCreateAdminClient = vi.mocked(createAdminClient);
 // Faithful in-memory Supabase mock
 // -----------------------------------------------------------------------------
 
-type ChannelRow = { id: string; code: string };
 type BrandRow = { id: string; name: string };
 type RecipeRow = { id: string; brand_id: string | null; pricing_tier_id: string | null };
 type PriceRow = {
@@ -56,7 +49,6 @@ type PriceRow = {
 };
 
 type Fixtures = {
-  channels: ChannelRow[];
   brands: BrandRow[];
   recipes: RecipeRow[];
   prices: PriceRow[];
@@ -68,32 +60,13 @@ type Thenable = {
 
 /**
  * Builds an object that mimics the Supabase admin client's chainable query
- * builder for exactly the four tables pricing.ts touches. Filter args that
- * matter (code, sales_channel_id) are honored; the rest are pass-through.
+ * builder for the three tables resolveChannelPrices touches (brands, recipes,
+ * pricing_tier_prices). The sales_channel_id filter is honored; the rest are
+ * pass-through.
  */
 function makeAdmin(fixtures: Fixtures) {
   return {
     from(table: string) {
-      if (table === "sales_channels") {
-        let codeFilter: string | undefined;
-        const builder = {
-          select: () => builder,
-          eq: (col: string, val: string) => {
-            if (col === "code") codeFilter = val;
-            return builder;
-          },
-          single: () => {
-            const row = fixtures.channels.find((c) => c.code === codeFilter);
-            return Promise.resolve(
-              row
-                ? { data: { id: row.id }, error: null }
-                : { data: null, error: { message: "not found" } }
-            );
-          },
-        };
-        return builder;
-      }
-
       if (table === "brands") {
         const result = { data: fixtures.brands, error: null };
         const builder = {
@@ -154,10 +127,6 @@ const BRAND_B = "brand-b-uuid";
 const BRAND_IDS = [BRAND_A, BRAND_B];
 
 const baseFixtures: Fixtures = {
-  channels: [
-    { id: TAPROOM_ID, code: "taproom" },
-    { id: WHOLESALE_ID, code: "wholesale" },
-  ],
   brands: [
     { id: BRAND_A, name: "Brand A" },
     { id: BRAND_B, name: "Brand B" },
@@ -178,24 +147,6 @@ const baseFixtures: Fixtures = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-});
-
-describe("resolveTaproomChannelId", () => {
-  it("returns the taproom channel id", async () => {
-    useFixtures(baseFixtures);
-    const admin = (await createAdminClient()) as unknown as Parameters<
-      typeof resolveTaproomChannelId
-    >[0];
-    expect(await resolveTaproomChannelId(admin)).toBe(TAPROOM_ID);
-  });
-
-  it("returns null when the taproom channel is missing", async () => {
-    useFixtures({ ...baseFixtures, channels: [{ id: WHOLESALE_ID, code: "wholesale" }] });
-    const admin = (await createAdminClient()) as unknown as Parameters<
-      typeof resolveTaproomChannelId
-    >[0];
-    expect(await resolveTaproomChannelId(admin)).toBeNull();
-  });
 });
 
 describe("resolveChannelPrices", () => {
@@ -226,29 +177,5 @@ describe("resolveChannelPrices", () => {
   it("returns [] when the channel has no prices", async () => {
     useFixtures(baseFixtures);
     expect(await resolveChannelPrices(BRAND_IDS, "chan-unknown-uuid")).toEqual([]);
-  });
-});
-
-describe("parity: resolveTaproomPrices === resolveChannelPrices(_, taproomId)", () => {
-  it("passing the taproom channel id reproduces today's taproom prices", async () => {
-    useFixtures(baseFixtures);
-    const legacy = await resolveTaproomPrices(BRAND_IDS);
-
-    useFixtures(baseFixtures);
-    const parameterized = await resolveChannelPrices(BRAND_IDS, TAPROOM_ID);
-
-    expect(parameterized).toEqual(legacy);
-    // sanity: parity is non-trivial (there really are prices to compare)
-    expect(legacy.length).toBeGreaterThan(0);
-  });
-
-  it("resolveTaproomPrices returns [] when the taproom channel is missing", async () => {
-    useFixtures({ ...baseFixtures, channels: [{ id: WHOLESALE_ID, code: "wholesale" }] });
-    expect(await resolveTaproomPrices(BRAND_IDS)).toEqual([]);
-  });
-
-  it("resolveTaproomPrices returns [] for empty brandIds", async () => {
-    useFixtures(baseFixtures);
-    expect(await resolveTaproomPrices([])).toEqual([]);
   });
 });
