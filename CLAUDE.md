@@ -18,6 +18,10 @@
 
 Domain source of truth: `docs/knowledge/brewing-domain.md`, `docs/knowledge/entity-model.md` — update those, not agent files, when domain rules change.
 
+## Opus 4.8 tuning
+- Minor choices (naming, defaults, equivalent approaches): pick one and note it — don't ask. Ask only for scope changes or destructive actions.
+- When work fans out across independent files/tests, dispatch the expert agents in parallel rather than iterating serially.
+
 ## Conventions
 - Commit prefixes feat/fix/chore/docs/refactor/perf/ci; NEVER Co-Authored-By lines
 - Query keys only via `src/lib/query-keys.ts`
