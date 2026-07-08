@@ -971,8 +971,8 @@ const lossTables = (): Record<string, Resp[]> => ({
   allocations: [
     {
       data: [
-        { volume_bbl: 0.5, reason_code: null, destination_type: "loss" },
-        { volume_bbl: null, reason_code: null, destination_type: "finished_good" },
+        { volume_bbl: 0.5, idempotency_key: null, destination_type: "loss" },
+        { volume_bbl: null, idempotency_key: null, destination_type: "finished_good" },
       ],
       error: null,
     },
@@ -1131,8 +1131,9 @@ describe("reconcileBatchLoss", () => {
         data: [
           {
             volume_bbl: 1.5,
-            // Guard now keys on the structured reason_code, not the notes prefix (audit #15).
-            reason_code: "reconciliation",
+            // Guard keys on the stable idempotency_key system column, not the
+            // user-editable reason_code/notes (audit #15).
+            idempotency_key: "batch_reconcile:batch-1",
             destination_type: "loss",
           },
         ],
@@ -1145,6 +1146,33 @@ describe("reconcileBatchLoss", () => {
 
     expect(result).toEqual({ success: true, data: 0, invalidate: [] });
     expect(callsByTable.allocations).toHaveLength(1); // guard select only, no insert
+  });
+
+  it("does NOT treat a user-picked reason_code='reconciliation' as the guard — only the idempotency_key counts (audit #15)", async () => {
+    // A manual batch-loss row that happens to carry reason_code='reconciliation'
+    // (a selectable "Completion Reconciliation" option) but no idempotency_key
+    // must not spoof the guard, or legitimate auto-reconciliation is suppressed.
+    const tables = lossTables();
+    tables.allocations = [
+      {
+        data: [
+          { volume_bbl: 0.5, idempotency_key: null, destination_type: "loss" },
+          { volume_bbl: null, idempotency_key: null, destination_type: "finished_good" },
+        ],
+        error: null,
+      },
+      { data: null, error: null }, // insert (writer only) — proves it still fires
+    ];
+    const { supabase, callsByTable } = makeSupabase(tables);
+
+    const result = await reconcileBatchLoss(supabase, "batch-1");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data).toBeCloseTo(1.5); // reconciliation still recorded
+    const inserted = callsByTable.allocations[1].insert.mock.calls[0][0];
+    expect(inserted.idempotency_key).toBe("batch_reconcile:batch-1");
+    expect(inserted.reason_code).toBe("reconciliation");
   });
 
   it("skips while any packaging session for the batch is still open", async () => {
