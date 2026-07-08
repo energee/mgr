@@ -382,6 +382,45 @@ describe("computeBomConsumption", () => {
     const result = computeBomConsumption(lineItems, bomLines);
     expect(result.has("free-item")).toBe(false);
   });
+
+  // Parity contract with the SQL whole_unit_material_qty helper (migration
+  // 00217): revise_packaging_session ceils whole-unit materials in SQL, so it
+  // must agree with this TS ceiling. These exact (quantity_per_unit, units)
+  // fixtures are asserted identically in the helper's live rollback test —
+  // keep both sides in sync if either formula changes.
+  it("matches the SQL whole_unit_material_qty fixtures (migration 00217 parity)", () => {
+    const cases: Array<[number, number, number]> = [
+      [0.0417, 24, 1],
+      [0.0417, 25, 2],
+      [0.0417, 30, 2],
+      [0.0417, 48, 2],
+      [0.25, 10, 3],
+      [2.0, 5, 10],
+      [1.0, 7, 7],
+      [0.1667, 6, 1],
+    ];
+    for (const [qpu, units, expected] of cases) {
+      const result = computeBomConsumption(
+        [{ selling_format_id: "fmt-1", actual_quantity: units }],
+        [{ selling_format_id: "fmt-1", inventory_item_id: "wu", quantity_per_unit: qpu, unit: "each" }],
+      );
+      expect(result.get("wu")).toBe(expected);
+    }
+  });
+
+  it("delta of ceiled whole-unit requirements matches the revise RPC (00217)", () => {
+    // The revise RPC consumes whole_unit(new) - whole_unit(old), NOT ceil(delta):
+    // ceiling is not linear, so a raw ceiled delta would over-consume.
+    const wu = (units: number) =>
+      computeBomConsumption(
+        [{ selling_format_id: "fmt-1", actual_quantity: units }],
+        [{ selling_format_id: "fmt-1", inventory_item_id: "case", quantity_per_unit: 0.0417, unit: "each" }],
+      ).get("case") ?? 0;
+    // 30 -> 36 cans: both ceil to 2 cases, so revising adds 0 (not ceil(6/24)=1).
+    expect(wu(36) - wu(30)).toBe(0);
+    // 30 -> 50 cans: 3 - 2 = 1 additional case.
+    expect(wu(50) - wu(30)).toBe(1);
+  });
 });
 
 describe("computeTransferLoss", () => {
