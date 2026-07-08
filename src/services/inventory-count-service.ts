@@ -14,7 +14,10 @@
  * - Count INCREASE (found stock): allocations cannot add stock to a lot
  *   (CHECK (quantity >= 0) in 00010 + subtract-only view math in 00014),
  *   so increases update inventory_lots.quantity directly and append an
- *   audit line to the lot's notes as the paper trail.
+ *   audit line to the lot's notes as the paper trail. The write is a
+ *   compare-and-swap on the pre-image quantity (`inventory_lots` has no
+ *   `version` column) so a concurrent count/depletion can't be silently
+ *   clobbered by a lost update (audit M15) — a stale write returns CONFLICT.
  * - Exact match: nothing is written.
  */
 
@@ -82,15 +85,29 @@ export async function recordInventoryCount(
       notes: params.notes,
     });
 
-    const { error: updateError } = await supabase
+    // Compare-and-swap on the pre-image quantity: the write only lands if no
+    // concurrent count/depletion changed inventory_lots.quantity between our
+    // read above and this write. ponytail: quantity CAS, not a version column
+    // (the table has none) — ABA (two concurrent writes netting to the same
+    // quantity) is not distinguished, acceptable for a manual count dialog.
+    const { data: updatedRows, error: updateError } = await supabase
       .from("inventory_lots")
       .update({
         quantity: lot.quantity + plan.delta,
         notes: appendLotNote(lot.notes, auditNote),
       })
-      .eq("id", params.lotId);
+      .eq("id", params.lotId)
+      .eq("quantity", lot.quantity)
+      .select("id");
     if (updateError)
       return err(parseSupabaseError(updateError, { table: "inventory_lots" }));
+    if (!updatedRows || updatedRows.length === 0)
+      return err({
+        code: "CONFLICT",
+        currentVersion: lot.quantity,
+        message:
+          "This lot's on-hand changed while you were counting. Refresh and re-count.",
+      });
 
     return ok(plan);
   } catch (e) {
