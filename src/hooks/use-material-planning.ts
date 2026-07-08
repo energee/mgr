@@ -183,12 +183,13 @@ export function useOrderMaterials(orderId: string | null) {
  * Steps:
  * 1. Fetch all session_line_items for the session with their planned_quantity and selling_format_id.
  * 2. Fetch selling_format_materials for those format IDs to get per-unit BOM.
- * 3. Aggregate total required quantity per inventory_item across all line items.
- *    Whole-unit rows use exact integer math from the recovered BOM ratio
- *    when possible (avoids precision drift from the 4-decimal storage).
+ * 3. Aggregate required quantity per (batch, inventory_item), then ceil each
+ *    batch's whole-unit need before summing across batches — matching the
+ *    completion path's per-batch consumption (M8). Whole-unit rows use exact
+ *    integer math from the recovered BOM ratio (avoids 4-decimal drift).
  * 4. Fetch on-hand quantities from inventory_lots_with_quantities.
- * 5. Ceil whole-unit need / floor whole-unit on-hand once here so consumers
- *    render directly. Return items sorted by shortfall descending.
+ * 5. Floor whole-unit on-hand so consumers render integers directly. Return
+ *    items sorted by shortfall descending.
  */
 export function useSessionMaterialPreview(sessionId: string | null) {
   const supabase = createClient();
@@ -197,7 +198,7 @@ export function useSessionMaterialPreview(sessionId: string | null) {
     queryFn: async (): Promise<SessionMaterialPreview[]> => {
       // Step 1: Get line items for session
       const { data: lineItems, error: lineErr } = await dynamicFrom(supabase, "session_line_items")
-        .select("selling_format_id, planned_quantity")
+        .select("selling_format_id, planned_quantity, batch_id")
         .eq("session_id", sessionId!);
       if (lineErr) throw lineErr;
       if (!lineItems || lineItems.length === 0) return [];
@@ -205,6 +206,7 @@ export function useSessionMaterialPreview(sessionId: string | null) {
       const typedLineItems = lineItems as unknown as Array<{
         selling_format_id: string | null;
         planned_quantity: number | null;
+        batch_id: string | null;
       }>;
 
       // Collect unique selling format IDs that have a BOM
@@ -240,7 +242,7 @@ export function useSessionMaterialPreview(sessionId: string | null) {
         } | null;
       }>;
 
-      // Step 3: Aggregate required quantities per inventory_item.
+      // Step 3: Aggregate required quantities per (batch, inventory_item).
       //
       // For whole-unit materials (each, case) where we can recover a clean
       // integer ratio from the stored decimal (`1/24` from `0.0417`), use
@@ -255,8 +257,6 @@ export function useSessionMaterialPreview(sessionId: string | null) {
         total_required: number;
         is_whole_unit: boolean;
       };
-      const aggregated = new Map<string, AggEntry>();
-
       // Pre-index BOM by selling_format_id for O(1) lookup. Whole/ratio are
       // loop-invariant per BOM row, so precompute alongside the index.
       type BomEntry = typeof typedBOM[number] & {
@@ -279,26 +279,57 @@ export function useSessionMaterialPreview(sessionId: string | null) {
         }
       }
 
+      // Accumulate raw required quantity per (batch, inventory_item). Whole-unit
+      // materials are ceiled PER BATCH before summing (below), mirroring the
+      // completion path: consumePackagingMaterials
+      // (src/services/consumption-service.ts) groups line items by batch and
+      // ceils each batch's whole-unit need on its own, because a partial
+      // case/tray cannot be shared across two different batches. Bulk materials
+      // just sum. (M8: per-batch is the canonical ceiling semantic.)
+      const perBatch = new Map<string, Map<string, number>>();
+      const itemMeta = new Map<string, Omit<AggEntry, "total_required">>();
       for (const li of typedLineItems) {
         if (!li.selling_format_id || li.planned_quantity == null) continue;
-        const bomForFormat = bomByFormat.get(li.selling_format_id) ?? [];
-        for (const bom of bomForFormat) {
+        const batchKey = li.batch_id ?? "nobatch";
+        let byItem = perBatch.get(batchKey);
+        if (!byItem) {
+          byItem = new Map<string, number>();
+          perBatch.set(batchKey, byItem);
+        }
+        for (const bom of bomByFormat.get(li.selling_format_id) ?? []) {
           const required = bom._ratio
             ? (li.planned_quantity * bom._ratio.numerator) / bom._ratio.denominator
             : bom.quantity_per_unit * li.planned_quantity;
-          const existing = aggregated.get(bom.inventory_item_id);
-          if (existing) {
-            existing.total_required += required;
-          } else {
-            aggregated.set(bom.inventory_item_id, {
+          byItem.set(
+            bom.inventory_item_id,
+            (byItem.get(bom.inventory_item_id) ?? 0) + required,
+          );
+          if (!itemMeta.has(bom.inventory_item_id)) {
+            itemMeta.set(bom.inventory_item_id, {
               inventory_item_id: bom.inventory_item_id,
               inventory_item_name: bom.inventory_item?.name ?? bom.inventory_item_id,
               sku: bom.inventory_item?.sku ?? null,
               category: bom.inventory_item?.category ?? null,
               unit: bom.inventory_item?.unit ?? null,
-              total_required: required,
               is_whole_unit: bom._whole,
             });
+          }
+        }
+      }
+
+      // Collapse to per-item totals: ceil each batch's whole-unit contribution
+      // (Math.ceil(raw - 1e-9) matches computeBomConsumption), then sum across
+      // batches. Bulk contributions sum unchanged.
+      const aggregated = new Map<string, AggEntry>();
+      for (const byItem of perBatch.values()) {
+        for (const [itemId, raw] of byItem) {
+          const meta = itemMeta.get(itemId)!;
+          const contribution = meta.is_whole_unit ? Math.ceil(raw - 1e-9) : raw;
+          const existing = aggregated.get(itemId);
+          if (existing) {
+            existing.total_required += contribution;
+          } else {
+            aggregated.set(itemId, { ...meta, total_required: contribution });
           }
         }
       }
@@ -322,23 +353,19 @@ export function useSessionMaterialPreview(sessionId: string | null) {
         onHandMap.set(row.inventory_item_id, prev + (row.remaining_quantity ?? 0));
       }
 
-      // Step 5: Build result sorted by shortfall descending.
-      // Whole-unit values are ceiled/floored once here so consumers render
-      // directly without rounding logic of their own.
+      // Step 5: Build result sorted by shortfall descending. total_required is
+      // already per-batch-ceiled above; only on-hand needs flooring for
+      // whole-unit materials so consumers render integers directly.
       const result: SessionMaterialPreview[] = [];
       for (const entry of aggregated.values()) {
         const onHandRaw = onHandMap.get(entry.inventory_item_id) ?? 0;
-        const total_required = entry.is_whole_unit
-          ? Math.ceil(entry.total_required)
-          : entry.total_required;
         const on_hand_quantity = entry.is_whole_unit
           ? Math.floor(onHandRaw)
           : onHandRaw;
         result.push({
           ...entry,
-          total_required,
           on_hand_quantity,
-          shortfall: Math.max(0, total_required - on_hand_quantity),
+          shortfall: Math.max(0, entry.total_required - on_hand_quantity),
         });
       }
 
