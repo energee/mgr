@@ -10,26 +10,29 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc, dynamicFrom } from "./types";
 
-/** Result from the get_inventory_overview RPC function. */
+/**
+ * Result from the get_inventory_overview RPC function.
+ * Shape matches the SQL function (00208) and the UI consumer
+ * (src/components/domain/inventory/inventory-alerts.tsx).
+ */
 export type InventoryOverview = {
   finished_goods: Array<{
-    brand_name: string;
-    package_type_name: string;
-    available_quantity: number;
-    committed_quantity: number;
+    brand: string;
+    package_type: string;
     total_quantity: number;
+    available_quantity: number;
+  }>;
+  raw_materials: Array<{
+    item_name: string;
+    item_type: string;
+    quantity_available: number;
+    unit: string;
   }>;
   batches_in_progress: Array<{
     batch_code: string;
     recipe_name: string;
     status: string;
-    volume_bbl: number;
-  }>;
-  low_stock_items: Array<{
-    item_name: string;
-    current_quantity: number;
-    min_quantity: number;
-    unit: string;
+    planned_start: string | null;
   }>;
 }
 
