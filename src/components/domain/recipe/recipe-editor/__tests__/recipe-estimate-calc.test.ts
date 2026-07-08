@@ -47,6 +47,32 @@ describe("getHopUtilizationFactor", () => {
     expect(getHopUtilizationFactor("dry_hop")).toBe(0);
     expect(getHopUtilizationFactor("unknown")).toBe(0);
   });
+
+  // Parity contract with the SQL hop_utilization_factor helper (migration
+  // 00218): recipes_with_estimates computes IBU in SQL, so it must agree with
+  // this TS utilization. These exact fixtures are asserted identically in the
+  // helper's live rollback test — keep both sides in sync if the formula
+  // changes. (M1/M2: Tinseth is the single source of truth.)
+  it("matches the SQL hop_utilization_factor fixtures (migration 00218 parity)", () => {
+    const cases: Array<[string, number | null, number, number]> = [
+      // [timing, boilTimeMin, gravity, expected]
+      ["boil", 60, 1.05, 0.23067],
+      ["boil", 15, 1.05, 0.11446],
+      ["boil", 5, 1.05, 0.04599],
+      ["boil", 0, 1.05, 0],
+      ["first_wort", null, 1.05, 0.23067],
+      ["whirlpool", null, 1.05, 0.05],
+      ["mash", null, 1.05, 0.08],
+      ["dry_hop", null, 1.05, 0],
+      // higher gravity lowers utilization (bigness term)
+      ["boil", 60, 1.08, 0.17615],
+    ];
+    for (const [timing, bt, gravity, expected] of cases) {
+      expect(getHopUtilizationFactor(timing, bt, gravity)).toBeCloseTo(expected, 4);
+    }
+    // Null gravity falls back to 1.050, same as the SQL helper's COALESCE.
+    expect(getHopUtilizationFactor("boil", 60, null)).toBeCloseTo(0.23067, 4);
+  });
 });
 
 describe("calculateEstimates", () => {

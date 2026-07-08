@@ -9,7 +9,9 @@
  * chains the service calls:
  *   - allocations: .insert(payload) -> { error }
  *   - inventory_lots (read): .select().eq().single() -> { data, error }
- *   - inventory_lots (write): .update(payload).eq() -> { error }
+ *   - inventory_lots (write): .update(payload).eq(id).eq(quantity CAS)
+ *       .select("id") -> { data: rows, error }  (empty rows = lost-update
+ *       conflict; see audit M15)
  *
  * These tests pin *current* behavior (including quirks), not aspirational
  * behavior — see inline QUIRK notes.
@@ -33,7 +35,12 @@ type LotRow = { id: string; quantity: number; notes: string | null };
 function makeSupabase(opts: {
   insertResult?: { error: unknown };
   selectResult?: { data: LotRow | null; error: unknown };
-  updateResult?: { error: unknown };
+  /**
+   * Result of the increase-path CAS write's terminal `.select("id")`. Default
+   * models one row updated (CAS hit): `{ data: [{ id: "lot-1" }], error: null }`.
+   * An empty `data` array models the lost-update conflict (CAS miss).
+   */
+  updateResult?: { data: { id: string }[] | null; error: unknown };
 }) {
   const insertSpy = vi.fn(() => Promise.resolve(opts.insertResult ?? { error: null }));
 
@@ -43,9 +50,14 @@ function makeSupabase(opts: {
   const selectEqSpy = vi.fn(() => ({ single: singleSpy }));
   const selectSpy = vi.fn(() => ({ eq: selectEqSpy }));
 
-  const updateEqSpy = vi.fn(() => Promise.resolve(opts.updateResult ?? { error: null }));
+  // Write chain: .update(payload).eq("id", ...).eq("quantity", ...).select("id")
+  const updateSelectSpy = vi.fn(() =>
+    Promise.resolve(opts.updateResult ?? { data: [{ id: "lot-1" }], error: null })
+  );
+  const updateQtyEqSpy = vi.fn(() => ({ select: updateSelectSpy }));
+  const updateIdEqSpy = vi.fn(() => ({ eq: updateQtyEqSpy }));
   const updateSpy = vi.fn((_payload: { quantity: number; notes: string }) => ({
-    eq: updateEqSpy,
+    eq: updateIdEqSpy,
   }));
 
   const fromSpy = vi.fn((table: string) => {
@@ -67,7 +79,9 @@ function makeSupabase(opts: {
     selectEqSpy,
     singleSpy,
     updateSpy,
-    updateEqSpy,
+    updateIdEqSpy,
+    updateQtyEqSpy,
+    updateSelectSpy,
   };
 }
 
@@ -213,10 +227,17 @@ describe("recordInventoryCount", () => {
     });
 
     it("reads the lot fresh, then updates quantity and appends an audit note to existing notes", async () => {
-      const { supabase, fromSpy, selectSpy, selectEqSpy, updateSpy, updateEqSpy } =
-        makeSupabase({
-          selectResult: { data: { id: "lot-1", quantity: 10, notes: "prior note" }, error: null },
-        });
+      const {
+        supabase,
+        fromSpy,
+        selectSpy,
+        selectEqSpy,
+        updateSpy,
+        updateIdEqSpy,
+        updateQtyEqSpy,
+      } = makeSupabase({
+        selectResult: { data: { id: "lot-1", quantity: 10, notes: "prior note" }, error: null },
+      });
 
       const result = await recordInventoryCount(supabase, {
         lotId: "lot-1",
@@ -242,7 +263,9 @@ describe("recordInventoryCount", () => {
         quantity: 14, // lot.quantity (10) + delta (4)
         notes: expectedNotes,
       });
-      expect(updateEqSpy).toHaveBeenCalledWith("id", "lot-1");
+      expect(updateIdEqSpy).toHaveBeenCalledWith("id", "lot-1");
+      // CAS guard: the write is filtered on the pre-image quantity we read.
+      expect(updateQtyEqSpy).toHaveBeenCalledWith("quantity", 10);
 
       expect(result).toEqual({
         success: true,
@@ -317,7 +340,7 @@ describe("recordInventoryCount", () => {
         // which table the denial came from.
         const { supabase, updateSpy } = makeSupabase({
           selectResult: { data: { id: "lot-1", quantity: 10, notes: null }, error: null },
-          updateResult: { error: { code: "42501", message: "not allowed" } },
+          updateResult: { data: null, error: { code: "42501", message: "not allowed" } },
         });
 
         const result = await recordInventoryCount(supabase, {
@@ -330,6 +353,36 @@ describe("recordInventoryCount", () => {
         expect(result).toEqual({
           success: false,
           error: { code: "RLS_DENIED", message: "not allowed" },
+        });
+      }
+    );
+
+    it(
+      "returns CONFLICT (lost-update) when the CAS write matches no rows — " +
+        "the lot's quantity changed between our read and write (audit M15)",
+      async () => {
+        const { supabase, updateSpy } = makeSupabase({
+          selectResult: { data: { id: "lot-1", quantity: 10, notes: null }, error: null },
+          // CAS miss: `.eq("quantity", 10)` matched nothing because a concurrent
+          // write moved the lot off 10. PostgREST returns an empty row set.
+          updateResult: { data: [], error: null },
+        });
+
+        const result = await recordInventoryCount(supabase, {
+          lotId: "lot-1",
+          expectedQuantity: 10,
+          countedQuantity: 12,
+        });
+
+        expect(updateSpy).toHaveBeenCalled();
+        expect(result).toEqual({
+          success: false,
+          error: {
+            code: "CONFLICT",
+            currentVersion: 10, // the pre-image quantity we based the write on
+            message:
+              "This lot's on-hand changed while you were counting. Refresh and re-count.",
+          },
         });
       }
     );
