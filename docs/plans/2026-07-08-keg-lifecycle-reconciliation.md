@@ -25,8 +25,10 @@ variance (foam, comps, over-pour, shrinkage, theft).
 
 1. **Fill-instance QR.** A new QR label is printed **at packaging/fill time**, one
    per physical keg (an N-keg fill produces N labels). The label identifies *this
-   fill* (brand, selling format, volume, batch, fill date) — **not** a durable
-   physical-asset id. No permanent keg-asset registry in v1.
+   fill* (brand, selling format, batch, fill date) — **not** a durable
+   physical-asset id. No permanent keg-asset registry in v1. A scan resolves the
+   **SKU** (brand) and **keg type/size** (1/2 BBL, 1/6 BBL…) straight from the
+   fill's `selling_format → container`; we **do not snapshot a per-keg volume**.
 2. **Taps are serving slots.** A **tap** belongs to a bin (the taproom
    cold-room/keg cooler) and holds **at most one active keg at a time**. The keg
    stays physically in the bin while on tap (lines run to the tap) — the binding
@@ -42,11 +44,14 @@ variance (foam, comps, over-pour, shrinkage, theft).
    be advertised to Square as a sellable whole keg. → **edits the shipped
    `sellable_inventory` / `keg_filled_contents` (Milestone C era) to exclude (or
    reclassify) `on_tap` kegs.**
-6. **Reconciliation per keg:** expected = container `volume_oz`; actual = Σ
-   `square_draft_sales.volume_oz` for that brand at that bin during the keg's tap
-   window; variance = expected − actual. Exact per-keg for this brewery (they do
-   **not** run the same brand on two taps at once, so brand → the one active keg is
-   unambiguous). Pool-level fallback documented for same-brand multi-tap.
+6. **Reconciliation per keg (kept — the audit overlay).** expected = the keg's
+   **size**, i.e. `containers.volume_oz` reached via `keg_fills.selling_format_id →
+   container` — **no per-fill volume snapshot**; kegs are always filled whole, so
+   size = volume exactly. actual = Σ `square_draft_sales.volume_oz` for that brand
+   at that bin during the keg's tap window; variance = expected − actual. Exact
+   per-keg for this brewery (they do **not** run the same brand on two taps at once,
+   so brand → the one active keg is unambiguous). Pool-level fallback documented for
+   same-brand multi-tap.
 7. **Draft pours are never used to *decide* an empty** — only to compare. The scan
    is authoritative.
 
@@ -84,10 +89,11 @@ keg_fills            -- one row per physical keg filled (a "fill instance")
   id                 uuid pk
   qr_token           text unique         -- printed on the label; scanned at swap
   finished_good_id   uuid -> finished_goods
-  brand_id           uuid -> brands
+  brand_id           uuid -> brands       -- the SKU (brand)
   selling_format_id  uuid -> selling_formats
-  container_id       uuid -> containers   -- for volume_oz snapshot
-  volume_oz          numeric              -- snapshot at fill (calibration knob)
+  container_id       uuid -> containers   -- keg type/size (1/2 BBL, 1/6 BBL…);
+                                          --   nominal volume via containers.volume_oz
+                                          --   on demand — NOT snapshotted per fill
   bin_id             uuid -> bins         -- where it physically lives
   packaging_session_id uuid -> packaging_sessions
   state              text                 -- filled | on_tap | empty
@@ -114,7 +120,8 @@ keg_tap_bindings
   unbound_at   timestamptz null   -- set when the next keg is scanned onto this tap
 ```
 
-**Reconciliation** for a closed binding: `expected = keg_fills.volume_oz`; `actual =
+**Reconciliation** for a closed binding: `expected = containers.volume_oz` (the keg's
+size, via `keg_fills.selling_format_id → container` — no per-fill snapshot); `actual =
 Σ square_draft_sales.volume_oz WHERE brand_id = keg_fills.brand_id AND bin =
 tap.bin_id AND sold_at ∈ [bound_at, unbound_at]`; `variance = expected − actual`.
 
