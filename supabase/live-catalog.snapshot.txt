@@ -21,6 +21,7 @@ FUNC|create_keg_ship_transactions_from_order(p_order_id uuid)|1522232adc48aaa379
 FUNC|create_notification(p_user_id uuid, p_type text, p_title text, p_message text, p_entity_type text, p_entity_id uuid, p_priority text, p_action_url text, p_metadata jsonb)|2af2115d2e5d40ee5b446f8ae60cfbce
 FUNC|create_user_preferences()|f248145e572c69bb35b2e7109d3ebf87
 FUNC|create_user_profile()|e3be190b6698efa7c86a10cbbcd208c0
+FUNC|debit_bin_inventory(p_bin_id uuid, p_finished_good_id uuid, p_qty integer)|ce93b24119168088b2f6000ab4ef3120
 FUNC|dismiss_notification(p_notification_id uuid)|d575be856ecba8b1ff3d2c49483022a4
 FUNC|dismiss_notifications_bulk(p_notification_ids uuid[])|367cc4ef273279ad08105754d66350bd
 FUNC|dispatch_email_notification(p_user_id uuid, p_type text, p_title text, p_message text, p_priority text, p_action_url text, p_metadata jsonb)|b9c1c74b6ecd14b2246470bdfd6ef27b

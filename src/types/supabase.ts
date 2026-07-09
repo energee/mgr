@@ -10206,6 +10206,13 @@ export type Database = {
         }
         Returns: string
       }
+      debit_bin_inventory: {
+        Args: { p_bin_id: string; p_finished_good_id: string; p_qty: number }
+        Returns: {
+          clamped: boolean
+          new_quantity: number
+        }[]
+      }
       dismiss_notification: {
         Args: { p_notification_id: string }
         Returns: undefined

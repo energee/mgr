@@ -8,8 +8,11 @@
  * verification using the webhook_signature_key stored in square_settings.
  *
  * Supported event types:
- *   - payment.completed: Ingests sale data, creates allocations for packaged
- *     goods and draft sale records for draft pours.
+ *   - payment.completed: Ingests sale data. Packaged lines resolve the Square
+ *     location to a POS bin, debit that bin's FIFO finished good (RPC
+ *     debit_bin_inventory) and record a taproom_sale allocation; oversells clamp
+ *     the bin to 0 and are surfaced in the response + sync log. Draft pours are
+ *     staged in square_draft_sales (keg depletion is deferred).
  *   - inventory.count.updated: Logged for informational purposes only (MGR is
  *     the source of truth for inventory).
  *   - All other events: Acknowledged with 200 but ignored.
@@ -64,6 +67,20 @@ type SquareWebhookEvent = {
     };
   };
 }
+
+/**
+ * A packaged sale line whose sold quantity exceeded the physical count in its
+ * resolved POS bin (D3 oversell). The bin was clamped to 0; the sale still
+ * succeeds (itemsSynced). Surfaced in the webhook response and durably in
+ * square_sync_log.details so the POS/caller can reconcile.
+ */
+type OversoldLine = {
+  lineItemUid: string;
+  brandId: string;
+  sellingFormatId: string;
+  soldQty: number;
+  binQuantityBefore: number;
+};
 
 export async function POST(request: NextRequest) {
   // 1. Read raw body as text (needed for signature verification)
@@ -148,11 +165,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, ignored: replay.reason });
   }
 
+  let oversoldLines: OversoldLine[] = [];
   try {
     switch (event.type) {
-      case "payment.completed":
-        await handlePaymentCompleted(event);
+      case "payment.completed": {
+        const result = await handlePaymentCompleted(event);
+        oversoldLines = result?.oversoldLines ?? [];
         break;
+      }
 
       case "inventory.count.updated":
         await handleInventoryCountUpdated(event);
@@ -172,7 +192,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "processing_failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ received: true });
+  // D3: the sale succeeded, but one or more packaged lines sold more units than
+  // the resolved bin physically held (clamped to 0). Surface them so the caller
+  // can reconcile; they are also recorded in square_sync_log.details.
+  return NextResponse.json(
+    oversoldLines.length > 0
+      ? { received: true, oversoldLines }
+      : { received: true }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -262,21 +289,32 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       return;
     }
 
-    // Resolve the MGR location from the Square location ID
-    let locationId: string | null = null;
+    // Resolve the POS bin from the Square location ID (D1). Bins are the POS
+    // targets in the bin-sync model: a Square location maps to at most one bin
+    // (partial-unique index bins_unique_square_location). Packaged lines debit
+    // this bin's finished-good stock; draft lines derive their MGR location from
+    // it. Unmapped Square locations flag their lines below rather than guessing.
+    let resolvedBin: {
+      id: string;
+      location_id: string;
+      pos_sales_channel_id: string | null;
+    } | null = null;
     if (squareLocationId) {
-      const { data: location } = await admin
-        .from("locations")
-        .select("id")
+      const { data: bin } = await admin
+        .from("bins")
+        .select("id, location_id, pos_sales_channel_id")
         .eq("square_location_id", squareLocationId)
         .maybeSingle();
-
-      locationId = location?.id ?? null;
+      resolvedBin = bin ?? null;
     }
+    // MGR location used for draft staging (below) and the sync-log row. Derived
+    // once from the resolved bin so both the packaged and draft branches agree.
+    const locationId: string | null = resolvedBin?.location_id ?? null;
 
     let itemsSynced = 0;
     let itemsFailed = 0;
     const errors: Array<{ lineItemUid: string; error: string }> = [];
+    const oversoldLines: OversoldLine[] = [];
 
     for (const lineItem of order.lineItems) {
       const catalogObjectId = lineItem.catalogObjectId;
@@ -317,32 +355,53 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
 
         if (!isDraft) {
           // ---------------------------------------------------------------
-          // Packaged good sale: create a completed allocation
+          // Packaged good sale: debit the resolved bin's FIFO finished good
+          // (D2) and record a taproom_sale allocation (audit/TTB ledger).
           // ---------------------------------------------------------------
 
-          // Find the most relevant finished good for this brand + selling format
-          // (pick the one with the most available stock via FIFO by production date)
-          const { data: fg } = await dynamicFrom(admin, "finished_goods_with_availability")
-            .select("id")
-            .eq("brand_id", mapping.brand_id)
-            .eq("selling_format_id", mapping.selling_format_id)
-            .gt("available_quantity", 0)
-            .order("production_date", { ascending: true })
-            .limit(1)
-            .maybeSingle();
-
-          if (!fg) {
+          // A packaged sale must land in a mapped POS bin; without one we cannot
+          // know which physical stock to debit, so flag the line (D1).
+          if (!resolvedBin) {
             itemsFailed++;
             errors.push({
               lineItemUid: lineItem.uid ?? "unknown",
-              error: `No finished good with available inventory found for brand ${mapping.brand_id} / selling format ${mapping.selling_format_id}`,
+              error: `Square location ${squareLocationId} is not mapped to a POS bin`,
             });
             continue;
           }
 
+          // Pick the finished good to debit: FIFO by production date, restricted
+          // to stock physically in THIS bin for the sold brand + selling format.
+          // Uses dynamicFrom because the strongly-typed builder rejects the
+          // embedded-resource filters (finished_goods.brand_id) — same idiom the
+          // old finished_goods_with_availability lookup used.
+          const { data: binRow } = await dynamicFrom(admin, "bin_inventory")
+            .select(
+              "finished_good_id, quantity, finished_goods!inner(production_date, brand_id, selling_format_id)"
+            )
+            .eq("bin_id", resolvedBin.id)
+            .eq("finished_goods.brand_id", mapping.brand_id)
+            .eq("finished_goods.selling_format_id", mapping.selling_format_id)
+            .gt("quantity", 0)
+            .order("production_date", { ascending: true, referencedTable: "finished_goods" })
+            .limit(1)
+            .maybeSingle();
+
+          if (!binRow) {
+            itemsFailed++;
+            errors.push({
+              lineItemUid: lineItem.uid ?? "unknown",
+              error: `No finished good with available inventory in bin ${resolvedBin.id} for brand ${mapping.brand_id} / selling format ${mapping.selling_format_id}`,
+            });
+            continue;
+          }
+
+          // Audit/TTB ledger: records what was SOLD (full quantity). Independent
+          // of the physical bin count debited below — only this path writes
+          // bin_inventory, so keeping both is not a double-count.
           await admin.from("allocations").insert({
             source_type: "finished_good",
-            source_id: fg.id,
+            source_id: binRow.finished_good_id,
             destination_type: "taproom_sale",
             destination_id: null,
             quantity,
@@ -350,6 +409,28 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
             completed_at: event.created_at ?? new Date().toISOString(),
             notes: `Square order ${orderId}`,
           });
+
+          // Physical debit (D2): atomic, row-locked RPC that clamps to 0 on
+          // oversell (never negative). We do NOT clamp the allocation quantity
+          // above — the ledgers are intentionally independent.
+          const { data: debit } = await admin.rpc("debit_bin_inventory", {
+            p_bin_id: resolvedBin.id,
+            p_finished_good_id: binRow.finished_good_id,
+            p_qty: quantity,
+          });
+          const debitRow = debit?.[0];
+
+          // Oversell (D3): sold more than the bin held. The sale still succeeds
+          // (the bin clamped to 0); collect the line for the response + log.
+          if (debitRow?.clamped) {
+            oversoldLines.push({
+              lineItemUid: lineItem.uid ?? "unknown",
+              brandId: mapping.brand_id,
+              sellingFormatId: mapping.selling_format_id,
+              soldQty: quantity,
+              binQuantityBefore: binRow.quantity,
+            });
+          }
 
           itemsSynced++;
         } else {
@@ -361,7 +442,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
             itemsFailed++;
             errors.push({
               lineItemUid: lineItem.uid ?? "unknown",
-              error: `Draft sale requires a mapped location but Square location ${squareLocationId} is not mapped to an MGR location`,
+              error: `Draft sale requires a mapped location but Square location ${squareLocationId} is not mapped to a POS bin`,
             });
             continue;
           }
@@ -401,6 +482,7 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       square_location_id: squareLocationId,
       line_item_count: order.lineItems.length,
       ...(errors.length > 0 ? { errors } : {}),
+      ...(oversoldLines.length > 0 ? { oversoldLines } : {}),
     };
 
     if (logId) {
@@ -425,6 +507,9 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
         completed_at: new Date().toISOString(),
       });
     }
+
+    // Return the oversold lines (D3) so POST can echo them in the response.
+    return { oversoldLines };
   } catch (err) {
     // Free the claimed slot on failure so Square's retry can re-process.
     if (logId) {
