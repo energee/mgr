@@ -61,6 +61,7 @@ compose; ours is additive and must not assume it runs alone.
 
 | File | Change |
 |---|---|
+| `.gitignore` | un-ignore `/.claude/hooks/**` — `/.claude/*` is an allowlist and would otherwise leave the hook untracked |
 | `.claude/hooks/expert-context.ts` | new — the hook |
 | `.claude/hooks/expert-context.test.ts` | new — vitest unit test |
 | `.claude/settings.json` | register `PreToolUse` / `Edit\|Write` |
