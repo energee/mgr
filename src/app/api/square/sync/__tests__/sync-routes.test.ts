@@ -25,15 +25,15 @@
  *     - square_sync_log rows are written in ONE batched insert; location_id is the
  *       view's location uuid (not the Square id).
  *
- * The Supabase admin client is mocked with a small faithful chainable builder
- * per the repo idiom (see src/integrations/square/__tests__/pricing.test.ts).
- * withPermission is stubbed to a pass-through so the handler logic is exercised
- * directly.
+ * The Supabase admin client is faked with the shared admin mock
+ * (src/test/supabase-admin-mock.ts). withPermission is stubbed to a pass-through
+ * so the handler logic is exercised directly.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import type { SquareSyncResult } from "@/integrations/square/types";
+import { makeAdminMock, type TableData, type Write } from "@/test/supabase-admin-mock";
 
 // -----------------------------------------------------------------------------
 // Mocks (must precede route imports)
@@ -87,45 +87,19 @@ const mockedPushInventoryCounts = vi.mocked(pushInventoryCounts);
 const mockedResolveChannelPrices = vi.mocked(resolveChannelPrices);
 
 // -----------------------------------------------------------------------------
-// In-memory admin builder
+// In-memory admin (shared mock)
 // -----------------------------------------------------------------------------
 
-type QueryResult = { data: unknown; error: unknown };
-type TableData = Record<string, QueryResult>;
+/** Every write the handler performs, in order. Re-created by useTables. */
+let writes: Write[];
 
-const inserted: Array<{ table: string; row: unknown }> = [];
-
-function makeAdmin(tables: TableData) {
-  return {
-    from(table: string) {
-      const result: QueryResult = tables[table] ?? { data: [], error: null };
-      const builder = {
-        select: () => builder,
-        not: () => builder,
-        in: () => builder,
-        gt: () => builder,
-        eq: () => builder,
-        order: () => builder,
-        single: () => Promise.resolve(result),
-        insert: (row: unknown) => {
-          inserted.push({ table, row });
-          return {
-            then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-              Promise.resolve({ error: null }).then(onF, onR),
-          };
-        },
-        then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-          Promise.resolve(result).then(onF, onR),
-      };
-      return builder;
-    },
-  };
-}
+/** Rows the handler inserted, filtered from the write log. */
+const inserted = () => writes.filter((w) => w.op === "insert");
 
 function useTables(tables: TableData) {
-  mockedCreateAdminClient.mockImplementation(
-    async () => makeAdmin(tables) as unknown as Awaited<ReturnType<typeof createAdminClient>>
-  );
+  const mock = makeAdminMock(tables);
+  writes = mock.writes;
+  mockedCreateAdminClient.mockResolvedValue(mock.admin as never);
 }
 
 const SYNC_RESULT = (n: number): SquareSyncResult => ({
@@ -149,7 +123,6 @@ const req = () => new NextRequest("http://localhost/api/square/sync");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  inserted.length = 0;
   mockedGetSquareClient.mockResolvedValue({} as never);
   mockedUpdateSquareSettings.mockResolvedValue(undefined as never);
 });
@@ -243,7 +216,7 @@ describe("catalog sync (bin-driven)", () => {
     expect(mockedDeleteStaleItems).toHaveBeenCalledWith(expect.anything(), expect.arrayContaining(["brand-1", "brand-2"]));
 
     // log records the POS bin count
-    const log = inserted.find((i) => i.table === "square_sync_log")!.row as {
+    const log = inserted().find((i) => i.table === "square_sync_log")!.row as {
       details: { posBinCount: number };
     };
     expect(log.details.posBinCount).toBe(2);
@@ -388,7 +361,7 @@ describe("catalog sync (bin-driven)", () => {
     const body = await res.json();
     expect(body.data.unpricedVariations).toEqual(["Brand One / 16oz 4-Pack"]);
     // and it's durable in the sync log, not just the response
-    const log = inserted.find((i) => i.table === "square_sync_log")!.row as {
+    const log = inserted().find((i) => i.table === "square_sync_log")!.row as {
       details: { unpricedVariations?: string[] };
     };
     expect(log.details.unpricedVariations).toEqual(["Brand One / 16oz 4-Pack"]);
@@ -470,7 +443,7 @@ describe("inventory sync (bin-driven)", () => {
     expect(bin2Counts).toHaveLength(2);
 
     // E2: ONE batched insert whose payload is the array of per-bin rows.
-    const logInserts = inserted.filter((i) => i.table === "square_sync_log");
+    const logInserts = inserted().filter((i) => i.table === "square_sync_log");
     expect(logInserts).toHaveLength(1);
     const logs = logInserts[0].row as Array<{
       location_id: string | null;
@@ -554,7 +527,7 @@ describe("inventory sync (bin-driven)", () => {
     expect(mockedPushInventoryCounts).not.toHaveBeenCalled();
     // F4: the mapping error is durably logged per-bin (batched insert), not just
     // in the response.
-    const logRows = inserted.find((i) => i.table === "square_sync_log")!.row as Array<{
+    const logRows = inserted().find((i) => i.table === "square_sync_log")!.row as Array<{
       details: { errors?: Array<{ itemId: string }> };
     }>;
     expect(logRows[0].details.errors).toEqual([

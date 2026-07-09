@@ -10,12 +10,13 @@
  *       100). A chunk that fails retains its map rows while succeeded chunks still
  *       drop theirs.
  *
- * createAdminClient and the Square SDK client are mocked with small in-memory
- * fakes (repo idiom — see pricing.test.ts). The client-logger is silenced.
+ * createAdminClient is faked with the shared admin mock (src/test/supabase-admin-mock.ts);
+ * the Square SDK client with a small in-memory stub. The client-logger is silenced.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { SquareClient } from "square";
+import { makeAdminMock, type Write } from "@/test/supabase-admin-mock";
 
 vi.mock("@/lib/supabase/server", () => ({
   createAdminClient: vi.fn(),
@@ -39,29 +40,20 @@ type StaleEntry = {
 };
 
 /**
- * In-memory admin whose square_catalog_map select resolves to `staleEntries` and
- * whose .delete().in("id", ids) records the deleted ids (so the test can assert
- * exactly which local rows were removed).
+ * Admin whose square_catalog_map select resolves to `staleEntries`. Installs it
+ * as createAdminClient's result and returns the recorder's write log.
  */
-function makeAdmin(staleEntries: StaleEntry[], deletedIds: string[]) {
-  return {
-    from() {
-      const builder = {
-        select: () => builder,
-        not: () => builder,
-        then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-          Promise.resolve({ data: staleEntries, error: null }).then(onF, onR),
-        delete: () => ({
-          in: (_col: string, ids: string[]) => {
-            deletedIds.push(...ids);
-            return Promise.resolve({ error: null });
-          },
-        }),
-      };
-      return builder;
-    },
-  } as unknown as Awaited<ReturnType<typeof createAdminClient>>;
+function useStaleEntries(staleEntries: StaleEntry[]): Write[] {
+  const { admin, writes } = makeAdminMock({
+    square_catalog_map: { data: staleEntries, error: null },
+  });
+  mockedCreateAdminClient.mockResolvedValue(admin as never);
+  return writes;
 }
+
+/** The ids each `.delete().in("id", ids)` removed, flattened in chunk order. */
+const deletedIds = (writes: Write[]): string[] =>
+  writes.filter((w) => w.op === "delete").flatMap((w) => (w.row ?? []) as string[]);
 
 /**
  * Fake Square client. `failOnCall` is the 0-based index of the batchDelete call
@@ -93,8 +85,7 @@ describe("deleteStaleItems", () => {
       { id: "row-1", brand_id: "b1", square_catalog_id: "SQ-1", object_type: "ITEM" },
       { id: "row-2", brand_id: "b1", square_catalog_id: "SQ-2", object_type: "ITEM_VARIATION" },
     ];
-    const deletedIds: string[] = [];
-    mockedCreateAdminClient.mockResolvedValue(makeAdmin(stale, deletedIds));
+    const writes = useStaleEntries(stale);
 
     const deleteCalls: string[][] = [];
     const client = makeClient(deleteCalls, /* failOnCall */ 0);
@@ -104,7 +95,7 @@ describe("deleteStaleItems", () => {
     // Square was asked to delete the objects...
     expect(deleteCalls).toEqual([["SQ-1", "SQ-2"]]);
     // ...but since that failed, NO local map rows were deleted.
-    expect(deletedIds).toEqual([]);
+    expect(deletedIds(writes)).toEqual([]);
     // ...and the failure is surfaced to the caller.
     expect(result.deleted).toBe(0);
     expect(result.failed).toBe(2);
@@ -119,8 +110,7 @@ describe("deleteStaleItems", () => {
       square_catalog_id: `SQ-${i}`,
       object_type: "ITEM_VARIATION",
     }));
-    const deletedIds: string[] = [];
-    mockedCreateAdminClient.mockResolvedValue(makeAdmin(stale, deletedIds));
+    const writes = useStaleEntries(stale);
 
     const deleteCalls: string[][] = [];
     const client = makeClient(deleteCalls, /* failOnCall */ 1);
@@ -134,8 +124,8 @@ describe("deleteStaleItems", () => {
 
     // Chunk 0 succeeded -> its 100 rows removed locally; chunk 1 failed -> its 50
     // rows RETAINED.
-    expect(deletedIds).toHaveLength(100);
-    expect(deletedIds).toEqual(stale.slice(0, 100).map((e) => e.id));
+    expect(deletedIds(writes)).toHaveLength(100);
+    expect(deletedIds(writes)).toEqual(stale.slice(0, 100).map((e) => e.id));
     expect(result.deleted).toBe(100);
     expect(result.failed).toBe(50);
     expect(result.errors).toHaveLength(1);
@@ -145,13 +135,12 @@ describe("deleteStaleItems", () => {
     const stale: StaleEntry[] = [
       { id: "row-1", brand_id: "b1", square_catalog_id: "SQ-1", object_type: "ITEM" },
     ];
-    const deletedIds: string[] = [];
-    mockedCreateAdminClient.mockResolvedValue(makeAdmin(stale, deletedIds));
+    const writes = useStaleEntries(stale);
     const deleteCalls: string[][] = [];
 
     const result = await deleteStaleItems(makeClient(deleteCalls), ["keep-brand"]);
 
-    expect(deletedIds).toEqual(["row-1"]);
+    expect(deletedIds(writes)).toEqual(["row-1"]);
     expect(result).toEqual({ deleted: 1, failed: 0, errors: [] });
   });
 });

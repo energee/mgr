@@ -23,14 +23,20 @@
  * unmapped-location flagging, a debit RPC error marking the line FAILED, and
  * draft (keg) staging into square_draft_sales with the bin's MGR location_id.
  *
- * Mirrors the repo mock idiom (src/app/api/square/sync/__tests__/sync-routes.test.ts):
- * a small in-memory chainable admin builder + module-level vi.mock. Signature
- * verification and the replay window are stubbed to pass so the handler body is
- * exercised directly.
+ * The Supabase admin client is faked with the shared admin mock
+ * (src/test/supabase-admin-mock.ts). Signature verification and the replay window
+ * are stubbed to pass so the handler body is exercised directly.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NextRequest } from "next/server";
+import {
+  makeAdminMock,
+  type QueryResult,
+  type ResponseContext,
+  type TableData,
+  type Write,
+} from "@/test/supabase-admin-mock";
 
 // -----------------------------------------------------------------------------
 // Mocks (must precede route imports)
@@ -64,69 +70,42 @@ const mockedGetSquareSettings = vi.mocked(getSquareSettings);
 // In-memory admin builder
 // -----------------------------------------------------------------------------
 
-type QueryResult = { data: unknown; error: unknown };
-type TableData = Record<string, QueryResult>;
 type AdminOpts = {
   /**
    * Successive results for square_sync_log UPSERTs (the dedup claim), consumed
    * in order across POST calls — simulates the UNIQUE(square_payment_id)
    * constraint: first delivery claims (CLAIM_OK), the retry gets CLAIM_DUP.
+   * Keyed on `ops` rather than the table alone: only the claim builder upserts,
+   * so the finalize UPDATE and the failure-path DELETE on square_sync_log leave
+   * the queue untouched.
    */
   claimQueue?: QueryResult[];
 };
 
-/** Every write the handler performs, in order, tagged by table + op. */
-const writes: Array<{ table: string; op: "insert" | "upsert" | "update"; row: unknown }> = [];
-/** Every debit_bin_inventory RPC call, in order. */
-const rpcCalls: Array<{ fn: string; args: unknown }> = [];
+/** Every write the handler performs, in order. Re-created by useTables. */
+let writes: Write[];
+/** Every debit_bin_inventory RPC call, in order. Re-created by useTables. */
+let rpcCalls: Array<{ fn: string; args: unknown }>;
 /** Configurable RPC response (default: normal debit, no clamp). */
 let rpcResponse: QueryResult = { data: [{ new_quantity: 5, clamped: false }], error: null };
 
-function makeAdmin(tables: TableData, opts: AdminOpts = {}) {
-  return {
-    from(table: string) {
-      let result: QueryResult = tables[table] ?? { data: [], error: null };
-      const builder = {
-        select: () => builder,
-        eq: () => builder,
-        gt: () => builder,
-        order: () => builder,
-        limit: () => builder,
-        delete: () => builder,
-        upsert: (row: unknown) => {
-          writes.push({ table, op: "upsert", row });
-          // The dedup claim: hand out the next queued result if configured.
-          if (table === "square_sync_log" && opts.claimQueue && opts.claimQueue.length > 0) {
-            result = opts.claimQueue.shift()!;
-          }
-          return builder;
-        },
-        insert: (row: unknown) => {
-          writes.push({ table, op: "insert", row });
-          return builder;
-        },
-        update: (row: unknown) => {
-          writes.push({ table, op: "update", row });
-          return builder;
-        },
-        maybeSingle: () => Promise.resolve(result),
-        single: () => Promise.resolve(result),
-        then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-          Promise.resolve(result).then(onF, onR),
-      };
-      return builder;
-    },
-    rpc: (fn: string, args: unknown) => {
-      rpcCalls.push({ fn, args });
-      return Promise.resolve(rpcResponse);
-    },
-  };
-}
-
 function useTables(tables: TableData, opts: AdminOpts = {}) {
-  mockedCreateAdminClient.mockImplementation(
-    async () => makeAdmin(tables, opts) as unknown as Awaited<ReturnType<typeof createAdminClient>>
+  const claims = opts.claimQueue ? [...opts.claimQueue] : undefined;
+  const fallback = tables.square_sync_log;
+  const mock = makeAdminMock(
+    claims
+      ? {
+          ...tables,
+          square_sync_log: ({ ops }: ResponseContext) =>
+            ops.includes("upsert") && claims.length > 0 ? claims.shift()! : (fallback as QueryResult),
+        }
+      : tables,
+    // Resolve rpcResponse lazily — tests reassign it before invoking the route.
+    { rpc: () => rpcResponse }
   );
+  writes = mock.writes;
+  rpcCalls = mock.rpcCalls;
+  mockedCreateAdminClient.mockResolvedValue(mock.admin as never);
 }
 
 type LineItem = {
@@ -201,8 +180,6 @@ function lot(finished_good_id: string, quantity: number, date: string | null) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  writes.length = 0;
-  rpcCalls.length = 0;
   rpcResponse = { data: [{ new_quantity: 5, clamped: false }], error: null };
   process.env.NEXT_PUBLIC_APP_URL = "http://localhost";
   mockedGetSquareSettings.mockResolvedValue({ webhookSignatureKey: "k" } as never);

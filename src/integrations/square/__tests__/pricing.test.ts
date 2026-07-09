@@ -9,13 +9,15 @@
  * byte-for-byte — asserted by the exact-cents case below. The multi-channel case
  * proves batching + no cross-channel leakage in a single call.
  *
- * Supabase is mocked at @/lib/supabase/server per the repo idiom
- * (see src/lib/__tests__/api-routes.test.ts). The mock builder is faithful
- * enough to honor the .in("sales_channel_id", [...]) filter so channel
- * parameterization is genuinely exercised, not stubbed away.
+ * Supabase is mocked at @/lib/supabase/server with the shared admin mock
+ * (src/test/supabase-admin-mock.ts). The pricing_tier_prices response honors the
+ * .in("sales_channel_id", [...]) filter, so channel parameterization is genuinely
+ * exercised rather than stubbed away, and any table the resolver does not already
+ * query throws instead of resolving vacuously empty.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { makeAdminMock } from "@/test/supabase-admin-mock";
 
 vi.mock("@/lib/supabase/server", () => ({
   createAdminClient: vi.fn(),
@@ -55,72 +57,32 @@ type Fixtures = {
   prices: PriceRow[];
 };
 
-type Thenable = {
-  then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) => Promise<unknown>;
-};
-
 /**
- * Builds an object that mimics the Supabase admin client's chainable query
- * builder for the three tables resolveChannelPrices touches (brands, recipes,
- * pricing_tier_prices). The sales_channel_id filter is honored; the rest are
- * pass-through.
+ * Installs an admin client over the three tables resolveChannelPrices touches
+ * (brands, recipes, pricing_tier_prices). The sales_channel_id filter is honored;
+ * the rest are pass-through. Any fourth table throws.
  */
-function makeAdmin(fixtures: Fixtures) {
-  return {
-    from(table: string) {
-      if (table === "brands") {
-        const result = { data: fixtures.brands, error: null };
-        const builder = {
-          select: () => builder,
-          in: () => builder,
-          then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-            Promise.resolve(result).then(onF, onR),
-        };
-        return builder;
-      }
-
-      if (table === "recipes") {
-        const result = { data: fixtures.recipes, error: null };
-        const builder = {
-          select: () => builder,
-          in: () => builder,
-          not: () => builder,
-          then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-            Promise.resolve(result).then(onF, onR),
-        };
-        return builder;
-      }
-
-      if (table === "pricing_tier_prices") {
-        // The resolver now filters channels with .in("sales_channel_id", [...]);
-        // honor that (and ignore the .in("pricing_tier_id", ...) which the fixture
-        // rows already satisfy).
-        let channelFilter: string[] | undefined;
-        const builder = {
-          select: () => builder,
-          in: (col: string, vals: string[]) => {
-            if (col === "sales_channel_id") channelFilter = vals;
-            return builder;
-          },
-          then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) => {
-            const data = fixtures.prices.filter((p) =>
-              channelFilter ? channelFilter.includes(p.sales_channel_id) : true
-            );
-            return Promise.resolve({ data, error: null }).then(onF, onR);
-          },
-        };
-        return builder as unknown as Thenable;
-      }
-
-      throw new Error(`unexpected table in mock: ${table}`);
-    },
-  };
-}
-
 function useFixtures(fixtures: Fixtures) {
-  mockedCreateAdminClient.mockImplementation(
-    async () => makeAdmin(fixtures) as unknown as Awaited<ReturnType<typeof createAdminClient>>
+  const { admin } = makeAdminMock(
+    {
+      brands: { data: fixtures.brands, error: null },
+      recipes: { data: fixtures.recipes, error: null },
+      // The resolver filters channels with .in("sales_channel_id", [...]); honor
+      // that (and ignore the .in("pricing_tier_id", ...) which the fixture rows
+      // already satisfy).
+      pricing_tier_prices: ({ calls }) => {
+        const channelFilter = calls.find(
+          (c) => c.method === "in" && c.args[0] === "sales_channel_id"
+        )?.args[1] as string[] | undefined;
+        const data = fixtures.prices.filter((p) =>
+          channelFilter ? channelFilter.includes(p.sales_channel_id) : true
+        );
+        return { data, error: null };
+      },
+    },
+    { onUnknownTable: "throw" }
   );
+  mockedCreateAdminClient.mockResolvedValue(admin as never);
 }
 
 const TAPROOM_ID = "chan-taproom-uuid";
