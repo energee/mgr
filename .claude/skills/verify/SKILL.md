@@ -81,38 +81,48 @@ In dev the login page renders a **Dev Login** button (`dev@brewery.test`,
 `src/app/(auth)/login/login-form.tsx:252`). Use it — one click, no credentials,
 no dependency on whether `test@brewery.com` exists in the hosted project.
 
+**It is not free.** `src/app/api/auth/dev-login/route.ts` uses
+`createAdminClient()` to *create* `dev@brewery.test` if absent. `.env` points at
+the hosted Supabase, so the first `verify.sh up` on a fresh project writes a real
+auth user. Idempotent afterwards, and the route 404s unless
+`NODE_ENV === "development"` — but confirm that user already exists before
+running this against a project whose auth table you care about.
+
+Don't do this by hand — `verify.sh up` does all of it and fails loud if login
+didn't land on `/dashboard`. The equivalent by hand:
+
 ```bash
 agent-browser open http://localhost:<port>/login
-agent-browser find role button click "Dev Login (dev@brewery.test)"
-agent-browser wait 2000 && agent-browser get url    # expect /dashboard
-```
-
-Fall back to the form only if the Dev button is absent:
-
-```bash
-agent-browser find label Email    fill "${E2E_USER_EMAIL:-…}"
-agent-browser find label Password fill "${E2E_USER_PASSWORD:-…}"
-agent-browser find role button click "Sign in"
+agent-browser find text "Dev Login (dev@brewery.test)" click
+agent-browser wait 3000 && agent-browser get url    # expect /dashboard
 ```
 
 ## Drive
 
-Use `agent-browser` (v0.31.x, Playwright-backed, auto-waiting). Prefer semantic
-targeting over CSS — the UI is config-driven and class names are not stable.
-`snapshot` returns an accessibility tree with `[ref=eN]` handles you can act on.
+Use `agent-browser` (v0.31.x, Playwright-backed, auto-waiting).
+
+**`snapshot` + `@eN` refs are the fastest and most reliable path** — its own docs
+say so. Snapshot once, act on refs, re-snapshot after the DOM changes.
 
 ```bash
-agent-browser snapshot                         # tree with @refs
-agent-browser find role button click "Save"    # find <locator> <value> <action> [text]
-agent-browser get text "[data-testid=batch-status]"
+agent-browser snapshot -i          # accessibility tree with @e1, @e2, …
+agent-browser click @e7
+agent-browser fill @e4 "VERIFY-2026-07-09-batch"
+agent-browser get text @e12
 ```
 
-`find`'s actions are `click`/`fill`/`check`/… — **`get` is not one of them.**
-`agent-browser find label Email get text` fails with `Unknown subaction: get`.
-Reads go through the separate `get` command.
+Two traps, both of which cost real time here:
+
+- **`find role button click "Save"` does not click Save.** The trailing
+  positional is the *action's input* (text to fill/type), not a name filter, so
+  this clicks the first `role=button` on the page. Use
+  `find role button click --name "Save"`, or `find text "Save" click`.
+- **`get` is not a `find` action.** `find label Email get text` fails with
+  `Unknown subaction: get`. Reads go through the separate `get` command.
 
 `agent-browser skills get core --full` prints the version-matched command
-reference. Read it rather than guessing flags.
+reference. Read it rather than guessing flags — that is how both traps above
+were found, after guessing wrong first.
 
 ## Evidence to collect
 
