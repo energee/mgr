@@ -8,11 +8,22 @@
  * verification using the webhook_signature_key stored in square_settings.
  *
  * Supported event types:
- *   - payment.completed: Ingests sale data. Packaged lines resolve the Square
- *     location to a POS bin, debit that bin's FIFO finished good (RPC
- *     debit_bin_inventory) and record a taproom_sale allocation; oversells clamp
- *     the bin to 0 and are surfaced in the response + sync log. Draft pours are
- *     staged in square_draft_sales (keg depletion is deferred).
+ *   - payment.created / payment.updated: Square does NOT emit a
+ *     "payment.completed" event — a payment's lifecycle is surfaced through
+ *     created/updated deliveries whose `status` field transitions to
+ *     "COMPLETED". Both are routed to handleCompletedPayment, which only
+ *     ingests the sale once the payment status is "COMPLETED" (other statuses
+ *     are acknowledged and ignored). Because BOTH a created and an updated
+ *     delivery can arrive already-COMPLETED for the same sale, dedup keys on
+ *     the Square *payment id* (not the event id) so a sale debits inventory
+ *     exactly once. Packaged lines resolve the Square location to a POS bin and
+ *     draw the sold quantity FIFO across every finished-good lot physically in
+ *     that bin (oldest production_date first), recording one taproom_sale
+ *     allocation (with volume_bbl for TTB removals) and one debit_bin_inventory
+ *     call per lot drawn. If the bin cannot cover the sale, only the stock that
+ *     physically existed is allocated and the shortfall is surfaced in the
+ *     response + sync log. Draft (keg) pours are staged in square_draft_sales
+ *     (keg depletion is deferred).
  *   - inventory.count.updated: Logged for informational purposes only (MGR is
  *     the source of truth for inventory).
  *   - All other events: Acknowledged with 200 but ignored.
@@ -23,11 +34,31 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, getSquareSettings } from "@/integrations/square/client";
 import { checkReplayWindow, verifyWebhookSignature } from "@/integrations/square/webhook";
 import { calculateVolumeOz } from "@/integrations/square/utils";
+import { computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
 import type { SquareSyncType } from "@/integrations/square/types";
 import { dynamicFrom } from "@/services/types";
 import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/square/webhook" });
+
+/**
+ * Render a thrown value as a human-readable message for the per-line error log.
+ * supabase-js rejects with plain PostgrestError objects (not Error instances),
+ * so a bare `String(err)` would flatten them to "[object Object]" and swallow
+ * the DB message — this keeps per-line failures loud in square_sync_log.
+ */
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (
+    err !== null &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    return (err as { message: string }).message;
+  }
+  return String(err);
+}
 
 /**
  * Resolve the notification URL Square signs against. Either SQUARE_WEBHOOK_URL
@@ -61,6 +92,9 @@ type SquareWebhookEvent = {
         id?: string;
         order_id?: string;
         location_id?: string;
+        // Square delivers payment.created/updated as the payment moves through
+        // its lifecycle; we only ingest the sale once this reads "COMPLETED".
+        status?: string;
       };
       // inventory.count.updated nests differently
       [key: string]: unknown;
@@ -69,10 +103,17 @@ type SquareWebhookEvent = {
 }
 
 /**
- * A packaged sale line whose sold quantity exceeded the physical count in its
- * resolved POS bin (D3 oversell). The bin was clamped to 0; the sale still
- * succeeds (itemsSynced). Surfaced in the webhook response and durably in
- * square_sync_log.details so the POS/caller can reconcile.
+ * A packaged sale line whose sold quantity exceeded the physical stock in its
+ * resolved POS bin (D3 oversell). The FIFO draw consumed every matching lot in
+ * the bin and still could not cover the sale; only the stock that physically
+ * existed was allocated/debited (we never invent an allocation for the
+ * shortfall). The sale still counts as synced. Surfaced in the webhook response
+ * and durably in square_sync_log.details so the POS/caller can reconcile.
+ *
+ * - binQuantityBefore: SUM of the bin's quantities across every matched lot
+ *   before the debit (what the bin actually held for this brand + format).
+ * - shortfallQty: sold quantity that no lot could cover (soldQty −
+ *   binQuantityBefore, clamped at 0).
  */
 type OversoldLine = {
   lineItemUid: string;
@@ -80,6 +121,7 @@ type OversoldLine = {
   sellingFormatId: string;
   soldQty: number;
   binQuantityBefore: number;
+  shortfallQty: number;
 };
 
 export async function POST(request: NextRequest) {
@@ -168,8 +210,12 @@ export async function POST(request: NextRequest) {
   let oversoldLines: OversoldLine[] = [];
   try {
     switch (event.type) {
-      case "payment.completed": {
-        const result = await handlePaymentCompleted(event);
+      // Square emits payment.created and payment.updated (never
+      // "payment.completed"); both may already carry status COMPLETED, so both
+      // route to the same handler, which dedups on the payment id.
+      case "payment.created":
+      case "payment.updated": {
+        const result = await handleCompletedPayment(event);
         oversoldLines = result?.oversoldLines ?? [];
         break;
       }
@@ -184,7 +230,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (err) {
     // Return 500 so Square retries delivery; the UNIQUE constraint on
-    // event_id guarantees only one retry can actually re-process.
+    // square_payment_id guarantees only one retry can actually re-process.
     log.error(
       { err: err instanceof Error ? err.message : err, event_id: event.event_id, type: event.type },
       `Error processing ${event.type}; Square will retry`
@@ -193,8 +239,9 @@ export async function POST(request: NextRequest) {
   }
 
   // D3: the sale succeeded, but one or more packaged lines sold more units than
-  // the resolved bin physically held (clamped to 0). Surface them so the caller
-  // can reconcile; they are also recorded in square_sync_log.details.
+  // the resolved bin physically held. Only the stock that existed was
+  // allocated/debited; the shortfall is surfaced so the caller can reconcile
+  // (also recorded in square_sync_log.details).
   return NextResponse.json(
     oversoldLines.length > 0
       ? { received: true, oversoldLines }
@@ -203,13 +250,24 @@ export async function POST(request: NextRequest) {
 }
 
 // ---------------------------------------------------------------------------
-// payment.completed handler
+// payment.created / payment.updated handler
 // ---------------------------------------------------------------------------
 
-async function handlePaymentCompleted(event: SquareWebhookEvent) {
+async function handleCompletedPayment(event: SquareWebhookEvent) {
   const payment = event.data?.object?.payment;
   if (!payment) {
-    log.warn("payment.completed event missing payment object");
+    log.warn("payment event missing payment object");
+    return;
+  }
+
+  // Square delivers payment.created/updated as the payment moves through its
+  // lifecycle. Only ingest once it is COMPLETED; acknowledge (and ignore)
+  // every other status so Square does not retry.
+  if (payment.status !== "COMPLETED") {
+    log.info(
+      { payment_id: payment.id, status: payment.status, type: event.type },
+      "Payment not COMPLETED; acknowledged and ignored"
+    );
     return;
   }
 
@@ -217,46 +275,60 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
   const paymentId = payment.id;
   const squareLocationId = payment.location_id;
 
-  if (!orderId) {
-    log.warn("payment.completed event missing order_id");
+  const admin = await createAdminClient();
+
+  // Race-safe dedup (audit F-135): claim on the Square PAYMENT id before any
+  // side effects. Keying on payment id (not event id) is essential because a
+  // single sale can arrive as BOTH payment.created and payment.updated already
+  // COMPLETED — an event-id claim would let each debit the bin, double-counting
+  // the sale. ON CONFLICT DO NOTHING (UNIQUE uniq_square_sync_log_square_payment_id,
+  // 00224) returns [] on duplicate so concurrent retries cannot both proceed.
+  // claimKey is the payment id (always present on payment.* events); we fall
+  // back to order_id only in the impossible-in-practice case that it is absent,
+  // so dedup is never skipped entirely.
+  const claimKey = paymentId ?? orderId;
+  if (!claimKey) {
+    log.warn(
+      { event_id: event.event_id },
+      "Payment event has neither payment id nor order_id; cannot dedup, ignoring"
+    );
     return;
   }
 
-  const admin = await createAdminClient();
+  const { data: claimed, error: claimError } = await admin
+    .from("square_sync_log")
+    .upsert(
+      {
+        sync_type: "sale_ingest" satisfies SquareSyncType,
+        event_id: event.event_id ?? null,
+        square_payment_id: claimKey,
+        items_synced: 0,
+        items_failed: 0,
+      },
+      { onConflict: "square_payment_id", ignoreDuplicates: true }
+    )
+    .select("id");
 
-  // Race-safe dedup (audit F-135): claim the event_id row before any side
-  // effects. ON CONFLICT DO NOTHING returns empty data on duplicate, so
-  // concurrent retries cannot both proceed past this point. Fallback: if
-  // event_id is absent (Square contract change), proceed without dedup —
-  // don't synthesize from order_id, which would mask that contract change.
-  let logId: string | null = null;
-  if (event.event_id) {
-    const { data: claimed } = await admin
-      .from("square_sync_log")
-      .upsert(
-        {
-          sync_type: "sale_ingest" satisfies SquareSyncType,
-          event_id: event.event_id,
-          items_synced: 0,
-          items_failed: 0,
-        },
-        { onConflict: "event_id", ignoreDuplicates: true }
-      )
-      .select("id");
-
-    if (!claimed || claimed.length === 0) {
-      log.info(
-        { event_id: event.event_id, order_id: orderId },
-        "Duplicate payment.completed, skipping"
-      );
-      return;
-    }
-    logId = claimed[0].id;
-  } else {
-    log.warn(
-      { order_id: orderId },
-      "payment.completed missing event_id; proceeding without race-safe dedup"
+  // A transient DB error must NOT be mistaken for a duplicate: on error `data`
+  // is null, which would otherwise look identical to an empty (already-claimed)
+  // result and silently drop the sale with a 200. Throw so the outer handler
+  // returns 500 and Square retries. Only a genuine empty array is a duplicate.
+  if (claimError) throw claimError;
+  if (!claimed || claimed.length === 0) {
+    log.info(
+      { payment_id: paymentId, order_id: orderId },
+      "Duplicate payment (already claimed), skipping"
     );
+    return;
+  }
+  const logId: string = claimed[0].id;
+
+  // A COMPLETED payment should always carry an order_id; without one we cannot
+  // fetch line items. Free the claim so a corrected retry can re-process.
+  if (!orderId) {
+    log.warn({ payment_id: paymentId }, "COMPLETED payment missing order_id");
+    await admin.from("square_sync_log").delete().eq("id", logId);
+    return;
   }
 
   try {
@@ -272,20 +344,18 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
 
     if (!order?.lineItems?.length) {
       log.info({ order_id: orderId }, "Order has no line items, skipping");
-      if (logId) {
-        await admin
-          .from("square_sync_log")
-          .update({
-            details: {
-              order_id: orderId,
-              payment_id: paymentId,
-              square_location_id: squareLocationId,
-              note: "Order had no line items",
-            },
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", logId);
-      }
+      await admin
+        .from("square_sync_log")
+        .update({
+          details: {
+            order_id: orderId,
+            payment_id: paymentId,
+            square_location_id: squareLocationId,
+            note: "Order had no line items",
+          },
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", logId);
       return;
     }
 
@@ -314,6 +384,9 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
     let itemsSynced = 0;
     let itemsFailed = 0;
     const errors: Array<{ lineItemUid: string; error: string }> = [];
+    // Non-fatal notes (e.g. a container missing volume_oz so volume_bbl could
+    // not be computed) — the line still syncs, but we record why for TTB audit.
+    const warnings: string[] = [];
     const oversoldLines: OversoldLine[] = [];
 
     for (const lineItem of order.lineItems) {
@@ -324,9 +397,13 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       }
 
       try {
-        // Look up the catalog mapping with selling format container type
+        // Look up the catalog mapping with the selling format's container type
+        // AND the volume fields needed to stamp allocation.volume_bbl (so TTB
+        // taxpaid-removals report the sale — get_ttb_removals_summary, 00203).
         const { data: mapping } = await dynamicFrom(admin, "square_catalog_map")
-          .select("id, brand_id, selling_format_id, selling_formats(containers(type))")
+          .select(
+            "id, brand_id, selling_format_id, selling_formats(unit_count, containers(type, volume_oz))"
+          )
           .eq("square_catalog_id", catalogObjectId)
           .eq("object_type", "ITEM_VARIATION")
           .maybeSingle();
@@ -355,8 +432,9 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
 
         if (!isDraft) {
           // ---------------------------------------------------------------
-          // Packaged good sale: debit the resolved bin's FIFO finished good
-          // (D2) and record a taproom_sale allocation (audit/TTB ledger).
+          // Packaged good sale: draw the sold quantity FIFO across the bin's
+          // finished-good lots (D2), recording one taproom_sale allocation
+          // (with volume_bbl for TTB) + one debit_bin_inventory per lot.
           // ---------------------------------------------------------------
 
           // A packaged sale must land in a mapped POS bin; without one we cannot
@@ -370,24 +448,34 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
             continue;
           }
 
-          // Pick the finished good to debit: FIFO by production date, restricted
-          // to stock physically in THIS bin for the sold brand + selling format.
-          // Uses dynamicFrom because the strongly-typed builder rejects the
-          // embedded-resource filters (finished_goods.brand_id) — same idiom the
-          // old finished_goods_with_availability lookup used.
-          const { data: binRow } = await dynamicFrom(admin, "bin_inventory")
+          // ALL matching lots physically in THIS bin for the sold brand +
+          // selling format. bin_inventory is UNIQUE(finished_good_id, bin_id),
+          // so one bin legitimately holds several lots (production dates) of the
+          // same brand+format — we must draw across them, not dump the whole
+          // sold quantity on one arbitrary lot. dynamicFrom is used because the
+          // strongly-typed builder rejects the embedded-resource filters
+          // (finished_goods.brand_id). NOTE: PostgREST cannot order by an
+          // embedded to-one column here (`referencedTable` orders the embed, a
+          // no-op for the parent row order), so we fetch unordered and sort the
+          // FIFO in JS below.
+          const { data: binRows, error: binError } = await dynamicFrom(admin, "bin_inventory")
             .select(
               "finished_good_id, quantity, finished_goods!inner(production_date, brand_id, selling_format_id)"
             )
             .eq("bin_id", resolvedBin.id)
             .eq("finished_goods.brand_id", mapping.brand_id)
             .eq("finished_goods.selling_format_id", mapping.selling_format_id)
-            .gt("quantity", 0)
-            .order("production_date", { ascending: true, referencedTable: "finished_goods" })
-            .limit(1)
-            .maybeSingle();
+            .gt("quantity", 0);
+          if (binError) throw binError;
 
-          if (!binRow) {
+          type BinLot = {
+            finished_good_id: string;
+            quantity: number;
+            finished_goods: { production_date: string | null } | null;
+          };
+          const lots: BinLot[] = (binRows ?? []) as BinLot[];
+
+          if (lots.length === 0) {
             itemsFailed++;
             errors.push({
               lineItemUid: lineItem.uid ?? "unknown",
@@ -396,39 +484,88 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
             continue;
           }
 
-          // Audit/TTB ledger: records what was SOLD (full quantity). Independent
-          // of the physical bin count debited below — only this path writes
-          // bin_inventory, so keeping both is not a double-count.
-          await admin.from("allocations").insert({
-            source_type: "finished_good",
-            source_id: binRow.finished_good_id,
-            destination_type: "taproom_sale",
-            destination_id: null,
-            quantity,
-            status: "completed",
-            completed_at: event.created_at ?? new Date().toISOString(),
-            notes: `Square order ${orderId}`,
-          });
+          // Real FIFO: oldest production_date first, undated lots (null) last.
+          const prodTime = (l: BinLot) => {
+            const d = l.finished_goods?.production_date;
+            return d ? new Date(d).getTime() : Number.POSITIVE_INFINITY;
+          };
+          const sortedLots = [...lots].sort((a, b) => prodTime(a) - prodTime(b));
+          const binQuantityBefore = sortedLots.reduce((sum, l) => sum + l.quantity, 0);
 
-          // Physical debit (D2): atomic, row-locked RPC that clamps to 0 on
-          // oversell (never negative). We do NOT clamp the allocation quantity
-          // above — the ledgers are intentionally independent.
-          const { data: debit } = await admin.rpc("debit_bin_inventory", {
-            p_bin_id: resolvedBin.id,
-            p_finished_good_id: binRow.finished_good_id,
-            p_qty: quantity,
+          // Per-selling-unit fill volume (bbl) for the TTB allocation. Reuses
+          // the canonical oz->bbl helper (COALESCE(volume_bbl, volume_oz/3968) x
+          // unit_count); packaged cans/bottles carry only volume_oz. Null when
+          // volume_oz is missing — we then leave volume_bbl null (never NaN) and
+          // record a warning so TTB under-reporting is visible, not silent.
+          const unitFillBbl = computeUnitFillVolumeBbl({
+            unit_count: mapping.selling_formats?.unit_count ?? null,
+            container: {
+              volume_bbl: null,
+              volume_oz: mapping.selling_formats?.containers?.volume_oz ?? null,
+            },
           });
-          const debitRow = debit?.[0];
+          if (unitFillBbl == null) {
+            const warning = `Line ${lineItem.uid ?? "unknown"} (selling format ${mapping.selling_format_id}) has no container volume_oz; allocation.volume_bbl left null (TTB removals under-report this sale)`;
+            warnings.push(warning);
+            log.warn({ selling_format_id: mapping.selling_format_id }, warning);
+          }
 
-          // Oversell (D3): sold more than the bin held. The sale still succeeds
-          // (the bin clamped to 0); collect the line for the response + log.
-          if (debitRow?.clamped) {
+          // Draw FIFO across the sorted lots, mirroring suggestFifoAllocations
+          // (src/domain/consumption-planning.ts): for each lot take
+          // min(remaining, lot.quantity), record one allocation + one debit for
+          // exactly that draw, and stop when the sale is covered.
+          let remaining = quantity;
+          for (const lot of sortedLots) {
+            if (remaining <= 0) break;
+            const draw = Math.min(remaining, lot.quantity);
+            if (draw <= 0) continue;
+
+            // Audit/TTB ledger: one allocation per lot drawn, quantity == draw
+            // (only what physically existed — never the un-covered shortfall).
+            // volume_bbl feeds get_ttb_removals_summary's taproom_sale arm.
+            const { error: allocError } = await admin.from("allocations").insert({
+              source_type: "finished_good",
+              source_id: lot.finished_good_id,
+              destination_type: "taproom_sale",
+              destination_id: null,
+              quantity: draw,
+              volume_bbl: unitFillBbl != null ? unitFillBbl * draw : null,
+              reason_code: "other",
+              status: "completed",
+              completed_at: event.created_at ?? new Date().toISOString(),
+              notes: `Square order ${orderId}`,
+            });
+            if (allocError) throw allocError;
+
+            // Physical debit (D2): atomic, row-locked RPC. supabase-js does not
+            // throw on error — surface it so the per-line catch records the line
+            // as FAILED rather than silently counting it synced.
+            // ponytail: the allocation insert and this debit are not wrapped in
+            // a single DB transaction, so a debit failure after the insert
+            // leaves an orphan allocation row. Acceptable — the line is flagged
+            // failed in square_sync_log and reconciled from there; a proper
+            // fix would push both into one RPC.
+            const { error: debitError } = await admin.rpc("debit_bin_inventory", {
+              p_bin_id: resolvedBin.id,
+              p_finished_good_id: lot.finished_good_id,
+              p_qty: draw,
+            });
+            if (debitError) throw debitError;
+
+            remaining -= draw;
+          }
+
+          // Oversell (D3): the bin's lots could not cover the full sale. Only
+          // what existed was allocated/debited; surface the shortfall for the
+          // response + log. The sale still counts as synced.
+          if (remaining > 0) {
             oversoldLines.push({
               lineItemUid: lineItem.uid ?? "unknown",
               brandId: mapping.brand_id,
               sellingFormatId: mapping.selling_format_id,
               soldQty: quantity,
-              binQuantityBefore: binRow.quantity,
+              binQuantityBefore,
+              shortfallQty: remaining,
             });
           }
 
@@ -469,13 +606,13 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
         itemsFailed++;
         errors.push({
           lineItemUid: lineItem.uid ?? "unknown",
-          error: err instanceof Error ? err.message : String(err),
+          error: errorMessage(err),
         });
       }
     }
 
-    // Finalise the sync log: update the claimed row, or insert a fresh row
-    // for the no-event_id fallback path.
+    // Finalise the claimed sync-log row (logId is always set now that dedup
+    // keys on the payment id — there is no unguarded fallback path).
     const logDetails = {
       order_id: orderId,
       payment_id: paymentId,
@@ -483,38 +620,25 @@ async function handlePaymentCompleted(event: SquareWebhookEvent) {
       line_item_count: order.lineItems.length,
       ...(errors.length > 0 ? { errors } : {}),
       ...(oversoldLines.length > 0 ? { oversoldLines } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
 
-    if (logId) {
-      await admin
-        .from("square_sync_log")
-        .update({
-          location_id: locationId,
-          items_synced: itemsSynced,
-          items_failed: itemsFailed,
-          details: logDetails,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", logId);
-    } else {
-      await admin.from("square_sync_log").insert({
-        sync_type: "sale_ingest" satisfies SquareSyncType,
-        event_id: null,
+    await admin
+      .from("square_sync_log")
+      .update({
         location_id: locationId,
         items_synced: itemsSynced,
         items_failed: itemsFailed,
         details: logDetails,
         completed_at: new Date().toISOString(),
-      });
-    }
+      })
+      .eq("id", logId);
 
     // Return the oversold lines (D3) so POST can echo them in the response.
     return { oversoldLines };
   } catch (err) {
     // Free the claimed slot on failure so Square's retry can re-process.
-    if (logId) {
-      await admin.from("square_sync_log").delete().eq("id", logId);
-    }
+    await admin.from("square_sync_log").delete().eq("id", logId);
     throw err;
   }
 }
@@ -528,7 +652,9 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
   // but do not update any MGR inventory data.
   const admin = await createAdminClient();
 
-  await admin.from("square_sync_log").upsert(
+  // supabase-js does not throw on error — surface it so the outer handler
+  // returns 500 and Square retries, rather than silently dropping the log row.
+  const { error } = await admin.from("square_sync_log").upsert(
     {
       sync_type: "inventory_push" satisfies SquareSyncType,
       event_id: event.event_id,
@@ -543,4 +669,5 @@ async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
     },
     { onConflict: "event_id", ignoreDuplicates: true }
   );
+  if (error) throw error;
 }
