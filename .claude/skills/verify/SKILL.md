@@ -106,13 +106,24 @@ Driven live, read-only: cold `up` reaches `/dashboard` in ~20s, warm `up` reuses
 server and session in ~0s, `down` leaves nothing behind. The authenticated
 dashboard renders with one console error (a hydration mismatch, pre-existing).
 
-## Known broken, not fixed here
+## Running the Playwright suite
 
-`e2e/auth.setup.ts:16` navigates to `/auth/login`, which 404s — `src/app/(auth)/`
-is a route group, so the real route is `/login`. Every spec in the `chromium`
-project depends on that setup, and `playwright.config.ts:22` hardcodes
-`baseURL: "http://localhost:3000"`, a port other worktrees routinely occupy. The
-Playwright suite cannot be green until both are fixed.
+Fixed 2026-07-09: `auth.setup.ts` used to navigate to `/auth/login` (a 404 —
+`src/app/(auth)/` is a route group) and `baseURL` was hardcoded to `:3000`. It
+now signs in through `/api/auth/dev-login`, and `PLAYWRIGHT_BASE_URL` moves both
+the server and the tests:
+
+```bash
+PLAYWRIGHT_BASE_URL=http://localhost:3007 npx playwright test --project=setup
+```
+
+Use a spare port whenever another worktree holds `:3000` — `reuseExistingServer`
+is on locally and will silently adopt whatever already answers there.
+
+**The six specs have not been run since the fix.** They drive packaging sessions
+and customer orders against hosted Supabase, so they can write real rows and fire
+Square, QuickBooks, and Resend. Read the mutation protocol above before running
+anything beyond `--project=setup`.
 
 If something here is wrong, correct it the same day. A skill that lies is worse
 than no skill.
