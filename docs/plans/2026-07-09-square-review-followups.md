@@ -1,14 +1,24 @@
 # Square bin-sync — code-review follow-ups
 
-**Status:** open. Created 2026-07-09 after an xhigh `/code-review` of `feat/square-pos-bin-sync`
-(15 findings). Thirteen findings were fixed in `506f9daf`, `cf795a80`, `b4ee38d4`. This doc
-tracks what remains, with a resolution for each and a paste-in kickoff prompt at the bottom.
+**Status:** all code follow-ups DONE; **one operational item remains (§2, the migration push).**
+Created 2026-07-09 after an xhigh `/code-review` of `feat/square-pos-bin-sync` (15 findings).
+Thirteen were fixed in `506f9daf`, `cf795a80`, `b4ee38d4`; the rest were worked 2026-07-09:
+
+| § | Item | Outcome |
+|---|---|---|
+| 1 | keg-only-brand keep-set regression | **FIXED** `593dedaa` |
+| 2 | `00224`–`00227` committed but unapplied | **OPEN — blocks deploy** |
+| 3 | `00223` header + `COMMENT ON FUNCTION` false | **FIXED** `b35ad3b7` |
+| 4 | `00222` `DISTINCT ON` without `ORDER BY` | won't fix (recorded) |
+| 5 | `location/core.ts` vestiges | **FIXED** `c9d94e6b` |
+| 6 | `makeAdmin` duplicated 5× | **FIXED** `c9cc8c8e` |
+| 7 | branch behind `origin/main` | **MERGED** `3dea7bd6` |
 
 Branch: `feat/square-pos-bin-sync` · PR [#361](https://github.com/energee/mgr/pull/361)
 
 ---
 
-## 1. Keg-only brands still deleted-and-recreated on stockout (REGRESSION)
+## 1. Keg-only brands deleted-and-recreated on stockout — FIXED (`593dedaa`)
 
 **Severity:** high. Introduced by the fix for review finding #11, which only protected
 packaged brands.
@@ -28,16 +38,21 @@ The route's own comment already names the hole: *"UNIONed with the currently in-
 
 **Resolution.** Stop inferring "discontinued" from stock at all — that is the altitude error.
 
-- *Preferred:* make discontinuation explicit. Check whether `brands` already carries an
-  `is_active` / `is_discontinued` column (grep the schema; do not assume). If it does,
-  `deleteStaleItems` should key off it and delete only explicitly-inactive brands. Stock level
-  stops being an input.
-- *Lazy fallback, if no such column exists:* union the keep set with every brand that has any
-  `finished_goods` row whose `selling_format → containers.type = 'keg'`. That means "this brand
-  is sold on draft," independent of current inventory. Pair it with a `// ponytail:` comment —
-  the ceiling is that a genuinely discontinued keg brand must be removed from Square by hand.
+- *Preferred:* make discontinuation explicit via an `is_active` / `is_discontinued` column on
+  `brands`. **Checked: no such column exists.** `brands` is `(id, name, sku, variant, style_id,
+  abv, hops, description, untappd_rating, untappd_url, created_at, updated_at)`. So the preferred
+  route needs a migration and was not taken.
+- *Applied (the lazy fallback):* the keep set now unions every brand sold on draft, independent
+  of stock. Read off `finished_goods_with_ttb_class` — an existing view that is exactly
+  `finished_goods ⋈ selling_formats ⋈ containers` with **no quantity filter** — via
+  `.select("brand_id").eq("container_type", "keg")`. One flat query, no embed. Carries a
+  `// ponytail:` comment naming the ceiling (a genuinely retired draft brand must be removed
+  from Square by hand) and the upgrade path (add `brands.is_active`, key the whole keep set off
+  it, drop stock inference entirely).
 
-Add a test: a keg-only brand with zero filled kegs survives a catalog sync.
+Test added in `sync-routes.test.ts`: *"keeps a KEG-ONLY brand whose last keg blew"* — brand-2 has
+zero stock and no `bin_inventory` row, appears in no other fixture, and must still land in the
+keep set passed to `deleteStaleItems` while being absent from the catalog push.
 
 ---
 
@@ -62,7 +77,7 @@ Regenerate the drift snapshot too.
 
 ---
 
-## 3. `00223`'s header and function comment are now false
+## 3. `00223`'s header and function comment are now false — FIXED (`b35ad3b7`)
 
 `00223_debit_bin_inventory.sql` still states that idempotency comes from the webhook's
 `event_id` dedup (it now comes from payment-id dedup, `00224`) and that "only this path writes
@@ -90,7 +105,7 @@ overwrites the name from Square.
 
 ---
 
-## 5. Cleanup: `location/core.ts` vestiges
+## 5. Cleanup: `location/core.ts` vestiges — FIXED (`c9d94e6b`)
 
 `src/entities/location/core.ts`:
 - line 65 — `viewTable: "locations"` is identical to `table: "locations"`, which is exactly what
@@ -104,35 +119,51 @@ overwrites the name from Square.
 
 ---
 
-## 6. Cleanup: the `makeAdmin` Supabase mock is duplicated five times
+## 6. Cleanup: the `makeAdmin` Supabase mock is duplicated five times — FIXED (`c9cc8c8e`)
 
 `webhook-route.test.ts`, `refresh-route.test.ts`, `sync-routes.test.ts`, `catalog.test.ts`,
 `pricing.test.ts` each define their own chainable in-memory admin-client builder plus its
 `QueryResult` / `TableData` types. The review found four copies; `cf795a80` added a fifth.
 
-**Resolution.** Extract one shared helper — `src/integrations/square/__tests__/mock-admin.ts`
-(or `src/test/`, matching whatever `src/test/supabase-mock.ts` already does — read it first;
-it may already cover this). Import it from all five. The variants differ in which builder
-methods they stub (`.not`, `.in`, `.gt`, `.limit`, `.maybeSingle`, `.upsert`), so the shared
-builder needs the union of them.
+**Resolution.** `src/test/supabase-mock.ts` does **not** already cover this — it queues one
+response per `.from()` call and throws when dry, records no writes, and stubs no
+`.rpc`/`.upsert`/`.delete`/`.maybeSingle`. Twenty-plus tests depend on that contract, so it was
+left alone.
+
+Extracted a sibling instead: **`src/test/supabase-admin-mock.ts`** (`makeAdminMock`) — one
+response per *table*, reused across `.from()` calls, plus a write log and an `.rpc` recorder.
+Imported by all five. Fidelity was preserved rather than flattened: a table's response may be a
+*function* of the chain built on its builder, so `pricing.test.ts` still honors
+`.in("sales_channel_id", […])` and `webhook-route.test.ts` still simulates
+`UNIQUE(square_payment_id)` by advancing a claim queue on `upsert` (keyed on the write ops, so
+the finalize `UPDATE` and failure-path `DELETE` on the same table leave the queue alone).
+`pricing.test.ts` keeps its throw-on-unexpected-table via `onUnknownTable: "throw"`.
 
 ---
 
-## 7. Branch hygiene
+## 7. Branch hygiene — MERGED (`3dea7bd6`)
 
-`feat/square-pos-bin-sync` forked at `c3dba263` and is two commits behind `origin/main`.
-Merging `origin/main` in conflicts in three files:
+`feat/square-pos-bin-sync` forked at `c3dba263` and was two commits behind `origin/main`:
+`#348` (vessel-transfer integrity) and `#360` — which is a **squash of an earlier slice of this
+same branch**. The merge conflicted in seven files, not three; the extra four are all
+Square code where our side is simply the later revision of its own ancestor:
 
-- `PROGRESS.md`
-- `docs/plans/2026-07-07-square-pos-bin-sync.md`
-- `src/entities/bin/core.ts`
+`PROGRESS.md`, `docs/plans/2026-07-07-square-pos-bin-sync.md`, `src/entities/bin/core.ts`,
+`src/entities/location/core.ts`, `src/integrations/square/pricing.ts`,
+`src/app/api/square/sync/{catalog,inventory}/route.ts`,
+`src/app/api/square/sync/__tests__/sync-routes.test.ts`,
+`src/integrations/square/__tests__/pricing.test.ts`
 
-`00210_vessel_transfer_integrity.sql` and `vessel-transfer-dialog.tsx` are **not** reverted by a
-merge — the branch never touches them, so git keeps `origin/main`'s copies. A two-dot
-`git diff origin/main` makes it *look* like they are deleted; that is a diff artifact, not a
-merge outcome. Do not "restore" them.
+All resolved to **ours**, but only after checking per file that `origin/main` contributes no line
+absent from `HEAD` (`git diff HEAD origin/main -- <file>`). The two that looked risky both came
+back clean: main's `resolveChannelPrices` is still the single-channel C4 signature our E3 batch
+rewrite replaced, and main's `bins.is_default_fg` addition is already on this branch. Note
+`git checkout --ours` takes the *whole* HEAD file, discarding main's cleanly auto-merged hunks —
+verify before reaching for it.
 
-**Resolution.** Merge `origin/main` before pushing. Resolve the three conflicts by hand.
+`00210_vessel_transfer_integrity.sql` and `vessel-transfer-dialog.tsx` were **not** reverted, as
+predicted: git kept `origin/main`'s copies (`A` and `M` in the merge index, dialog byte-identical
+to main). A two-dot `git diff origin/main` makes them *look* deleted; that is a diff artifact.
 
 ---
 
@@ -158,46 +189,30 @@ merge outcome. Do not "restore" them.
 
 ## Kickoff prompt for a new session
 
+The five code follow-ups shipped on 2026-07-09 (see the table at the top). What remains is §2,
+and it is a database operation, not a code change.
+
 ```
 We're on branch feat/square-pos-bin-sync in /Users/tedslesinski/Repos/mgr (PR #361).
-An xhigh code review found 15 defects in the Square POS <-> bin inventory sync. Thirteen are
-fixed in commits 506f9daf, cf795a80, b4ee38d4. Read docs/plans/2026-07-09-square-review-followups.md
-first — it has the full context and the resolution for each remaining item.
+The code follow-ups from docs/plans/2026-07-09-square-review-followups.md are all done and the
+branch is merged up to origin/main. One item is left: §2, applying migrations 00224-00227.
 
-Do these, in this order:
+THE BRANCH IS NOT DEPLOYABLE UNTIL THIS LANDS. The webhook upserts
+square_sync_log.square_payment_id, a column that only exists in unapplied 00224, so every Square
+sale currently fails at the dedup claim.
 
-1. Fix the keg-only-brand regression (section 1 of that doc). This is the only item with real
-   design in it. sync/catalog/route.ts infers "discontinued" from current stock, but kegs are
-   never in bin_inventory and keg_filled_contents is positive-only, so a draft-only brand loses
-   its Square catalog objects the moment its last keg blows. First grep the brands table for an
-   is_active / is_discontinued column; if one exists, make deleteStaleItems key off it and stop
-   inferring from stock entirely. If not, fall back to keeping any brand with a finished_goods
-   row whose selling_format -> containers.type = 'keg', and mark it with a ponytail: comment.
-   Add a test: a keg-only brand with zero filled kegs survives a catalog sync.
-
-2. Correct the false prose in 00223_debit_bin_inventory.sql — the header block and the
-   COMMENT ON FUNCTION string both claim event_id idempotency and a single bin_inventory writer.
-   Comments only. Do NOT touch its DDL; it is already applied live.
-
-3. Clean up src/entities/location/core.ts (section 5): drop the redundant viewTable line and
-   inline the LocationWithPos alias across the triad.
-
-4. Extract the duplicated makeAdmin Supabase test mock into one shared helper (section 6). Read
-   src/test/supabase-mock.ts first — it may already do this. Five test files currently each
-   define their own.
-
-5. Merge origin/main into the branch. Expect conflicts in PROGRESS.md,
-   docs/plans/2026-07-07-square-pos-bin-sync.md, and src/entities/bin/core.ts. 00210 and
-   vessel-transfer-dialog.tsx are NOT reverted by the merge — do not "restore" them.
-
-Gates before every commit: bun run lint, bun run typecheck, bun run test (vitest — never
-`bun test`). No Co-Authored-By lines. Commit each item as its own logical unit.
-
-Do NOT run `supabase db push` — ask me first. Migrations 00224-00227 are committed but
-unapplied, and the deployed webhook is broken until 00224 lands (it upserts a
-square_payment_id column that does not exist yet). When we do push, it's
-`supabase db push --include-all`, then regenerate src/types/supabase.ts from live (it was
-hand-edited) and regenerate the drift snapshot.
+1. `supabase db push --include-all` (the flag is always required here). Each migration ends in a
+   self-rolling-back DO block whose assertions have NEVER run against a real database — no DB was
+   available when they were authored. Expect this push to be their first execution. Watch for
+   ASSERT_FAIL; a failure aborts the migration by design. 00226 asserts place-10 -> debit-3 ->
+   revise-to-12 lands the bin at 9; 00227 asserts a packaging-filled keg surfaces in
+   sellable_inventory with a resolved bin.
+2. Regenerate src/types/supabase.ts from live. It was HAND-EDITED in b4ee38d4
+   (square_sync_log.square_payment_id, plus bins_with_summary.square_location_id /
+   pos_sales_channel_id / is_default_fg) and should not be trusted until regenerated.
+3. Regenerate the drift snapshot.
+4. Gates: bun run lint, bun run typecheck, bun run test (vitest — never `bun test`).
+   No Co-Authored-By lines.
 
 Do NOT touch the four items under "Deferred on purpose" in that doc.
 ```
