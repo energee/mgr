@@ -16,9 +16,11 @@
  *    resolveChannelPrices call per DISTINCT channel — the common single-channel
  *    setup makes exactly one call)
  * 5. Builds SquareSyncProduct array and pushes to Square
- * 6. Cleans up stale (DISCONTINUED) catalog items — brands with no bin_inventory
- *    presence at any POS bin. Sold-out-but-still-stocked brands (qty-0 rows) are
- *    KEPT so their Square items/history survive.
+ * 6. Cleans up stale (DISCONTINUED) catalog items. The keep set is packaged
+ *    brands with any bin_inventory row at a POS bin UNION every brand sold on
+ *    draft (any keg-container finished good). Sold-out brands — packaged qty-0
+ *    rows, and draft brands whose last keg blew — are KEPT so their Square
+ *    items/history survive.
  * 7. Logs sync result
  */
 
@@ -273,17 +275,14 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     const syncResult = await pushCatalog(client, products);
 
     // 9. Compute the catalog KEEP set for stale cleanup. "Stale" must mean
-    //    DISCONTINUED, not merely SOLD OUT:
-    //      - sold out  = brand still belongs on the POS but is momentarily at 0.
-    //                    debit_bin_inventory (00223) clamps to 0 and NEVER deletes
-    //                    the bin_inventory row, so a sold-out packaged brand keeps
-    //                    a qty-0 row and stays in the keep set — its Square item,
-    //                    images, modifier lists, and Item-Sales history survive.
-    //      - discontinued = brand has no bin_inventory presence at any POS bin.
-    //    The keep set is therefore brands with ANY bin_inventory row at a POS bin
-    //    (quantity UNFILTERED — sellable_inventory can't help, it bakes in
-    //    quantity > 0) UNIONed with the currently in-stock brands (which also
-    //    covers filled kegs, whose contents view is positive-only).
+    //    DISCONTINUED, not merely SOLD OUT — deleting a Square item destroys its
+    //    variations, images, modifier lists, and Item-Sales reporting continuity.
+    //    Three contributors, UNIONed:
+    //      (a) the currently in-stock brands (activeBrandIds);
+    //      (b) packaged brands with ANY bin_inventory row at a POS bin, quantity
+    //          UNFILTERED — debit_bin_inventory (00223) clamps to 0 and never
+    //          deletes the row, so a sold-out packaged brand keeps a qty-0 row;
+    //      (c) every brand sold on draft (see below).
     const keepBrandIds = new Set<string>(activeBrandIds);
     const { data: binInvRows, error: binInvError } = await admin
       .from("bin_inventory")
@@ -311,6 +310,30 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         if (fg.brand_id) keepBrandIds.add(fg.brand_id);
       }
     }
+
+    // (c) Draft brands. Kegs are NEVER written to bin_inventory (00221's
+    //     double-count guard) and keg_filled_contents is positive-only, so (a)
+    //     and (b) both drop a draft-only brand the moment its last keg blows.
+    //     Keep every brand that is sold on draft *at all*, independent of stock:
+    //     any finished good in a keg-container selling format.
+    //     finished_goods_with_ttb_class is fg ⋈ selling_formats ⋈ containers with
+    //     no quantity filter, which is exactly that predicate.
+    // ponytail: brands carries no is_active/is_discontinued column, so "sold on
+    // draft" stands in for "not discontinued". Ceiling: a genuinely retired draft
+    // brand must be deleted from the Square catalog by hand. Upgrade path — add
+    // brands.is_active and key the whole keep set off it, dropping stock
+    // inference here entirely.
+    const { data: kegBrandRows, error: kegBrandError } = await admin
+      .from("finished_goods_with_ttb_class")
+      .select("brand_id")
+      .eq("container_type", "keg");
+    if (kegBrandError) {
+      throw new Error(`Failed to query keg brands: ${kegBrandError.message}`);
+    }
+    for (const r of kegBrandRows ?? []) {
+      if (r.brand_id) keepBrandIds.add(r.brand_id);
+    }
+
     const keepBrandIdList = [...keepBrandIds];
 
     // Guard the empty keep set: deleteStaleItems treats [] as "delete the ENTIRE

@@ -320,6 +320,47 @@ describe("catalog sync (bin-driven)", () => {
     expect(keepSet).toEqual(expect.arrayContaining(["brand-1", "brand-2"]));
   });
 
+  it("keeps a KEG-ONLY brand whose last keg blew: no stock, no bin_inventory row, still in the keep set", async () => {
+    // Regression: kegs are never in bin_inventory (00221's double-count guard) and
+    // keg_filled_contents is positive-only, so a draft-only brand disappears from
+    // BOTH the in-stock set and the bin_inventory set at zero kegs. It must still
+    // survive stale cleanup — it's sold out, not discontinued.
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
+        error: null,
+      },
+      // brand-2 (draft-only) is absent: zero filled kegs.
+      sellable_inventory: {
+        data: [{ bin_id: "bin-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5 }],
+        error: null,
+      },
+      brands: { data: [{ id: "brand-1", name: "Brand One", description: null }], error: null },
+      selling_formats: { data: [{ id: "fmt-1", name: "16oz 4-Pack" }], error: null },
+      square_catalog_map: { data: [], error: null },
+      bin_inventory: { data: [], error: null }, // kegs are never here
+      // brand-2 has a keg-container finished good => sold on draft => keep.
+      finished_goods_with_ttb_class: { data: [{ brand_id: "brand-2" }], error: null },
+      square_sync_log: { data: null, error: null },
+    });
+    mockedResolveChannelPrices.mockImplementation(async (_brandIds, channelIds) =>
+      channelMap({ "chan-A": [{ brandId: "brand-1", sellingFormatId: "fmt-1", priceCents: 1000 }] })(channelIds)
+    );
+    mockedPushCatalog.mockResolvedValue(SYNC_RESULT(1));
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(200);
+
+    // Nothing to push for the empty brand...
+    const products = mockedPushCatalog.mock.calls[0][1];
+    expect(products.map((p) => p.brandId)).toEqual(["brand-1"]);
+
+    // ...but its Square item survives.
+    const keepSet = mockedDeleteStaleItems.mock.calls[0][1];
+    expect(keepSet).toEqual(expect.arrayContaining(["brand-1", "brand-2"]));
+  });
+
   it("flags a variation as unpriced (would push $0) when its channel has no price row", async () => {
     useTables({
       bins: {
