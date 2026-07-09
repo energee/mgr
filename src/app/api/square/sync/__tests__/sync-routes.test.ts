@@ -15,10 +15,15 @@
  *     - a variation stocked at bins on DIFFERENT channels deterministically takes
  *       the first channel by bin order (v1 single-price-per-variation).
  *   Inventory:
- *     - packaged rows (source='packaged') are converted cases -> selling units
- *       (× unit_count); filled kegs (source='keg') are pushed as-is (NOT × unit_count);
+ *     - quantities are pushed AS-IS (NOT × unit_count — that over-reported on-hand;
+ *       an FG quantity is already in selling units and a Square variation is
+ *       counted per selling unit);
+ *     - every mapped variation NOT stocked at a bin is zeroed (quantity 0) so
+ *       sold-out variations drop to 0 on the POS instead of showing phantom stock;
  *     - counts are scoped to each bin's square_location_id;
- *     - square_sync_log.location_id is the view's location uuid (not the Square id).
+ *     - all bins are pushed in parallel (Promise.all) with per-bin attribution;
+ *     - square_sync_log rows are written in ONE batched insert; location_id is the
+ *       view's location uuid (not the Square id).
  *
  * The Supabase admin client is mocked with a small faithful chainable builder
  * per the repo idiom (see src/integrations/square/__tests__/pricing.test.ts).
@@ -130,6 +135,16 @@ const SYNC_RESULT = (n: number): SquareSyncResult => ({
   errors: [],
 });
 
+/** deleteStaleItems' new result shape (nothing deleted, no failures). */
+const NO_STALE = { deleted: 0, failed: 0, errors: [] as Array<{ chunk: number; error: string }> };
+
+/** resolveChannelPrices' new return: a per-channel Map. `byChannel` maps a
+ *  channel id -> its ChannelPrice[]; any channel not present resolves to []. */
+const channelMap = (
+  byChannel: Record<string, Array<{ brandId: string; sellingFormatId: string; priceCents: number }>>
+) => (channelIds: string[]) =>
+  new Map(channelIds.map((id) => [id, byChannel[id] ?? []]));
+
 const req = () => new NextRequest("http://localhost/api/square/sync");
 
 beforeEach(() => {
@@ -190,26 +205,26 @@ describe("catalog sync (bin-driven)", () => {
       square_sync_log: { data: null, error: null },
     });
 
-    mockedResolveChannelPrices.mockImplementation(async (_brandIds, channelId) => {
-      if (channelId === "chan-A") {
-        return [{ brandId: "brand-1", sellingFormatId: "fmt-1", priceCents: 1000 }];
-      }
-      if (channelId === "chan-B") {
-        return [
-          { brandId: "brand-1", sellingFormatId: "fmt-1", priceCents: 2000 },
-          { brandId: "brand-2", sellingFormatId: "fmt-2", priceCents: 3000 },
-        ];
-      }
-      return [];
+    const resolve = channelMap({
+      "chan-A": [{ brandId: "brand-1", sellingFormatId: "fmt-1", priceCents: 1000 }],
+      "chan-B": [
+        { brandId: "brand-1", sellingFormatId: "fmt-1", priceCents: 2000 },
+        { brandId: "brand-2", sellingFormatId: "fmt-2", priceCents: 3000 },
+      ],
     });
+    mockedResolveChannelPrices.mockImplementation(async (_brandIds, channelIds) => resolve(channelIds));
     mockedPushCatalog.mockResolvedValue(SYNC_RESULT(2));
-    mockedDeleteStaleItems.mockResolvedValue(0);
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
 
     const res = await catalogPOST(req());
     expect(res.status).toBe(200);
 
-    // one resolveChannelPrices call per DISTINCT channel
-    expect(mockedResolveChannelPrices).toHaveBeenCalledTimes(2);
+    // ONE batched resolveChannelPrices call covering every DISTINCT channel (E3)
+    expect(mockedResolveChannelPrices).toHaveBeenCalledTimes(1);
+    expect(mockedResolveChannelPrices).toHaveBeenCalledWith(
+      expect.arrayContaining(["brand-1", "brand-2"]),
+      expect.arrayContaining(["chan-A", "chan-B"])
+    );
 
     const products = mockedPushCatalog.mock.calls[0][1];
     const brand1 = products.find((p) => p.brandId === "brand-1")!;
@@ -249,13 +264,60 @@ describe("catalog sync (bin-driven)", () => {
       square_sync_log: { data: null, error: null },
     });
     mockedPushCatalog.mockResolvedValue(SYNC_RESULT(0));
-    mockedDeleteStaleItems.mockResolvedValue(0);
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
 
     const res = await catalogPOST(req());
     expect(res.status).toBe(200);
-    // Empty active-brand set must NOT reach deleteStaleItems, which treats [] as
-    // "delete the ENTIRE catalog" — a transient empty bin would otherwise nuke it.
+    // Empty keep set (no stock AND no bin_inventory rows) must NOT reach
+    // deleteStaleItems, which treats [] as "delete the ENTIRE catalog" — a
+    // transient empty bin would otherwise nuke it.
     expect(mockedDeleteStaleItems).not.toHaveBeenCalled();
+  });
+
+  it("keeps a SOLD-OUT (not discontinued) brand in the catalog: absent from the push, present in the keep set", async () => {
+    // brand-1 in stock; brand-2 sold out (absent from the positive-only view) but
+    // still has a qty-0 bin_inventory row (debit clamps, never deletes — 00223),
+    // so brand-2 must survive stale cleanup even though it isn't re-pushed.
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
+        error: null,
+      },
+      sellable_inventory: {
+        data: [{ bin_id: "bin-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5 }],
+        error: null,
+      },
+      brands: { data: [{ id: "brand-1", name: "Brand One", description: null }], error: null },
+      selling_formats: { data: [{ id: "fmt-1", name: "16oz 4-Pack" }], error: null },
+      square_catalog_map: { data: [], error: null },
+      // bin_inventory retains sold-out brand-2's finished good (fg-2) at a POS bin.
+      bin_inventory: {
+        data: [{ finished_good_id: "fg-1" }, { finished_good_id: "fg-2" }],
+        error: null,
+      },
+      finished_goods: {
+        data: [{ brand_id: "brand-1" }, { brand_id: "brand-2" }],
+        error: null,
+      },
+      square_sync_log: { data: null, error: null },
+    });
+    mockedResolveChannelPrices.mockImplementation(async (_brandIds, channelIds) =>
+      channelMap({ "chan-A": [{ brandId: "brand-1", sellingFormatId: "fmt-1", priceCents: 1000 }] })(channelIds)
+    );
+    mockedPushCatalog.mockResolvedValue(SYNC_RESULT(1));
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(200);
+
+    // Only the in-stock brand is pushed.
+    const products = mockedPushCatalog.mock.calls[0][1];
+    expect(products.map((p) => p.brandId)).toEqual(["brand-1"]);
+
+    // ...but the keep set passed to deleteStaleItems includes the SOLD-OUT brand-2,
+    // so its Square item is NOT deleted.
+    const keepSet = mockedDeleteStaleItems.mock.calls[0][1];
+    expect(keepSet).toEqual(expect.arrayContaining(["brand-1", "brand-2"]));
   });
 
   it("flags a variation as unpriced (would push $0) when its channel has no price row", async () => {
@@ -273,9 +335,12 @@ describe("catalog sync (bin-driven)", () => {
       square_catalog_map: { data: [], error: null },
       square_sync_log: { data: null, error: null },
     });
-    mockedResolveChannelPrices.mockResolvedValue([]); // no price rows on the channel
+    // Channel present in the map but with NO price rows -> variation pushes $0.
+    mockedResolveChannelPrices.mockImplementation(async (_brandIds, channelIds) =>
+      channelMap({})(channelIds)
+    );
     mockedPushCatalog.mockResolvedValue(SYNC_RESULT(1));
-    mockedDeleteStaleItems.mockResolvedValue(0);
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
 
     const res = await catalogPOST(req());
     expect(res.status).toBe(200);
@@ -303,7 +368,7 @@ describe("inventory sync (bin-driven)", () => {
     expect(mockedPushInventoryCounts).not.toHaveBeenCalled();
   });
 
-  it("converts packaged cases by unit_count, pushes kegs as-is, scopes to bin square location, logs view location_id", async () => {
+  it("pushes quantities as-is (no × unit_count), zeroes unstocked mapped variations, scopes to bin location, batches the log", async () => {
     useTables({
       bins: {
         data: [
@@ -321,19 +386,12 @@ describe("inventory sync (bin-driven)", () => {
       },
       sellable_inventory: {
         data: [
-          // packaged: 5 cases × unit_count 6 = 30 selling units, at SQ-LOC-1
+          // packaged: 5 cases pushed as 5 (NOT × any unit_count), at SQ-LOC-1
           { bin_id: "bin-1", location_id: "loc-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5, source: "packaged" },
-          // keg: 2 kegs pushed as-is (NOT × unit_count 12), at SQ-LOC-1
+          // keg: 2 kegs pushed as 2, at SQ-LOC-1
           { bin_id: "bin-1", location_id: "loc-1", brand_id: "brand-2", selling_format_id: "fmt-2", quantity: 2, source: "keg" },
-          // packaged: 4 cases × 6 = 24, at SQ-LOC-2
+          // packaged: 4 cases pushed as 4, at SQ-LOC-2 (SQ-VAR-2 NOT stocked here)
           { bin_id: "bin-2", location_id: "loc-2", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 4, source: "packaged" },
-        ],
-        error: null,
-      },
-      selling_formats: {
-        data: [
-          { id: "fmt-1", unit_count: 6 },
-          { id: "fmt-2", unit_count: 12 }, // keg format: proves keg is NOT multiplied
         ],
         error: null,
       },
@@ -347,29 +405,38 @@ describe("inventory sync (bin-driven)", () => {
     const body = await res.json();
     expect(body.data.binsProcessed).toBe(2);
 
-    // two pushes: one per bin that produced counts, in bin order
+    // one push per bin (Promise.all preserves bin order)
     expect(mockedPushInventoryCounts).toHaveBeenCalledTimes(2);
 
+    // bin-1 stocks both mapped variations -> both non-zero, no zero-fill needed
     const bin1Counts = mockedPushInventoryCounts.mock.calls[0][1];
     expect(bin1Counts).toEqual(
       expect.arrayContaining([
-        { squareVariationId: "SQ-VAR-1", squareLocationId: "SQ-LOC-1", quantity: 30 },
+        { squareVariationId: "SQ-VAR-1", squareLocationId: "SQ-LOC-1", quantity: 5 },
         { squareVariationId: "SQ-VAR-2", squareLocationId: "SQ-LOC-1", quantity: 2 },
       ])
     );
     expect(bin1Counts).toHaveLength(2);
 
+    // bin-2 stocks only SQ-VAR-1 -> SQ-VAR-2 is zeroed (phantom-stock fix)
     const bin2Counts = mockedPushInventoryCounts.mock.calls[1][1];
-    expect(bin2Counts).toEqual([
-      { squareVariationId: "SQ-VAR-1", squareLocationId: "SQ-LOC-2", quantity: 24 },
-    ]);
+    expect(bin2Counts).toEqual(
+      expect.arrayContaining([
+        { squareVariationId: "SQ-VAR-1", squareLocationId: "SQ-LOC-2", quantity: 4 },
+        { squareVariationId: "SQ-VAR-2", squareLocationId: "SQ-LOC-2", quantity: 0 },
+      ])
+    );
+    expect(bin2Counts).toHaveLength(2);
 
-    // one log per bin; location_id is the view's location uuid, not the Square id
-    const logs = inserted.filter((i) => i.table === "square_sync_log").map((i) => i.row as {
+    // E2: ONE batched insert whose payload is the array of per-bin rows.
+    const logInserts = inserted.filter((i) => i.table === "square_sync_log");
+    expect(logInserts).toHaveLength(1);
+    const logs = logInserts[0].row as Array<{
       location_id: string | null;
       details: { squareLocationId: string };
-    });
+    }>;
     expect(logs).toHaveLength(2);
+    // location_id is the view's location uuid, not the Square id
     expect(logs[0].location_id).toBe("loc-1");
     expect(logs[0].details.squareLocationId).toBe("SQ-LOC-1");
     expect(logs[1].location_id).toBe("loc-2");
@@ -378,6 +445,45 @@ describe("inventory sync (bin-driven)", () => {
     expect(mockedUpdateSquareSettings).toHaveBeenCalledWith(
       expect.objectContaining({ last_inventory_sync_at: expect.any(String) })
     );
+  });
+
+  it("pushes an explicit quantity 0 for a mapped variation that sold out in MGR (no phantom stock)", async () => {
+    // fmt-1 in stock; fmt-2 mapped in the catalog but sold out at this bin -> must
+    // be pushed as quantity 0 so Square stops showing its last non-zero count.
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1" }],
+        error: null,
+      },
+      square_catalog_map: {
+        data: [
+          { brand_id: "brand-1", selling_format_id: "fmt-1", square_catalog_id: "SQ-VAR-1" },
+          { brand_id: "brand-1", selling_format_id: "fmt-2", square_catalog_id: "SQ-VAR-2" },
+        ],
+        error: null,
+      },
+      sellable_inventory: {
+        data: [
+          { bin_id: "bin-1", location_id: "loc-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 7, source: "packaged" },
+        ],
+        error: null,
+      },
+      square_sync_log: { data: null, error: null },
+    });
+
+    mockedPushInventoryCounts.mockImplementation(async (_client, counts) => SYNC_RESULT(counts.length));
+
+    const res = await inventoryPOST(req());
+    expect(res.status).toBe(200);
+
+    const counts = mockedPushInventoryCounts.mock.calls[0][1];
+    expect(counts).toEqual(
+      expect.arrayContaining([
+        { squareVariationId: "SQ-VAR-1", squareLocationId: "SQ-LOC-1", quantity: 7 },
+        { squareVariationId: "SQ-VAR-2", squareLocationId: "SQ-LOC-1", quantity: 0 },
+      ])
+    );
+    expect(counts).toHaveLength(2);
   });
 
   it("reports an error (no push) when a stocked format has no catalog mapping", async () => {
@@ -393,7 +499,6 @@ describe("inventory sync (bin-driven)", () => {
         ],
         error: null,
       },
-      selling_formats: { data: [{ id: "fmt-1", unit_count: 1 }], error: null },
       square_sync_log: { data: null, error: null },
     });
 
@@ -404,12 +509,14 @@ describe("inventory sync (bin-driven)", () => {
     expect(body.data.errors).toEqual([
       expect.objectContaining({ itemId: "brand-1/fmt-1" }),
     ]);
+    // Empty catalog map -> no mapped variations -> nothing (not even zeros) to push.
     expect(mockedPushInventoryCounts).not.toHaveBeenCalled();
-    // F4: the mapping error is durably logged per-bin, not just in the response.
-    const log = inserted.find((i) => i.table === "square_sync_log")!.row as {
+    // F4: the mapping error is durably logged per-bin (batched insert), not just
+    // in the response.
+    const logRows = inserted.find((i) => i.table === "square_sync_log")!.row as Array<{
       details: { errors?: Array<{ itemId: string }> };
-    };
-    expect(log.details.errors).toEqual([
+    }>;
+    expect(logRows[0].details.errors).toEqual([
       expect.objectContaining({ itemId: "brand-1/fmt-1" }),
     ]);
   });

@@ -12,6 +12,7 @@ import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateSquareSettings } from "@/integrations/square/client";
+import { getPosBins } from "@/integrations/square/route-helpers";
 
 export const GET = withPermission("integrations:manage", async () => {
   const admin = await createAdminClient();
@@ -39,12 +40,12 @@ export const GET = withPermission("integrations:manage", async () => {
   //    square_location_id and pos_sales_channel_id set), with their Square
   //    location + sales-channel names resolved for display. Names are mapped
   //    separately (square_locations has no FK from bins) rather than embedded.
-  const { data: posBinRows } = await admin
-    .from("bins")
-    .select("id, name, square_location_id, pos_sales_channel_id")
-    .not("square_location_id", "is", null)
-    .not("pos_sales_channel_id", "is", null)
-    .order("name");
+  const { data: posBinRows } = await getPosBins<{
+    id: string;
+    name: string;
+    square_location_id: string | null;
+    pos_sales_channel_id: string | null;
+  }>(admin, { select: "id, name, square_location_id, pos_sales_channel_id", orderBy: "name" });
 
   const squareLocationIds = [
     ...new Set((posBinRows ?? []).map((b) => b.square_location_id).filter((v): v is string => !!v)),

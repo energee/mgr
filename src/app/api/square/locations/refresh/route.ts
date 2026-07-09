@@ -14,18 +14,13 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getSquareClient, listSquareLocations } from "@/integrations/square/client";
+import { listSquareLocations } from "@/integrations/square/client";
+import { requireSquareClient } from "@/integrations/square/route-helpers";
 
 export const POST = withPermission("integrations:manage", async () => {
-  const client = await getSquareClient();
-  if (!client) {
-    return errorResponse(
-      "INTEGRATION_DISABLED",
-      "Square integration is not connected or not enabled",
-      undefined,
-      400
-    );
-  }
+  const guard = await requireSquareClient();
+  if (!guard.ok) return guard.response;
+  const client = guard.client;
 
   let locations;
   try {

@@ -8,41 +8,46 @@ type ChannelPrice = {
 }
 
 /**
- * Query pricing_tier_prices for a specific sales channel.
- * Returns prices in cents for Square catalog sync.
+ * Query pricing_tier_prices for one or more sales channels in a SINGLE round of
+ * queries, returning a per-channel map of prices (in cents) for Square catalog
+ * sync.
  *
  * The pricing path is:
  *   Brand -> Recipe -> recipe.pricing_tier_id
- *   -> pricing_tier_prices WHERE pricing_tier_id AND sales_channel = salesChannelId
+ *   -> pricing_tier_prices WHERE pricing_tier_id AND sales_channel_id IN (...)
  *   -> price (in dollars) -> convert to cents (* 100)
  *
- * Selling formats are referenced via pricing_tier_prices.format_id
- * (which references selling_formats).
+ * Selling formats are referenced via pricing_tier_prices.format_id (which
+ * references selling_formats).
  *
- * @param brandIds      Brands to resolve prices for.
- * @param salesChannelId UUID of the sales channel whose prices to read.
+ * Batching (E3): the brand->tier resolution is channel-INDEPENDENT, so it runs
+ * ONCE here rather than once per channel. Only the final pricing_tier_prices
+ * read is channel-dependent, and it uses `.in("sales_channel_id", ...)` to fetch
+ * every requested channel in one query. Callers that need multiple channels
+ * (mixed-channel POS bins) previously looped this function, re-running the
+ * brands/recipes queries on every call.
+ *
+ * @param brandIds        Brands to resolve prices for.
+ * @param salesChannelIds UUIDs of the sales channels whose prices to read.
+ * @returns Map keyed by sales_channel_id -> ChannelPrice[] (every requested
+ *          channel is present as a key, with an empty array when it has no
+ *          matching prices).
  */
 export async function resolveChannelPrices(
   brandIds: string[],
-  salesChannelId: string
-): Promise<ChannelPrice[]> {
-  if (brandIds.length === 0) return [];
+  salesChannelIds: string[]
+): Promise<Map<string, ChannelPrice[]>> {
+  // Seed every requested channel so callers can index the result unconditionally.
+  const result = new Map<string, ChannelPrice[]>();
+  for (const id of salesChannelIds) result.set(id, []);
+
+  if (brandIds.length === 0 || salesChannelIds.length === 0) return result;
 
   const admin = await createAdminClient();
 
-  // 1. Get brands with their recipes' pricing tier IDs
-  //    A brand can have multiple recipes, but typically one "primary" recipe.
-  //    We pick the first recipe with a pricing_tier_id set.
-  const { data: brands, error: brandsError } = await admin
-    .from("brands")
-    .select("id, name")
-    .in("id", brandIds);
-
-  if (brandsError || !brands || brands.length === 0) {
-    return [];
-  }
-
-  // 2. Get recipes for these brands that have a pricing_tier_id
+  // 1. Get recipes for these brands that have a pricing_tier_id (channel-
+  //    independent). A brand can have multiple recipes but typically one
+  //    "primary" recipe — the first recipe with a tier wins.
   const { data: recipes, error: recipesError } = await admin
     .from("recipes")
     .select("id, brand_id, pricing_tier_id")
@@ -50,10 +55,10 @@ export async function resolveChannelPrices(
     .not("pricing_tier_id", "is", null);
 
   if (recipesError || !recipes || recipes.length === 0) {
-    return [];
+    return result;
   }
 
-  // Build a map of brand_id -> pricing_tier_id (first recipe with a tier wins)
+  // Build a map of brand_id -> pricing_tier_id (first recipe with a tier wins).
   const brandTierMap: Record<string, string> = {};
   for (const recipe of recipes) {
     if (recipe.brand_id && recipe.pricing_tier_id && !brandTierMap[recipe.brand_id]) {
@@ -63,47 +68,50 @@ export async function resolveChannelPrices(
 
   const tierIds = [...new Set(Object.values(brandTierMap))];
   if (tierIds.length === 0) {
-    return [];
+    return result;
   }
 
-  // 3. Get pricing_tier_prices for those tiers and the requested channel
+  // 2. Get pricing_tier_prices for those tiers across ALL requested channels in
+  //    one query (channel-dependent).
   const { data: tierPrices, error: pricesError } = await admin
     .from("pricing_tier_prices")
-    .select("pricing_tier_id, format_id, price")
+    .select("pricing_tier_id, format_id, price, sales_channel_id")
     .in("pricing_tier_id", tierIds)
-    .eq("sales_channel_id", salesChannelId);
+    .in("sales_channel_id", salesChannelIds);
 
   if (pricesError || !tierPrices || tierPrices.length === 0) {
-    return [];
+    return result;
   }
 
-  // 4. Build a lookup: tier_id -> { format_id -> price }
-  const tierPriceMap: Record<string, Record<string, number>> = {};
+  // 3. Build a lookup: channel_id -> tier_id -> { format_id -> price }
+  const channelTierPriceMap: Record<string, Record<string, Record<string, number>>> = {};
   for (const tp of tierPrices) {
-    if (!tierPriceMap[tp.pricing_tier_id]) {
-      tierPriceMap[tp.pricing_tier_id] = {};
-    }
-    if (tp.format_id != null) {
-      tierPriceMap[tp.pricing_tier_id][tp.format_id] = Number(tp.price);
-    }
+    if (tp.format_id == null || tp.sales_channel_id == null) continue;
+    const byTier = (channelTierPriceMap[tp.sales_channel_id] ??= {});
+    (byTier[tp.pricing_tier_id] ??= {})[tp.format_id] = Number(tp.price);
   }
 
-  // 5. Map results back to brands
-  // format_id references selling_formats directly
-  const results: ChannelPrice[] = [];
+  // 4. Map results back to brands, per channel. format_id references
+  //    selling_formats directly.
+  for (const channelId of salesChannelIds) {
+    const tierPriceMap = channelTierPriceMap[channelId];
+    if (!tierPriceMap) continue; // stays [] from the seed
 
-  for (const [brandId, tierId] of Object.entries(brandTierMap)) {
-    const pricesForTier = tierPriceMap[tierId];
-    if (!pricesForTier) continue;
+    const prices: ChannelPrice[] = [];
+    for (const [brandId, tierId] of Object.entries(brandTierMap)) {
+      const pricesForTier = tierPriceMap[tierId];
+      if (!pricesForTier) continue;
 
-    for (const [formatId, priceDollars] of Object.entries(pricesForTier)) {
-      results.push({
-        brandId,
-        sellingFormatId: formatId,
-        priceCents: dollarsToCents(priceDollars),
-      });
+      for (const [formatId, priceDollars] of Object.entries(pricesForTier)) {
+        prices.push({
+          brandId,
+          sellingFormatId: formatId,
+          priceCents: dollarsToCents(priceDollars),
+        });
+      }
     }
+    result.set(channelId, prices);
   }
 
-  return results;
+  return result;
 }

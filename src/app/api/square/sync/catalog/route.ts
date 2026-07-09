@@ -16,28 +16,25 @@
  *    resolveChannelPrices call per DISTINCT channel — the common single-channel
  *    setup makes exactly one call)
  * 5. Builds SquareSyncProduct array and pushes to Square
- * 6. Cleans up stale catalog items no longer in inventory
+ * 6. Cleans up stale (DISCONTINUED) catalog items — brands with no bin_inventory
+ *    presence at any POS bin. Sold-out-but-still-stocked brands (qty-0 rows) are
+ *    KEPT so their Square items/history survive.
  * 7. Logs sync result
  */
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getSquareClient, updateSquareSettings } from "@/integrations/square/client";
+import { updateSquareSettings } from "@/integrations/square/client";
 import { pushCatalog, deleteStaleItems } from "@/integrations/square/catalog";
+import { getPosBins, requireSquareClient, logSyncFailure } from "@/integrations/square/route-helpers";
 import { resolveChannelPrices } from "@/integrations/square/pricing";
 import type { SquareSyncProduct, SquareSyncVariation } from "@/integrations/square/types";
 
 export const POST = withPermission("integrations:manage", async (_request, { user }) => {
-  const client = await getSquareClient();
-  if (!client) {
-    return errorResponse(
-      "INTEGRATION_DISABLED",
-      "Square integration is not connected or not enabled",
-      undefined,
-      400
-    );
-  }
+  const guard = await requireSquareClient();
+  if (!guard.ok) return guard.response;
+  const client = guard.client;
 
   const admin = await createAdminClient();
   const startedAt = new Date().toISOString();
@@ -45,15 +42,14 @@ export const POST = withPermission("integrations:manage", async (_request, { use
   try {
     // 1. Get POS-configured bins (both square_location_id and pos_sales_channel_id
     //    set => a Square POS sync target). Replaces the old POS-on-location model.
-    const { data: posBins, error: binsError } = await admin
-      .from("bins")
-      .select("id, square_location_id, pos_sales_channel_id")
-      .not("square_location_id", "is", null)
-      .not("pos_sales_channel_id", "is", null)
-      // Stable total order (id is the non-null unique PK) so the multi-channel
-      // price tie-break below is deterministic across syncs. created_at is
-      // nullable/non-unique and can't guarantee a total order.
-      .order("id");
+    //    Stable total order (id is the non-null unique PK) so the multi-channel
+    //    price tie-break below is deterministic across syncs. created_at is
+    //    nullable/non-unique and can't guarantee a total order.
+    const { data: posBins, error: binsError } = await getPosBins<{
+      id: string;
+      square_location_id: string | null;
+      pos_sales_channel_id: string | null;
+    }>(admin, { select: "id, square_location_id, pos_sales_channel_id", orderBy: "id" });
 
     if (binsError) {
       throw new Error(`Failed to query POS bins: ${binsError.message}`);
@@ -166,6 +162,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       // Price this variation from the channel of the earliest-ordered POS bin that
       // stocks it. When all POS bins share a channel (the common case) this is
       // unambiguous; the bin-order tie-break only matters for mixed-channel setups.
+      // Keep the binIndex tie-break: it looks like YAGNI, but the stock query has
+      // no bin ordering, so without it the chosen channel would flip between syncs
+      // on DB row order — removing it is NOT behavior-preserving.
       // ponytail: v1 Square catalog is single-price-per-variation. Per-location
       // price overrides are deferred, so a variation stocked at bins on DIFFERENT
       // channels deterministically takes the first channel by bin order.
@@ -180,16 +179,19 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       }
     }
 
+    // In-stock brands drive the catalog/pricing PUSH (we only have variations +
+    // prices for what the view returns, i.e. quantity > 0).
     const activeBrandIds = [...brandMap.keys()];
 
-    // 5. Resolve prices for each DISTINCT POS channel (one call per channel; the
-    //    common single-channel setup makes exactly one call). Replaces the old
-    //    hardcoded taproom-channel lookup.
+    // 5. Resolve prices for ALL DISTINCT POS channels in a single batched call
+    //    (resolveChannelPrices runs the channel-independent brand->tier queries
+    //    once and fetches every channel's prices with one IN query). Replaces the
+    //    old per-channel loop that re-ran those queries each iteration.
     //    channelId -> brandId -> varKey -> priceCents
     const distinctChannels = [...new Set(posBins.map((b) => b.pos_sales_channel_id!))];
+    const pricesByChannel = await resolveChannelPrices(activeBrandIds, distinctChannels);
     const channelPriceLookup = new Map<string, Map<string, Map<string, number>>>();
-    for (const channelId of distinctChannels) {
-      const prices = await resolveChannelPrices(activeBrandIds, channelId);
+    for (const [channelId, prices] of pricesByChannel) {
       const brandLookup = new Map<string, Map<string, number>>();
       for (const p of prices) {
         if (!brandLookup.has(p.brandId)) {
@@ -270,12 +272,55 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     // 8. Push catalog to Square
     const syncResult = await pushCatalog(client, products);
 
-    // 9. Clean up stale items. Guard the empty active set: deleteStaleItems treats
-    //    [] as "delete the ENTIRE catalog", and the bin-driven model makes a
-    //    transient all-empty state reachable (POS bins configured but momentarily
-    //    holding no sellable stock). Skip cleanup rather than wipe everything.
-    const deletedCount =
-      activeBrandIds.length > 0 ? await deleteStaleItems(client, activeBrandIds) : 0;
+    // 9. Compute the catalog KEEP set for stale cleanup. "Stale" must mean
+    //    DISCONTINUED, not merely SOLD OUT:
+    //      - sold out  = brand still belongs on the POS but is momentarily at 0.
+    //                    debit_bin_inventory (00223) clamps to 0 and NEVER deletes
+    //                    the bin_inventory row, so a sold-out packaged brand keeps
+    //                    a qty-0 row and stays in the keep set — its Square item,
+    //                    images, modifier lists, and Item-Sales history survive.
+    //      - discontinued = brand has no bin_inventory presence at any POS bin.
+    //    The keep set is therefore brands with ANY bin_inventory row at a POS bin
+    //    (quantity UNFILTERED — sellable_inventory can't help, it bakes in
+    //    quantity > 0) UNIONed with the currently in-stock brands (which also
+    //    covers filled kegs, whose contents view is positive-only).
+    const keepBrandIds = new Set<string>(activeBrandIds);
+    const { data: binInvRows, error: binInvError } = await admin
+      .from("bin_inventory")
+      .select("finished_good_id")
+      .in("bin_id", posBinIds);
+    if (binInvError) {
+      throw new Error(`Failed to query bin inventory: ${binInvError.message}`);
+    }
+    const cataloguedFgIds = [
+      ...new Set(
+        (binInvRows ?? [])
+          .map((r) => r.finished_good_id)
+          .filter((v): v is string => !!v)
+      ),
+    ];
+    if (cataloguedFgIds.length > 0) {
+      const { data: fgRows, error: fgError } = await admin
+        .from("finished_goods")
+        .select("brand_id")
+        .in("id", cataloguedFgIds);
+      if (fgError) {
+        throw new Error(`Failed to query finished goods: ${fgError.message}`);
+      }
+      for (const fg of fgRows ?? []) {
+        if (fg.brand_id) keepBrandIds.add(fg.brand_id);
+      }
+    }
+    const keepBrandIdList = [...keepBrandIds];
+
+    // Guard the empty keep set: deleteStaleItems treats [] as "delete the ENTIRE
+    // catalog", and the bin-driven model makes a transient all-empty state
+    // reachable (POS bins configured but no FG placed anywhere). Skip cleanup
+    // rather than wipe everything.
+    const staleResult =
+      keepBrandIdList.length > 0
+        ? await deleteStaleItems(client, keepBrandIdList)
+        : { deleted: 0, failed: 0, errors: [] as Array<{ chunk: number; error: string }> };
 
     // 10. Update last_catalog_sync_at
     const completedAt = new Date().toISOString();
@@ -283,16 +328,20 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       last_catalog_sync_at: completedAt,
     });
 
-    // 11. Log to square_sync_log
+    // 11. Log to square_sync_log. Fold stale-delete failures (Square objects that
+    //     could not be removed and whose map rows were retained) into items_failed
+    //     so they surface in the count, and record their detail.
     await admin.from("square_sync_log").insert({
       sync_type: "catalog_push",
       items_synced: syncResult.itemsSynced,
-      items_failed: syncResult.itemsFailed,
+      items_failed: syncResult.itemsFailed + staleResult.failed,
       details: {
         posBinCount: posBins.length,
         productsCount: products.length,
         variationsCount: products.reduce((sum, p) => sum + p.variations.length, 0),
-        staleDeleted: deletedCount,
+        staleDeleted: staleResult.deleted,
+        staleFailed: staleResult.failed > 0 ? staleResult.failed : undefined,
+        staleErrors: staleResult.errors.length > 0 ? staleResult.errors : undefined,
         unpricedVariations: unpricedVariations.length > 0 ? unpricedVariations : undefined,
         errors: syncResult.errors.length > 0 ? syncResult.errors : undefined,
         triggeredBy: user.id,
@@ -302,30 +351,22 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     });
 
     return successResponse({
-      success: syncResult.success,
+      success: syncResult.success && staleResult.failed === 0,
       itemsSynced: syncResult.itemsSynced,
-      itemsFailed: syncResult.itemsFailed,
-      staleDeleted: deletedCount,
+      itemsFailed: syncResult.itemsFailed + staleResult.failed,
+      staleDeleted: staleResult.deleted,
+      staleFailed: staleResult.failed,
+      staleErrors: staleResult.errors,
       productsCount: products.length,
       unpricedVariations,
       errors: syncResult.errors,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Catalog sync failed";
-
-    // Log the failed sync
-    await admin
-      .from("square_sync_log")
-      .insert({
-        sync_type: "catalog_push",
-        items_synced: 0,
-        items_failed: 0,
-        details: { error: message, triggeredBy: user.id },
-        started_at: startedAt,
-        completed_at: new Date().toISOString(),
-      })
-      .then(() => {});
-
-    return errorResponse("SYNC_FAILED", message, undefined, 500);
+    return logSyncFailure(admin, {
+      syncType: "catalog_push",
+      startedAt,
+      userId: user.id,
+      err,
+    });
   }
 });
