@@ -16,9 +16,17 @@
 --   negative) and returns clamped = true so the caller can flag the oversell in
 --   square_sync_log. The physical count can't go negative; the taproom_sale
 --   allocation the webhook also writes remains the audit/TTB record of what was
---   actually sold. The two ledgers are intentionally independent -- only this
---   path writes bin_inventory (see the D0 spike), so keeping both is not a
---   double-count.
+--   actually sold. The two ledgers are intentionally independent and are
+--   reconciled at the POS read, not here.
+--
+--   SUPERSEDED BY 00226: this file originally argued "only this path writes
+--   bin_inventory, so keeping both is not a double-count". True when written,
+--   FALSE now. bin_inventory has a SECOND writer -- revise_packaging_session
+--   (00219) mirrors corrected FG quantities onto the bin. 00226(A) changed that
+--   mirror from an absolute overwrite to a delta, so it stops resurrecting units
+--   already sold through the POS; 00226(B) clamps the sellable_inventory view to
+--   LEAST(bin count, ledger availability) so the POS cannot over-report. Read
+--   00226 before reasoning about bin_inventory writers.
 --
 -- SECURITY DEFINER: the debit must bypass the (system, unauthenticated) webhook
 --   caller's bin_inventory RLS -- same rationale as place_finished_good_in_bin
@@ -32,9 +40,13 @@
 --   so EXECUTE is revoked from PUBLIC and granted only to service_role (the role
 --   the admin webhook client connects as).
 --
--- Idempotency is handled upstream by the webhook's event_id dedup
--- (square_sync_log unique constraint) -- this function is NOT itself idempotent
--- and must be called at most once per sale line.
+-- Idempotency is handled upstream by the webhook's dedup claim -- this function
+-- is NOT itself idempotent and must be called at most once per sale line.
+-- SUPERSEDED BY 00224: that claim was originally keyed on event_id. Square emits
+-- both payment.created and payment.updated for one payment, each with its own
+-- event_id, so an event-keyed claim let a single sale debit the bin twice. The
+-- webhook now claims on square_sync_log.square_payment_id (00224). event_id dedup
+-- survives only for the non-payment inventory.count.updated path.
 --
 -- Live-safe: one new function. Verified by a self-rolling-back DO block at the
 -- end of this file (commits no rows).
@@ -82,7 +94,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION debit_bin_inventory(UUID, UUID, INTEGER) IS
-  'Atomically debit a bin''s finished-good quantity for a Square POS sale (00223, Square bin-sync D2). Row-locks (SELECT FOR UPDATE) so concurrent sales at the same bin cannot lose updates. Clamps to zero on oversell (never negative) and returns (new_quantity, clamped) so the webhook can flag oversold lines (D3). SECURITY DEFINER to bypass the system webhook caller''s bin_inventory RLS; EXECUTE locked to service_role. NOT idempotent -- the webhook''s event_id dedup guarantees at-most-once.';
+  'Atomically debit a bin''s finished-good quantity for a Square POS sale (00223, Square bin-sync D2). Row-locks (SELECT FOR UPDATE) so concurrent sales at the same bin cannot lose updates. Clamps to zero on oversell (never negative) and returns (new_quantity, clamped) so the webhook can flag oversold lines (D3). SECURITY DEFINER to bypass the system webhook caller''s bin_inventory RLS; EXECUTE locked to service_role. NOT idempotent -- the webhook''s payment-id dedup (square_sync_log.square_payment_id, 00224) guarantees at-most-once. NOTE: bin_inventory has a SECOND writer, revise_packaging_session (00226), which applies revision deltas; the sellable_inventory view clamps the bin count to ledger availability so the two ledgers are reconciled at the POS read (00226).';
 
 -- System-internal: only the service-role webhook client may call it.
 REVOKE ALL ON FUNCTION debit_bin_inventory(UUID, UUID, INTEGER) FROM PUBLIC;
