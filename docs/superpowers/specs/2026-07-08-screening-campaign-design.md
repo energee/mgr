@@ -141,11 +141,27 @@ and guards its entry point with `import.meta.main`.
 ## Out of scope
 
 `scripts/migration/{migrate_catalog_items,migrate_orders,migration_utils}.py`
-are one-shot MongoDB→Postgres importers from #161 (January). `migration_utils.py`
-imports `bson`, an undeclared pip dependency. The data landed long ago
-(`00161_supplier_catalog_inventory_items.sql` is live). Deleting them is safe —
-git preserves them — and would bring the repo to zero Python files, but it is
-unrelated to agent tooling and needs the owner's explicit confirmation.
+are MongoDB→Postgres importers from #161 (January). `migration_utils.py` imports
+`bson`, an undeclared pip dependency.
+
+They are **superseded, not merely finished**. `POST /api/integrations/mongodb/sync`
+(`src/integrations/mongodb/{client,sync,transformers,types,id}.ts`) is a live
+TypeScript reimplementation covering the same entities — suppliers, malts, hops,
+yeasts, orders, order_items. Nothing in `src/` shells out to Python.
+
+**Prerequisite before deleting them.** `src/integrations/mongodb/id.ts` and
+`scripts/migration/migration_utils.py` both hardcode
+`MIGRATION_NAMESPACE = a1b2c3d4-e5f6-7890-abcd-ef1234567890`. Both derive
+Postgres UUIDs from Mongo ObjectIDs via UUID v5 against that namespace, so a sync
+today maps an ObjectID onto exactly the row January's migration created. **The
+namespace is a frozen compatibility constant; changing it duplicates the entire
+catalog on the next sync.** `id.ts` inlines the value, so deleting the Python
+breaks no code — but `id.ts:5` cites "PR #161's Python migration scripts" as its
+provenance. Rewrite that comment to cite PR #161 in git history rather than a
+file path, and to state the never-change constraint, *before* removing the files.
+
+Deleting them brings the repo to zero Python. It is unrelated to agent tooling
+and needs the owner's explicit confirmation.
 
 ## Non-goals
 
