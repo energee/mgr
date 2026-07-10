@@ -82,6 +82,12 @@ export const binSchema = z.object({
   // packaging session has no default_bin_id. At most one per location (enforced
   // by the bins_one_default_fg_per_location partial-unique index).
   is_default_fg: z.boolean().default(false),
+  // Square POS config (00222): a bin is an outbound Square sync target IFF BOTH
+  // square_location_id and pos_sales_channel_id are set. square_location_id is
+  // the Square location PK (text); pos_sales_channel_id picks the channel whose
+  // pricing this bin's catalog pushes at. Both optional — most bins aren't POS.
+  square_location_id: z.string().nullable().optional(),
+  pos_sales_channel_id: z.string().uuid().nullable().optional(),
 });
 
 export type BinFormValues = z.infer<typeof binSchema>;

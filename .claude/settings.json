@@ -1,5 +1,28 @@
 {
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Bash(sudo:*)"
+    ],
+    "ask": [
+      "Bash(git reset --hard:*)",
+      "Bash(git push --force:*)",
+      "Bash(supabase db reset:*)"
+    ]
+  },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command // \"\"' | grep -qE 'git +[^|;&]*push +[^|;&]*-(f|-force)( |$)|git +[^|;&]*reset +--hard|rm +-(rf|fr) |supabase +db +reset|(^|[;&|] *)sudo ' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"Destructive pattern (force-push / hard reset / recursive delete / db reset) - confirm before running.\"}}' || true"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",

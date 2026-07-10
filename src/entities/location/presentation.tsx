@@ -7,9 +7,9 @@
 
 import type { EntityPresentation } from "@/types/entity";
 import { getValueLabel, valuesAsOptions } from "@/types/entity";
-import { locationCore, locationTypeDisplayConfig, type LocationWithPos } from "./core";
+import { locationCore, locationTypeDisplayConfig, type Location } from "./core";
 
-export const locationPresentation: EntityPresentation<LocationWithPos> = {
+export const locationPresentation: EntityPresentation<Location> = {
   // ---------------------------------------------------------------------------
   // List View
   // ---------------------------------------------------------------------------

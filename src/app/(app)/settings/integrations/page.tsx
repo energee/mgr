@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/shared/integration-badge";
 import { Switch } from "@/components/ui/switch";
-import { Check, Database, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { Check, Database, ExternalLink, Loader2, MapPin, RefreshCw } from "lucide-react";
 import { SecretKeyInput } from "@/components/domain/shared/secret-key-input";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { SquareIcon } from "@/components/ui/square-icon";
@@ -266,6 +266,31 @@ function SquareIntegrationCard() {
     },
   });
 
+  // Refresh Square locations (pulls locations.list into square_locations so bins
+  // can be pointed at them). Invalidates status to refresh the POS-bins list.
+  const refreshLocations = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/square/locations/refresh", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "Failed to refresh locations");
+      return data.data as { count: number };
+    },
+    onSuccess: (data) => {
+      toast.success(`Refreshed ${data.count} Square location${data.count === 1 ? "" : "s"}`);
+      queryClient.invalidateQueries({ queryKey: squareKeys.syncStatus() });
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to refresh locations: ${err.message}`);
+    },
+  });
+
+  const posBins: Array<{
+    id: string;
+    name: string;
+    squareLocationName: string | null;
+    channelName: string | null;
+  }> = status?.posBins ?? [];
+
   const isConnected = status?.isEnabled && status?.catalogItemCount > 0;
 
   function getSquareStatus(): IntegrationStatus {
@@ -371,6 +396,55 @@ function SquareIntegrationCard() {
                 {status.catalogItemCount} items synced to Square
               </p>
             )}
+
+            {/* Square Locations + per-bin POS config */}
+            <div className="rounded-md border px-3 py-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5" />
+                    POS Bins
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Bins that push to Square. Configure a bin&apos;s Square location + channel on the bin.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refreshLocations.mutate()}
+                  disabled={refreshLocations.isPending}
+                >
+                  {refreshLocations.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-3 w-3" />
+                      Refresh Locations
+                    </>
+                  )}
+                </Button>
+              </div>
+              {posBins.length > 0 ? (
+                <ul className="space-y-1">
+                  {posBins.map((b) => (
+                    <li key={b.id} className="flex items-center justify-between text-xs">
+                      <span className="font-medium">{b.name}</span>
+                      <span className="text-muted-foreground">
+                        {b.squareLocationName ?? "—"} · {b.channelName ?? "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No bins configured for Square POS yet.
+                </p>
+              )}
+            </div>
 
             {/* Recent Sync Log */}
             {status?.recentSyncs?.length > 0 && (

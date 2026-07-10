@@ -1,20 +1,23 @@
 /**
  * Square pricing resolution tests.
  *
- * Characterizes the C4 channel-parameterized price resolver:
- *   - resolveChannelPrices(brandIds, salesChannelId) reads a specific channel.
+ * Characterizes the batched channel price resolver (E3):
+ *   - resolveChannelPrices(brandIds, salesChannelIds[]) fetches EVERY requested
+ *     channel in one round of queries and returns a Map<channelId, ChannelPrice[]>.
  *
- * Parity guarantee (C4 acceptance): passing the taproom channel id reproduces
- * today's taproom prices byte-for-byte — asserted by the exact-cents case in
- * the "resolveChannelPrices" block below.
+ * Parity guarantee: passing [taproom] reproduces today's taproom prices
+ * byte-for-byte — asserted by the exact-cents case below. The multi-channel case
+ * proves batching + no cross-channel leakage in a single call.
  *
- * Supabase is mocked at @/lib/supabase/server per the repo idiom
- * (see src/lib/__tests__/api-routes.test.ts). The mock builder is faithful
- * enough to honor the .eq("sales_channel_id", ...) filter so channel
- * parameterization is genuinely exercised, not stubbed away.
+ * Supabase is mocked at @/lib/supabase/server with the shared admin mock
+ * (src/test/supabase-admin-mock.ts). The pricing_tier_prices response honors the
+ * .in("sales_channel_id", [...]) filter, so channel parameterization is genuinely
+ * exercised rather than stubbed away, and any table the resolver does not already
+ * query throws instead of resolving vacuously empty.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { makeAdminMock } from "@/test/supabase-admin-mock";
 
 vi.mock("@/lib/supabase/server", () => ({
   createAdminClient: vi.fn(),
@@ -54,70 +57,32 @@ type Fixtures = {
   prices: PriceRow[];
 };
 
-type Thenable = {
-  then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) => Promise<unknown>;
-};
-
 /**
- * Builds an object that mimics the Supabase admin client's chainable query
- * builder for the three tables resolveChannelPrices touches (brands, recipes,
- * pricing_tier_prices). The sales_channel_id filter is honored; the rest are
- * pass-through.
+ * Installs an admin client over the three tables resolveChannelPrices touches
+ * (brands, recipes, pricing_tier_prices). The sales_channel_id filter is honored;
+ * the rest are pass-through. Any fourth table throws.
  */
-function makeAdmin(fixtures: Fixtures) {
-  return {
-    from(table: string) {
-      if (table === "brands") {
-        const result = { data: fixtures.brands, error: null };
-        const builder = {
-          select: () => builder,
-          in: () => builder,
-          then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-            Promise.resolve(result).then(onF, onR),
-        };
-        return builder;
-      }
-
-      if (table === "recipes") {
-        const result = { data: fixtures.recipes, error: null };
-        const builder = {
-          select: () => builder,
-          in: () => builder,
-          not: () => builder,
-          then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-            Promise.resolve(result).then(onF, onR),
-        };
-        return builder;
-      }
-
-      if (table === "pricing_tier_prices") {
-        let channelFilter: string | undefined;
-        const builder = {
-          select: () => builder,
-          in: () => builder,
-          eq: (col: string, val: string) => {
-            if (col === "sales_channel_id") channelFilter = val;
-            return builder;
-          },
-          then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) => {
-            const data = fixtures.prices.filter(
-              (p) => p.sales_channel_id === channelFilter
-            );
-            return Promise.resolve({ data, error: null }).then(onF, onR);
-          },
-        };
-        return builder as unknown as Thenable;
-      }
-
-      throw new Error(`unexpected table in mock: ${table}`);
-    },
-  };
-}
-
 function useFixtures(fixtures: Fixtures) {
-  mockedCreateAdminClient.mockImplementation(
-    async () => makeAdmin(fixtures) as unknown as Awaited<ReturnType<typeof createAdminClient>>
+  const { admin } = makeAdminMock(
+    {
+      brands: { data: fixtures.brands, error: null },
+      recipes: { data: fixtures.recipes, error: null },
+      // The resolver filters channels with .in("sales_channel_id", [...]); honor
+      // that (and ignore the .in("pricing_tier_id", ...) which the fixture rows
+      // already satisfy).
+      pricing_tier_prices: ({ calls }) => {
+        const channelFilter = calls.find(
+          (c) => c.method === "in" && c.args[0] === "sales_channel_id"
+        )?.args[1] as string[] | undefined;
+        const data = fixtures.prices.filter((p) =>
+          channelFilter ? channelFilter.includes(p.sales_channel_id) : true
+        );
+        return { data, error: null };
+      },
+    },
+    { onUnknownTable: "throw" }
   );
+  mockedCreateAdminClient.mockResolvedValue(admin as never);
 }
 
 const TAPROOM_ID = "chan-taproom-uuid";
@@ -152,30 +117,68 @@ beforeEach(() => {
 describe("resolveChannelPrices", () => {
   it("resolves prices for the taproom channel", async () => {
     useFixtures(baseFixtures);
-    const result = await resolveChannelPrices(BRAND_IDS, TAPROOM_ID);
-    expect(result).toEqual([
+    const result = await resolveChannelPrices(BRAND_IDS, [TAPROOM_ID]);
+    expect(result.get(TAPROOM_ID)).toEqual([
       { brandId: BRAND_A, sellingFormatId: "fmt-x", priceCents: 1000 },
       { brandId: BRAND_A, sellingFormatId: "fmt-y", priceCents: 1250 },
       { brandId: BRAND_B, sellingFormatId: "fmt-x", priceCents: 800 },
     ]);
   });
 
-  it("is parameterized by channel: a different channel id yields that channel's prices", async () => {
+  it("batches multiple channels in one call with no cross-channel leakage", async () => {
     useFixtures(baseFixtures);
-    const result = await resolveChannelPrices(BRAND_IDS, WHOLESALE_ID);
-    expect(result).toEqual([
+    const result = await resolveChannelPrices(BRAND_IDS, [TAPROOM_ID, WHOLESALE_ID]);
+    // taproom prices (unchanged by the presence of the wholesale channel)
+    expect(result.get(TAPROOM_ID)).toEqual([
+      { brandId: BRAND_A, sellingFormatId: "fmt-x", priceCents: 1000 },
+      { brandId: BRAND_A, sellingFormatId: "fmt-y", priceCents: 1250 },
+      { brandId: BRAND_B, sellingFormatId: "fmt-x", priceCents: 800 },
+    ]);
+    // wholesale channel gets ONLY its own price — no taproom bleed-through
+    expect(result.get(WHOLESALE_ID)).toEqual([
       { brandId: BRAND_A, sellingFormatId: "fmt-x", priceCents: 2000 },
     ]);
   });
 
-  it("returns [] for empty brandIds without querying", async () => {
+  it("seeds an empty array for every requested channel; empty brandIds does not query", async () => {
     useFixtures(baseFixtures);
-    expect(await resolveChannelPrices([], TAPROOM_ID)).toEqual([]);
+    const result = await resolveChannelPrices([], [TAPROOM_ID]);
+    expect(result.get(TAPROOM_ID)).toEqual([]);
     expect(mockedCreateAdminClient).not.toHaveBeenCalled();
   });
 
-  it("returns [] when the channel has no prices", async () => {
+  it("returns an empty array for a channel that has no prices", async () => {
     useFixtures(baseFixtures);
-    expect(await resolveChannelPrices(BRAND_IDS, "chan-unknown-uuid")).toEqual([]);
+    const result = await resolveChannelPrices(BRAND_IDS, ["chan-unknown-uuid"]);
+    expect(result.get("chan-unknown-uuid")).toEqual([]);
+  });
+
+  // A transient DB error must PROPAGATE, not degrade to an empty price map —
+  // the catalog sync would push every variation at $0 to the live register.
+  it("throws on a recipes read error instead of returning an empty price map", async () => {
+    const { admin } = makeAdminMock(
+      { recipes: { data: null, error: { message: "recipes read boom" } } },
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    await expect(resolveChannelPrices(BRAND_IDS, [TAPROOM_ID])).rejects.toMatchObject({
+      message: "recipes read boom",
+    });
+  });
+
+  it("throws on a pricing_tier_prices read error instead of returning an empty price map", async () => {
+    const { admin } = makeAdminMock(
+      {
+        recipes: { data: baseFixtures.recipes, error: null },
+        pricing_tier_prices: { data: null, error: { message: "prices read boom" } },
+      },
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    await expect(resolveChannelPrices(BRAND_IDS, [TAPROOM_ID])).rejects.toMatchObject({
+      message: "prices read boom",
+    });
   });
 });
