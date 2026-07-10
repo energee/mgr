@@ -2,7 +2,7 @@
 
 ## Commands
 - `bun run lint` / `bun run typecheck` / `bun run test` (vitest — never `bun test`) — all three before any commit
-- Migrations: `supabase/migrations/00XXX_description.sql`, always `db push --include-all`
+- Migrations: `supabase/migrations/00XXX_description.sql`; push with `scripts/db-push.sh` (runs `db push --include-all` + regenerates `supabase/live-catalog.snapshot.txt` — commit both)
 
 ## Expert agents — consult before working in their areas
 | Touching | Use agent |
