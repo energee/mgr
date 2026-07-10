@@ -386,7 +386,7 @@ describe("catalog sync (bin-driven)", () => {
     expect(keepSet).toEqual(expect.arrayContaining(["brand-1", "brand-2"]));
   });
 
-  it("flags a variation as unpriced (would push $0) when its channel has no price row", async () => {
+  it("skips an unpriced variation instead of publishing it at $0, and keeps the brand active", async () => {
     useTables({
       bins: {
         data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
@@ -412,6 +412,15 @@ describe("catalog sync (bin-driven)", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.unpricedVariations).toEqual(["Brand One / 16oz 4-Pack"]);
+
+    // Square reads priceCents 0 as FIXED_PRICING $0.00 — sellable for free at the
+    // register. The variation must never reach pushCatalog.
+    const pushed = mockedPushCatalog.mock.calls[0][1];
+    expect(pushed.flatMap((p) => p.variations)).toEqual([]);
+
+    // ...but the brand IS stocked, so it stays active and deleteStaleItems must
+    // not treat it as stale and delete its live Square item.
+    expect(mockedDeleteStaleItems).toHaveBeenCalledWith(expect.anything(), ["brand-1"]);
     // and it's durable in the sync log, not just the response
     const log = inserted().find((i) => i.table === "square_sync_log")!.row as {
       details: { unpricedVariations?: string[] };
@@ -438,8 +447,8 @@ describe("inventory sync (bin-driven)", () => {
     useTables({
       bins: {
         data: [
-          { id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1" },
-          { id: "bin-2", name: "Bin 2", square_location_id: "SQ-LOC-2" },
+          { id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1", location_id: "loc-1" },
+          { id: "bin-2", name: "Bin 2", square_location_id: "SQ-LOC-2", location_id: "loc-2" },
         ],
         error: null,
       },
@@ -455,7 +464,11 @@ describe("inventory sync (bin-driven)", () => {
           // packaged: 5 cases pushed as 5 (NOT × any unit_count), at SQ-LOC-1
           { bin_id: "bin-1", location_id: "loc-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5, source: "packaged" },
           // keg: 2 kegs pushed as 2, at SQ-LOC-1
-          { bin_id: "bin-1", location_id: "loc-1", brand_id: "brand-2", selling_format_id: "fmt-2", quantity: 2, source: "keg" },
+          // This keg row's location_id deliberately disagrees with bin-1's: keg
+          // rows carry keg_transactions.to_location_id, which is set
+          // independently of the bin. The sync log must record the BIN's
+          // location (loc-1), never a stock row's.
+          { bin_id: "bin-1", location_id: "loc-9", brand_id: "brand-2", selling_format_id: "fmt-2", quantity: 2, source: "keg" },
           // packaged: 4 cases pushed as 4, at SQ-LOC-2 (SQ-VAR-2 NOT stocked here)
           { bin_id: "bin-2", location_id: "loc-2", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 4, source: "packaged" },
         ],
@@ -518,7 +531,7 @@ describe("inventory sync (bin-driven)", () => {
     // be pushed as quantity 0 so Square stops showing its last non-zero count.
     useTables({
       bins: {
-        data: [{ id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1" }],
+        data: [{ id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1", location_id: "loc-1" }],
         error: null,
       },
       square_catalog_map: {
@@ -555,7 +568,7 @@ describe("inventory sync (bin-driven)", () => {
   it("reports an error (no push) when a stocked format has no catalog mapping", async () => {
     useTables({
       bins: {
-        data: [{ id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1" }],
+        data: [{ id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1", location_id: "loc-1" }],
         error: null,
       },
       square_catalog_map: { data: [], error: null },

@@ -61,7 +61,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       id: string;
       name: string;
       square_location_id: string | null;
-    }>(admin, { select: "id, name, square_location_id", orderBy: "id" });
+      location_id: string | null;
+    }>(admin, { select: "id, name, square_location_id, location_id", orderBy: "id" });
 
     if (binsError) {
       throw new Error(`Failed to query POS bins: ${binsError.message}`);
@@ -152,10 +153,12 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       const squareLocationId = bin.square_location_id!;
       const binRows = stockByBin.get(bin.id) ?? [];
 
-      // The view's location_id for this bin (all rows share it, since a bin has one
-      // location). Used for square_sync_log.location_id, which FKs locations(id) —
-      // a real location uuid, NOT the Square location id.
-      const locationId = binRows.find((r) => r.location_id)?.location_id ?? null;
+      // The BIN's own location. Used for square_sync_log.location_id, which FKs
+      // locations(id) — a real location uuid, NOT the Square location id. Taken
+      // from the bin rather than from a stock row: keg rows carry
+      // keg_transactions.to_location_id, set independently of the bin, so they
+      // can name a location that does not own this bin.
+      const locationId = bin.location_id;
 
       // Aggregate by brand + selling_format. Quantity is pushed AS-IS (see the
       // module header): a selling_format's Square variation is priced/counted per

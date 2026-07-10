@@ -260,21 +260,27 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         const resolvedPrice = chan
           ? channelPriceLookup.get(chan.channelId)?.get(brand.brandId)?.get(varKey)
           : undefined;
-        // No price configured for this variation on its channel -> Square would
-        // show $0. Push it (behavior-preserving) but flag it loudly.
+        // No price configured for this variation on its channel. SKIP it: Square
+        // reads priceCents 0 as FIXED_PRICING $0.00, which makes the item
+        // sellable for free at the live register. Surfaced in the log + response.
         if (resolvedPrice == null || resolvedPrice === 0) {
           unpricedVariations.push(`${brand.brandName} / ${displayName}`);
+          continue;
         }
-        const priceCents = resolvedPrice ?? 0;
 
         variations.push({
           sellingFormatId: variation.sellingFormatId,
           name: displayName,
-          priceCents,
+          priceCents: resolvedPrice,
           squareCatalogId: varMapping?.squareCatalogId,
           squareVersion: varMapping?.squareVersion,
         });
       }
+
+      // A brand whose every variation is unpriced has nothing to publish. It
+      // stays in activeBrandIds (it IS stocked), so deleteStaleItems will not
+      // treat it as stale and delete its live Square item.
+      if (variations.length === 0) continue;
 
       products.push({
         brandId: brand.brandId,
