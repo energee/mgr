@@ -25,7 +25,12 @@ setup("authenticate", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(process.env.E2E_USER_PASSWORD ?? "");
-    await page.getByRole("button", { name: /^sign in$/i }).click();
+    // Structural selector, not getByRole({ name }): the submit button's
+    // accessible name is composed from its children, so a decorative child
+    // (e.g. the <Kbd>⌘⏎</Kbd> hint) can silently change it and strand the
+    // whole credential path in a timeout. The password form renders exactly
+    // one type="submit" button — "Sign in with magic link" is type="button".
+    await page.locator("form button[type='submit']").click();
   } else {
     await page.goto("/api/auth/dev-login?redirect=/dashboard");
   }

@@ -12,13 +12,18 @@
  *   E2E_USER_PASSWORD   - Supabase user password
  *
  * Set PLAYWRIGHT_BASE_URL when :3000 is taken by another worktree's dev server.
- * The port is derived from it and passed to `bun dev`, so one variable moves
- * both the server and the tests.
+ * For localhost targets the port is derived from it and passed to `bun dev`,
+ * so one variable moves both the server and the tests. For a non-localhost
+ * target (e.g. a preview deploy) no webServer is configured at all — the
+ * target is assumed to be already serving, and deriving PORT=3000 from a
+ * port-less https URL would otherwise wrongly boot a local dev server.
  */
 import { defineConfig, devices } from "@playwright/test";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
-const PORT = new URL(BASE_URL).port || "3000";
+const baseUrl = new URL(BASE_URL);
+const IS_LOCAL_TARGET = ["localhost", "127.0.0.1", "[::1]"].includes(baseUrl.hostname);
+const PORT = baseUrl.port || "3000";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -42,14 +47,18 @@ export default defineConfig({
       dependencies: ["setup"],
     },
   ],
-  webServer: {
-    command: "bun dev",
-    url: BASE_URL,
-    // Next reads PORT, so BASE_URL moves the server and the tests together.
-    env: { PORT },
-    // Locally this adopts whatever already answers on BASE_URL — including
-    // another worktree's dev server. Set PLAYWRIGHT_BASE_URL to an unused port
-    // when that matters.
-    reuseExistingServer: !process.env.CI,
-  },
+  // Only boot a dev server for localhost targets; a remote base URL is
+  // already serving and must not trigger a local `bun dev` on :3000.
+  ...(IS_LOCAL_TARGET && {
+    webServer: {
+      command: "bun dev",
+      url: BASE_URL,
+      // Next reads PORT, so BASE_URL moves the server and the tests together.
+      env: { PORT },
+      // Locally this adopts whatever already answers on BASE_URL — including
+      // another worktree's dev server. Set PLAYWRIGHT_BASE_URL to an unused port
+      // when that matters.
+      reuseExistingServer: !process.env.CI,
+    },
+  }),
 });
