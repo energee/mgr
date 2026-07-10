@@ -20,10 +20,11 @@
  *     draw the sold quantity FIFO across every finished-good lot physically in
  *     that bin (oldest production_date first), recording one taproom_sale
  *     allocation (with volume_bbl for TTB removals) and one debit_bin_inventory
- *     call per lot drawn. If the bin cannot cover the sale, only the stock that
- *     physically existed is allocated and the shortfall is surfaced in the
- *     response + sync log. Draft (keg) pours are staged in square_draft_sales
- *     (keg depletion is deferred).
+ *     call per lot drawn. If the bin cannot cover the sale — either the planned
+ *     FIFO draw falls short, or a concurrent sale won the row lock and the RPC
+ *     clamped a debit at zero — only the stock that physically existed is
+ *     debited and the oversell is surfaced in the response + sync log. Draft
+ *     (keg) pours are staged in square_draft_sales (keg depletion is deferred).
  *   - inventory.count.updated: Logged for informational purposes only (MGR is
  *     the source of truth for inventory).
  *   - All other events: Acknowledged with 200 but ignored.
@@ -104,16 +105,27 @@ type SquareWebhookEvent = {
 
 /**
  * A packaged sale line whose sold quantity exceeded the physical stock in its
- * resolved POS bin (D3 oversell). The FIFO draw consumed every matching lot in
- * the bin and still could not cover the sale; only the stock that physically
- * existed was allocated/debited (we never invent an allocation for the
- * shortfall). The sale still counts as synced. Surfaced in the webhook response
- * and durably in square_sync_log.details so the POS/caller can reconcile.
+ * resolved POS bin (D3 oversell). Two triggers:
+ *
+ * 1. The FIFO draw consumed every matching lot in the bin and still could not
+ *    cover the sale (planned shortfall — shortfallQty > 0).
+ * 2. debit_bin_inventory returned clamped = true: a concurrent sale drained the
+ *    bin between our unlocked bin_inventory read and the row-locked debit, so
+ *    the DB clamped the debit at zero (clamped race — shortfallQty may be 0,
+ *    because the plan looked fully covered; the true shortfall is unknowable
+ *    from (new_quantity, clamped) alone, so we never invent a number).
+ *
+ * Either way only the stock that physically existed was debited (we never
+ * invent an allocation for a planned shortfall). The sale still counts as
+ * synced. Surfaced in the webhook response and durably in
+ * square_sync_log.details so the POS/caller can reconcile.
  *
  * - binQuantityBefore: SUM of the bin's quantities across every matched lot
  *   before the debit (what the bin actually held for this brand + format).
- * - shortfallQty: sold quantity that no lot could cover (soldQty −
- *   binQuantityBefore, clamped at 0).
+ * - shortfallQty: sold quantity that no lot could cover per the FIFO plan
+ *   (soldQty − binQuantityBefore, clamped at 0). 0 on a pure clamped race.
+ * - clamped: present (true) when trigger 2 fired — at least one debit for this
+ *   line was clamped at zero by the DB.
  */
 type OversoldLine = {
   lineItemUid: string;
@@ -122,6 +134,7 @@ type OversoldLine = {
   soldQty: number;
   binQuantityBefore: number;
   shortfallQty: number;
+  clamped?: boolean;
 };
 
 export async function POST(request: NextRequest) {
@@ -239,9 +252,11 @@ export async function POST(request: NextRequest) {
   }
 
   // D3: the sale succeeded, but one or more packaged lines sold more units than
-  // the resolved bin physically held. Only the stock that existed was
-  // allocated/debited; the shortfall is surfaced so the caller can reconcile
-  // (also recorded in square_sync_log.details).
+  // the resolved bin physically held — either the FIFO plan fell short
+  // (shortfallQty > 0) or a concurrent sale forced the DB to clamp a debit at
+  // zero (clamped: true, shortfallQty may be 0). Only the stock that existed
+  // was debited; the oversell is surfaced so the caller can reconcile (also
+  // recorded in square_sync_log.details).
   return NextResponse.json(
     oversoldLines.length > 0
       ? { received: true, oversoldLines }
@@ -515,6 +530,12 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
           // min(remaining, lot.quantity), record one allocation + one debit for
           // exactly that draw, and stop when the sale is covered.
           let remaining = quantity;
+          // True when any debit_bin_inventory call clamped at zero: a
+          // concurrent sale drained the bin between our unlocked read above and
+          // the row-locked debit, so the plan's `draw` overstated what was
+          // physically there. remaining is still decremented by the full draw,
+          // so this flag is the only oversell signal in that race.
+          let clampedRace = false;
           for (const lot of sortedLots) {
             if (remaining <= 0) break;
             const draw = Math.min(remaining, lot.quantity);
@@ -542,23 +563,36 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
             // as FAILED rather than silently counting it synced.
             // ponytail: the allocation insert and this debit are not wrapped in
             // a single DB transaction, so a debit failure after the insert
-            // leaves an orphan allocation row. Acceptable — the line is flagged
-            // failed in square_sync_log and reconciled from there; a proper
-            // fix would push both into one RPC.
-            const { error: debitError } = await admin.rpc("debit_bin_inventory", {
-              p_bin_id: resolvedBin.id,
-              p_finished_good_id: lot.finished_good_id,
-              p_qty: draw,
-            });
+            // leaves an orphan allocation row. Same ceiling on a clamped race:
+            // the allocation row already inserted above records the full `draw`
+            // and so overstates the physical debit — exact accounting would
+            // need the RPC to return the actual debited amount (or fold both
+            // writes into one RPC). Acceptable — the line is flagged (failed or
+            // clamped) in square_sync_log and reconciled from there.
+            const { data: debitResult, error: debitError } = await admin.rpc(
+              "debit_bin_inventory",
+              {
+                p_bin_id: resolvedBin.id,
+                p_finished_good_id: lot.finished_good_id,
+                p_qty: draw,
+              }
+            );
             if (debitError) throw debitError;
+            // Missing/null data reads as not-clamped; only an explicit
+            // clamped=true row flags the race.
+            if (debitResult?.[0]?.clamped === true) clampedRace = true;
 
             remaining -= draw;
           }
 
-          // Oversell (D3): the bin's lots could not cover the full sale. Only
-          // what existed was allocated/debited; surface the shortfall for the
-          // response + log. The sale still counts as synced.
-          if (remaining > 0) {
+          // Oversell (D3), two triggers: the FIFO plan fell short of the sold
+          // quantity (remaining > 0), OR the plan looked covered but a debit
+          // was clamped at zero by a concurrent sale (clampedRace — remaining
+          // is 0 and the true shortfall is unknowable, so shortfallQty stays
+          // 0; the `clamped` flag is the signal). Only what physically existed
+          // was debited; surface for the response + log. The sale still counts
+          // as synced.
+          if (remaining > 0 || clampedRace) {
             oversoldLines.push({
               lineItemUid: lineItem.uid ?? "unknown",
               brandId: mapping.brand_id,
@@ -566,6 +600,7 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
               soldQty: quantity,
               binQuantityBefore,
               shortfallQty: remaining,
+              ...(clampedRace ? { clamped: true } : {}),
             });
           }
 

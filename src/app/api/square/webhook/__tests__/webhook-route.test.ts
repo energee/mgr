@@ -13,9 +13,12 @@
  *   D2 — draw the sold quantity FIFO across those lots (oldest production_date
  *        first), recording one taproom_sale allocation (with volume_bbl for TTB)
  *        AND one debit_bin_inventory RPC per lot drawn;
- *   D3 — a shortfall (bin cannot cover the sale) does not fail the sale; only
- *        what physically existed is allocated, and the shortfall is surfaced in
- *        the response and durably in square_sync_log.details.
+ *   D3 — an oversell (bin cannot cover the sale) does not fail the sale; only
+ *        what physically existed is debited, and the oversell is surfaced in
+ *        the response and durably in square_sync_log.details. Two triggers:
+ *        the FIFO plan falls short (shortfallQty > 0), or the plan looked
+ *        covered but debit_bin_inventory clamped at zero because a concurrent
+ *        sale drained the bin first (clamped: true, shortfallQty 0).
  *
  * Also pins the invariants the milestone must not break: race-safe
  * payment-id dedup (duplicate = no side effects), a transient dedup-claim DB
@@ -327,6 +330,52 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
     ]);
 
     // Sale still succeeded: synced, not failed.
+    expect(finalize.items_synced).toBe(1);
+    expect(finalize.items_failed).toBe(0);
+  });
+
+  it("clamped race: bin read promised enough stock but the DB clamped the debit — oversold line with clamped: true, shortfallQty 0, sale still synced", async () => {
+    // The unlocked bin_inventory read plans a fully-covered draw (10 >= 3), but
+    // a concurrent sale drained the bin before our row-locked debit: the RPC
+    // clamps at zero and returns clamped = true. `remaining` still reaches 0,
+    // so the clamped flag is the ONLY oversell signal in this race.
+    rpcResponse = { data: [{ new_quantity: 0, clamped: true }], error: null };
+    useTables({
+      square_sync_log: CLAIM_OK,
+      bins: BIN_SQ_LOC_1,
+      square_catalog_map: MAP_PACKAGED,
+      bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+      allocations: { data: null, error: null },
+    });
+
+    const res = await post(EVENT);
+    expect(res.status).toBe(200);
+
+    const expectedLine = {
+      lineItemUid: "line-1",
+      brandId: "brand-1",
+      sellingFormatId: "fmt-1",
+      soldQty: 3,
+      binQuantityBefore: 10,
+      // The plan looked covered; the true shortfall is unknowable from
+      // (new_quantity, clamped) alone, so the route never invents a number.
+      shortfallQty: 0,
+      clamped: true,
+    };
+
+    // Response surfaces the oversold line, flagged clamped.
+    const body = await res.json();
+    expect(body).toEqual({ received: true, oversoldLines: [expectedLine] });
+
+    // Durable in the sync log details.
+    const finalize = writes.find((w) => w.table === "square_sync_log" && w.op === "update")!.row as {
+      items_synced: number;
+      items_failed: number;
+      details: { oversoldLines?: unknown[] };
+    };
+    expect(finalize.details.oversoldLines).toEqual([expectedLine]);
+
+    // The line still counts as synced, not failed.
     expect(finalize.items_synced).toBe(1);
     expect(finalize.items_failed).toBe(0);
   });
