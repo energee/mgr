@@ -5,6 +5,8 @@ on:
     paths:
       - 'supabase/migrations/**/*.sql'
       - 'supabase/functions/**'
+      - 'src/__tests__/integration/_fixtures/bootstrap-plain-postgres.sql'
+      - '.github/workflows/db-lint.yml'
   push:
     branches:
       - main
@@ -47,7 +49,9 @@ jobs:
 
       - name: Create Supabase roles
         run: |
-          # Create the roles that Supabase migrations expect
+          # Create the roles that Supabase migrations expect. Schemas, auth.*
+          # helpers, and out-of-band table stubs come from the shared fixture
+          # in the next step.
           psql "$DATABASE_URL" <<EOF
           CREATE ROLE anon NOLOGIN;
           CREATE ROLE authenticated NOLOGIN;
@@ -56,20 +60,24 @@ jobs:
           GRANT anon TO authenticator;
           GRANT authenticated TO authenticator;
           GRANT service_role TO authenticator;
-          CREATE SCHEMA IF NOT EXISTS auth;
-          CREATE SCHEMA IF NOT EXISTS extensions;
-          -- Mock auth.uid() function for RLS policies
-          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS \$\$
-            SELECT NULL::uuid;
-          \$\$ LANGUAGE sql;
           EOF
 
-      - name: Apply migrations
+      - name: Apply plain-Postgres Supabase shim
         run: |
-          # Apply all migrations in order using psql
+          # auth schema/users/uid(), realtime publication, default privileges,
+          # and stubs for tables created out-of-band on live. Same fixture the
+          # integration tests use.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f src/__tests__/integration/_fixtures/bootstrap-plain-postgres.sql
+
+      - name: Apply migrations (from-scratch replay gate)
+        run: |
+          # Apply all migrations in order. ON_ERROR_STOP makes this a real
+          # gate: a PR whose migration cannot replay from scratch fails here
+          # instead of silently linting a half-built database.
           for migration in supabase/migrations/*.sql; do
             echo "Applying $migration..."
-            psql "$DATABASE_URL" -f "$migration"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
           done
 
       - name: Run Database Linter

@@ -1,10 +1,20 @@
 name: Live DB Drift Check
 
-# Diffs the live database catalog (functions + signatures + body hashes,
-# triggers, tables) against the committed snapshot in
+# Watchdog: diffs the live database catalog (functions + signatures + body
+# hashes, triggers, tables) against the committed snapshot in
 # supabase/live-catalog.snapshot.txt. Catches the C2/C3 class of bug where
-# enforcement objects are dropped out-of-band on live while db push still
-# reports a clean no-op. See scripts/check-live-drift.sh.
+# enforcement objects are dropped or edited out-of-band on live while db push
+# still reports a clean no-op. See scripts/check-live-drift.sh.
+#
+# Severity is classified: objects the snapshot expects that are missing or
+# changed on live FAIL the run; live-only additions (usually an in-flight
+# feature branch applied to live before merge, or a snapshot update that
+# wasn't committed) only WARN.
+#
+# Deliberately NOT a pull_request gate. PR-time comparison against live forced
+# an apply-before-merge ordering and made concurrent migration PRs fail each
+# other's runs. The PR-time question — "does the migration chain still replay
+# from scratch?" — is answered deterministically by db-lint.yml instead.
 #
 # Requires repository secret SUPABASE_DB_URL: a READ-ONLY Postgres connection
 # string to the live project (e.g. a dedicated read-only login role via the
@@ -14,14 +24,6 @@ on:
   # Watchdog for out-of-band drift that no PR would surface.
   schedule:
     - cron: '0 12 * * *' # daily 12:00 UTC
-  # Gate migration changes: a PR that alters the catalog must update the snapshot.
-  pull_request:
-    paths:
-      - 'supabase/migrations/**/*.sql'
-      - 'supabase/live-catalog.snapshot.txt'
-      - 'scripts/check-live-drift.sh'
-      - 'scripts/live-catalog.sql'
-      - '.github/workflows/live-drift.yml'
   workflow_dispatch: {}
 
 jobs:
