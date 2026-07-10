@@ -1,9 +1,7 @@
 ---
 name: verify
 description: Drive a changed feature end-to-end in a real browser against the running app and observe behavior, before claiming it works. Use after implementing or fixing anything with a runtime surface — a page, a form, an API route, a state transition. Do NOT use for diffs that only touch tests, docs, or config.
-allowed-tools:
-  - Bash
-  - Read
+allowed-tools: Bash, Read
 ---
 
 # verify — drive the feature, don't just typecheck it
@@ -19,7 +17,7 @@ fan out:
 
 | Flow | Fires |
 |---|---|
-| Packaging session / Square sale | Square bin-inventory debit (`00223`, PR #361) |
+| Packaging session / Square sale | Square bin-inventory debit (`debit_bin_inventory`, from the Square POS bin-sync work — migration numbering varies by branch) |
 | Orders, invoices | QuickBooks sync |
 | Customer-facing actions | Resend email |
 | Various transitions | Slack notifications |
@@ -48,10 +46,22 @@ BASE=$(bash .claude/skills/verify/verify.sh up)   # ~20s cold, ~0s warm
 bash .claude/skills/verify/verify.sh down
 ```
 
-`up` symlinks `.env`, boots `bun dev`, reads the port Next actually chose (never
-assume `:3000` — other worktrees hold it), signs in via the dev-login button, and
-fails loud unless it lands on `/dashboard`. Re-running reuses the server and the
-browser session. See `verify.sh` for the agent-browser gotchas it encodes.
+`up` symlinks `.env` from the main checkout, boots `bun dev` in its own process
+group, reads the port Next actually chose (never assume `:3000` — other
+worktrees hold it), signs in via the dev-login button, and fails loud unless it
+lands on `/dashboard`. Re-running reuses the server and the browser session.
+`down` kills the server's process group, closes the current browser session,
+removes the state dir, and removes the `.env` symlink it created (only when it
+is still that symlink — a real `.env` you placed is never touched).
+
+One shared-daemon caveat: agent-browser sessions are daemon-wide. Without
+`AGENT_BROWSER_SESSION` set, every worktree drives the same default session, so
+parallel verify runs can steal each other's page (`up` guards against adopting
+another worktree's dashboard, but mid-run interleaving is still possible) and
+`down` closes that shared session. For real isolation, export a unique
+`AGENT_BROWSER_SESSION` per worktree before `up`, the driving commands, and
+`down` — verify.sh honors it transparently. See `verify.sh` for the other
+agent-browser gotchas it encodes.
 
 **First run on a fresh project writes an auth user.**
 `src/app/api/auth/dev-login/route.ts` uses `createAdminClient()` to create
@@ -103,8 +113,10 @@ mutating flows.
 ## Verified 2026-07-09
 
 Driven live, read-only: cold `up` reaches `/dashboard` in ~20s, warm `up` reuses
-server and session in ~0s, `down` leaves nothing behind. The authenticated
-dashboard renders with one console error (a hydration mismatch, pre-existing).
+server and session in ~0s. The authenticated dashboard renders with one console
+error (a hydration mismatch, pre-existing). Teardown was hardened after that
+run (process-group kill, `.env` symlink removal, session-scoped browser close)
+and has not been re-driven live since.
 
 ## Running the Playwright suite
 
