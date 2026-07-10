@@ -1,13 +1,13 @@
 # Square bin-sync — code-review follow-ups
 
-**Status:** all code follow-ups DONE; **one operational item remains (§2, the migration push).**
+**Status:** all follow-ups DONE (§2 closed 2026-07-10).
 Created 2026-07-09 after an xhigh `/code-review` of `feat/square-pos-bin-sync` (15 findings).
 Thirteen were fixed in `506f9daf`, `cf795a80`, `b4ee38d4`; the rest were worked 2026-07-09:
 
 | § | Item | Outcome |
 |---|---|---|
 | 1 | keg-only-brand keep-set regression | **FIXED** `593dedaa` |
-| 2 | `00224`–`00227` committed but unapplied | **OPEN — blocks deploy** |
+| 2 | `00224`–`00227` committed but unapplied | **DONE** 2026-07-10 |
 | 3 | `00223` header + `COMMENT ON FUNCTION` false | **FIXED** `b35ad3b7` |
 | 4 | `00222` `DISTINCT ON` without `ORDER BY` | won't fix (recorded) |
 | 5 | `location/core.ts` vestiges | **FIXED** `c9d94e6b` |
@@ -74,6 +74,18 @@ design. Then regenerate `src/types/supabase.ts` from the live database — it wa
 in `b4ee38d4` (`square_sync_log.square_payment_id`, plus `bins_with_summary.square_location_id`
 / `pos_sales_channel_id` / `is_default_fg`) and should not be trusted until regenerated.
 Regenerate the drift snapshot too.
+
+**CLOSED 2026-07-10.** `supabase migration list` showed `00224`–`00227` already applied live
+(pushed out-of-band alongside `00228`/`00229` from `fix/square-bin-integrity`, which branches
+off this one — no `ASSERT_FAIL`, so every self-verifying DO block passed on its first real run).
+`src/types/supabase.ts` regenerated from live (`supabase gen types typescript --linked`): picks
+up the `bins_pos_sales_channel_id_fkey` relationship the hand-edit missed and drops
+`keg_inventory.bin_id` / `keg_inventory_with_details.bin_id`+`bin_name` (removed live by
+`00228`; nothing on this branch references them). Drift snapshot regenerated from live —
+four FUNC hashes changed (`create_finished_goods_from_packaging` per `00227`,
+`revise_packaging_session` per `00226`, plus `handle_vessel_transfer` /
+`create_keg_ship_transactions_from_order` per `00228`/`00229`) — and verified byte-identical
+to the live catalog query via md5.
 
 ---
 
@@ -187,7 +199,7 @@ to main). A two-dot `git diff origin/main` makes them *look* deleted; that is a 
 
 ---
 
-## Kickoff prompt for a new session
+## Kickoff prompt for a new session (historical — §2 closed 2026-07-10, nothing remains)
 
 The five code follow-ups shipped on 2026-07-09 (see the table at the top). What remains is §2,
 and it is a database operation, not a code change.

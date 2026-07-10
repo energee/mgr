@@ -7577,6 +7577,13 @@ export type Database = {
             referencedRelation: "locations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bins_pos_sales_channel_id_fkey"
+            columns: ["pos_sales_channel_id"]
+            isOneToOne: false
+            referencedRelation: "sales_channels"
+            referencedColumns: ["id"]
+          },
         ]
       }
       brand_packaging_summary: {
@@ -8463,7 +8470,6 @@ export type Database = {
       }
       keg_inventory: {
         Row: {
-          bin_id: string | null
           id: string | null
           keg_owner_id: string | null
           location_id: string | null
@@ -8491,8 +8497,6 @@ export type Database = {
       }
       keg_inventory_with_details: {
         Row: {
-          bin_id: string | null
-          bin_name: string | null
           id: string | null
           keg_owner_code: string | null
           keg_owner_id: string | null
