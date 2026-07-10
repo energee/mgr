@@ -2,7 +2,8 @@
  * RLS Policy Coverage — Tasks 2–6 of the RLS coverage-gap plan.
  *
  * Schema-level assertions: for each table whose policy was tightened in
- * migrations 00193–00197, this test queries `pg_policies` and verifies that
+ * migrations 00193–00197 (plus square_locations, tightened in 00231), this
+ * test queries `pg_policies` and verifies that
  * the SELECT and write policies exist with `user_has_permission(...)` (or
  * the catalog-pattern `auth.uid() IS NOT NULL`) in the qual/with_check,
  * and that no `USING (true)` / `WITH CHECK (true)` policies remain.
@@ -97,6 +98,16 @@ const EXPECTATIONS: Expectation[] = [
     writeQualContains: "settings:manage",
     writeCheckContains: "settings:manage",
     liveDbOnly: true,
+  },
+  // 00231 — square_locations: SELECT tightened from staff-wide
+  // (auth.uid() IS NOT NULL, 00222) to inventory:read so production_manager
+  // keeps the bin-form Square Location picker while the portal customer role
+  // is excluded. Writes stay integrations:manage (00222).
+  {
+    table: "square_locations",
+    selectQualContains: "inventory:read",
+    writeQualContains: "integrations:manage",
+    writeCheckContains: "integrations:manage",
   },
 ];
 
