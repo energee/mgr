@@ -3,9 +3,11 @@
  *
  * Square does NOT emit a "payment.completed" event: a payment's lifecycle is
  * delivered via payment.created / payment.updated whose `status` transitions to
- * "COMPLETED". Both route to handleCompletedPayment. Because BOTH deliveries can
- * arrive already-COMPLETED for the same sale, dedup keys on the Square PAYMENT
- * id (not the event id) so a sale debits inventory exactly once.
+ * "COMPLETED". Both route to handleCompletedPayment. Dedup keys on the Square
+ * ORDER id (payment id only as a fallback when order_id is absent): both
+ * deliveries of one payment AND every tender of a split-tender check reference
+ * the same order, whose full line-item list is what gets ingested — so the
+ * order id is the unit a sale must debit exactly once.
  *
  * Characterizes the packaged-bin-debit path of the webhook handler:
  *   D1 — resolve the Square location to a POS bin (bins.square_location_id) and
@@ -77,12 +79,19 @@ type AdminOpts = {
   /**
    * Successive results for square_sync_log UPSERTs (the dedup claim), consumed
    * in order across POST calls — simulates the UNIQUE(square_payment_id)
-   * constraint: first delivery claims (CLAIM_OK), the retry gets CLAIM_DUP.
+   * constraint (which now stores the ORDER-first claim key): first delivery
+   * claims (CLAIM_OK), the retry gets CLAIM_DUP.
    * Keyed on `ops` rather than the table alone: only the claim builder upserts,
    * so the finalize UPDATE and the failure-path DELETE on square_sync_log leave
    * the queue untouched.
    */
   claimQueue?: QueryResult[];
+  /**
+   * Result of the stale-claim TAKEOVER update (an UPDATE whose chain filters
+   * with .lt("started_at", …)). Defaults to no-stale-claim (empty), so a
+   * duplicate stays a duplicate unless a test opts in.
+   */
+  takeoverResult?: QueryResult;
 };
 
 /** Every write the handler performs, in order. Re-created by useTables. */
@@ -94,15 +103,20 @@ let rpcResponse: QueryResult = { data: [{ new_quantity: 5, clamped: false }], er
 
 function useTables(tables: TableData, opts: AdminOpts = {}) {
   const claims = opts.claimQueue ? [...opts.claimQueue] : undefined;
+  const takeover = opts.takeoverResult ?? CLAIM_DUP; // default: no stale claim to steal
   const fallback = tables.square_sync_log;
   const mock = makeAdminMock(
-    claims
-      ? {
-          ...tables,
-          square_sync_log: ({ ops }: ResponseContext) =>
-            ops.includes("upsert") && claims.length > 0 ? claims.shift()! : (fallback as QueryResult),
-        }
-      : tables,
+    {
+      ...tables,
+      square_sync_log: ({ ops, calls }: ResponseContext) => {
+        if (claims && ops.includes("upsert") && claims.length > 0) return claims.shift()!;
+        // The stale-claim takeover is the only square_sync_log UPDATE that
+        // filters on started_at (.lt) — distinguish it from the finalize
+        // UPDATE (which filters .eq("id", …) only).
+        if (ops.includes("update") && calls.some((c) => c.method === "lt")) return takeover;
+        return fallback as QueryResult;
+      },
+    },
     // Resolve rpcResponse lazily — tests reassign it before invoking the route.
     { rpc: () => rpcResponse }
   );
@@ -409,6 +423,107 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
     expect(writes.some((w) => w.table === "allocations")).toBe(false);
   });
 
+  it("split tender — two DIFFERENT payments for the SAME order debit exactly ONCE (order-id claim)", async () => {
+    // A check split across two cards: Square delivers a COMPLETED payment event
+    // per tender, each carrying the same order_id, and the handler ingests the
+    // ORDER's full line-item list. Claiming on the payment id would debit the
+    // bins once per tender; the order-id claim makes the second tender a dup.
+    useTables(
+      {
+        square_sync_log: CLAIM_OK,
+        bins: BIN_SQ_LOC_1,
+        square_catalog_map: MAP_PACKAGED,
+        bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+        allocations: { data: null, error: null },
+      },
+      { claimQueue: [CLAIM_OK, CLAIM_DUP] }
+    );
+
+    const tender1 = {
+      ...EVENT,
+      event_id: "evt-tender-1",
+      data: {
+        ...EVENT.data,
+        object: { payment: { id: "pay-A", order_id: "order-1", location_id: "SQ-LOC-1", status: "COMPLETED" } },
+      },
+    };
+    const tender2 = {
+      ...EVENT,
+      event_id: "evt-tender-2",
+      data: {
+        ...EVENT.data,
+        object: { payment: { id: "pay-B", order_id: "order-1", location_id: "SQ-LOC-1", status: "COMPLETED" } },
+      },
+    };
+
+    expect((await post(tender1)).status).toBe(200);
+    expect((await post(tender2)).status).toBe(200);
+
+    // Both claims keyed the ORDER id — the DB UNIQUE is what dedups tender 2.
+    const claimRows = writes
+      .filter((w) => w.table === "square_sync_log" && w.op === "upsert")
+      .map((w) => w.row as { square_payment_id: string });
+    expect(claimRows.map((r) => r.square_payment_id)).toEqual(["order-1", "order-1"]);
+
+    // Exactly one debit + one allocation despite two distinct payment ids.
+    expect(rpcCalls).toEqual([
+      { fn: "debit_bin_inventory", args: { p_bin_id: "bin-1", p_finished_good_id: "fg-1", p_qty: 3 } },
+    ]);
+    expect(writes.filter((w) => w.table === "allocations")).toHaveLength(1);
+  });
+
+  it("stale in-flight claim (crash mid-processing) is taken over and the sale re-processed", async () => {
+    // The claim upsert dups ([]), but the existing claim never completed and is
+    // older than the staleness window — the atomic takeover UPDATE wins a row
+    // and processing proceeds against the reclaimed log id.
+    useTables(
+      {
+        square_sync_log: CLAIM_OK,
+        bins: BIN_SQ_LOC_1,
+        square_catalog_map: MAP_PACKAGED,
+        bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+        allocations: { data: null, error: null },
+      },
+      {
+        claimQueue: [CLAIM_DUP],
+        takeoverResult: { data: [{ id: "log-stale" }], error: null },
+      }
+    );
+
+    const res = await post(EVENT);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+
+    // The sale processed under the taken-over claim. (The takeover itself is
+    // also an update on square_sync_log — find the FINALIZE update, which
+    // carries the counts.)
+    expect(rpcCalls).toHaveLength(1);
+    const finalize = writes.find(
+      (w) => w.table === "square_sync_log" && w.op === "update" && w.row != null && "items_synced" in (w.row as object)
+    )!;
+    expect(finalize.row).toMatchObject({ items_synced: 1 });
+  });
+
+  it("fresh duplicate claim is NOT taken over — still a no-op dedup skip", async () => {
+    // Default takeoverResult = empty (the conditional UPDATE matched no stale
+    // row): the duplicate stays a duplicate and produces no side effects.
+    useTables(
+      {
+        square_sync_log: CLAIM_OK,
+        bins: BIN_SQ_LOC_1,
+        square_catalog_map: MAP_PACKAGED,
+        bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+        allocations: { data: null, error: null },
+      },
+      { claimQueue: [CLAIM_DUP] }
+    );
+
+    const res = await post(EVENT);
+    expect(res.status).toBe(200);
+    expect(rpcCalls).toHaveLength(0);
+    expect(writes.some((w) => w.table === "allocations")).toBe(false);
+  });
+
   it("same sale delivered twice (payment.created then payment.updated, both COMPLETED) debits exactly ONCE", async () => {
     // UNIQUE(square_payment_id) simulated: first claim wins, second gets [].
     useTables(
@@ -443,8 +558,13 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
       { fn: "debit_bin_inventory", args: { p_bin_id: "bin-1", p_finished_good_id: "fg-1", p_qty: 3 } },
     ]);
     expect(writes.filter((w) => w.table === "allocations")).toHaveLength(1);
-    // Exactly one finalize (the deduped delivery returns before finalizing).
-    expect(writes.filter((w) => w.table === "square_sync_log" && w.op === "update")).toHaveLength(1);
+    // Exactly one finalize (the deduped delivery attempts a stale-claim
+    // takeover — also an update, but without counts — then returns).
+    expect(
+      writes.filter(
+        (w) => w.table === "square_sync_log" && w.op === "update" && w.row != null && "items_synced" in (w.row as object)
+      )
+    ).toHaveLength(1);
   });
 
   it("debit RPC error marks the line FAILED, not synced", async () => {
@@ -519,6 +639,57 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
     expect(finalize.details.errors?.[0].error).toContain("not mapped to a POS bin");
   });
 
+  it("transient bin-lookup error returns 500 and frees the claim (NOT 'location not mapped')", async () => {
+    // A failed bins read must not be misclassified as an unmapped location:
+    // that path flags the line, returns 200, and Square never retries — the
+    // sale would be permanently lost on a transient blip. Throwing 500s the
+    // delivery so Square retries, and the claim is freed for that retry.
+    useTables({
+      square_sync_log: CLAIM_OK,
+      bins: { data: null, error: { message: "bins read boom" } },
+      square_catalog_map: MAP_PACKAGED,
+      bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+      allocations: { data: null, error: null },
+    });
+
+    const res = await post(EVENT);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "processing_failed" });
+
+    // No side effects, and the claim row was deleted so the retry can re-claim.
+    expect(rpcCalls).toHaveLength(0);
+    expect(writes.some((w) => w.table === "allocations")).toBe(false);
+    const freed = writes.find((w) => w.table === "square_sync_log" && w.op === "delete");
+    expect(freed?.row).toBe("log-1");
+  });
+
+  it("non-integer quantity is flagged FAILED, never truncated into a wrong debit", async () => {
+    useOrder([
+      { catalogObjectId: "CAT-1", quantity: "2.5", uid: "line-frac", basePriceMoney: { amount: 500 } },
+    ]);
+    useTables({
+      square_sync_log: CLAIM_OK,
+      bins: BIN_SQ_LOC_1,
+      square_catalog_map: MAP_PACKAGED,
+      bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+      allocations: { data: null, error: null },
+    });
+
+    const res = await post(EVENT);
+    expect(res.status).toBe(200);
+
+    // parseInt would have debited 2; the defensive parse flags instead.
+    expect(rpcCalls).toHaveLength(0);
+    const finalize = writes.find((w) => w.table === "square_sync_log" && w.op === "update")!.row as {
+      items_synced: number;
+      items_failed: number;
+      details: { errors?: Array<{ error: string }> };
+    };
+    expect(finalize.items_synced).toBe(0);
+    expect(finalize.items_failed).toBe(1);
+    expect(finalize.details.errors?.[0].error).toContain("Non-integer quantity");
+  });
+
   it("draft (keg) line still staged into square_draft_sales with the bin's location_id", async () => {
     useTables({
       square_sync_log: CLAIM_OK,
@@ -546,5 +717,62 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
       selling_format_id: "fmt-1",
       quantity: 3,
     });
+  });
+
+  it("failed square_draft_sales insert marks the line FAILED — never a silent 200 with the pour lost", async () => {
+    // The insert error used to be undestructured: itemsSynced++ still ran, the
+    // claim was held, and 200 was returned — the pour was unrecoverable AND
+    // invisible. It must route through the same per-line failure handling as
+    // allocError/debitError.
+    useTables({
+      square_sync_log: CLAIM_OK,
+      bins: BIN_SQ_LOC_1,
+      square_catalog_map: MAP_KEG,
+      square_draft_sales: { data: null, error: { message: "draft insert boom" } },
+    });
+
+    const res = await post(EVENT);
+    expect(res.status).toBe(200);
+
+    const finalize = writes.find((w) => w.table === "square_sync_log" && w.op === "update")!.row as {
+      items_synced: number;
+      items_failed: number;
+      details: { errors?: Array<{ error: string }> };
+    };
+    expect(finalize.items_synced).toBe(0);
+    expect(finalize.items_failed).toBe(1);
+    expect(finalize.details.errors?.[0].error).toContain("draft insert boom");
+  });
+});
+
+describe("inventory.count.updated — inbound event logging", () => {
+  const COUNT_EVENT = {
+    merchant_id: "MERCHANT-1",
+    type: "inventory.count.updated",
+    event_id: "evt-count-1",
+    created_at: new Date().toISOString(),
+    data: { type: "inventory_count", id: "obj-1", object: {} },
+  };
+
+  it("logs the inbound event as sync_type inventory_event (not inventory_push)", async () => {
+    useTables({ square_sync_log: { data: null, error: null } });
+
+    const res = await post(COUNT_EVENT);
+    expect(res.status).toBe(200);
+
+    const row = writes.find((w) => w.table === "square_sync_log")!.row as {
+      sync_type: string;
+      event_id: string;
+    };
+    expect(row.sync_type).toBe("inventory_event");
+    expect(row.event_id).toBe("evt-count-1");
+  });
+
+  it("skips the durable log when event_id is absent (NULLs are distinct — would duplicate unbounded)", async () => {
+    useTables({ square_sync_log: { data: null, error: null } });
+
+    const res = await post({ ...COUNT_EVENT, event_id: undefined });
+    expect(res.status).toBe(200);
+    expect(writes.some((w) => w.table === "square_sync_log")).toBe(false);
   });
 });

@@ -13,10 +13,17 @@
  *     created/updated deliveries whose `status` field transitions to
  *     "COMPLETED". Both are routed to handleCompletedPayment, which only
  *     ingests the sale once the payment status is "COMPLETED" (other statuses
- *     are acknowledged and ignored). Because BOTH a created and an updated
- *     delivery can arrive already-COMPLETED for the same sale, dedup keys on
- *     the Square *payment id* (not the event id) so a sale debits inventory
- *     exactly once. Packaged lines resolve the Square location to a POS bin and
+ *     are acknowledged and ignored). Dedup keys on the Square *order id*
+ *     (falling back to the payment id only when order_id is absent): a single
+ *     sale can arrive as BOTH a created and an updated delivery already
+ *     COMPLETED, and a check split across tenders arrives as MULTIPLE
+ *     payments — each of which references the SAME order whose full line-item
+ *     list we ingest. Claiming per payment would debit the bins once per
+ *     tender; claiming per order debits exactly once. A claim that never
+ *     completed (crash/timeout mid-processing) is treated as stale after
+ *     STALE_CLAIM_MS and atomically taken over by a retry, so a stranded
+ *     claim cannot permanently dedup-skip the sale.
+ *     Packaged lines resolve the Square location to a POS bin and
  *     draw the sold quantity FIFO across every finished-good lot physically in
  *     that bin (oldest production_date first), recording one taproom_sale
  *     allocation (with volume_bbl for TTB removals) and one debit_bin_inventory
@@ -41,6 +48,15 @@ import { dynamicFrom } from "@/services/types";
 import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/square/webhook" });
+
+/**
+ * How old an UNFINISHED dedup claim (completed_at IS NULL) must be before a
+ * retry may take it over. Claims normally finish (completed_at set) or are
+ * deleted on failure within seconds; only a crash/timeout mid-processing
+ * strands one. 15 minutes comfortably exceeds any serverless function timeout,
+ * so a live in-flight handler can never be raced by its own retry.
+ */
+const STALE_CLAIM_MS = 15 * 60 * 1000;
 
 /**
  * Render a thrown value as a human-readable message for the per-line error log.
@@ -292,20 +308,25 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
 
   const admin = await createAdminClient();
 
-  // Race-safe dedup (audit F-135): claim on the Square PAYMENT id before any
-  // side effects. Keying on payment id (not event id) is essential because a
-  // single sale can arrive as BOTH payment.created and payment.updated already
-  // COMPLETED — an event-id claim would let each debit the bin, double-counting
-  // the sale. ON CONFLICT DO NOTHING (UNIQUE uniq_square_sync_log_square_payment_id,
-  // 00224) returns [] on duplicate so concurrent retries cannot both proceed.
-  // claimKey is the payment id (always present on payment.* events); we fall
-  // back to order_id only in the impossible-in-practice case that it is absent,
-  // so dedup is never skipped entirely.
-  const claimKey = paymentId ?? orderId;
+  // Race-safe dedup (audit F-135): claim on the Square ORDER id before any
+  // side effects. Keying on order id (not payment id, not event id) is
+  // essential because the handler ingests the ORDER's full line-item list:
+  //   - one payment arrives as BOTH payment.created and payment.updated
+  //     (both can be COMPLETED) — two event_ids, one sale;
+  //   - a check SPLIT ACROSS TENDERS arrives as multiple payments — several
+  //     payment ids, one order. A payment-id claim would fetch and debit the
+  //     same order's lines once per tender (double-debit + double TTB count).
+  // The payment id is the fallback only when order_id is absent (in which case
+  // there are no line items to double-ingest anyway). The claim column is
+  // still named square_payment_id (00224); 00233 documents that it now stores
+  // this order-first claim key and re-keys historical sale rows to order ids.
+  // ON CONFLICT DO NOTHING (UNIQUE uniq_square_sync_log_square_payment_id)
+  // returns [] on duplicate so concurrent retries cannot both proceed.
+  const claimKey = orderId ?? paymentId;
   if (!claimKey) {
     log.warn(
       { event_id: event.event_id },
-      "Payment event has neither payment id nor order_id; cannot dedup, ignoring"
+      "Payment event has neither order_id nor payment id; cannot dedup, ignoring"
     );
     return;
   }
@@ -329,20 +350,63 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
   // result and silently drop the sale with a 200. Throw so the outer handler
   // returns 500 and Square retries. Only a genuine empty array is a duplicate.
   if (claimError) throw claimError;
-  if (!claimed || claimed.length === 0) {
-    log.info(
-      { payment_id: paymentId, order_id: orderId },
-      "Duplicate payment (already claimed), skipping"
+
+  let logId: string;
+  if (claimed && claimed.length > 0) {
+    logId = claimed[0].id;
+  } else {
+    // Already claimed. Usually a genuine duplicate delivery — but a claim whose
+    // processing crashed mid-flight (timeout after the claim committed) never
+    // completes and never frees itself, and every retry would dedup-skip into
+    // a permanently lost sale. Treat an UNFINISHED claim older than
+    // STALE_CLAIM_MS as abandoned and take it over ATOMICALLY: the conditional
+    // UPDATE re-stamps started_at only if the claim is still stale, so exactly
+    // one of several concurrent retries wins (the others match zero rows).
+    // NOTE: re-processing after a partial crash can re-debit lines the crashed
+    // attempt already debited — at-least-once by design; the alternative (hold
+    // the claim forever) silently loses the whole sale, which is worse. The
+    // sync-log row survives for reconciliation either way.
+    const staleCutoff = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+    const { data: takeover, error: takeoverError } = await admin
+      .from("square_sync_log")
+      .update({ started_at: new Date().toISOString() })
+      .eq("square_payment_id", claimKey)
+      .is("completed_at", null)
+      .lt("started_at", staleCutoff)
+      .select("id");
+    if (takeoverError) throw takeoverError;
+    if (!takeover || takeover.length === 0) {
+      log.info(
+        { payment_id: paymentId, order_id: orderId },
+        "Duplicate sale (order already claimed), skipping"
+      );
+      return;
+    }
+    logId = takeover[0].id;
+    log.warn(
+      { payment_id: paymentId, order_id: orderId, log_id: logId },
+      "Took over stale in-flight sale claim; re-processing"
     );
-    return;
   }
-  const logId: string = claimed[0].id;
 
   // A COMPLETED payment should always carry an order_id; without one we cannot
-  // fetch line items. Free the claim so a corrected retry can re-process.
+  // fetch line items. Retrying THIS delivery is useless (same payload), so ACK
+  // with 200 — but free the claim rather than hold it: the claim key here is
+  // the payment id, and a sibling delivery for the same payment might carry
+  // the order_id. Holding a dead zero-item claim row would only pollute the
+  // sync log.
   if (!orderId) {
     log.warn({ payment_id: paymentId }, "COMPLETED payment missing order_id");
-    await admin.from("square_sync_log").delete().eq("id", logId);
+    const { error: freeError } = await admin
+      .from("square_sync_log")
+      .delete()
+      .eq("id", logId);
+    if (freeError) {
+      log.error(
+        { err: freeError.message, log_id: logId },
+        "Failed to free claim for order-less payment"
+      );
+    }
     return;
   }
 
@@ -385,11 +449,16 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
       pos_sales_channel_id: string | null;
     } | null = null;
     if (squareLocationId) {
-      const { data: bin } = await admin
+      const { data: bin, error: binLookupError } = await admin
         .from("bins")
         .select("id, location_id, pos_sales_channel_id")
         .eq("square_location_id", squareLocationId)
         .maybeSingle();
+      // A transient read failure is NOT "location not mapped": flagging the
+      // lines as unmapped returns 200, Square never retries, and the sale is
+      // permanently lost. Throw so the catch below frees the claim and the
+      // outer handler 500s — Square retries and the lookup gets another shot.
+      if (binLookupError) throw binLookupError;
       resolvedBin = bin ?? null;
     }
     // MGR location used for draft staging (below) and the sync-log row. Derived
@@ -428,8 +497,20 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
           continue;
         }
 
-        const quantity = parseInt(lineItem.quantity, 10) || 0;
-        if (quantity <= 0) continue;
+        // Square sends quantity as a decimal string (up to 5 decimal places).
+        // parseInt would silently truncate "2.5" to 2 and mis-debit; parse with
+        // Number and only accept positive whole numbers — MGR sells packaged
+        // units and pours in integers, so anything else is flagged, not guessed.
+        const quantity = Number(lineItem.quantity);
+        if (!Number.isFinite(quantity) || quantity <= 0) continue;
+        if (!Number.isInteger(quantity)) {
+          itemsFailed++;
+          errors.push({
+            lineItemUid: lineItem.uid ?? "unknown",
+            error: `Non-integer quantity "${lineItem.quantity}" — cannot debit fractional units`,
+          });
+          continue;
+        }
 
         // Determine if this is a keg (draft) or packaged good based on container type.
         // The join may be null if the selling format or container was deleted.
@@ -621,7 +702,12 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
 
           const volumeOz = calculateVolumeOz(quantity);
 
-          await admin.from("square_draft_sales").insert({
+          // supabase-js does not throw on error — a swallowed failure here
+          // would still run itemsSynced++, hold the claim, and 200: the pour
+          // would be unrecoverable AND invisible. Surface it so the per-line
+          // catch records the line as FAILED (same handling as allocError /
+          // debitError on the packaged path).
+          const { error: draftError } = await admin.from("square_draft_sales").insert({
             square_order_id: orderId,
             square_payment_id: paymentId ?? null,
             brand_id: mapping.brand_id,
@@ -634,6 +720,7 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
             location_id: locationId,
             sold_at: event.created_at ?? new Date().toISOString(),
           });
+          if (draftError) throw draftError;
 
           itemsSynced++;
         }
@@ -658,7 +745,11 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
       ...(warnings.length > 0 ? { warnings } : {}),
     };
 
-    await admin
+    // Deliberately NOT thrown on: the debits/allocations above already
+    // happened, so a 500 here would free the claim and Square's retry would
+    // DOUBLE-debit the sale. An unfinalized row (completed_at NULL) is visible
+    // in the sync log; log the failure so observability loss isn't silent.
+    const { error: finalizeError } = await admin
       .from("square_sync_log")
       .update({
         location_id: locationId,
@@ -668,12 +759,29 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
         completed_at: new Date().toISOString(),
       })
       .eq("id", logId);
+    if (finalizeError) {
+      log.error(
+        { err: finalizeError.message, log_id: logId, order_id: orderId },
+        "Failed to finalize sale sync-log row (sale WAS processed)"
+      );
+    }
 
     // Return the oversold lines (D3) so POST can echo them in the response.
     return { oversoldLines };
   } catch (err) {
-    // Free the claimed slot on failure so Square's retry can re-process.
-    await admin.from("square_sync_log").delete().eq("id", logId);
+    // Free the claimed slot on failure so Square's retry can re-process. If the
+    // delete itself fails the claim strands — the stale-claim takeover above is
+    // the backstop — but log it so the strand is observable.
+    const { error: freeError } = await admin
+      .from("square_sync_log")
+      .delete()
+      .eq("id", logId);
+    if (freeError) {
+      log.error(
+        { err: freeError.message, log_id: logId },
+        "Failed to free sale claim after processing error; stale-claim takeover will recover it"
+      );
+    }
     throw err;
   }
 }
@@ -685,13 +793,26 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
 async function handleInventoryCountUpdated(event: SquareWebhookEvent) {
   // MGR is the source of truth for inventory — log the event for visibility
   // but do not update any MGR inventory data.
+
+  // event_id is the dedup key here; NULLs are distinct under the UNIQUE
+  // constraint, so an id-less event would insert an unbounded duplicate row on
+  // every Square retry. It also cannot be traced back to anything — skip the
+  // durable log entirely (this row is informational only).
+  if (!event.event_id) {
+    log.warn("inventory.count.updated event missing event_id; not logging");
+    return;
+  }
+
   const admin = await createAdminClient();
 
   // supabase-js does not throw on error — surface it so the outer handler
   // returns 500 and Square retries, rather than silently dropping the log row.
+  // sync_type "inventory_event" (00233) marks this as an INBOUND notification,
+  // distinct from "inventory_push" (MGR pushing counts out) so the sync status
+  // page's push history isn't polluted with Square's own echoes.
   const { error } = await admin.from("square_sync_log").upsert(
     {
-      sync_type: "inventory_push" satisfies SquareSyncType,
+      sync_type: "inventory_event" satisfies SquareSyncType,
       event_id: event.event_id,
       items_synced: 0,
       items_failed: 0,

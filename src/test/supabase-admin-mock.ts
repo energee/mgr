@@ -64,7 +64,7 @@ export type AdminMockOptions = {
 const EMPTY: QueryResult = { data: [], error: null };
 
 /** Pass-through filter/modifier methods. Every one returns the builder. */
-const FILTER_METHODS = ["select", "eq", "in", "gt", "not", "order", "limit"] as const;
+const FILTER_METHODS = ["select", "eq", "in", "gt", "lt", "is", "not", "order", "limit"] as const;
 
 /**
  * Builds a fake admin client from table-keyed responses.
