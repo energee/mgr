@@ -61,7 +61,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       id: string;
       name: string;
       square_location_id: string | null;
-      location_id: string | null;
+      // NOT NULL on bins in the live-regenerated types; must match Row exactly
+      // for getPosBins' Partial<Row> constraint.
+      location_id: string;
     }>(admin, { select: "id, name, square_location_id, location_id", orderBy: "id" });
 
     if (binsError) {
