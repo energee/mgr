@@ -86,8 +86,13 @@ export function KeyboardShortcutsDialog({
                     >
                       <td className="py-2 pr-4">
                         <KbdGroup>
+                          {/* aria-hidden={false}: here the keys are the
+                              content, not a decorative hint (Kbd hides
+                              itself from AT by default). */}
                           {shortcut.keys.map((k) => (
-                            <Kbd key={k}>{k}</Kbd>
+                            <Kbd key={k} aria-hidden={false}>
+                              {k}
+                            </Kbd>
                           ))}
                         </KbdGroup>
                       </td>
