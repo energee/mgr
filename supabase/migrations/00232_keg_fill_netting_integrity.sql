@@ -67,7 +67,19 @@
 --           00229's FIFO business rule retroactively to historical orders --
 --           out of scope here, and the ambiguity is why 00229 itself declined it.
 --   Part 4  debit_bin_inventory: defensive p_qty >= 0 guard (00223 nit).
---   Part 5  Verification: proves fill -> revise-down netting and fill -> ship
+--   Part 5  Register 'revised' in the enum_values registry. Discovered by a
+--           rolled-back live dry-run of this migration's verification: 00184
+--           made 'revised' a real status and 00192 added it to the CHECK
+--           constraint, but NOBODY inserted it into enum_values -- and the
+--           00040 validate_enum_value trigger rejects any value missing from
+--           the registry. So EVERY revision on live has been aborting at the
+--           final status flip ('Invalid packaging_session_status value:
+--           revised') since the trigger and the status coexisted. Without
+--           this row, the Part 2 netting fix is unreachable and the
+--           verification below cannot run. The 00143/00205 transition maps
+--           already allow completed -> revised, so the registry row is the
+--           only missing piece.
+--   Part 6  Verification: proves fill -> revise-down netting and fill -> ship
 --           netting (00227's block only proved a FRESH fill, which is exactly
 --           why it passed over bug (a)), plus the Part 3 repair, then rolls
 --           back.
@@ -822,7 +834,26 @@ REVOKE ALL ON FUNCTION debit_bin_inventory(UUID, UUID, INTEGER) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION debit_bin_inventory(UUID, UUID, INTEGER) TO service_role;
 
 -- =============================================================================
--- PART 5 -- verification (self-rolling-back; commits NO rows)
+-- PART 5 -- register the 'revised' packaging-session status (see header)
+-- =============================================================================
+-- 00184 flips sessions into 'revised', 00192 CHECK-allows it, the 00143/00205
+-- state machine allows completed -> revised -- but the value was never added
+-- to enum_values, so the 00040 validate_enum_value trigger has been aborting
+-- every real revision on live. Register it (idempotent), and correct the
+-- 'completed' row's informational next_states metadata, stale since 00184.
+INSERT INTO enum_values (enum_type, value, label, description, color, sort_order, is_default, metadata)
+VALUES ('packaging_session_status', 'revised', 'Revised',
+        'Completed session whose quantities were corrected after the fact', 'warning', 35, FALSE,
+        '{"next_states": []}'::jsonb)
+ON CONFLICT (enum_type, value) DO NOTHING;
+
+UPDATE enum_values
+SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{next_states}', '["revised"]'::jsonb)
+WHERE enum_type = 'packaging_session_status'
+  AND value = 'completed';
+
+-- =============================================================================
+-- PART 6 -- verification (self-rolling-back; commits NO rows)
 -- =============================================================================
 -- Proves, then rolls back -- deliberately covering the leg shapes 00227's block
 -- did NOT (a fresh fill alone would pass with all three bugs present):
