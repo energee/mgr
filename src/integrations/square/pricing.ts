@@ -48,9 +48,13 @@ export async function resolveChannelPrices(
   // 1. Get recipes for these brands that have a pricing_tier_id (channel-
   //    independent). A brand can have several priced recipes, so row order
   //    decides its price. ORDER BY makes that deterministic — most recently
-  //    updated recipe wins, id breaking ties — matching how 00191 resolves a
-  //    brand's preferred recipe. Without it Postgres returns a plan-dependent
-  //    order and the brand's live Square price flips between syncs.
+  //    updated recipe wins, id breaking ties — the same ordering 00191's
+  //    preferred-recipe view uses. (Not full parity: 00191 also filters
+  //    is_active = true; here an inactive recipe's tier still prices the brand
+  //    rather than turning its variations "unpriced" mid-catalog. Deliberate —
+  //    tighten only together with the catalog route's unpriced handling.)
+  //    Without the ORDER BY Postgres returns a plan-dependent order and the
+  //    brand's live Square price flips between syncs.
   const { data: recipes, error: recipesError } = await admin
     .from("recipes")
     .select("id, brand_id, pricing_tier_id")

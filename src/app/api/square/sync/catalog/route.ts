@@ -15,7 +15,11 @@
  * 4. Prices each variation via its bin's pos_sales_channel_id (one
  *    resolveChannelPrices call per DISTINCT channel — the common single-channel
  *    setup makes exactly one call)
- * 5. Builds SquareSyncProduct array and pushes to Square
+ * 5. Builds SquareSyncProduct array and pushes to Square. Unpriced variations:
+ *    UNMAPPED ones are omitted (nothing live to lose); MAPPED ones are preserved
+ *    in the push at their CURRENT live Square price (the batch upsert replaces
+ *    an item's full variation set, so omitting a mapped variation would delete
+ *    it live and destroy its Item-Sales reporting continuity)
  * 6. Cleans up stale (DISCONTINUED) catalog items. The keep set is packaged
  *    brands with any bin_inventory row at a POS bin UNION every brand sold on
  *    draft (any keg-container finished good). Sold-out brands — packaged qty-0
@@ -29,7 +33,12 @@ import { successResponse, errorResponse } from "@/lib/api/response";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateSquareSettings } from "@/integrations/square/client";
-import { pushCatalog, deleteStaleItems } from "@/integrations/square/catalog";
+import {
+  pushCatalog,
+  deleteStaleItems,
+  retrieveVariationPricing,
+  type LiveVariationPricing,
+} from "@/integrations/square/catalog";
 import { getPosBins, requireSquareClient, logSyncFailure } from "@/integrations/square/route-helpers";
 import { resolveChannelPrices } from "@/integrations/square/pricing";
 import type { SquareSyncProduct, SquareSyncVariation } from "@/integrations/square/types";
@@ -241,30 +250,73 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       }
     }
 
-    // 7. Build SquareSyncProduct array
+    // 7. Build SquareSyncProduct array.
+    //
+    // Unpriced variations (no price row on their channel, or an explicit $0)
+    // split on mapping state — Square's batch upsert REPLACES an item's full
+    // variation set, so what "skip" means differs:
+    //   - UNMAPPED (never pushed): safely OMITTED. Square holds no object for
+    //     it, so there is nothing to lose. Pushing it would publish it at
+    //     FIXED_PRICING $0.00 — sellable for free at the live register.
+    //   - MAPPED (live on Square): MUST stay in the push. Omitting it would
+    //     DELETE the live variation (destroying Item-Sales reporting continuity
+    //     and leaving square_catalog_map pointing at a dead object with a stale
+    //     version). It is re-included with its CURRENT live pricing, read back
+    //     via retrieveVariationPricing — preserved, never repriced.
+    // Both lists are surfaced (log + response) so staff can price them in MGR.
+    // NOTE: a deliberately-$0 comp price set in MGR is indistinguishable from
+    // "unpriced" here, so comps cannot be (re)published FROM MGR — price them
+    // directly in Square; once mapped, this preservation keeps them intact.
     const products: SquareSyncProduct[] = [];
-    // Variations whose channel has no price row -> pushed at $0. Collected and
-    // surfaced (log + response) rather than silently shipping free product.
     const unpricedVariations: string[] = [];
+    const preservedVariations: string[] = [];
+
+    // Pass 1: price what MGR can price; queue mapped-but-unpriced variations
+    // for live-price preservation.
+    type PendingPreserve = {
+      sellingFormatId: string;
+      displayName: string;
+      label: string;
+      squareCatalogId: string;
+      squareVersion?: bigint;
+    };
+    const pendingBrands: Array<{
+      brand: NonNullable<ReturnType<typeof brandMap.get>>;
+      itemMapping: { squareCatalogId: string; squareVersion: bigint | undefined } | undefined;
+      variations: SquareSyncVariation[];
+      pending: PendingPreserve[];
+    }> = [];
 
     for (const brand of brandMap.values()) {
       const itemMapping = mapLookup.get(`brand-${brand.brandId}`);
       const variations: SquareSyncVariation[] = [];
+      const pending: PendingPreserve[] = [];
 
       for (const [varKey, variation] of brand.variations) {
         const varMapping = mapLookup.get(`var-${brand.brandId}-${varKey}`);
         const displayName = formatNames[variation.sellingFormatId] ?? "Unknown Format";
+        const label = `${brand.brandName} / ${displayName}`;
 
         // Price from the channel of the bin(s) that stock this variation.
         const chan = variationChannel.get(`${brand.brandId}-${varKey}`);
         const resolvedPrice = chan
           ? channelPriceLookup.get(chan.channelId)?.get(brand.brandId)?.get(varKey)
           : undefined;
-        // No price configured for this variation on its channel. SKIP it: Square
-        // reads priceCents 0 as FIXED_PRICING $0.00, which makes the item
-        // sellable for free at the live register. Surfaced in the log + response.
+
         if (resolvedPrice == null || resolvedPrice === 0) {
-          unpricedVariations.push(`${brand.brandName} / ${displayName}`);
+          if (varMapping) {
+            // Mapped: must be preserved (see block comment above).
+            pending.push({
+              sellingFormatId: variation.sellingFormatId,
+              displayName,
+              label,
+              squareCatalogId: varMapping.squareCatalogId,
+              squareVersion: varMapping.squareVersion,
+            });
+          } else {
+            // Unmapped: omission is safe — nothing live to delete.
+            unpricedVariations.push(label);
+          }
           continue;
         }
 
@@ -277,9 +329,48 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         });
       }
 
-      // A brand whose every variation is unpriced has nothing to publish. It
-      // stays in activeBrandIds (it IS stocked), so deleteStaleItems will not
-      // treat it as stale and delete its live Square item.
+      pendingBrands.push({ brand, itemMapping, variations, pending });
+    }
+
+    // Fetch live pricing for every queued preservation in one Square read. A
+    // failure here must ABORT the sync (throw -> catch -> 500): pushing without
+    // the preserved variations is exactly the deletion this exists to prevent.
+    const preserveIds = pendingBrands.flatMap((b) => b.pending.map((p) => p.squareCatalogId));
+    const livePricing =
+      preserveIds.length > 0
+        ? await retrieveVariationPricing(client, preserveIds)
+        : new Map<string, LiveVariationPricing>();
+
+    // Pass 2: fold preserved variations back in and assemble the products.
+    for (const { brand, itemMapping, variations, pending } of pendingBrands) {
+      for (const p of pending) {
+        const live = livePricing.get(p.squareCatalogId);
+        if (!live) {
+          // The mapped object no longer exists on Square (deleted out-of-band):
+          // treat as unmapped — omission deletes nothing.
+          unpricedVariations.push(p.label);
+          continue;
+        }
+        variations.push({
+          sellingFormatId: p.sellingFormatId,
+          name: p.displayName,
+          // Echo the live pricing block back verbatim (a live $0 comp price is
+          // a real price; null = live VARIABLE_PRICING, omits price_money).
+          priceCents: live.priceCents,
+          pricingType: live.pricingType,
+          squareCatalogId: p.squareCatalogId,
+          // Prefer the LIVE version — the map's copy can be stale, and a stale
+          // version fails Square's optimistic concurrency check on upsert.
+          squareVersion: live.version ?? p.squareVersion,
+        });
+        preservedVariations.push(p.label);
+      }
+
+      // A brand with nothing to publish (every variation unpriced AND unmapped)
+      // is skipped. It stays in activeBrandIds (it IS stocked), so
+      // deleteStaleItems will not treat it as stale and delete its live Square
+      // item. A brand with only PRESERVED variations is still pushed — that is
+      // what keeps its live variations alive.
       if (variations.length === 0) continue;
 
       products.push({
@@ -388,6 +479,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         staleFailed: staleResult.failed > 0 ? staleResult.failed : undefined,
         staleErrors: staleResult.errors.length > 0 ? staleResult.errors : undefined,
         unpricedVariations: unpricedVariations.length > 0 ? unpricedVariations : undefined,
+        preservedVariations: preservedVariations.length > 0 ? preservedVariations : undefined,
         errors: syncResult.errors.length > 0 ? syncResult.errors : undefined,
         triggeredBy: user.id,
       },
@@ -407,6 +499,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       staleErrors: staleResult.errors,
       productsCount: products.length,
       unpricedVariations,
+      preservedVariations,
       errors: syncResult.errors,
     });
   } catch (err) {

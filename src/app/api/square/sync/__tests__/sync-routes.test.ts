@@ -59,6 +59,7 @@ vi.mock("@/integrations/square/client", () => ({
 vi.mock("@/integrations/square/catalog", () => ({
   pushCatalog: vi.fn(),
   deleteStaleItems: vi.fn(),
+  retrieveVariationPricing: vi.fn(),
 }));
 
 vi.mock("@/integrations/square/inventory", () => ({
@@ -71,7 +72,7 @@ vi.mock("@/integrations/square/pricing", () => ({
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, updateSquareSettings } from "@/integrations/square/client";
-import { pushCatalog, deleteStaleItems } from "@/integrations/square/catalog";
+import { pushCatalog, deleteStaleItems, retrieveVariationPricing } from "@/integrations/square/catalog";
 import { pushInventoryCounts } from "@/integrations/square/inventory";
 import { resolveChannelPrices } from "@/integrations/square/pricing";
 
@@ -83,6 +84,7 @@ const mockedGetSquareClient = vi.mocked(getSquareClient);
 const mockedUpdateSquareSettings = vi.mocked(updateSquareSettings);
 const mockedPushCatalog = vi.mocked(pushCatalog);
 const mockedDeleteStaleItems = vi.mocked(deleteStaleItems);
+const mockedRetrieveVariationPricing = vi.mocked(retrieveVariationPricing);
 const mockedPushInventoryCounts = vi.mocked(pushInventoryCounts);
 const mockedResolveChannelPrices = vi.mocked(resolveChannelPrices);
 
@@ -125,6 +127,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockedGetSquareClient.mockResolvedValue({} as never);
   mockedUpdateSquareSettings.mockResolvedValue(undefined as never);
+  // Default: no mapped-but-unpriced variations need live-price preservation.
+  mockedRetrieveVariationPricing.mockResolvedValue(new Map());
 });
 
 // =============================================================================
@@ -386,7 +390,7 @@ describe("catalog sync (bin-driven)", () => {
     expect(keepSet).toEqual(expect.arrayContaining(["brand-1", "brand-2"]));
   });
 
-  it("skips an unpriced variation instead of publishing it at $0, and keeps the brand active", async () => {
+  it("skips an UNMAPPED unpriced brand entirely instead of publishing it at $0, and keeps it active", async () => {
     useTables({
       bins: {
         data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
@@ -414,9 +418,11 @@ describe("catalog sync (bin-driven)", () => {
     expect(body.data.unpricedVariations).toEqual(["Brand One / 16oz 4-Pack"]);
 
     // Square reads priceCents 0 as FIXED_PRICING $0.00 — sellable for free at the
-    // register. The variation must never reach pushCatalog.
+    // register. An UNMAPPED unpriced variation must never reach pushCatalog, and
+    // with nothing mapped there is no live price to preserve either.
     const pushed = mockedPushCatalog.mock.calls[0][1];
     expect(pushed.flatMap((p) => p.variations)).toEqual([]);
+    expect(mockedRetrieveVariationPricing).not.toHaveBeenCalled();
 
     // ...but the brand IS stocked, so it stays active and deleteStaleItems must
     // not treat it as stale and delete its live Square item.
@@ -426,6 +432,153 @@ describe("catalog sync (bin-driven)", () => {
       details: { unpricedVariations?: string[] };
     };
     expect(log.details.unpricedVariations).toEqual(["Brand One / 16oz 4-Pack"]);
+  });
+
+  /** Fixture: brand-1 stocks fmt-1 (priced $10) and fmt-2 (NO price row). */
+  const twoVariationTables = (catalogMap: Array<Record<string, unknown>>): TableData => ({
+    bins: {
+      data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
+      error: null,
+    },
+    sellable_inventory: {
+      data: [
+        { bin_id: "bin-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5 },
+        { bin_id: "bin-1", brand_id: "brand-1", selling_format_id: "fmt-2", quantity: 3 },
+      ],
+      error: null,
+    },
+    brands: { data: [{ id: "brand-1", name: "Brand One", description: null }], error: null },
+    selling_formats: {
+      data: [
+        { id: "fmt-1", name: "16oz 4-Pack" },
+        { id: "fmt-2", name: "1/2 BBL Draft" },
+      ],
+      error: null,
+    },
+    square_catalog_map: { data: catalogMap, error: null },
+    square_sync_log: { data: null, error: null },
+  });
+
+  const priceOnlyFmt1 = () =>
+    mockedResolveChannelPrices.mockImplementation(async (_brandIds, channelIds) =>
+      channelMap({
+        "chan-A": [{ brandId: "brand-1", sellingFormatId: "fmt-1", priceCents: 1000 }],
+      })(channelIds)
+    );
+
+  it("preserves a MAPPED unpriced sibling variation at its CURRENT live price — Square's upsert replaces the full variation set, so omitting it would delete it live", async () => {
+    useTables(
+      twoVariationTables([
+        {
+          object_type: "ITEM_VARIATION",
+          brand_id: "brand-1",
+          selling_format_id: "fmt-2",
+          square_catalog_id: "SQ-VAR-2",
+          square_version: 5,
+        },
+      ])
+    );
+    priceOnlyFmt1();
+    // Live Square says fmt-2 currently sells at $8.50, object version 9.
+    mockedRetrieveVariationPricing.mockResolvedValue(
+      new Map([["SQ-VAR-2", { pricingType: "FIXED_PRICING" as const, priceCents: 850, version: BigInt(9) }]])
+    );
+    mockedPushCatalog.mockResolvedValue(SYNC_RESULT(1));
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    // The live price was read for exactly the mapped-unpriced variation.
+    expect(mockedRetrieveVariationPricing).toHaveBeenCalledWith(expect.anything(), ["SQ-VAR-2"]);
+
+    // Both variations reach the push: fmt-1 at its MGR price, fmt-2 PRESERVED
+    // with its existing Square id, LIVE price (not repriced), and LIVE version.
+    const pushed = mockedPushCatalog.mock.calls[0][1];
+    const variations = pushed.flatMap((p) => p.variations);
+    expect(variations).toHaveLength(2);
+    expect(variations.find((v) => v.sellingFormatId === "fmt-1")?.priceCents).toBe(1000);
+    const preserved = variations.find((v) => v.sellingFormatId === "fmt-2");
+    expect(preserved).toMatchObject({
+      squareCatalogId: "SQ-VAR-2",
+      priceCents: 850,
+      pricingType: "FIXED_PRICING",
+      squareVersion: BigInt(9),
+    });
+
+    // Surfaced as preserved, NOT as omitted.
+    expect(body.data.preservedVariations).toEqual(["Brand One / 1/2 BBL Draft"]);
+    expect(body.data.unpricedVariations).toEqual([]);
+  });
+
+  it("omits an UNMAPPED unpriced sibling from the push (nothing live to delete) while the priced sibling still publishes", async () => {
+    useTables(twoVariationTables([]));
+    priceOnlyFmt1();
+    mockedPushCatalog.mockResolvedValue(SYNC_RESULT(1));
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const pushed = mockedPushCatalog.mock.calls[0][1];
+    const variations = pushed.flatMap((p) => p.variations);
+    expect(variations.map((v) => v.sellingFormatId)).toEqual(["fmt-1"]);
+    expect(mockedRetrieveVariationPricing).not.toHaveBeenCalled();
+    expect(body.data.unpricedVariations).toEqual(["Brand One / 1/2 BBL Draft"]);
+    expect(body.data.preservedVariations).toEqual([]);
+  });
+
+  it("treats a mapped unpriced variation whose live object is GONE as unmapped: omitted and surfaced, not pushed with a dead id", async () => {
+    useTables(
+      twoVariationTables([
+        {
+          object_type: "ITEM_VARIATION",
+          brand_id: "brand-1",
+          selling_format_id: "fmt-2",
+          square_catalog_id: "SQ-VAR-GONE",
+          square_version: 5,
+        },
+      ])
+    );
+    priceOnlyFmt1();
+    // batchGet omits deleted objects -> empty map.
+    mockedRetrieveVariationPricing.mockResolvedValue(new Map());
+    mockedPushCatalog.mockResolvedValue(SYNC_RESULT(1));
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const pushed = mockedPushCatalog.mock.calls[0][1];
+    expect(pushed.flatMap((p) => p.variations).map((v) => v.sellingFormatId)).toEqual(["fmt-1"]);
+    expect(body.data.unpricedVariations).toEqual(["Brand One / 1/2 BBL Draft"]);
+    expect(body.data.preservedVariations).toEqual([]);
+  });
+
+  it("aborts (500 SYNC_FAILED, no push) when the live-pricing read fails — pushing without the preserved variations is exactly the deletion being prevented", async () => {
+    useTables(
+      twoVariationTables([
+        {
+          object_type: "ITEM_VARIATION",
+          brand_id: "brand-1",
+          selling_format_id: "fmt-2",
+          square_catalog_id: "SQ-VAR-2",
+          square_version: 5,
+        },
+      ])
+    );
+    priceOnlyFmt1();
+    mockedRetrieveVariationPricing.mockRejectedValue(new Error("square read boom"));
+    mockedPushCatalog.mockResolvedValue(SYNC_RESULT(1));
+    mockedDeleteStaleItems.mockResolvedValue(NO_STALE);
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(500);
+    expect(mockedPushCatalog).not.toHaveBeenCalled();
+    expect(mockedDeleteStaleItems).not.toHaveBeenCalled();
   });
 });
 

@@ -30,11 +30,19 @@ export function buildCatalogObjects(products: SquareSyncProduct[]) {
         itemVariationData: {
           itemId,
           name: variation.name,
-          pricingType: "FIXED_PRICING" as const,
-          priceMoney: {
-            amount: BigInt(variation.priceCents),
-            currency: "USD" as const,
-          },
+          // pricingType/priceCents default to a fixed price; both are overridable
+          // so a PRESERVED mapped-but-locally-unpriced variation can republish its
+          // live pricing block verbatim (a null priceCents omits price_money, for
+          // live VARIABLE_PRICING objects that have no fixed price to echo back).
+          pricingType: variation.pricingType ?? ("FIXED_PRICING" as const),
+          ...(variation.priceCents != null
+            ? {
+                priceMoney: {
+                  amount: BigInt(variation.priceCents),
+                  currency: "USD" as const,
+                },
+              }
+            : {}),
         },
       };
     });
@@ -50,6 +58,56 @@ export function buildCatalogObjects(products: SquareSyncProduct[]) {
       },
     };
   });
+}
+
+/** A mapped variation's CURRENT live pricing block, read back from Square. */
+export type LiveVariationPricing = {
+  /** Live pricing type; undefined if Square omitted it. */
+  pricingType?: "FIXED_PRICING" | "VARIABLE_PRICING";
+  /** Live fixed price in cents; null when the live object has no price_money
+   *  (VARIABLE_PRICING). A live $0 comp price is a real value, not "unpriced". */
+  priceCents: number | null;
+  /** Live object version — the version the next upsert must carry. */
+  version?: bigint;
+};
+
+/**
+ * Batch-read the live pricing of mapped ITEM_VARIATIONs from Square.
+ *
+ * Used by the catalog route to PRESERVE mapped-but-locally-unpriced variations:
+ * Square's batch upsert replaces an item's FULL variation set, so a mapped
+ * variation omitted from the push is DELETED live (destroying its Item-Sales
+ * reporting continuity and leaving square_catalog_map pointing at a dead object).
+ * Such variations must be re-included with their CURRENT live price — preserved,
+ * never repriced — which requires reading that price back first.
+ *
+ * Objects Square no longer has (deleted out-of-band) are simply absent from the
+ * returned map; the caller treats them as unmapped. Errors propagate — pushing
+ * WITHOUT the preserved variations would delete them, so the sync must abort.
+ *
+ * @param client    Square SDK client.
+ * @param objectIds mapped ITEM_VARIATION Square catalog ids to read.
+ * @returns Map: square catalog id -> {@link LiveVariationPricing}.
+ */
+export async function retrieveVariationPricing(
+  client: SquareClient,
+  objectIds: string[]
+): Promise<Map<string, LiveVariationPricing>> {
+  const result = new Map<string, LiveVariationPricing>();
+  if (objectIds.length === 0) return result;
+
+  const response = await client.catalog.batchGet({ objectIds });
+  for (const obj of response.objects ?? []) {
+    if (obj.type !== "ITEM_VARIATION" || !obj.id) continue;
+    const data = obj.itemVariationData;
+    const amount = data?.priceMoney?.amount;
+    result.set(obj.id, {
+      pricingType: data?.pricingType,
+      priceCents: amount != null ? Number(amount) : null,
+      version: obj.version,
+    });
+  }
+  return result;
 }
 
 /**
