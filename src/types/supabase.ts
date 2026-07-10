@@ -5923,6 +5923,7 @@ export type Database = {
           items_failed: number
           items_synced: number
           location_id: string | null
+          square_payment_id: string | null
           started_at: string
           sync_type: string
         }
@@ -5934,6 +5935,7 @@ export type Database = {
           items_failed?: number
           items_synced?: number
           location_id?: string | null
+          square_payment_id?: string | null
           started_at?: string
           sync_type: string
         }
@@ -5945,6 +5947,7 @@ export type Database = {
           items_failed?: number
           items_synced?: number
           location_id?: string | null
+          square_payment_id?: string | null
           started_at?: string
           sync_type?: string
         }
@@ -7554,12 +7557,15 @@ export type Database = {
           fg_item_count: number | null
           id: string | null
           is_active: boolean | null
+          is_default_fg: boolean | null
           location_id: string | null
           location_name: string | null
           location_type: string | null
           name: string | null
           notes: string | null
+          pos_sales_channel_id: string | null
           rm_item_count: number | null
+          square_location_id: string | null
           total_item_count: number | null
           updated_at: string | null
         }
@@ -7569,6 +7575,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bins_pos_sales_channel_id_fkey"
+            columns: ["pos_sales_channel_id"]
+            isOneToOne: false
+            referencedRelation: "sales_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -8457,7 +8470,6 @@ export type Database = {
       }
       keg_inventory: {
         Row: {
-          bin_id: string | null
           id: string | null
           keg_owner_id: string | null
           location_id: string | null
@@ -8485,8 +8497,6 @@ export type Database = {
       }
       keg_inventory_with_details: {
         Row: {
-          bin_id: string | null
-          bin_name: string | null
           id: string | null
           keg_owner_code: string | null
           keg_owner_id: string | null
@@ -10205,6 +10215,13 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      debit_bin_inventory: {
+        Args: { p_bin_id: string; p_finished_good_id: string; p_qty: number }
+        Returns: {
+          clamped: boolean
+          new_quantity: number
+        }[]
       }
       dismiss_notification: {
         Args: { p_notification_id: string }

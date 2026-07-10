@@ -16,11 +16,12 @@ FUNC|cleanup_old_notifications(p_days_old integer)|ab9dcb629ba7c869f8097d005f819
 FUNC|cogs_by_period(p_start_date date, p_end_date date)|84b42e8d51304011807151190543447d
 FUNC|compute_pallet_quantity()|ebfb0a3b6b83fd44c023c1ed04de4789
 FUNC|convert_to_lbs(p_amount numeric, p_unit text)|7aaf32f274800823dfa5dad14bfbe985
-FUNC|create_finished_goods_from_packaging(p_session_id uuid)|9b11a26734aa8a8ef9bffc8da7c0cb20
-FUNC|create_keg_ship_transactions_from_order(p_order_id uuid)|1522232adc48aaa3796f4ae6c5623653
+FUNC|create_finished_goods_from_packaging(p_session_id uuid)|4f2e3f10805167c970205f790b2472b9
+FUNC|create_keg_ship_transactions_from_order(p_order_id uuid)|f125f5b73eaeaa3776ae2826f638d0f3
 FUNC|create_notification(p_user_id uuid, p_type text, p_title text, p_message text, p_entity_type text, p_entity_id uuid, p_priority text, p_action_url text, p_metadata jsonb)|2af2115d2e5d40ee5b446f8ae60cfbce
 FUNC|create_user_preferences()|f248145e572c69bb35b2e7109d3ebf87
 FUNC|create_user_profile()|e3be190b6698efa7c86a10cbbcd208c0
+FUNC|debit_bin_inventory(p_bin_id uuid, p_finished_good_id uuid, p_qty integer)|ce93b24119168088b2f6000ab4ef3120
 FUNC|dismiss_notification(p_notification_id uuid)|d575be856ecba8b1ff3d2c49483022a4
 FUNC|dismiss_notifications_bulk(p_notification_ids uuid[])|367cc4ef273279ad08105754d66350bd
 FUNC|dispatch_email_notification(p_user_id uuid, p_type text, p_title text, p_message text, p_priority text, p_action_url text, p_metadata jsonb)|b9c1c74b6ecd14b2246470bdfd6ef27b
@@ -58,7 +59,7 @@ FUNC|get_user_role(p_user_id uuid)|27c8d334155133c79a6decf28ba491bb
 FUNC|get_yeast_lineage_root(p_pitch_id uuid)|084ae8cc6a0a04a718ab094b15c41425
 FUNC|guard_allocation_availability()|ea70f60041a57c08dbb739368a76315b
 FUNC|guard_finished_good_outbound()|0af1fb5d54af9683856e247c9b246a0d
-FUNC|handle_vessel_transfer()|01b4be314e25ccf103f11bc94ee5a63b
+FUNC|handle_vessel_transfer()|bcbaa2b816a3500542fb09cdd1261d04
 FUNC|hop_utilization_factor(p_timing text, p_boil_time_min numeric, p_gravity numeric)|ad3e27b9418f66f2399ef62b129609d8
 FUNC|increment_bin_inventory_version()|f6cb0dd1b766e4a19da838b0011e462d
 FUNC|increment_version()|8ac7dfb8b39fde3eb242844ef452554e
@@ -79,7 +80,7 @@ FUNC|packaging_session_before_update()|8e932b9407940972b16c9fdb03585c8a
 FUNC|place_finished_good_in_bin()|ae4e858d41ca7ed39e5daddbbf841d65
 FUNC|prevent_completed_allocation_delete()|06dc744313b05d0b23d94d3c4047139e
 FUNC|record_keg_transaction(p_transaction_type keg_transaction_type, p_selling_format_id uuid, p_quantity integer, p_from_state keg_state, p_to_state keg_state, p_from_location_id uuid, p_to_location_id uuid, p_order_id uuid, p_customer_id uuid, p_packaging_session_id uuid, p_batch_id uuid, p_finished_good_id uuid, p_notes text, p_created_by_name text, p_from_bin_id uuid, p_to_bin_id uuid)|83aebf35de59859e5065793c60bfe3ee
-FUNC|revise_packaging_session(p_session_id uuid, p_items jsonb, p_reason text)|ad20494c755d5daf33f75ca0f889e998
+FUNC|revise_packaging_session(p_session_id uuid, p_items jsonb, p_reason text)|86759de3d032973dc525e15e6e440de2
 FUNC|set_batch_completed_at()|c18cf601085fb6aa686c21dc8115ac40
 FUNC|set_keg_transaction_states()|75d5dec952085dbfae7cad70fc19ff03
 FUNC|set_order_fulfilled_date()|9f18f4d5d6e9463b5845b41db86ea052

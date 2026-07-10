@@ -60,6 +60,14 @@ export function buildCatalogObjects(products: SquareSyncProduct[]) {
  *  2. Call Square batchUpsertCatalogObjects
  *  3. Map returned IDs back to brands/selling formats
  *  4. Upsert into square_catalog_map
+ *
+ * C7 (no location dimension in v1): square_catalog_map is keyed only by
+ * (brand_id, selling_format_id, object_type) — there is deliberately NO
+ * square_location_id column. A brand/variation maps to ONE Square catalog
+ * object shared across all Square locations, because v1 uses a single price per
+ * variation (see resolveChannelPrices). Per-location price overrides (future)
+ * would require a per-location catalog object, i.e. adding a location dimension
+ * to this table and keying the map by it.
  */
 export async function pushCatalog(
   client: SquareClient,
@@ -208,51 +216,101 @@ export async function pushCatalog(
   };
 }
 
+/** Outcome of {@link deleteStaleItems}. */
+export type DeleteStaleResult = {
+  /** Map rows removed locally (only for chunks Square actually deleted). */
+  deleted: number;
+  /** Objects whose delete failed on Square; their map rows were RETAINED. */
+  failed: number;
+  /** Per-failed-chunk error messages, surfaced so the route can report them. */
+  errors: Array<{ chunk: number; error: string }>;
+};
+
+/** Square's BatchDeleteCatalogObjects caps object_ids at 200; we mirror
+ *  pushInventoryCounts' 100 for symmetry across the two batch paths. */
+const DELETE_BATCH_SIZE = 100;
+
 /**
- * Remove catalog items from Square that are no longer in the active brand set.
+ * Remove catalog items from Square whose brands are no longer in the KEEP set.
  *
- * Flow:
- *  1. Query square_catalog_map for ITEM entries not in activeBrandIds
- *  2. Call Square batchDeleteCatalogObjects for those IDs
- *  3. Delete from square_catalog_map
- *  4. Return count deleted
+ * `keepBrandIds` is the set of brands that SHOULD remain in the Square catalog
+ * (see the catalog route's discontinued-vs-sold-out split). Every map row whose
+ * brand is NOT in that set is treated as stale and deleted from BOTH Square and
+ * square_catalog_map. An empty keep set means "delete the entire catalog" — the
+ * route guards against calling with [] so a transient empty inventory can't wipe
+ * everything.
+ *
+ * Failure handling (data-loss guard): the Square delete is chunked
+ * (DELETE_BATCH_SIZE). A local map row is deleted ONLY for a chunk that Square
+ * successfully deleted. When a chunk's Square delete fails we KEEP its map rows
+ * (so the objects stay tracked and can be retried) and surface the failure via
+ * the returned `failed`/`errors`. Previously the local delete ran unconditionally
+ * even when Square's delete threw, orphaning the Square objects and causing the
+ * next sync to recreate them as duplicates under fresh `#brand-` temp ids.
+ *
+ * @param client        Square SDK client.
+ * @param keepBrandIds  brands to KEEP; every other mapped brand is deleted.
+ * @returns counts + per-chunk errors for the caller to log/report.
  */
 export async function deleteStaleItems(
   client: SquareClient,
-  activeBrandIds: string[]
-): Promise<number> {
+  keepBrandIds: string[]
+): Promise<DeleteStaleResult> {
   const admin = await createAdminClient();
 
-  // Find catalog map entries for brands not in the active set
+  // Find catalog map entries for brands not in the keep set.
   let query = admin
     .from("square_catalog_map")
     .select("id, brand_id, square_catalog_id, object_type");
 
-  // If there are active brands, exclude them; otherwise, delete everything
-  if (activeBrandIds.length > 0) {
-    query = query.not("brand_id", "in", `(${activeBrandIds.join(",")})`);
+  // If there are brands to keep, exclude them; otherwise, delete everything.
+  if (keepBrandIds.length > 0) {
+    query = query.not("brand_id", "in", `(${keepBrandIds.join(",")})`);
   }
 
   const { data: staleEntries, error } = await query;
 
   if (error || !staleEntries || staleEntries.length === 0) {
-    return 0;
+    return { deleted: 0, failed: 0, errors: [] };
   }
 
-  const squareIdsToDelete = staleEntries.map((e) => e.square_catalog_id);
-  const dbIdsToDelete = staleEntries.map((e) => e.id);
+  let deleted = 0;
+  let failed = 0;
+  const errors: Array<{ chunk: number; error: string }> = [];
 
-  try {
-    await client.catalog.batchDelete({ objectIds: squareIdsToDelete });
-  } catch (err) {
-    // Log but continue to clean up local mappings even if Square delete fails
-    log.error(
-      "Square catalog batch delete error:",
-      err instanceof Error ? err.message : err
-    );
+  for (let i = 0; i < staleEntries.length; i += DELETE_BATCH_SIZE) {
+    const chunk = staleEntries.slice(i, i + DELETE_BATCH_SIZE);
+    const chunkIndex = Math.floor(i / DELETE_BATCH_SIZE);
+    const squareIds = chunk.map((e) => e.square_catalog_id);
+    const dbIds = chunk.map((e) => e.id);
+
+    try {
+      await client.catalog.batchDelete({ objectIds: squareIds });
+    } catch (err) {
+      // Square delete failed: KEEP this chunk's map rows so the objects remain
+      // tracked and retryable. Do NOT delete the local rows.
+      const message = err instanceof Error ? err.message : String(err);
+      log.error("Square catalog batch delete error:", message);
+      failed += chunk.length;
+      errors.push({ chunk: chunkIndex, error: message });
+      continue;
+    }
+
+    // Square deleted this chunk — now (and only now) drop the local map rows.
+    const { error: delError } = await admin
+      .from("square_catalog_map")
+      .delete()
+      .in("id", dbIds);
+    if (delError) {
+      // Square objects are gone but the local rows survived; report it (they'll
+      // be retried on the next sync as no-op deletes).
+      failed += chunk.length;
+      errors.push({ chunk: chunkIndex, error: `local map delete failed: ${delError.message}` });
+      continue;
+    }
+
+    deleted += chunk.length;
   }
 
-  await admin.from("square_catalog_map").delete().in("id", dbIdsToDelete);
-
-  return staleEntries.length;
+  return { deleted, failed, errors };
 }

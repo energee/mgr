@@ -41,19 +41,27 @@ bun-debug.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# belt-and-braces: redundant with .env* above, kept explicit so .local variants
+# stay ignored even if the broad pattern is ever narrowed
+.env*.local
 !.env.example
 
 # worktrees
 .worktrees/
 
 # Claude agent working directory — ignore everything under .claude/ except the
-# project-level settings.json (Stop hook, etc.) and the project-scoped expert
-# agents under agents/, both of which travel with the repo.
+# project-level settings.json (Stop hook, etc.), the project-scoped expert agents
+# under agents/, the repo hooks under hooks/, and the project skills under
+# skills/. All four travel with the repo.
 # Per-developer overrides go in .claude/settings.local.json (still ignored).
 /.claude/*
 !/.claude/settings.json
 !/.claude/agents/
 !/.claude/agents/**
+!/.claude/hooks/
+!/.claude/hooks/**
+!/.claude/skills/
+!/.claude/skills/**
 
 # Supabase CLI auto-touches this on every invocation; keep it untracked.
 # Other files in supabase/.temp/ (project-ref, version stamps) are tracked

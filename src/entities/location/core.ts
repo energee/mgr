@@ -15,12 +15,11 @@ import type { EntityCore, ValueDisplayConfig } from "@/types/entity";
 import { valuesAsOptions } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-type Location = Database["public"]["Tables"]["locations"]["Row"];
-// Square POS config moved to the bin in 00222 (bins.square_location_id /
-// pos_sales_channel_id); the locations_with_pos view and locations'
-// square_location_id/pos_bin_id columns were dropped. Kept as an alias for
-// back-compat with existing imports.
-export type LocationWithPos = Location;
+// Square POS config lives on the BIN since 00222 (bins.square_location_id /
+// pos_sales_channel_id); that migration dropped the locations_with_pos view and
+// locations' square_location_id/pos_bin_id columns. This entity reads the plain
+// table — there is no computed view, hence no viewTable below.
+export type Location = Database["public"]["Tables"]["locations"]["Row"];
 
 // =============================================================================
 // Zod Schema
@@ -59,10 +58,9 @@ export const LOCATION_TYPES = valuesAsOptions(locationTypeDisplayConfig);
 // Entity Core
 // =============================================================================
 
-export const locationCore: EntityCore<LocationWithPos> = {
+export const locationCore: EntityCore<Location> = {
   name: "location",
   table: "locations",
-  viewTable: "locations",
   displayName: "Location",
   displayNamePlural: "Locations",
   description: "Physical facilities for production, storage, and sales",
