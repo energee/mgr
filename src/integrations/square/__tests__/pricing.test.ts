@@ -152,4 +152,33 @@ describe("resolveChannelPrices", () => {
     const result = await resolveChannelPrices(BRAND_IDS, ["chan-unknown-uuid"]);
     expect(result.get("chan-unknown-uuid")).toEqual([]);
   });
+
+  // A transient DB error must PROPAGATE, not degrade to an empty price map —
+  // the catalog sync would push every variation at $0 to the live register.
+  it("throws on a recipes read error instead of returning an empty price map", async () => {
+    const { admin } = makeAdminMock(
+      { recipes: { data: null, error: { message: "recipes read boom" } } },
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    await expect(resolveChannelPrices(BRAND_IDS, [TAPROOM_ID])).rejects.toMatchObject({
+      message: "recipes read boom",
+    });
+  });
+
+  it("throws on a pricing_tier_prices read error instead of returning an empty price map", async () => {
+    const { admin } = makeAdminMock(
+      {
+        recipes: { data: baseFixtures.recipes, error: null },
+        pricing_tier_prices: { data: null, error: { message: "prices read boom" } },
+      },
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    await expect(resolveChannelPrices(BRAND_IDS, [TAPROOM_ID])).rejects.toMatchObject({
+      message: "prices read boom",
+    });
+  });
 });

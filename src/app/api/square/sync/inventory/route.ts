@@ -29,11 +29,14 @@
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
+import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateSquareSettings } from "@/integrations/square/client";
 import { pushInventoryCounts } from "@/integrations/square/inventory";
 import { getPosBins, requireSquareClient, logSyncFailure } from "@/integrations/square/route-helpers";
 import type { SquareSyncInventory, SquareSyncResult } from "@/integrations/square/types";
+
+const log = logger.child({ route: "/api/square/sync/inventory" });
 
 const EMPTY_RESULT: SquareSyncResult = {
   success: true,
@@ -258,8 +261,10 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     await updateSquareSettings({ last_inventory_sync_at: completedAt });
 
     // 7. Log to square_sync_log — ONE batched insert of the per-bin rows (E2).
+    //    A failed log write must not fail the sync (the push to Square already
+    //    happened), but it must not be SILENT either — log it (observability).
     if (binResults.length > 0) {
-      await admin.from("square_sync_log").insert(
+      const { error: logError } = await admin.from("square_sync_log").insert(
         binResults.map((br) => ({
           sync_type: "inventory_push" as const,
           location_id: br.locationId,
@@ -276,9 +281,12 @@ export const POST = withPermission("integrations:manage", async (_request, { use
           completed_at: completedAt,
         }))
       );
+      if (logError) {
+        log.error({ err: logError.message }, "Failed to write inventory sync log rows");
+      }
     } else {
       // No bins produced counts — log a single entry.
-      await admin.from("square_sync_log").insert({
+      const { error: logError } = await admin.from("square_sync_log").insert({
         sync_type: "inventory_push",
         items_synced: 0,
         items_failed: allErrors.length,
@@ -290,6 +298,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         started_at: startedAt,
         completed_at: completedAt,
       });
+      if (logError) {
+        log.error({ err: logError.message }, "Failed to write inventory sync log row");
+      }
     }
 
     return successResponse({

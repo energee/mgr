@@ -26,12 +26,15 @@
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
+import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateSquareSettings } from "@/integrations/square/client";
 import { pushCatalog, deleteStaleItems } from "@/integrations/square/catalog";
 import { getPosBins, requireSquareClient, logSyncFailure } from "@/integrations/square/route-helpers";
 import { resolveChannelPrices } from "@/integrations/square/pricing";
 import type { SquareSyncProduct, SquareSyncVariation } from "@/integrations/square/types";
+
+const log = logger.child({ route: "/api/square/sync/catalog" });
 
 export const POST = withPermission("integrations:manage", async (_request, { user }) => {
   const guard = await requireSquareClient();
@@ -114,10 +117,15 @@ export const POST = withPermission("integrations:manage", async (_request, { use
 
     let formatNames: Record<string, string> = {};
     if (formatIds.length > 0) {
-      const { data: sfData } = await admin
+      const { data: sfData, error: sfError } = await admin
         .from("selling_formats")
         .select("id, name")
         .in("id", formatIds);
+      // A swallowed failure here would fall back to "Unknown Format" as the
+      // LIVE variation name on every pushed object — throw like brandError.
+      if (sfError) {
+        throw new Error(`Failed to query selling formats: ${sfError.message}`);
+      }
       if (sfData) {
         formatNames = Object.fromEntries(sfData.map((sf) => [sf.id, sf.name]));
       }
@@ -204,10 +212,17 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       channelPriceLookup.set(channelId, brandLookup);
     }
 
-    // 6. Load existing catalog mappings for Square IDs and versions
-    const { data: existingMaps } = await admin
+    // 6. Load existing catalog mappings for Square IDs and versions. A swallowed
+    //    failure here is CATASTROPHIC, not cosmetic: an empty map lookup makes
+    //    every object below push with a temp "#brand-…" id, so Square creates a
+    //    FULL DUPLICATE catalog instead of updating in place — throw like
+    //    binsError/stockError.
+    const { data: existingMaps, error: mapsError } = await admin
       .from("square_catalog_map")
       .select("*");
+    if (mapsError) {
+      throw new Error(`Failed to query catalog mappings: ${mapsError.message}`);
+    }
 
     // Build lookup: "brand-{brandId}" -> mapping, "var-{brandId}-fmt-{id}" -> mapping
     const mapLookup = new Map<string, { squareCatalogId: string; squareVersion: bigint | undefined }>();
@@ -353,8 +368,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
 
     // 11. Log to square_sync_log. Fold stale-delete failures (Square objects that
     //     could not be removed and whose map rows were retained) into items_failed
-    //     so they surface in the count, and record their detail.
-    await admin.from("square_sync_log").insert({
+    //     so they surface in the count, and record their detail. A failed log
+    //     write must not fail the completed sync, but not stay silent either.
+    const { error: logError } = await admin.from("square_sync_log").insert({
       sync_type: "catalog_push",
       items_synced: syncResult.itemsSynced,
       items_failed: syncResult.itemsFailed + staleResult.failed,
@@ -372,6 +388,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       started_at: startedAt,
       completed_at: completedAt,
     });
+    if (logError) {
+      log.error({ err: logError.message }, "Failed to write catalog sync log row");
+    }
 
     return successResponse({
       success: syncResult.success && staleResult.failed === 0,

@@ -20,6 +20,7 @@ import type { NextResponse } from "next/server";
 import type { SquareClient } from "square";
 import type { Database } from "@/types/supabase";
 import { errorResponse } from "@/lib/api/response";
+import { logger } from "@/lib/logger";
 import { getSquareClient } from "./client";
 import type { SquareSyncType } from "./types";
 
@@ -43,7 +44,11 @@ export type AdminClient = SupabaseClient<Database>;
  * @returns the raw { data, error } — the caller decides how strict to be about
  *          the error (the sync routes throw; the status route tolerates null).
  */
-export async function getPosBins<Row>(
+export async function getPosBins<
+  // Constrained to bins columns so a caller cannot cast the untyped dynamic
+  // select into a shape the table can never return.
+  Row extends Partial<Database["public"]["Tables"]["bins"]["Row"]>,
+>(
   admin: AdminClient,
   opts: { select: string; orderBy: string }
 ): Promise<{ data: Row[] | null; error: { message: string } | null }> {
@@ -53,7 +58,7 @@ export async function getPosBins<Row>(
     .not("square_location_id", "is", null)
     .not("pos_sales_channel_id", "is", null)
     .order(opts.orderBy);
-  return { data: data as Row[] | null, error };
+  return { data: data as unknown as Row[] | null, error };
 }
 
 /** Discriminated result of {@link requireSquareClient}. */
@@ -106,7 +111,9 @@ export async function logSyncFailure(
   const message =
     opts.err instanceof Error ? opts.err.message : "Sync failed";
 
-  await admin.from("square_sync_log").insert({
+  // The 500 below is returned regardless, but a failed failure-log write would
+  // otherwise erase the durable record of WHY the sync failed — surface it.
+  const { error: logError } = await admin.from("square_sync_log").insert({
     sync_type: opts.syncType,
     items_synced: 0,
     items_failed: 0,
@@ -114,6 +121,12 @@ export async function logSyncFailure(
     started_at: opts.startedAt,
     completed_at: new Date().toISOString(),
   });
+  if (logError) {
+    logger.error(
+      { err: logError.message, sync_type: opts.syncType, original_failure: message },
+      "Failed to record sync failure in square_sync_log"
+    );
+  }
 
   return errorResponse("SYNC_FAILED", message, undefined, 500);
 }

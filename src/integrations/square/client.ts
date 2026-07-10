@@ -1,5 +1,6 @@
 import { SquareClient } from "square";
 import { createAdminClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 type SquareSettings = {
   accessToken: string;
@@ -96,6 +97,11 @@ export async function listSquareLocations(
 /**
  * Update specific columns on the Square settings singleton row.
  * Uses admin client to bypass RLS.
+ *
+ * A failed write is logged, not thrown: callers use this for last-sync-at
+ * bookkeeping AFTER the sync work already succeeded, so failing the request
+ * over a timestamp would be worse than a stale timestamp — but it must not be
+ * silent either (observability).
  */
 export async function updateSquareSettings(
   updates: Partial<{
@@ -105,8 +111,11 @@ export async function updateSquareSettings(
   }>
 ): Promise<void> {
   const admin = await createAdminClient();
-  await admin
+  const { error } = await admin
     .from("square_settings")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", SINGLETON_ID);
+  if (error) {
+    logger.error({ err: error.message }, "Failed to update square_settings");
+  }
 }

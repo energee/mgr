@@ -226,6 +226,58 @@ describe("catalog sync (bin-driven)", () => {
     );
   });
 
+  it("aborts (500 SYNC_FAILED, no push) when the square_catalog_map read fails — a swallowed error would duplicate the whole catalog", async () => {
+    // With an empty map lookup every object pushes with a temp "#brand-…" id,
+    // creating a FULL DUPLICATE catalog in Square. The read error must abort.
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
+        error: null,
+      },
+      sellable_inventory: {
+        data: [{ bin_id: "bin-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5 }],
+        error: null,
+      },
+      brands: { data: [{ id: "brand-1", name: "Brand One", description: null }], error: null },
+      selling_formats: { data: [{ id: "fmt-1", name: "16oz 4-Pack" }], error: null },
+      square_catalog_map: { data: null, error: { message: "map read boom" } },
+      square_sync_log: { data: null, error: null },
+    });
+    mockedResolveChannelPrices.mockResolvedValue(new Map([["chan-A", []]]));
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error.code).toBe("SYNC_FAILED");
+    expect(body.error.message).toContain("map read boom");
+    expect(mockedPushCatalog).not.toHaveBeenCalled();
+    expect(mockedDeleteStaleItems).not.toHaveBeenCalled();
+  });
+
+  it("aborts (500 SYNC_FAILED, no push) when the selling_formats read fails — would push 'Unknown Format' as live variation names", async () => {
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", square_location_id: "SQ-LOC-1", pos_sales_channel_id: "chan-A" }],
+        error: null,
+      },
+      sellable_inventory: {
+        data: [{ bin_id: "bin-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5 }],
+        error: null,
+      },
+      brands: { data: [{ id: "brand-1", name: "Brand One", description: null }], error: null },
+      selling_formats: { data: null, error: { message: "formats read boom" } },
+      square_sync_log: { data: null, error: null },
+    });
+
+    const res = await catalogPOST(req());
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error.code).toBe("SYNC_FAILED");
+    expect(body.error.message).toContain("formats read boom");
+    expect(mockedPushCatalog).not.toHaveBeenCalled();
+    expect(mockedDeleteStaleItems).not.toHaveBeenCalled();
+  });
+
   it("does NOT wipe the catalog when POS bins are configured but hold no stock", async () => {
     useTables({
       bins: {

@@ -46,15 +46,24 @@ export async function resolveChannelPrices(
   const admin = await createAdminClient();
 
   // 1. Get recipes for these brands that have a pricing_tier_id (channel-
-  //    independent). A brand can have multiple recipes but typically one
-  //    "primary" recipe — the first recipe with a tier wins.
+  //    independent). A brand can have several priced recipes, so row order
+  //    decides its price. ORDER BY makes that deterministic — most recently
+  //    updated recipe wins, id breaking ties — matching how 00191 resolves a
+  //    brand's preferred recipe. Without it Postgres returns a plan-dependent
+  //    order and the brand's live Square price flips between syncs.
   const { data: recipes, error: recipesError } = await admin
     .from("recipes")
     .select("id, brand_id, pricing_tier_id")
     .in("brand_id", brandIds)
-    .not("pricing_tier_id", "is", null);
+    .not("pricing_tier_id", "is", null)
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: true });
 
-  if (recipesError || !recipes || recipes.length === 0) {
+  // A transient read failure must NOT degrade to an empty price map: the
+  // catalog sync would push every variation at $0 to the LIVE register.
+  // Throw so the sync aborts (the route's catch logs + 500s) instead.
+  if (recipesError) throw recipesError;
+  if (!recipes || recipes.length === 0) {
     return result;
   }
 
@@ -79,7 +88,9 @@ export async function resolveChannelPrices(
     .in("pricing_tier_id", tierIds)
     .in("sales_channel_id", salesChannelIds);
 
-  if (pricesError || !tierPrices || tierPrices.length === 0) {
+  // Same $0-catastrophe rationale as recipesError above.
+  if (pricesError) throw pricesError;
+  if (!tierPrices || tierPrices.length === 0) {
     return result;
   }
 
