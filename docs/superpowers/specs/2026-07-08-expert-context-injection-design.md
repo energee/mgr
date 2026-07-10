@@ -19,8 +19,10 @@ The agent-team design assumed these files "are auto-invoked by future sessions"
 (`2026-07-05-expert-agent-team-design.md`, line 19). They are not. **There is no
 autoloader.** A subagent runs only when the `Agent` tool is called with its
 `subagent_type`. "MUST BE USED" in a description is a hint to the model, not a
-trigger the harness fires. Nothing in this repo enforces the `CLAUDE.md` table —
-there are no repo hooks at all.
+trigger the harness fires. Nothing in this repo enforces the `CLAUDE.md` table
+— the only repo-level hook registered on this branch (a `Stop` hook running
+`scripts/check-progress-drift.sh` via `.claude/settings.json`) checks progress
+notes, not expert routing.
 
 Four symptoms follow, all from that one root cause:
 
@@ -54,7 +56,8 @@ hooks in `~/.claude/plugins/marketplaces/ecc/hooks/hooks.json`.
 - **stdout:** `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"<text>"}}`
 - **exit:** always `0`. This hook never denies.
 
-ECC already registers four `PreToolUse` hooks matching `Edit|Write`. Hooks
+ECC already registers its own `PreToolUse` hooks matching `Edit|Write` (several
+at the time of writing — the exact count shifts with plugin updates). Hooks
 compose; ours is additive and must not assume it runs alone.
 
 ### Files
@@ -65,6 +68,7 @@ compose; ours is additive and must not assume it runs alone.
 | `.claude/hooks/expert-context.ts` | new — the hook |
 | `.claude/hooks/expert-context.test.ts` | new — vitest unit test |
 | `.claude/settings.json` | register `PreToolUse` / `Edit\|Write` |
+| `tsconfig.json` | add `".claude/hooks/**/*.ts"` to `include` — tsc wildcards never descend into dot-directories, so the default `**/*.ts` cannot see the hook |
 | `vitest.config.ts` | add `".claude/hooks/**/*.test.ts"` to `include` |
 | `.claude/agents/ai-features-expert.md` | new expert |
 | `.claude/agents/ui-systems-expert.md` | scope: claim `src/hooks/`, `src/contexts/` |
@@ -75,10 +79,14 @@ compose; ours is additive and must not assume it runs alone.
 
 Not Python, for two reasons that were checked rather than assumed:
 
-- `tsconfig.json` includes `**/*.ts` and excludes only `node_modules` and
-  `supabase/functions`, so `.claude/hooks/expert-context.ts` is covered by
-  `bun run typecheck`. A `.py` file is invisible to `lint`, `typecheck`, and
-  `test` — a strange property for the one tool whose job is making code correct.
+- A `.ts` hook can be covered by `bun run typecheck` — but not for free.
+  `tsconfig.json`'s `**/*.ts` include does NOT reach it: tsc wildcards never
+  descend into dot-directories, so anything under `.claude/` is invisible to
+  the default include. The design therefore adds `.claude/hooks/**/*.ts` to
+  the tsconfig `include` array (see the files table), parallel to the vitest
+  `include` addition. A `.py` file, by contrast, is invisible to `lint`,
+  `typecheck`, and `test` no matter what — a strange property for the one tool
+  whose job is making code correct.
 - `bun` executes a zero-import `.ts` file directly. No `bun install`, no build
   step. Verified: piping a hook payload into `bun hooktest.ts` parsed
   `tool_input.file_path` and printed it.
