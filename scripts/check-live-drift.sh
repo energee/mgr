@@ -1,20 +1,29 @@
 #!/usr/bin/env bash
 # scripts/check-live-drift.sh
 #
-# Fails (exit 1) if the LIVE database catalog has drifted from the committed
-# snapshot in supabase/live-catalog.snapshot.txt. Catches the C2/C3 class of
-# bug: enforcement functions/triggers dropped out-of-band on live while the
-# migration rows still read as applied (db push is a no-op), so nothing else
-# notices.
+# Compares the LIVE database catalog against the committed snapshot in
+# supabase/live-catalog.snapshot.txt and classifies the delta:
+#
+#   FAIL (exit 1)  — a snapshot line is missing on live: an expected object
+#                    was dropped or edited out-of-band (the C2/C3 class of
+#                    bug: enforcement functions/triggers removed while the
+#                    migration rows still read as applied, so db push is a
+#                    clean no-op and nothing else notices).
+#   WARN (exit 0)  — live has lines the snapshot lacks, and nothing expected
+#                    is missing: usually an in-flight feature branch applied
+#                    to live before merge, or a merged migration whose
+#                    snapshot update was not committed.
 #
 # What it compares (see scripts/live-catalog.sql): every public function
 # (name + identity args + body hash), every non-internal trigger (name + table
 # + definition hash), and every base table. A body-hash change catches an
 # out-of-band CREATE OR REPLACE (e.g. a racy generate_lot_number swapped in),
-# not just adds/drops.
+# not just adds/drops. A changed object appears on both sides of the delta
+# (old line missing, new line added); the missing side fails the run.
 #
 # The snapshot is the expected live state. When a migration intentionally
-# changes the catalog, regenerate it AFTER applying the migration to live:
+# changes the catalog, regenerate it AFTER applying the migration to live —
+# scripts/db-push.sh does both in one step — or manually:
 #
 #     SUPABASE_DB_URL='postgresql://readonly:***@db.<ref>.supabase.co:5432/postgres' \
 #       bash scripts/check-live-drift.sh --update
@@ -66,22 +75,38 @@ if [[ ! -f "$SNAPSHOT" ]]; then
   exit 2
 fi
 
-# diff exits 1 on differences. '<' lines are in the snapshot but not live
-# (dropped/changed on live = drift); '>' lines are on live but not the snapshot
-# (added out-of-band, or a migration whose snapshot update was not committed).
-if diff_out="$(LC_ALL=C diff "$SNAPSHOT" "$current")"; then
+# Both files are LC_ALL=C sorted, so comm(1) splits the delta cleanly.
+missing="$(LC_ALL=C comm -23 "$SNAPSHOT" "$current")"
+added="$(LC_ALL=C comm -13 "$SNAPSHOT" "$current")"
+
+if [[ -z "$missing" && -z "$added" ]]; then
   echo "OK: live database catalog matches supabase/live-catalog.snapshot.txt."
   exit 0
 fi
 
-echo "::error::Live database has DRIFTED from the migration chain (supabase/live-catalog.snapshot.txt)."
+if [[ -n "$missing" ]]; then
+  echo "::error::Live database has DRIFTED from supabase/live-catalog.snapshot.txt: expected objects are missing or changed on live (C2/C3 class)."
+  echo ""
+  echo "Expected (in snapshot) but missing/changed on live:"
+  echo "$missing" | sed 's/^/  < /'
+  if [[ -n "$added" ]]; then
+    echo ""
+    echo "Live-only lines (new versions of changed objects, or unrelated additions):"
+    echo "$added" | sed 's/^/  > /'
+  fi
+  echo ""
+  echo "If this is a legitimate change, apply the migration to live and regenerate"
+  echo "the snapshot (scripts/db-push.sh does both), then commit"
+  echo "supabase/live-catalog.snapshot.txt. Otherwise: restore the object on live."
+  exit 1
+fi
+
+echo "::warning::Live database has objects not in supabase/live-catalog.snapshot.txt (additions only — nothing expected is missing)."
 echo ""
-echo "  '<' = expected (in snapshot) but MISSING/CHANGED on live  -> likely an out-of-band drop/edit (C2/C3 class)"
-echo "  '>' = present on live but NOT in the snapshot            -> a migration landed without regenerating the snapshot"
+echo "$added" | sed 's/^/  > /'
 echo ""
-echo "$diff_out"
-echo ""
-echo "If this drift is from a legitimate migration, regenerate the snapshot after"
-echo "applying it to live:  SUPABASE_DB_URL=... bash scripts/check-live-drift.sh --update"
-echo "and commit supabase/live-catalog.snapshot.txt in the same PR."
-exit 1
+echo "Usually an in-flight feature branch applied to live before merge (fine), or"
+echo "a merged migration whose snapshot update was never committed — if so run:"
+echo "  SUPABASE_DB_URL=... bash scripts/check-live-drift.sh --update"
+echo "and commit supabase/live-catalog.snapshot.txt."
+exit 0
