@@ -12,6 +12,7 @@ import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateSquareSettings } from "@/integrations/square/client";
+import { getPosBins } from "@/integrations/square/route-helpers";
 
 export const GET = withPermission("integrations:manage", async () => {
   const admin = await createAdminClient();
@@ -35,6 +36,50 @@ export const GET = withPermission("integrations:manage", async () => {
     .order("started_at", { ascending: false })
     .limit(10);
 
+  // 4. POS-config surface: bins that are outbound Square sync targets (both
+  //    square_location_id and pos_sales_channel_id set), with their Square
+  //    location + sales-channel names resolved for display. Names are mapped
+  //    separately (square_locations has no FK from bins) rather than embedded.
+  const { data: posBinRows } = await getPosBins<{
+    id: string;
+    name: string;
+    square_location_id: string | null;
+    pos_sales_channel_id: string | null;
+  }>(admin, { select: "id, name, square_location_id, pos_sales_channel_id", orderBy: "name" });
+
+  const squareLocationIds = [
+    ...new Set((posBinRows ?? []).map((b) => b.square_location_id).filter((v): v is string => !!v)),
+  ];
+  const channelIds = [
+    ...new Set((posBinRows ?? []).map((b) => b.pos_sales_channel_id).filter((v): v is string => !!v)),
+  ];
+
+  const locationNames = new Map<string, string | null>();
+  if (squareLocationIds.length > 0) {
+    const { data: locRows } = await admin
+      .from("square_locations")
+      .select("square_location_id, name")
+      .in("square_location_id", squareLocationIds);
+    for (const l of locRows ?? []) locationNames.set(l.square_location_id, l.name);
+  }
+
+  const channelNames = new Map<string, string>();
+  if (channelIds.length > 0) {
+    const { data: chanRows } = await admin
+      .from("sales_channels")
+      .select("id, name")
+      .in("id", channelIds);
+    for (const c of chanRows ?? []) channelNames.set(c.id, c.name);
+  }
+
+  const posBins = (posBinRows ?? []).map((b) => ({
+    id: b.id,
+    name: b.name,
+    squareLocationId: b.square_location_id,
+    squareLocationName: b.square_location_id ? locationNames.get(b.square_location_id) ?? null : null,
+    channelName: b.pos_sales_channel_id ? channelNames.get(b.pos_sales_channel_id) ?? null : null,
+  }));
+
   return successResponse({
     isEnabled: settings?.is_enabled ?? false,
     lastCatalogSync: settings?.last_catalog_sync_at ?? null,
@@ -48,6 +93,7 @@ export const GET = withPermission("integrations:manage", async () => {
       startedAt: s.started_at,
       completedAt: s.completed_at,
     })),
+    posBins,
   });
 });
 

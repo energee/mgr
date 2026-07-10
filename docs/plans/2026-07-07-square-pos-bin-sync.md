@@ -90,6 +90,9 @@ Highest tracked on main is **00218**; next new migration is **00219**. Verify th
   *Acceptance:* a user can, end to end, refresh locations, pick one for a bin, pick its channel, and sync; `bun lint && bun typecheck`.
 - **C7. `square_catalog_map`** — confirm the single-price model needs no location dimension (it does not for v1). Document that per-location price overrides (future) would add a location dimension here.
   *Acceptance:* note recorded; no schema change in v1.
+  **RECORDED (2026-07-08):** `square_catalog_map` is keyed by `(brand_id, selling_format_id, object_type)` with **no** `square_location_id` column. v1 pushes ONE catalog object per brand/variation shared across all Square locations (single price per variation via `resolveChannelPrices`). Per-location price overrides would add a location dimension to this table. Note lives in `src/integrations/square/catalog.ts` (`pushCatalog` header). No schema change.
+
+**C-remainder SHIPPED (2026-07-08):** C3 (`listSquareLocations` + `POST /api/square/locations/refresh`, upsert-only), C6 (bin entity Square-location + POS-channel pickers; settings "Refresh Locations" action + POS-bins surface via `sync/status`), C7 (above). Milestone C complete → next is **D**.
 
 ---
 

@@ -1,5 +1,6 @@
 import { SquareClient } from "square";
 import { createAdminClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 type SquareSettings = {
   accessToken: string;
@@ -67,9 +68,40 @@ export async function getSquareClient(): Promise<SquareClient | null> {
   });
 }
 
+/** A Square business location normalized for the square_locations table. */
+export type SquareLocationRow = {
+  square_location_id: string;
+  name: string | null;
+  status: string | null;
+};
+
+/**
+ * List the seller's Square business locations (Square `locations.list`),
+ * normalized to square_locations rows. Locations without an `id` are skipped —
+ * `id` is the table's primary key. Includes inactive locations (Square returns
+ * them; `status` is preserved so the UI can distinguish).
+ */
+export async function listSquareLocations(
+  client: SquareClient
+): Promise<SquareLocationRow[]> {
+  const { locations } = await client.locations.list();
+  return (locations ?? [])
+    .filter((loc): loc is typeof loc & { id: string } => !!loc.id)
+    .map((loc) => ({
+      square_location_id: loc.id,
+      name: loc.name ?? null,
+      status: loc.status ?? null,
+    }));
+}
+
 /**
  * Update specific columns on the Square settings singleton row.
  * Uses admin client to bypass RLS.
+ *
+ * A failed write is logged, not thrown: callers use this for last-sync-at
+ * bookkeeping AFTER the sync work already succeeded, so failing the request
+ * over a timestamp would be worse than a stale timestamp — but it must not be
+ * silent either (observability).
  */
 export async function updateSquareSettings(
   updates: Partial<{
@@ -79,8 +111,11 @@ export async function updateSquareSettings(
   }>
 ): Promise<void> {
   const admin = await createAdminClient();
-  await admin
+  const { error } = await admin
     .from("square_settings")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", SINGLETON_ID);
+  if (error) {
+    logger.error({ err: error.message }, "Failed to update square_settings");
+  }
 }

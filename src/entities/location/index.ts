@@ -13,5 +13,5 @@ import { locationPresentation } from "./presentation";
 export const locationEntity = createEntityConfig(locationCore, locationPresentation);
 
 // Re-export the server-safe core surface: locationCore, locationSchema,
-// LocationFormValues, locationTypeDisplayConfig, LOCATION_TYPES, LocationWithPos.
+// LocationFormValues, locationTypeDisplayConfig, LOCATION_TYPES, Location.
 export * from "./core";
