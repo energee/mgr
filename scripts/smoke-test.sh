@@ -163,11 +163,7 @@ suite_production() {
     "document.querySelector('table')?.rows?.length > 1 ? 'has-data' : ''" "has-data"
   screenshot "03-batches-list"
 
-  # Navigate to first batch by extracting its ID from the row
-  local batch_id
-  batch_id=$($B js "document.querySelector('table tbody tr')?.querySelector('[data-row-id]')?.getAttribute('data-row-id') || document.querySelector('table tbody tr td:nth-child(2)')?.textContent?.trim() || ''" 2>&1) || true
-
-  # Navigate directly to batch detail — rows use React router.push, not DOM links
+  # Navigate to batch detail — rows use React router.push, not DOM links
   nav "$BASE/production/batches"
   sleep 1
   # Use browse click on the row which triggers React's onRowClick

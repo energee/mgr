@@ -1,10 +1,11 @@
 name: Live DB Drift Check
 
 # Watchdog: diffs the live database catalog (functions + signatures + body
-# hashes, triggers, tables) against the committed snapshot in
-# supabase/live-catalog.snapshot.txt. Catches the C2/C3 class of bug where
-# enforcement objects are dropped or edited out-of-band on live while db push
-# still reports a clean no-op. See scripts/check-live-drift.sh.
+# hashes, triggers, tables, RLS policies + row-security flags) against the
+# committed snapshot in supabase/live-catalog.snapshot.txt. Catches the C2/C3
+# class of bug where enforcement objects are dropped or edited out-of-band on
+# live while db push still reports a clean no-op. See
+# scripts/check-live-drift.sh.
 #
 # Severity is classified: objects the snapshot expects that are missing or
 # changed on live FAIL the run; live-only additions (usually an in-flight
@@ -26,6 +27,9 @@ on:
     - cron: '0 12 * * *' # daily 12:00 UTC
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   live-drift:
     name: Live catalog vs migration chain
@@ -42,7 +46,13 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           if [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::warning::SUPABASE_DB_URL secret is not configured; skipping live-drift check."
+            # On the schedule this workflow IS the only drift net: a rotated or
+            # deleted secret must fail loudly, not turn the cron green forever.
+            if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+              echo "::error::SUPABASE_DB_URL secret is not configured (rotated/deleted?) — the scheduled live-drift watchdog cannot run. Restore the read-only connection-string secret."
+              exit 1
+            fi
+            echo "::warning::SUPABASE_DB_URL secret is not configured; skipping live-drift check (non-schedule run)."
             exit 0
           fi
           bash scripts/check-live-drift.sh
