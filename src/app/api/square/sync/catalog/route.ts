@@ -491,7 +491,9 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     }
 
     return successResponse({
-      success: syncResult.success && staleResult.failed === 0,
+      // staleResult.errors also covers the failed===0 case where the stale-entry
+      // SELECT itself failed (chunk -1) and cleanup never ran — not a success.
+      success: syncResult.success && staleResult.failed === 0 && staleResult.errors.length === 0,
       itemsSynced: syncResult.itemsSynced,
       itemsFailed: syncResult.itemsFailed + staleResult.failed,
       staleDeleted: staleResult.deleted,
