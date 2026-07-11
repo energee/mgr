@@ -15,6 +15,7 @@
 import { Controller } from "react-hook-form";
 import { FieldDisplay } from "./field-display";
 import { FieldInput } from "./field-input";
+import { createModeStateOptions } from "@/types/entity";
 import type { UnifiedFieldDef, EntityConfig } from "@/types/entity";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -63,6 +64,27 @@ export function isFieldEditable(
   return true;
 }
 
+/**
+ * Whether this field is a state-machine state field being rendered in create
+ * mode. Such fields may only offer the machine's initial state — creating a
+ * record directly in a later state bypasses transition validation and side
+ * effects (audit EA-1; see createModeStateOptions in types/entity.ts).
+ *
+ * Exported for the entity-registry test that asserts every create-editable
+ * state select is clamped (src/entities/__tests__/create-mode-state.test.ts).
+ */
+export function isCreateModeStateField(
+  field: UnifiedFieldDef<Record<string, unknown>>,
+  isCreateMode: boolean,
+  entity?: EntityConfig<Record<string, unknown>>,
+): boolean {
+  return (
+    isCreateMode &&
+    !!entity?.stateMachine &&
+    field.name === entity.stateMachine.stateField
+  );
+}
+
 export function UnifiedField({
   field,
   editing,
@@ -73,6 +95,18 @@ export function UnifiedField({
   relationDisplayValues,
   dynamicOptions,
 }: UnifiedFieldProps) {
+  // Create mode: clamp the state field's choices to the initial state (EA-1).
+  // dynamicOptions are suppressed for it too — FieldInput prefers them over
+  // static options, which would defeat the clamp.
+  const stateClamped = isCreateModeStateField(field, isCreateMode, entity);
+  const effectiveField =
+    stateClamped && entity.stateMachine
+      ? {
+          ...field,
+          options: createModeStateOptions(entity.stateMachine, field.options),
+        }
+      : field;
+
   if (isFieldEditable(field, editing, isCreateMode, entity) && form) {
     return (
       <Controller
@@ -80,12 +114,12 @@ export function UnifiedField({
         name={field.name}
         render={({ field: formField, fieldState }) => (
           <FieldInput
-            field={field}
+            field={effectiveField}
             value={formField.value}
             error={fieldState.error?.message}
             onChange={formField.onChange}
             disabled={field.disabled}
-            dynamicOptions={dynamicOptions}
+            dynamicOptions={stateClamped ? undefined : dynamicOptions}
           />
         )}
       />
