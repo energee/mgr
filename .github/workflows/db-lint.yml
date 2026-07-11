@@ -52,7 +52,7 @@ jobs:
       # (v2.107+): a --db-url without sslmode is treated as remote and tried
       # TLS-only with no plaintext fallback, so it can never reach the plain
       # postgres service container. psql/libpq accepts the param unchanged.
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
 
     steps:
       - name: Checkout repository
