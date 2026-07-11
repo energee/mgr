@@ -1,0 +1,210 @@
+/**
+ * MongoDB sync orchestrator tests — syncRecipes destructive re-sync safety
+ * (audit SF-5).
+ *
+ * syncRecipes is delete-then-rebuild (recipes + recipe_malts/hops/yeasts have
+ * no UNIQUE(name) to upsert against). These tests pin the hardened contract:
+ *
+ *   (1) Happy path: all FK lookups resolve, junctions cleared then rebuilt
+ *       with resolved PG UUIDs, sync log completed as success.
+ *   (2) A FAILED FK-lookup read (Supabase error) aborts BEFORE any delete —
+ *       previously a transient read failure was treated as "no rows" and every
+ *       recipe was rebuilt with NULL FKs after the originals were gone.
+ *   (3) An EMPTY lookup map that the Mongo data references (e.g. phase 1 never
+ *       ran, so `brands` is empty) also refuses the destructive rebuild.
+ *
+ * createAdminClient is faked with the shared admin mock
+ * (src/test/supabase-admin-mock.ts); the Mongo Db handle with a tiny
+ * collection stub. The logger is silenced.
+ */
+
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { ObjectId, type Db } from "mongodb";
+import { makeAdminMock, type TableData, type Write } from "@/test/supabase-admin-mock";
+
+vi.mock("@/lib/supabase/server", () => ({
+  createAdminClient: vi.fn(),
+  createClient: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock("../client", () => ({
+  getMongoDb: vi.fn(),
+  getMongoClient: vi.fn(),
+  closeMongoClient: vi.fn(),
+  testConnection: vi.fn(),
+}));
+
+import { createAdminClient } from "@/lib/supabase/server";
+import { getMongoDb } from "../client";
+import { syncEntity } from "../sync";
+
+const mockedCreateAdminClient = vi.mocked(createAdminClient);
+const mockedGetMongoDb = vi.mocked(getMongoDb);
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+const STYLE_OID = new ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa");
+const BEER_OID = new ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb");
+const MALT_OID = new ObjectId("cccccccccccccccccccccccc");
+const HOP_OID = new ObjectId("dddddddddddddddddddddddd");
+const YEAST_OID = new ObjectId("eeeeeeeeeeeeeeeeeeeeeeee");
+const RECIPE_OID = new ObjectId("ffffffffffffffffffffffff");
+
+/** One Mongo recipe referencing every FK-lookup kind (style/brand/malt/hop/yeast). */
+const MONGO_COLLECTIONS: Record<string, unknown[]> = {
+  recipes: [
+    {
+      _id: RECIPE_OID,
+      name: "Hazy IPA",
+      beer: BEER_OID,
+      style: STYLE_OID,
+      yeast: YEAST_OID,
+      malts: [{ malt: MALT_OID, weight: 10 }],
+      hops: [{ hop: HOP_OID, weight: 1, hopTiming: "dry-hop" }],
+    },
+  ],
+  styles: [{ _id: STYLE_OID, name: "IPA" }],
+  beers: [{ _id: BEER_OID, name: "Cloud Cover" }],
+  malts: [{ _id: MALT_OID, name: "Pilsner" }],
+  hops: [{ _id: HOP_OID, name: "Citra" }],
+  yeasts: [{ _id: YEAST_OID, name: "London Ale III" }],
+};
+
+/** Minimal Mongo Db stub: collection(name).find()[.sort()].toArray(). */
+function makeDb(collections: Record<string, unknown[]>): Db {
+  const cursor = (name: string) => ({
+    toArray: async () => collections[name] ?? [],
+    sort: () => ({ toArray: async () => collections[name] ?? [] }),
+  });
+  return {
+    collection: (name: string) => ({ find: () => cursor(name) }),
+  } as unknown as Db;
+}
+
+/** PG tables with every FK lookup resolving; override per test. */
+function pgTables(overrides: TableData = {}): TableData {
+  return {
+    mongodb_sync_log: { data: { id: "log-1" }, error: null },
+    beer_styles: { data: [{ id: "pg-style-1", name: "IPA" }], error: null },
+    brands: { data: [{ id: "pg-brand-1", name: "Cloud Cover" }], error: null },
+    malts: { data: [{ id: "pg-malt-1", name: "Pilsner" }], error: null },
+    hops: { data: [{ id: "pg-hop-1", name: "Citra" }], error: null },
+    yeasts: { data: [{ id: "pg-yeast-1", name: "London Ale III" }], error: null },
+    // Served to the post-insert name → UUID read for junction FKs.
+    recipes: { data: [{ id: "pg-recipe-1", name: "Hazy IPA" }], error: null },
+    recipe_malts: { data: [], error: null },
+    recipe_hops: { data: [], error: null },
+    recipe_yeasts: { data: [], error: null },
+    ...overrides,
+  };
+}
+
+function setup(overrides: TableData = {}): Write[] {
+  const { admin, writes } = makeAdminMock(pgTables(overrides), { onUnknownTable: "throw" });
+  mockedCreateAdminClient.mockResolvedValue(admin as never);
+  mockedGetMongoDb.mockResolvedValue(makeDb(MONGO_COLLECTIONS));
+  return writes;
+}
+
+const deletes = (writes: Write[]) => writes.filter((w) => w.op === "delete");
+const upsertFor = (writes: Write[], table: string) =>
+  writes.find((w) => w.op === "upsert" && w.table === table);
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("syncRecipes (via syncEntity)", () => {
+  it("rebuilds recipes + junctions with resolved FKs; deletes happen only after verified reads", async () => {
+    const writes = setup();
+
+    const result = await syncEntity("recipes");
+
+    // All four tables cleared, in junction-first order.
+    expect(deletes(writes).map((w) => w.table)).toEqual([
+      "recipe_malts",
+      "recipe_hops",
+      "recipe_yeasts",
+      "recipes",
+    ]);
+    // Deletes precede the recipes rebuild insert.
+    const firstDeleteIdx = writes.findIndex((w) => w.op === "delete");
+    const recipesUpsertIdx = writes.findIndex((w) => w.op === "upsert" && w.table === "recipes");
+    expect(firstDeleteIdx).toBeGreaterThan(-1);
+    expect(recipesUpsertIdx).toBeGreaterThan(firstDeleteIdx);
+
+    // Recipe row carries resolved style + brand FKs.
+    expect(upsertFor(writes, "recipes")?.row).toEqual([
+      expect.objectContaining({
+        name: "Hazy IPA",
+        style_id: "pg-style-1",
+        brand_id: "pg-brand-1",
+      }),
+    ]);
+
+    // Junction rows carry the post-insert recipe UUID and resolved ingredient UUIDs.
+    expect(upsertFor(writes, "recipe_malts")?.row).toEqual([
+      { recipe_id: "pg-recipe-1", malt_id: "pg-malt-1", weight_lbs: 10, position: 0 },
+    ]);
+    expect(upsertFor(writes, "recipe_hops")?.row).toEqual([
+      {
+        recipe_id: "pg-recipe-1",
+        hop_id: "pg-hop-1",
+        weight_oz: 16,
+        timing: "dry_hop",
+        boil_time_min: null,
+        position: 0,
+      },
+    ]);
+    expect(upsertFor(writes, "recipe_yeasts")?.row).toEqual([
+      { recipe_id: "pg-recipe-1", yeast_id: "pg-yeast-1", is_primary: true, position: 0 },
+    ]);
+
+    // 1 recipe + 3 junction rows, no failures; sync log completed as success.
+    expect(result).toMatchObject({ entityType: "recipes", synced: 4, failed: 0, errors: [] });
+    expect(writes.at(-1)).toMatchObject({
+      table: "mongodb_sync_log",
+      op: "update",
+      row: expect.objectContaining({ status: "success", records_synced: 4 }),
+    });
+  });
+
+  it("aborts BEFORE any delete when a FK-lookup read fails (no NULL-FK rebuild)", async () => {
+    const writes = setup({
+      brands: { data: null, error: { message: "connection reset" } },
+    });
+
+    await expect(syncEntity("recipes")).rejects.toThrow(
+      /Failed to read brands for FK resolution: connection reset/
+    );
+
+    // Nothing was deleted and nothing was rebuilt — only the sync-log insert ran.
+    expect(deletes(writes)).toEqual([]);
+    expect(writes.filter((w) => w.op === "upsert")).toEqual([]);
+    expect(writes.map((w) => w.table)).toEqual(["mongodb_sync_log"]);
+  });
+
+  it("refuses the destructive rebuild when a referenced lookup resolves 0 entries", async () => {
+    // brands read succeeds but is empty (e.g. phase 2 brands sync never ran)
+    // while the Mongo recipes reference a beer — rebuilding would null every
+    // brand FK after the delete.
+    const writes = setup({ brands: { data: [], error: null } });
+
+    await expect(syncEntity("recipes")).rejects.toThrow(
+      /Refusing destructive recipe re-sync: brands lookup resolved 0 entries/
+    );
+
+    expect(deletes(writes)).toEqual([]);
+    expect(writes.filter((w) => w.op === "upsert")).toEqual([]);
+  });
+});
