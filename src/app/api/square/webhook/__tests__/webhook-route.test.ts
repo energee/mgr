@@ -23,14 +23,18 @@
  *        sale drained the bin first (clamped: true, shortfallQty 0).
  *
  * Also pins the invariants the milestone must not break: race-safe
- * payment-id dedup (duplicate = no side effects), a transient dedup-claim DB
- * error surfacing as 500 (not a silent skip), non-COMPLETED payments ignored,
- * unmapped-location flagging, a debit RPC error marking the line FAILED, and
- * draft (keg) staging into square_draft_sales with the bin's MGR location_id.
+ * payment-id dedup (COMPLETED duplicate = 200 + no side effects; unfinished
+ * fresh claim = 503 so Square keeps retrying — audit IN-1), a transient
+ * dedup-claim DB error surfacing as 500 (not a silent skip), non-COMPLETED
+ * payments ignored, unmapped-location flagging, a debit RPC or catalog-map
+ * read error marking the line FAILED (audit SF-1), draft (keg) staging into
+ * square_draft_sales with the bin's MGR location_id, and the per-event-type
+ * replay window (payment.* = 24h retry horizon, others ±5 min — audit IN-2).
  *
  * The Supabase admin client is faked with the shared admin mock
- * (src/test/supabase-admin-mock.ts). Signature verification and the replay window
- * are stubbed to pass so the handler body is exercised directly.
+ * (src/test/supabase-admin-mock.ts). Signature verification is stubbed to
+ * pass; the replay-window check is the REAL implementation so the
+ * per-event-type window selection is genuinely exercised.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -57,10 +61,13 @@ vi.mock("@/integrations/square/client", () => ({
   getSquareSettings: vi.fn(),
 }));
 
-vi.mock("@/integrations/square/webhook", () => ({
-  verifyWebhookSignature: vi.fn().mockReturnValue(true),
-  checkReplayWindow: vi.fn().mockReturnValue({ ok: true }),
-}));
+vi.mock("@/integrations/square/webhook", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/integrations/square/webhook")>();
+  return {
+    ...actual, // real checkReplayWindow + window constants (IN-2 tests below)
+    verifyWebhookSignature: vi.fn().mockReturnValue(true),
+  };
+});
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, getSquareSettings } from "@/integrations/square/client";
@@ -92,6 +99,13 @@ type AdminOpts = {
    * duplicate stays a duplicate unless a test opts in.
    */
   takeoverResult?: QueryResult;
+  /**
+   * Result of the claim-STATUS read (select-only chain filtered on
+   * square_payment_id) that tells a COMPLETED duplicate (→ 200) from an
+   * in-flight unfinished claim (→ 503, audit IN-1). Defaults to a completed
+   * claim, so a duplicate is a genuine duplicate unless a test opts in.
+   */
+  claimStatusResult?: QueryResult;
 };
 
 /** Every write the handler performs, in order. Re-created by useTables. */
@@ -104,6 +118,7 @@ let rpcResponse: QueryResult = { data: [{ new_quantity: 5, clamped: false }], er
 function useTables(tables: TableData, opts: AdminOpts = {}) {
   const claims = opts.claimQueue ? [...opts.claimQueue] : undefined;
   const takeover = opts.takeoverResult ?? CLAIM_DUP; // default: no stale claim to steal
+  const claimStatus = opts.claimStatusResult ?? CLAIM_STATUS_COMPLETED;
   const fallback = tables.square_sync_log;
   const mock = makeAdminMock(
     {
@@ -114,6 +129,14 @@ function useTables(tables: TableData, opts: AdminOpts = {}) {
         // filters on started_at (.lt) — distinguish it from the finalize
         // UPDATE (which filters .eq("id", …) only).
         if (ops.includes("update") && calls.some((c) => c.method === "lt")) return takeover;
+        // The claim-status read is the only WRITE-FREE square_sync_log chain
+        // filtered on square_payment_id (completed duplicate vs in-flight).
+        if (
+          ops.length === 0 &&
+          calls.some((c) => c.method === "eq" && c.args[0] === "square_payment_id")
+        ) {
+          return claimStatus;
+        }
         return fallback as QueryResult;
       },
     },
@@ -167,6 +190,15 @@ function post(event: unknown) {
 
 const CLAIM_OK: QueryResult = { data: [{ id: "log-1" }], error: null };
 const CLAIM_DUP: QueryResult = { data: [], error: null };
+/** Claim-status read: the existing claim finished — a genuine duplicate. */
+const CLAIM_STATUS_COMPLETED: QueryResult = {
+  data: { completed_at: "2026-01-01T00:00:10.000Z", started_at: "2026-01-01T00:00:00.000Z" },
+  error: null,
+};
+/** Claim-status read: unfinished and fresh — in flight (or a recent crash). */
+function claimStatusInFlight(): QueryResult {
+  return { data: { completed_at: null, started_at: new Date().toISOString() }, error: null };
+}
 const BIN_SQ_LOC_1: QueryResult = {
   data: { id: "bin-1", location_id: "loc-1", pos_sales_channel_id: "chan-A" },
   error: null,
@@ -504,9 +536,10 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
     expect(finalize.row).toMatchObject({ items_synced: 1 });
   });
 
-  it("fresh duplicate claim is NOT taken over — still a no-op dedup skip", async () => {
+  it("duplicate of a COMPLETED claim ACKs 200 — a no-op dedup skip", async () => {
     // Default takeoverResult = empty (the conditional UPDATE matched no stale
-    // row): the duplicate stays a duplicate and produces no side effects.
+    // row) and default claim status = COMPLETED: a genuine duplicate delivery.
+    // Only a FINISHED claim may 200; see the in-flight test below (IN-1).
     useTables(
       {
         square_sync_log: CLAIM_OK,
@@ -520,8 +553,44 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
 
     const res = await post(EVENT);
     expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
     expect(rpcCalls).toHaveLength(0);
     expect(writes.some((w) => w.table === "allocations")).toBe(false);
+  });
+
+  it("unfinished-but-fresh claim (in flight) returns 503 with Retry-After — never a 200 that marks the sale delivered (IN-1)", async () => {
+    // The claim upsert dups, the takeover matches no row (not stale yet), and
+    // the claim never completed: its owner may still be running — or crashed
+    // seconds ago. A 200 would make Square mark the event delivered and the
+    // sale would be permanently lost on a crash; 503 keeps Square's retry
+    // stream alive until the claim completes (→ 200) or goes stale (→
+    // takeover re-processes).
+    useTables(
+      {
+        square_sync_log: CLAIM_OK,
+        bins: BIN_SQ_LOC_1,
+        square_catalog_map: MAP_PACKAGED,
+        bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+        allocations: { data: null, error: null },
+      },
+      { claimQueue: [CLAIM_DUP], claimStatusResult: claimStatusInFlight() }
+    );
+
+    const res = await post(EVENT);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "sale_claim_in_flight" });
+
+    // Retry-After hints when the claim becomes stale enough to take over
+    // (fresh claim → ~STALE_CLAIM_MS = 15 min).
+    const retryAfter = Number(res.headers.get("Retry-After"));
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(15 * 60);
+
+    // No side effects — and the claim row is NOT freed: it belongs to the
+    // in-flight owner (only the failure path of the OWNING attempt deletes).
+    expect(rpcCalls).toHaveLength(0);
+    expect(writes.some((w) => w.table === "allocations")).toBe(false);
+    expect(writes.some((w) => w.table === "square_sync_log" && w.op === "delete")).toBe(false);
   });
 
   it("same sale delivered twice (payment.created then payment.updated, both COMPLETED) debits exactly ONCE", async () => {
@@ -590,6 +659,38 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
     expect(finalize.items_synced).toBe(0);
     expect(finalize.items_failed).toBe(1);
     expect(finalize.details.errors?.[0].error).toContain("boom");
+  });
+
+  it("transient square_catalog_map read error marks the line FAILED — not silently skipped as a non-MGR product (SF-1)", async () => {
+    // The mapping read used to leave `error` undestructured: a transient DB
+    // failure read as `mapping == null` — indistinguishable from "not an MGR
+    // product" — and the line was `continue`-skipped under a 200, losing the
+    // sale line invisibly. It must surface through the per-line catch like
+    // every other read in the handler.
+    useTables({
+      square_sync_log: CLAIM_OK,
+      bins: BIN_SQ_LOC_1,
+      square_catalog_map: { data: null, error: { message: "mapping read boom" } },
+      bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+      allocations: { data: null, error: null },
+    });
+
+    const res = await post(EVENT);
+    // Per-line data problem: the sale as a whole still ACKs 200, but the line
+    // is FAILED and durably surfaced — never a silent skip.
+    expect(res.status).toBe(200);
+
+    expect(rpcCalls).toHaveLength(0);
+    expect(writes.some((w) => w.table === "allocations")).toBe(false);
+
+    const finalize = writes.find((w) => w.table === "square_sync_log" && w.op === "update")!.row as {
+      items_synced: number;
+      items_failed: number;
+      details: { errors?: Array<{ error: string }> };
+    };
+    expect(finalize.items_synced).toBe(0);
+    expect(finalize.items_failed).toBe(1);
+    expect(finalize.details.errors?.[0].error).toContain("mapping read boom");
   });
 
   it("dedup-claim DB error returns 500 (not a silent 200 skip)", async () => {
@@ -773,6 +874,65 @@ describe("inventory.count.updated — inbound event logging", () => {
 
     const res = await post({ ...COUNT_EVENT, event_id: undefined });
     expect(res.status).toBe(200);
+    expect(writes.some((w) => w.table === "square_sync_log")).toBe(false);
+  });
+});
+
+describe("per-event-type replay window (IN-2)", () => {
+  // The route runs the REAL checkReplayWindow (only signature verification is
+  // stubbed), so these exercise the actual window selection end-to-end.
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
+
+  const PACKAGED_TABLES = {
+    square_sync_log: CLAIM_OK,
+    bins: BIN_SQ_LOC_1,
+    square_catalog_map: MAP_PACKAGED,
+    bin_inventory: { data: [lot("fg-1", 10, "2024-01-01")], error: null },
+    allocations: { data: null, error: null },
+  };
+
+  it("payment event older than 5 min but inside the 24h retry horizon is PROCESSED, not ignored", async () => {
+    // A >5-min outage makes Square's retries arrive late; the order-keyed
+    // dedup claim (UNIQUE, 00224/00233) already guarantees exactly-once for
+    // payment events, so late retries are safe to ingest — dropping them
+    // permanently lost the sale.
+    useTables(PACKAGED_TABLES);
+
+    const res = await post({ ...EVENT, created_at: hoursAgo(6) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+
+    // Genuinely processed: claim written, bin debited, allocation recorded.
+    expect(rpcCalls).toHaveLength(1);
+    expect(writes.filter((w) => w.table === "allocations")).toHaveLength(1);
+  });
+
+  it("payment event beyond the 25h horizon is still acknowledged-and-ignored", async () => {
+    useTables(PACKAGED_TABLES);
+
+    const res = await post({ ...EVENT, created_at: hoursAgo(26) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true, ignored: "stale_event" });
+
+    // Rejected before any side effect.
+    expect(rpcCalls).toHaveLength(0);
+    expect(writes).toHaveLength(0);
+  });
+
+  it("non-payment event (inventory.count.updated) keeps the tight ±5-min window — 10 min old is ignored", async () => {
+    // inventory.count.updated has no unconditional dedup key (event_id may be
+    // absent), so it must NOT inherit the widened payment window.
+    useTables({ square_sync_log: { data: null, error: null } });
+
+    const res = await post({
+      merchant_id: "MERCHANT-1",
+      type: "inventory.count.updated",
+      event_id: "evt-count-late",
+      created_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      data: { type: "inventory_count", id: "obj-1", object: {} },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true, ignored: "stale_event" });
     expect(writes.some((w) => w.table === "square_sync_log")).toBe(false);
   });
 });

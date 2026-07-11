@@ -274,7 +274,8 @@ export default function ProductionTimelinePage() {
     queryKey: entityKeys.list("brands"),
     queryFn: async () => {
       return await unwrap(
-        supabase.from("brands").select("id, name").eq("is_active", true).order("name")
+        // brands has no is_active column — filtering on it 400s and killed this filter
+        supabase.from("brands").select("id, name").order("name")
       );
     },
   });

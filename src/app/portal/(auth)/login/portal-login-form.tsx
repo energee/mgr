@@ -15,6 +15,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import { otpSignInErrorMessage } from "@/lib/auth-utils";
 import { OtpCodeInput, OTP_LENGTH } from "@/components/auth/otp-code-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +46,9 @@ export function PortalLoginForm() {
       },
     });
     if (error) {
-      toast.error(error.message);
+      // Unknown email → Supabase's raw "Signups not allowed for otp" is
+      // mapped to a friendly "no account" message (shared with staff login).
+      toast.error(otpSignInErrorMessage(error.message));
       return false;
     }
     return true;

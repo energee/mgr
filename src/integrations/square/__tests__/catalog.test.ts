@@ -1,7 +1,18 @@
 /**
- * Square catalog helper tests — deleteStaleItems (data-loss + chunking guards).
+ * Square catalog helper tests — pushCatalog mapping persistence and
+ * deleteStaleItems (data-loss + chunking guards).
  *
- * Covers the two defects fixed in deleteStaleItems:
+ * pushCatalog (audit SF-4/IN-8 + PERF-1): the square_catalog_map write is ONE
+ * batched, error-checked upsert targeting the 00236 unique index
+ * (brand_id, object_type, selling_format_id) NULLS NOT DISTINCT:
+ *   (1) success persists every ITEM + ITEM_VARIATION mapping in a single call
+ *       and counts them all in itemsSynced;
+ *   (2) an upsert failure marks EVERY row in the batch failed, surfaces the
+ *       error per row, and counts NONE in itemsSynced — a silently dropped
+ *       mapping makes the next sync push temp "#brand-…" ids and duplicate the
+ *       whole Square catalog.
+ *
+ * deleteStaleItems:
  *   (1) A Square batchDelete failure must NOT delete the local square_catalog_map
  *       rows — otherwise the Square objects survive but MGR forgets their ids, so
  *       the next sync recreates them as duplicates. The failed chunk's map rows
@@ -9,6 +20,9 @@
  *   (2) The Square delete is chunked (Square caps object_ids at 200; we chunk at
  *       100). A chunk that fails retains its map rows while succeeded chunks still
  *       drop theirs.
+ *   (3) A failure of the initial stale-entry SELECT is surfaced as a chunk -1
+ *       error (SF-6/IN-11) while deletion stays fail-safely skipped — previously
+ *       it was folded into the silent empty-result return.
  *
  * createAdminClient is faked with the shared admin mock (src/test/supabase-admin-mock.ts);
  * the Square SDK client with a small in-memory stub. The client-logger is silenced.
@@ -16,7 +30,8 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { SquareClient } from "square";
-import { makeAdminMock, type Write } from "@/test/supabase-admin-mock";
+import type { SquareSyncProduct } from "@/integrations/square/types";
+import { makeAdminMock, type QueryResult, type Write } from "@/test/supabase-admin-mock";
 
 vi.mock("@/lib/supabase/server", () => ({
   createAdminClient: vi.fn(),
@@ -28,7 +43,7 @@ vi.mock("@/lib/client-logger", () => ({
 }));
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { deleteStaleItems } from "@/integrations/square/catalog";
+import { pushCatalog, deleteStaleItems } from "@/integrations/square/catalog";
 
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 
@@ -77,6 +92,95 @@ function makeClient(calls: string[][], failOnCall?: number): SquareClient {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+// =============================================================================
+// pushCatalog — batched, error-checked square_catalog_map upsert (SF-4/IN-8)
+// =============================================================================
+
+/** Admin whose square_catalog_map upsert resolves to `response`. */
+function useCatalogMapResponse(response: QueryResult): Write[] {
+  const { admin, writes } = makeAdminMock({ square_catalog_map: response });
+  mockedCreateAdminClient.mockResolvedValue(admin as never);
+  return writes;
+}
+
+/** One brand with one variation — produces one ITEM + one ITEM_VARIATION row. */
+const PRODUCT: SquareSyncProduct = {
+  brandId: "b1",
+  brandName: "Brand One",
+  variations: [{ sellingFormatId: "f1", name: "16oz 4-Pack", priceCents: 1000 }],
+};
+
+/** Square's batchUpsert response: temp-id mappings + versioned objects. */
+const BATCH_RESPONSE = {
+  idMappings: [
+    { clientObjectId: "#brand-b1", objectId: "SQ-ITEM-1" },
+    { clientObjectId: "#var-b1-fmt-f1", objectId: "SQ-VAR-1" },
+  ],
+  objects: [
+    {
+      type: "ITEM",
+      id: "SQ-ITEM-1",
+      version: BigInt(3),
+      itemData: { variations: [{ id: "SQ-VAR-1", version: BigInt(4) }] },
+    },
+  ],
+};
+
+function makePushClient(): SquareClient {
+  return {
+    catalog: { batchUpsert: async () => BATCH_RESPONSE },
+  } as unknown as SquareClient;
+}
+
+describe("pushCatalog", () => {
+  it("persists all mappings in ONE batched upsert onto the 00236 key and counts them synced", async () => {
+    const writes = useCatalogMapResponse({ data: [], error: null });
+
+    const result = await pushCatalog(makePushClient(), [PRODUCT]);
+
+    // ONE upsert (not 2N inserts/updates — PERF-1), carrying both rows and
+    // targeting the NULLS NOT DISTINCT unique index by its column list.
+    const upserts = writes.filter((w) => w.table === "square_catalog_map" && w.op === "upsert");
+    expect(upserts).toHaveLength(1);
+    expect(writes).toHaveLength(1);
+    expect(upserts[0].options).toEqual({ onConflict: "brand_id,object_type,selling_format_id" });
+    expect(upserts[0].row).toEqual([
+      expect.objectContaining({
+        brand_id: "b1",
+        selling_format_id: null, // ITEM rows carry NULL — collides via NULLS NOT DISTINCT
+        square_catalog_id: "SQ-ITEM-1",
+        square_version: 3,
+        object_type: "ITEM",
+      }),
+      expect.objectContaining({
+        brand_id: "b1",
+        selling_format_id: "f1",
+        square_catalog_id: "SQ-VAR-1",
+        square_version: 4,
+        object_type: "ITEM_VARIATION",
+      }),
+    ]);
+
+    expect(result).toEqual({ success: true, itemsSynced: 2, itemsFailed: 0, errors: [] });
+  });
+
+  it("on upsert failure marks EVERY row in the batch failed and counts NONE synced", async () => {
+    // A silently-unpersisted mapping is the duplicate-catalog vector: the next
+    // sync would push temp "#brand-…" ids and Square would create everything anew.
+    useCatalogMapResponse({ data: null, error: { message: "upsert boom" } });
+
+    const result = await pushCatalog(makePushClient(), [PRODUCT]);
+
+    expect(result.success).toBe(false);
+    expect(result.itemsSynced).toBe(0);
+    expect(result.itemsFailed).toBe(2);
+    expect(result.errors).toEqual([
+      { itemId: "b1", error: "catalog map upsert failed: upsert boom" },
+      { itemId: "b1/fmt-f1", error: "catalog map upsert failed: upsert boom" },
+    ]);
+  });
 });
 
 describe("deleteStaleItems", () => {
@@ -129,6 +233,24 @@ describe("deleteStaleItems", () => {
     expect(result.deleted).toBe(100);
     expect(result.failed).toBe(50);
     expect(result.errors).toHaveLength(1);
+  });
+
+  it("surfaces a stale-entry SELECT failure as a chunk -1 error and deletes NOTHING (fail-safe)", async () => {
+    // SF-6/IN-11: previously the SELECT error was folded into the silent
+    // empty-result return — the route reported success while cleanup never ran.
+    const writes = useCatalogMapResponse({ data: null, error: { message: "select boom" } });
+    const deleteCalls: string[][] = [];
+
+    const result = await deleteStaleItems(makeClient(deleteCalls), ["keep-brand"]);
+
+    expect(result.deleted).toBe(0);
+    expect(result.failed).toBe(0);
+    expect(result.errors).toEqual([
+      { chunk: -1, error: "stale-entry select failed: select boom" },
+    ]);
+    // Fail-safe: nothing was deleted on Square OR locally.
+    expect(deleteCalls).toEqual([]);
+    expect(deletedIds(writes)).toEqual([]);
   });
 
   it("deletes every chunk's rows when all Square deletes succeed", async () => {
