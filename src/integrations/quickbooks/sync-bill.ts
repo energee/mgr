@@ -1,6 +1,14 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 import { qboClient } from "./client";
-import { getMapping, upsertMapping, createSyncLog, updateSyncLog, getDefaultPaymentTermsDays } from "./sync-utils";
+import {
+  getMapping,
+  getMappingOrLogFailure,
+  upsertMapping,
+  createSyncLog,
+  updateSyncLog,
+  getDefaultPaymentTermsDays,
+} from "./sync-utils";
 import { syncSupplier } from "./sync-supplier";
 import type { QBOBill, QBOBillLine, QBOEntityResponse } from "./types";
 
@@ -52,11 +60,18 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
   }
   const accountRef = { value: cogsMapping.qbo_account_id };
 
-  // Fetch PO line items
-  const { data: lineItems } = await admin
+  // Fetch PO line items. A failed READ must throw here: treating it as
+  // "no items" used to fall through to the shipping-only branch below and
+  // create a Bill with the entire COGS omitted (audit SF-3).
+  const { data: lineItems, error: lineItemsError } = await admin
     .from("po_line_items")
     .select("*")
     .eq("purchase_order_id", purchaseOrderId);
+  if (lineItemsError) {
+    throw new Error(
+      `Failed to read line items for purchase order ${po.po_number || purchaseOrderId}: ${lineItemsError.message}`
+    );
+  }
 
   // Build bill lines
   const lines: QBOBillLine[] = (lineItems || []).map((item) => ({
@@ -74,14 +89,28 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
     );
   }
 
-  // Add shipping cost as extra line if present
+  // Add shipping cost as extra line if present. Shipping falls back to the
+  // COGS account either way, but a failed lookup and a genuinely
+  // unconfigured mapping log distinct warnings (audit SF-7) — the Bill total
+  // stays right; only the P&L categorization diverges.
   const shippingCost = Number(po.shipping_cost || 0);
   if (shippingCost > 0) {
-    const { data: shippingMapping } = await admin
+    const { data: shippingMapping, error: shippingMappingError } = await admin
       .from("qbo_account_mappings")
       .select("qbo_account_id")
       .eq("category", "shipping")
       .maybeSingle();
+    if (shippingMappingError) {
+      logger.warn(
+        { err: shippingMappingError.message, purchaseOrderId },
+        "QBO sync: failed to read 'shipping' account mapping; posting shipping to the COGS account"
+      );
+    } else if (!shippingMapping?.qbo_account_id) {
+      logger.warn(
+        { purchaseOrderId },
+        "QBO sync: no 'shipping' account mapping configured; posting shipping to the COGS account"
+      );
+    }
 
     lines.push({
       Amount: shippingCost,
@@ -95,17 +124,28 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
     });
   }
 
-  // Get supplier for payment terms
-  const { data: supplier } = await admin
+  // Get supplier for payment terms. A failed read falls back to the default
+  // terms (due-date only), but is logged so the divergence is observable
+  // (audit SF-11).
+  const { data: supplier, error: supplierError } = await admin
     .from("suppliers")
     .select("payment_terms")
     .eq("id", po.supplier_id)
     .single();
+  if (supplierError) {
+    logger.warn(
+      { err: supplierError.message, supplierId: po.supplier_id, purchaseOrderId },
+      "QBO sync: failed to read supplier payment terms; falling back to default terms"
+    );
+  }
 
   const parsedDays = parsePaymentTermsDays(supplier?.payment_terms);
   const paymentTermsDays = parsedDays > 0 ? parsedDays : await getDefaultPaymentTermsDays();
 
-  const existing = await getMapping("purchase_order", purchaseOrderId);
+  // Create-vs-update decision — a failed mapping read throws (recorded as a
+  // failed sync-log row) rather than falling through to "create", which
+  // would post a duplicate Bill into QuickBooks (audit SF-2).
+  const existing = await getMappingOrLogFailure("purchase_order", purchaseOrderId);
   const action = existing ? "update" : "create";
   const logId = await createSyncLog("purchase_order", purchaseOrderId, action);
 
