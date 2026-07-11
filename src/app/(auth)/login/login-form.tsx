@@ -6,6 +6,10 @@
  * Handles email/password login and passwordless authentication.
  * Passwordless flow sends a magic link and OTP code via email.
  * Users can either click the link or enter the code manually.
+ *
+ * Invite-only: the passwordless flow passes `shouldCreateUser: false` —
+ * staff accounts are provisioned via /api/users/invite, never self-registered
+ * here (audit DL-2; implicit signup minted a 'viewer'-role staff profile).
  */
 
 import { useRef, useState, type FormEvent } from "react";
@@ -13,7 +17,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
-import { rememberEmail, readRememberedEmail } from "@/lib/auth-utils";
+import { rememberEmail, readRememberedEmail, otpSignInErrorMessage } from "@/lib/auth-utils";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { OtpCodeInput, OTP_LENGTH } from "@/components/auth/otp-code-input";
 import { Button } from "@/components/ui/button";
@@ -92,12 +96,17 @@ export function LoginForm() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
+          // Invite-only: never create an auth user for an unknown email —
+          // implicit signup gave any address a 'viewer'-role staff profile
+          // via create_user_profile() (audit DL-2). Staff are provisioned
+          // via /api/users/invite.
+          shouldCreateUser: false,
           emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=${redirect}`,
         },
       });
 
       if (error) {
-        toast.error(error.message);
+        toast.error(otpSignInErrorMessage(error.message));
         return;
       }
 
