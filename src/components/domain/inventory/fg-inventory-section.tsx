@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { allocationEntity } from "@/entities/allocation";
@@ -38,7 +39,12 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
   const supabase = createClient();
 
   // Fetch bin breakdown
-  const { data: binRows, isLoading: binsLoading } = useQuery({
+  const {
+    data: binRows,
+    isLoading: binsLoading,
+    isError: binsError,
+    refetch: refetchBins,
+  } = useQuery({
     queryKey: finishedGoodKeys.binInventory(fgId),
     queryFn: async () => {
       return await unwrap(
@@ -53,7 +59,12 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
   });
 
   // Fetch commitments (allocations to orders) with order number
-  const { data: commitments, isLoading: commitmentsLoading } = useQuery({
+  const {
+    data: commitments,
+    isLoading: commitmentsLoading,
+    isError: commitmentsError,
+    refetch: refetchCommitments,
+  } = useQuery({
     queryKey: finishedGoodKeys.commitments(fgId),
     queryFn: async () => {
       const rows = await unwrap(
@@ -125,6 +136,16 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
             <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
             Loading...
           </div>
+        ) : binsError ? (
+          // A failed bin_inventory read must not render as "genuinely
+          // unbinned" (audit UI-9) — staff reconcile Square sales with this
+          // panel, and error-as-empty invites false "missing stock" reports.
+          <div className="flex items-center gap-3 text-sm text-destructive">
+            Failed to load bin locations
+            <Button variant="outline" size="sm" onClick={() => refetchBins()}>
+              Try Again
+            </Button>
+          </div>
         ) : !binRows || binRows.length === 0 ? (
           <div className="text-sm text-muted-foreground">
             Not assigned to any bins
@@ -176,6 +197,13 @@ export function FGInventorySection({ data }: FGInventorySectionProps) {
           <div className="text-sm text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
             Loading...
+          </div>
+        ) : commitmentsError ? (
+          <div className="flex items-center gap-3 text-sm text-destructive">
+            Failed to load commitments
+            <Button variant="outline" size="sm" onClick={() => refetchCommitments()}>
+              Try Again
+            </Button>
           </div>
         ) : !commitments || commitments.length === 0 ? (
           <div className="text-sm text-muted-foreground">No commitments</div>
