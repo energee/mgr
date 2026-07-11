@@ -85,7 +85,7 @@ type FinishedGoodRow = {
   id: string | null;
   batch_id: string | null;
   brand_name: string | null;
-  package_type_name: string | null;
+  selling_format_name: string | null;
   available_quantity: number | null;
   quantity: number | null;
 }
@@ -172,7 +172,7 @@ export default function InventoryValuationPage() {
         supabase
           .from("finished_goods_with_availability")
           .select(
-            "id, batch_id, brand_name, package_type_name, available_quantity, quantity"
+            "id, batch_id, brand_name, selling_format_name, available_quantity, quantity"
           )
           .gt("available_quantity", 0)
           .lte("production_date", asOfDate)
@@ -307,7 +307,7 @@ export default function InventoryValuationPage() {
     >();
 
     for (const fg of finishedGoods) {
-      const key = `${fg.brand_name ?? "Unknown"}::${fg.package_type_name ?? "Unknown"}`;
+      const key = `${fg.brand_name ?? "Unknown"}::${fg.selling_format_name ?? "Unknown"}`;
       const available = fg.available_quantity ?? 0;
 
       // Calculate per-unit cost from batch ingredient costs
@@ -326,7 +326,7 @@ export default function InventoryValuationPage() {
       } else {
         grouped.set(key, {
           brandName: fg.brand_name ?? "Unknown",
-          packageType: fg.package_type_name ?? "Unknown",
+          packageType: fg.selling_format_name ?? "Unknown",
           quantity: available,
           totalValue: available * unitCost,
         });

@@ -115,13 +115,22 @@ export type ValueFormat = "date" | "datetime" | "currency" | "number" | "percent
  * Format an unknown value for display in tables and detail views.
  * Date/datetime output pins the "en-US" locale so SSR and client render
  * identically regardless of environment locale (MGR-7 hydration fix).
+ * Date-only strings (YYYY-MM-DD, how PostgREST returns `date` columns) are
+ * formatted without a Date round-trip: `new Date("2026-07-15")` is UTC
+ * midnight, which renders as the PREVIOUS day in Americas timezones.
  */
 export function formatValue(value: unknown, format?: ValueFormat): string {
   if (value === null || value === undefined) return "—";
 
   switch (format) {
-    case "date":
+    case "date": {
+      const dateOnly =
+        typeof value === "string" ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null;
+      if (dateOnly) {
+        return `${Number(dateOnly[2])}/${Number(dateOnly[3])}/${dateOnly[1]}`;
+      }
       return new Date(value as string).toLocaleDateString("en-US");
+    }
     case "datetime":
       return new Date(value as string).toLocaleString("en-US");
     case "currency":
