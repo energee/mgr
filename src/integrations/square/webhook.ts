@@ -46,6 +46,23 @@ export function verifyWebhookSignature(
  */
 export const DEFAULT_REPLAY_WINDOW_MS = 5 * 60 * 1000;
 
+/**
+ * Replay window for `payment.*` events: Square's retry horizon (24h of
+ * exponential backoff on non-2xx responses) plus an hour of clock-skew slack.
+ *
+ * Payment events can safely accept late retries because sale ingestion is
+ * exactly-once INDEPENDENT of this window (audit IN-2): the route claims the
+ * Square ORDER id under a UNIQUE constraint
+ * (uniq_square_sync_log_square_payment_id, migrations 00224/00233) before any
+ * side effect, so a replayed event dedups against the completed claim. Under
+ * the tight DEFAULT_REPLAY_WINDOW_MS, any outage longer than 5 minutes
+ * permanently dropped every sale delivered during it — Square kept retrying
+ * for 24h, but each retry read as "stale" and was 200-acknowledged. Event
+ * types WITHOUT an unconditional dedup key (inventory.count.updated dedups
+ * only when event_id is present) must keep the tight default window.
+ */
+export const PAYMENT_REPLAY_WINDOW_MS = 25 * 60 * 60 * 1000;
+
 export type ReplayCheck =
   | { ok: true }
   | { ok: false; reason: "missing_created_at" | "invalid_created_at" | "stale_event" };
