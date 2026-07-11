@@ -23,6 +23,12 @@
  *   (3) A failure of the initial stale-entry SELECT is surfaced as a chunk -1
  *       error (SF-6/IN-11) while deletion stays fail-safely skipped — previously
  *       it was folded into the silent empty-result return.
+ *   (4) Bulk-delete guard (audit IN-9): without `force`, a stale set over
+ *       STALE_DELETE_MAX_COUNT rows or over STALE_DELETE_MAX_FRACTION of all
+ *       mapped rows is REFUSED — `aborted` returned, nothing deleted on Square
+ *       or locally; `force: true` (human-confirmed) bypasses it. Tiny stale
+ *       sets (< 3 rows) skip the fraction check so a small catalog can retire
+ *       a brand without an override.
  *
  * createAdminClient is faked with the shared admin mock (src/test/supabase-admin-mock.ts);
  * the Square SDK client with a small in-memory stub. The client-logger is silenced.
@@ -185,6 +191,9 @@ describe("pushCatalog", () => {
 
 describe("deleteStaleItems", () => {
   it("KEEPS the local map rows when Square's batchDelete fails (no orphan/duplicate)", async () => {
+    // Also pins the fraction-guard floor: 2 stale of 2 mapped is 100% of the
+    // catalog, but under STALE_DELETE_FRACTION_MIN_ROWS (3) the delete still
+    // proceeds without force — a tiny catalog can retire a brand.
     const stale: StaleEntry[] = [
       { id: "row-1", brand_id: "b1", square_catalog_id: "SQ-1", object_type: "ITEM" },
       { id: "row-2", brand_id: "b1", square_catalog_id: "SQ-2", object_type: "ITEM_VARIATION" },
@@ -219,7 +228,9 @@ describe("deleteStaleItems", () => {
     const deleteCalls: string[][] = [];
     const client = makeClient(deleteCalls, /* failOnCall */ 1);
 
-    const result = await deleteStaleItems(client, ["keep-brand"]);
+    // 150 stale rows trips the IN-9 bulk guard — force past it; the chunking
+    // and retention mechanics under test are unchanged by the override.
+    const result = await deleteStaleItems(client, ["keep-brand"], { force: true });
 
     // Chunked at 100: two batchDelete calls of 100 and 50.
     expect(deleteCalls).toHaveLength(2);
@@ -264,5 +275,83 @@ describe("deleteStaleItems", () => {
 
     expect(deletedIds(writes)).toEqual(["row-1"]);
     expect(result).toEqual({ deleted: 1, failed: 0, errors: [] });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Bulk-delete guard (audit IN-9)
+  // ---------------------------------------------------------------------------
+
+  /** `total` map rows, the first `staleCount` stale (brand "old"), rest kept. */
+  const mapRowsWith = (staleCount: number, total: number): StaleEntry[] =>
+    Array.from({ length: total }, (_, i) => ({
+      id: `row-${i}`,
+      brand_id: i < staleCount ? "old" : "keep-brand",
+      square_catalog_id: `SQ-${i}`,
+      object_type: "ITEM_VARIATION",
+    }));
+
+  it("ABORTS an oversized delete set (absolute cap): nothing deleted on Square or locally, abort surfaced", async () => {
+    // 11 stale of 40 mapped: over STALE_DELETE_MAX_COUNT (10), under the
+    // fraction — the absolute cap alone must trip.
+    const writes = useStaleEntries(mapRowsWith(11, 40));
+    const deleteCalls: string[][] = [];
+
+    const result = await deleteStaleItems(makeClient(deleteCalls), ["keep-brand"]);
+
+    expect(result.aborted).toEqual({
+      staleCount: 11,
+      mappedCount: 40,
+      reason: expect.stringContaining("absolute cap"),
+    });
+    expect(result).toMatchObject({ deleted: 0, failed: 0, errors: [] });
+    // Fail-safe: neither Square nor the local map was touched.
+    expect(deleteCalls).toEqual([]);
+    expect(deletedIds(writes)).toEqual([]);
+  });
+
+  it("ABORTS when the delete set exceeds the mapped-object fraction, even under the absolute cap", async () => {
+    // 6 stale of 10 mapped: under STALE_DELETE_MAX_COUNT but over
+    // STALE_DELETE_MAX_FRACTION (50%) — a keep-set collapse in a small catalog.
+    const writes = useStaleEntries(mapRowsWith(6, 10));
+    const deleteCalls: string[][] = [];
+
+    const result = await deleteStaleItems(makeClient(deleteCalls), ["keep-brand"]);
+
+    expect(result.aborted).toEqual({
+      staleCount: 6,
+      mappedCount: 10,
+      reason: expect.stringContaining("50%"),
+    });
+    expect(deleteCalls).toEqual([]);
+    expect(deletedIds(writes)).toEqual([]);
+  });
+
+  it("force: true bypasses the guard and the delete proceeds (human-confirmed mass retirement)", async () => {
+    const writes = useStaleEntries(mapRowsWith(11, 40));
+    const deleteCalls: string[][] = [];
+
+    const result = await deleteStaleItems(makeClient(deleteCalls), ["keep-brand"], {
+      force: true,
+    });
+
+    expect(result.aborted).toBeUndefined();
+    expect(result.deleted).toBe(11);
+    // Only the stale rows were deleted; the 29 kept-brand rows survived.
+    expect(deleteCalls).toEqual([mapRowsWith(11, 40).slice(0, 11).map((e) => e.square_catalog_id)]);
+    expect(deletedIds(writes)).toHaveLength(11);
+  });
+
+  it("keeps rows of brands IN the keep set: only non-kept brands' rows are stale", async () => {
+    // The keep-set partition itself (post-00244 the set is the ACTIVE brand
+    // list): rows for kept brands never enter the delete, regardless of what
+    // the map read returned.
+    const writes = useStaleEntries(mapRowsWith(2, 5));
+    const deleteCalls: string[][] = [];
+
+    const result = await deleteStaleItems(makeClient(deleteCalls), ["keep-brand"]);
+
+    expect(result).toEqual({ deleted: 2, failed: 0, errors: [] });
+    expect(deleteCalls).toEqual([["SQ-0", "SQ-1"]]);
+    expect(deletedIds(writes)).toEqual(["row-0", "row-1"]);
   });
 });
