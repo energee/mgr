@@ -22,7 +22,14 @@
  *     tender; claiming per order debits exactly once. A claim that never
  *     completed (crash/timeout mid-processing) is treated as stale after
  *     STALE_CLAIM_MS and atomically taken over by a retry, so a stranded
- *     claim cannot permanently dedup-skip the sale.
+ *     claim cannot permanently dedup-skip the sale. Until the claim is stale
+ *     enough to take over, a retry hitting an UNFINISHED claim gets 503 (with
+ *     Retry-After) — never 200, which would make Square mark the event
+ *     delivered while the sale may never have been ingested (audit IN-1).
+ *     Because the order-keyed claim makes payment ingestion exactly-once,
+ *     payment.* events accept a replay window covering Square's full 24h
+ *     retry horizon (PAYMENT_REPLAY_WINDOW_MS, audit IN-2); all other event
+ *     types keep the tight ±5-min window.
  *     Packaged lines resolve the Square location to a POS bin and
  *     draw the sold quantity FIFO across every finished-good lot physically in
  *     that bin (oldest production_date first), recording one taproom_sale
@@ -40,7 +47,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSquareClient, getSquareSettings } from "@/integrations/square/client";
-import { checkReplayWindow, verifyWebhookSignature } from "@/integrations/square/webhook";
+import {
+  checkReplayWindow,
+  DEFAULT_REPLAY_WINDOW_MS,
+  PAYMENT_REPLAY_WINDOW_MS,
+  verifyWebhookSignature,
+} from "@/integrations/square/webhook";
 import { calculateVolumeOz } from "@/integrations/square/utils";
 import { computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
 import type { SquareSyncType } from "@/integrations/square/types";
@@ -54,7 +66,9 @@ const log = logger.child({ route: "/api/square/webhook" });
  * retry may take it over. Claims normally finish (completed_at set) or are
  * deleted on failure within seconds; only a crash/timeout mid-processing
  * strands one. 15 minutes comfortably exceeds any serverless function timeout,
- * so a live in-flight handler can never be raced by its own retry.
+ * so a live in-flight handler can never be raced by its own retry. Retries
+ * that arrive while the claim is unfinished but NOT yet stale get 503 (audit
+ * IN-1) so Square keeps retrying until takeover becomes possible.
  */
 const STALE_CLAIM_MS = 15 * 60 * 1000;
 
@@ -153,6 +167,22 @@ type OversoldLine = {
   clamped?: boolean;
 };
 
+/**
+ * Outcome of handleCompletedPayment. `undefined` means acknowledged-and-ignored
+ * (non-COMPLETED status, missing ids, duplicate of a COMPLETED claim, …) — POST
+ * answers 200 so Square stops delivering.
+ *
+ * - processed: the sale was ingested (this delivery, or a stale-claim
+ *   takeover); oversoldLines carries any D3 oversells for the response.
+ * - in_flight: the order is claimed by an UNFINISHED, not-yet-stale claim
+ *   (audit IN-1). POST answers 503 so Square keeps retrying until the claim
+ *   either completes (→ duplicate, 200) or goes stale (→ takeover).
+ *   retryAfterSeconds hints when the claim becomes stale enough to take over.
+ */
+type PaymentIngestResult =
+  | { kind: "processed"; oversoldLines: OversoldLine[] }
+  | { kind: "in_flight"; retryAfterSeconds: number };
+
 export async function POST(request: NextRequest) {
   // 1. Read raw body as text (needed for signature verification)
   const body = await request.text();
@@ -227,7 +257,20 @@ export async function POST(request: NextRequest) {
   // Replay protection (audit F-127). Rejections return 200 (not 4xx): Square
   // retries any non-2xx on exponential backoff for up to 24h, and a stale
   // event is stale on every retry — 4xx here would create a retry storm.
-  const replay = checkReplayWindow(event.created_at);
+  //
+  // The window is per event type (audit IN-2): payment.* ingestion is
+  // exactly-once regardless of delivery age — the order-keyed dedup claim
+  // (UNIQUE uniq_square_sync_log_square_payment_id, 00224/00233) rejects
+  // re-ingestion — so payment events accept Square's full 24h retry horizon.
+  // Under the tight ±5-min window, any outage longer than 5 minutes
+  // permanently dropped every sale delivered during it: Square retried for a
+  // day, but each retry was "stale" and 200-acknowledged. Event types without
+  // that unconditional dedup guarantee (inventory.count.updated dedups only
+  // when event_id is present) keep the tight window.
+  const replayWindowMs = event.type.startsWith("payment.")
+    ? PAYMENT_REPLAY_WINDOW_MS
+    : DEFAULT_REPLAY_WINDOW_MS;
+  const replay = checkReplayWindow(event.created_at, replayWindowMs);
   if (!replay.ok) {
     log.warn(
       { event_id: event.event_id, created_at: event.created_at, reason: replay.reason },
@@ -245,6 +288,21 @@ export async function POST(request: NextRequest) {
       case "payment.created":
       case "payment.updated": {
         const result = await handleCompletedPayment(event);
+        // IN-1: an unfinished-but-fresh dedup claim means the sale may still be
+        // processing — or its handler crashed too recently for the stale-claim
+        // takeover. A 200 here would make Square mark the event delivered,
+        // permanently losing the sale if the owner crashed. 503 keeps Square's
+        // retry stream alive (exponential backoff, up to 24h) until the claim
+        // completes (→ 200 duplicate) or goes stale (→ takeover re-processes).
+        if (result?.kind === "in_flight") {
+          return NextResponse.json(
+            { error: "sale_claim_in_flight" },
+            {
+              status: 503,
+              headers: { "Retry-After": String(result.retryAfterSeconds) },
+            }
+          );
+        }
         oversoldLines = result?.oversoldLines ?? [];
         break;
       }
@@ -284,7 +342,9 @@ export async function POST(request: NextRequest) {
 // payment.created / payment.updated handler
 // ---------------------------------------------------------------------------
 
-async function handleCompletedPayment(event: SquareWebhookEvent) {
+async function handleCompletedPayment(
+  event: SquareWebhookEvent
+): Promise<PaymentIngestResult | undefined> {
   const payment = event.data?.object?.payment;
   if (!payment) {
     log.warn("payment event missing payment object");
@@ -355,13 +415,20 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
   if (claimed && claimed.length > 0) {
     logId = claimed[0].id;
   } else {
-    // Already claimed. Usually a genuine duplicate delivery — but a claim whose
-    // processing crashed mid-flight (timeout after the claim committed) never
-    // completes and never frees itself, and every retry would dedup-skip into
-    // a permanently lost sale. Treat an UNFINISHED claim older than
-    // STALE_CLAIM_MS as abandoned and take it over ATOMICALLY: the conditional
-    // UPDATE re-stamps started_at only if the claim is still stale, so exactly
-    // one of several concurrent retries wins (the others match zero rows).
+    // Already claimed. Three cases, told apart below:
+    //   1. The claim COMPLETED — a genuine duplicate delivery (created +
+    //      updated of one payment, or a second tender of a split check).
+    //      ACK 200 so Square stops delivering.
+    //   2. The claim is UNFINISHED and older than STALE_CLAIM_MS — its handler
+    //      crashed mid-flight (timeout after the claim committed) and never
+    //      freed it. Take it over ATOMICALLY: the conditional UPDATE re-stamps
+    //      started_at only if the claim is still stale, so exactly one of
+    //      several concurrent retries wins (the others match zero rows).
+    //   3. The claim is UNFINISHED but fresh — its owner may still be running,
+    //      or crashed too recently for takeover. Answering 200 would make
+    //      Square mark the event delivered while the sale may never have been
+    //      ingested (audit IN-1) — so signal 503 instead, keeping the retry
+    //      stream alive until the claim resolves into case 1 or case 2.
     // NOTE: re-processing after a partial crash can re-debit lines the crashed
     // attempt already debited — at-least-once by design; the alternative (hold
     // the claim forever) silently loses the whole sale, which is worse. The
@@ -376,11 +443,38 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
       .select("id");
     if (takeoverError) throw takeoverError;
     if (!takeover || takeover.length === 0) {
-      log.info(
-        { payment_id: paymentId, order_id: orderId },
-        "Duplicate sale (order already claimed), skipping"
+      // Not stale: read the claim to tell case 1 (completed duplicate) from
+      // case 3 (in flight). A read error throws → 500 → Square retries, same
+      // policy as every other read here; never delete the row — it belongs to
+      // the claim's owner.
+      const { data: claimRow, error: claimReadError } = await admin
+        .from("square_sync_log")
+        .select("completed_at, started_at")
+        .eq("square_payment_id", claimKey)
+        .maybeSingle();
+      if (claimReadError) throw claimReadError;
+
+      if (claimRow?.completed_at != null) {
+        log.info(
+          { payment_id: paymentId, order_id: orderId },
+          "Duplicate sale (order already ingested), skipping"
+        );
+        return;
+      }
+
+      // Case 3 — or the row vanished between our upsert and this read (the
+      // owner's failure path freed it), in which case the next retry re-claims
+      // immediately. Hint Square when the claim becomes stale enough for the
+      // takeover to succeed.
+      const startedAtMs = claimRow?.started_at ? Date.parse(claimRow.started_at) : NaN;
+      const retryAfterSeconds = Number.isFinite(startedAtMs)
+        ? Math.max(1, Math.ceil((startedAtMs + STALE_CLAIM_MS - Date.now()) / 1000))
+        : 1;
+      log.warn(
+        { payment_id: paymentId, order_id: orderId, retryAfterSeconds },
+        "Sale claim in flight (unfinished, not yet stale); 503 so Square retries"
       );
-      return;
+      return { kind: "in_flight", retryAfterSeconds };
     }
     logId = takeover[0].id;
     log.warn(
@@ -484,13 +578,19 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
         // Look up the catalog mapping with the selling format's container type
         // AND the volume fields needed to stamp allocation.volume_bbl (so TTB
         // taxpaid-removals report the sale — get_ttb_removals_summary, 00203).
-        const { data: mapping } = await dynamicFrom(admin, "square_catalog_map")
+        const { data: mapping, error: mappingError } = await dynamicFrom(admin, "square_catalog_map")
           .select(
             "id, brand_id, selling_format_id, selling_formats(unit_count, containers(type, volume_oz))"
           )
           .eq("square_catalog_id", catalogObjectId)
           .eq("object_type", "ITEM_VARIATION")
           .maybeSingle();
+        // A transient read failure is NOT "not an MGR product" (audit SF-1):
+        // treating it as unmapped silently skips the sale line under a 200 and
+        // Square never retries. Throw so the per-line catch records the line
+        // as FAILED in square_sync_log — same handling as binError /
+        // allocError / debitError.
+        if (mappingError) throw mappingError;
 
         if (!mapping) {
           // No mapping found — could be a non-MGR product sold on Square
@@ -767,7 +867,7 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
     }
 
     // Return the oversold lines (D3) so POST can echo them in the response.
-    return { oversoldLines };
+    return { kind: "processed", oversoldLines };
   } catch (err) {
     // Free the claimed slot on failure so Square's retry can re-process. If the
     // delete itself fails the claim strands — the stale-claim takeover above is
