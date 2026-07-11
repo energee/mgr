@@ -7,12 +7,12 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
 
 - [x] **1. Push the pending migration chain to live** (DL-1/IN-13, C) — **PUSH DONE out-of-band** (verified 2026-07-10 via `supabase migration list`: live has 00230–00235); **snapshot refresh (DL-3) still OUTSTANDING** — user action
   The push happened without `scripts/db-push.sh`, so `supabase/live-catalog.snapshot.txt` (last regenerated at PR #361) still has zero POLICY/RLS lines and predates 00230–00235: the watchdog's policy-drop protection stays dormant and the next cron will warn on every new object. Run `SUPABASE_DB_URL='postgresql://readonly:…' bash scripts/check-live-drift.sh --update`, review the REMOVED-lines diff (expect only objects replaced by 00230–00235), commit the snapshot. Do not transfer the snapshot through MCP (known homoglyph corruption).
-- [ ] **2. Close the staff OTP self-registration door** (DL-2, H) — owner: `data-layer-expert`
-  `shouldCreateUser: false` on `src/app/(auth)/login/login-form.tsx` passwordless path; verify/disable the hosted "allow new signups" toggle (user action; flagged since 2026-07-06).
-- [ ] **3. Make webhook recovery actually recover** (IN-1 + IN-2 + SF-1, H/H/C) — owner: `integrations-expert`
-  (a) Return 5xx (not 200-duplicate) for an unfinished, not-yet-stale claim so Square keeps retrying through a crash; (b) widen the ±5-min replay window for `payment.*` events (order-keyed dedup already guarantees exactly-once) so a >5-min outage doesn't permanently drop sales; (c) destructure and throw the one unchecked `square_catalog_map` read at `webhook/route.ts:487-498`. Add the crash-retry test the current suite fabricates around.
-- [ ] **4. Real upsert for `square_catalog_map`** (SF-4 = IN-8 = PERF-1) — owner: `integrations-expert` + `data-layer-expert` (constraint)
-  UNIQUE on `(brand_id, object_type, selling_format_id)` + batched `.upsert()` with thrown errors, replacing INSERT-then-blind-UPDATE. One change closes the remaining catalog-duplication vector and the 6–12s sequential-write latency.
+- [x] **2. Close the staff OTP self-registration door** (DL-2, H) — owner: `data-layer-expert` — **PR #368**
+  `shouldCreateUser: false` on `src/app/(auth)/login/login-form.tsx` passwordless path; shared `otpSignInErrorMessage()` mapper applied to staff AND portal forms; new login-form test file. **Residual user action: disable the hosted "allow new signups" toggle** (flagged since 2026-07-06; now safe — no in-app path depends on it).
+- [x] **3. Make webhook recovery actually recover** (IN-1 + IN-2 + SF-1, H/H/C) — owner: `integrations-expert` — **PR #369**
+  In-flight (unfinished, not-yet-stale) claims now 503 with Retry-After instead of 200-duplicate; `payment.*` replay window widened to 25h (order-keyed dedup carries idempotency; inventory events keep ±5 min); the unchecked `square_catalog_map` read throws → line FAILED. +7 tests incl. the crash-retry scenario; replay-window mock replaced with the real implementation.
+- [x] **4. Real upsert for `square_catalog_map`** (SF-4 = IN-8 = PERF-1) — owner: `integrations-expert` + `data-layer-expert` — **PR #370; migration 00236 NOT applied live (deploy via `scripts/db-push.sh` after merge)**
+  `UNIQUE (brand_id, object_type, selling_format_id) NULLS NOT DISTINCT` (live is PG 17.6, verified) + keep-newest dedup + one batched error-checked `.upsert()`; batch failure marks all rows failed, none counted synced. Also surfaces `deleteStaleItems`' SELECT error (SF-6/IN-11). Closes the catalog-duplication vector and the 6–12s sequential-write latency.
 
 ## P1 — Money & compliance
 
