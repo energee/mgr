@@ -5,8 +5,8 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
 
 ## P0 — Do first (live correctness + sale loss + security residual)
 
-- [ ] **1. Push the pending migration chain to live** (DL-1/IN-13, C) — owner: `data-layer-expert`; push is a user action
-  `scripts/db-push.sh` from main applies 00230–00235 and regenerates the snapshot — this simultaneously un-breaks live packaging revisions ('revised' enum), the webhook's `inventory_event` sync-log writes, the 00233 claim re-key, and the `square_locations` picker RLS; the regenerated snapshot also activates the dormant POLICY/RLS drift protection (DL-3). Preflight first (a concurrent session may have pushed). Push BEFORE re-baselining, never the reverse.
+- [x] **1. Push the pending migration chain to live** (DL-1/IN-13, C) — **PUSH DONE out-of-band** (verified 2026-07-10 via `supabase migration list`: live has 00230–00235); **snapshot refresh (DL-3) still OUTSTANDING** — user action
+  The push happened without `scripts/db-push.sh`, so `supabase/live-catalog.snapshot.txt` (last regenerated at PR #361) still has zero POLICY/RLS lines and predates 00230–00235: the watchdog's policy-drop protection stays dormant and the next cron will warn on every new object. Run `SUPABASE_DB_URL='postgresql://readonly:…' bash scripts/check-live-drift.sh --update`, review the REMOVED-lines diff (expect only objects replaced by 00230–00235), commit the snapshot. Do not transfer the snapshot through MCP (known homoglyph corruption).
 - [ ] **2. Close the staff OTP self-registration door** (DL-2, H) — owner: `data-layer-expert`
   `shouldCreateUser: false` on `src/app/(auth)/login/login-form.tsx` passwordless path; verify/disable the hosted "allow new signups" toggle (user action; flagged since 2026-07-06).
 - [ ] **3. Make webhook recovery actually recover** (IN-1 + IN-2 + SF-1, H/H/C) — owner: `integrations-expert`
