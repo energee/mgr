@@ -141,6 +141,32 @@ async function requireMongoDb(): Promise<Db> {
 }
 
 // =============================================================================
+// Checked read/delete helpers
+//
+// Sync reads must fail LOUDLY (audit SF-5): a discarded read error looks
+// identical to "no rows", which silently nulls FKs — catastrophic when the
+// sync function has already deleted the rows it is rebuilding.
+// =============================================================================
+
+type AdminClient = Awaited<ReturnType<typeof createAdminClient>>;
+
+/** SELECT `id, name` from a table, throwing on any read error. */
+async function selectIdName(
+  admin: AdminClient,
+  table: string
+): Promise<Array<{ id: string; name: string }>> {
+  const { data, error } = await dynamicFrom(admin, table).select("id, name");
+  if (error) throw new Error(`Failed to read ${table} for FK resolution: ${error.message}`);
+  return (data ?? []) as Array<{ id: string; name: string }>;
+}
+
+/** Delete every row of a table (created_at is NOT NULL on synced tables), throwing on error. */
+async function deleteAllOrThrow(admin: AdminClient, table: string): Promise<void> {
+  const { error } = await dynamicFrom(admin, table).delete().gte("created_at", "1970-01-01");
+  if (error) throw new Error(`Failed to clear ${table} for re-sync: ${error.message}`);
+}
+
+// =============================================================================
 // Shared lookup builders (avoid duplicating across sync functions)
 // =============================================================================
 
@@ -152,14 +178,10 @@ async function buildSupplierNameMap(db: Db): Promise<Map<string, string>> {
 /** Resolve MongoDB style ObjectIds → PG beer_styles UUIDs (case-insensitive name match). */
 async function buildStyleLookup(db: Db): Promise<Map<string, string>> {
   const admin = await createAdminClient();
-  const { data: existingStyles } = await dynamicFrom(admin, "beer_styles").select("id, name");
+  const existingStyles = await selectIdName(admin, "beer_styles");
 
-  const byExact = new Map(
-    (existingStyles ?? []).map((s: { id: string; name: string }) => [s.name, s.id])
-  );
-  const byLower = new Map(
-    (existingStyles ?? []).map((s: { id: string; name: string }) => [s.name.toLowerCase(), s.id])
-  );
+  const byExact = new Map(existingStyles.map((s) => [s.name, s.id]));
+  const byLower = new Map(existingStyles.map((s) => [s.name.toLowerCase(), s.id]));
 
   const mongoStyles = await db.collection<MongoStyle>("styles").find().toArray();
   const result = new Map<string, string>();
@@ -183,11 +205,9 @@ async function buildStyleLookup(db: Db): Promise<Map<string, string>> {
 async function buildVesselLookups(db: Db) {
   const admin = await createAdminClient();
   const mongoVessels = await db.collection<MongoVessel>("vessels").find().toArray();
-  const { data: pgVessels } = await dynamicFrom(admin, "vessels").select("id, name");
+  const pgVessels = await selectIdName(admin, "vessels");
 
-  const vesselNameToId = new Map<string, string>(
-    (pgVessels ?? []).map((v: { id: string; name: string }) => [v.name, v.id])
-  );
+  const vesselNameToId = new Map<string, string>(pgVessels.map((v) => [v.name, v.id]));
   const mongoVesselIdToName = new Map(
     mongoVessels.map((v) => [v._id.toString(), v.name])
   );
@@ -308,28 +328,94 @@ async function syncVessels(): Promise<SyncResult> {
   return { entityType: "vessels", phase: 2, ...result };
 }
 
+/**
+ * Destructive recipe re-sync, hardened per audit SF-5.
+ *
+ * Recipes have no UNIQUE(name) constraint, so re-sync is delete-then-rebuild
+ * across recipes + recipe_malts/recipe_hops/recipe_yeasts. The Supabase JS
+ * client has no client-side transactions, and adding a Postgres RPC just for
+ * this legacy import tool would be new infrastructure — so the accepted
+ * ceiling is fetch-and-verify BEFORE delete:
+ *   1. every Mongo read and every PG FK-lookup read runs first, throwing on
+ *      any error (never treating a failed read as "no rows"), and
+ *   2. every lookup map the Mongo data references must be non-empty
+ * before any destructive statement runs. Upgrade path if this ever needs to
+ * be stronger: move the delete+rebuild into a single Postgres function
+ * (one transaction) called via rpc().
+ */
 async function syncRecipes(): Promise<SyncResult> {
   const logId = await createSyncLog("recipes", 2);
   const db = await requireMongoDb();
   const admin = await createAdminClient();
 
-  const mongoStyleIdToPgId = await buildStyleLookup(db);
-
-  // Build brand name lookup
-  const { data: pgBrands } = await dynamicFrom(admin, "brands").select("id, name");
-  const brandNameToId = new Map(
-    (pgBrands ?? []).map((b: { id: string; name: string }) => [b.name, b.id])
-  );
-  const mongoBeers = await db.collection<MongoBeer>("beers").find().toArray();
-  const mongoBeerIdToName = new Map(mongoBeers.map((b) => [b._id.toString(), b.name]));
+  // ---- Fetch phase: ALL reads happen before any write, all error-checked ----
 
   const docs = await db.collection<MongoRecipe>("recipes").find().toArray();
 
+  const mongoStyleIdToPgId = await buildStyleLookup(db);
+
+  const mongoBeers = await db.collection<MongoBeer>("beers").find().toArray();
+  const mongoBeerIdToName = new Map(mongoBeers.map((b) => [b._id.toString(), b.name]));
+  const mongoMalts = await db.collection<MongoMalt>("malts").find().toArray();
+  const mongoMaltIdToName = new Map(mongoMalts.map((m) => [m._id.toString(), m.name]));
+  const mongoHops = await db.collection<MongoHop>("hops").find().toArray();
+  const mongoHopIdToName = new Map(mongoHops.map((h) => [h._id.toString(), h.name]));
+  const mongoYeasts = await db.collection<MongoYeast>("yeasts").find().toArray();
+  const mongoYeastIdToName = new Map(mongoYeasts.map((y) => [y._id.toString(), y.name]));
+
+  const brandNameToId = new Map((await selectIdName(admin, "brands")).map((b) => [b.name, b.id]));
+  const maltNameToId = new Map((await selectIdName(admin, "malts")).map((m) => [m.name, m.id]));
+  const hopNameToId = new Map((await selectIdName(admin, "hops")).map((h) => [h.name, h.id]));
+  const yeastNameToId = new Map((await selectIdName(admin, "yeasts")).map((y) => [y.name, y.id]));
+
+  // Build direct Mongo ObjectId → PG UUID maps for brand + ingredient FKs
+  const mongoBeerIdToPgBrandId = new Map<string, string>();
+  for (const [mongoId, name] of mongoBeerIdToName) {
+    const pgId = brandNameToId.get(name);
+    if (pgId) mongoBeerIdToPgBrandId.set(mongoId, pgId);
+  }
+  const mongoMaltIdToPgId = new Map<string, string>();
+  for (const [mongoId, name] of mongoMaltIdToName) {
+    const pgId = maltNameToId.get(name);
+    if (pgId) mongoMaltIdToPgId.set(mongoId, pgId);
+  }
+  const mongoHopIdToPgId = new Map<string, string>();
+  for (const [mongoId, name] of mongoHopIdToName) {
+    const pgId = hopNameToId.get(name);
+    if (pgId) mongoHopIdToPgId.set(mongoId, pgId);
+  }
+  const mongoYeastIdToPgId = new Map<string, string>();
+  for (const [mongoId, name] of mongoYeastIdToName) {
+    const pgId = yeastNameToId.get(name);
+    if (pgId) mongoYeastIdToPgId.set(mongoId, pgId);
+  }
+
+  // ---- Verify phase: refuse the destructive rebuild if any lookup map the
+  // Mongo data references resolved to nothing. An empty map here would rebuild
+  // every recipe with NULL FKs / drop every junction row AFTER the originals
+  // are already deleted — exactly the SF-5 failure mode. ----
+  const lookupGuards = [
+    { referenced: docs.some((d) => !!d.style), size: mongoStyleIdToPgId.size, what: "beer_styles" },
+    { referenced: docs.some((d) => !!d.beer), size: mongoBeerIdToPgBrandId.size, what: "brands" },
+    { referenced: docs.some((d) => (d.malts ?? []).length > 0), size: mongoMaltIdToPgId.size, what: "malts" },
+    { referenced: docs.some((d) => (d.hops ?? []).length > 0), size: mongoHopIdToPgId.size, what: "hops" },
+    { referenced: docs.some((d) => !!d.yeast), size: mongoYeastIdToPgId.size, what: "yeasts" },
+  ];
+  for (const guard of lookupGuards) {
+    if (guard.referenced && guard.size === 0) {
+      throw new Error(
+        `Refusing destructive recipe re-sync: ${guard.what} lookup resolved 0 entries but Mongo recipes reference it (run earlier sync phases first, or investigate a name mismatch)`
+      );
+    }
+  }
+
+  // ---- Destructive rebuild phase (all reads above are verified) ----
+
   // Delete all existing recipes and re-insert (no UNIQUE(name) constraint on recipes table)
-  await dynamicFrom(admin, "recipe_malts").delete().gte("created_at", "1970-01-01");
-  await dynamicFrom(admin, "recipe_hops").delete().gte("created_at", "1970-01-01");
-  await dynamicFrom(admin, "recipe_yeasts").delete().gte("created_at", "1970-01-01");
-  await dynamicFrom(admin, "recipes").delete().gte("created_at", "1970-01-01");
+  await deleteAllOrThrow(admin, "recipe_malts");
+  await deleteAllOrThrow(admin, "recipe_hops");
+  await deleteAllOrThrow(admin, "recipe_yeasts");
+  await deleteAllOrThrow(admin, "recipes");
 
   const recipeRows = docs.map((d) => {
     const row = transformRecipe(d);
@@ -339,51 +425,18 @@ async function syncRecipes(): Promise<SyncResult> {
     }
     // Resolve brand FK
     if (d.beer) {
-      const beerName = mongoBeerIdToName.get(d.beer.toString());
-      (row as Record<string, unknown>).brand_id = beerName ? (brandNameToId.get(beerName) as string ?? null) : null;
+      (row as Record<string, unknown>).brand_id = mongoBeerIdToPgBrandId.get(d.beer.toString()) ?? null;
     }
     return row;
   });
   const recipeResult = await upsertRows("recipes", recipeRows);
 
-  // Build recipe name → PG UUID lookup for junction tables
-  const { data: pgRecipes } = await dynamicFrom(admin, "recipes").select("id, name");
+  // Recipes get fresh auto-generated UUIDs on insert, so the name → UUID
+  // lookup for junction rows can only happen after the insert. selectIdName
+  // throws on a failed read rather than silently skipping every junction row.
   const recipeNameToId = new Map(
-    (pgRecipes ?? []).map((r: { id: string; name: string }) => [r.name, r.id])
+    (await selectIdName(admin, "recipes")).map((r) => [r.name, r.id])
   );
-
-  // Resolve malt/hop/yeast FKs via name lookup
-  const { data: pgMalts } = await dynamicFrom(admin, "malts").select("id, name");
-  const maltNameToId = new Map((pgMalts ?? []).map((m: { id: string; name: string }) => [m.name, m.id]));
-  const mongoMalts = await db.collection<MongoMalt>("malts").find().toArray();
-  const mongoMaltIdToName = new Map(mongoMalts.map((m) => [m._id.toString(), m.name]));
-
-  const { data: pgHops } = await dynamicFrom(admin, "hops").select("id, name");
-  const hopNameToId = new Map((pgHops ?? []).map((h: { id: string; name: string }) => [h.name, h.id]));
-  const mongoHops = await db.collection<MongoHop>("hops").find().toArray();
-  const mongoHopIdToName = new Map(mongoHops.map((h) => [h._id.toString(), h.name]));
-
-  const { data: pgYeasts } = await dynamicFrom(admin, "yeasts").select("id, name");
-  const yeastNameToId = new Map((pgYeasts ?? []).map((y: { id: string; name: string }) => [y.name, y.id]));
-  const mongoYeasts = await db.collection<MongoYeast>("yeasts").find().toArray();
-  const mongoYeastIdToName = new Map(mongoYeasts.map((y) => [y._id.toString(), y.name]));
-
-  // Build direct Mongo ObjectId → PG UUID maps for ingredient FKs
-  const mongoMaltIdToPgId = new Map<string, string>();
-  for (const [mongoId, name] of mongoMaltIdToName) {
-    const pgId = maltNameToId.get(name) as string | undefined;
-    if (pgId) mongoMaltIdToPgId.set(mongoId, pgId);
-  }
-  const mongoHopIdToPgId = new Map<string, string>();
-  for (const [mongoId, name] of mongoHopIdToName) {
-    const pgId = hopNameToId.get(name) as string | undefined;
-    if (pgId) mongoHopIdToPgId.set(mongoId, pgId);
-  }
-  const mongoYeastIdToPgId = new Map<string, string>();
-  for (const [mongoId, name] of mongoYeastIdToName) {
-    const pgId = yeastNameToId.get(name) as string | undefined;
-    if (pgId) mongoYeastIdToPgId.set(mongoId, pgId);
-  }
 
   // Build junction rows with resolved PG UUIDs
   const maltRows: Record<string, unknown>[] = [];
@@ -391,7 +444,7 @@ async function syncRecipes(): Promise<SyncResult> {
   const yeastRows: Record<string, unknown>[] = [];
 
   for (const doc of docs) {
-    const pgRecipeId = recipeNameToId.get(doc.name) as string | undefined;
+    const pgRecipeId = recipeNameToId.get(doc.name);
     if (!pgRecipeId) continue;
 
     let maltPos = 0;
@@ -458,6 +511,9 @@ async function syncBatches(): Promise<SyncResult> {
     db.collection<MongoRecipe>("recipes").find().toArray(),
     dynamicFrom(admin, "recipes").select("id, name"),
   ]);
+  if (pgRecipesResult.error) {
+    throw new Error(`Failed to read recipes for FK resolution: ${pgRecipesResult.error.message}`);
+  }
   const pgRecipeNameToId = new Map(
     (pgRecipesResult.data ?? []).map((r: { id: string; name: string }) => [r.name, r.id])
   );
@@ -554,16 +610,19 @@ async function syncOrders(): Promise<SyncResult> {
 
   // Build order_number → PG UUID lookup for order_items FK resolution
   const admin2 = await createAdminClient();
-  const { data: pgOrders } = await dynamicFrom(admin2, "orders").select("id, order_number");
+  const { data: pgOrders, error: pgOrdersError } = await dynamicFrom(admin2, "orders")
+    .select("id, order_number");
+  if (pgOrdersError) {
+    throw new Error(`Failed to read orders for FK resolution: ${pgOrdersError.message}`);
+  }
   const orderNumberToId = new Map(
     (pgOrders ?? []).map((o: { id: string; order_number: string }) => [o.order_number, o.id])
   );
 
   // Build Mongo beer ObjectId → PG brand UUID lookup
   const mongoBeers = await db.collection<MongoBeer>("beers").find().toArray();
-  const { data: pgBrands } = await dynamicFrom(admin2, "brands").select("id, name");
   const brandNameToId = new Map(
-    (pgBrands ?? []).map((b: { id: string; name: string }) => [b.name, b.id])
+    (await selectIdName(admin2, "brands")).map((b) => [b.name, b.id])
   );
   const mongoBeerIdToName = new Map(
     mongoBeers.map((b) => [b._id.toString(), b.name])
@@ -579,7 +638,7 @@ async function syncOrders(): Promise<SyncResult> {
       // Resolve brand_id via name lookup
       if (product.product?.value) {
         const beerName = mongoBeerIdToName.get(product.product.value.toString());
-        row.brand_id = beerName ? (brandNameToId.get(beerName) as string ?? null) : null;
+        row.brand_id = beerName ? (brandNameToId.get(beerName) ?? null) : null;
       }
       return row;
     });
@@ -592,9 +651,12 @@ async function syncOrders(): Promise<SyncResult> {
       .map((r) => orderNumberToId.get(r.order_number) as string | undefined)
       .filter(Boolean) as string[];
     if (syncedOrderIds.length > 0) {
-      await dynamicFrom(admin2, "order_items")
+      const { error: deleteError } = await dynamicFrom(admin2, "order_items")
         .delete()
         .in("order_id", syncedOrderIds);
+      if (deleteError) {
+        throw new Error(`Failed to clear order_items for re-sync: ${deleteError.message}`);
+      }
     }
     itemResult = await upsertRows("order_items", itemRows);
   }
@@ -617,7 +679,11 @@ async function syncBrewLogs(): Promise<SyncResult> {
   const brewLogResult = await upsertRows("brew_logs", brewLogRows, "brew_number");
 
   // Build brew_number → PG brew_log UUID lookup for junction table
-  const { data: pgBrewLogs } = await dynamicFrom(admin, "brew_logs").select("id, brew_number");
+  const { data: pgBrewLogs, error: pgBrewLogsError } = await dynamicFrom(admin, "brew_logs")
+    .select("id, brew_number");
+  if (pgBrewLogsError) {
+    throw new Error(`Failed to read brew_logs for FK resolution: ${pgBrewLogsError.message}`);
+  }
   const brewNumberToId = new Map(
     (pgBrewLogs ?? []).map((bl: { id: string; brew_number: string }) => [bl.brew_number, bl.id])
   );
@@ -647,9 +713,12 @@ async function syncBrewLogs(): Promise<SyncResult> {
   // Delete existing junction entries for these brew logs, then insert
   const syncedBrewLogIds = junctionRows.map((r) => r.brew_log_id as string);
   if (syncedBrewLogIds.length > 0) {
-    await dynamicFrom(admin, "brew_log_batches")
+    const { error: deleteError } = await dynamicFrom(admin, "brew_log_batches")
       .delete()
       .in("brew_log_id", syncedBrewLogIds);
+    if (deleteError) {
+      throw new Error(`Failed to clear brew_log_batches for re-sync: ${deleteError.message}`);
+    }
   }
   const junctionResult = await upsertRows("brew_log_batches", junctionRows);
 
@@ -694,10 +763,13 @@ async function syncBatchReadings(): Promise<SyncResult> {
   // We use a broad delete of all measurement logs for the synced batches.
   const syncedBatchIds = [...new Set(rows.map((r) => r.batch_id as string))];
   if (syncedBatchIds.length > 0) {
-    await dynamicFrom(admin, "batch_logs")
+    const { error: deleteError } = await dynamicFrom(admin, "batch_logs")
       .delete()
       .in("batch_id", syncedBatchIds)
       .eq("log_type", "measurement");
+    if (deleteError) {
+      throw new Error(`Failed to clear batch_logs for re-sync: ${deleteError.message}`);
+    }
   }
 
   const insertResult = await upsertRows("batch_logs", rows);
@@ -734,9 +806,8 @@ async function syncPackagingSessions(): Promise<SyncResult> {
   );
   const mongoBeers = await db.collection<MongoBeer>("beers").find().toArray();
   const mongoBeerIdToName = new Map(mongoBeers.map((b) => [b._id.toString(), b.name]));
-  const { data: pgBrands } = await dynamicFrom(admin, "brands").select("id, name");
   const brandNameToId = new Map(
-    (pgBrands ?? []).map((b: { id: string; name: string }) => [b.name, b.id])
+    (await selectIdName(admin, "brands")).map((b) => [b.name, b.id])
   );
 
   // Format lookup: MongoDB formats → PG selling_formats
@@ -749,8 +820,11 @@ async function syncPackagingSessions(): Promise<SyncResult> {
   );
 
   // Query selling_formats with their container names for composite matching
-  const { data: pgFormatsRaw } = await dynamicFrom(admin, "selling_formats")
+  const { data: pgFormatsRaw, error: pgFormatsError } = await dynamicFrom(admin, "selling_formats")
     .select("id, name, containers(name)");
+  if (pgFormatsError) {
+    throw new Error(`Failed to read selling_formats for FK resolution: ${pgFormatsError.message}`);
+  }
 
   type PgFormatRow = { id: string; name: string; containers: { name: string } | null };
   const pgFormatsWithContainers = (pgFormatsRaw ?? []) as PgFormatRow[];
@@ -838,7 +912,7 @@ async function syncPackagingSessions(): Promise<SyncResult> {
         if (beerId) {
           const beerName = mongoBeerIdToName.get(beerId);
           if (beerName) {
-            pgBrandId = brandNameToId.get(beerName) as string ?? null;
+            pgBrandId = brandNameToId.get(beerName) ?? null;
           }
         }
       }
@@ -876,9 +950,12 @@ async function syncPackagingSessions(): Promise<SyncResult> {
   // 4. Delete existing line items for synced sessions, then insert fresh
   const syncedSessionIds = sessionRows.map((r) => r.id);
   if (syncedSessionIds.length > 0) {
-    await dynamicFrom(admin, "session_line_items")
+    const { error: deleteError } = await dynamicFrom(admin, "session_line_items")
       .delete()
       .in("session_id", syncedSessionIds);
+    if (deleteError) {
+      throw new Error(`Failed to clear session_line_items for re-sync: ${deleteError.message}`);
+    }
   }
   const lineResult = await upsertRows("session_line_items", lineItems);
 

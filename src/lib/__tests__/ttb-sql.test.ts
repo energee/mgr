@@ -1,17 +1,21 @@
 /**
- * TTB summary SQL regression tests (audit 2026-07-06, finding H2)
+ * TTB summary SQL regression tests (audits 2026-07-06 H2, 2026-07-10 BD-1)
  *
  * Structural assertions on the latest migration definitions of the three
- * get_ttb_*_summary functions (00203). Pins the finished-goods volume
- * contract shared with the client-side computeUnitFillVolumeBbl
- * (src/domain/consumption-planning.ts):
+ * get_ttb_*_summary functions (00203 volume math, 00237 period keying).
+ * Pins the finished-goods volume contract shared with the client-side
+ * computeUnitFillVolumeBbl (src/domain/consumption-planning.ts):
  *
  *     per-FG-unit bbl = COALESCE(volume_bbl, volume_oz / 3968) x unit_count
  *
- * and the classification of taproom sales as taxpaid removals. These are
- * regulatory-grade contracts (TTB Form 5130.9) — a regression here is a
- * compliance bug, not a cosmetic one. See sql-def-helpers.ts for the idiom's
- * ceiling (structural, not DB-behavioral).
+ * the classification of taproom sales as taxpaid removals, and the period
+ * attribution of completed allocations: removals AND begin/end inventory must
+ * key on COALESCE(a.completed_at, a.created_at) — completed_at is stamped at
+ * order fulfillment, so a June-reserved/July-fulfilled removal reports in
+ * July, not in June's possibly-filed month (BD-1). These are regulatory-grade
+ * contracts (TTB Form 5130.9) — a regression here is a compliance bug, not a
+ * cosmetic one. See sql-def-helpers.ts for the idiom's ceiling (structural,
+ * not DB-behavioral).
  */
 import { describe, it, expect } from "vitest";
 import { latestFunctionBody } from "./sql-def-helpers";
@@ -23,6 +27,16 @@ const FG_VOLUME_EXPR =
 /** The broken pre-00203 expression (no unit_count, no keg volume_bbl). */
 const BROKEN_VOLUME_EXPR = /fg\.quantity \* c\.volume_oz \/ 3968\.0/;
 
+/**
+ * The 00237 period key for completed allocations: when the removal happened
+ * (completed_at, stamped at fulfillment), falling back to created_at for
+ * legacy rows completed before the stamp existed.
+ */
+const ALLOC_PERIOD_KEY = /COALESCE\(a\.completed_at, a\.created_at\)/g;
+
+/** The broken pre-00237 keying (allocation-creation month, BD-1). */
+const BROKEN_PERIOD_KEY = /AND a\.created_at [<>]/;
+
 describe("get_ttb_inventory_summary volume math", () => {
   const body = latestFunctionBody("get_ttb_inventory_summary");
 
@@ -33,6 +47,13 @@ describe("get_ttb_inventory_summary volume math", () => {
   it("computes per-unit volume as COALESCE(volume_bbl, volume_oz/3968) x unit_count", () => {
     expect(body!).toMatch(FG_VOLUME_EXPR);
     expect(body!).not.toMatch(BROKEN_VOLUME_EXPR);
+  });
+
+  it("keys BOTH begin (alloc_before) and end (alloc_end) allocation terms on COALESCE(completed_at, created_at)", () => {
+    // One occurrence per boundary; keying only one side would silently break
+    // the begin + produced - removed = end identity.
+    expect(body!.match(ALLOC_PERIOD_KEY)?.length).toBe(2);
+    expect(body!).not.toMatch(BROKEN_PERIOD_KEY);
   });
 });
 
@@ -69,5 +90,13 @@ describe("get_ttb_removals_summary classification", () => {
       body!.indexOf("losses_bbl"),
     );
     expect(samplesArm).not.toMatch(/taproom_sale/);
+  });
+
+  it("buckets removals by COALESCE(completed_at, created_at), not created_at (BD-1)", () => {
+    // Both period boundaries (>= start, < end) must use the completed_at-first
+    // key, matching the inventory summary's alloc terms, so a removal leaves
+    // inventory in exactly the month it is reported as removed.
+    expect(body!.match(ALLOC_PERIOD_KEY)?.length).toBe(2);
+    expect(body!).not.toMatch(BROKEN_PERIOD_KEY);
   });
 });
