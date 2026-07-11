@@ -114,6 +114,16 @@ jobs:
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
           done
 
+      - name: Install plpgsql_check in the postgres service
+        run: |
+          # `supabase db lint` wraps plpgsql_check, which vanilla postgres:15
+          # doesn't ship (Supabase's own image does, but we deliberately avoid
+          # it — see the service-container comment above). The official
+          # postgres image carries the PGDG apt repo, so install the extension
+          # package into the running service container.
+          docker exec ${{ job.services.postgres.id }} bash -ceu \
+            'apt-get update -qq && apt-get install -y -qq postgresql-15-plpgsql-check'
+
       - name: Run Database Linter
         id: lint
         run: |
