@@ -14,12 +14,40 @@
 #                    to live before merge, or a merged migration whose
 #                    snapshot update was not committed.
 #
+# WARN-level additions are split into two classes so behavior-altering objects
+# can't hide in a generic warning:
+#   * BEHAVIOR-ALTERING — TRIG| (new triggers), POLICY| (new RLS policies) and
+#     RLS|<table>|false|* (a new table with row security DISABLED — a security
+#     smell in this RLS-heavy schema) get their own loud callout. An RLS flip
+#     on an existing table never reaches this path: its old flag line goes
+#     missing, which is the FAIL branch above.
+#   * Other additions — new functions/tables/RLS-enabled flag lines, listed
+#     separately.
+# All WARN-level drift is also appended to $GITHUB_STEP_SUMMARY (when set) so
+# it is visible on the run page without opening logs.
+#
+# Why behavior-altering additions stay WARN instead of FAIL: this repo's
+# normal flow applies feature-branch migrations to live before the branch
+# merges, so a new trigger/policy on live is expected for every in-flight
+# migration PR that adds one. FAILing on additions would red-flag each such
+# window with no way to distinguish it from a genuinely rogue object; the
+# compromise is the labeled callout + step summary above.
+#
+# SECURITY DEFINER functions cannot be singled out among FUNC| additions:
+# the line format carries only name(args) + a body hash, and definer-ness
+# lives inside the hashed body. Marking it in the line format would change
+# every existing FUNC| line, hard-FAILing the next cron until someone with
+# live access re-baselines — so new SECURITY DEFINER functions surface as
+# ordinary FUNC| additions.
+#
 # What it compares (see scripts/live-catalog.sql): every public function
 # (name + identity args + body hash), every non-internal trigger (name + table
-# + definition hash), and every base table. A body-hash change catches an
-# out-of-band CREATE OR REPLACE (e.g. a racy generate_lot_number swapped in),
-# not just adds/drops. A changed object appears on both sides of the delta
-# (old line missing, new line added); the missing side fails the run.
+# + definition hash), every base table, every RLS policy (table + name + cmd +
+# permissive + roles + qual/with_check hash), and per-table row-security
+# flags. A body-hash change catches an out-of-band CREATE OR REPLACE (e.g. a
+# racy generate_lot_number swapped in), not just adds/drops. A changed object
+# appears on both sides of the delta (old line missing, new line added); the
+# missing side fails the run.
 #
 # The snapshot is the expected live state. When a migration intentionally
 # changes the catalog, regenerate it AFTER applying the migration to live —
@@ -75,6 +103,15 @@ if [[ ! -f "$SNAPSHOT" ]]; then
   exit 2
 fi
 
+# An unsorted snapshot (e.g. mangled by a bad merge) makes comm(1) abort
+# mid-diff on GNU or silently emit garbage on BSD — check sortedness up front
+# with a clear message instead.
+if ! LC_ALL=C sort -c "$SNAPSHOT"; then
+  echo "ERROR: $SNAPSHOT is not LC_ALL=C sorted (bad merge?). Fix the merge or" >&2
+  echo "       regenerate it with: SUPABASE_DB_URL=... $0 --update" >&2
+  exit 2
+fi
+
 # Both files are LC_ALL=C sorted, so comm(1) splits the delta cleanly.
 missing="$(LC_ALL=C comm -23 "$SNAPSHOT" "$current")"
 added="$(LC_ALL=C comm -13 "$SNAPSHOT" "$current")"
@@ -88,11 +125,11 @@ if [[ -n "$missing" ]]; then
   echo "::error::Live database has DRIFTED from supabase/live-catalog.snapshot.txt: expected objects are missing or changed on live (C2/C3 class)."
   echo ""
   echo "Expected (in snapshot) but missing/changed on live:"
-  echo "$missing" | sed 's/^/  < /'
+  printf '%s\n' "$missing" | sed 's/^/  < /'
   if [[ -n "$added" ]]; then
     echo ""
     echo "Live-only lines (new versions of changed objects, or unrelated additions):"
-    echo "$added" | sed 's/^/  > /'
+    printf '%s\n' "$added" | sed 's/^/  > /'
   fi
   echo ""
   echo "If this is a legitimate change, apply the migration to live and regenerate"
@@ -101,12 +138,57 @@ if [[ -n "$missing" ]]; then
   exit 1
 fi
 
-echo "::warning::Live database has objects not in supabase/live-catalog.snapshot.txt (additions only — nothing expected is missing)."
-echo ""
-echo "$added" | sed 's/^/  > /'
-echo ""
+# Additions only (WARN). Split behavior-altering classes out so they can't
+# hide in a generic warning nobody reads: triggers, policies, and new tables
+# whose row security is disabled (RLS|<table>|false|*).
+hot_re='^(TRIG|POLICY)\||^RLS\|[^|]*\|false\|'
+hot="$(printf '%s\n' "$added" | grep -E "$hot_re" || true)"
+benign="$(printf '%s\n' "$added" | grep -vE "$hot_re" || true)"
+
+if [[ -n "$hot" ]]; then
+  echo "::warning::BEHAVIOR-ALTERING live-only additions: new triggers / RLS policies / RLS-disabled tables exist on live that the snapshot does not expect. Verify each maps to an in-flight migration."
+  echo ""
+  echo "Behavior-altering additions (TRIG/POLICY/RLS-disabled):"
+  printf '%s\n' "$hot" | sed 's/^/  > /'
+  echo ""
+fi
+
+if [[ -n "$benign" ]]; then
+  echo "::warning::Live database has objects not in supabase/live-catalog.snapshot.txt (additions only — nothing expected is missing)."
+  echo ""
+  printf '%s\n' "$benign" | sed 's/^/  > /'
+  echo ""
+fi
+
 echo "Usually an in-flight feature branch applied to live before merge (fine), or"
 echo "a merged migration whose snapshot update was never committed — if so run:"
 echo "  SUPABASE_DB_URL=... bash scripts/check-live-drift.sh --update"
 echo "and commit supabase/live-catalog.snapshot.txt."
+
+# Surface WARN-level drift on the workflow run page, not just in the logs.
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  {
+    echo "## Live-drift: WARN (additions only — nothing expected is missing)"
+    if [[ -n "$hot" ]]; then
+      echo ""
+      echo "### Behavior-altering additions (triggers / RLS policies / RLS-disabled tables)"
+      echo ""
+      echo '```'
+      printf '%s\n' "$hot"
+      echo '```'
+    fi
+    if [[ -n "$benign" ]]; then
+      echo ""
+      echo "### Other additions (functions / tables / RLS-enabled flag lines)"
+      echo ""
+      echo '```'
+      printf '%s\n' "$benign"
+      echo '```'
+    fi
+    echo ""
+    echo "If these are merged changes whose snapshot update was never committed, run"
+    echo '`scripts/db-push.sh` (or `check-live-drift.sh --update`) and commit the snapshot.'
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+
 exit 0
