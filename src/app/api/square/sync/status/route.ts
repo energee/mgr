@@ -6,6 +6,8 @@
  * - Last sync timestamps
  * - Count of catalog mappings
  * - Recent sync log entries
+ * - Count of unreconciled draft sales (drives the settings-page badge for
+ *   api/square/reconcile-draft-sales — audit BD-2)
  */
 
 import { withPermission } from "@/lib/api/auth";
@@ -13,6 +15,7 @@ import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 import { updateSquareSettings } from "@/integrations/square/client";
 import { getPosBins } from "@/integrations/square/route-helpers";
+import { dynamicFrom } from "@/services/types";
 
 export const GET = withPermission("integrations:manage", async () => {
   const admin = await createAdminClient();
@@ -35,6 +38,13 @@ export const GET = withPermission("integrations:manage", async () => {
     .select("id, sync_type, items_synced, items_failed, started_at, completed_at")
     .order("started_at", { ascending: false })
     .limit(10);
+
+  // 3b. Staged keg pours not yet converted into TTB removals (BD-2). Drives
+  //     the "Reconcile draft sales" badge. dynamicFrom: reconciled_at (00240)
+  //     is not in the generated types yet.
+  const { count: unreconciledDraftSales } = await dynamicFrom(admin, "square_draft_sales")
+    .select("id", { count: "exact", head: true })
+    .is("reconciled_at", null);
 
   // 4. POS-config surface: bins that are outbound Square sync targets (both
   //    square_location_id and pos_sales_channel_id set), with their Square
@@ -85,6 +95,7 @@ export const GET = withPermission("integrations:manage", async () => {
     lastCatalogSync: settings?.last_catalog_sync_at ?? null,
     lastInventorySync: settings?.last_inventory_sync_at ?? null,
     catalogItemCount: catalogItemCount ?? 0,
+    unreconciledDraftSales: unreconciledDraftSales ?? 0,
     recentSyncs: (recentSyncs ?? []).map((s) => ({
       id: s.id,
       syncType: s.sync_type,

@@ -45,10 +45,17 @@ export type SquareSyncResult = {
 }
 
 /**
- * square_sync_log.sync_type values (CHECK constraint: 00091, relaxed in 00233).
- * catalog_push / inventory_push are MGR pushing OUT to Square; sale_ingest is a
- * sale coming IN via the payment webhook; inventory_event is Square's own
- * inventory.count.updated echo, logged for visibility only (00233 — previously
- * mislogged as inventory_push, polluting the push history).
+ * square_sync_log.sync_type values (CHECK constraint: 00091, relaxed in 00233
+ * and 00240). catalog_push / inventory_push are MGR pushing OUT to Square;
+ * sale_ingest is a sale coming IN via the payment webhook; inventory_event is
+ * Square's own inventory.count.updated echo, logged for visibility only (00233
+ * — previously mislogged as inventory_push, polluting the push history);
+ * draft_reconcile is a run of api/square/reconcile-draft-sales converting
+ * staged keg pours into TTB taproom_sale removals (00240 — audit BD-2).
  */
-export type SquareSyncType = "catalog_push" | "inventory_push" | "sale_ingest" | "inventory_event";
+export type SquareSyncType =
+  | "catalog_push"
+  | "inventory_push"
+  | "sale_ingest"
+  | "inventory_event"
+  | "draft_reconcile";

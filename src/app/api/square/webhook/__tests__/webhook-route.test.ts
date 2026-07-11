@@ -185,7 +185,16 @@ const MAP_KEG: QueryResult = {
     id: "map-2",
     brand_id: "brand-1",
     selling_format_id: "fmt-1",
+    // No pour_size_oz key: the pre-00240 shape — must fall back to 16 oz.
     selling_formats: { unit_count: 1, containers: { type: "keg", volume_oz: null } },
+  },
+  error: null,
+};
+/** MAP_KEG with a per-variation pour size (square_catalog_map.pour_size_oz, 00240). */
+const MAP_KEG_10OZ: QueryResult = {
+  data: {
+    ...(MAP_KEG.data as Record<string, unknown>),
+    pour_size_oz: 10,
   },
   error: null,
 };
@@ -710,13 +719,37 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
       brand_id: string;
       selling_format_id: string;
       quantity: number;
+      volume_oz: number;
     };
     expect(draft).toMatchObject({
       location_id: "loc-1",
       brand_id: "brand-1",
       selling_format_id: "fmt-1",
       quantity: 3,
+      // No pour_size_oz on the mapping -> the 16 oz STANDARD_POUR_OZ default.
+      volume_oz: 48,
     });
+  });
+
+  it("draft line uses the mapping's per-variation pour_size_oz for volume_oz (BD-3)", async () => {
+    // 3 pours of a 10 oz variation (square_catalog_map.pour_size_oz = 10, 00240)
+    // must stage 30 oz — not the hard-coded 16 oz default's 48.
+    useTables({
+      square_sync_log: CLAIM_OK,
+      bins: BIN_SQ_LOC_1,
+      square_catalog_map: MAP_KEG_10OZ,
+      square_draft_sales: { data: null, error: null },
+    });
+
+    const res = await post(EVENT);
+    expect(res.status).toBe(200);
+
+    const draft = writes.find((w) => w.table === "square_draft_sales")!.row as {
+      quantity: number;
+      volume_oz: number;
+    };
+    expect(draft.quantity).toBe(3);
+    expect(draft.volume_oz).toBe(30);
   });
 
   it("failed square_draft_sales insert marks the line FAILED — never a silent 200 with the pour lost", async () => {

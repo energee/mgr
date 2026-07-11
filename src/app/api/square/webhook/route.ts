@@ -31,7 +31,11 @@
  *     FIFO draw falls short, or a concurrent sale won the row lock and the RPC
  *     clamped a debit at zero — only the stock that physically existed is
  *     debited and the oversell is surfaced in the response + sync log. Draft
- *     (keg) pours are staged in square_draft_sales (keg depletion is deferred).
+ *     (keg) pours are staged in square_draft_sales (keg depletion is deferred);
+ *     each pour's volume_oz uses the mapping's per-variation pour size
+ *     (square_catalog_map.pour_size_oz, 00240 — audit BD-3), falling back to
+ *     the 16 oz STANDARD_POUR_OZ default when NULL. Staged pours reach TTB
+ *     removals via api/square/reconcile-draft-sales (audit BD-2).
  *   - inventory.count.updated: Logged for informational purposes only (MGR is
  *     the source of truth for inventory).
  *   - All other events: Acknowledged with 200 but ignored.
@@ -484,9 +488,11 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
         // Look up the catalog mapping with the selling format's container type
         // AND the volume fields needed to stamp allocation.volume_bbl (so TTB
         // taxpaid-removals report the sale — get_ttb_removals_summary, 00203).
+        // pour_size_oz (00240) rides along for the draft branch below —
+        // extending this select avoids a second query per line.
         const { data: mapping } = await dynamicFrom(admin, "square_catalog_map")
           .select(
-            "id, brand_id, selling_format_id, selling_formats(unit_count, containers(type, volume_oz))"
+            "id, brand_id, selling_format_id, pour_size_oz, selling_formats(unit_count, containers(type, volume_oz))"
           )
           .eq("square_catalog_id", catalogObjectId)
           .eq("object_type", "ITEM_VARIATION")
@@ -700,7 +706,10 @@ async function handleCompletedPayment(event: SquareWebhookEvent) {
             continue;
           }
 
-          const volumeOz = calculateVolumeOz(quantity);
+          // Per-variation pour size (BD-3): the mapping's pour_size_oz when
+          // set, otherwise the 16 oz STANDARD_POUR_OZ default inside
+          // calculateVolumeOz.
+          const volumeOz = calculateVolumeOz(quantity, mapping.pour_size_oz ?? null);
 
           // supabase-js does not throw on error — a swallowed failure here
           // would still run itemsSynced++, hold the claim, and 200: the pour
