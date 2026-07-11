@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import { createHmac } from "crypto";
 import {
   DEFAULT_REPLAY_WINDOW_MS,
+  PAYMENT_REPLAY_WINDOW_MS,
   checkReplayWindow,
   verifyWebhookSignature,
 } from "@/integrations/square/webhook";
@@ -143,6 +144,27 @@ describe("checkReplayWindow", () => {
     });
     // 60s window: accepts.
     expect(checkReplayWindow(createdAt, 60_000, now)).toEqual({ ok: true });
+  });
+});
+
+// The widened payment.* window (audit IN-2): sale ingestion is exactly-once
+// via the order-keyed dedup claim (UNIQUE, 00224/00233), so payment events may
+// accept Square's full 24h retry horizon — a >5-min outage must not
+// permanently drop the sales Square dutifully keeps retrying.
+describe("PAYMENT_REPLAY_WINDOW_MS (audit IN-2)", () => {
+  const now = Date.parse("2026-05-14T12:00:00.000Z");
+
+  it("covers Square's full 24h retry horizon", () => {
+    const createdAt = new Date(now - 24 * 60 * 60_000).toISOString();
+    expect(checkReplayWindow(createdAt, PAYMENT_REPLAY_WINDOW_MS, now)).toEqual({ ok: true });
+  });
+
+  it("still rejects events beyond the horizon (26h) as stale", () => {
+    const createdAt = new Date(now - 26 * 60 * 60_000).toISOString();
+    expect(checkReplayWindow(createdAt, PAYMENT_REPLAY_WINDOW_MS, now)).toEqual({
+      ok: false,
+      reason: "stale_event",
+    });
   });
 });
 
