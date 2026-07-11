@@ -49,8 +49,8 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
   PO editor reuses the order-item price parser (folds into 2026-07-06 backlog #17); `onError` toasts on Square-enable + channel-format toggles (+ global `MutationCache.onError` fallback); error states on pick-list/FG-bin/Square-status reads; throwing write path for the settings toggle.
 - [ ] **19. A11y quick wins + systemics** (A11Y-4 C, A11Y-2, A11Y-5 trivial; A11Y-1/3/6/7 systemic) — owner: `ui-systems-expert`
   Login error wiring (`role="alert"` + `aria-describedby`/`aria-invalid`) and `aria-label="Row actions"` first; then Form-primitive migration for the 7 hand-rolled dialogs and a keyboard path for entity rows (copy `entity-mobile-card-list`'s Link pattern).
-- [ ] **20. SEC-1: stop deriving self-fetch origin from `request.url`** (L, quick) — owner: `integrations-expert`
-  Use `SITE_URL` (or call the sync logic as functions) in `api/square/sync/route.ts`.
+- [x] **20. SEC-1: stop deriving self-fetch origin from `request.url`** (L, quick) — owner: `integrations-expert` — **branch `fix/square-sync-origin`**
+  Use `SITE_URL` (or call the sync logic as functions) in `api/square/sync/route.ts`. Done via direct function invocation of the sibling route handlers (no origin, no loopback hop); QBO OAuth redirect-URI fallbacks left as-is (Intuit registered-URI matching, per SEC-1).
 
 ## P3 — Test debt (order = risk)
 
