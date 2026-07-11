@@ -43,7 +43,12 @@ const mockedCreateAdminClient = vi.mocked(createAdminClient);
 // -----------------------------------------------------------------------------
 
 type BrandRow = { id: string; name: string };
-type RecipeRow = { id: string; brand_id: string | null; pricing_tier_id: string | null };
+type RecipeRow = {
+  id: string;
+  brand_id: string | null;
+  pricing_tier_id: string | null;
+  updated_at: string;
+};
 type PriceRow = {
   pricing_tier_id: string;
   format_id: string | null;
@@ -66,7 +71,24 @@ function useFixtures(fixtures: Fixtures) {
   const { admin } = makeAdminMock(
     {
       brands: { data: fixtures.brands, error: null },
-      recipes: { data: fixtures.recipes, error: null },
+      // Honor the .order() chain, so the deterministic-tier tests below genuinely
+      // exercise the resolver's ORDER BY instead of passing vacuously on
+      // fixture insertion order.
+      recipes: ({ calls }) => {
+        const orders = calls.filter((c) => c.method === "order");
+        const data = [...fixtures.recipes].sort((a, b) => {
+          for (const { args } of orders) {
+            const col = args[0] as keyof RecipeRow;
+            const asc = (args[1] as { ascending?: boolean } | undefined)?.ascending !== false;
+            const av = a[col] ?? "";
+            const bv = b[col] ?? "";
+            if (av === bv) continue;
+            return (av < bv ? -1 : 1) * (asc ? 1 : -1);
+          }
+          return 0;
+        });
+        return { data, error: null };
+      },
       // The resolver filters channels with .in("sales_channel_id", [...]); honor
       // that (and ignore the .in("pricing_tier_id", ...) which the fixture rows
       // already satisfy).
@@ -97,8 +119,8 @@ const baseFixtures: Fixtures = {
     { id: BRAND_B, name: "Brand B" },
   ],
   recipes: [
-    { id: "recipe-a", brand_id: BRAND_A, pricing_tier_id: "tier-1" },
-    { id: "recipe-b", brand_id: BRAND_B, pricing_tier_id: "tier-2" },
+    { id: "recipe-a", brand_id: BRAND_A, pricing_tier_id: "tier-1", updated_at: "2026-01-01T00:00:00Z" },
+    { id: "recipe-b", brand_id: BRAND_B, pricing_tier_id: "tier-2", updated_at: "2026-01-01T00:00:00Z" },
   ],
   prices: [
     // taproom prices
@@ -180,5 +202,42 @@ describe("resolveChannelPrices", () => {
     await expect(resolveChannelPrices(BRAND_IDS, [TAPROOM_ID])).rejects.toMatchObject({
       message: "prices read boom",
     });
+  });
+
+  // recipes.brand_id is a plain FK, so a brand may carry several priced recipes.
+  // "First row wins" is only safe because the query orders the rows; without the
+  // ORDER BY the chosen tier — and so the live Square price — is plan-dependent.
+  it("picks the most recently updated priced recipe when a brand has several", async () => {
+    useFixtures({
+      ...baseFixtures,
+      recipes: [
+        // Listed oldest-first: an unordered query would pick tier-2 ($8).
+        { id: "recipe-old", brand_id: BRAND_A, pricing_tier_id: "tier-2", updated_at: "2026-01-01T00:00:00Z" },
+        { id: "recipe-new", brand_id: BRAND_A, pricing_tier_id: "tier-1", updated_at: "2026-06-01T00:00:00Z" },
+      ],
+    });
+
+    const result = await resolveChannelPrices([BRAND_A], [TAPROOM_ID]);
+    expect(result.get(TAPROOM_ID)).toEqual([
+      { brandId: BRAND_A, sellingFormatId: "fmt-x", priceCents: 1000 },
+      { brandId: BRAND_A, sellingFormatId: "fmt-y", priceCents: 1250 },
+    ]);
+  });
+
+  it("breaks a same-updated_at tie on recipe id, so the price is stable", async () => {
+    useFixtures({
+      ...baseFixtures,
+      recipes: [
+        { id: "recipe-z", brand_id: BRAND_A, pricing_tier_id: "tier-2", updated_at: "2026-01-01T00:00:00Z" },
+        { id: "recipe-a", brand_id: BRAND_A, pricing_tier_id: "tier-1", updated_at: "2026-01-01T00:00:00Z" },
+      ],
+    });
+
+    // recipe-a sorts first on id, so tier-1 wins regardless of row order.
+    const result = await resolveChannelPrices([BRAND_A], [TAPROOM_ID]);
+    expect(result.get(TAPROOM_ID)).toEqual([
+      { brandId: BRAND_A, sellingFormatId: "fmt-x", priceCents: 1000 },
+      { brandId: BRAND_A, sellingFormatId: "fmt-y", priceCents: 1250 },
+    ]);
   });
 });

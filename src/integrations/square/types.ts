@@ -13,7 +13,19 @@ export type SquareSyncVariation = {
   /** Selling format ID (unified identifier for all format types) */
   sellingFormatId: string;
   name: string; // e.g., "16oz 4-Pack", "1/2 BBL Draft"
-  priceCents: number;
+  /**
+   * Price to publish, in cents. `null` omits price_money from the pushed
+   * object — used when PRESERVING a mapped variation whose live Square object
+   * has no fixed price (e.g. VARIABLE_PRICING), so the push cannot invent one.
+   */
+  priceCents: number | null;
+  /**
+   * Square pricing type to publish; defaults to FIXED_PRICING. Set from the
+   * live object when preserving a mapped-but-locally-unpriced variation
+   * (see the catalog route: omitting a mapped variation from the batch upsert
+   * would DELETE it on Square, since the upsert replaces the full variation set).
+   */
+  pricingType?: "FIXED_PRICING" | "VARIABLE_PRICING";
   /** Existing Square catalog ID */
   squareCatalogId?: string;
   squareVersion?: bigint;
