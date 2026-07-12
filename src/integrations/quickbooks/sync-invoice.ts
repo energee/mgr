@@ -1,6 +1,14 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 import { qboClient } from "./client";
-import { getMapping, upsertMapping, createSyncLog, updateSyncLog, getDefaultPaymentTermsDays } from "./sync-utils";
+import {
+  getMapping,
+  getMappingOrLogFailure,
+  upsertMapping,
+  createSyncLog,
+  updateSyncLog,
+  getDefaultPaymentTermsDays,
+} from "./sync-utils";
 import { syncCustomer } from "./sync-customer";
 import type { QBOInvoice, QBOInvoiceLine, QBOEntityResponse } from "./types";
 
@@ -31,21 +39,36 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
   }
   if (!customerMapping) throw new Error("Failed to sync customer to QBO");
 
-  // Get customer for payment terms
-  const { data: customer } = await admin
+  // Get customer for payment terms. A failed read falls back to the default
+  // terms (due-date only), but is logged so the divergence is observable
+  // (audit SF-11).
+  const { data: customer, error: customerError } = await admin
     .from("customers")
     .select("payment_terms_days, is_tax_exempt")
     .eq("id", order.customer_id)
     .single();
+  if (customerError) {
+    logger.warn(
+      { err: customerError.message, customerId: order.customer_id, orderId },
+      "QBO sync: failed to read customer payment terms; falling back to default terms"
+    );
+  }
 
   const paymentTermsDays = (customer as Record<string, unknown> | null)?.payment_terms_days as number | null
     ?? await getDefaultPaymentTermsDays();
 
-  // Fetch order items
-  const { data: items } = await admin
+  // Fetch order items. A failed READ throws its own error — reporting it as
+  // "has no line items" masked the real DB failure in qbo_sync_log
+  // (audit SF-9).
+  const { data: items, error: itemsError } = await admin
     .from("order_items")
     .select("*, brand:brands(name), selling_format:selling_formats(name)")
     .eq("order_id", orderId);
+  if (itemsError) {
+    throw new Error(
+      `Failed to read line items for order ${order.order_number || orderId}: ${itemsError.message}`
+    );
+  }
 
   if (!items?.length) {
     throw new Error(`Order ${order.order_number || orderId} has no line items. Cannot create an empty invoice in QuickBooks.`);
@@ -67,7 +90,10 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
     };
   });
 
-  const existing = await getMapping("order", orderId);
+  // Create-vs-update decision — a failed mapping read throws (recorded as a
+  // failed sync-log row) rather than falling through to "create", which
+  // would post a duplicate Invoice into QuickBooks (audit SF-2).
+  const existing = await getMappingOrLogFailure("order", orderId);
   const action = existing ? "update" : "create";
   const logId = await createSyncLog("order", orderId, action);
 
