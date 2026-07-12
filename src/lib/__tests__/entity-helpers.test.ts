@@ -1,13 +1,16 @@
 /**
  * Tests for entity helper functions exported from @/types/entity.
  *
- * Covers: statesAsOptions, formatStateLabel, getStateLabel,
- * valuesAsOptions, getValueDisplay, getValueLabel.
+ * Covers: statesAsOptions, createModeStateOptions, clampCreateStateField,
+ * formatStateLabel, getStateLabel, valuesAsOptions, getValueDisplay,
+ * getValueLabel, resolveServerCore (incl. the state-field schema guard).
  */
 
 import { describe, it, expect } from "vitest";
 import {
   statesAsOptions,
+  createModeStateOptions,
+  clampCreateStateField,
   formatStateLabel,
   getStateLabel,
   valuesAsOptions,
@@ -170,6 +173,63 @@ describe("statesAsOptions", () => {
       transitions: {},
     };
     expect(statesAsOptions(empty)).toEqual([]);
+  });
+});
+
+// =============================================================================
+// createModeStateOptions (audit EA-1)
+// =============================================================================
+
+describe("createModeStateOptions", () => {
+  it("returns only the initial state, labeled from stateDisplay", () => {
+    expect(createModeStateOptions(fullStateMachine)).toEqual([
+      { value: "draft", label: "Draft" },
+    ]);
+  });
+
+  it("prefers the authored option's label when provided", () => {
+    const options = createModeStateOptions(fullStateMachine, [
+      { value: "draft", label: "Custom Draft Label" },
+      { value: "active", label: "Active" },
+    ]);
+    expect(options).toEqual([{ value: "draft", label: "Custom Draft Label" }]);
+  });
+
+  it("falls back to a formatted label without stateDisplay", () => {
+    expect(createModeStateOptions(noDisplayStateMachine)).toEqual([
+      { value: "in_progress", label: "In Progress" },
+    ]);
+  });
+
+  it("ignores authored options that lack the initial state", () => {
+    const options = createModeStateOptions(fullStateMachine, [
+      { value: "completed", label: "Completed" },
+    ]);
+    expect(options).toEqual([{ value: "draft", label: "Draft" }]);
+  });
+});
+
+// =============================================================================
+// clampCreateStateField (audit EA-1)
+// =============================================================================
+
+describe("clampCreateStateField", () => {
+  it("forces a staged later state back to the initial state", () => {
+    const data: Record<string, unknown> = { name: "X", status: "completed" };
+    clampCreateStateField(fullStateMachine, data);
+    expect(data.status).toBe("draft");
+  });
+
+  it("leaves payloads without the state field untouched", () => {
+    const data: Record<string, unknown> = { name: "X" };
+    clampCreateStateField(fullStateMachine, data);
+    expect("status" in data).toBe(false);
+  });
+
+  it("is a no-op without a state machine", () => {
+    const data: Record<string, unknown> = { status: "anything" };
+    clampCreateStateField(undefined, data);
+    expect(data.status).toBe("anything");
   });
 });
 
@@ -454,5 +514,67 @@ describe("resolveServerCore", () => {
     expect(resolved.detailHeader).toEqual({ title: "name", badge: "status" });
     expect(resolved.table).toBe("widgets");
     expect(resolved.domain).toBe("production");
+  });
+
+  it("leaves a stateless entity's formSchema untouched (identity)", () => {
+    const schema = z.object({ name: z.string() });
+    const resolved = resolveServerCore({ ...baseCore, formSchema: schema });
+    expect(resolved.formSchema).toBe(schema);
+  });
+});
+
+// =============================================================================
+// resolveServerCore — state-field schema guard (audit EA-9)
+// =============================================================================
+
+describe("resolveServerCore state-field guard", () => {
+  const statefulCore: EntityCoreInput<Record<string, unknown>> = {
+    name: "widget",
+    table: "widgets",
+    displayName: "Widget",
+    description: "test fixture",
+    domain: "production",
+    // Deliberately a bare z.string() status — the pre-EA-9 shape several
+    // cores still author; the guard must reject non-machine states anyway.
+    formSchema: z.object({
+      name: z.string().optional(),
+      status: z.string().default("draft"),
+    }),
+    stateMachine: fullStateMachine,
+  };
+
+  it("rejects a status outside the state machine, on the status path", () => {
+    const resolved = resolveServerCore(statefulCore);
+    const result = resolved.formSchema.safeParse({ status: "bogus" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path[0] === "status")).toBe(true);
+    }
+  });
+
+  it("accepts every machine state", () => {
+    const resolved = resolveServerCore(statefulCore);
+    for (const state of fullStateMachine.states) {
+      expect(resolved.formSchema.safeParse({ status: state }).success).toBe(true);
+    }
+  });
+
+  it("lets the base schema default apply when status is omitted", () => {
+    const resolved = resolveServerCore(statefulCore);
+    const result = resolved.formSchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data as Record<string, unknown>).status).toBe("draft");
+    }
+  });
+
+  it("ignores payloads whose parse output omits the state field", () => {
+    // Schemas without the state field (e.g. delivery) strip unknown keys, so
+    // the guard sees no status and stays silent — the DB default rules there.
+    const resolved = resolveServerCore({
+      ...statefulCore,
+      formSchema: z.object({ name: z.string().optional() }),
+    });
+    expect(resolved.formSchema.safeParse({ status: "bogus" }).success).toBe(true);
   });
 });

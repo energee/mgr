@@ -9,6 +9,7 @@
 
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { settingsKeys, channelFormatKeys } from "@/lib/query-keys";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -105,6 +106,16 @@ export function FormatManagement({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: channelFormatKeys.all() });
       queryClient.invalidateQueries({ queryKey: settingsKeys.pricingFormats() });
+    },
+    // channel_formats drives which formats are exposed per channel (feeds the
+    // pricing matrix and the Square catalog push) — a failed write must not
+    // look like a saved toggle (audit UI-7/SF-8).
+    onError: (_error, { enabled }) => {
+      toast.error(
+        enabled
+          ? "Failed to enable format for channel"
+          : "Failed to disable format for channel"
+      );
     },
   });
 

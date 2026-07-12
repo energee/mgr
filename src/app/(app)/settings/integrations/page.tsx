@@ -221,12 +221,19 @@ function IntegrationKeySection({
 function SquareIntegrationCard() {
   const queryClient = useQueryClient();
 
-  // Fetch sync status
-  const { data: status } = useQuery({
+  // Fetch sync status. A failed status read must surface as an error, not as
+  // "not connected" — the old `return null` on !res.ok made a 500 render the
+  // not-connected badge and hide the sync controls, prompting credential
+  // re-entry (audit UI-10/SF-10).
+  const {
+    data: status,
+    isError: statusError,
+    refetch: refetchStatus,
+  } = useQuery({
     queryKey: squareKeys.syncStatus(),
     queryFn: async () => {
       const res = await fetch("/api/square/sync/status");
-      if (!res.ok) return null;
+      if (!res.ok) throw new Error("Failed to load Square status");
       const data = await res.json();
       return data.data;
     },
@@ -251,7 +258,9 @@ function SquareIntegrationCard() {
     },
   });
 
-  // Toggle enabled
+  // Toggle enabled. A failed POST previously snapped the switch back with no
+  // feedback — on a fresh bin-sync install the user believed sync was enabled
+  // while nothing pushed (audit UI-7/SF-8).
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const res = await fetch("/api/square/sync/status", {
@@ -259,10 +268,52 @@ function SquareIntegrationCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_enabled: enabled }),
       });
-      if (!res.ok) throw new Error("Failed to update");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error?.message || "Failed to update");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: squareKeys.syncStatus() });
+    },
+    onError: (err: Error, enabled) => {
+      toast.error(
+        `Failed to ${enabled ? "enable" : "disable"} Square sync: ${err.message}`
+      );
+    },
+  });
+
+  // Reconcile staged draft (keg-pour) sales into TTB taproom-sale removals
+  // (audit BD-2). Per-row failures are surfaced in a warning toast — never
+  // silently swallowed (UI-7).
+  const reconcileDraftSales = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/square/reconcile-draft-sales", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "Failed to reconcile draft sales");
+      return data.data as {
+        processed: number;
+        reconciled: number;
+        alreadyReconciled: number;
+        failed: number;
+        failures: Array<{ draftSaleId: string; error: string }>;
+      };
+    },
+    onSuccess: (data) => {
+      if (data.failed > 0) {
+        toast.warning(
+          `Reconciled ${data.reconciled} draft sale${data.reconciled === 1 ? "" : "s"}; ${data.failed} failed — see the Square sync log`
+        );
+      } else if (data.reconciled === 0 && data.alreadyReconciled > 0) {
+        toast.success("All draft sales were already reconciled");
+      } else {
+        toast.success(`Reconciled ${data.reconciled} draft sale${data.reconciled === 1 ? "" : "s"}`);
+      }
+      queryClient.invalidateQueries({ queryKey: squareKeys.syncStatus() });
+      queryClient.invalidateQueries({ queryKey: squareKeys.draftSales() });
+    },
+    onError: (err: Error) => {
+      toast.error(`Draft-sale reconciliation failed: ${err.message}`);
     },
   });
 
@@ -292,8 +343,10 @@ function SquareIntegrationCard() {
   }> = status?.posBins ?? [];
 
   const isConnected = status?.isEnabled && status?.catalogItemCount > 0;
+  const unreconciledDraftSales: number = status?.unreconciledDraftSales ?? 0;
 
   function getSquareStatus(): IntegrationStatus {
+    if (statusError) return "error"; // unknown, not "not connected"
     if (isConnected) return "connected";
     if (status?.isEnabled) return "enabled";
     return "not_connected";
@@ -317,6 +370,18 @@ function SquareIntegrationCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Status read failed — distinguish from unconfigured (audit UI-10) */}
+        {statusError && (
+          <div className="flex items-center justify-between rounded-md border border-destructive/50 px-3 py-2">
+            <p className="text-sm text-destructive">
+              Failed to load Square status — connection state is unknown.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetchStatus()}>
+              Try Again
+            </Button>
+          </div>
+        )}
+
         {/* Access Token */}
         <div>
           <h4 className="text-sm font-medium mb-2">Access Token</h4>
@@ -446,6 +511,39 @@ function SquareIntegrationCard() {
               )}
             </div>
 
+            {/* Draft-sale reconciliation (BD-2): staged keg pours -> TTB removals */}
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <div>
+                <p className="text-sm font-medium flex items-center gap-2">
+                  Draft Sales
+                  {unreconciledDraftSales > 0 && (
+                    <Badge variant="secondary">{unreconciledDraftSales} unreconciled</Badge>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Convert staged keg pours into taproom-sale removals (TTB)
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reconcileDraftSales.mutate()}
+                disabled={reconcileDraftSales.isPending || unreconciledDraftSales === 0}
+              >
+                {reconcileDraftSales.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    Reconciling...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-3 w-3" />
+                    Reconcile draft sales
+                  </>
+                )}
+              </Button>
+            </div>
+
             {/* Recent Sync Log */}
             {status?.recentSyncs?.length > 0 && (
               <div>
@@ -477,7 +575,7 @@ function SquareIntegrationCard() {
             {[
               "Outbound catalog sync (products & prices)",
               "Inventory count sync (cases \u2192 selling units)",
-              "Inbound draft sales tracking",
+              "Inbound draft sales tracking & TTB reconciliation",
               "Multi-location support",
             ].map((feature, index) => (
               <li key={index} className="flex items-center gap-2">
