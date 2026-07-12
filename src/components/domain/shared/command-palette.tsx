@@ -6,8 +6,9 @@
  * Global cmd+K / ctrl+K palette with three capabilities:
  *
  * 1. Navigation — all navigation targets from the shared nav config
- *    (`nav-items.ts`, the same source the sidebar uses), grouped by sidebar
- *    section, plus Help and (permission-gated) Settings.
+ *    (`nav-items.ts`, the same source the sidebar uses): direct links under
+ *    "Pages" plus one group per nav section, plus Help and (permission-gated)
+ *    Settings.
  * 2. Quick actions — permission-gated create/receive shortcuts ("New Batch",
  *    "New Order", "Receive PO") whose routes are derived from entity configs.
  * 3. Record search — once the query reaches MIN_SEARCH_CHARS, key entities
@@ -67,7 +68,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { navigation } from "@/components/domain/shared/nav-items";
+import { navigation, isNavSection } from "@/components/domain/shared/nav-items";
+import type { NavItem } from "@/components/domain/shared/nav-items";
 
 // =============================================================================
 // Record search configuration
@@ -364,12 +366,26 @@ export function CommandPalette() {
             Searching records…
           </div>
         )}
-        {navigation.map((section) => (
+        <CommandGroup heading="Pages">
+          {navigation
+            .filter((entry): entry is NavItem => !isNavSection(entry))
+            .map((item) => (
+              <CommandItem
+                key={item.href}
+                value={item.label}
+                onSelect={() => navigate(item.href)}
+              >
+                <item.icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </CommandItem>
+            ))}
+        </CommandGroup>
+        {navigation.filter(isNavSection).map((section) => (
           <CommandGroup key={section.label} heading={section.label}>
             {section.items.map((item) => (
               <CommandItem
                 key={item.href}
-                // Include the section label so e.g. "reports ttb" matches.
+                // Include the section label so e.g. "production batches" matches.
                 value={`${section.label} ${item.label}`}
                 onSelect={() => navigate(item.href)}
               >
