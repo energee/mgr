@@ -679,6 +679,95 @@ describe("consumePackagingMaterials", () => {
     expect(insertedRows[2]).toMatchObject({ destination_id: null, source_id: "lot-cap-2", quantity: 4 });
   });
 
+  it("sorts the insert batch by (inventory_item_id, lot id) — canonical lock order, not BOM/FIFO pick order (audit PG-2)", async () => {
+    // BOM lists item-z BEFORE item-a, and item-a's FIFO pick order is
+    // lot-a-9 (expires first) before lot-a-1. The insert batch must instead be
+    // sorted (item-a lot-a-1, item-a lot-a-9, item-z lot-z-1): the rows'
+    // insert order is guard_allocation_availability's FOR UPDATE
+    // lock-acquisition order on inventory_lots, and concurrent packaging
+    // writers sharing materials must acquire those locks in one canonical
+    // order or they can deadlock.
+    const preloaded: PackagingDepletionLineItem[] = [
+      { selling_format_id: "fmt-1", actual_quantity: 5, batch_id: "batch-A" },
+    ];
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [{ data: [], error: null }, { data: null, error: null }],
+      selling_format_materials: [
+        {
+          data: [
+            {
+              selling_format_id: "fmt-1",
+              inventory_item_id: "item-z",
+              quantity_per_unit: 1,
+              inventory_item: { unit: "oz" },
+            },
+            {
+              selling_format_id: "fmt-1",
+              inventory_item_id: "item-a",
+              quantity_per_unit: 3,
+              inventory_item: { unit: "oz" },
+            },
+          ],
+          error: null,
+        },
+      ],
+      inventory_lots_with_quantities: [
+        {
+          data: [
+            {
+              id: "lot-z-1",
+              inventory_item_id: "item-z",
+              lot_number: "Z1",
+              remaining_quantity: 50,
+              expiration_date: "2025-06-01",
+              received_date: "2025-01-01",
+              unit_cost: 0.1,
+            },
+            {
+              id: "lot-a-1",
+              inventory_item_id: "item-a",
+              lot_number: "A1",
+              remaining_quantity: 20,
+              expiration_date: "2026-01-01",
+              received_date: "2026-01-01",
+              unit_cost: 0.5,
+            },
+            {
+              id: "lot-a-9",
+              inventory_item_id: "item-a",
+              lot_number: "A9",
+              remaining_quantity: 10,
+              expiration_date: "2025-01-01",
+              received_date: "2025-01-01",
+              unit_cost: 0.4,
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+
+    const result = await consumePackagingMaterials(supabase, "session-7", preloaded);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data).toEqual({ allocations_inserted: 3, shortfalls: [] });
+
+    // item-a needs 5*3=15: FIFO picks lot-a-9 (10, expires first) then
+    // lot-a-1 (5) — but the BATCH is sorted by (item, lot id).
+    const insertedRows = callsByTable.allocations[1].insert.mock.calls[0][0];
+    expect(insertedRows.map((r: { source_id: string }) => r.source_id)).toEqual([
+      "lot-a-1",
+      "lot-a-9",
+      "lot-z-1",
+    ]);
+    // FIFO still decides the QUANTITIES; only the row order is canonical.
+    expect(insertedRows).toEqual([
+      expect.objectContaining({ source_id: "lot-a-1", quantity: 5 }),
+      expect.objectContaining({ source_id: "lot-a-9", quantity: 10 }),
+      expect.objectContaining({ source_id: "lot-z-1", quantity: 5 }),
+    ]);
+  });
+
   it("reports a shortfall when available lots don't cover the required quantity, and still inserts the covered picks", async () => {
     const preloaded: PackagingDepletionLineItem[] = [
       { selling_format_id: "fmt-1", actual_quantity: 10, batch_id: "batch-A" },
