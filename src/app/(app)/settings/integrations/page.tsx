@@ -221,12 +221,19 @@ function IntegrationKeySection({
 function SquareIntegrationCard() {
   const queryClient = useQueryClient();
 
-  // Fetch sync status
-  const { data: status } = useQuery({
+  // Fetch sync status. A failed status read must surface as an error, not as
+  // "not connected" — the old `return null` on !res.ok made a 500 render the
+  // not-connected badge and hide the sync controls, prompting credential
+  // re-entry (audit UI-10/SF-10).
+  const {
+    data: status,
+    isError: statusError,
+    refetch: refetchStatus,
+  } = useQuery({
     queryKey: squareKeys.syncStatus(),
     queryFn: async () => {
       const res = await fetch("/api/square/sync/status");
-      if (!res.ok) return null;
+      if (!res.ok) throw new Error("Failed to load Square status");
       const data = await res.json();
       return data.data;
     },
@@ -251,7 +258,9 @@ function SquareIntegrationCard() {
     },
   });
 
-  // Toggle enabled
+  // Toggle enabled. A failed POST previously snapped the switch back with no
+  // feedback — on a fresh bin-sync install the user believed sync was enabled
+  // while nothing pushed (audit UI-7/SF-8).
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const res = await fetch("/api/square/sync/status", {
@@ -259,10 +268,18 @@ function SquareIntegrationCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_enabled: enabled }),
       });
-      if (!res.ok) throw new Error("Failed to update");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error?.message || "Failed to update");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: squareKeys.syncStatus() });
+    },
+    onError: (err: Error, enabled) => {
+      toast.error(
+        `Failed to ${enabled ? "enable" : "disable"} Square sync: ${err.message}`
+      );
     },
   });
 
@@ -329,6 +346,7 @@ function SquareIntegrationCard() {
   const unreconciledDraftSales: number = status?.unreconciledDraftSales ?? 0;
 
   function getSquareStatus(): IntegrationStatus {
+    if (statusError) return "error"; // unknown, not "not connected"
     if (isConnected) return "connected";
     if (status?.isEnabled) return "enabled";
     return "not_connected";
@@ -352,6 +370,18 @@ function SquareIntegrationCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Status read failed — distinguish from unconfigured (audit UI-10) */}
+        {statusError && (
+          <div className="flex items-center justify-between rounded-md border border-destructive/50 px-3 py-2">
+            <p className="text-sm text-destructive">
+              Failed to load Square status — connection state is unknown.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetchStatus()}>
+              Try Again
+            </Button>
+          </div>
+        )}
+
         {/* Access Token */}
         <div>
           <h4 className="text-sm font-medium mb-2">Access Token</h4>
