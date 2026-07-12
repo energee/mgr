@@ -265,6 +265,17 @@ export function EntityDataTable<T = Record<string, unknown>>({
     [path, router],
   );
 
+  // Keyboard/screen-reader path to the detail page: the first data cell of
+  // each row renders a real <Link> (audit A11Y-1 — desktop counterpart of the
+  // mobile card list's Link). handleRowClick keeps the whole-row mouse target.
+  const getRowHref = useCallback(
+    (row: T) => {
+      const id = (row as Record<string, unknown>).id;
+      return id ? `${path}/${id}` : null;
+    },
+    [path],
+  );
+
   const isMobile = useIsMobile();
   const isTouch = useIsTouch();
   // Bulk-capable surfaces: status transitions (stateMachine) and bulk delete
@@ -1315,6 +1326,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
                 "[&_td]:py-3 [&_th]:h-10 [&_td_button]:min-h-10 [&_td_button]:min-w-10"
             )}
             onRowClick={handleRowClick}
+            getRowHref={getRowHref}
             actionBar={
               // Show the bar when the selection has something actionable:
               // a common status transition and/or deletable rows

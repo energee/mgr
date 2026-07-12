@@ -19,6 +19,10 @@
  * - Implied loss capture: when the transferred volume is less than the
  *   batch's remaining volume, prompts a RecordLossDialog to record the
  *   difference as a loss allocation (feeds TTB losses)
+ *
+ * Fields use the shared Form primitives (FormField/FormControl/FormMessage)
+ * so validation errors are announced and associated with their inputs
+ * (audit A11Y-3).
  */
 
 import { useForm } from "react-hook-form";
@@ -35,6 +39,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { FormActions } from "@/components/ui/form-actions";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -339,6 +351,7 @@ export function VesselTransferDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <Form {...form}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {fromVesselName && (
             <div className="space-y-2">
@@ -347,16 +360,22 @@ export function VesselTransferDialog({
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="to_vessel_id">Destination Vessel</Label>
+          <FormField
+            control={form.control}
+            name="to_vessel_id"
+            render={({ field }) => (
+              <FormItem>
+            <FormLabel>Destination Vessel</FormLabel>
             <Select
-              value={selectedVesselId}
-              onValueChange={(v) => form.setValue("to_vessel_id", v)}
+              value={field.value}
+              onValueChange={field.onChange}
               disabled={vesselsLoading}
             >
-              <SelectTrigger className="min-h-[44px]">
-                <SelectValue placeholder={vesselsLoading ? "Loading..." : "Select vessel..."} />
-              </SelectTrigger>
+              <FormControl>
+                <SelectTrigger className="min-h-[44px]">
+                  <SelectValue placeholder={vesselsLoading ? "Loading..." : "Select vessel..."} />
+                </SelectTrigger>
+              </FormControl>
               <SelectContent>
                 {availableVessels?.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">
@@ -385,11 +404,7 @@ export function VesselTransferDialog({
                 )}
               </SelectContent>
             </Select>
-            {form.formState.errors.to_vessel_id && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.to_vessel_id.message}
-              </p>
-            )}
+            <FormMessage />
             {selectedVessel && (
               <p className="text-sm text-muted-foreground">
                 Capacity: <UnitDisplay value={selectedVessel.capacity_bbl} unitType="volume" />
@@ -398,42 +413,57 @@ export function VesselTransferDialog({
                 )}
               </p>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="volume_bbl">Volume</Label>
-            <UnitInput
-              value={watchedVolume || null}
-              onChange={(val) => {
-                volumeTouchedRef.current = true;
-                form.setValue("volume_bbl", val ?? 0, { shouldValidate: true });
-              }}
-              unitType="volume"
-              decimals={2}
-              placeholder="e.g., 7"
-              className="min-h-[44px]"
-            />
-            {form.formState.errors.volume_bbl && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.volume_bbl.message}
-              </p>
+              </FormItem>
             )}
-            {exceedsCapacity && (
-              <p className="text-sm text-destructive">
-                Volume exceeds vessel capacity (<UnitDisplay value={selectedVessel.capacity_bbl} unitType="volume" />)
-              </p>
-            )}
-          </div>
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea
-              id="notes"
-              {...form.register("notes")}
-              placeholder="Transfer notes..."
-              rows={2}
-            />
-          </div>
+          <FormField
+            control={form.control}
+            name="volume_bbl"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Volume</FormLabel>
+                <FormControl>
+                  <UnitInput
+                    value={typeof field.value === "number" && field.value !== 0 ? field.value : null}
+                    onChange={(val) => {
+                      volumeTouchedRef.current = true;
+                      field.onChange(val ?? 0);
+                    }}
+                    unitType="volume"
+                    decimals={2}
+                    placeholder="e.g., 7"
+                    className="min-h-[44px]"
+                  />
+                </FormControl>
+                <FormMessage />
+                {exceedsCapacity && (
+                  <p role="alert" className="text-sm text-destructive">
+                    Volume exceeds vessel capacity (<UnitDisplay value={selectedVessel.capacity_bbl} unitType="volume" />)
+                  </p>
+                )}
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes (optional)</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Transfer notes..."
+                    rows={2}
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <DialogFooter>
             <FormActions
@@ -446,6 +476,7 @@ export function VesselTransferDialog({
             />
           </DialogFooter>
         </form>
+        </Form>
       </DialogContent>
     </Dialog>
 

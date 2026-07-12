@@ -10,10 +10,14 @@
  * The dialog adapts its UI and calls the appropriate RPC:
  * - cancel_batch: Simple cancellation for planned batches
  * - archive_batch: Full termination with loss recording for in-progress batches
+ *
+ * Fields use the shared Form primitives (FormField/FormControl/FormMessage)
+ * so validation errors are announced and associated with their inputs
+ * (audit A11Y-3).
  */
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -30,7 +34,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -211,6 +223,7 @@ export function BatchCancellationDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <Form {...form}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Warning alert */}
           <Alert variant={isArchive ? "destructive" : "default"}>
@@ -228,79 +241,81 @@ export function BatchCancellationDialog({
           </Alert>
 
           {/* Reason selection */}
-          <div className="space-y-2">
-            <Label htmlFor="reason">{isArchive ? "Archive" : "Cancellation"} Reason *</Label>
-            <Select
-              value={form.watch("reason")}
-              onValueChange={(v) => form.setValue("reason", v)}
-            >
-              <SelectTrigger className="min-h-[44px]">
-                <SelectValue placeholder="Select reason..." />
-              </SelectTrigger>
-              <SelectContent>
-                {reasons.map((reason) => (
-                  <SelectItem key={reason.value} value={reason.value}>
-                    <span className="font-medium">{reason.label}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {form.formState.errors.reason && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.reason.message}
-              </p>
+          <FormField
+            control={form.control}
+            name="reason"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{isArchive ? "Archive" : "Cancellation"} Reason *</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger className="min-h-[44px]">
+                      <SelectValue placeholder="Select reason..." />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {reasons.map((reason) => (
+                      <SelectItem key={reason.value} value={reason.value}>
+                        <span className="font-medium">{reason.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+                {selectedReasonInfo && (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedReasonInfo.description}
+                  </p>
+                )}
+              </FormItem>
             )}
-            {selectedReasonInfo && (
-              <p className="text-sm text-muted-foreground">
-                {selectedReasonInfo.description}
-              </p>
-            )}
-          </div>
+          />
 
           {/* Loss volume - only for archive mode */}
           {isArchive && (
-            <div className="space-y-2">
-              <Label htmlFor="loss_volume_bbl">Loss Volume</Label>
-              <Controller
-                control={form.control}
-                name="loss_volume_bbl"
-                render={({ field }) => (
-                  <UnitInput
-                    id="loss_volume_bbl"
-                    value={typeof field.value === "number" ? field.value : null}
-                    onChange={field.onChange}
-                    unitType="volume"
-                    decimals={1}
-                  />
-                )}
-              />
-              {form.formState.errors.loss_volume_bbl && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.loss_volume_bbl.message}
-                </p>
+            <FormField
+              control={form.control}
+              name="loss_volume_bbl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Loss Volume</FormLabel>
+                  <FormControl>
+                    <UnitInput
+                      value={typeof field.value === "number" ? field.value : null}
+                      onChange={field.onChange}
+                      unitType="volume"
+                      decimals={1}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                  <FormDescription>
+                    Volume of beer lost. Used for TTB loss reporting.
+                    {currentVolume && <>{" "}Current batch volume: <UnitDisplay value={currentVolume} unitType="volume" /></>}
+                  </FormDescription>
+                </FormItem>
               )}
-              <p className="text-sm text-muted-foreground">
-                Volume of beer lost. Used for TTB loss reporting.
-                {currentVolume && <>{" "}Current batch volume: <UnitDisplay value={currentVolume} unitType="volume" /></>}
-              </p>
-            </div>
+            />
           )}
 
           {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              {...form.register("notes")}
-              placeholder={`Additional details about the ${mode === "archive" ? "archive" : "cancellation"}...`}
-              className="min-h-[80px]"
-            />
-            {form.formState.errors.notes && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.notes.message}
-              </p>
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder={`Additional details about the ${mode === "archive" ? "archive" : "cancellation"}...`}
+                    className="min-h-[80px]"
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
           {/* Confirmation step */}
           {showConfirm && (
@@ -350,6 +365,7 @@ export function BatchCancellationDialog({
             </Button>
           </DialogFooter>
         </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
