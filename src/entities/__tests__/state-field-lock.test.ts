@@ -81,7 +81,8 @@ describe("Entity configs: state field lock", () => {
   it("the framework lock does not affect create mode", () => {
     for (const [entity, field] of stateFieldDefs()) {
       // Fields without an explicit editable restriction stay editable at
-      // create time (initial-state selection is a separate product decision).
+      // create time. Note the create form still only OFFERS the machine's
+      // initial state — see create-mode-state.test.ts (audit EA-1).
       if (field.editable === false || !field.type) continue;
       expect(
         isFieldEditable(field, true, true, entity),
