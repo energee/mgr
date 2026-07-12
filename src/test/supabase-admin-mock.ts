@@ -1,6 +1,6 @@
 /**
- * Shared in-memory Supabase ADMIN-client fake for route-handler and
- * server-component tests (originally built for the Square integration suites).
+ * Shared in-memory Supabase ADMIN-client fake for route-handler,
+ * server-component, and integration tests (Square routes/catalog, MongoDB sync).
  *
  * Sibling of `supabase-mock.ts`, deliberately a DIFFERENT contract — pick by
  * what the module under test needs:
@@ -65,7 +65,7 @@ export type AdminMockOptions = {
 const EMPTY: QueryResult = { data: [], error: null };
 
 /** Pass-through filter/modifier methods. Every one returns the builder. */
-const FILTER_METHODS = ["select", "eq", "ilike", "in", "gt", "lt", "is", "not", "order", "limit"] as const;
+const FILTER_METHODS = ["select", "eq", "ilike", "in", "gt", "gte", "lt", "is", "not", "order", "limit"] as const;
 
 /**
  * Builds a fake admin client from table-keyed responses.
