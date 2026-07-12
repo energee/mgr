@@ -1,12 +1,30 @@
 /**
  * Square Combined Sync
  *
- * POST: Runs catalog sync followed by inventory sync in sequence.
- * This is a convenience endpoint that calls the individual sync endpoints.
+ * POST: Runs catalog sync followed by inventory sync in sequence by invoking
+ * the sibling route handlers directly as functions with the caller's request.
+ *
+ * No HTTP self-fetch (audit SEC-1): an earlier version fetched
+ * `${new URL(request.url).origin}/api/square/sync/{catalog,inventory}` with the
+ * caller's cookie forwarded. `request.url` derives from the incoming Host
+ * header, so on a deployment that doesn't strictly validate Host a spoofed
+ * header could send the loopback call — admin session cookie included — to an
+ * attacker-chosen origin. Direct invocation removes the derived origin (and
+ * the loopback HTTP hop) entirely; each sibling handler still runs its own
+ * withPermission gate against the same request, so auth semantics are
+ * unchanged.
+ *
+ * Body threading: the caller's request object is passed through, so an
+ * optional body like { forceStaleDelete: true } — the IN-9 bulk stale-delete
+ * override — reaches the catalog handler with no forwarding code. The catalog
+ * handler is the ONLY body reader (a request body is a single-use stream);
+ * inventorySync must stay body-free, or it would need request.clone() here.
  */
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
+import { POST as catalogSync } from "./catalog/route";
+import { POST as inventorySync } from "./inventory/route";
 
 type SyncResponse = {
   data?: unknown;
@@ -14,24 +32,10 @@ type SyncResponse = {
 }
 
 export const POST = withPermission("integrations:manage", async (request) => {
-  const origin = new URL(request.url).origin;
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-  };
-
-  // Forward auth cookies
-  const cookie = request.headers.get("cookie");
-  if (cookie) {
-    headers["cookie"] = cookie;
-  }
-
   // 1. Run catalog sync first
   let catalogData: SyncResponse;
   try {
-    const catalogRes = await fetch(`${origin}/api/square/sync/catalog`, {
-      method: "POST",
-      headers,
-    });
+    const catalogRes = await catalogSync(request);
     catalogData = await catalogRes.json();
 
     if (!catalogRes.ok) {
@@ -51,10 +55,7 @@ export const POST = withPermission("integrations:manage", async (request) => {
   // 2. Run inventory sync
   let inventoryData: SyncResponse;
   try {
-    const inventoryRes = await fetch(`${origin}/api/square/sync/inventory`, {
-      method: "POST",
-      headers,
-    });
+    const inventoryRes = await inventorySync(request);
     inventoryData = await inventoryRes.json();
 
     if (!inventoryRes.ok) {

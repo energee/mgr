@@ -290,12 +290,31 @@ export async function pushCatalog(
   };
 }
 
+/** Why the bulk stale-delete guard refused to run (audit IN-9). */
+export type StaleDeleteAbort = {
+  /** Map rows that would have been deleted. */
+  staleCount: number;
+  /** All rows currently in square_catalog_map. */
+  mappedCount: number;
+  /** Human-readable threshold that tripped. */
+  reason: string;
+};
+
 /** Outcome of {@link deleteStaleItems}. */
 export type DeleteStaleResult = {
   /** Map rows removed locally (only for chunks Square actually deleted). */
   deleted: number;
   /** Objects whose delete failed on Square; their map rows were RETAINED. */
   failed: number;
+  /**
+   * Set when the bulk-delete guard aborted the cleanup (audit IN-9): the stale
+   * set exceeded {@link STALE_DELETE_MAX_COUNT} rows or
+   * {@link STALE_DELETE_MAX_FRACTION} of all mapped objects. NOTHING was
+   * deleted, on Square or locally. A human confirms the removals are
+   * intentional and re-runs with `force: true`
+   * (POST /api/square/sync/catalog with body `{ "forceStaleDelete": true }`).
+   */
+  aborted?: StaleDeleteAbort;
   /**
    * Per-failed-chunk error messages, surfaced so the route can report them.
    * `chunk: -1` marks a failure of the initial stale-entry SELECT (SF-6/IN-11):
@@ -310,14 +329,39 @@ export type DeleteStaleResult = {
 const DELETE_BATCH_SIZE = 100;
 
 /**
+ * Bulk stale-delete guard thresholds (audit IN-9). Deleting a Square item
+ * destroys its variations, images, and Item-Sales reporting continuity, so an
+ * unexpectedly LARGE delete set is far more likely a keep-set derivation bug
+ * or a misconfiguration than a mass product retirement. Without `force`,
+ * deleteStaleItems refuses to run when the stale set exceeds EITHER threshold.
+ */
+export const STALE_DELETE_MAX_COUNT = 10;
+/** Fraction of ALL mapped rows above which the guard trips (see above). */
+export const STALE_DELETE_MAX_FRACTION = 0.5;
+/**
+ * The fraction guard only applies at/above this many stale rows: retiring one
+ * brand in a tiny catalog (e.g. 2 rows of 2 mapped) is a legitimate small
+ * delete and must not demand a force override.
+ */
+const STALE_DELETE_FRACTION_MIN_ROWS = 3;
+
+/**
  * Remove catalog items from Square whose brands are no longer in the KEEP set.
  *
  * `keepBrandIds` is the set of brands that SHOULD remain in the Square catalog
+ * — since 00244, the ACTIVE brand set (`brands.is_active`), pure config state
  * (see the catalog route's discontinued-vs-sold-out split). Every map row whose
  * brand is NOT in that set is treated as stale and deleted from BOTH Square and
  * square_catalog_map. An empty keep set means "delete the entire catalog" — the
- * route guards against calling with [] so a transient empty inventory can't wipe
+ * route guards against calling with [] so an empty/failed brand read can't wipe
  * everything.
+ *
+ * Bulk-delete guard (audit IN-9): unless `options.force`, the delete is REFUSED
+ * — `aborted` returned, nothing touched — when the stale set exceeds
+ * {@link STALE_DELETE_MAX_COUNT} rows, or {@link STALE_DELETE_MAX_FRACTION} of
+ * all mapped rows (fraction applies from STALE_DELETE_FRACTION_MIN_ROWS up).
+ * A delete set that large is more plausibly a keep-set bug than a mass
+ * retirement; a human re-runs with force after confirming.
  *
  * Failure handling (data-loss guard): the Square delete is chunked
  * (DELETE_BATCH_SIZE). A local map row is deleted ONLY for a chunk that Square
@@ -329,25 +373,23 @@ const DELETE_BATCH_SIZE = 100;
  *
  * @param client        Square SDK client.
  * @param keepBrandIds  brands to KEEP; every other mapped brand is deleted.
- * @returns counts + per-chunk errors for the caller to log/report.
+ * @param options.force bypass the bulk-delete guard (human-confirmed).
+ * @returns counts + guard abort + per-chunk errors for the caller to log/report.
  */
 export async function deleteStaleItems(
   client: SquareClient,
-  keepBrandIds: string[]
+  keepBrandIds: string[],
+  options: { force?: boolean } = {}
 ): Promise<DeleteStaleResult> {
   const admin = await createAdminClient();
 
-  // Find catalog map entries for brands not in the keep set.
-  let query = admin
+  // Read ALL map rows and partition locally: the guard needs the total mapped
+  // count anyway, and partitioning in JS replaces the old string-interpolated
+  // `.not("brand_id", "in", …)` filter. The map is small (one ITEM + a few
+  // ITEM_VARIATIONs per brand).
+  const { data: mapRows, error } = await admin
     .from("square_catalog_map")
     .select("id, brand_id, square_catalog_id, object_type");
-
-  // If there are brands to keep, exclude them; otherwise, delete everything.
-  if (keepBrandIds.length > 0) {
-    query = query.not("brand_id", "in", `(${keepBrandIds.join(",")})`);
-  }
-
-  const { data: staleEntries, error } = await query;
 
   if (error) {
     // Surface the SELECT failure instead of folding it into the empty-result
@@ -362,8 +404,33 @@ export async function deleteStaleItems(
     };
   }
 
-  if (!staleEntries || staleEntries.length === 0) {
+  const allRows = mapRows ?? [];
+  const keep = new Set(keepBrandIds);
+  // Empty keep set still means "everything is stale" — the route guards [].
+  const staleEntries = allRows.filter((e) => !keep.has(e.brand_id));
+
+  if (staleEntries.length === 0) {
     return { deleted: 0, failed: 0, errors: [] };
+  }
+
+  if (!options.force) {
+    const overCount = staleEntries.length > STALE_DELETE_MAX_COUNT;
+    const overFraction =
+      staleEntries.length >= STALE_DELETE_FRACTION_MIN_ROWS &&
+      staleEntries.length > allRows.length * STALE_DELETE_MAX_FRACTION;
+    if (overCount || overFraction) {
+      const reason = overCount
+        ? `stale set of ${staleEntries.length} exceeds the absolute cap of ${STALE_DELETE_MAX_COUNT} mapped objects`
+        : `stale set of ${staleEntries.length} exceeds ${STALE_DELETE_MAX_FRACTION * 100}% of the ${allRows.length} mapped objects`;
+      // error-level on purpose: an aborted cleanup needs a human decision.
+      log.error("Square catalog bulk stale-delete refused (IN-9 guard):", reason);
+      return {
+        deleted: 0,
+        failed: 0,
+        aborted: { staleCount: staleEntries.length, mappedCount: allRows.length, reason },
+        errors: [],
+      };
+    }
   }
 
   let deleted = 0;
