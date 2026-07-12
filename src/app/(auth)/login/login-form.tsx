@@ -10,6 +10,11 @@
  * Invite-only: the passwordless flow passes `shouldCreateUser: false` —
  * staff accounts are provisioned via /api/users/invite, never self-registered
  * here (audit DL-2; implicit signup minted a 'viewer'-role staff profile).
+ *
+ * Validation errors are announced to screen readers: each error paragraph is
+ * a `role="alert"` region referenced by the failing input's `aria-describedby`
+ * with `aria-invalid` set (audit A11Y-4). Inputs carry autocomplete tokens
+ * (audit A11Y-5).
  */
 
 import { useRef, useState, type FormEvent } from "react";
@@ -187,12 +192,19 @@ export function LoginForm() {
         <Input
           id="email"
           type="email"
+          autoComplete="email"
           placeholder="you@brewery.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? "email-error" : undefined}
         />
-        {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+        {errors.email && (
+          <p id="email-error" role="alert" className="text-sm text-destructive">
+            {errors.email}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -208,12 +220,19 @@ export function LoginForm() {
         <Input
           id="password"
           type="password"
+          autoComplete="current-password"
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={isLoading}
+          aria-invalid={!!errors.password}
+          aria-describedby={errors.password ? "password-error" : undefined}
         />
-        {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+        {errors.password && (
+          <p id="password-error" role="alert" className="text-sm text-destructive">
+            {errors.password}
+          </p>
+        )}
       </div>
 
       <Button ref={submitRef} type="submit" className="w-full" disabled={isLoading}>
