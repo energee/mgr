@@ -14,6 +14,7 @@ import { AppHeader } from "@/components/domain/shared/app-header";
 import { AppProviders } from "@/components/domain/shared/app-providers";
 import { ChatLayout } from "@/components/domain/shared/chat-layout";
 import { CommandPalette } from "@/components/domain/shared/command-palette";
+import { MobileTabBar } from "@/components/domain/shared/mobile-tab-bar";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { dynamicFrom } from "@/services/types";
 
@@ -73,11 +74,12 @@ export default async function AppLayout({ children }: AppLayoutProps) {
         <aside aria-label="Primary navigation">
           <AppSidebar />
         </aside>
-        <SidebarInset>
+        <SidebarInset className="max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
           <ChatLayout header={<AppHeader user={user} breweryName={breweryName} breweryLogoSvg={breweryLogoSvg} />}>
             {children}
           </ChatLayout>
         </SidebarInset>
+        <MobileTabBar />
       </SidebarProvider>
     </AppProviders>
   );
