@@ -3,7 +3,7 @@
  * deleteStaleItems (data-loss + chunking guards).
  *
  * pushCatalog (audit SF-4/IN-8 + PERF-1): the square_catalog_map write is ONE
- * batched, error-checked upsert targeting the 00236 unique index
+ * batched, error-checked upsert targeting the 00242 unique index
  * (brand_id, object_type, selling_format_id) NULLS NOT DISTINCT:
  *   (1) success persists every ITEM + ITEM_VARIATION mapping in a single call
  *       and counts them all in itemsSynced;
@@ -135,7 +135,7 @@ function makePushClient(): SquareClient {
 }
 
 describe("pushCatalog", () => {
-  it("persists all mappings in ONE batched upsert onto the 00236 key and counts them synced", async () => {
+  it("persists all mappings in ONE batched upsert onto the 00242 key and counts them synced", async () => {
     const writes = useCatalogMapResponse({ data: [], error: null });
 
     const result = await pushCatalog(makePushClient(), [PRODUCT]);
