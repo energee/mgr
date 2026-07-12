@@ -117,7 +117,7 @@ export async function retrieveVariationPricing(
  *  1. Build CatalogObject array from products
  *  2. Call Square batchUpsertCatalogObjects
  *  3. Map returned IDs back to brands/selling formats
- *  4. Persist ALL mappings in ONE batched, error-checked upsert onto the 00236
+ *  4. Persist ALL mappings in ONE batched, error-checked upsert onto the 00242
  *     unique index (brand_id, object_type, selling_format_id) NULLS NOT
  *     DISTINCT. This replaced a per-row INSERT-then-blind-UPDATE whose fallback
  *     UPDATE error was never checked (audit SF-4/IN-8): a silently dropped
@@ -127,7 +127,7 @@ export async function retrieveVariationPricing(
  *     the batch is reported failed and NONE are counted in itemsSynced.
  *
  * C7 (no location dimension in v1): square_catalog_map is keyed only by
- * (brand_id, selling_format_id, object_type) — enforced by the 00236 unique
+ * (brand_id, selling_format_id, object_type) — enforced by the 00242 unique
  * index; there is deliberately NO square_location_id column. A brand/variation
  * maps to ONE Square catalog object shared across all Square locations, because
  * v1 uses a single price per variation (see resolveChannelPrices). Per-location
@@ -251,7 +251,7 @@ export async function pushCatalog(
     }
 
     if (mappingRows.length > 0) {
-      // onConflict targets the 00236 unique index (brand_id, object_type,
+      // onConflict targets the 00242 unique index (brand_id, object_type,
       // selling_format_id) NULLS NOT DISTINCT — a plain-column index because
       // PostgREST's on_conflict can only infer from a bare column list (partial
       // and expression indexes are unreachable), and NULLS NOT DISTINCT so the

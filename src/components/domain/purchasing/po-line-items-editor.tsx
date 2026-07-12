@@ -6,6 +6,15 @@
  * Inline editor for purchase order line items. Supports catalog type selection
  * and dynamic item lookup based on type (malt, hop, yeast, etc.).
  *
+ * Qty/price edits on existing rows are buffered locally and committed on
+ * blur/Enter through the shared line-item parser (order-item-edit-utils.ts,
+ * `parsePoItemFieldEdit`) — one validated write per edit instead of an
+ * unvalidated write per keystroke. Invalid input (empty/NaN/negative price/
+ * non-positive qty) reverts to the saved value. The add row holds raw input
+ * strings and parses them on Add, so an explicit $0 price is stored as 0 and
+ * only a blank price means unpriced (NULL) — the old `parseFloat(...) || null`
+ * path stored $0 as NULL (audit UI-6, the PO twin of order M10).
+ *
  * Units come from the shared INVENTORY_UNIT_OPTIONS list (same list as
  * inventory items/lots) so units survive the accept-into-inventory copy;
  * legacy free-text units on existing rows are still rendered as an extra
@@ -53,6 +62,10 @@ import {
   isFreeTextCatalogType,
 } from "@/entities/po-line-item";
 import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
+import {
+  parsePoItemFieldEdit,
+  type EditableItemField,
+} from "@/components/domain/order/order-item-edit-utils";
 
 // =============================================================================
 // Types
@@ -73,12 +86,26 @@ type POLineItemsEditorProps = {
   readOnly?: boolean;
 }
 
+/**
+ * Add-row form state. Quantity/price hold RAW input strings; they are parsed
+ * via the shared parser only when the user commits the row (handleAdd), so
+ * mid-typing values are never coerced and "$0" survives as an explicit price.
+ */
 type NewItemState = {
+  catalog_type: string;
+  catalog_id: string;
+  quantity: string;
+  unit: string;
+  unit_price: string;
+}
+
+/** Parsed insert payload produced by handleAdd (null price = unpriced). */
+type NewItemInsert = {
   catalog_type: string;
   catalog_id: string;
   quantity: number;
   unit: string;
-  unit_price: number;
+  unit_price: number | null;
 }
 
 type CatalogItem = {
@@ -98,11 +125,16 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
   const [newItem, setNewItem] = useState<NewItemState>({
     catalog_type: "",
     catalog_id: "",
-    quantity: 1,
+    quantity: "1",
     unit: "lb",
-    unit_price: 0,
+    unit_price: "",
   });
   const [showAddRow, setShowAddRow] = useState(false);
+
+  // Local buffer for existing-row qty/price edits, keyed by `${itemId}:${field}`.
+  // Raw strings are held while typing and committed on blur/Enter via
+  // commitItemEdit — mirrors the pendingEdits pattern in order-items-editor.tsx.
+  const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
 
   // Fetch PO line items with resolved catalog names
   const { data: items, isLoading: itemsLoading } = useQuery({
@@ -172,22 +204,23 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     enabled: !!newItem.catalog_type && !isFreeTextCatalogType(newItem.catalog_type) && !!CATALOG_TABLES[newItem.catalog_type],
   });
 
-  // Add item mutation
+  // Add item mutation. Takes the parsed payload from handleAdd — unit_price is
+  // already number | null there (0 is a real price; null means unpriced).
   const addItem = useMutation({
-    mutationFn: async (item: NewItemState) => {
+    mutationFn: async (item: NewItemInsert) => {
       const { error } = await supabase.from("po_line_items").insert({
         po_id: poId,
         catalog_type: item.catalog_type,
         catalog_id: item.catalog_id,
         quantity: item.quantity,
         unit: item.unit,
-        unit_price: item.unit_price || null,
+        unit_price: item.unit_price,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
-      setNewItem({ catalog_type: "", catalog_id: "", quantity: 1, unit: "lb", unit_price: 0 });
+      setNewItem({ catalog_type: "", catalog_id: "", quantity: "1", unit: "lb", unit_price: "" });
       setShowAddRow(false);
       toast.success("Item added");
     },
@@ -213,6 +246,30 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     },
   });
 
+  // Buffer a keystroke for an existing row's qty/price input
+  const setPendingEdit = (itemId: string, field: EditableItemField, raw: string) => {
+    setPendingEdits((prev) => ({ ...prev, [`${itemId}:${field}`]: raw }));
+  };
+
+  // Commit a buffered qty/price edit on blur/Enter. Invalid input
+  // (empty/NaN/negative price/non-positive qty) is dropped so the field
+  // reverts to the saved value; unchanged values skip the write entirely.
+  const commitItemEdit = (item: POLineItemRow, field: EditableItemField) => {
+    const key = `${item.id}:${field}`;
+    const raw = pendingEdits[key];
+    if (raw === undefined) return; // nothing typed since last commit
+    setPendingEdits((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    const parsed = parsePoItemFieldEdit(field, raw);
+    if (parsed === null) return; // revert to saved value
+    const current = field === "quantity" ? item.quantity : item.unit_price;
+    if (parsed === current) return; // no-op — avoid the write
+    updateItem.mutate({ id: item.id, field, value: parsed });
+  };
+
   // Delete item mutation
   const deleteItem = useMutation({
     mutationFn: async (id: string) => {
@@ -233,7 +290,13 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     return sum + (item.quantity * (item.unit_price || 0));
   }, 0) || 0;
 
-  // Handle add item
+  // Parsed add-row values for the live line-total preview
+  const newQuantity = parsePoItemFieldEdit("quantity", newItem.quantity);
+  const newUnitPrice = parsePoItemFieldEdit("unit_price", newItem.unit_price);
+
+  // Handle add item — parse the raw add-row strings through the shared parser.
+  // A blank price means unpriced (NULL); anything typed must parse to a
+  // non-negative number, and $0 is stored as 0, not NULL.
   const handleAdd = () => {
     if (!newItem.catalog_type) {
       toast.error("Please select item type");
@@ -243,7 +306,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       toast.error(isFreeTextCatalogType(newItem.catalog_type) ? "Please enter item description" : "Please select an item");
       return;
     }
-    if (newItem.quantity <= 0) {
+    if (newQuantity === null) {
       toast.error("Quantity must be greater than zero");
       return;
     }
@@ -251,7 +314,17 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
       toast.error("Unit is required");
       return;
     }
-    addItem.mutate(newItem);
+    if (newItem.unit_price.trim() !== "" && newUnitPrice === null) {
+      toast.error("Price must be zero or greater");
+      return;
+    }
+    addItem.mutate({
+      catalog_type: newItem.catalog_type,
+      catalog_id: newItem.catalog_id,
+      quantity: newQuantity,
+      unit: newItem.unit,
+      unit_price: newUnitPrice,
+    });
   };
 
   if (itemsLoading) {
@@ -301,14 +374,12 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                     type="number"
                     step="0.01"
                     min={0}
-                    value={item.quantity}
-                    onChange={(e) =>
-                      updateItem.mutate({
-                        id: item.id,
-                        field: "quantity",
-                        value: parseFloat(e.target.value) || 0,
-                      })
-                    }
+                    value={pendingEdits[`${item.id}:quantity`] ?? item.quantity}
+                    onChange={(e) => setPendingEdit(item.id, "quantity", e.target.value)}
+                    onBlur={() => commitItemEdit(item, "quantity")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitItemEdit(item, "quantity");
+                    }}
                     className="h-8 w-full"
                   />
                 )}
@@ -337,14 +408,12 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                     type="number"
                     step="0.01"
                     min={0}
-                    value={item.unit_price || ""}
-                    onChange={(e) =>
-                      updateItem.mutate({
-                        id: item.id,
-                        field: "unit_price",
-                        value: parseFloat(e.target.value) || null,
-                      })
-                    }
+                    value={pendingEdits[`${item.id}:unit_price`] ?? item.unit_price ?? ""}
+                    onChange={(e) => setPendingEdit(item.id, "unit_price", e.target.value)}
+                    onBlur={() => commitItemEdit(item, "unit_price")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitItemEdit(item, "unit_price");
+                    }}
                     className="h-8 w-full"
                     placeholder="0.00"
                   />
@@ -434,7 +503,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                   min={0}
                   value={newItem.quantity}
                   onChange={(e) =>
-                    setNewItem({ ...newItem, quantity: parseFloat(e.target.value) || 0 })
+                    setNewItem({ ...newItem, quantity: e.target.value })
                   }
                   className="h-8 w-full"
                 />
@@ -450,16 +519,16 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                   type="number"
                   step="0.01"
                   min={0}
-                  value={newItem.unit_price || ""}
+                  value={newItem.unit_price}
                   onChange={(e) =>
-                    setNewItem({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })
+                    setNewItem({ ...newItem, unit_price: e.target.value })
                   }
                   className="h-8 w-full"
                   placeholder="0.00"
                 />
               </TableCell>
               <TableCell className="text-right font-medium">
-                ${(newItem.quantity * newItem.unit_price).toFixed(2)}
+                ${((newQuantity ?? 0) * (newUnitPrice ?? 0)).toFixed(2)}
               </TableCell>
               <TableCell>
                 <Button

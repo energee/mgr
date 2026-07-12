@@ -209,11 +209,49 @@ export type EntityCoreInput<T = Record<string, unknown>> = Omit<
   Partial<Pick<EntityCore<T>, DefaultableCoreField>>;
 
 /**
+ * Wrap a stateful entity's formSchema so the state field only accepts values
+ * that exist in its state machine (audit EA-9). Several cores author the
+ * status field as a bare `z.string()`; without this guard any string passes
+ * client/service validation and only the DB enum rejects it. The guard is
+ * membership-only — WHICH machine state is allowed on create vs. edit is
+ * enforced by the form layer (see clampCreateStateField / the edit-mode strip
+ * in entity-detail-unified.tsx) and the 00143/00205 UPDATE triggers.
+ *
+ * Applied centrally in `resolveServerCore` so every formSchema consumer
+ * (EntityDetailUnified, QuickCreateDialog, entityService.create/update, the
+ * AI chat cores registry) inherits it without per-entity schema edits.
+ * Schemas whose parse output omits the state field entirely (e.g. delivery)
+ * are untouched — the DB default supplies the initial state there.
+ */
+function withStateFieldGuard<T>(
+  formSchema: EntityCore<T>["formSchema"],
+  stateMachine: StateMachineConfig<T>,
+): EntityCore<T>["formSchema"] {
+  const { stateField, states } = stateMachine;
+  return formSchema.superRefine((values, ctx) => {
+    const value = (values as Record<string, unknown>)[stateField];
+    // Absent/null state is the base schema's concern (defaults, nullability).
+    if (value === undefined || value === null) return;
+    if (typeof value !== "string" || !states.includes(value)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [stateField],
+        message: `Invalid ${stateField} "${String(value)}" — must be one of: ${states.join(", ")}`,
+      });
+    }
+  });
+}
+
+/**
  * Apply the single `EntityCore` default that doesn't depend on the
  * presentation half (`displayNamePlural` → `${displayName}s`) and return a
  * complete `EntityCore<T>`. Server-safe: no React imports, no `listColumns`
  * dependency. Used by both `createEntityConfig` (the React path) and
  * `src/entities/cores.ts` (the server path that powers the AI chat route).
+ *
+ * Stateful entities additionally get their formSchema wrapped with
+ * `withStateFieldGuard` so the state field rejects strings outside the state
+ * machine (audit EA-9) on every validation path.
  *
  * `searchableFields` and `defaultSort` are intentionally left as the core
  * authored them. Both are optional on `EntityCore`; defaulting them here
@@ -225,6 +263,9 @@ export function resolveServerCore<T>(core: EntityCoreInput<T>): EntityCore<T> {
   return {
     ...core,
     displayNamePlural: core.displayNamePlural ?? `${core.displayName}s`,
+    formSchema: core.stateMachine
+      ? withStateFieldGuard(core.formSchema, core.stateMachine)
+      : core.formSchema,
   };
 }
 
@@ -803,6 +844,62 @@ export function statesAsOptions<T>(
     value: state,
     label: stateMachine.stateDisplay?.[state]?.label || formatStateLabel(state),
   }));
+}
+
+/**
+ * Select options a state-machine state field may offer in CREATE mode: only
+ * the machine's initial state (audit EA-1). New records must enter their
+ * lifecycle at `initialState` — creating a record directly in a later state
+ * would bypass both server-side transition validation (the 00143/00205
+ * triggers fire on UPDATE only, never INSERT) and the transition side-effect
+ * registry (src/services/transition-side-effects.ts), e.g. a packaging
+ * session created as "Completed" would never deplete materials or create
+ * finished goods. Consumed by the universal form layer (unified-field.tsx,
+ * quick-create-dialog.tsx); authored option labels win when provided,
+ * falling back to stateDisplay / formatted labels.
+ */
+export function createModeStateOptions<T>(
+  stateMachine: StateMachineConfig<T>,
+  authoredOptions?: { value: string; label: string }[],
+): { value: string; label: string }[] {
+  const { initialState } = stateMachine;
+  const authored = authoredOptions?.find((o) => o.value === initialState);
+  return [
+    authored ?? {
+      value: initialState,
+      label:
+        stateMachine.stateDisplay?.[initialState]?.label ||
+        formatStateLabel(initialState),
+    },
+  ];
+}
+
+/**
+ * Force a create-mode INSERT payload's state field to the state machine's
+ * initial state (audit EA-1). New records must enter their lifecycle at
+ * `initialState`: an INSERT is invisible to the server-side transition
+ * triggers (migrations 00143/00205 fire on UPDATE only) and to the
+ * transition side-effect registry (src/services/transition-side-effects.ts),
+ * so a record created directly in a later state (e.g. a packaging session
+ * created "Completed") would skip material depletion, FG creation, and every
+ * other transition effect. Create forms only offer the initial state
+ * (createModeStateOptions) — this clamp is the backstop for values staged
+ * via the prefill store or programmatic defaultValues. Payloads whose parsed
+ * schema omits the state field (e.g. delivery) are untouched; the DB default
+ * supplies the initial state there. No-op for stateless entities.
+ *
+ * Mutates `data` in place. Used by the create paths in
+ * entity-detail-unified.tsx and quick-create-dialog.tsx.
+ */
+export function clampCreateStateField<T>(
+  stateMachine: StateMachineConfig<T> | undefined,
+  data: Record<string, unknown>,
+): void {
+  if (!stateMachine) return;
+  const { stateField, initialState } = stateMachine;
+  if (stateField in data) {
+    data[stateField] = initialState;
+  }
 }
 
 /**

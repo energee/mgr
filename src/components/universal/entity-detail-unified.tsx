@@ -75,8 +75,10 @@ import {
   type EntityConfig,
   type EntityActionDef,
   type EntityRelationDef,
+  type StateMachineConfig,
   type UnifiedSectionDef,
   type UnifiedFieldDef,
+  clampCreateStateField,
   resolveEntityBasePath,
   getStateLabel,
 } from "@/types/entity";
@@ -313,7 +315,8 @@ function groupSectionsForDisplay<T>(
 
 function buildDefaultValues<T>(
   sections: UnifiedSectionDef<T>[],
-  defaultValues?: Partial<T>
+  defaultValues?: Partial<T>,
+  stateMachine?: StateMachineConfig<T>
 ): Record<string, unknown> {
   const initial: Record<string, unknown> = {};
   for (const section of sections) {
@@ -344,6 +347,16 @@ function buildDefaultValues<T>(
   }
   if (defaultValues) {
     Object.assign(initial, defaultValues);
+  }
+  // State-machine state fields always start at the machine's initial state
+  // (audit EA-1): the create select only offers that state
+  // (createModeStateOptions) and the save path clamps it
+  // (clampCreateStateField), so the default must agree — neither the prefill
+  // store nor page-level defaultValues can stage a later state. Runs after
+  // the Object.assign on purpose. Edit mode is unaffected: record values are
+  // merged over these defaults in resetFormFromRecord.
+  if (stateMachine && stateMachine.stateField in initial) {
+    initial[stateMachine.stateField] = stateMachine.initialState;
   }
   return initial;
 }
@@ -591,11 +604,15 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
   // EntityDetailPage) win over store prefill.
   const formDefaults = useMemo(
     () =>
-      buildDefaultValues(sections, {
-        ...storePrefill,
-        ...(defaultValues as Partial<T> | undefined),
-      } as Partial<T>),
-    [sections, defaultValues, storePrefill]
+      buildDefaultValues(
+        sections,
+        {
+          ...storePrefill,
+          ...(defaultValues as Partial<T> | undefined),
+        } as Partial<T>,
+        entity.stateMachine
+      ),
+    [sections, defaultValues, storePrefill, entity.stateMachine]
   );
 
   const form = useForm<Record<string, unknown>>({
@@ -940,6 +957,15 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
       delete (result.data as Record<string, unknown>)[
         entity.stateMachine.stateField
       ];
+    }
+    // Create-mode mirror of the strip above: new records always enter at the
+    // machine's initial state (audit EA-1) — see clampCreateStateField in
+    // types/entity.ts.
+    if (isCreateMode) {
+      clampCreateStateField(
+        entity.stateMachine,
+        result.data as Record<string, unknown>
+      );
     }
 
     setIsSubmitting(true);
