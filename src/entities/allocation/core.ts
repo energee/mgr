@@ -56,6 +56,10 @@ export const REASON_CODES = [
   // Auto-inserted by reconcileBatchLoss at batch completion (packaged vs
   // produced wort). Keep value in sync with the service's insert literal.
   { value: "reconciliation", label: "Completion Reconciliation" },
+  // Auto-inserted by the Square refund webhook (00241) as the inverse
+  // adjustment reversing a refunded taproom_sale. Keep value in sync with the
+  // webhook's insert literal (src/app/api/square/webhook/route.ts).
+  { value: "refund", label: "POS Refund" },
   { value: "other", label: "Other" },
 ];
 
