@@ -13,6 +13,12 @@
  * the loopback HTTP hop) entirely; each sibling handler still runs its own
  * withPermission gate against the same request, so auth semantics are
  * unchanged.
+ *
+ * Body threading: the caller's request object is passed through, so an
+ * optional body like { forceStaleDelete: true } — the IN-9 bulk stale-delete
+ * override — reaches the catalog handler with no forwarding code. The catalog
+ * handler is the ONLY body reader (a request body is a single-use stream);
+ * inventorySync must stay body-free, or it would need request.clone() here.
  */
 
 import { withPermission } from "@/lib/api/auth";
