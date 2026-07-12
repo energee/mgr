@@ -28,7 +28,7 @@ import {
   buildQuickCreateDefaults,
 } from "@/components/universal/quick-create-dialog";
 import { FieldInput } from "@/components/universal/field-input";
-import type { UnifiedSectionDef } from "@/types/entity";
+import type { StateMachineConfig, UnifiedSectionDef } from "@/types/entity";
 
 type AnyRecord = Record<string, unknown>;
 
@@ -136,6 +136,32 @@ describe("buildQuickCreateDefaults", () => {
       parent_id: null,
       is_active: true,
       kind: "a",
+    });
+  });
+
+  it("seeds a stateful entity's state field with the machine's initial state", () => {
+    // Audit EA-1: quick-create is always create mode, so the state field
+    // (e.g. vessel status) starts — and stays — at the initial state instead
+    // of "" (which a non-nullable enum status would reject at parse time).
+    const sections: UnifiedSectionDef<AnyRecord>[] = [
+      {
+        id: "s",
+        title: "S",
+        fields: [
+          { name: "name", label: "Name", type: "text", required: true },
+          { name: "status", label: "Status", type: "select" },
+        ],
+      },
+    ];
+    const stateMachine: StateMachineConfig<AnyRecord> = {
+      stateField: "status",
+      states: ["ready_for_use", "in_use", "dirty"],
+      initialState: "ready_for_use",
+      transitions: { ready_for_use: ["in_use"], in_use: ["dirty"], dirty: [] },
+    };
+    expect(buildQuickCreateDefaults(sections, stateMachine)).toEqual({
+      name: "",
+      status: "ready_for_use",
     });
   });
 });

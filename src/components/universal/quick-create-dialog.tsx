@@ -40,10 +40,13 @@ import { dynamicFrom } from "@/services/types";
 import { entityKeys, dynamicOptionsKeys } from "@/lib/query-keys";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { log } from "@/lib/client-logger";
-import type {
-  EntityConfig,
-  UnifiedFieldDef,
-  UnifiedSectionDef,
+import {
+  type EntityConfig,
+  type StateMachineConfig,
+  type UnifiedFieldDef,
+  type UnifiedSectionDef,
+  clampCreateStateField,
+  createModeStateOptions,
 } from "@/types/entity";
 import { FieldInput } from "./field-input";
 
@@ -121,10 +124,15 @@ export function getQuickCreateFields(
 /**
  * Initial form values for every create-editable field (not just the rendered
  * subset) so config `defaultValue`s like `is_active: true` are submitted.
- * Mirrors buildDefaultValues in entity-detail-unified.tsx.
+ * Mirrors buildDefaultValues in entity-detail-unified.tsx — including the
+ * state-field rule: a stateful entity's state field (e.g. vessel status) is
+ * seeded with the machine's initial state instead of "" so quick-created
+ * records enter their lifecycle at the start (audit EA-1; also what lets a
+ * non-nullable enum status like vessel's parse without the field rendered).
  */
 export function buildQuickCreateDefaults(
-  sections: UnifiedSectionDef<AnyRecord>[] | undefined
+  sections: UnifiedSectionDef<AnyRecord>[] | undefined,
+  stateMachine?: StateMachineConfig<AnyRecord>
 ): AnyRecord {
   const initial: AnyRecord = {};
   for (const field of getEditableFields(sections)) {
@@ -149,6 +157,7 @@ export function buildQuickCreateDefaults(
       }
     }
   }
+  clampCreateStateField(stateMachine, initial);
   return initial;
 }
 
@@ -250,7 +259,7 @@ function QuickCreateForm({
   );
 
   const [values, setValues] = useState<AnyRecord>(() =>
-    buildQuickCreateDefaults(config.sections)
+    buildQuickCreateDefaults(config.sections, config.stateMachine)
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -276,6 +285,11 @@ function QuickCreateForm({
         candidate[field.name] = null;
       }
     }
+
+    // Quick-create is always create mode: the state field (if any) can only
+    // hold the machine's initial state (audit EA-1; mirrors the create path
+    // in entity-detail-unified.tsx).
+    clampCreateStateField(config.stateMachine, candidate);
 
     const result = config.formSchema.safeParse(candidate);
     if (!result.success) {
@@ -333,8 +347,23 @@ function QuickCreateForm({
         {visibleFields.map((field) => (
           <FieldInput
             key={field.name}
-            // Strip any explicit quickCreate component on nested fields
-            field={{ ...field, quickCreate: undefined }}
+            // Strip any explicit quickCreate component on nested fields.
+            // State fields only offer the machine's initial state — a
+            // quick-create is always create mode (audit EA-1; mirrors
+            // UnifiedField's create-mode clamp).
+            field={{
+              ...field,
+              quickCreate: undefined,
+              ...(config.stateMachine &&
+              field.name === config.stateMachine.stateField
+                ? {
+                    options: createModeStateOptions(
+                      config.stateMachine,
+                      field.options
+                    ),
+                  }
+                : null),
+            }}
             value={values[field.name]}
             error={errors[field.name]}
             onChange={(v) => {
