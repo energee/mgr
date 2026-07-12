@@ -1,13 +1,17 @@
 /**
- * Tests for the order items editor's blur-commit parse/validation helper
+ * Tests for the shared line-item blur-commit parse/validation helpers
  * (order-item-edit-utils.ts). Existing-row qty/price inputs buffer keystrokes
  * and only commit on blur/Enter; parseItemFieldEdit must reject
  * empty/NaN/out-of-range input (returning null so the editor reverts) instead
  * of coercing — the old onChange path coerced a cleared qty to 1 and a "0"
- * price to null mid-edit.
+ * price to null mid-edit. parsePoItemFieldEdit is the purchasing twin
+ * (audit UI-6): identical price semantics, decimal quantities.
  */
 import { describe, it, expect } from "vitest";
-import { parseItemFieldEdit } from "@/components/domain/order/order-item-edit-utils";
+import {
+  parseItemFieldEdit,
+  parsePoItemFieldEdit,
+} from "@/components/domain/order/order-item-edit-utils";
 
 describe("parseItemFieldEdit — quantity", () => {
   it("parses a valid integer quantity", () => {
@@ -62,5 +66,37 @@ describe("parseItemFieldEdit — unit_price", () => {
   it("rejects non-numeric input", () => {
     expect(parseItemFieldEdit("unit_price", "abc")).toBeNull();
     expect(parseItemFieldEdit("unit_price", "1,50")).toBeNull();
+  });
+});
+
+describe("parsePoItemFieldEdit — quantity (decimal, positive)", () => {
+  it("accepts decimal quantities (raw materials are ordered in e.g. 55.5 lb)", () => {
+    expect(parsePoItemFieldEdit("quantity", "55.5")).toBe(55.5);
+    expect(parsePoItemFieldEdit("quantity", "0.25")).toBe(0.25);
+    expect(parsePoItemFieldEdit("quantity", "10")).toBe(10);
+  });
+
+  it("rejects zero, negative, empty and non-numeric quantities", () => {
+    expect(parsePoItemFieldEdit("quantity", "0")).toBeNull();
+    expect(parsePoItemFieldEdit("quantity", "-3")).toBeNull();
+    expect(parsePoItemFieldEdit("quantity", "")).toBeNull();
+    expect(parsePoItemFieldEdit("quantity", "  ")).toBeNull();
+    expect(parsePoItemFieldEdit("quantity", "abc")).toBeNull();
+    expect(parsePoItemFieldEdit("quantity", "12abc")).toBeNull();
+  });
+});
+
+describe("parsePoItemFieldEdit — unit_price (reuses order-item semantics)", () => {
+  it("preserves an explicit $0 (the PO add path stored $0 as NULL — audit UI-6)", () => {
+    expect(parsePoItemFieldEdit("unit_price", "0")).toBe(0);
+    expect(parsePoItemFieldEdit("unit_price", "0.00")).toBe(0);
+  });
+
+  it("matches parseItemFieldEdit for representative price inputs", () => {
+    for (const raw of ["12.50", ".5", "0", "", "  ", "-1", "abc", "1,50"]) {
+      expect(parsePoItemFieldEdit("unit_price", raw)).toBe(
+        parseItemFieldEdit("unit_price", raw)
+      );
+    }
   });
 });

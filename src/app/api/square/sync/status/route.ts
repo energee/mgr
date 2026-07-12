@@ -13,7 +13,7 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
-import { updateSquareSettings } from "@/integrations/square/client";
+import { updateSquareSettingsOrThrow } from "@/integrations/square/client";
 import { getPosBins } from "@/integrations/square/route-helpers";
 import { dynamicFrom } from "@/services/types";
 
@@ -121,7 +121,10 @@ export const POST = withPermission("integrations:manage", async (request) => {
     );
   }
 
-  await updateSquareSettings({ is_enabled: isEnabled });
+  // Throwing write path (audit IN-12): the log-only updateSquareSettings is
+  // for post-sync timestamp bookkeeping; a failed toggle write here must
+  // become a 5xx (via withAuth's catch), not a silent success.
+  await updateSquareSettingsOrThrow({ is_enabled: isEnabled });
 
   return successResponse({ is_enabled: isEnabled });
 });
