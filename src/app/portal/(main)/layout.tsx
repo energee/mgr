@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 import { PortalShell } from "@/components/portal/portal-shell";
 import type { PortalCustomer } from "@/contexts/portal";
 import { dynamicFrom } from "@/services/types";
@@ -32,19 +33,31 @@ export default async function PortalLayout({
     .map((l: { customers: PortalCustomer | null }) => l.customers)
     .filter((c: PortalCustomer | null): c is PortalCustomer => c != null);
 
-  // Auto-link by email on first login (no existing links)
+  // Auto-link by email on first login (no existing links).
+  // Case-insensitive to match migration 00201's lower()=lower() role
+  // assignment (audit DL-6): Supabase lowercases auth emails, so an exact
+  // .eq() match misses customers stored with a mixed-case email — the user
+  // gets the 'customer' role (locked out of the staff app) but no portal
+  // link, i.e. a permanently empty portal.
   if (customers.length === 0 && user.email) {
     const adminDb = await createAdminClient();
-    const { data: matched } = await dynamicFrom(adminDb, "customers")
+    const { data: candidates } = await dynamicFrom(adminDb, "customers")
       .select("id, name, email")
-      .eq("email", user.email);
+      .ilike("email", escapeIlikePattern(user.email));
 
-    if (matched?.length > 0) {
+    // Auto-linking grants access to a customer's orders, so re-verify exact
+    // case-insensitive equality in JS: a pattern-escaping edge case must
+    // never link the wrong customer.
+    const authEmail = user.email.toLowerCase();
+    const matched = ((candidates ?? []) as Array<PortalCustomer & { email: string | null }>)
+      .filter((c) => c.email?.toLowerCase() === authEmail);
+
+    if (matched.length > 0) {
       for (const cust of matched) {
         await dynamicFrom(adminDb, "customer_portal_users")
           .upsert({ customer_id: cust.id, user_id: user.id });
       }
-      customers = matched.map((c: PortalCustomer) => ({
+      customers = matched.map((c) => ({
         id: c.id,
         name: c.name,
       }));

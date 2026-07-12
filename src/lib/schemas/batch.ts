@@ -9,27 +9,9 @@
 import { z } from "zod";
 
 // =============================================================================
-// Zod Schema
-// =============================================================================
-
-export const batchSchema = z.object({
-  batch_code: z.string().optional(),
-  name: z.string().min(1, "Name is required"),
-  status: z.string().default("planned"),
-  recipe_id: z.string().uuid().nullable().optional(),
-  recipe_variant_id: z.string().uuid().nullable().optional(),
-  planned_start_date: z.string().nullable().optional(),
-  volume_bbl: z.coerce.number().nullable().optional(),
-  actual_fg: z.coerce.number().nullable().optional(),
-  actual_abv: z.coerce.number().nullable().optional(),
-  notes: z.string().nullable().optional(),
-});
-
-export type BatchFormValues = z.infer<typeof batchSchema>;
-
-// =============================================================================
 // State Machine Data
 // =============================================================================
+// Declared before the schema so `batchSchema.status` can validate against it.
 
 export const batchStates = [
   "planned",
@@ -42,6 +24,29 @@ export const batchStates = [
 ] as const;
 
 export type BatchState = (typeof batchStates)[number];
+
+// =============================================================================
+// Zod Schema
+// =============================================================================
+
+export const batchSchema = z.object({
+  batch_code: z.string().optional(),
+  name: z.string().min(1, "Name is required"),
+  // Machine states only (audit EA-9): this raw schema is imported directly by
+  // src/app/api/batches/* (bypassing the entity-config formSchema guard), so
+  // the enum must live here. New records still enter at "planned" — the form
+  // layer and the batch state machine own WHICH state is allowed when.
+  status: z.enum(batchStates).default("planned"),
+  recipe_id: z.string().uuid().nullable().optional(),
+  recipe_variant_id: z.string().uuid().nullable().optional(),
+  planned_start_date: z.string().nullable().optional(),
+  volume_bbl: z.coerce.number().nullable().optional(),
+  actual_fg: z.coerce.number().nullable().optional(),
+  actual_abv: z.coerce.number().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export type BatchFormValues = z.infer<typeof batchSchema>;
 
 /** Valid state transitions: { fromState: [toStates] }
  * planned -> fermenting is triggered by Transfer (to fermenter) or Pitch Yeast suggestion.

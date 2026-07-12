@@ -7,6 +7,17 @@
 > **Prerequisite / sequencing:** ship Square **D1–D3** (packaged bin debit) first
 > — it is independent of this epic and fixes a live bug (see the bottom of this
 > doc for the D1–D3 kick-off prompt). This epic replaces D4/D5.
+>
+> **2026-07 update (audit BD-2/BD-3/BD-4, migration 00240):** a MINIMAL TTB
+> bridge shipped separately and does not preempt this epic: staged
+> `square_draft_sales` rows are converted into COMPLETED finished_good →
+> taproom_sale allocations (brand-level FIFO over keg-format lots, fractional
+> keg quantities, volume_oz/3968 bbl) by `api/square/reconcile-draft-sales`,
+> marked via `square_draft_sales.reconciled_at`; per-variation pour size lives
+> in `square_catalog_map.pour_size_oz`; keg rows are excluded from Square
+> PHYSICAL_COUNT pushes. The per-keg QR/tap-window reconciliation below remains
+> the full design — when it lands, it should subsume the brand-level FIFO
+> source choice.
 
 ## Why this exists
 

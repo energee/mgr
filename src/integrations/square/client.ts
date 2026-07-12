@@ -24,11 +24,20 @@ const SINGLETON_ID = "00000000-0000-0000-0000-000000000002";
 export async function getSquareSettings(): Promise<SquareSettings | null> {
   const admin = await createAdminClient();
 
-  // Read tokens from system_settings (where the UI stores them)
-  const { data: tokenRows } = await admin
+  // Read tokens from system_settings (where the UI stores them).
+  // Read errors are logged before falling through to null/defaults (audit
+  // SF-10): the null return renders as "Square not connected", so without the
+  // log a transient DB error is indistinguishable from a missing token.
+  const { data: tokenRows, error: tokenError } = await admin
     .from("system_settings")
     .select("key, value")
     .in("key", ["square_api_key", "square-webhook_api_key"]);
+  if (tokenError) {
+    logger.error(
+      { err: tokenError.message },
+      "Failed to read Square tokens from system_settings — treating as not connected"
+    );
+  }
 
   const tokenMap = new Map(
     (tokenRows ?? []).map((r) => [r.key, r.value as string | null])
@@ -38,11 +47,17 @@ export async function getSquareSettings(): Promise<SquareSettings | null> {
   if (!accessToken) return null;
 
   // Read operational state from square_settings
-  const { data: settings } = await admin
+  const { data: settings, error: settingsError } = await admin
     .from("square_settings")
     .select("is_enabled, last_catalog_sync_at, last_inventory_sync_at")
     .eq("id", SINGLETON_ID)
     .single();
+  if (settingsError) {
+    logger.error(
+      { err: settingsError.message },
+      "Failed to read square_settings — defaulting to disabled"
+    );
+  }
 
   return {
     accessToken,
@@ -94,6 +109,25 @@ export async function listSquareLocations(
     }));
 }
 
+/** Columns writable on the Square settings singleton row. */
+type SquareSettingsUpdate = Partial<{
+  is_enabled: boolean;
+  last_catalog_sync_at: string;
+  last_inventory_sync_at: string;
+}>;
+
+/** Shared write for the settings singleton; returns the error message or null. */
+async function writeSquareSettings(
+  updates: SquareSettingsUpdate
+): Promise<string | null> {
+  const admin = await createAdminClient();
+  const { error } = await admin
+    .from("square_settings")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", SINGLETON_ID);
+  return error ? error.message : null;
+}
+
 /**
  * Update specific columns on the Square settings singleton row.
  * Uses admin client to bypass RLS.
@@ -101,21 +135,30 @@ export async function listSquareLocations(
  * A failed write is logged, not thrown: callers use this for last-sync-at
  * bookkeeping AFTER the sync work already succeeded, so failing the request
  * over a timestamp would be worse than a stale timestamp — but it must not be
- * silent either (observability).
+ * silent either (observability). User-initiated writes that must not no-op
+ * (e.g. the enable/disable toggle) use {@link updateSquareSettingsOrThrow}.
  */
 export async function updateSquareSettings(
-  updates: Partial<{
-    is_enabled: boolean;
-    last_catalog_sync_at: string;
-    last_inventory_sync_at: string;
-  }>
+  updates: SquareSettingsUpdate
 ): Promise<void> {
-  const admin = await createAdminClient();
-  const { error } = await admin
-    .from("square_settings")
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq("id", SINGLETON_ID);
-  if (error) {
-    logger.error({ err: error.message }, "Failed to update square_settings");
+  const err = await writeSquareSettings(updates);
+  if (err) {
+    logger.error({ err }, "Failed to update square_settings");
+  }
+}
+
+/**
+ * Throwing twin of {@link updateSquareSettings} for user-initiated writes
+ * where a swallowed failure would be reported as success (audit IN-12: the
+ * enable/disable toggle POST could no-op while returning 200). The thrown
+ * error propagates to the route's withAuth handler, which converts it into a
+ * 5xx error response the client toggle surfaces as a toast.
+ */
+export async function updateSquareSettingsOrThrow(
+  updates: SquareSettingsUpdate
+): Promise<void> {
+  const err = await writeSquareSettings(updates);
+  if (err) {
+    throw new Error(`Failed to update square_settings: ${err}`);
   }
 }

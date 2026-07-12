@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
+import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 import { STAFF_ROLES } from "@/lib/permissions";
 import { logger } from "@/lib/logger";
 import { SITE_URL } from "@/lib/env";
@@ -70,11 +71,16 @@ export const POST = withPermission(
 
     const adminDb = await createAdminClient();
 
-    // Check if a user_profiles row already exists for this email
+    // Check if a user_profiles row already exists for this email.
+    // Case-insensitive (audit DL-6 sweep): profile emails mirror auth.users,
+    // which Supabase stores lowercased, so an exact .eq() misses a mixed-case
+    // duplicate and defers the failure to inviteUserByEmail's opaque
+    // "already registered" branch below.
     const { data: existingProfile } = await adminDb
       .from("user_profiles")
       .select("id, email, status")
-      .eq("email", email)
+      .ilike("email", escapeIlikePattern(email))
+      .limit(1)
       .maybeSingle();
 
     if (existingProfile) {
