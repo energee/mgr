@@ -449,8 +449,13 @@ export async function consumePackagingMaterials(
     const lotsByItem = await fetchAvailableLots(supabase, allItemIds);
 
     // idempotency_key isn't in the generated types yet (00215) — tag it on here
-    // and insert via dynamicFrom below.
-    const inserts: (AllocationInsert & { idempotency_key: string })[] = [];
+    // and insert via dynamicFrom below. Each row is collected alongside its
+    // inventory_item_id so the batch can be sorted into a canonical lock order
+    // before insert (see below).
+    const pendingInserts: Array<{
+      inventoryItemId: string;
+      row: AllocationInsert & { idempotency_key: string };
+    }> = [];
     const shortfallByItem = new Map<string, number>();
     const now = new Date().toISOString();
 
@@ -462,18 +467,21 @@ export async function consumePackagingMaterials(
         for (const pick of picks) {
           const lot = lots.find((l) => l.lot_id === pick.lot_id);
           if (lot) lot.remaining_quantity -= pick.quantity;
-          inserts.push({
-            source_type: "inventory_lot",
-            source_id: pick.lot_id,
-            destination_type: "batch",
-            destination_id: batchId,
-            quantity: pick.quantity,
-            unit_cost: pick.unit_cost,
-            status: "completed",
-            completed_at: now,
-            lot_number: pick.lot_number,
-            notes: sessionNote,
-            idempotency_key: idempotencyKey,
+          pendingInserts.push({
+            inventoryItemId: itemId,
+            row: {
+              source_type: "inventory_lot",
+              source_id: pick.lot_id,
+              destination_type: "batch",
+              destination_id: batchId,
+              quantity: pick.quantity,
+              unit_cost: pick.unit_cost,
+              status: "completed",
+              completed_at: now,
+              lot_number: pick.lot_number,
+              notes: sessionNote,
+              idempotency_key: idempotencyKey,
+            },
           });
         }
         if (shortfall > 0) {
@@ -481,6 +489,24 @@ export async function consumePackagingMaterials(
         }
       }
     }
+
+    // Deadlock hardening (audit PG-2): guard_allocation_availability (00212)
+    // FOR UPDATE-locks each row's inventory_lots row as the rows insert, so
+    // the batch's row order IS the lock-acquisition order. Two concurrent
+    // packaging completions sharing BOM materials (or a completion racing
+    // revise_packaging_session, whose BOM loop iterates in inventory_item_id
+    // order since 00239) could otherwise lock the same lots in opposite orders
+    // and deadlock. Sort by (inventory_item_id, then lot id) — a stable,
+    // data-independent total order. This deliberately reorders rows away from
+    // FIFO *pick* order; allocation rows carry their own quantities, so row
+    // order has no business meaning.
+    const byKey = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
+    pendingInserts.sort(
+      (a, b) =>
+        byKey(a.inventoryItemId, b.inventoryItemId) ||
+        byKey(String(a.row.source_id), String(b.row.source_id))
+    );
+    const inserts = pendingInserts.map((p) => p.row);
 
     if (inserts.length > 0) {
       const { error: insertError } = await dynamicFrom(supabase, "allocations").insert(inserts);

@@ -28,3 +28,4 @@ Domain source of truth: `docs/knowledge/brewing-domain.md`, `docs/knowledge/enti
 - One entity = one directory `src/entities/<name>/` (`core.ts` + `presentation.tsx` + `index.ts`), registered in `src/entities/index.ts`
 - knip/depcheck flag false positives (entity registry, `z.infer`) — verify before deleting
 - Search: `mgrep` to locate code by meaning; literal `grep`/`rg` only for exact-string ref-counting
+- Progress log: ADD `docs/progress/YYYY-MM-DD-slug.md` (one file per session entry, the `- **date (title).** …` bullet verbatim); PROGRESS.md is GENERATED on main by CI — never edit or commit PROGRESS.md on a branch
