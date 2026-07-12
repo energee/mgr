@@ -1,0 +1,40 @@
+# Rebuilds the generated PROGRESS.md whenever entry files under docs/progress/
+# change on main (see scripts/build-progress.sh for the format). Commits the
+# result back to main as the actions bot; [skip ci] keeps the bot commit from
+# triggering the test/lint workflows (it only ever touches PROGRESS.md).
+name: Build PROGRESS.md
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/progress/**"
+      - "scripts/build-progress.sh"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-progress
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Rebuild PROGRESS.md
+        run: bash scripts/build-progress.sh
+      - name: Commit if changed
+        run: |
+          if git diff --quiet PROGRESS.md; then
+            echo "PROGRESS.md already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add PROGRESS.md
+          git commit -m "docs(progress): rebuild PROGRESS.md [skip ci]"
+          git push origin main
