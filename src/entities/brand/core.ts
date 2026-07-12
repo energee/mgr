@@ -6,14 +6,22 @@
  * route handlers and API routes.
  *
  * Brands represent the brewery's beer products/labels. Each brand has a
- * style, ABV, and optional Untappd integration.
+ * style, ABV, optional Untappd integration, and an is_active lifecycle flag
+ * (00244): inactive = discontinued, which is the ONLY path that removes a
+ * brand's objects from the Square catalog (the sync's stale-cleanup keep set
+ * is the active-brand set — audit IN-9).
  */
 
 import { z } from "zod";
 import type { EntityCoreInput } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 
-export type Brand = Database["public"]["Tables"]["brands"]["Row"];
+type BrandBase = Database["public"]["Tables"]["brands"]["Row"];
+// is_active (00244) is hand-extended pending a types regen once the migration
+// is applied live (same idiom as sales-channel's change_request_cutoff_state).
+// Optional because pre-00244 rows lack the column; absent = active (the column
+// defaults true).
+export type Brand = BrandBase & { is_active?: boolean };
 
 // =============================================================================
 // Zod Schema
@@ -26,6 +34,9 @@ export const brandSchema = z.object({
   abv: z.coerce.number().nullable().optional(),
   description: z.string().nullable().optional(),
   untappd_url: z.string().url().nullable().optional().or(z.literal("")),
+  // Drives the Square catalog keep set (00244, audit IN-9): switching a brand
+  // inactive deletes its mapped Square objects on the next catalog sync.
+  is_active: z.boolean().default(true),
 });
 
 export type BrandFormValues = z.infer<typeof brandSchema>;
@@ -66,7 +77,11 @@ export const brandCore: EntityCoreInput<Brand> = {
     "What IPAs do we make?",
     "Show brands over 7% ABV",
     "What's the most popular brand on Untappd?",
+    "Which brands are discontinued?",
   ],
 
+  // NOTE: add "is_active" here once 00244 is applied live and the Supabase
+  // types are regenerated — entity-map-sync.test.ts pins keyFields to columns
+  // present in the GENERATED types, which don't carry the column yet.
   keyFields: ["name", "variant", "style_id", "abv"],
 };
