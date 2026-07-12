@@ -235,7 +235,7 @@ describe("calculateVolumeOz", () => {
   });
 
   it("uses the per-variation pour size when provided (BD-3)", () => {
-    // square_catalog_map.pour_size_oz (00240): a 10 oz tulip, a 32 oz crowler.
+    // square_catalog_map.pour_size_oz (00243): a 10 oz tulip, a 32 oz crowler.
     expect(calculateVolumeOz(3, 10)).toBe(30);
     expect(calculateVolumeOz(2, 32)).toBe(64);
   });

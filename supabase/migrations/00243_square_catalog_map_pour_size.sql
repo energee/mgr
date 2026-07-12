@@ -1,8 +1,9 @@
--- 00240_square_catalog_map_pour_size.sql
+-- 00243_square_catalog_map_pour_size.sql
 -- Draft (keg-pour) Square sales -> TTB removals: schema for audit findings
 -- BD-2 (draft-sale reconciliation) and BD-3 (per-variation pour size).
 --
--- NUMBERING: 00236-00239 are claimed by other in-flight branches; 00240 is the
+-- NUMBERING: 00236-00242 are claimed (00241 refund_ingest is on main; 00242 by
+-- the 00236 renumber, PR #381); 00243 is the
 -- number reserved for this branch. NOT applied live -- deploy via
 -- scripts/db-push.sh after merge; do not apply this file to any live DB by hand.
 --
@@ -38,7 +39,7 @@ ALTER TABLE square_catalog_map
   ADD COLUMN IF NOT EXISTS pour_size_oz NUMERIC CHECK (pour_size_oz > 0);
 
 COMMENT ON COLUMN square_catalog_map.pour_size_oz IS
-  'Fluid ounces poured per unit sold of this ITEM_VARIATION when it is a draft (keg) line (00240, audit BD-3). NULL = the app default of 16 oz (STANDARD_POUR_OZ in src/integrations/square/utils.ts). Only meaningful for keg-container variations; ignored for packaged lines, which debit whole selling units.';
+  'Fluid ounces poured per unit sold of this ITEM_VARIATION when it is a draft (keg) line (00243, audit BD-3). NULL = the app default of 16 oz (STANDARD_POUR_OZ in src/integrations/square/utils.ts). Only meaningful for keg-container variations; ignored for packaged lines, which debit whole selling units.';
 
 -- =============================================================================
 -- PART 2 -- BD-2: draft-sale reconciliation stamp
@@ -48,7 +49,7 @@ ALTER TABLE square_draft_sales
   ADD COLUMN IF NOT EXISTS reconciled_at TIMESTAMPTZ;
 
 COMMENT ON COLUMN square_draft_sales.reconciled_at IS
-  'When this staged draft sale was converted into COMPLETED finished_good -> taproom_sale allocations for TTB removals by api/square/reconcile-draft-sales (00240, audit BD-2). NULL = not yet reconciled. Exactly-once is enforced app-side via allocations.idempotency_key = ''square_draft_sale:<id>'' (00215 pattern); this stamp is the queue marker, not the idempotency guard.';
+  'When this staged draft sale was converted into COMPLETED finished_good -> taproom_sale allocations for TTB removals by api/square/reconcile-draft-sales (00243, audit BD-2). NULL = not yet reconciled. Exactly-once is enforced app-side via allocations.idempotency_key = ''square_draft_sale:<id>'' (00215 pattern); this stamp is the queue marker, not the idempotency guard.';
 
 -- The reconciliation route reads WHERE reconciled_at IS NULL ORDER BY sold_at;
 -- the settings page badge counts the same predicate.
@@ -64,10 +65,12 @@ ALTER TABLE square_sync_log
   DROP CONSTRAINT IF EXISTS square_sync_log_sync_type_check;
 ALTER TABLE square_sync_log
   ADD CONSTRAINT square_sync_log_sync_type_check
-  CHECK (sync_type IN ('catalog_push', 'inventory_push', 'sale_ingest', 'inventory_event', 'draft_reconcile'));
+  CHECK (sync_type IN ('catalog_push', 'inventory_push', 'sale_ingest', 'inventory_event', 'refund_ingest', 'draft_reconcile'));
+-- ^ MUST list 00241's refund_ingest too: this rewrite replaces 00241's CHECK,
+--   and dropping a value here would break the refund webhook's logging.
 
 COMMENT ON COLUMN square_sync_log.sync_type IS
-  'Type of sync: catalog_push / inventory_push (MGR pushing OUT to Square), sale_ingest (a sale coming IN via the payment webhook), inventory_event (Square''s own inventory.count.updated echo, informational only -- 00233), or draft_reconcile (a draft-sale -> TTB-removal reconciliation run -- 00240).';
+  'Type of sync: catalog_push / inventory_push (MGR pushing OUT to Square), sale_ingest (a sale coming IN via the payment webhook), inventory_event (Square''s own inventory.count.updated echo, informational only -- 00233), refund_ingest (a refund coming IN via the refund webhook, reversing an ingested sale -- 00241), or draft_reconcile (a draft-sale -> TTB-removal reconciliation run -- 00243). Mirror of SquareSyncType in src/integrations/square/types.ts.';
 
 -- =============================================================================
 -- PART 4 -- verification (self-rolling-back; commits NO rows)

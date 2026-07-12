@@ -29,7 +29,18 @@
  * payments ignored, unmapped-location flagging, a debit RPC or catalog-map
  * read error marking the line FAILED (audit SF-1), draft (keg) staging into
  * square_draft_sales with the bin's MGR location_id, and the per-event-type
- * replay window (payment.* = 24h retry horizon, others ±5 min — audit IN-2).
+ * replay window (payment.* and refund.* = 24h retry horizon, others ±5 min —
+ * audit IN-2).
+ *
+ * refund.created / refund.updated (audit IN-3): a COMPLETED refund of an
+ * ingested order reverses each original taproom_sale lot draw with an INVERSE
+ * adjustment allocation (negative quantity + volume_bbl, reason_code
+ * 'refund' — the only mechanism 00211/00205 permit; see 00241) and credits
+ * the bin via credit_bin_inventory. Pinned here: TTB volume + bin credit
+ * reversal, refund-id idempotency (duplicate = no side effects), the
+ * unknown-order 200-ignore gate, the proportional partial-refund path
+ * (floored, flagged in details), full-refund voiding of staged draft rows,
+ * and non-COMPLETED refunds ignored.
  *
  * The Supabase admin client is faked with the shared admin mock
  * (src/test/supabase-admin-mock.ts). Signature verification is stubbed to
@@ -106,6 +117,13 @@ type AdminOpts = {
    * claim, so a duplicate is a genuine duplicate unless a test opts in.
    */
   claimStatusResult?: QueryResult;
+  /**
+   * Result of the refund path's SALE-CLAIM gate — the only square_sync_log
+   * read filtered on sync_type ('sale_ingest') — deciding whether the
+   * refunded order was one this system ingested. Defaults to a COMPLETED sale
+   * claim so refund tests reverse unless they opt out (unknown order = null).
+   */
+  saleClaimResult?: QueryResult;
 };
 
 /** Every write the handler performs, in order. Re-created by useTables. */
@@ -119,6 +137,7 @@ function useTables(tables: TableData, opts: AdminOpts = {}) {
   const claims = opts.claimQueue ? [...opts.claimQueue] : undefined;
   const takeover = opts.takeoverResult ?? CLAIM_DUP; // default: no stale claim to steal
   const claimStatus = opts.claimStatusResult ?? CLAIM_STATUS_COMPLETED;
+  const saleClaim = opts.saleClaimResult ?? CLAIM_STATUS_COMPLETED;
   const fallback = tables.square_sync_log;
   const mock = makeAdminMock(
     {
@@ -129,8 +148,17 @@ function useTables(tables: TableData, opts: AdminOpts = {}) {
         // filters on started_at (.lt) — distinguish it from the finalize
         // UPDATE (which filters .eq("id", …) only).
         if (ops.includes("update") && calls.some((c) => c.method === "lt")) return takeover;
-        // The claim-status read is the only WRITE-FREE square_sync_log chain
-        // filtered on square_payment_id (completed duplicate vs in-flight).
+        // The refund path's sale-claim gate is the only square_sync_log chain
+        // filtered on sync_type (was the refunded order ever ingested?).
+        if (
+          ops.length === 0 &&
+          calls.some((c) => c.method === "eq" && c.args[0] === "sync_type")
+        ) {
+          return saleClaim;
+        }
+        // The claim-status read is the only remaining WRITE-FREE
+        // square_sync_log chain filtered on square_payment_id (completed
+        // duplicate vs in-flight).
         if (
           ops.length === 0 &&
           calls.some((c) => c.method === "eq" && c.args[0] === "square_payment_id")
@@ -155,9 +183,9 @@ type LineItem = {
   basePriceMoney?: { amount: number };
 };
 
-function useOrder(lineItems: LineItem[]) {
+function useOrder(lineItems: LineItem[], totalMoney?: { amount: number }) {
   mockedGetSquareClient.mockResolvedValue({
-    orders: { get: vi.fn().mockResolvedValue({ order: { lineItems } }) },
+    orders: { get: vi.fn().mockResolvedValue({ order: { lineItems, totalMoney } }) },
   } as never);
 }
 
@@ -217,12 +245,12 @@ const MAP_KEG: QueryResult = {
     id: "map-2",
     brand_id: "brand-1",
     selling_format_id: "fmt-1",
-    // No pour_size_oz key: the pre-00240 shape — must fall back to 16 oz.
+    // No pour_size_oz key: the pre-00243 shape — must fall back to 16 oz.
     selling_formats: { unit_count: 1, containers: { type: "keg", volume_oz: null } },
   },
   error: null,
 };
-/** MAP_KEG with a per-variation pour size (square_catalog_map.pour_size_oz, 00240). */
+/** MAP_KEG with a per-variation pour size (square_catalog_map.pour_size_oz, 00243). */
 const MAP_KEG_10OZ: QueryResult = {
   data: {
     ...(MAP_KEG.data as Record<string, unknown>),
@@ -833,7 +861,7 @@ describe("payment.updated — packaged bin debit (D1–D3)", () => {
   });
 
   it("draft line uses the mapping's per-variation pour_size_oz for volume_oz (BD-3)", async () => {
-    // 3 pours of a 10 oz variation (square_catalog_map.pour_size_oz = 10, 00240)
+    // 3 pours of a 10 oz variation (square_catalog_map.pour_size_oz = 10, 00243)
     // must stage 30 oz — not the hard-coded 16 oz default's 48.
     useTables({
       square_sync_log: CLAIM_OK,
@@ -967,5 +995,234 @@ describe("per-event-type replay window (IN-2)", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ received: true, ignored: "stale_event" });
     expect(writes.some((w) => w.table === "square_sync_log")).toBe(false);
+  });
+});
+
+describe("refund.created / refund.updated — sale reversal (IN-3)", () => {
+  /** volume_bbl the sale path stamped on the original 3 × 16oz-unit draw. */
+  const SALE_VOLUME_BBL = (16 / 3968) * 3;
+
+  const REFUND_EVENT = {
+    merchant_id: "MERCHANT-1",
+    type: "refund.updated",
+    event_id: "evt-refund-1",
+    created_at: new Date().toISOString(),
+    data: {
+      type: "refund",
+      id: "refund-1",
+      object: {
+        refund: {
+          id: "refund-1",
+          status: "COMPLETED",
+          payment_id: "pay-1",
+          order_id: "order-1",
+          location_id: "SQ-LOC-1",
+          amount_money: { amount: 1500, currency: "USD" },
+        },
+      },
+    },
+  };
+
+  /**
+   * The original sale's ledger record: one completed taproom_sale lot draw
+   * (linked by notes = "Square order order-1"). The same response serves the
+   * handler's reversal INSERTs — they only destructure `error`.
+   */
+  const SALE_ALLOCS: QueryResult = {
+    data: [{ id: "alloc-1", source_id: "fg-1", quantity: 3, volume_bbl: SALE_VOLUME_BBL }],
+    error: null,
+  };
+
+  const REFUND_TABLES = {
+    square_sync_log: CLAIM_OK,
+    bins: BIN_SQ_LOC_1,
+    allocations: SALE_ALLOCS,
+    square_draft_sales: { data: [], error: null },
+  };
+
+  beforeEach(() => {
+    // Order total 1500 = the refund amount → full refund unless a test says
+    // otherwise. Refunds ignore line items (no line detail on PaymentRefund).
+    useOrder([], { amount: 1500 });
+  });
+
+  it("full refund reverses TTB volume (inverse adjustment allocation) and credits the bin", async () => {
+    useTables(REFUND_TABLES);
+
+    const res = await post(REFUND_EVENT);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+
+    // Claim keyed on the REFUND id, sync_type refund_ingest (the order-id
+    // slot in the UNIQUE column belongs to the sale claim).
+    const claimRow = writes.find((w) => w.table === "square_sync_log" && w.op === "upsert")!
+      .row as { sync_type: string; square_payment_id: string };
+    expect(claimRow.sync_type).toBe("refund_ingest");
+    expect(claimRow.square_payment_id).toBe("refund-1");
+
+    // The INVERSE adjustment: negative quantity + volume, reason 'refund'.
+    // Deleting or status-cancelling the completed original is blocked
+    // (00211 / 00205's terminal 'completed'); the negative volume is what
+    // nets TTB removals via adjustments_bbl and the negative quantity is what
+    // restores ledger availability (00241).
+    const reversal = writes.find((w) => w.table === "allocations" && w.op === "insert")!
+      .row as {
+      source_type: string;
+      source_id: string;
+      destination_type: string;
+      quantity: number;
+      volume_bbl: number | null;
+      reason_code: string;
+      status: string;
+      notes: string;
+    };
+    expect(reversal).toMatchObject({
+      source_type: "finished_good",
+      source_id: "fg-1",
+      destination_type: "adjustment",
+      quantity: -3,
+      reason_code: "refund",
+      status: "completed",
+      notes: "Square refund refund-1 of order order-1",
+    });
+    expect(reversal.volume_bbl).toBeCloseTo(-SALE_VOLUME_BBL, 6);
+
+    // Physical credit mirrors the sale's debit (row-locked RPC, 00241).
+    expect(rpcCalls).toEqual([
+      { fn: "credit_bin_inventory", args: { p_bin_id: "bin-1", p_finished_good_id: "fg-1", p_qty: 3 } },
+    ]);
+
+    // Finalized durably: one item reversed, details carry the reversal record.
+    const finalize = writes.find(
+      (w) => w.table === "square_sync_log" && w.op === "update" && w.row != null && "items_synced" in (w.row as object)
+    )!.row as {
+      items_synced: number;
+      items_failed: number;
+      details: { proportional: boolean; reversals?: unknown[] };
+    };
+    expect(finalize.items_synced).toBe(1);
+    expect(finalize.items_failed).toBe(0);
+    expect(finalize.details.proportional).toBe(false);
+    expect(finalize.details.reversals).toEqual([
+      {
+        allocationId: "alloc-1",
+        finishedGoodId: "fg-1",
+        reversedQuantity: 3,
+        reversedVolumeBbl: expect.closeTo(-SALE_VOLUME_BBL, 6),
+      },
+    ]);
+  });
+
+  it("duplicate refund delivery (created + updated, both COMPLETED) reverses exactly ONCE", async () => {
+    // UNIQUE(square_payment_id) on the refund id simulated: first claim wins,
+    // the retry gets [] and resolves as a completed duplicate → 200, no-op.
+    useTables(REFUND_TABLES, { claimQueue: [CLAIM_OK, CLAIM_DUP] });
+
+    const created = { ...REFUND_EVENT, type: "refund.created", event_id: "evt-refund-created" };
+    const updated = { ...REFUND_EVENT, type: "refund.updated", event_id: "evt-refund-updated" };
+
+    expect((await post(created)).status).toBe(200);
+    expect((await post(updated)).status).toBe(200);
+
+    expect(writes.filter((w) => w.table === "allocations" && w.op === "insert")).toHaveLength(1);
+    expect(rpcCalls).toHaveLength(1);
+  });
+
+  it("refund for an order this system never ingested is 200-acknowledged and ignored (no claim, no reversal)", async () => {
+    // The sale-claim gate finds nothing: not an MGR sale, or pre-integration.
+    useTables(REFUND_TABLES, { saleClaimResult: { data: null, error: null } });
+
+    const res = await post(REFUND_EVENT);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+
+    // Gated BEFORE claiming: no refund_ingest row, no reversal, no credit.
+    expect(writes.some((w) => w.table === "square_sync_log" && w.op === "upsert")).toBe(false);
+    expect(writes.some((w) => w.table === "allocations")).toBe(false);
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("partial refund reverses proportionally by amount (floored) and flags it in details", async () => {
+    // 500 of 1500 refunded → f = 1/3; the 3-unit draw reverses floor(3·⅓) = 1.
+    useTables(REFUND_TABLES);
+
+    const partial = {
+      ...REFUND_EVENT,
+      event_id: "evt-refund-partial",
+      data: {
+        ...REFUND_EVENT.data,
+        object: {
+          refund: {
+            ...REFUND_EVENT.data.object.refund,
+            id: "refund-2",
+            amount_money: { amount: 500, currency: "USD" },
+          },
+        },
+      },
+    };
+
+    const res = await post(partial);
+    expect(res.status).toBe(200);
+
+    const reversal = writes.find((w) => w.table === "allocations" && w.op === "insert")!
+      .row as { quantity: number; volume_bbl: number | null };
+    expect(reversal.quantity).toBe(-1);
+    expect(reversal.volume_bbl).toBeCloseTo(-(SALE_VOLUME_BBL / 3), 6);
+
+    expect(rpcCalls).toEqual([
+      { fn: "credit_bin_inventory", args: { p_bin_id: "bin-1", p_finished_good_id: "fg-1", p_qty: 1 } },
+    ]);
+
+    // Flagged proportional in the durable log (no line detail on the refund
+    // object, so the fraction — not exact lines — sized the reversal).
+    const finalize = writes.find(
+      (w) => w.table === "square_sync_log" && w.op === "update" && w.row != null && "items_synced" in (w.row as object)
+    )!.row as { details: { proportional: boolean; proportion?: number } };
+    expect(finalize.details.proportional).toBe(true);
+    expect(finalize.details.proportion).toBeCloseTo(1 / 3, 5);
+  });
+
+  it("full refund voids un-reconciled staged draft (keg pour) rows instead of allocating", async () => {
+    useTables({
+      ...REFUND_TABLES,
+      allocations: { data: [], error: null }, // draft-only order: no packaged draws
+      square_draft_sales: { data: [{ id: "draft-1" }, { id: "draft-2" }], error: null },
+    });
+
+    const res = await post(REFUND_EVENT);
+    expect(res.status).toBe(200);
+
+    // No reversal allocations, no bin credit — the pours were never depleted
+    // (reconciliation is backlog #7); the rows are stamped void instead.
+    expect(writes.some((w) => w.table === "allocations" && w.op === "insert")).toBe(false);
+    expect(rpcCalls).toHaveLength(0);
+
+    const voided = writes.find((w) => w.table === "square_draft_sales" && w.op === "update")!
+      .row as { voided_at: string };
+    expect(voided.voided_at).toEqual(expect.any(String));
+
+    const finalize = writes.find(
+      (w) => w.table === "square_sync_log" && w.op === "update" && w.row != null && "items_synced" in (w.row as object)
+    )!.row as { details: { draft_rows_voided?: number } };
+    expect(finalize.details.draft_rows_voided).toBe(2);
+  });
+
+  it("non-COMPLETED refund (PENDING) is acknowledged and ignored before any side effect", async () => {
+    useTables(REFUND_TABLES);
+
+    const pending = {
+      ...REFUND_EVENT,
+      event_id: "evt-refund-pending",
+      data: {
+        ...REFUND_EVENT.data,
+        object: { refund: { ...REFUND_EVENT.data.object.refund, status: "PENDING" } },
+      },
+    };
+
+    const res = await post(pending);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+    expect(writes).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
   });
 });

@@ -25,14 +25,16 @@
  *   idempotency_key `square_draft_sale:<id>` (the 00215 pattern — one key may
  *   tag SEVERAL rows when a sale spans lots), and all rows for one sale are
  *   inserted in a SINGLE statement so a guard rejection lands none of them.
- *   square_draft_sales.reconciled_at (00240) marks the row done; a re-run
- *   skips keyed sales and repairs a missing reconciled_at stamp.
+ *   square_draft_sales.reconciled_at (00243) marks the row done; a re-run
+ *   skips keyed sales and repairs a missing reconciled_at stamp. Rows the
+ *   refund webhook voided (voided_at, 00241) are excluded — a refunded pour
+ *   must never become a TTB removal.
  * - Per-row failures (guard_allocation_availability rejection, missing
  *   volume_oz, insufficient keg availability) are surfaced in the response and
  *   the draft_reconcile square_sync_log row; the batch continues — one bad row
  *   never aborts the run.
  *
- * dynamicFrom is used wherever the query touches 00240 columns
+ * dynamicFrom is used wherever the query touches 00243 columns
  * (reconciled_at, pour_size_oz), idempotency_key (00215), or embedded-resource
  * filters — none of which the generated types/typed builder support yet.
  */
@@ -85,9 +87,13 @@ export const POST = withPermission("integrations:manage", async (_request, { use
   try {
     // 1. Unreconciled draft sales, oldest first — FIFO consumes in sale order
     //    so two sales of one brand drain the same lot deterministically.
+    //    voided_at rows are excluded: the refund webhook (00241) voids a fully
+    //    refunded un-reconciled pour, and reconciling it would post a TTB
+    //    removal for beer that was refunded, not removed.
     const { data: draftRows, error: draftError } = await dynamicFrom(admin, "square_draft_sales")
       .select("id, brand_id, selling_format_id, quantity, volume_oz, sold_at, square_order_id")
       .is("reconciled_at", null)
+      .is("voided_at", null)
       .order("sold_at", { ascending: true });
     if (draftError) throw new Error(`Failed to query draft sales: ${draftError.message}`);
 

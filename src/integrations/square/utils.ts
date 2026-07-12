@@ -7,7 +7,7 @@
 /**
  * Standard pour size in fluid ounces for draft sales — the documented DEFAULT,
  * used when a catalog mapping carries no per-variation pour size
- * (square_catalog_map.pour_size_oz, 00240 — NULL means "16 oz pour").
+ * (square_catalog_map.pour_size_oz, 00243 — NULL means "16 oz pour").
  */
 export const STANDARD_POUR_OZ = 16;
 

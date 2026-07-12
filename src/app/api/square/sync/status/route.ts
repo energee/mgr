@@ -40,7 +40,7 @@ export const GET = withPermission("integrations:manage", async () => {
     .limit(10);
 
   // 3b. Staged keg pours not yet converted into TTB removals (BD-2). Drives
-  //     the "Reconcile draft sales" badge. dynamicFrom: reconciled_at (00240)
+  //     the "Reconcile draft sales" badge. dynamicFrom: reconciled_at (00243)
   //     is not in the generated types yet.
   const { count: unreconciledDraftSales } = await dynamicFrom(admin, "square_draft_sales")
     .select("id", { count: "exact", head: true })
