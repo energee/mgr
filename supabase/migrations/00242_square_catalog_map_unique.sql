@@ -1,4 +1,4 @@
--- 00236_square_catalog_map_unique.sql
+-- 00242_square_catalog_map_unique.sql
 -- Audit findings SF-4/IN-8 (silent mapping loss -> duplicate catalog) + PERF-1
 -- (2N sequential writes per catalog push), schema side.
 --
@@ -64,7 +64,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_square_catalog_map_brand_type_format
   NULLS NOT DISTINCT;
 
 COMMENT ON INDEX uq_square_catalog_map_brand_type_format IS
-  'Upsert target for pushCatalog''s batched mapping write (00236). NULLS NOT DISTINCT so ITEM rows (selling_format_id NULL) collide: one ITEM row per brand, one ITEM_VARIATION row per (brand, selling format). Plain-column (not partial/expression) because PostgREST on_conflict can only infer from a bare column list.';
+  'Upsert target for pushCatalog''s batched mapping write (00242). NULLS NOT DISTINCT so ITEM rows (selling_format_id NULL) collide: one ITEM row per brand, one ITEM_VARIATION row per (brand, selling format). Plain-column (not partial/expression) because PostgREST on_conflict can only infer from a bare column list.';
 
 -- =============================================================================
 -- PART 3 -- verification (self-rolling-back; commits NO rows)
