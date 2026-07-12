@@ -38,6 +38,14 @@ export const brandPresentation: EntityPresentation<Brand> = {
       sortable: true,
       render: (value) => (value ? `${value}%` : "—"),
     },
+    {
+      accessorKey: "is_active",
+      header: "Active",
+      sortable: true,
+      // Absent-safe until 00244 is applied + types regenerated: only an
+      // explicit false is discontinued (the column defaults true).
+      render: (value) => (value === false ? "No" : "Yes"),
+    },
   ],
 
   listFilters: [
@@ -51,6 +59,11 @@ export const brandPresentation: EntityPresentation<Brand> = {
         labelField: "name",
         orderBy: "name",
       },
+    },
+    {
+      field: "is_active",
+      type: "boolean",
+      label: "Active",
     },
   ],
 
@@ -93,6 +106,15 @@ export const brandPresentation: EntityPresentation<Brand> = {
           type: "number",
           placeholder: "e.g., 6.5",
           render: (v) => (v ? `${v}%` : "—"),
+          colSpan: 6,
+        },
+        {
+          name: "is_active",
+          label: "Active",
+          type: "switch",
+          description:
+            "Inactive (discontinued) brands are removed from the Square catalog on the next sync",
+          defaultValue: true,
           colSpan: 6,
         },
       ],
