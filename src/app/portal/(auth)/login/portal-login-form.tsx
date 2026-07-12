@@ -9,6 +9,10 @@
  * Invite-only: `shouldCreateUser: false` — the portal never self-registers
  * accounts (audit C1/M16). Portal users are provisioned exclusively via the
  * staff customer-invite flow (/api/customers/[id]/invite).
+ *
+ * The email validation error is announced to screen readers: `role="alert"`
+ * region referenced by the input's `aria-describedby`, with `aria-invalid`
+ * set (audit A11Y-4); the input carries `autoComplete="email"` (A11Y-5).
  */
 
 import { useRef, useState, type FormEvent } from "react";
@@ -171,6 +175,7 @@ export function PortalLoginForm() {
         <Input
           id="email"
           type="email"
+          autoComplete="email"
           placeholder="you@example.com"
           value={email}
           onChange={(e) => {
@@ -178,9 +183,13 @@ export function PortalLoginForm() {
             if (emailError) setEmailError(null);
           }}
           disabled={isLoading}
+          aria-invalid={!!emailError}
+          aria-describedby={emailError ? "email-error" : undefined}
         />
         {emailError && (
-          <p className="text-sm text-destructive">{emailError}</p>
+          <p id="email-error" role="alert" className="text-sm text-destructive">
+            {emailError}
+          </p>
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
