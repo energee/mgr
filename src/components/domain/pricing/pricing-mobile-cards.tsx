@@ -65,6 +65,7 @@ export function PricingMobileCards({
                           channelId={activeChannelId}
                           rowIndex={0}
                           colIndex={0}
+                          label={`${tier.name} — ${fmt.name}`}
                           onSave={onSave}
                           onNavigate={() => {}}
                         />

@@ -9,6 +9,10 @@
  *
  * The source pitch is NOT updated — it retains its current status since
  * remaining quantity is tracked via the events model.
+ *
+ * Fields use the shared Form primitives (FormField/FormControl/FormMessage)
+ * so validation errors are announced and associated with their inputs
+ * (audit A11Y-3).
  */
 
 import { useEffect } from "react";
@@ -27,8 +31,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -205,32 +217,37 @@ export function YeastHarvestDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <Form {...form}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Source Strain */}
           {pitchedStrains.length > 1 ? (
-            <div className="grid gap-2">
-              <Label htmlFor="source_pitch_id">Source Strain</Label>
-              <Select
-                value={form.watch("source_pitch_id") || undefined}
-                onValueChange={(v) => form.setValue("source_pitch_id", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select strain..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {pitchedStrains.map((s) => (
-                    <SelectItem key={s.pitch_id} value={s.pitch_id}>
-                      {s.strain_name} (G{s.generation})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.source_pitch_id && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.source_pitch_id.message}
-                </p>
+            <FormField
+              control={form.control}
+              name="source_pitch_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Source Strain</FormLabel>
+                  <Select
+                    value={field.value || undefined}
+                    onValueChange={field.onChange}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select strain..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {pitchedStrains.map((s) => (
+                        <SelectItem key={s.pitch_id} value={s.pitch_id}>
+                          {s.strain_name} (G{s.generation})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
+            />
           ) : selectedStrain ? (
             <div className="rounded-md bg-muted p-3">
               <p className="text-sm text-muted-foreground">Source Strain</p>
@@ -241,105 +258,136 @@ export function YeastHarvestDialog({
           ) : null}
 
           {/* Destination Brink */}
-          <div className="grid gap-2">
-            <Label htmlFor="vessel_id">Destination Brink</Label>
-            {brinksLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading brinks...
-              </div>
-            ) : (
-              <Select
-                value={form.watch("vessel_id") || undefined}
-                onValueChange={(v) => form.setValue("vessel_id", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a brink..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {brinks?.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                      {b.capacity_bbl != null && (
-                        <span className="text-muted-foreground">
-                          {" "}
-                          ({b.capacity_bbl} BBL)
-                        </span>
+          <FormField
+            control={form.control}
+            name="vessel_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Destination Brink</FormLabel>
+                {brinksLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading brinks...
+                  </div>
+                ) : (
+                  <Select
+                    value={field.value || undefined}
+                    onValueChange={field.onChange}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a brink..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {brinks?.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}
+                          {b.capacity_bbl != null && (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              ({b.capacity_bbl} BBL)
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                      {brinks?.length === 0 && (
+                        <SelectItem value="_none" disabled>
+                          No available brinks
+                        </SelectItem>
                       )}
-                    </SelectItem>
-                  ))}
-                  {brinks?.length === 0 && (
-                    <SelectItem value="_none" disabled>
-                      No available brinks
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+                    </SelectContent>
+                  </Select>
+                )}
+                <FormMessage />
+              </FormItem>
             )}
-            {form.formState.errors.vessel_id && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.vessel_id.message}
-              </p>
-            )}
-          </div>
+          />
 
           {/* Weight Harvested */}
-          <div className="grid gap-2">
-            <Label htmlFor="quantity_lbs">Weight Harvested (lbs)</Label>
-            <Input
-              id="quantity_lbs"
-              type="number"
-              step="0.1"
-              placeholder="e.g., 25"
-              {...form.register("quantity_lbs")}
-            />
-            {form.formState.errors.quantity_lbs && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.quantity_lbs.message}
-              </p>
+          <FormField
+            control={form.control}
+            name="quantity_lbs"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Weight Harvested (lbs)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 25"
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
           {/* Cell Count */}
-          <div className="grid gap-2">
-            <Label htmlFor="cell_count_thousand">
-              Cell Count (thousand cells)
-            </Label>
-            <Input
-              id="cell_count_thousand"
-              type="number"
-              placeholder="Optional — measured value"
-              {...form.register("cell_count_thousand")}
-            />
-            <p className="text-sm text-muted-foreground">
-              Leave blank if not measured
-            </p>
-          </div>
+          <FormField
+            control={form.control}
+            name="cell_count_thousand"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cell Count (thousand cells)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="Optional — measured value"
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormDescription>Leave blank if not measured</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {/* Initial Viability */}
-          <div className="grid gap-2">
-            <Label htmlFor="initial_viability">Initial Viability (%)</Label>
-            <Input
-              id="initial_viability"
-              type="number"
-              min={0}
-              max={100}
-              {...form.register("initial_viability")}
-            />
-            <p className="text-sm text-muted-foreground">
-              Harvested yeast typically starts at 85-95% viability
-            </p>
-          </div>
+          <FormField
+            control={form.control}
+            name="initial_viability"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Initial Viability (%)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Harvested yeast typically starts at 85-95% viability
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {/* Notes */}
-          <div className="grid gap-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              placeholder="Any observations about this harvest..."
-              {...form.register("notes")}
-            />
-          </div>
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Any observations about this harvest..."
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <DialogFooter>
             <Button
@@ -361,6 +409,7 @@ export function YeastHarvestDialog({
             </Button>
           </DialogFooter>
         </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

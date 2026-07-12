@@ -7,6 +7,11 @@
  *   emails is mapped to a friendly "no account" message.
  * - Success still flips the form into the OTP-entry state.
  *
+ * Also pins the validation-feedback wiring (audit A11Y-4/A11Y-5): error
+ * paragraphs are role="alert" regions referenced by the failing inputs'
+ * aria-describedby with aria-invalid set, and the credential inputs carry
+ * autocomplete tokens.
+ *
  * Uses the shared createRoot+act harness (src/test/react-harness.ts) — the
  * repo intentionally has no @testing-library/react.
  */
@@ -121,6 +126,7 @@ async function requestMagicLink(email: string): Promise<HTMLElement> {
 
 beforeEach(() => {
   mockSignInWithOtp.mockReset();
+  mockSignInWithPassword.mockReset();
   mockToastError.mockReset();
   mockToastSuccess.mockReset();
   storage.clear();
@@ -178,6 +184,58 @@ describe("LoginForm passwordless flow", () => {
 
     expect(mockToastSuccess).toHaveBeenCalled();
     expect(container.textContent).toContain("We sent a login link and code");
+  });
+});
+
+describe("LoginForm validation feedback (audit A11Y-4/A11Y-5)", () => {
+  it("announces validation errors and associates them with the failing inputs", async () => {
+    const container = render(<LoginForm />);
+    // Invalid email + empty (too-short) password, then submit. The submit
+    // event is dispatched directly (fireEvent.submit semantics): jsdom's
+    // requestSubmit/button-click path runs native constraint validation
+    // (type="email") and would swallow the submit before React sees it.
+    await typeEmail(container, "not-an-email");
+    const formEl = container.querySelector("form") as HTMLFormElement;
+    await act(async () => {
+      formEl.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true })
+      );
+    });
+
+    const emailInput = container.querySelector("#email") as HTMLInputElement;
+    const emailError = container.querySelector("#email-error");
+    expect(emailError, "email error region not rendered").not.toBeNull();
+    expect(emailError!.getAttribute("role")).toBe("alert");
+    expect(emailError!.textContent).toContain("valid email");
+    expect(emailInput.getAttribute("aria-invalid")).toBe("true");
+    expect(emailInput.getAttribute("aria-describedby")).toBe("email-error");
+
+    const passwordInput = container.querySelector("#password") as HTMLInputElement;
+    const passwordError = container.querySelector("#password-error");
+    expect(passwordError, "password error region not rendered").not.toBeNull();
+    expect(passwordError!.getAttribute("role")).toBe("alert");
+    expect(passwordError!.textContent).toContain("at least 8 characters");
+    expect(passwordInput.getAttribute("aria-invalid")).toBe("true");
+    expect(passwordInput.getAttribute("aria-describedby")).toBe("password-error");
+
+    // Never reached Supabase — validation failed client-side.
+    expect(mockSignInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("does not reference an error region while the fields are valid", () => {
+    const container = render(<LoginForm />);
+    const emailInput = container.querySelector("#email") as HTMLInputElement;
+    expect(emailInput.getAttribute("aria-invalid")).toBe("false");
+    expect(emailInput.getAttribute("aria-describedby")).toBeNull();
+    expect(container.querySelector("#email-error")).toBeNull();
+  });
+
+  it("sets autocomplete tokens on the credential inputs", () => {
+    const container = render(<LoginForm />);
+    const emailInput = container.querySelector("#email") as HTMLInputElement;
+    const passwordInput = container.querySelector("#password") as HTMLInputElement;
+    expect(emailInput.getAttribute("autocomplete")).toBe("email");
+    expect(passwordInput.getAttribute("autocomplete")).toBe("current-password");
   });
 });
 
