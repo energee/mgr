@@ -266,6 +266,40 @@ function SquareIntegrationCard() {
     },
   });
 
+  // Reconcile staged draft (keg-pour) sales into TTB taproom-sale removals
+  // (audit BD-2). Per-row failures are surfaced in a warning toast — never
+  // silently swallowed (UI-7).
+  const reconcileDraftSales = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/square/reconcile-draft-sales", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "Failed to reconcile draft sales");
+      return data.data as {
+        processed: number;
+        reconciled: number;
+        alreadyReconciled: number;
+        failed: number;
+        failures: Array<{ draftSaleId: string; error: string }>;
+      };
+    },
+    onSuccess: (data) => {
+      if (data.failed > 0) {
+        toast.warning(
+          `Reconciled ${data.reconciled} draft sale${data.reconciled === 1 ? "" : "s"}; ${data.failed} failed — see the Square sync log`
+        );
+      } else if (data.reconciled === 0 && data.alreadyReconciled > 0) {
+        toast.success("All draft sales were already reconciled");
+      } else {
+        toast.success(`Reconciled ${data.reconciled} draft sale${data.reconciled === 1 ? "" : "s"}`);
+      }
+      queryClient.invalidateQueries({ queryKey: squareKeys.syncStatus() });
+      queryClient.invalidateQueries({ queryKey: squareKeys.draftSales() });
+    },
+    onError: (err: Error) => {
+      toast.error(`Draft-sale reconciliation failed: ${err.message}`);
+    },
+  });
+
   // Refresh Square locations (pulls locations.list into square_locations so bins
   // can be pointed at them). Invalidates status to refresh the POS-bins list.
   const refreshLocations = useMutation({
@@ -292,6 +326,7 @@ function SquareIntegrationCard() {
   }> = status?.posBins ?? [];
 
   const isConnected = status?.isEnabled && status?.catalogItemCount > 0;
+  const unreconciledDraftSales: number = status?.unreconciledDraftSales ?? 0;
 
   function getSquareStatus(): IntegrationStatus {
     if (isConnected) return "connected";
@@ -446,6 +481,39 @@ function SquareIntegrationCard() {
               )}
             </div>
 
+            {/* Draft-sale reconciliation (BD-2): staged keg pours -> TTB removals */}
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <div>
+                <p className="text-sm font-medium flex items-center gap-2">
+                  Draft Sales
+                  {unreconciledDraftSales > 0 && (
+                    <Badge variant="secondary">{unreconciledDraftSales} unreconciled</Badge>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Convert staged keg pours into taproom-sale removals (TTB)
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => reconcileDraftSales.mutate()}
+                disabled={reconcileDraftSales.isPending || unreconciledDraftSales === 0}
+              >
+                {reconcileDraftSales.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    Reconciling...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-3 w-3" />
+                    Reconcile draft sales
+                  </>
+                )}
+              </Button>
+            </div>
+
             {/* Recent Sync Log */}
             {status?.recentSyncs?.length > 0 && (
               <div>
@@ -477,7 +545,7 @@ function SquareIntegrationCard() {
             {[
               "Outbound catalog sync (products & prices)",
               "Inventory count sync (cases \u2192 selling units)",
-              "Inbound draft sales tracking",
+              "Inbound draft sales tracking & TTB reconciliation",
               "Multi-location support",
             ].map((feature, index) => (
               <li key={index} className="flex items-center gap-2">
