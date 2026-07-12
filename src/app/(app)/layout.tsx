@@ -1,7 +1,10 @@
 /**
  * App Layout
  *
- * Main authenticated layout with sidebar navigation.
+ * Main authenticated layout with two primary-navigation surfaces:
+ * the sidebar on md+ viewports, and on phones (<md) the fixed bottom
+ * MobileTabBar — three floor-workflow tabs plus a "More" button that
+ * opens the full nav in the sidebar's mobile sheet.
  * All protected routes render within this layout.
  */
 
