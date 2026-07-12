@@ -7,6 +7,10 @@
  * Deducts quantity from the source pitch via yeast_pitch_events,
  * calculates pitch rate from batch volume and OG, and suggests
  * a batch state transition after successful pitching.
+ *
+ * Fields use the shared Form primitives (FormField/FormControl/FormMessage)
+ * so validation errors are announced and associated with their inputs
+ * (audit A11Y-3).
  */
 
 import { useEffect, useMemo } from "react";
@@ -25,9 +29,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -339,22 +351,29 @@ export function PitchYeastDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <Form {...form}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 1. Yeast Source Select */}
-          <div className="space-y-2">
-            <Label htmlFor="pitch_id">Yeast Source</Label>
+          <FormField
+            control={form.control}
+            name="pitch_id"
+            render={({ field }) => (
+              <FormItem>
+            <FormLabel>Yeast Source</FormLabel>
             <Select
-              value={selectedPitchId}
-              onValueChange={(v) => form.setValue("pitch_id", v)}
+              value={field.value}
+              onValueChange={field.onChange}
               disabled={pitchesLoading}
             >
-              <SelectTrigger className="min-h-[44px]">
-                <SelectValue
-                  placeholder={
-                    pitchesLoading ? "Loading..." : "Select yeast source..."
-                  }
-                />
-              </SelectTrigger>
+              <FormControl>
+                <SelectTrigger className="min-h-[44px]">
+                  <SelectValue
+                    placeholder={
+                      pitchesLoading ? "Loading..." : "Select yeast source..."
+                    }
+                  />
+                </SelectTrigger>
+              </FormControl>
               <SelectContent>
                 {sortedPitches.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">
@@ -386,11 +405,7 @@ export function PitchYeastDialog({
                 )}
               </SelectContent>
             </Select>
-            {form.formState.errors.pitch_id && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.pitch_id.message}
-              </p>
-            )}
+            <FormMessage />
             {/* Generation warning — informational only, never blocks pitching */}
             {selectedPitch && isOverGeneration(selectedPitch) && (
               <p className="text-sm text-amber-600 flex items-center gap-1">
@@ -401,29 +416,35 @@ export function PitchYeastDialog({
                 drift.
               </p>
             )}
-          </div>
+              </FormItem>
+            )}
+          />
 
           {/* 2. Viability */}
-          <div className="space-y-2">
-            <Label htmlFor="viability">Viability (%)</Label>
-            <Input
-              id="viability"
-              type="number"
-              min={0}
-              max={100}
-              step="0.1"
-              {...form.register("viability")}
-              className="min-h-[44px]"
-            />
-            <p className="text-sm text-muted-foreground">
-              Estimated from decay. Override if measured.
-            </p>
-            {form.formState.errors.viability && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.viability.message}
-              </p>
+          <FormField
+            control={form.control}
+            name="viability"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Viability (%)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.1"
+                    className="min-h-[44px]"
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Estimated from decay. Override if measured.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
           {/* 3. Pitch Rate Calculation Display */}
           {pitchCalc && (
@@ -444,22 +465,26 @@ export function PitchYeastDialog({
           )}
 
           {/* 4. Quantity */}
-          <div className="space-y-2">
-            <Label htmlFor="quantity_lbs">Quantity (lbs)</Label>
-            <Input
-              id="quantity_lbs"
-              type="number"
-              step="0.1"
-              placeholder="e.g., 2.5"
-              {...form.register("quantity_lbs")}
-              className="min-h-[44px]"
-            />
-            {form.formState.errors.quantity_lbs && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.quantity_lbs.message}
-              </p>
+          <FormField
+            control={form.control}
+            name="quantity_lbs"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Quantity (lbs)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 2.5"
+                    className="min-h-[44px]"
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
           {/* 5. Remaining display / overdraw warning */}
           {selectedPitch && watchedQuantity > 0 && (
@@ -483,15 +508,24 @@ export function PitchYeastDialog({
           )}
 
           {/* 6. Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea
-              id="notes"
-              {...form.register("notes")}
-              placeholder="Pitch notes..."
-              rows={2}
-            />
-          </div>
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes (optional)</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Pitch notes..."
+                    rows={2}
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {/* 7. Footer */}
           <DialogFooter>
@@ -504,6 +538,7 @@ export function PitchYeastDialog({
             />
           </DialogFooter>
         </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
