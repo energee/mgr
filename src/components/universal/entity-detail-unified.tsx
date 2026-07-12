@@ -9,7 +9,10 @@
  * Supports:
  * - View mode: data display, header, tabs, relations, state transitions, actions
  *   (`type: "button"` actions render as visible header buttons, capped at
- *   MAX_HEADER_ACTION_BUTTONS; the rest live in the Actions dropdown).
+ *   MAX_HEADER_ACTION_BUTTONS; the rest live in the Actions dropdown. On
+ *   phones (useIsMobile, <768px) the visible header buttons collapse into
+ *   the Actions dropdown too, so the header stays a single compact row —
+ *   Save/Cancel/Edit remain visible regardless of viewport).
  *   Actions with `confirm: true` are gated behind EntityActionConfirmDialog
  *   and actions with `transitionFields` behind EntityTransitionFieldsDialog
  *   (which collects field values merged into the same UPDATE as the status
@@ -71,6 +74,7 @@ import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { useQBOAutoSync } from "@/hooks/use-qbo-auto-sync";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import {
   type EntityConfig,
@@ -896,6 +900,15 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
     return { headerButtonActions: buttons, dropdownActions: dropdown };
   }, [availableActions, duplicateAction]);
 
+  const isMobile = useIsMobile();
+  // On phones the visible header buttons fold into the Actions menu so the
+  // header stays a single compact control row (mobile-UX spec §3). Save /
+  // Cancel / Edit stay visible — only configured actions collapse.
+  const visibleHeaderActions = isMobile ? [] : headerButtonActions;
+  const menuActions = isMobile
+    ? [...headerButtonActions, ...dropdownActions]
+    : dropdownActions;
+
   // ---------------------------------------------------------------------------
   // Edit mode: toggle in
   // ---------------------------------------------------------------------------
@@ -1290,7 +1303,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between max-sm:flex-col max-sm:gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-medium">
@@ -1310,7 +1323,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 max-sm:flex-wrap">
           {editing && !isCreateMode && (
             <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isSubmitting}>
               Cancel
@@ -1341,7 +1354,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
               unless the config sets an explicit variant) */}
           {!editing &&
             !isCreateMode &&
-            headerButtonActions.map((action, index) => {
+            visibleHeaderActions.map((action, index) => {
               const disabledReason = action.disabledWhen?.(displayData);
               return (
                 <Button
@@ -1362,7 +1375,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
 
           {!editing &&
             !isCreateMode &&
-            (dropdownActions.length > 0 || rawTransitions.length > 0) && (
+            (menuActions.length > 0 || rawTransitions.length > 0) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm">
@@ -1402,13 +1415,13 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
                           </DropdownMenuItem>
                         );
                       })}
-                      {dropdownActions.length > 0 && (
+                      {menuActions.length > 0 && (
                         <DropdownMenuSeparator />
                       )}
                     </>
                   )}
 
-                  {dropdownActions.map((action) => {
+                  {menuActions.map((action) => {
                     const disabledReason = action.disabledWhen?.(
                       displayData
                     );
@@ -1668,19 +1681,21 @@ function UnifiedTabsWithRelations<T>({
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange}>
-      <TabsList>
-        <TabsTrigger value="details">Details</TabsTrigger>
-        {tabs.map(([tabName]) => (
-          <TabsTrigger key={tabName} value={tabName}>
-            {tabName}
-          </TabsTrigger>
-        ))}
-        {relationTabs.map((rel) => (
-          <TabsTrigger key={rel.name} value={rel.name}>
-            {rel.detailTab}
-          </TabsTrigger>
-        ))}
-      </TabsList>
+      <div className="max-sm:overflow-x-auto">
+        <TabsList className="max-sm:w-max">
+          <TabsTrigger value="details">Details</TabsTrigger>
+          {tabs.map(([tabName]) => (
+            <TabsTrigger key={tabName} value={tabName}>
+              {tabName}
+            </TabsTrigger>
+          ))}
+          {relationTabs.map((rel) => (
+            <TabsTrigger key={rel.name} value={rel.name}>
+              {rel.detailTab}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
 
       <TabsContent value="details" className="space-y-4">
         <SectionGroupRenderer
