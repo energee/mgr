@@ -21,6 +21,7 @@ export function PriceCell({
   channelId,
   rowIndex,
   colIndex,
+  label,
   onSave,
   onNavigate,
 }: {
@@ -30,6 +31,11 @@ export function PriceCell({
   channelId: string;
   rowIndex: number;
   colIndex: number;
+  /**
+   * Accessible context for the cell (tier + format names). Without it, unset
+   * cells announce as an unlabeled "· button" (audit A11Y-7).
+   */
+  label: string;
   onSave: (tierId: string, formatId: string, channelId: string, value: number | null) => void;
   onNavigate: (rowIndex: number, colIndex: number, direction: NavigateDirection) => void;
 }) {
@@ -115,6 +121,7 @@ export function PriceCell({
         ref={inputRef}
         type="text"
         inputMode="decimal"
+        aria-label={label}
         value={value}
         onChange={(e) => { dirtyRef.current = true; setValue(e.target.value); }}
         onBlur={commit}
@@ -128,6 +135,9 @@ export function PriceCell({
     <button
       ref={buttonRef}
       onClick={startEditing}
+      aria-label={
+        price != null ? `${label}: $${price.toFixed(2)}` : `${label}: no price set`
+      }
       className={cn(
         "w-full h-8 text-right text-sm px-2 rounded transition-colors cursor-text tabular-nums",
         price != null

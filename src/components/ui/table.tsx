@@ -69,6 +69,9 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       data-slot="table-head"
+      // Column-header scope by default (audit A11Y-6); pass scope="row" via
+      // props for row-label header cells.
+      scope="col"
       className={cn(
         "text-muted-foreground h-8 px-3 text-left align-middle font-medium text-[11px] uppercase tracking-wider whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className

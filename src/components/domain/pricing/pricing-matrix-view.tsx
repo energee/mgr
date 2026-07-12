@@ -375,6 +375,7 @@ export function PricingMatrixView({
                           channelId={activeChannelId!}
                           rowIndex={tierIdx}
                           colIndex={fmtIdx}
+                          label={`${tier.name} — ${fmt.name}`}
                           onSave={handleSave}
                           onNavigate={handleCellNavigate}
                         />

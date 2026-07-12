@@ -9,6 +9,10 @@
  *
  * The measured_date field resets the viability decay baseline by updating
  * received_date (for purchases) or harvest_date (for harvests).
+ *
+ * Fields use the shared Form primitives (FormField/FormControl/FormMessage)
+ * so validation errors are announced and associated with their inputs
+ * (audit A11Y-3).
  */
 
 import { useForm } from "react-hook-form";
@@ -26,9 +30,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { FormActions } from "@/components/ui/form-actions";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { yeastKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
@@ -141,77 +153,88 @@ export function RecordCellCountDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 1. Cell Count */}
-          <div className="space-y-2">
-            <Label htmlFor="cell_count_thousand">
-              Cell Count (thousand cells)
-            </Label>
-            <Input
-              id="cell_count_thousand"
-              type="number"
-              min={0}
-              step="1"
-              placeholder="e.g., 200000"
-              {...form.register("cell_count_thousand")}
-              className="min-h-[44px]"
+        <Form {...form}>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* 1. Cell Count */}
+            <FormField
+              control={form.control}
+              name="cell_count_thousand"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cell Count (thousand cells)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="1"
+                      placeholder="e.g., 200000"
+                      className="min-h-[44px]"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {form.formState.errors.cell_count_thousand && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.cell_count_thousand.message}
-              </p>
-            )}
-          </div>
 
-          {/* 2. Viability */}
-          <div className="space-y-2">
-            <Label htmlFor="viability">Viability (%)</Label>
-            <Input
-              id="viability"
-              type="number"
-              min={0}
-              max={100}
-              step="0.1"
-              placeholder="e.g., 95"
-              {...form.register("viability")}
-              className="min-h-[44px]"
+            {/* 2. Viability */}
+            <FormField
+              control={form.control}
+              name="viability"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Viability (%)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.1"
+                      placeholder="e.g., 95"
+                      className="min-h-[44px]"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {form.formState.errors.viability && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.viability.message}
-              </p>
-            )}
-          </div>
 
-          {/* 3. Date Measured */}
-          <div className="space-y-2">
-            <Label htmlFor="measured_date">Date Measured</Label>
-            <Input
-              id="measured_date"
-              type="date"
-              {...form.register("measured_date")}
-              className="min-h-[44px]"
+            {/* 3. Date Measured */}
+            <FormField
+              control={form.control}
+              name="measured_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date Measured</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      className="min-h-[44px]"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Resets viability decay baseline to this date.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <p className="text-sm text-muted-foreground">
-              Resets viability decay baseline to this date.
-            </p>
-            {form.formState.errors.measured_date && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.measured_date.message}
-              </p>
-            )}
-          </div>
 
-          {/* Footer */}
-          <DialogFooter>
-            <FormActions
-              submitLabel="Record"
-              loadingLabel="Saving..."
-              isLoading={mutation.isPending}
-              onCancel={() => onOpenChange(false)}
-            />
-          </DialogFooter>
-        </form>
+            {/* Footer */}
+            <DialogFooter>
+              <FormActions
+                submitLabel="Record"
+                loadingLabel="Saving..."
+                isLoading={mutation.isPending}
+                onCancel={() => onOpenChange(false)}
+              />
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
