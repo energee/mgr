@@ -1,0 +1,4 @@
+# ponytail: union merge = concatenate both sides instead of conflicting.
+# Safe because PROGRESS.md entries are prepended blocks; edits to the SAME old
+# lines on two branches will silently keep both copies — dedupe by eye then.
+PROGRESS.md merge=union
