@@ -7,6 +7,10 @@
  * - Recipe selection (filtered by brand)
  * - Planned start date (from recommended brew start)
  * - Volume estimation based on shortfall quantity
+ *
+ * Fields use the shared Form primitives (FormField/FormControl/FormMessage)
+ * so validation errors are announced and associated with their inputs
+ * (audit A11Y-3).
  */
 
 import { useEffect } from "react";
@@ -25,9 +29,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -204,37 +215,43 @@ export function CreateBatchFromShortfall({
           </div>
         </div>
 
+        <Form {...form}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="planned_start_date">Planned Start</Label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="planned_start_date"
-                  type="date"
-                  className="pl-9"
-                  {...form.register("planned_start_date")}
-                />
-              </div>
-              {form.formState.errors.planned_start_date && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.planned_start_date.message}
-                </p>
+            <FormField
+              control={form.control}
+              name="planned_start_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Planned Start</FormLabel>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <FormControl>
+                      <Input type="date" className="pl-9" {...field} />
+                    </FormControl>
+                  </div>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
+            />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="recipe_id">Recipe</Label>
+          <FormField
+            control={form.control}
+            name="recipe_id"
+            render={({ field }) => (
+              <FormItem>
+            <FormLabel>Recipe</FormLabel>
             <Select
-              value={form.watch("recipe_id")}
-              onValueChange={(v) => form.setValue("recipe_id", v)}
+              value={field.value}
+              onValueChange={field.onChange}
               disabled={recipesLoading}
             >
-              <SelectTrigger>
-                <SelectValue placeholder={recipesLoading ? "Loading..." : "Select recipe..."} />
-              </SelectTrigger>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder={recipesLoading ? "Loading..." : "Select recipe..."} />
+                </SelectTrigger>
+              </FormControl>
               <SelectContent>
                 {recipes?.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">
@@ -254,11 +271,7 @@ export function CreateBatchFromShortfall({
                 )}
               </SelectContent>
             </Select>
-            {form.formState.errors.recipe_id && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.recipe_id.message}
-              </p>
-            )}
+            <FormMessage />
             {selectedRecipe && (
               <p className="text-xs text-muted-foreground">
                 Lead time: {scheduleDays(selectedRecipe).fermentationDays}{" "}
@@ -266,37 +279,43 @@ export function CreateBatchFromShortfall({
                 conditioning days
               </p>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="name">Batch Name</Label>
-            <Input
-              id="name"
-              {...form.register("name")}
-              placeholder="e.g., Hazy IPA #5"
-            />
-            {form.formState.errors.name && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.name.message}
-              </p>
+              </FormItem>
             )}
-          </div>
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="volume_bbl">Volume (BBL)</Label>
-            <Input
-              id="volume_bbl"
-              type="number"
-              step="0.1"
-              {...form.register("volume_bbl")}
-              placeholder="e.g., 10"
-            />
-            {form.formState.errors.volume_bbl && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.volume_bbl.message}
-              </p>
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Batch Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Hazy IPA #5" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
+
+          <FormField
+            control={form.control}
+            name="volume_bbl"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Volume (BBL)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 10"
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <DialogFooter>
             <Button
@@ -324,6 +343,7 @@ export function CreateBatchFromShortfall({
             </Button>
           </DialogFooter>
         </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
