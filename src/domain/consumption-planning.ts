@@ -235,8 +235,13 @@ export function computeTransferLoss(
   return loss > LOSS_EPSILON_BBL ? loss : 0;
 }
 
-/** Fluid ounces per barrel: 31 US gallons x 128 oz. */
-const OZ_PER_BARREL = 31 * 128;
+/**
+ * Fluid ounces per barrel: 31 US gallons x 128 oz (= 3968). The federally
+ * defined TTB barrel — the single oz->bbl constant shared by
+ * computeUnitFillVolumeBbl, the 00203 TTB SQL summaries, and the Square
+ * draft-sale reconciliation route (volume_oz / 3968).
+ */
+export const OZ_PER_BARREL = 31 * 128;
 
 /** Container volume fields needed for fill-volume math. */
 export type FillVolumeContainer = {

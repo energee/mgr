@@ -11,7 +11,15 @@
  *
  * For each POS-configured bin:
  * 1. Reads sellable stock (packaged FG + filled kegs, unified) from the
- *    sellable_inventory view (00221)
+ *    sellable_inventory view (00221). KEG rows (source = 'keg') are EXCLUDED
+ *    from PHYSICAL_COUNT pushes (audit BD-4): a keg row's quantity counts
+ *    whole kegs, but its Square variation is sold as POURS at the register —
+ *    pushing "2" would mark the tap sold-out after two pints. MGR therefore
+ *    does not manage Square counts for keg variations at all (they are also
+ *    excluded from the zero-fill sweep in step 4 — zeroing them would mark
+ *    every tap sold out immediately); draft depletion is tracked via
+ *    square_draft_sales + api/square/reconcile-draft-sales instead. Skipped
+ *    keg rows are surfaced in the response and the sync log.
  * 2. Aggregates per (brand, selling_format). Quantities are pushed AS-IS: a
  *    finished-goods quantity is already a count of SELLING UNITS (cases/packs)
  *    and buildCatalogObjects makes exactly ONE ITEM_VARIATION per selling_format
@@ -20,9 +28,10 @@
  *    selling_formats.unit_count — that OVER-reports on-hand by unit_count, since
  *    unit_count is containers-per-case, not cases; removed.)
  * 3. Looks up Square variation IDs from square_catalog_map
- * 4. Emits an explicit quantity-0 PHYSICAL_COUNT for every mapped variation NOT
- *    stocked at the bin, so a variation that sold out in MGR drops to 0 on the
- *    POS instead of displaying its last non-zero count forever (phantom stock).
+ * 4. Emits an explicit quantity-0 PHYSICAL_COUNT for every mapped NON-KEG
+ *    variation NOT stocked at the bin, so a variation that sold out in MGR
+ *    drops to 0 on the POS instead of displaying its last non-zero count
+ *    forever (phantom stock).
  * 5. Pushes physical counts to Square scoped to the bin's square_location_id
  * 6. Logs sync result (square_sync_log.location_id = the view's location uuid)
  */
@@ -35,6 +44,7 @@ import { updateSquareSettings } from "@/integrations/square/client";
 import { pushInventoryCounts } from "@/integrations/square/inventory";
 import { getPosBins, requireSquareClient, logSyncFailure } from "@/integrations/square/route-helpers";
 import type { SquareSyncInventory, SquareSyncResult } from "@/integrations/square/types";
+import { dynamicFrom } from "@/services/types";
 
 const log = logger.child({ route: "/api/square/sync/inventory" });
 
@@ -111,6 +121,27 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       }
     }
 
+    // 2b. Which mapped selling formats are KEG formats (containers.type = 'keg')?
+    //     Needed so the zero-fill sweep in step 4 can skip keg variations: MGR
+    //     does not manage Square counts for them (BD-4 — see the module header).
+    //     Identified via the container join (not via stocked keg rows, which
+    //     would miss a keg format with zero filled kegs anywhere). dynamicFrom:
+    //     the typed builder rejects embedded-resource filters (containers.type).
+    const kegFormatIds = new Set<string>();
+    const mappedFormatIds = [...new Set(mappedVariations.map((v) => v.formatId))];
+    if (mappedFormatIds.length > 0) {
+      const { data: kegFormats, error: kegFmtError } = await dynamicFrom(admin, "selling_formats")
+        .select("id, containers!inner(type)")
+        .in("id", mappedFormatIds)
+        .eq("containers.type", "keg");
+      if (kegFmtError) {
+        // A swallowed error here would misclassify every keg variation as
+        // packaged and zero-sweep the taps — abort instead.
+        throw new Error(`Failed to query keg selling formats: ${kegFmtError.message}`);
+      }
+      for (const f of (kegFormats ?? []) as Array<{ id: string }>) kegFormatIds.add(f.id);
+    }
+
     // 3. Read sellable stock across all POS bins from the unified read model
     //    (packaged finished goods in bins + filled-keg contents, double-count
     //    guard baked in). The view is already positive-only (bi.quantity > 0);
@@ -128,7 +159,24 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       throw new Error(`Failed to query sellable inventory: ${stockError.message}`);
     }
 
-    const rows = stock ?? [];
+    // BD-4: drop keg rows before aggregation — a keg quantity counts whole
+    // kegs, not the pours its Square variation sells, so pushing it would mark
+    // the tap sold-out after N pints (see the module header for the full
+    // decision). Skipped rows are counted per bin and surfaced.
+    const allRows = stock ?? [];
+    const rows: typeof allRows = [];
+    const kegRowsSkippedByBin = new Map<string, number>();
+    let kegRowsSkipped = 0;
+    for (const r of allRows) {
+      if (r.source === "keg") {
+        kegRowsSkipped++;
+        if (r.bin_id) {
+          kegRowsSkippedByBin.set(r.bin_id, (kegRowsSkippedByBin.get(r.bin_id) ?? 0) + 1);
+        }
+        continue;
+      }
+      rows.push(r);
+    }
 
     // Group stock rows by bin.
     const stockByBin = new Map<string, typeof rows>();
@@ -194,13 +242,16 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         }
       }
 
-      // Zero out every mapped variation NOT stocked at this bin, so sold-out
-      // variations drop to 0 on the POS (phantom-stock fix). pushInventoryCounts
-      // already accepts quantity 0 (it stringifies).
+      // Zero out every mapped NON-KEG variation NOT stocked at this bin, so
+      // sold-out variations drop to 0 on the POS (phantom-stock fix).
+      // pushInventoryCounts already accepts quantity 0 (it stringifies).
+      // Keg variations are skipped (BD-4): their counts are not MGR-managed,
+      // and zeroing them would mark every tap sold out immediately.
       // ponytail: this is a full mapped-variation x bin sweep each sync (bounded,
       // fine at taproom scale). Upgrade path if that grows: track the last-pushed
       // (bin, variation) set and only zero the ones that transitioned to 0.
       for (const mv of mappedVariations) {
+        if (kegFormatIds.has(mv.formatId)) continue;
         if (stockedKeys.has(`${mv.brandId}::${mv.formatId}`)) continue;
         counts.push({ squareVariationId: mv.squareVariationId, squareLocationId, quantity: 0 });
       }
@@ -245,6 +296,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
           hasWork: p.counts.length > 0 || p.mappingErrors.length > 0,
           itemsSynced: pr.itemsSynced,
           itemsFailed: pr.itemsFailed + p.mappingErrors.length,
+          // BD-4: keg rows deliberately not pushed for this bin (see header).
+          kegRowsSkipped: kegRowsSkippedByBin.get(p.binId) ?? 0,
           errors: [...pr.errors, ...p.mappingErrors],
         };
       })
@@ -279,6 +332,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
             binId: br.binId,
             binName: br.binName,
             squareLocationId: br.squareLocationId,
+            // BD-4: keg rows at this bin deliberately not pushed as counts.
+            kegRowsSkipped: br.kegRowsSkipped > 0 ? br.kegRowsSkipped : undefined,
             errors: br.errors.length > 0 ? br.errors : undefined,
             triggeredBy: user.id,
           },
@@ -297,6 +352,8 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         items_failed: allErrors.length,
         details: {
           message: "No inventory counts to push",
+          // BD-4: keg rows deliberately not pushed as counts.
+          kegRowsSkipped: kegRowsSkipped > 0 ? kegRowsSkipped : undefined,
           errors: allErrors.length > 0 ? allErrors : undefined,
           triggeredBy: user.id,
         },
@@ -313,12 +370,16 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       totalSynced,
       totalFailed,
       binsProcessed: binResults.length,
+      // BD-4: keg rows excluded from PHYSICAL_COUNT pushes (whole-keg counts
+      // are not pour counts) — surfaced so the exclusion is never silent.
+      kegRowsSkipped,
       bins: binResults.map((br) => ({
         binId: br.binId,
         binName: br.binName,
         squareLocationId: br.squareLocationId,
         itemsSynced: br.itemsSynced,
         itemsFailed: br.itemsFailed,
+        kegRowsSkipped: br.kegRowsSkipped,
       })),
       errors: allErrors,
     });

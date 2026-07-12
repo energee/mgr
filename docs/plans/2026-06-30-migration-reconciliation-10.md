@@ -42,15 +42,18 @@ A "catch-up" migration must reconstruct the lost refactor **before** `00139` fir
 
 Build the DDL text in SQL from the live catalog → `CREATE TABLE _recon_blob AS SELECT <text> c` → record `md5(c)` → pull back as newline-stripped base64; large MCP results auto-spill to a file under the session `tool-results/` dir, so extract with `jq`/python instead of re-emitting → `base64 -d` → check whole-file md5 → `DROP TABLE _recon_blob`. `pg_get_functiondef` errors on **aggregate** functions (`prokind='a'`); filter `prokind='f'`. Record numbered migrations with `execute_sql` (DDL) + manual `INSERT` of the `00NNN` row; never `apply_migration` (timestamp version → drift).
 
-## Tracked live bugs — do NOT fix here (each needs its own red-green test)
+## Tracked live bugs — ALL RESOLVED IN-CHAIN as of 2026-07-12
 
-These change live behavior, so they are out of scope for the reconciliation migrations:
+> **STATUS (2026-07-12):** Every one of the 5 bugs below is now fixed in the migration
+> chain and merged to `origin/main`. This section is retained for history. The only
+> residual is **verifying the fixes are applied to the shared live DB** — a deploy
+> question, requiring the Supabase MCP, not new code. Do NOT re-author these fixes.
 
-**Category ② — live BEHIND migrations (migration newer than live; live is the buggy one):**
-1. `generate_delivery_number` — live is missing the per-date `pg_advisory_xact_lock` added in `00075` → delivery-number race under concurrency.
-2. `generate_lot_number` — live is the old inline version with no lock; `00142` delegates to the race-safe `generate_next_number` → lot-number race.
-3. `calculate_ingredient_shortfalls` — live omits the `on_order_qty` / open-PO logic added in `00150` → overstates shortfalls when POs are open.
-4. `get_price_for_customer` — migrations `DROP` it in `00077`, yet it is live with a different pricing model → investigate before any change.
+**Category ② — live BEHIND migrations (migration newer than live; live was the buggy one):**
+1. `generate_delivery_number` — per-date `pg_advisory_xact_lock` present in **`00075`**. ✅ chain-fixed (old migration, applied live long ago).
+2. `generate_lot_number` — **`00142`** replaces the inline version with the race-safe `generate_next_number` delegate. ✅ chain-fixed.
+3. `calculate_ingredient_shortfalls` — **`00150`** includes the `on_order_qty` / open-PO CTE and column. ✅ chain-fixed.
+4. `get_price_for_customer` — **`00214`** (PR #354) captures the live definition verbatim into the chain (dual pricing model documented); byte-identical to live prosrc, so `db push` is a semantic no-op. ✅ chain-reconciled — no behavior change needed.
 
-**New finding (2026-06-30):**
-5. `get_inventory_overview` — its body still references `package_types`, which no longer exists live → the function errors when invoked. Confirm call sites, then rewrite against `selling_formats`/`containers` with a red-green test.
+**New finding (2026-06-30) — now fixed:**
+5. `get_inventory_overview` — **`00208`** (PR #346) rewrites the body off dropped `package_types`/`catalog_type`/`bin_inventory`, preserving the JSON output shape. ✅ chain-fixed. **Only open item:** confirm `00208` is applied to live (if not, live still errors when the function is invoked) — needs Supabase MCP.
