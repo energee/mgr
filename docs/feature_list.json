@@ -548,6 +548,16 @@
       "evidence": "pr:398",
       "branch": "sentry-fix/SENTRY-7597067731",
       "notes": "Pattern scan found the identical swallow-and-return-[] bug duplicated in all three dashboard trend queries (dashboard/page.tsx ProductionTrends, dashboard/inventory/page.tsx InventoryTrends, dashboard/sales/page.tsx SalesTrends); all three fixed identically."
+    },
+    {
+      "id": "SENTRY-7597067759",
+      "area": "infra",
+      "title": "Failed to fetch planned batches by day:",
+      "user_visible_behavior": "BatchActivityHeatmap on /dashboard logged RPC errors by passing a destructured plain object to log.error instead of the real PostgrestError instance, so client-logger's instanceof-Error check missed it and Sentry captured only the generic literal message with no stack or detail. Same anti-pattern found and fixed in NotificationsProvider's fetch-notifications error path.",
+      "verification": "bun run test src/components/dashboard/__tests__/batch-activity-heatmap.test.tsx src/contexts/__tests__/notifications.test.tsx",
+      "state": "passing",
+      "evidence": "pr:397",
+      "branch": "sentry-fix/SENTRY-7597067759"
     }
   ]
 }
