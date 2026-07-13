@@ -6,6 +6,18 @@ export type SentryIssue = {
   culprit: string;
   permalink: string;
   stackTrace: string;
+  /**
+   * Flattened dump of the latest event's `contexts` + `extra` bag and its
+   * `message`/`request` entries. This is where a Supabase failure carries its
+   * real cause — the PostgrestError `code` (42501 = permission denied,
+   * 42883 = undefined function), `details`, and `hint`. Without it, a
+   * `log.error("Failed to fetch X:", err)` issue presents as nothing but a
+   * stack trace ending in the error handler, and the only fix reachable from
+   * the repo is the error handler itself.
+   */
+  eventContext: string;
+  /** Most recent breadcrumbs (newest last), formatted one per line. */
+  breadcrumbs: string;
   eventCount14d: number;
   firstSeen: string;
   lastSeen: string;

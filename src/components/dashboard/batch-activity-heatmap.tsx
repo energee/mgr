@@ -101,12 +101,12 @@ export function BatchActivityHeatmap() {
         { p_days: DAYS },
       );
       if (error) {
-        log.error("Failed to fetch planned batches by day:", {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
+        // Pass the PostgrestError instance itself (not a destructured copy) so
+        // client-logger's `instanceof Error` check routes this to
+        // Sentry.captureException with the real message/stack (audit
+        // SENTRY-7597067759 — a plain object here silently degrades to a
+        // generic captureMessage with no diagnostic detail).
+        log.error("Failed to fetch planned batches by day:", error);
         return [];
       }
       return ((data || []) as PlannedByDayRow[]).map((r) => ({
