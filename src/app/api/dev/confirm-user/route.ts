@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
   const { email } = await request.json();
 
-  if (!email) {
+  if (!email || typeof email !== "string") {
     return NextResponse.json({ error: "Email required" }, { status: 400 });
   }
 
@@ -37,7 +37,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: listError.message }, { status: 500 });
     }
 
-    const user = users.find(u => u.email === email);
+    // Auth emails are stored lowercased by Supabase; compare
+    // case-insensitively so a mixed-case request still finds the user
+    // (audit DL-6 sweep — same class as the portal auto-link lockout).
+    const normalizedEmail = email.toLowerCase();
+    const user = users.find(u => u.email?.toLowerCase() === normalizedEmail);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });

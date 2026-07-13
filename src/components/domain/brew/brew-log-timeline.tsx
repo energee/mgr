@@ -61,8 +61,11 @@ export function BrewLogTimeline({ data, actionTrigger }: BrewLogTimelineProps) {
     };
   }
 
-  // Mutation for updating events with optimistic updates
+  // Mutation for updating events with optimistic updates. Errors are handled
+  // at the mutateAsync call sites (rollback + specific toast per action), so
+  // opt out of the global MutationCache fallback toast (query-client.ts).
   const updateEventsMutation = useMutation({
+    meta: { suppressGlobalErrorToast: true },
     mutationFn: async (newEvents: BrewEvent[]) => {
       await unwrap(
         supabase

@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import { createHmac } from "crypto";
 import {
   DEFAULT_REPLAY_WINDOW_MS,
+  PAYMENT_REPLAY_WINDOW_MS,
   checkReplayWindow,
   verifyWebhookSignature,
 } from "@/integrations/square/webhook";
@@ -146,6 +147,27 @@ describe("checkReplayWindow", () => {
   });
 });
 
+// The widened payment.* window (audit IN-2): sale ingestion is exactly-once
+// via the order-keyed dedup claim (UNIQUE, 00224/00233), so payment events may
+// accept Square's full 24h retry horizon — a >5-min outage must not
+// permanently drop the sales Square dutifully keeps retrying.
+describe("PAYMENT_REPLAY_WINDOW_MS (audit IN-2)", () => {
+  const now = Date.parse("2026-05-14T12:00:00.000Z");
+
+  it("covers Square's full 24h retry horizon", () => {
+    const createdAt = new Date(now - 24 * 60 * 60_000).toISOString();
+    expect(checkReplayWindow(createdAt, PAYMENT_REPLAY_WINDOW_MS, now)).toEqual({ ok: true });
+  });
+
+  it("still rejects events beyond the horizon (26h) as stale", () => {
+    const createdAt = new Date(now - 26 * 60 * 60_000).toISOString();
+    expect(checkReplayWindow(createdAt, PAYMENT_REPLAY_WINDOW_MS, now)).toEqual({
+      ok: false,
+      reason: "stale_event",
+    });
+  });
+});
+
 // =============================================================================
 // Dollar-to-Cents Conversion
 // =============================================================================
@@ -210,5 +232,18 @@ describe("calculateVolumeOz", () => {
   it("handles fractional quantities", () => {
     // Half a pour (e.g., taster)
     expect(calculateVolumeOz(0.5)).toBe(8);
+  });
+
+  it("uses the per-variation pour size when provided (BD-3)", () => {
+    // square_catalog_map.pour_size_oz (00243): a 10 oz tulip, a 32 oz crowler.
+    expect(calculateVolumeOz(3, 10)).toBe(30);
+    expect(calculateVolumeOz(2, 32)).toBe(64);
+  });
+
+  it("falls back to STANDARD_POUR_OZ when pour size is null or undefined", () => {
+    // NULL pour_size_oz means "the 16 oz default", not zero.
+    expect(calculateVolumeOz(3, null)).toBe(48);
+    expect(calculateVolumeOz(3, undefined)).toBe(48);
+    expect(calculateVolumeOz(3, null)).toBe(3 * STANDARD_POUR_OZ);
   });
 });

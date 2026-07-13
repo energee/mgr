@@ -117,15 +117,22 @@ export async function retrieveVariationPricing(
  *  1. Build CatalogObject array from products
  *  2. Call Square batchUpsertCatalogObjects
  *  3. Map returned IDs back to brands/selling formats
- *  4. Upsert into square_catalog_map
+ *  4. Persist ALL mappings in ONE batched, error-checked upsert onto the 00242
+ *     unique index (brand_id, object_type, selling_format_id) NULLS NOT
+ *     DISTINCT. This replaced a per-row INSERT-then-blind-UPDATE whose fallback
+ *     UPDATE error was never checked (audit SF-4/IN-8): a silently dropped
+ *     mapping makes the NEXT sync push temp "#brand-…" ids, and Square creates
+ *     a FULL DUPLICATE catalog. The single round-trip also removes the 2N
+ *     sequential DB writes per push (PERF-1). On upsert failure every row in
+ *     the batch is reported failed and NONE are counted in itemsSynced.
  *
  * C7 (no location dimension in v1): square_catalog_map is keyed only by
- * (brand_id, selling_format_id, object_type) — there is deliberately NO
- * square_location_id column. A brand/variation maps to ONE Square catalog
- * object shared across all Square locations, because v1 uses a single price per
- * variation (see resolveChannelPrices). Per-location price overrides (future)
- * would require a per-location catalog object, i.e. adding a location dimension
- * to this table and keying the map by it.
+ * (brand_id, selling_format_id, object_type) — enforced by the 00242 unique
+ * index; there is deliberately NO square_location_id column. A brand/variation
+ * maps to ONE Square catalog object shared across all Square locations, because
+ * v1 uses a single price per variation (see resolveChannelPrices). Per-location
+ * price overrides (future) would require a per-location catalog object, i.e.
+ * adding a location dimension to this table and keying the map by it.
  */
 export async function pushCatalog(
   client: SquareClient,
@@ -173,8 +180,22 @@ export async function pushCatalog(
       }
     }
 
-    // Persist mappings back to square_catalog_map
+    // Persist mappings back to square_catalog_map: collect every row, then
+    // flush in ONE batched upsert (see the function doc — SF-4/IN-8 + PERF-1).
     const now = new Date().toISOString();
+
+    type MappingRow = {
+      brand_id: string;
+      selling_format_id: string | null;
+      square_catalog_id: string;
+      square_version: number | null;
+      object_type: "ITEM" | "ITEM_VARIATION";
+      last_synced_at: string;
+      updated_at: string;
+    };
+    const mappingRows: MappingRow[] = [];
+    /** errors[].itemId label for each mappingRows entry (same index). */
+    const rowLabels: string[] = [];
 
     for (const product of products) {
       const tempItemId = `#brand-${product.brandId}`;
@@ -190,34 +211,17 @@ export async function pushCatalog(
         continue;
       }
 
-      // Upsert ITEM mapping -- try INSERT first, fall back to UPDATE on conflict
-      const { error: insertError } = await admin
-        .from("square_catalog_map")
-        .insert({
-          brand_id: product.brandId,
-          selling_format_id: null,
-          square_catalog_id: realItemId,
-          square_version: itemVersion ? Number(itemVersion) : null,
-          object_type: "ITEM",
-          last_synced_at: now,
-          updated_at: now,
-        });
+      mappingRows.push({
+        brand_id: product.brandId,
+        selling_format_id: null,
+        square_catalog_id: realItemId,
+        square_version: itemVersion ? Number(itemVersion) : null,
+        object_type: "ITEM",
+        last_synced_at: now,
+        updated_at: now,
+      });
+      rowLabels.push(product.brandId);
 
-      if (insertError) {
-        await admin
-          .from("square_catalog_map")
-          .update({
-            square_catalog_id: realItemId,
-            square_version: itemVersion ? Number(itemVersion) : null,
-            last_synced_at: now,
-            updated_at: now,
-          })
-          .eq("brand_id", product.brandId)
-          .eq("object_type", "ITEM");
-      }
-      itemsSynced++;
-
-      // Upsert each variation mapping
       for (const variation of product.variations) {
         const varKey = variationKey(variation);
         const tempVarId = `#var-${product.brandId}-${varKey}`;
@@ -233,32 +237,44 @@ export async function pushCatalog(
           continue;
         }
 
-        const { error: varInsertError } = await admin
-          .from("square_catalog_map")
-          .insert({
-            brand_id: product.brandId,
-            selling_format_id: variation.sellingFormatId,
-            square_catalog_id: realVarId,
-            square_version: varVersion ? Number(varVersion) : null,
-            object_type: "ITEM_VARIATION",
-            last_synced_at: now,
-            updated_at: now,
-          });
+        mappingRows.push({
+          brand_id: product.brandId,
+          selling_format_id: variation.sellingFormatId,
+          square_catalog_id: realVarId,
+          square_version: varVersion ? Number(varVersion) : null,
+          object_type: "ITEM_VARIATION",
+          last_synced_at: now,
+          updated_at: now,
+        });
+        rowLabels.push(`${product.brandId}/${varKey}`);
+      }
+    }
 
-        if (varInsertError) {
-          await admin
-            .from("square_catalog_map")
-            .update({
-              square_catalog_id: realVarId,
-              square_version: varVersion ? Number(varVersion) : null,
-              last_synced_at: now,
-              updated_at: now,
-            })
-            .eq("brand_id", product.brandId)
-            .eq("object_type", "ITEM_VARIATION")
-            .eq("selling_format_id", variation.sellingFormatId);
+    if (mappingRows.length > 0) {
+      // onConflict targets the 00242 unique index (brand_id, object_type,
+      // selling_format_id) NULLS NOT DISTINCT — a plain-column index because
+      // PostgREST's on_conflict can only infer from a bare column list (partial
+      // and expression indexes are unreachable), and NULLS NOT DISTINCT so the
+      // ITEM rows' NULL selling_format_id collides correctly. One call covers
+      // both ITEM and ITEM_VARIATION rows.
+      const { error: upsertError } = await admin
+        .from("square_catalog_map")
+        .upsert(mappingRows, { onConflict: "brand_id,object_type,selling_format_id" });
+
+      if (upsertError) {
+        // The batched upsert is atomic: NO row persisted. Report every row
+        // failed and count none as synced — a mapping that silently fails to
+        // persist makes the next sync push temp "#brand-…" ids and duplicate
+        // the whole Square catalog (SF-4/IN-8).
+        log.error("Square catalog map upsert error:", upsertError.message);
+        for (const label of rowLabels) {
+          errors.push({
+            itemId: label,
+            error: `catalog map upsert failed: ${upsertError.message}`,
+          });
         }
-        itemsSynced++;
+      } else {
+        itemsSynced += mappingRows.length;
       }
     }
   } catch (err) {
@@ -274,13 +290,37 @@ export async function pushCatalog(
   };
 }
 
+/** Why the bulk stale-delete guard refused to run (audit IN-9). */
+export type StaleDeleteAbort = {
+  /** Map rows that would have been deleted. */
+  staleCount: number;
+  /** All rows currently in square_catalog_map. */
+  mappedCount: number;
+  /** Human-readable threshold that tripped. */
+  reason: string;
+};
+
 /** Outcome of {@link deleteStaleItems}. */
 export type DeleteStaleResult = {
   /** Map rows removed locally (only for chunks Square actually deleted). */
   deleted: number;
   /** Objects whose delete failed on Square; their map rows were RETAINED. */
   failed: number;
-  /** Per-failed-chunk error messages, surfaced so the route can report them. */
+  /**
+   * Set when the bulk-delete guard aborted the cleanup (audit IN-9): the stale
+   * set exceeded {@link STALE_DELETE_MAX_COUNT} rows or
+   * {@link STALE_DELETE_MAX_FRACTION} of all mapped objects. NOTHING was
+   * deleted, on Square or locally. A human confirms the removals are
+   * intentional and re-runs with `force: true`
+   * (POST /api/square/sync/catalog with body `{ "forceStaleDelete": true }`).
+   */
+  aborted?: StaleDeleteAbort;
+  /**
+   * Per-failed-chunk error messages, surfaced so the route can report them.
+   * `chunk: -1` marks a failure of the initial stale-entry SELECT (SF-6/IN-11):
+   * deletion was skipped entirely (fail-safe), `deleted`/`failed` are both 0,
+   * and only this error tells the caller the cleanup did not actually run.
+   */
   errors: Array<{ chunk: number; error: string }>;
 };
 
@@ -289,14 +329,39 @@ export type DeleteStaleResult = {
 const DELETE_BATCH_SIZE = 100;
 
 /**
+ * Bulk stale-delete guard thresholds (audit IN-9). Deleting a Square item
+ * destroys its variations, images, and Item-Sales reporting continuity, so an
+ * unexpectedly LARGE delete set is far more likely a keep-set derivation bug
+ * or a misconfiguration than a mass product retirement. Without `force`,
+ * deleteStaleItems refuses to run when the stale set exceeds EITHER threshold.
+ */
+export const STALE_DELETE_MAX_COUNT = 10;
+/** Fraction of ALL mapped rows above which the guard trips (see above). */
+export const STALE_DELETE_MAX_FRACTION = 0.5;
+/**
+ * The fraction guard only applies at/above this many stale rows: retiring one
+ * brand in a tiny catalog (e.g. 2 rows of 2 mapped) is a legitimate small
+ * delete and must not demand a force override.
+ */
+const STALE_DELETE_FRACTION_MIN_ROWS = 3;
+
+/**
  * Remove catalog items from Square whose brands are no longer in the KEEP set.
  *
  * `keepBrandIds` is the set of brands that SHOULD remain in the Square catalog
+ * — since 00244, the ACTIVE brand set (`brands.is_active`), pure config state
  * (see the catalog route's discontinued-vs-sold-out split). Every map row whose
  * brand is NOT in that set is treated as stale and deleted from BOTH Square and
  * square_catalog_map. An empty keep set means "delete the entire catalog" — the
- * route guards against calling with [] so a transient empty inventory can't wipe
+ * route guards against calling with [] so an empty/failed brand read can't wipe
  * everything.
+ *
+ * Bulk-delete guard (audit IN-9): unless `options.force`, the delete is REFUSED
+ * — `aborted` returned, nothing touched — when the stale set exceeds
+ * {@link STALE_DELETE_MAX_COUNT} rows, or {@link STALE_DELETE_MAX_FRACTION} of
+ * all mapped rows (fraction applies from STALE_DELETE_FRACTION_MIN_ROWS up).
+ * A delete set that large is more plausibly a keep-set bug than a mass
+ * retirement; a human re-runs with force after confirming.
  *
  * Failure handling (data-loss guard): the Square delete is chunked
  * (DELETE_BATCH_SIZE). A local map row is deleted ONLY for a chunk that Square
@@ -308,28 +373,64 @@ const DELETE_BATCH_SIZE = 100;
  *
  * @param client        Square SDK client.
  * @param keepBrandIds  brands to KEEP; every other mapped brand is deleted.
- * @returns counts + per-chunk errors for the caller to log/report.
+ * @param options.force bypass the bulk-delete guard (human-confirmed).
+ * @returns counts + guard abort + per-chunk errors for the caller to log/report.
  */
 export async function deleteStaleItems(
   client: SquareClient,
-  keepBrandIds: string[]
+  keepBrandIds: string[],
+  options: { force?: boolean } = {}
 ): Promise<DeleteStaleResult> {
   const admin = await createAdminClient();
 
-  // Find catalog map entries for brands not in the keep set.
-  let query = admin
+  // Read ALL map rows and partition locally: the guard needs the total mapped
+  // count anyway, and partitioning in JS replaces the old string-interpolated
+  // `.not("brand_id", "in", …)` filter. The map is small (one ITEM + a few
+  // ITEM_VARIATIONs per brand).
+  const { data: mapRows, error } = await admin
     .from("square_catalog_map")
     .select("id, brand_id, square_catalog_id, object_type");
 
-  // If there are brands to keep, exclude them; otherwise, delete everything.
-  if (keepBrandIds.length > 0) {
-    query = query.not("brand_id", "in", `(${keepBrandIds.join(",")})`);
+  if (error) {
+    // Surface the SELECT failure instead of folding it into the empty-result
+    // return (audit SF-6/IN-11): keep the fail-safe skip-deletion behavior,
+    // but tell the caller the cleanup never ran. chunk -1 = "the SELECT, not
+    // a delete chunk" (see DeleteStaleResult.errors).
+    log.error("Square catalog stale-entry select error:", error.message);
+    return {
+      deleted: 0,
+      failed: 0,
+      errors: [{ chunk: -1, error: `stale-entry select failed: ${error.message}` }],
+    };
   }
 
-  const { data: staleEntries, error } = await query;
+  const allRows = mapRows ?? [];
+  const keep = new Set(keepBrandIds);
+  // Empty keep set still means "everything is stale" — the route guards [].
+  const staleEntries = allRows.filter((e) => !keep.has(e.brand_id));
 
-  if (error || !staleEntries || staleEntries.length === 0) {
+  if (staleEntries.length === 0) {
     return { deleted: 0, failed: 0, errors: [] };
+  }
+
+  if (!options.force) {
+    const overCount = staleEntries.length > STALE_DELETE_MAX_COUNT;
+    const overFraction =
+      staleEntries.length >= STALE_DELETE_FRACTION_MIN_ROWS &&
+      staleEntries.length > allRows.length * STALE_DELETE_MAX_FRACTION;
+    if (overCount || overFraction) {
+      const reason = overCount
+        ? `stale set of ${staleEntries.length} exceeds the absolute cap of ${STALE_DELETE_MAX_COUNT} mapped objects`
+        : `stale set of ${staleEntries.length} exceeds ${STALE_DELETE_MAX_FRACTION * 100}% of the ${allRows.length} mapped objects`;
+      // error-level on purpose: an aborted cleanup needs a human decision.
+      log.error("Square catalog bulk stale-delete refused (IN-9 guard):", reason);
+      return {
+        deleted: 0,
+        failed: 0,
+        aborted: { staleCount: staleEntries.length, mappedCount: allRows.length, reason },
+        errors: [],
+      };
+    }
   }
 
   let deleted = 0;

@@ -5752,6 +5752,7 @@ export type Database = {
           square_order_id: string
           square_payment_id: string | null
           unit_price_cents: number | null
+          voided_at: string | null
           volume_oz: number | null
         }
         Insert: {
@@ -5765,6 +5766,7 @@ export type Database = {
           square_order_id: string
           square_payment_id?: string | null
           unit_price_cents?: number | null
+          voided_at?: string | null
           volume_oz?: number | null
         }
         Update: {
@@ -5777,7 +5779,7 @@ export type Database = {
           sold_at?: string
           square_order_id?: string
           square_payment_id?: string | null
-          unit_price_cents?: number | null
+          voided_at?: string | null
           volume_oz?: number | null
         }
         Relationships: [
@@ -10215,6 +10217,12 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      credit_bin_inventory: {
+        Args: { p_bin_id: string; p_finished_good_id: string; p_qty: number }
+        Returns: {
+          new_quantity: number
+        }[]
       }
       debit_bin_inventory: {
         Args: { p_bin_id: string; p_finished_good_id: string; p_qty: number }

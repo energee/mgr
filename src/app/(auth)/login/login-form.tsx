@@ -6,6 +6,15 @@
  * Handles email/password login and passwordless authentication.
  * Passwordless flow sends a magic link and OTP code via email.
  * Users can either click the link or enter the code manually.
+ *
+ * Invite-only: the passwordless flow passes `shouldCreateUser: false` —
+ * staff accounts are provisioned via /api/users/invite, never self-registered
+ * here (audit DL-2; implicit signup minted a 'viewer'-role staff profile).
+ *
+ * Validation errors are announced to screen readers: each error paragraph is
+ * a `role="alert"` region referenced by the failing input's `aria-describedby`
+ * with `aria-invalid` set (audit A11Y-4). Inputs carry autocomplete tokens
+ * (audit A11Y-5).
  */
 
 import { useRef, useState, type FormEvent } from "react";
@@ -13,7 +22,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
-import { rememberEmail, readRememberedEmail } from "@/lib/auth-utils";
+import { rememberEmail, readRememberedEmail, otpSignInErrorMessage } from "@/lib/auth-utils";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { OtpCodeInput, OTP_LENGTH } from "@/components/auth/otp-code-input";
 import { Button } from "@/components/ui/button";
@@ -92,12 +101,17 @@ export function LoginForm() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
+          // Invite-only: never create an auth user for an unknown email —
+          // implicit signup gave any address a 'viewer'-role staff profile
+          // via create_user_profile() (audit DL-2). Staff are provisioned
+          // via /api/users/invite.
+          shouldCreateUser: false,
           emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=${redirect}`,
         },
       });
 
       if (error) {
-        toast.error(error.message);
+        toast.error(otpSignInErrorMessage(error.message));
         return;
       }
 
@@ -178,12 +192,19 @@ export function LoginForm() {
         <Input
           id="email"
           type="email"
+          autoComplete="email"
           placeholder="you@brewery.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? "email-error" : undefined}
         />
-        {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+        {errors.email && (
+          <p id="email-error" role="alert" className="text-sm text-destructive">
+            {errors.email}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -199,12 +220,19 @@ export function LoginForm() {
         <Input
           id="password"
           type="password"
+          autoComplete="current-password"
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={isLoading}
+          aria-invalid={!!errors.password}
+          aria-describedby={errors.password ? "password-error" : undefined}
         />
-        {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+        {errors.password && (
+          <p id="password-error" role="alert" className="text-sm text-destructive">
+            {errors.password}
+          </p>
+        )}
       </div>
 
       <Button ref={submitRef} type="submit" className="w-full" disabled={isLoading}>

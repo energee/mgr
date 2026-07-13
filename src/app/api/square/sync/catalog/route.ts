@@ -20,11 +20,14 @@
  *    in the push at their CURRENT live Square price (the batch upsert replaces
  *    an item's full variation set, so omitting a mapped variation would delete
  *    it live and destroy its Item-Sales reporting continuity)
- * 6. Cleans up stale (DISCONTINUED) catalog items. The keep set is packaged
- *    brands with any bin_inventory row at a POS bin UNION every brand sold on
- *    draft (any keg-container finished good). Sold-out brands — packaged qty-0
- *    rows, and draft brands whose last keg blew — are KEPT so their Square
- *    items/history survive.
+ * 6. Cleans up stale (DISCONTINUED) catalog items. The keep set is the ACTIVE
+ *    brand set (brands.is_active, 00244) — pure config state, NEVER stock/bin
+ *    inference (audit IN-9: a bin re-point shrank the derived keep set and
+ *    bulk-deleted live Square items). Sold-out brands stay active, so their
+ *    Square items/history survive; flipping a brand inactive is the
+ *    intentional-removal path. deleteStaleItems additionally refuses oversized
+ *    delete sets unless the request body carries { forceStaleDelete: true }
+ *    (the IN-9 interim guard, kept as defense in depth).
  * 7. Logs sync result
  */
 
@@ -37,18 +40,28 @@ import {
   pushCatalog,
   deleteStaleItems,
   retrieveVariationPricing,
+  type DeleteStaleResult,
   type LiveVariationPricing,
 } from "@/integrations/square/catalog";
 import { getPosBins, requireSquareClient, logSyncFailure } from "@/integrations/square/route-helpers";
 import { resolveChannelPrices } from "@/integrations/square/pricing";
+import { dynamicFrom } from "@/services/types";
 import type { SquareSyncProduct, SquareSyncVariation } from "@/integrations/square/types";
 
 const log = logger.child({ route: "/api/square/sync/catalog" });
 
-export const POST = withPermission("integrations:manage", async (_request, { user }) => {
+export const POST = withPermission("integrations:manage", async (request, { user }) => {
   const guard = await requireSquareClient();
   if (!guard.ok) return guard.response;
   const client = guard.client;
+
+  // Optional body: { forceStaleDelete?: boolean } — human confirmation that an
+  // oversized stale-delete set (see deleteStaleItems' IN-9 guard) is a real
+  // mass retirement. No/invalid JSON body = false (guard armed).
+  const body = (await request.json().catch(() => null)) as {
+    forceStaleDelete?: boolean;
+  } | null;
+  const forceStaleDelete = body?.forceStaleDelete === true;
 
   const admin = await createAdminClient();
   const startedAt = new Date().toISOString();
@@ -102,26 +115,35 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       throw new Error(`Failed to query sellable inventory: ${stockError.message}`);
     }
 
-    // 3. Enrich brand + selling-format metadata (the view exposes only ids).
-    const brandIds = [
-      ...new Set((stock ?? []).map((s) => s.brand_id).filter((v): v is string => !!v)),
-    ];
+    // 3. Read ALL ACTIVE brands (00244) — one query doing double duty:
+    //    - enriches brand metadata for the push (the view exposes only ids);
+    //    - IS the catalog KEEP set for stale cleanup (step 9). The keep set
+    //      must be config state (is_active), never a function of what the
+    //      stock read happened to return — audit IN-9: re-pointing a bin's POS
+    //      target shrank the derived keep set and bulk-deleted the live Square
+    //      catalog. A failed read throws (sync aborts); an INACTIVE brand is
+    //      excluded here, which both drops its stock rows from the push below
+    //      (the brandInfo lookup misses) and lets deleteStaleItems remove its
+    //      mapped Square objects — discontinuing is the ONLY removal path.
+    //    dynamicFrom: is_active is a 00244 column not yet in the generated
+    //    types (regenerate after the migration is applied live).
     const formatIds = [
       ...new Set((stock ?? []).map((s) => s.selling_format_id).filter((v): v is string => !!v)),
     ];
 
+    const { data: brandRows, error: brandError } = await dynamicFrom(admin, "brands")
+      .select("id, name, description")
+      .eq("is_active", true);
+    if (brandError) {
+      throw new Error(`Failed to query brands: ${brandError.message}`);
+    }
     const brandInfo = new Map<string, { name: string; description: string | null }>();
-    if (brandIds.length > 0) {
-      const { data: brandRows, error: brandError } = await admin
-        .from("brands")
-        .select("id, name, description")
-        .in("id", brandIds);
-      if (brandError) {
-        throw new Error(`Failed to query brands: ${brandError.message}`);
-      }
-      for (const b of brandRows ?? []) {
-        brandInfo.set(b.id, { name: b.name, description: b.description });
-      }
+    for (const b of (brandRows ?? []) as Array<{
+      id: string;
+      name: string;
+      description: string | null;
+    }>) {
+      brandInfo.set(b.id, { name: b.name, description: b.description });
     }
 
     let formatNames: Record<string, string> = {};
@@ -367,7 +389,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       }
 
       // A brand with nothing to publish (every variation unpriced AND unmapped)
-      // is skipped. It stays in activeBrandIds (it IS stocked), so
+      // is skipped. It is still an ACTIVE brand (00244 keep set), so
       // deleteStaleItems will not treat it as stale and delete its live Square
       // item. A brand with only PRESERVED variations is still pushed — that is
       // what keeps its live variations alive.
@@ -386,76 +408,25 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     // 8. Push catalog to Square
     const syncResult = await pushCatalog(client, products);
 
-    // 9. Compute the catalog KEEP set for stale cleanup. "Stale" must mean
+    // 9. The catalog KEEP set for stale cleanup. "Stale" must mean
     //    DISCONTINUED, not merely SOLD OUT — deleting a Square item destroys its
     //    variations, images, modifier lists, and Item-Sales reporting continuity.
-    //    Three contributors, UNIONed:
-    //      (a) the currently in-stock brands (activeBrandIds);
-    //      (b) packaged brands with ANY bin_inventory row at a POS bin, quantity
-    //          UNFILTERED — debit_bin_inventory (00223) clamps to 0 and never
-    //          deletes the row, so a sold-out packaged brand keeps a qty-0 row;
-    //      (c) every brand sold on draft (see below).
-    const keepBrandIds = new Set<string>(activeBrandIds);
-    const { data: binInvRows, error: binInvError } = await admin
-      .from("bin_inventory")
-      .select("finished_good_id")
-      .in("bin_id", posBinIds);
-    if (binInvError) {
-      throw new Error(`Failed to query bin inventory: ${binInvError.message}`);
-    }
-    const cataloguedFgIds = [
-      ...new Set(
-        (binInvRows ?? [])
-          .map((r) => r.finished_good_id)
-          .filter((v): v is string => !!v)
-      ),
-    ];
-    if (cataloguedFgIds.length > 0) {
-      const { data: fgRows, error: fgError } = await admin
-        .from("finished_goods")
-        .select("brand_id")
-        .in("id", cataloguedFgIds);
-      if (fgError) {
-        throw new Error(`Failed to query finished goods: ${fgError.message}`);
-      }
-      for (const fg of fgRows ?? []) {
-        if (fg.brand_id) keepBrandIds.add(fg.brand_id);
-      }
-    }
-
-    // (c) Draft brands. Kegs are NEVER written to bin_inventory (00221's
-    //     double-count guard) and keg_filled_contents is positive-only, so (a)
-    //     and (b) both drop a draft-only brand the moment its last keg blows.
-    //     Keep every brand that is sold on draft *at all*, independent of stock:
-    //     any finished good in a keg-container selling format.
-    //     finished_goods_with_ttb_class is fg ⋈ selling_formats ⋈ containers with
-    //     no quantity filter, which is exactly that predicate.
-    // ponytail: brands carries no is_active/is_discontinued column, so "sold on
-    // draft" stands in for "not discontinued". Ceiling: a genuinely retired draft
-    // brand must be deleted from the Square catalog by hand. Upgrade path — add
-    // brands.is_active and key the whole keep set off it, dropping stock
-    // inference here entirely.
-    const { data: kegBrandRows, error: kegBrandError } = await admin
-      .from("finished_goods_with_ttb_class")
-      .select("brand_id")
-      .eq("container_type", "keg");
-    if (kegBrandError) {
-      throw new Error(`Failed to query keg brands: ${kegBrandError.message}`);
-    }
-    for (const r of kegBrandRows ?? []) {
-      if (r.brand_id) keepBrandIds.add(r.brand_id);
-    }
-
-    const keepBrandIdList = [...keepBrandIds];
+    //    Since 00244 the keep set IS the active-brand set read in step 3: pure
+    //    config state. The pre-00244 derivation (in-stock brands ∪ bin_inventory
+    //    rows at POS bins ∪ any keg-format FG brand) shrank with the reads it
+    //    was built from — a bin re-point or transient empty read mass-deleted
+    //    live Square objects (audit IN-9). Sold-out active brands are kept by
+    //    construction; flipping is_active off is the intentional removal.
+    const keepBrandIdList = [...brandInfo.keys()];
 
     // Guard the empty keep set: deleteStaleItems treats [] as "delete the ENTIRE
-    // catalog", and the bin-driven model makes a transient all-empty state
-    // reachable (POS bins configured but no FG placed anywhere). Skip cleanup
+    // catalog". No active brands at all is far more plausibly an unseeded or
+    // misread brands table than a full product-line shutdown — skip cleanup
     // rather than wipe everything.
-    const staleResult =
+    const staleResult: DeleteStaleResult =
       keepBrandIdList.length > 0
-        ? await deleteStaleItems(client, keepBrandIdList)
-        : { deleted: 0, failed: 0, errors: [] as Array<{ chunk: number; error: string }> };
+        ? await deleteStaleItems(client, keepBrandIdList, { force: forceStaleDelete })
+        : { deleted: 0, failed: 0, errors: [] };
 
     // 10. Update last_catalog_sync_at
     const completedAt = new Date().toISOString();
@@ -478,6 +449,7 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         staleDeleted: staleResult.deleted,
         staleFailed: staleResult.failed > 0 ? staleResult.failed : undefined,
         staleErrors: staleResult.errors.length > 0 ? staleResult.errors : undefined,
+        staleAborted: staleResult.aborted,
         unpricedVariations: unpricedVariations.length > 0 ? unpricedVariations : undefined,
         preservedVariations: preservedVariations.length > 0 ? preservedVariations : undefined,
         errors: syncResult.errors.length > 0 ? syncResult.errors : undefined,
@@ -491,12 +463,21 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     }
 
     return successResponse({
-      success: syncResult.success && staleResult.failed === 0,
+      // staleResult.errors also covers the failed===0 case where the stale-entry
+      // SELECT itself failed (chunk -1) and cleanup never ran — not a success.
+      // An IN-9 guard abort (staleAborted) is likewise not a success: cleanup
+      // was refused pending human confirmation (re-POST with forceStaleDelete).
+      success:
+        syncResult.success &&
+        staleResult.failed === 0 &&
+        staleResult.errors.length === 0 &&
+        !staleResult.aborted,
       itemsSynced: syncResult.itemsSynced,
       itemsFailed: syncResult.itemsFailed + staleResult.failed,
       staleDeleted: staleResult.deleted,
       staleFailed: staleResult.failed,
       staleErrors: staleResult.errors,
+      staleAborted: staleResult.aborted ?? null,
       productsCount: products.length,
       unpricedVariations,
       preservedVariations,

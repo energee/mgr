@@ -83,7 +83,12 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
   const [pickedItems, setPickedItems] = useState<Set<string>>(new Set());
 
   // Fetch order details
-  const { data: order, isLoading: orderLoading } = useQuery({
+  const {
+    data: order,
+    isLoading: orderLoading,
+    isError: orderError,
+    refetch: refetchOrder,
+  } = useQuery({
     queryKey: orderKeys.pickList(orderId, "order"),
     queryFn: async () => {
       const data = (await unwrap(supabase
@@ -111,7 +116,12 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
   });
 
   // Fetch allocations for this order
-  const { data: pickItems = [], isLoading: itemsLoading } = useQuery({
+  const {
+    data: pickItems = [],
+    isLoading: itemsLoading,
+    isError: itemsError,
+    refetch: refetchItems,
+  } = useQuery({
     queryKey: orderKeys.pickList(orderId, "items"),
     queryFn: async () => {
       // Get allocations where destination is this order
@@ -152,10 +162,10 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
       const [brandsResult, formatsResult, binInventoryResult] = await Promise.all([
         brandIds.length > 0
           ? supabase.from("brands").select("id, name").in("id", brandIds)
-          : { data: [] },
+          : { data: [], error: null },
         formatIds.length > 0
           ? supabase.from("selling_formats").select("id, name").in("id", formatIds)
-          : { data: [] },
+          : { data: [], error: null },
         dynamicFrom(supabase, "bin_inventory")
           .select(`
             finished_good_id,
@@ -165,6 +175,13 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
           .in("finished_good_id", fgIds)
           .gt("quantity", 0),
       ]);
+
+      // A failed lookup must fail the query, not degrade to "Unknown"
+      // brand/format and a missing bin location (audit UI-8) — the picker
+      // would walk the warehouse without bin guidance on a transient error.
+      if (brandsResult.error) throw brandsResult.error;
+      if (formatsResult.error) throw formatsResult.error;
+      if (binInventoryResult.error) throw binInventoryResult.error;
 
       const brandMap = new Map((brandsResult.data || []).map((b) => [b.id, b.name]));
       const formatMap = new Map((formatsResult.data || []).map((f) => [f.id, f.name]));
@@ -246,6 +263,24 @@ export function OrderPickList({ orderId }: OrderPickListProps) {
       <div className="space-y-4">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  // Error state (audit UI-8) — a failed order/allocation/bin lookup renders
+  // as an explicit error with retry, never as an empty pick list.
+  if (orderError || itemsError) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8">
+        <p className="text-destructive">Failed to load pick list</p>
+        <Button
+          onClick={() => {
+            if (orderError) refetchOrder();
+            if (itemsError) refetchItems();
+          }}
+        >
+          Try Again
+        </Button>
       </div>
     );
   }

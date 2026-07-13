@@ -31,6 +31,15 @@ describe("formatValue locale pinning", () => {
       expect(result).not.toMatch(/^\d{1,2}\.\d{1,2}\.\d{4}$/);
     });
 
+    it("formats date-only strings as the same calendar day (no UTC shift)", () => {
+      // Regression: new Date("2026-07-15") is UTC midnight, which
+      // toLocaleDateString renders as 7/14 in Americas timezones. PostgREST
+      // returns `date` columns in exactly this shape.
+      expect(formatValue("2026-07-15", "date")).toBe("7/15/2026");
+      expect(formatValue("2026-01-01", "date")).toBe("1/1/2026");
+      expect(formatValue("2026-12-31", "date")).toBe("12/31/2026");
+    });
+
     it("returns em-dash for null", () => {
       expect(formatValue(null, "date")).toBe("—");
     });

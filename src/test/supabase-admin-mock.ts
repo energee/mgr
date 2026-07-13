@@ -1,5 +1,6 @@
 /**
- * Shared in-memory Supabase ADMIN-client fake for the Square integration tests.
+ * Shared in-memory Supabase ADMIN-client fake for route-handler,
+ * server-component, and integration tests (Square routes/catalog, MongoDB sync).
  *
  * Sibling of `supabase-mock.ts`, deliberately a DIFFERENT contract — pick by
  * what the module under test needs:
@@ -64,7 +65,7 @@ export type AdminMockOptions = {
 const EMPTY: QueryResult = { data: [], error: null };
 
 /** Pass-through filter/modifier methods. Every one returns the builder. */
-const FILTER_METHODS = ["select", "eq", "in", "gt", "lt", "is", "not", "order", "limit"] as const;
+const FILTER_METHODS = ["select", "eq", "ilike", "in", "gt", "gte", "lt", "is", "not", "order", "limit"] as const;
 
 /**
  * Builds a fake admin client from table-keyed responses.
@@ -138,4 +139,33 @@ export function makeAdminMock(tables: TableData = {}, options: AdminMockOptions 
 
   const admin = { from, rpc } as unknown as SupabaseClient<Database>;
   return { admin, writes, rpcCalls };
+}
+
+/**
+ * Emulates Postgres ILIKE matching for a PostgREST `.ilike()` pattern, so a
+ * table-response function can honor the filter with REAL semantics instead of
+ * recording-only pass-through (a revert from `.ilike` to `.eq`, or dropped
+ * pattern escaping, then fails the test rather than just changing call logs).
+ *
+ * Mirrors the server pipeline: PostgREST first translates `*` to `%` (it has
+ * no escape syntax for `*`), then SQL ILIKE interprets `%`/`_` wildcards with
+ * backslash as the escape character. Case-insensitive, whole-value anchored.
+ */
+export function ilikePatternToRegex(pattern: string): RegExp {
+  const escapeRegExp = (ch: string) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const translated = pattern.replace(/\*/g, "%");
+  let source = "";
+  for (let i = 0; i < translated.length; i++) {
+    const ch = translated[i];
+    if (ch === "\\" && i + 1 < translated.length) {
+      source += escapeRegExp(translated[++i]); // escaped literal
+    } else if (ch === "%") {
+      source += ".*";
+    } else if (ch === "_") {
+      source += ".";
+    } else {
+      source += escapeRegExp(ch);
+    }
+  }
+  return new RegExp(`^${source}$`, "i");
 }

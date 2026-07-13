@@ -259,7 +259,9 @@ export function buildActionsColumn<T>(
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
+            {/* Icon-only trigger needs an explicit name — otherwise every
+                entity table announces a bare "button" (audit A11Y-2). */}
+            <Button variant="ghost" size="sm" aria-label="Row actions">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
