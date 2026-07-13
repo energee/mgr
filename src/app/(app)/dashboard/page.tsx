@@ -39,6 +39,7 @@ import {
   TrendChartLazy,
   TodayPanel,
   GettingStartedChecklist,
+  DashboardSwitcher,
 } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { BatchActivityHeatmapLazy } from "@/components/dashboard/batch-activity-heatmap-lazy";
@@ -231,8 +232,11 @@ export default function DashboardPage() {
 
       {/* Header with Stats Strip */}
       <div className="space-y-1">
-        <div className="flex items-baseline justify-between">
-          <h1 className="text-2xl font-semibold">Production Dashboard</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold">Production Dashboard</h1>
+            <DashboardSwitcher />
+          </div>
           <div className="flex items-center gap-4">
             <Suspense fallback={null}>
               <PeriodSelector />
