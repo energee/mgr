@@ -9,6 +9,8 @@ const issue: SentryIssue = {
   culprit: "src/lib/foo.ts in handleBar",
   permalink: "https://sentry.io/organizations/x/issues/12345/",
   stackTrace: "TypeError: ...\n  at handleBar (src/lib/foo.ts:42)",
+  eventContext: "extra.code: 42501\nextra.hint: check policies",
+  breadcrumbs: "[2026-04-16T13:59:00Z] info fetch: GET /rest/v1/rpc/get_foo",
   eventCount14d: 342,
   firstSeen: "2026-04-14T09:00:00Z",
   lastSeen: "2026-04-16T14:00:00Z",
@@ -56,10 +58,34 @@ describe("buildFixPrompt", () => {
     expect(prompt).toContain("automated");
   });
 
-  it("includes diagnostic-PR fallback with needs-human label", () => {
+  it("embeds the event context and breadcrumbs — the payload that distinguishes a DB fault from a bad error handler", () => {
     const prompt = buildFixPrompt(issue);
+    expect(prompt).toContain("extra.code: 42501");
+    expect(prompt).toContain("GET /rest/v1/rpc/get_foo");
+  });
+
+  it("puts the triage gate ahead of the fix pipeline and names the Postgres codes that decide it", () => {
+    const prompt = buildFixPrompt(issue);
+    expect(prompt).toContain("Step 0");
+    expect(prompt.indexOf("Step 0")).toBeLessThan(prompt.indexOf("## Pipeline"));
+    for (const code of ["42501", "42883", "42P01"]) {
+      expect(prompt).toContain(code);
+    }
+  });
+
+  it("routes non-app-code root causes to an investigation issue, not a compensating code PR", () => {
+    const prompt = buildFixPrompt(issue);
+    expect(prompt).toContain("gh issue create");
     expect(prompt).toContain("needs-human");
-    expect(prompt).toContain("diagnostic");
+    expect(prompt).toContain("Do not open a code PR");
+    expect(prompt).toContain("Improving the error handler is not a fix");
+  });
+
+  it("points triage at the live catalog snapshot and migration chain as evidence", () => {
+    const prompt = buildFixPrompt(issue);
+    expect(prompt).toContain("supabase/live-catalog.snapshot.txt");
+    expect(prompt).toContain("supabase/migrations/");
+    expect(prompt).toContain("GRANT");
   });
 
   it("references AGENTS.md conventions", () => {
