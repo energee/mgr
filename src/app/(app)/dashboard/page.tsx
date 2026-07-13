@@ -24,7 +24,7 @@ import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { VESSEL_TYPES } from "@/entities/vessel";
 import { batchEntity } from "@/entities/batch";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { FlaskConical } from "lucide-react";
+import { AlertTriangle, FlaskConical } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense, useMemo } from "react";
@@ -390,7 +390,7 @@ function ProductionTrendsSkeleton() {
   );
 }
 
-function ProductionTrends() {
+export function ProductionTrends() {
   const supabase = createClient();
   const period = usePeriod();
   const volumeUnit = useVolumeUnit();
@@ -399,7 +399,7 @@ function ProductionTrends() {
   // Single 365-day fetch covers both the period-scoped delta cards (sliced
   // client-side) and the year weekly volume chart. Fetching twice would double
   // RPC traffic for no benefit.
-  const { data: productionTrends = [], isLoading } = useQuery({
+  const { data: productionTrends = [], isLoading, isError } = useQuery({
     queryKey: dashboardKeys.trends.production(365),
     queryFn: async () => {
       const { data, error } = await dynamicRpc(supabase, "get_production_trends", {
@@ -407,7 +407,7 @@ function ProductionTrends() {
       });
       if (error) {
         log.error("Failed to fetch production trends:", error);
-        return [];
+        throw error;
       }
       return (data || []) as Array<{
         date: string;
@@ -445,6 +445,13 @@ function ProductionTrends() {
 
   if (isLoading) {
     return <ProductionTrendsSkeleton />;
+  }
+
+  // Only fall back to the error state when there's no data to show — a
+  // transient background refetch failure (refetchInterval: 60000) should keep
+  // displaying the last known-good trends rather than blanking them out.
+  if (isError && productionTrends.length === 0) {
+    return <DashboardEmpty message="Couldn't load production trends" icon={AlertTriangle} />;
   }
 
   const currentBatchesStarted = currentPeriodData.reduce((sum, d) => sum + d.batches_started, 0);

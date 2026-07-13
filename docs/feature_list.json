@@ -547,6 +547,27 @@
       "evidence": "pr:396",
       "branch": "sentry-fix/SENTRY-7477285440",
       "notes": "PR #308 already fixed the originally-reported cause (ChatLayout's ChatPanel using next/dynamic(ssr:false)), merged 2026-07-05 — but the issue kept receiving new events afterward (last seen 2026-07-11, in a release that already had that fix). Root cause of the recurrence: TrendChartLazy and BatchActivityHeatmapLazy (src/components/dashboard/) also used next/dynamic({ ssr:false }), and are rendered inside ProductionTrends/SalesTrends, which sit inside a Suspense boundary that itself genuinely suspends (usePeriod() -> useSearchParams()). Nesting a dynamic(ssr:false) client-only bailout boundary inside another suspending boundary is the same class of bug already fixed for ChatLayout. Fix: converted both to React.lazy + an explicit <Suspense> at each call site (4 usages across src/app/(app)/dashboard/page.tsx and src/app/(app)/dashboard/sales/page.tsx), mirroring the established ChatLayout fix. cogs-period-chart-lazy.tsx and batch-readings-chart-lazy.tsx use the same next/dynamic(ssr:false) pattern but are not nested inside a suspending boundary, so left as-is."
+    },
+    {
+      "id": "SENTRY-7597067731",
+      "area": "infra",
+      "title": "Failed to fetch production trends:",
+      "user_visible_behavior": "The dashboard, sales, and inventory trend sections caught RPC errors (get_production_trends / get_sales_trends / get_inventory_trends) and returned an empty array from the query, so React Query treated the fetch as a success. Users saw a silently zeroed-out empty state (or, on a transient background refetch failure, a chart flip to a misleading zero) with no indication the fetch had failed. Fixed by rethrowing after logging so isError surfaces, and rendering an explicit \"Couldn't load ... trends\" DashboardEmpty state only when there is no cached data to fall back on (preserves last known-good data across transient refetchInterval polling failures).",
+      "verification": "bun run test src/app/(app)/dashboard/__tests__/production-trends.test.tsx",
+      "state": "passing",
+      "evidence": "pr:398",
+      "branch": "sentry-fix/SENTRY-7597067731",
+      "notes": "Pattern scan found the identical swallow-and-return-[] bug duplicated in all three dashboard trend queries (dashboard/page.tsx ProductionTrends, dashboard/inventory/page.tsx InventoryTrends, dashboard/sales/page.tsx SalesTrends); all three fixed identically."
+    },
+    {
+      "id": "SENTRY-7597067759",
+      "area": "infra",
+      "title": "Failed to fetch planned batches by day:",
+      "user_visible_behavior": "BatchActivityHeatmap on /dashboard logged RPC errors by passing a destructured plain object to log.error instead of the real PostgrestError instance, so client-logger's instanceof-Error check missed it and Sentry captured only the generic literal message with no stack or detail. Same anti-pattern found and fixed in NotificationsProvider's fetch-notifications error path.",
+      "verification": "bun run test src/components/dashboard/__tests__/batch-activity-heatmap.test.tsx src/contexts/__tests__/notifications.test.tsx",
+      "state": "passing",
+      "evidence": "pr:397",
+      "branch": "sentry-fix/SENTRY-7597067759"
     }
   ]
 }
