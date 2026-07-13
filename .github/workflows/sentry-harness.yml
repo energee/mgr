@@ -60,7 +60,10 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      issues: read
+      # `write`, not `read`: step 0 of the fix prompt opens an investigation
+      # issue via `gh issue create` when the root cause is in the database or a
+      # third party rather than in application code.
+      issues: write
       id-token: write
       actions: read
     strategy:
@@ -73,6 +76,27 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Branch from the newest main commit whose Test workflow passed, not from
+      # main's tip. A single unrelated red commit on main (e.g. a coverage
+      # threshold slipping under its floor) otherwise fails CI on every PR this
+      # harness opens, which reads as "the harness produced a bad fix" when it
+      # produced nothing of the sort. Falls back to main's tip if no green run
+      # is found in the last 50.
+      - name: Check out last green main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sha=$(gh run list \
+            --workflow=test.yml --branch=main --status=success \
+            --limit 50 --json headSha --jq '.[0].headSha // empty')
+          if [ -z "$sha" ] || ! git cat-file -e "$sha^{commit}" 2>/dev/null; then
+            echo "No green main run found (or SHA unreachable); staying on main tip."
+            exit 0
+          fi
+          echo "Branching from last green main: $sha"
+          git checkout --detach "$sha"
 
       - name: Run Claude Code Action
         uses: anthropics/claude-code-action@v1
@@ -96,10 +120,13 @@ jobs:
           # silently with 9–19 permission_denials each because none of the
           # write/exec tools were allowed — Claude completed turns without
           # being able to apply, validate, or push the fix.
-          # Sonnet is sufficient here: the prompt pipeline is heavily gated
-          # (reproducing test, typecheck/test/lint, make check, /code-review
-          # pass) and has a diagnostic-PR fallback, so a lighter model trades
-          # nothing but is faster and cheaper across up to 5 matrix jobs/run.
+          # Sonnet is sufficient here. The harness's observed failure mode was
+          # never weak reasoning — it was missing evidence: without the Sentry
+          # event's contexts/extra bag, a Supabase RPC failure is indisting-
+          # uishable from a bad error handler, so any model patches the handler.
+          # The fix is the payload (see sentry-api.ts) and the step-0 triage gate
+          # (see prompt.ts), not a heavier model. Revisit only if triage-passing
+          # (A) fixes start coming back wrong on their merits.
           claude_args: '--model claude-sonnet-5 --allowed-tools "Bash,Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task,WebFetch"'
           additional_permissions: |
             actions: read

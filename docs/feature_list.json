@@ -548,6 +548,27 @@
       "evidence": "branch:sentry-fix/SENTRY-7542174707",
       "branch": "sentry-fix/SENTRY-7542174707",
       "notes": "Root cause: upsertRows() (src/integrations/mongodb/sync.ts) sent Mongo-derived rows straight through to a single Supabase .upsert() call per 50-row chunk without deduping by the onConflict column(s) first. Fix adds dedupeByConflictKey(), which keeps the last row per conflict-key value (rows missing the conflict column pass through untouched, e.g. recipes upserts with no explicit id) and logs a warning with the dropped count."
+    },
+    {
+      "id": "SENTRY-7597067731",
+      "area": "infra",
+      "title": "Failed to fetch production trends:",
+      "user_visible_behavior": "The dashboard, sales, and inventory trend sections caught RPC errors (get_production_trends / get_sales_trends / get_inventory_trends) and returned an empty array from the query, so React Query treated the fetch as a success. Users saw a silently zeroed-out empty state (or, on a transient background refetch failure, a chart flip to a misleading zero) with no indication the fetch had failed. Fixed by rethrowing after logging so isError surfaces, and rendering an explicit \"Couldn't load ... trends\" DashboardEmpty state only when there is no cached data to fall back on (preserves last known-good data across transient refetchInterval polling failures).",
+      "verification": "bun run test src/app/(app)/dashboard/__tests__/production-trends.test.tsx",
+      "state": "passing",
+      "evidence": "pr:398",
+      "branch": "sentry-fix/SENTRY-7597067731",
+      "notes": "Pattern scan found the identical swallow-and-return-[] bug duplicated in all three dashboard trend queries (dashboard/page.tsx ProductionTrends, dashboard/inventory/page.tsx InventoryTrends, dashboard/sales/page.tsx SalesTrends); all three fixed identically."
+    },
+    {
+      "id": "SENTRY-7597067759",
+      "area": "infra",
+      "title": "Failed to fetch planned batches by day:",
+      "user_visible_behavior": "BatchActivityHeatmap on /dashboard logged RPC errors by passing a destructured plain object to log.error instead of the real PostgrestError instance, so client-logger's instanceof-Error check missed it and Sentry captured only the generic literal message with no stack or detail. Same anti-pattern found and fixed in NotificationsProvider's fetch-notifications error path.",
+      "verification": "bun run test src/components/dashboard/__tests__/batch-activity-heatmap.test.tsx src/contexts/__tests__/notifications.test.tsx",
+      "state": "passing",
+      "evidence": "pr:397",
+      "branch": "sentry-fix/SENTRY-7597067759"
     }
   ]
 }

@@ -35,7 +35,15 @@ const APP_PROVIDERS_SRC = resolve(
 // ---------------------------------------------------------------------------
 
 // Prevents env-var validation in @/lib/env from throwing at import time
-vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
+const limitMock = vi.fn();
+const selectMock = vi.fn(() => ({ limit: limitMock }));
+const fromMock = vi.fn(() => ({ select: selectMock }));
+// getUser resolves to no user so the realtime-subscription effect early-returns
+// before touching supabase.channel(), which this stub does not implement.
+const getUserMock = vi.fn(() => Promise.resolve({ data: { user: null } }));
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({ from: fromMock, auth: { getUser: getUserMock } }),
+}));
 
 // Prevents @sentry/nextjs initialisation errors in jsdom
 vi.mock("@/lib/client-logger", () => ({
@@ -46,6 +54,8 @@ vi.mock("@/lib/client-logger", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { log } from "@/lib/client-logger";
 import { NotificationsProvider, useNotifications } from "@/contexts/notifications";
 
 // ---------------------------------------------------------------------------
@@ -157,5 +167,40 @@ describe("MGR-8 regression — behavioral: NotificationsProvider guard renders s
     await clickAndWait("mark-read", "markAsRead-ok");
     await clickAndWait("mark-all", "markAllAsRead-ok");
     await clickAndWait("dismiss", "dismiss-ok");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SENTRY-7597067759 regression: log.error must receive the real error
+// instance, not a stripped-down primitive list, so client-logger routes it
+// to Sentry.captureException (with message/stack) instead of a generic
+// captureMessage.
+// ---------------------------------------------------------------------------
+
+describe("SENTRY-7597067759 regression — notifications fetch error logging", () => {
+  it("forwards the real error instance to log.error, not individual primitives", async () => {
+    class FakePostgrestError extends Error {
+      code = "42501";
+      details = "RLS denied";
+    }
+    const fetchError = new FakePostgrestError("permission denied");
+    limitMock.mockResolvedValue({ data: null, error: fetchError });
+    vi.mocked(log.error).mockClear();
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderIntoContainer(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(NotificationsProvider, null, createElement(ContextDisplay, null))
+      )
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(log.error).toHaveBeenCalledWith("Failed to fetch notifications:", fetchError);
   });
 });
