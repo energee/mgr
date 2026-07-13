@@ -59,6 +59,14 @@ Classify the root cause into exactly one of:
   Also here: Supabase/Square/QuickBooks outages, auth-token expiry, timeouts.
 - **(C) Third-party or unfixable-from-here** — a library bug, a browser
   extension, a bot, malformed input from an external caller.
+- **(D) Observability gap** — the error *reporting* is itself broken, so the
+  root cause is not knowable from this event. The tell: the stack trace is
+  \`(unavailable)\` or ends inside a \`catch\`, and the Event Context above is
+  empty. Usually the call site hands \`log.error\` a destructured *copy* of the
+  error (\`{ message, code, details }\`) rather than the error object;
+  \`src/lib/client-logger.ts\` only routes to \`Sentry.captureException\` when
+  \`arg instanceof Error\`, so a plain object silently degrades to a bare
+  \`captureMessage\` with no stack and no context.
 
 Gather evidence before you classify — do not guess:
 
@@ -77,6 +85,13 @@ Gather evidence before you classify — do not guess:
 **Branch on the classification:**
 
 - **(A)** → continue to step 1 below and fix it.
+- **(D)** → Fix the reporting (pass the real error object through), because
+  until you do, nobody — including the next run of this harness — can diagnose
+  the real failure. **But you have not fixed the error.** Open the PR, and
+  *also* open an investigation issue (below) for the underlying failure, noting
+  that the root cause is still unknown and that the next Sentry event for this
+  issue will now carry a usable stack and context. Say exactly this in the PR
+  body. Do not write "Followups: none".
 - **(B) or (C)** → **STOP. Do not open a code PR.** Open a GitHub *issue*
   instead (\`gh issue create\`), titled \`[sentry] ${issue.shortId}: <root cause>\`,
   labelled \`sentry-fix\` and \`needs-human\`, containing: the classification and
@@ -119,17 +134,19 @@ If — and only if — the root cause genuinely lies in app code, proceed:
 - Do not skip hooks (\`--no-verify\`) or bypass validation.
 - If validation fails 3 times in a row, do NOT force a bad fix. Stop and fall back to the investigation issue (see below).
 - Do not create documentation files unless the fix requires them.
-- **Improving the error handler is not a fix.** Passing a richer object to
-  \`log.error\`, rethrowing instead of swallowing, or rendering an error state
-  where there was an empty one — none of these stop the error from firing. They
-  are only ever acceptable as a *secondary* change alongside a real (A) fix, and
-  never as the whole PR. If the only change you can find to make is at the
-  \`catch\` site, you have a (B) or (C) on your hands: go open the issue.
+- **An error-handling fix does not resolve the underlying error.** Passing a
+  richer object to \`log.error\`, rethrowing instead of swallowing, or rendering
+  an error state where there was an empty one are all legitimate changes — see
+  (D) below — but none of them stop the error from firing. Never report the
+  Sentry issue as resolved on the strength of one, and never write "Followups:
+  none" after making one. The underlying failure is still there and still
+  undiagnosed; say so, and file the issue that says so.
 
 ## Investigation-Issue Fallback
 
-Open a GitHub issue instead of a PR when the root cause is (B) or (C), or when
-after 3 attempts you cannot produce a working fix for an (A). The issue must:
+Open a GitHub issue when the root cause is (B) or (C) (*instead of* a PR), when
+the classification is (D) (*in addition to* the PR), or when after 3 attempts
+you cannot produce a working fix for an (A). The issue must:
 
 - State the classification and the evidence for it (error code, live-catalog /
   migration findings, the offending object).

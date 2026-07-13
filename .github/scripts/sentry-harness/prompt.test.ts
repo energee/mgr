@@ -78,7 +78,20 @@ describe("buildFixPrompt", () => {
     expect(prompt).toContain("gh issue create");
     expect(prompt).toContain("needs-human");
     expect(prompt).toContain("Do not open a code PR");
-    expect(prompt).toContain("Improving the error handler is not a fix");
+  });
+
+  // A (D) "observability gap" — the call site hands log.error a destructured
+  // copy, so client-logger's `instanceof Error` check fails and the event
+  // arrives with no stack and no context — is a legitimate fix (nothing can be
+  // diagnosed until it lands). What it must NOT do is claim the underlying
+  // error is resolved. A blanket "never touch the error handler" rule would
+  // have wrongly blocked PR #397.
+  it("treats an observability gap as fixable, but forbids claiming the underlying error is resolved", () => {
+    const prompt = buildFixPrompt(issue);
+    expect(prompt).toContain("(D) Observability gap");
+    expect(prompt).toContain("instanceof Error");
+    expect(prompt).toContain("does not resolve the underlying error");
+    expect(prompt).toContain('Followups: none');
   });
 
   it("points triage at the live catalog snapshot and migration chain as evidence", () => {
