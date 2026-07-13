@@ -37,6 +37,22 @@ Run `make help` to list every target.
 3. Mark your feature `in_progress` *before* writing code.
 4. Mark it `passing` only after `make verify-feature ID=Fxxx` exits 0.
 
+## Shared worktrees
+
+All harnesses use `scripts/agent-worktree` for worktree creation and discovery. Worktrees live under `${AGENT_WORKTREE_ROOT:-$HOME/.agents/worktrees}/<repo>/<name>`, outside the checkout but registered in the repository's common Git directory.
+
+```bash
+scripts/agent-worktree create my-task --base origin/main --branch feat/my-task
+scripts/agent-worktree path my-task     # absolute path for handoff
+scripts/agent-worktree list
+scripts/agent-worktree doctor
+```
+
+- **MUST NOT** create new worktrees under `.claude/worktrees/`, `.worktrees/`, the repository's `.agents/`, or another harness-specific directory.
+- **MUST** hand another harness the absolute path from `scripts/agent-worktree path <name>`; do not create a duplicate checkout.
+- **MUST NOT** let multiple write agents edit the same worktree concurrently.
+- Use the `worktree-manager` skill for creation, handoff, diagnosis, and cleanup details.
+
 ## Load topic docs as needed
 
 Agent-facing quick-references (must-follow rules, code examples):
@@ -74,7 +90,7 @@ Full reference (deep architecture, decisions, data model):
 
 ## Expert agents and skills (all harnesses)
 
-Domain expertise lives in plain markdown under `.claude/agents/*.md` and `.claude/skills/*/SKILL.md` (package layout: one directory per skill with `SKILL.md`). These are ordinary files: a harness with subagents dispatches them by name when supported; a harness without **reads the matching agent file before editing that area, and follows it**. Either way the rules are the same.
+Domain expertise lives in plain markdown under `.claude/agents/*.md`. Shared skills live canonically under `.agents/skills/*/SKILL.md`; `.claude/skills/*` contains compatibility symlinks, which Grok also discovers through its Claude compatibility layer. A harness with subagents dispatches the expert files; a harness without named-agent adapters **reads the matching file before editing that area, and follows it**. Either way the rules are the same.
 
 | Touching | Agent file |
 |---|---|
@@ -86,7 +102,7 @@ Domain expertise lives in plain markdown under `.claude/agents/*.md` and `.claud
 | Writing/repairing tests, pre-refactor coverage | `test-surgeon` |
 | Reviewing any refactor/dedup diff (read-only gate) | `refactor-reviewer` |
 
-Each agent file has YAML frontmatter (`name`, `description`, and optionally Claude-only `tools`). Harnesses that don't understand frontmatter keys should ignore them and read the body. Path is under `.claude/` for historical reasons; content is harness-agnostic.
+Each agent file has YAML frontmatter (`name`, `description`, and optionally Claude-only `tools`). Harnesses that don't understand frontmatter keys should ignore them and read the body. Agent definitions remain under `.claude/` for historical reasons; their content is harness-agnostic.
 
 Domain source of truth: [`docs/knowledge/brewing-domain.md`](docs/knowledge/brewing-domain.md), [`docs/knowledge/entity-model.md`](docs/knowledge/entity-model.md) — update those, not the agent files, when domain rules change.
 

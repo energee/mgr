@@ -15,8 +15,9 @@ SHELL := /bin/bash
 
 .PHONY: help setup dev build \
         lint typecheck test e2e \
-        check-fast check check-all check-db check-wip check-coverage \
+        check-fast check check-all check-db check-wip check-coverage check-agent-config \
         verify-feature feature-mark \
+        worktree worktree-list worktree-doctor \
         db-generate db-generate-local db-migrate db-seed db-dry-run \
         clean
 
@@ -51,7 +52,11 @@ test: ## Vitest run (unit + integration)
 e2e: ## Playwright E2E
 	@bun run e2e
 
-check-fast: lint typecheck ## Layer 1: static checks only (fast feedback)
+check-fast: lint typecheck check-agent-config ## Layer 1: static checks only (fast feedback)
+
+check-agent-config: ## Validate shared agent skills and worktree tooling
+	@bash scripts/check-agent-config.sh
+	@bash scripts/__tests__/agent-worktree.test.sh
 
 check-db: ## DB rule checks (security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / schema_registry / data-model docs / permissive RLS)
 	@bun run scripts/check-security-invoker.ts
@@ -83,6 +88,18 @@ feature-mark: ## Mark a feature's state (usage: make feature-mark ID=F003 STATE=
 	@if [ -z "$(ID)" ] || [ -z "$(STATE)" ]; then \
 		echo "Usage: make feature-mark ID=F003 STATE=in_progress [EVIDENCE=...]" >&2; exit 1; fi
 	@bun run scripts/feature-mark.ts $(ID) $(STATE) $(if $(EVIDENCE),--evidence="$(EVIDENCE)")
+
+# Shared agent worktrees
+
+worktree: ## Create/resume a shared worktree (usage: make worktree NAME=my-task [BASE=origin/main] [BRANCH=feat/my-task])
+	@if [ -z "$(NAME)" ]; then echo "Usage: make worktree NAME=my-task [BASE=origin/main] [BRANCH=feat/my-task]" >&2; exit 1; fi
+	@bash scripts/agent-worktree create "$(NAME)" $(if $(BASE),--base "$(BASE)") $(if $(BRANCH),--branch "$(BRANCH)")
+
+worktree-list: ## List every worktree registered with this repository
+	@bash scripts/agent-worktree list
+
+worktree-doctor: ## Report legacy, misplaced, or stale worktrees
+	@bash scripts/agent-worktree doctor
 
 # Database
 

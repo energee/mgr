@@ -20,7 +20,7 @@ The cost of a subagent is the briefing — if writing the prompt takes longer th
 
 When the change set matches a row in `AGENTS.md` → **Expert agents**, either:
 
-1. **Dispatch** the matching expert as a subagent (harnesses that support named agents), or  
+1. **Dispatch** the matching expert as a subagent (harnesses that support named agents), or
 2. **Read** `.claude/agents/<name>.md` and follow its body before editing that area.
 
 Same rules either way. See also [`process.md`](process.md) for plan/execute and bug workflows.
@@ -124,4 +124,4 @@ The harness exists to make agents reliable, not to make every task multi-agent. 
 | Spawn | `Agent` / Task tool | `spawn_subagent` |
 | Explore | `subagent_type: Explore` | `subagent_type: explore` |
 | Domain experts | Named agents under `.claude/agents/` | Same files — spawn by name if listed, else read the body |
-| Isolation | worktree tooling | `isolation: "worktree"` |
+| Isolation | shared `scripts/agent-worktree` path | shared `scripts/agent-worktree` path |

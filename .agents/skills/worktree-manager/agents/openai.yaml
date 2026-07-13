@@ -1,0 +1,4 @@
+interface:
+  display_name: "Worktree Manager"
+  short_description: "Create and hand off shared Git worktrees"
+  default_prompt: "Use $worktree-manager to create or enter a shared agent worktree for this task."

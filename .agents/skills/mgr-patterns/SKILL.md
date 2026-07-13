@@ -84,7 +84,7 @@ Prefer the Makefile gate:
 | `make check` | **Required before every commit** |
 | `make check-all` | Before PR / merge (adds E2E) |
 
-Equivalents: `bun run lint`, typecheck (`tsc --noEmit`), `bun run test` (Vitest).  
+Equivalents: `bun run lint`, typecheck (`tsc --noEmit`), `bun run test` (Vitest).
 **Never** use bare `bun test` for the project suite — that is Bun's own runner.
 
 Re-run typecheck after rebases or simplification passes.
@@ -98,5 +98,5 @@ Re-run typecheck after rebases or simplification passes.
 ## Tooling Conventions
 
 - Package manager: **Bun**. Run `bun install` after creating a worktree.
-- Worktrees may live under harness dirs (e.g. `.claude/worktrees/`) — always verify `pwd` and branch.
+- Create and locate worktrees with `scripts/agent-worktree`; always verify `pwd` and branch before editing.
 - Progress log: add `docs/progress/YYYY-MM-DD-slug.md` (one bullet); never edit `PROGRESS.md` on a branch (CI generates it on main).

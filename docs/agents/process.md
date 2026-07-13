@@ -7,9 +7,12 @@ matching trigger or situation applies. Tool/skill names in italics are optional
 
 ## Git worktree rules
 
+- Create and locate worktrees only through `scripts/agent-worktree`; do not use a harness-native default location.
+- Hand another harness the absolute path from `scripts/agent-worktree path <name>` instead of creating another checkout.
 - Always confirm which worktree and branch you are in **before** making changes.
 - When the user specifies a worktree, never edit `main` or another worktree by mistake.
 - After switching worktrees, run `pwd` and `git branch --show-current` before proceeding.
+- Only one write agent may use a worktree at a time.
 
 ## Documentation gate
 

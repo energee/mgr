@@ -27,14 +27,12 @@ Run these in parallel and collect all failures:
 # Type checking
 bun typecheck 2>&1
 
-# Linting (ignore BABEL noise from worktree build artifacts)
-bun lint 2>&1 | grep -v "^\[BABEL\]"
+# Linting
+bun lint 2>&1
 
 # Unit tests
 bun run test 2>&1
 ```
-
-**Note**: ESLint may produce BABEL deoptimisation warnings from `.claude/worktrees/*/` build artifacts. These are noise — filter them out. Only real ESLint errors/warnings matter.
 
 Parse the output into a structured list of issues. For each issue, extract:
 - **file**: path to the affected file
@@ -76,18 +74,20 @@ For each issue from Step 1, classify it:
 For each AUTO-FIX and INVESTIGATE issue (or batch of related issues):
 
 1. **Create an isolated worktree**:
-   ```
-   Use the EnterWorktree tool or:
-   git worktree add .claude/worktrees/bugfix-<short-description> -b bugfix/<short-description>
+   ```bash
+   worktree_path=$(scripts/agent-worktree create bugfix-<short-description> \
+     --base origin/main \
+     --branch bugfix/<short-description>)
    ```
 
-2. **Spawn an agent** (subagent_type: general-purpose, isolation: worktree) with this prompt template:
+2. **Spawn an agent** with `$worktree_path` as its working directory. Do not request native worktree isolation, which would create a duplicate checkout. Use this prompt template:
    ```
    You are fixing a bug in the MGR brewery management system.
 
    **Issue**: {category} in {file}:{line}
    **Error**: {message}
    **Classification**: {AUTO-FIX or INVESTIGATE}
+   **Worktree**: {worktree_path}
 
    Instructions:
    1. Read the affected file and understand the context

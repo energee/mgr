@@ -1,0 +1,276 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly DEFAULT_RETENTION_WARNING=20
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+log() {
+  printf '%s\n' "$*" >&2
+}
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  scripts/agent-worktree create NAME [--base REF] [--branch BRANCH]
+  scripts/agent-worktree path NAME
+  scripts/agent-worktree list
+  scripts/agent-worktree doctor
+  scripts/agent-worktree remove NAME [--force]
+  scripts/agent-worktree prune
+
+Worktrees live under:
+  ${AGENT_WORKTREE_ROOT:-$HOME/.agents/worktrees}/<repo>/<name>
+EOF
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
+}
+
+initialize_repo_context() {
+  require_command git
+
+  local checkout_root common_dir
+  checkout_root=$(git rev-parse --show-toplevel 2>/dev/null) || \
+    die "run this command from a Git repository"
+
+  common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+  if [[ -z "$common_dir" ]]; then
+    common_dir=$(git rev-parse --git-common-dir)
+    if [[ "$common_dir" != /* ]]; then
+      common_dir=$(cd "$checkout_root/$common_dir" && pwd -P)
+    fi
+  fi
+
+  MAIN_ROOT=$(cd "$(dirname "$common_dir")" && pwd -P)
+  REPO_NAME=$(basename "$MAIN_ROOT")
+  SHARED_ROOT=${AGENT_WORKTREE_ROOT:-"$HOME/.agents/worktrees"}
+  mkdir -p "$SHARED_ROOT"
+  SHARED_ROOT=$(cd "$SHARED_ROOT" && pwd -P)
+  REPO_WORKTREE_ROOT="$SHARED_ROOT/$REPO_NAME"
+}
+
+validate_name() {
+  local name=$1
+  [[ "$name" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || \
+    die "invalid worktree name '$name' (use lowercase letters, digits, '.', '_' or '-')"
+  [[ "$name" != "." && "$name" != ".." ]] || die "invalid worktree name '$name'"
+}
+
+validate_branch() {
+  local branch=$1 short_branch=${1#refs/heads/}
+  git check-ref-format --branch "$branch" >/dev/null 2>&1 || die "invalid branch name '$branch'"
+  case "$short_branch" in
+    main|master)
+      die "refusing to create an agent worktree on protected branch '$short_branch'"
+      ;;
+  esac
+}
+
+default_base() {
+  if git show-ref --verify --quiet refs/remotes/origin/HEAD; then
+    printf 'origin/HEAD\n'
+  elif git show-ref --verify --quiet refs/remotes/origin/main; then
+    printf 'origin/main\n'
+  else
+    printf 'HEAD\n'
+  fi
+}
+
+worktree_path() {
+  printf '%s/%s\n' "$REPO_WORKTREE_ROOT" "$1"
+}
+
+is_registered_worktree() {
+  local target=$1
+  git worktree list --porcelain | sed -n 's/^worktree //p' | grep -Fqx -- "$target"
+}
+
+copy_worktree_includes() {
+  local destination=$1 include_file="$MAIN_ROOT/.worktreeinclude"
+  [[ -f "$include_file" ]] || return 0
+
+  local entry source target
+  while IFS= read -r entry || [[ -n "$entry" ]]; do
+    entry=${entry%$'\r'}
+    case "$entry" in
+      ''|'#'*) continue ;;
+      /*|*'..'*) die "unsafe .worktreeinclude entry: $entry" ;;
+      *'*'*|*'?'*|*'['*)
+        log "warning: skipping unsupported .worktreeinclude pattern: $entry"
+        continue
+        ;;
+    esac
+
+    source="$MAIN_ROOT/$entry"
+    target="$destination/$entry"
+    [[ -e "$source" || -L "$source" ]] || continue
+    [[ ! -e "$target" && ! -L "$target" ]] || continue
+    git -C "$MAIN_ROOT" check-ignore --quiet -- "$entry" || \
+      die ".worktreeinclude entry is not ignored: $entry"
+    mkdir -p "$(dirname "$target")"
+    cp -pR "$source" "$target"
+  done < "$include_file"
+}
+
+create_worktree() {
+  [[ $# -ge 1 ]] || die "create requires NAME"
+  local name=$1
+  shift
+  validate_name "$name"
+
+  local base branch
+  base=$(default_base)
+  branch="agent/$name"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --base)
+        [[ $# -ge 2 ]] || die "--base requires a ref"
+        base=$2
+        shift 2
+        ;;
+      --branch)
+        [[ $# -ge 2 ]] || die "--branch requires a branch"
+        branch=$2
+        shift 2
+        ;;
+      *) die "unknown create option: $1" ;;
+    esac
+  done
+
+  validate_branch "$branch"
+  git rev-parse --verify --quiet "${base}^{commit}" >/dev/null || \
+    die "base ref does not resolve to a commit: $base"
+
+  local destination
+  destination=$(worktree_path "$name")
+
+  if is_registered_worktree "$destination"; then
+    [[ -d "$destination" ]] || die "registered worktree directory is missing: $destination"
+    printf '%s\n' "$destination"
+    return 0
+  fi
+
+  [[ ! -e "$destination" ]] || die "path exists but is not a registered worktree: $destination"
+  mkdir -p "$REPO_WORKTREE_ROOT"
+
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    log "Attaching existing branch '$branch' at $destination"
+    git worktree add "$destination" "$branch" >&2
+  else
+    log "Creating worktree '$name' from '$base' on branch '$branch'"
+    git worktree add -b "$branch" "$destination" "$base" >&2
+  fi
+
+  copy_worktree_includes "$destination"
+  is_registered_worktree "$destination" || die "Git did not register the new worktree"
+  printf '%s\n' "$destination"
+}
+
+print_path() {
+  [[ $# -eq 1 ]] || die "path requires NAME"
+  validate_name "$1"
+  local destination
+  destination=$(worktree_path "$1")
+  [[ -d "$destination" ]] || die "worktree does not exist: $destination"
+  is_registered_worktree "$destination" || die "directory is not a registered worktree: $destination"
+  printf '%s\n' "$destination"
+}
+
+list_worktrees() {
+  git worktree list
+}
+
+doctor() {
+  local count=0 failures=0 path
+  while IFS= read -r path; do
+    [[ "$path" == "$MAIN_ROOT" ]] && continue
+    count=$((count + 1))
+    case "$path" in
+      "$REPO_WORKTREE_ROOT"/*) ;;
+      *)
+        log "outside shared root: $path"
+        failures=$((failures + 1))
+        ;;
+    esac
+  done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
+
+  if (( count > DEFAULT_RETENTION_WARNING )); then
+    log "warning: $count linked worktrees exceed the recommended limit of $DEFAULT_RETENTION_WARNING"
+  fi
+
+  local stale
+  stale=$(git worktree prune --dry-run --verbose 2>&1 || true)
+  if [[ -n "$stale" ]]; then
+    log "$stale"
+    failures=$((failures + 1))
+  fi
+
+  if (( failures > 0 )); then
+    die "worktree policy check found $failures issue(s)"
+  fi
+  printf 'OK: %s linked worktree(s) under %s\n' "$count" "$REPO_WORKTREE_ROOT"
+}
+
+remove_worktree() {
+  [[ $# -ge 1 ]] || die "remove requires NAME"
+  local name=$1 force=false
+  shift
+  validate_name "$name"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --force) force=true; shift ;;
+      *) die "unknown remove option: $1" ;;
+    esac
+  done
+
+  local destination
+  destination=$(worktree_path "$name")
+  is_registered_worktree "$destination" || die "not a registered shared worktree: $destination"
+
+  if [[ "$force" != true && -n "$(git -C "$destination" status --porcelain)" ]]; then
+    die "worktree has uncommitted changes: $destination"
+  fi
+
+  if [[ "$force" == true ]]; then
+    git worktree remove --force "$destination"
+  else
+    git worktree remove "$destination"
+  fi
+}
+
+create_from_claude() {
+  require_command jq
+  local name
+  name=$(jq -er '.name | strings | select(length > 0)') || \
+    die "Claude WorktreeCreate input did not include a name"
+  create_worktree "$name"
+}
+
+main() {
+  [[ $# -ge 1 ]] || { usage; exit 1; }
+  initialize_repo_context
+
+  local command=$1
+  shift
+  case "$command" in
+    create) create_worktree "$@" ;;
+    create-from-claude) create_from_claude ;;
+    path) print_path "$@" ;;
+    list) list_worktrees "$@" ;;
+    doctor) doctor "$@" ;;
+    remove) remove_worktree "$@" ;;
+    prune) git worktree prune --verbose ;;
+    help|-h|--help) usage ;;
+    *) usage; die "unknown command: $command" ;;
+  esac
+}
+
+main "$@"
