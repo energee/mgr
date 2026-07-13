@@ -3,7 +3,7 @@
 > **MGR** — brewery management system. Next.js App Router + Supabase/Postgres + AI integration. AI-first, minimalist design philosophy.
 > Read this file first, then load topic docs below as the work demands.
 
-This is the single source of truth for agent instructions, shared by every harness (Claude Code, Codex, and anything else that reads `AGENTS.md`). `CLAUDE.md` only imports this file — put rules here, never there.
+This is the single source of truth for agent instructions, shared by every harness (Claude Code, Grok, Codex, and anything else that reads `AGENTS.md`). Harness entry files (`CLAUDE.md`, etc.) only import this file — put project rules here, never in harness-only wrappers.
 
 ## First run
 
@@ -48,8 +48,9 @@ Agent-facing quick-references (must-follow rules, code examples):
 | [`docs/agents/db-security.md`](docs/agents/db-security.md) | Writing SQL migrations |
 | [`docs/agents/ui-rules.md`](docs/agents/ui-rules.md) | Building or reviewing UI components |
 | [`docs/agents/debugging.md`](docs/agents/debugging.md) | Investigating any bug |
+| [`docs/agents/process.md`](docs/agents/process.md) | Bug RGR, feature two-phase, worktrees, docs gate, guardrails |
 | [`docs/agents/dispatching-agents.md`](docs/agents/dispatching-agents.md) | Deciding when to spawn subagents and how to brief them |
-| [`PROGRESS.md`](PROGRESS.md) | **Session start** — current state, next steps |
+| [`PROGRESS.md`](PROGRESS.md) | **Session start** — current state, next steps (generated on main) |
 | [`DECISIONS.md`](DECISIONS.md) | Before non-trivial design choices |
 | [`docs/agents/session-handoff.md`](docs/agents/session-handoff.md) | Session end — handoff template |
 | [`docs/agents/clean-state-checklist.md`](docs/agents/clean-state-checklist.md) | Session end — verification checklist |
@@ -73,7 +74,7 @@ Full reference (deep architecture, decisions, data model):
 
 ## Expert agents and skills (all harnesses)
 
-Domain expertise lives in plain markdown under `.claude/agents/*.md` and `.claude/skills/*/SKILL.md`. They are ordinary files: a harness with subagents (Claude Code) dispatches them; a harness without (Codex) **reads the matching file before editing that area, and follows it**. Either way the rules are the same.
+Domain expertise lives in plain markdown under `.claude/agents/*.md` and `.claude/skills/*/SKILL.md` (package layout: one directory per skill with `SKILL.md`). These are ordinary files: a harness with subagents dispatches them by name when supported; a harness without **reads the matching agent file before editing that area, and follows it**. Either way the rules are the same.
 
 | Touching | Agent file |
 |---|---|
@@ -85,7 +86,7 @@ Domain expertise lives in plain markdown under `.claude/agents/*.md` and `.claud
 | Writing/repairing tests, pre-refactor coverage | `test-surgeon` |
 | Reviewing any refactor/dedup diff (read-only gate) | `refactor-reviewer` |
 
-Each agent file has YAML frontmatter (`name`, `description`, `tools`). Harnesses that don't understand the frontmatter should ignore it and read the body.
+Each agent file has YAML frontmatter (`name`, `description`, and optionally Claude-only `tools`). Harnesses that don't understand frontmatter keys should ignore them and read the body. Path is under `.claude/` for historical reasons; content is harness-agnostic.
 
 Domain source of truth: [`docs/knowledge/brewing-domain.md`](docs/knowledge/brewing-domain.md), [`docs/knowledge/entity-model.md`](docs/knowledge/entity-model.md) — update those, not the agent files, when domain rules change.
 
@@ -136,6 +137,8 @@ Litmus test for a new file: does it know what a "batch" is? → `src/domain/`. D
 15. **MUST** keep one entity per directory: `src/entities/<name>/` (`core.ts` + `presentation.tsx` + `index.ts`), registered in `src/entities/index.ts`.
 16. **MUST** prefix commit subjects with `feat`/`fix`/`chore`/`docs`/`refactor`/`perf`/`ci`.
 17. **MUST** verify before deleting anything knip/depcheck flags as unused — the entity registry and `z.infer` types produce false positives.
+18. **MUST** record session progress as a new file `docs/progress/YYYY-MM-DD-slug.md` (one bullet: `- **date (title).** …`). **MUST NOT** edit or commit `PROGRESS.md` on a branch — it is generated on `main` by CI.
+19. **MUST** confirm worktree + branch (`pwd`, `git branch --show-current`) before editing when using worktrees.
 
 ## Schema registry
 
@@ -167,13 +170,20 @@ MGR is built for AI assistance. Entry points:
 
 ## Process rules
 
+Full workflows (bug red–green–refactor, feature two-phase plan/execute, worktrees, documentation gate, review, guardrails): **[`docs/agents/process.md`](docs/agents/process.md)**.
+
 ### Before fixing any bug
 1. State the root cause.
 2. Explain why you believe it.
 3. List two alternative approaches, ranked by likelihood.
 4. Wait for confirmation before writing code.
 
+If the user says **"I'm reporting a bug: …"**, follow the full red–green–refactor process in [`process.md`](docs/agents/process.md) (failing test first).
+
 If the first fix fails: **stop and re-analyze**, don't iterate the same patch. See [`debugging.md`](docs/agents/debugging.md).
+
+### When implementing a feature
+If the user says **"I want to implement a new feature: …"**, follow the two-phase plan → approval → execute process in [`process.md`](docs/agents/process.md). Do not write implementation code in Phase 1.
 
 ### When making changes
 1. Check [`docs/spec/decisions.md`](docs/spec/decisions.md) for relevant DEC entries.
@@ -181,10 +191,12 @@ If the first fix fails: **stop and re-analyze**, don't iterate the same patch. S
 3. Update [`docs/data-model/`](docs/data-model/) when changing schema.
 4. Add `_schema_registry` entries in the migration for new tables.
 5. Document new architecture decisions in `docs/spec/decisions.md` or `docs/spec/architecture.md`.
+6. Update docs/comments for public API, schema, props, routes, or user-facing behavior in the **same** commit ([`process.md`](docs/agents/process.md) documentation gate).
 
 ### When making commits
 1. Run `make check` and fix any errors introduced.
 2. Never add `Co-Authored-By` lines.
+3. Add a `docs/progress/YYYY-MM-DD-slug.md` entry when the session lands meaningful work (do not touch `PROGRESS.md` on a branch).
 
 ## Landing the Plane (Session Completion)
 

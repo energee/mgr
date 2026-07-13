@@ -1,7 +1,9 @@
 ---
 name: refactor-reviewer
 description: Use as a read-only gate before merging any refactor, dedup, or structural file-move/reorg diff. MUST BE USED before accepting any change described as behavior-preserving.
+# tools = Claude Code allowlist (other harnesses ignore)
 tools: Read, Grep, Glob, Bash
+capability: read-only
 ---
 
 # Refactor Reviewer

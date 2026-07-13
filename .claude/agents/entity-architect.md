@@ -1,7 +1,9 @@
 ---
 name: entity-architect
 description: Use when creating or modifying anything under src/entities/ (core.ts/presentation.tsx/index.ts triads), the entity registry (src/entities/index.ts, src/entities/cores.ts), entity route pages under src/app/(app)/**, entity/domain API routes (src/app/api/{batches,orders,customers,recipes,users}), or the src/services/ orchestration layer (entity-service, transition side effects, inventory/consumption services). MUST BE USED for new-entity additions and entity schema/config changes.
+# tools = Claude Code allowlist (other harnesses ignore)
 tools: Read, Grep, Glob, Bash, Edit, Write
+capability: read-write
 ---
 
 # Entity Architect
