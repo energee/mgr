@@ -262,6 +262,7 @@ describe("runTransitionSideEffects: registry matching", () => {
 import {
   completeBatchConsumption,
   reconcileBatchLoss,
+  consumePackagingMaterials,
 } from "../consumption-service";
 
 const BATCH_A = "00000000-0000-0000-0000-0000000000ba";
@@ -914,5 +915,633 @@ describe("runTransitionSideEffects: deliveries → completed", () => {
 
     expect(result.error).toContain("syncing its orders failed");
     expect(result.error).toContain("boom");
+  });
+
+  it("treats a null linked-order payload as no linked orders", async () => {
+    // PostgREST can return data:null with no error; the `?? []` guard is what
+    // stops the entry from throwing on .length.
+    const { supabase, callsByTable } = makeSupabase({
+      orders: [{ data: null, error: null }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "deliveries", [DELIVERY_A], "completed");
+
+    expect(result.error).toBeNull();
+    expect(callsByTable.orders).toHaveLength(1); // read only
+    expect(callsByTable.allocations).toBeUndefined(); // nothing chained
+  });
+
+  it("does not chain an order whose flip returned a null payload", async () => {
+    // Same guard on the UPDATE ... .select("id") result: only rows we can SEE
+    // flipped may be chained, or we would synthesize removals for an order
+    // that never actually moved to fulfilled.
+    const { supabase, callsByTable } = makeSupabase({
+      orders: [
+        { data: [{ id: ORDER_A }], error: null },
+        { data: null, error: null }, // flip: no rows returned
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "deliveries", [DELIVERY_A], "completed");
+
+    expect(result.error).toBeNull();
+    expect(callsByTable.allocations).toBeUndefined();
+  });
+
+  it("surfaces an error raised by the chained orders → fulfilled effect", async () => {
+    const { supabase } = makeSupabase({
+      orders: [
+        { data: [{ id: ORDER_A }], error: null },
+        { data: [{ id: ORDER_A }], error: null }, // flip succeeds
+      ],
+      // The chained fulfillment effect's reservation read fails.
+      allocations: [{ data: null, error: { message: "chain boom" } }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "deliveries", [DELIVERY_A], "completed");
+
+    // The delivery still completed; the chained failure is nested, not lost.
+    expect(result.error).toContain("Delivery completed, but");
+    expect(result.error).toContain("completing its inventory reservations failed");
+    expect(result.error).toContain("chain boom");
+  });
+});
+
+// =============================================================================
+// pick_lists: null payload guard
+// =============================================================================
+
+describe("runTransitionSideEffects: pick_lists null payload", () => {
+  it("treats a null pick-list payload as no rows and skips the orders update", async () => {
+    const mock = createMockSupabase({ data: null, error: null });
+
+    const result = await runTransitionSideEffects(
+      mock.client,
+      "pick_lists",
+      [PICK_LIST_ID],
+      "in_progress"
+    );
+
+    expect(result.error).toBeNull();
+    expect(mock.from).not.toHaveBeenCalledWith("orders");
+  });
+});
+
+// =============================================================================
+// packaging_sessions → completed (BOM material depletion)
+// =============================================================================
+
+const SESSION_A = "00000000-0000-0000-0000-0000000000s1";
+const SESSION_B = "00000000-0000-0000-0000-0000000000s2";
+
+describe("runTransitionSideEffects: packaging_sessions → completed", () => {
+  it("depletes each completed session's packaging-material BOM", async () => {
+    const { supabase } = makeSupabase({});
+    vi.mocked(consumePackagingMaterials).mockResolvedValue({
+      success: true,
+      data: { allocations_inserted: 3, shortfalls: [] },
+      invalidate: [],
+    });
+
+    const result = await runTransitionSideEffects(
+      supabase,
+      "packaging_sessions",
+      [SESSION_A, SESSION_B],
+      "completed"
+    );
+
+    expect(result.error).toBeNull();
+    expect(consumePackagingMaterials).toHaveBeenCalledWith(supabase, SESSION_A);
+    expect(consumePackagingMaterials).toHaveBeenCalledWith(supabase, SESSION_B);
+  });
+
+  it("surfaces depletion failures once, deduped, without failing the session", async () => {
+    const { supabase } = makeSupabase({});
+    vi.mocked(consumePackagingMaterials).mockResolvedValue({
+      success: false,
+      error: { code: "UNKNOWN", message: "no lot for CAN-12OZ" },
+    });
+
+    const result = await runTransitionSideEffects(
+      supabase,
+      "packaging_sessions",
+      [SESSION_A, SESSION_B],
+      "completed"
+    );
+
+    expect(result.error).toContain("Session completed, but material depletion failed");
+    expect(result.error).toContain("no lot for CAN-12OZ");
+    // Both sessions failed identically — the message is deduped, not repeated.
+    expect(result.error?.match(/no lot for CAN-12OZ/g)).toHaveLength(1);
+  });
+
+  it("does nothing for packaging_sessions transitions without registered effects", async () => {
+    const { supabase } = makeSupabase({});
+    vi.mocked(consumePackagingMaterials).mockClear();
+
+    const result = await runTransitionSideEffects(
+      supabase,
+      "packaging_sessions",
+      [SESSION_A],
+      "in_progress"
+    );
+
+    expect(result.error).toBeNull();
+    expect(consumePackagingMaterials).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// batches → completed: consumption + vessel-release failure paths
+// =============================================================================
+
+describe("runTransitionSideEffects: batches → completed (failure paths)", () => {
+  it("surfaces consumption AND vessel-release failures together, and skips the vessel cache refresh", async () => {
+    const { supabase } = makeSupabase({
+      vessels: [{ data: null, error: { message: "vessel locked" } }],
+    });
+    const { queryClient, invalidateQueries } = createMockQueryClient();
+    vi.mocked(completeBatchConsumption).mockResolvedValue({
+      success: false,
+      error: { code: "UNKNOWN", message: "no planned allocations" },
+    });
+    vi.mocked(reconcileBatchLoss).mockResolvedValue({ success: true, data: 0, invalidate: [] });
+
+    const result = await runTransitionSideEffects(
+      supabase,
+      "batches",
+      [BATCH_A, BATCH_B],
+      "completed",
+      queryClient
+    );
+
+    // The batch is still completed; both failures are reported in one message.
+    expect(result.error).toContain("Batch completed, but");
+    expect(result.error).toContain("confirming ingredient consumption failed");
+    expect(result.error).toContain("no planned allocations");
+    expect(result.error).toContain("releasing the vessel failed: vessel locked");
+    // Identical per-batch failures are deduped.
+    expect(result.error?.match(/no planned allocations/g)).toHaveLength(1);
+    // No allocations were confirmed, so the count stays 0.
+    expect(result.completedAllocations).toBe(0);
+    // The vessel UPDATE failed → its caches must NOT be invalidated (that
+    // would paint a released vessel that is still occupied).
+    expect(invalidateQueries).not.toHaveBeenCalledWith({ queryKey: ["vessels"] });
+  });
+});
+
+// =============================================================================
+// orders → fulfilled: reservation-completion edge cases
+// =============================================================================
+
+describe("runTransitionSideEffects: orders → fulfilled (reservation edge cases)", () => {
+  it("skips the container-volume lookup entirely when no reservation names a source lot", async () => {
+    // No finished_goods queue is provided: the fake throws if the lookup runs.
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [{ id: "a1", source_id: null, quantity: 5, destination_id: ORDER_A }], error: null },
+        { data: null, error: null }, // update a1
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(callsByTable.finished_goods).toBeUndefined();
+    // Still completed — the shipment happened — but with no volume, flagged.
+    expect(callsByTable.allocations[1].update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "completed", volume_bbl: null })
+    );
+    expect(result.error).toContain("no container volume data");
+  });
+
+  it("completes reservations with null volume and a distinct warning when the volume LOOKUP fails", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [{ id: "a1", source_id: "fg-1", quantity: 10, destination_id: ORDER_A }], error: null },
+        { data: null, error: null }, // update a1
+      ],
+      finished_goods: [{ data: null, error: { message: "statement timeout" } }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(callsByTable.allocations[1].update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "completed", volume_bbl: null })
+    );
+    expect(result.error).toContain("looking up container volumes failed");
+    expect(result.error).toContain("statement timeout");
+    // A lookup FAILURE is reported instead of (not in addition to) the
+    // missing-data message — they have different remedies.
+    expect(result.error).not.toContain("no container volume data");
+  });
+
+  it("completes with null volume when the finished good has no selling-format join", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [{ id: "a1", source_id: "fg-x", quantity: 4, destination_id: ORDER_A }], error: null },
+        { data: null, error: null },
+      ],
+      finished_goods: [{ data: [{ id: "fg-x", selling_format: null }], error: null }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(callsByTable.allocations[1].update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "completed", volume_bbl: null })
+    );
+    expect(result.error).toContain("1 reservation(s) have no container volume data");
+  });
+
+  it("surfaces a rejected reservation UPDATE while still attempting the others", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        {
+          data: [
+            { id: "a1", source_id: "fg-1", quantity: 2, destination_id: ORDER_A },
+            { id: "a2", source_id: "fg-1", quantity: 3, destination_id: ORDER_A },
+          ],
+          error: null,
+        },
+        { data: null, error: { message: "guard_finished_good_outbound tripped" } }, // a1 rejected
+        { data: null, error: null }, // a2 succeeds
+      ],
+      finished_goods: [
+        {
+          data: [
+            {
+              id: "fg-1",
+              selling_format: { unit_count: 1, container: { volume_bbl: 0.5, volume_oz: null } },
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toContain("completing 1 reservation(s) failed");
+    expect(result.error).toContain("guard_finished_good_outbound tripped");
+    // Per-row updates: a2 still ran despite a1's rejection.
+    expect(callsByTable.allocations[2].update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "completed", volume_bbl: 1.5 })
+    );
+  });
+
+  it("treats a null reservation payload as no reservations and falls through to synthesis", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: null, error: null }, // planned read: null payload, no error
+        { data: [], error: null }, // synthesis guard read
+      ],
+      order_items: [{ data: [], error: null }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toBeNull();
+    expect(callsByTable.order_items).toHaveLength(1);
+  });
+});
+
+// =============================================================================
+// orders → fulfilled: synthesis failure / guard paths (BD-5)
+// =============================================================================
+
+/** One non-keg case line for ORDER_A, used by the synthesis failure tests. */
+const CASE_ITEM = {
+  id: ITEM_1,
+  order_id: ORDER_A,
+  brand_id: BRAND_1,
+  selling_format_id: "sf-case",
+  quantity: 10,
+};
+
+const CASE_FORMAT = {
+  id: "sf-case",
+  unit_count: 1,
+  container: { type: "can", volume_bbl: null, volume_oz: 3968 },
+};
+
+describe("runTransitionSideEffects: orders → fulfilled (synthesis failure paths)", () => {
+  it("surfaces a failed idempotency-guard read and never reads the line items", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null }, // planned read
+        { data: null, error: { message: "guard read boom" } },
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toContain("synthesizing removal allocations failed");
+    expect(result.error).toContain("guard read boom");
+    // Bailing BEFORE reading order_items matters: without the guard read we
+    // cannot know which lines were already synthesized, so re-inserting would
+    // double-count removals.
+    expect(callsByTable.order_items).toBeUndefined();
+  });
+
+  it("surfaces a failed order_items read and never reads the selling formats", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      order_items: [{ data: null, error: { message: "items boom" } }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toContain("synthesizing removal allocations failed");
+    expect(result.error).toContain("items boom");
+    expect(callsByTable.selling_formats).toBeUndefined();
+  });
+
+  it("surfaces a failed selling_formats read and never reads the lots", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      order_items: [{ data: [CASE_ITEM], error: null }],
+      selling_formats: [{ data: null, error: { message: "formats boom" } }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toContain("formats boom");
+    // Without formats we cannot tell keg lines apart — drawing lots anyway
+    // would risk double-attributing a keg shipment.
+    expect(callsByTable.finished_goods).toBeUndefined();
+  });
+
+  it("surfaces a failed lot read and inserts nothing", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      order_items: [{ data: [CASE_ITEM], error: null }],
+      selling_formats: [{ data: [CASE_FORMAT], error: null }],
+      finished_goods: [{ data: null, error: { message: "lots boom" } }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toContain("lots boom");
+    expect(callsByTable.allocations).toHaveLength(2); // reads only, no inserts
+  });
+
+  it("surfaces a failed per-lot availability read and inserts nothing", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null },
+        { data: [], error: null },
+        { data: null, error: { message: "availability boom" } },
+      ],
+      order_items: [{ data: [CASE_ITEM], error: null }],
+      selling_formats: [{ data: [CASE_FORMAT], error: null }],
+      finished_goods: [
+        {
+          data: [
+            {
+              id: "fg-1",
+              brand_id: BRAND_1,
+              selling_format_id: "sf-case",
+              quantity: 50,
+              production_date: "2026-01-01",
+              lot_number: "L1",
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    // Without per-lot availability we would be drawing blind — bail rather
+    // than insert rows the 00212 guard would reject anyway.
+    expect(result.error).toContain("availability boom");
+    expect(callsByTable.allocations).toHaveLength(3); // no inserts
+  });
+
+  it("skips (and flags) lines with no selling format, without querying formats", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      order_items: [
+        { data: [{ ...CASE_ITEM, selling_format_id: null }], error: null },
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toContain("1 order line(s) have no selling format and were skipped");
+    // Every line was skipped → no format/lot queries and no inserts.
+    expect(callsByTable.selling_formats).toBeUndefined();
+    expect(callsByTable.allocations).toHaveLength(2);
+  });
+
+  it("synthesizes nothing for a keg-only order (kegs belong to the keg_transactions ledger)", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      order_items: [
+        { data: [{ ...CASE_ITEM, id: ITEM_KEG, selling_format_id: "sf-keg" }], error: null },
+      ],
+      selling_formats: [
+        {
+          data: [{ id: "sf-keg", unit_count: 1, container: { type: "keg", volume_bbl: 0.5, volume_oz: null } }],
+          error: null,
+        },
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    // A double FIFO over allocation-availability would misattribute the lot
+    // the keg ledger already drew — so the run stops before touching lots.
+    expect(result.error).toBeNull();
+    expect(callsByTable.finished_goods).toBeUndefined();
+    expect(callsByTable.allocations).toHaveLength(2); // no inserts
+  });
+
+  it("flags a shortfall (and skips the availability read) when the format has no lots at all", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      order_items: [{ data: [CASE_ITEM], error: null }],
+      selling_formats: [{ data: [CASE_FORMAT], error: null }],
+      finished_goods: [{ data: [], error: null }], // nothing packaged
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    // Fulfillment stands; the uncovered quantity is surfaced, never silently
+    // dropped and never inserted over availability.
+    expect(result.error).toContain("Order fulfilled, but");
+    expect(result.error).toContain("1 order line(s) exceed available finished-goods stock");
+    // No lots → the per-lot availability read is pointless and must be skipped.
+    expect(callsByTable.allocations).toHaveLength(2);
+  });
+});
+
+// =============================================================================
+// orders → fulfilled: synthesis draw ordering (FIFO + wildcard-brand rules)
+// =============================================================================
+
+const BRAND_2 = "00000000-0000-0000-0000-00000000br02";
+const ITEM_NAMED = "i-named";
+const ITEM_WILDCARD = "i-wildcard";
+const ITEM_ORPHAN = "i-orphan"; // sorts before "i-wildcard" within the wildcard group
+
+describe("runTransitionSideEffects: orders → fulfilled (synthesis draw ordering)", () => {
+  it("plans named-brand lines before wildcard lines, draws lots FIFO with NULLs last, and flags orphan/volume-less lines", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null }, // planned read → no reservations
+        { data: [], error: null }, // synthesis guard read
+        {
+          // Per-lot active allocations. Two rows that must NOT affect
+          // availability: one with a null source, one for an unrelated lot.
+          data: [
+            { source_id: null, quantity: 99 },
+            { source_id: "fg-unrelated", quantity: 99 },
+          ],
+          error: null,
+        },
+        { data: null, error: null }, // insert 1
+        { data: null, error: null }, // insert 2
+      ],
+      order_items: [
+        {
+          data: [
+            // Wildcard (no brand) line — must plan AFTER the named line.
+            {
+              id: ITEM_WILDCARD,
+              order_id: ORDER_A,
+              brand_id: null,
+              selling_format_id: "sf-case",
+              quantity: 2,
+            },
+            // Named-brand line for BRAND_1.
+            {
+              id: ITEM_NAMED,
+              order_id: ORDER_A,
+              brand_id: BRAND_1,
+              selling_format_id: "sf-case",
+              quantity: 2,
+            },
+            // Line whose selling_format row is not returned (deleted / RLS
+            // hidden) — must be skipped and flagged, not crash the run.
+            {
+              id: ITEM_ORPHAN,
+              order_id: ORDER_A,
+              brand_id: null,
+              selling_format_id: "sf-missing",
+              quantity: 1,
+            },
+          ],
+          error: null,
+        },
+      ],
+      selling_formats: [
+        {
+          // container present but volume-less → no per-unit fill volume.
+          // "sf-missing" is deliberately absent from the response.
+          data: [{ id: "sf-case", unit_count: 1, container: null }],
+          error: null,
+        },
+      ],
+      finished_goods: [
+        {
+          data: [
+            // Null production_date → sorts LAST (NULLS LAST), so it must never
+            // be drawn while dated lots remain.
+            {
+              id: "lot-nulldate",
+              brand_id: BRAND_1,
+              selling_format_id: "sf-case",
+              quantity: 2,
+              production_date: null,
+              lot_number: "A",
+            },
+            // Same date as lot-dated-1 but a NULL lot_number → sorts after it.
+            {
+              id: "lot-nulllot",
+              brand_id: BRAND_2,
+              selling_format_id: "sf-case",
+              quantity: 2,
+              production_date: "2026-01-01",
+              lot_number: null,
+            },
+            {
+              id: "lot-dated-1",
+              brand_id: BRAND_1,
+              selling_format_id: "sf-case",
+              quantity: 2,
+              production_date: "2026-01-01",
+              lot_number: "L1",
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    // Exactly two inserts: the named line and the wildcard line. The orphan
+    // line draws nothing (its format — and therefore its lots — is unknown).
+    expect(callsByTable.allocations).toHaveLength(5);
+
+    // The NAMED line planned first and took its own brand's oldest dated lot.
+    // Had the wildcard line planned first it would have swallowed lot-dated-1
+    // and starved the named line — this is 00229's ordering rule.
+    expect(callsByTable.allocations[3].insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_id: "lot-dated-1",
+        destination_id: ORDER_A,
+        quantity: 2,
+        lot_number: "L1",
+        status: "completed",
+        volume_bbl: null, // no container volume → flagged below, not guessed
+        idempotency_key: `order_fulfill:${ORDER_A}:${ITEM_NAMED}`,
+      })
+    );
+
+    // The WILDCARD line then drew across brands: lot-dated-1 is exhausted, so
+    // it took lot-nulllot (same date, NULL lot_number → ordered after
+    // lot-dated-1) — NOT lot-nulldate, whose NULL production_date sorts last.
+    expect(callsByTable.allocations[4].insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_id: "lot-nulllot",
+        quantity: 2,
+        lot_number: null,
+        idempotency_key: `order_fulfill:${ORDER_A}:${ITEM_WILDCARD}`,
+      })
+    );
+
+    // lot-nulldate (NULLS LAST) was never drawn.
+    const drawnLots = callsByTable.allocations
+      .slice(3)
+      .map((b) => b.insert.mock.calls[0][0].source_id);
+    expect(drawnLots).not.toContain("lot-nulldate");
+    // The null-source / unrelated-lot allocation rows did not eat availability
+    // (had they, lot-dated-1's 2 units would have been unavailable).
+    expect(drawnLots).toContain("lot-dated-1");
+
+    // Both warnings surface: 3 lines with no volume (2 volume-less format
+    // lines + the orphan) and 1 uncoverable line (the orphan).
+    expect(result.error).toContain("3 order line(s) have no container volume data");
+    expect(result.error).toContain("1 order line(s) exceed available finished-goods stock");
   });
 });
