@@ -123,7 +123,10 @@ function NotificationsProviderInner({ children }: NotificationsProviderProps) {
         .limit(50);
 
       if (error) {
-        log.error("Failed to fetch notifications:", error.message, error.code, error.details);
+        // Pass the PostgrestError instance itself so client-logger routes this
+        // to Sentry.captureException with the real message/stack instead of a
+        // generic captureMessage (see SENTRY-7597067759).
+        log.error("Failed to fetch notifications:", error);
         return [];
       }
 
