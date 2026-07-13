@@ -539,6 +539,17 @@
       "branch": "sentry-fix/SENTRY-7479939863"
     },
     {
+      "id": "SENTRY-7597067731",
+      "area": "infra",
+      "title": "Failed to fetch production trends:",
+      "user_visible_behavior": "The dashboard, sales, and inventory trend sections caught RPC errors (get_production_trends / get_sales_trends / get_inventory_trends) and returned an empty array from the query, so React Query treated the fetch as a success. Users saw a silently zeroed-out empty state (or, on a transient background refetch failure, a chart flip to a misleading zero) with no indication the fetch had failed. Fixed by rethrowing after logging so isError surfaces, and rendering an explicit \"Couldn't load ... trends\" DashboardEmpty state only when there is no cached data to fall back on (preserves last known-good data across transient refetchInterval polling failures).",
+      "verification": "bun run test src/app/(app)/dashboard/__tests__/production-trends.test.tsx",
+      "state": "passing",
+      "evidence": "pr:398",
+      "branch": "sentry-fix/SENTRY-7597067731",
+      "notes": "Pattern scan found the identical swallow-and-return-[] bug duplicated in all three dashboard trend queries (dashboard/page.tsx ProductionTrends, dashboard/inventory/page.tsx InventoryTrends, dashboard/sales/page.tsx SalesTrends); all three fixed identically."
+    },
+    {
       "id": "SENTRY-7597067759",
       "area": "infra",
       "title": "Failed to fetch planned batches by day:",

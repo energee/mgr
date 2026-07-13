@@ -16,7 +16,7 @@ import { dashboardKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { InventoryAlerts } from "@/components/domain/inventory/inventory-alerts";
 import { Suspense } from "react";
-import { PackageCheck, Clock, ShoppingCart } from "lucide-react";
+import { AlertTriangle, PackageCheck, Clock, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
@@ -306,7 +306,7 @@ function InventoryTrends() {
   const supabase = createClient();
   const period = usePeriod();
 
-  const { data: inventoryTrends = [], isLoading } = useQuery({
+  const { data: inventoryTrends = [], isLoading, isError } = useQuery({
     queryKey: dashboardKeys.trends.inventory(period),
     queryFn: async () => {
       const { data, error } = await dynamicRpc(supabase, "get_inventory_trends", {
@@ -314,7 +314,7 @@ function InventoryTrends() {
       });
       if (error) {
         log.error("Failed to fetch inventory trends:", error);
-        return [];
+        throw error;
       }
       return (data || []) as Array<{
         date: string;
@@ -329,6 +329,13 @@ function InventoryTrends() {
 
   if (isLoading) {
     return <InventoryTrendsSkeleton />;
+  }
+
+  // Only fall back to the error state when there's no data to show — a
+  // transient background refetch failure (refetchInterval: 60000) should keep
+  // displaying the last known-good trends rather than blanking them out.
+  if (isError && inventoryTrends.length === 0) {
+    return <DashboardEmpty message="Couldn't load inventory trends" icon={AlertTriangle} />;
   }
 
   const currentPeriodData = inventoryTrends.slice(period);
