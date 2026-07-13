@@ -537,6 +537,16 @@
       "state": "passing",
       "evidence": "commit:c8d9161",
       "branch": "sentry-fix/SENTRY-7479939863"
+    },
+    {
+      "id": "SENTRY-7597067759",
+      "area": "infra",
+      "title": "Failed to fetch planned batches by day:",
+      "user_visible_behavior": "BatchActivityHeatmap on /dashboard logged RPC errors by passing a destructured plain object to log.error instead of the real PostgrestError instance, so client-logger's instanceof-Error check missed it and Sentry captured only the generic literal message with no stack or detail. Same anti-pattern found and fixed in NotificationsProvider's fetch-notifications error path.",
+      "verification": "bun run test src/components/dashboard/__tests__/batch-activity-heatmap.test.tsx src/contexts/__tests__/notifications.test.tsx",
+      "state": "passing",
+      "evidence": "branch:sentry-fix/SENTRY-7597067759",
+      "branch": "sentry-fix/SENTRY-7597067759"
     }
   ]
 }
