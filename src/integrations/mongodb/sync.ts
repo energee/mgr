@@ -101,6 +101,53 @@ async function completeSyncLog(
 // Generic upsert helper
 // =============================================================================
 
+/**
+ * Drop rows that share an onConflict key with an earlier row in the same array
+ * (last one wins). A single upsert() call maps to one INSERT ... ON CONFLICT
+ * statement, and Postgres rejects that statement outright — "ON CONFLICT DO
+ * UPDATE command cannot affect row a second time" — if two rows in it target
+ * the same conflict key, which failed the *entire* batch of up to BATCH_SIZE
+ * rows instead of just the duplicates. Source Mongo collections have no
+ * uniqueness guarantee on fields like name (onConflict for beer_styles,
+ * brands, vessels), so duplicates there are a real, recurring case.
+ *
+ * A row missing an onConflict column (e.g. recipes, which upsert without an
+ * explicit `id` and rely on Postgres generating one) has no real conflict key
+ * to collide on, so it passes through untouched rather than being folded in
+ * with — or letting its absence exempt — other rows that do have the key.
+ */
+function dedupeByConflictKey(
+  rows: Record<string, unknown>[],
+  onConflict: string,
+  table: string
+): Record<string, unknown>[] {
+  const conflictColumns = onConflict.split(",").map((c) => c.trim());
+  const hasConflictKey = (row: Record<string, unknown>) =>
+    conflictColumns.every((c) => row[c] !== undefined);
+
+  const seen = new Map<string, Record<string, unknown>>();
+  const passthrough: Record<string, unknown>[] = [];
+  let duplicates = 0;
+  for (const row of rows) {
+    if (!hasConflictKey(row)) {
+      passthrough.push(row);
+      continue;
+    }
+    const key = conflictColumns.map((c) => String(row[c])).join(" ");
+    if (seen.has(key)) duplicates++;
+    seen.set(key, row);
+  }
+  if (duplicates > 0) {
+    logger.warn(
+      "Dropping %d duplicate-key row(s) for %s before upsert (onConflict=%s)",
+      duplicates,
+      table,
+      onConflict
+    );
+  }
+  return [...seen.values(), ...passthrough];
+}
+
 async function upsertRows(
   table: string,
   rows: Record<string, unknown>[],
@@ -108,14 +155,16 @@ async function upsertRows(
 ): Promise<{ synced: number; failed: number; errors: Array<{ mongoId: string; error: string }> }> {
   if (rows.length === 0) return { synced: 0, failed: 0, errors: [] };
 
+  const dedupedRows = dedupeByConflictKey(rows, onConflict, table);
+
   const admin = await createAdminClient();
   const BATCH_SIZE = 50;
   let synced = 0;
   let failed = 0;
   const errors: Array<{ mongoId: string; error: string }> = [];
 
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < dedupedRows.length; i += BATCH_SIZE) {
+    const batch = dedupedRows.slice(i, i + BATCH_SIZE);
     const { error } = await dynamicFrom(admin, table)
       .upsert(batch, { onConflict, ignoreDuplicates: false });
 
