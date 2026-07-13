@@ -4,24 +4,19 @@
  * Lazy-loaded BatchActivityHeatmap
  *
  * Dynamically imports the react-activity-calendar-heavy heatmap so the
- * dashboard doesn't pull it into its initial bundle (same pattern as
- * trend-chart-lazy.tsx). Its `tooltips.css` is imported from the dashboard
- * layout so tooltip styles ship with the route CSS instead of arriving with
- * this deferred chunk (audit F-142).
+ * dashboard doesn't pull it into its initial bundle. Its `tooltips.css` is
+ * imported from the dashboard layout so tooltip styles ship with the route
+ * CSS instead of arriving with this deferred chunk (audit F-142).
+ *
+ * Uses React.lazy + an explicit <Suspense> at the call site rather than
+ * next/dynamic(ssr:false) — nesting a dynamic(ssr:false) boundary inside
+ * another Suspense that itself suspends (usePeriod()'s useSearchParams)
+ * caused a hydration mismatch on /dashboard (MGR-6 / SENTRY-7477285440), same
+ * class of bug already fixed for ChatLayout's ChatPanel.
  */
 
-import dynamic from "next/dynamic";
-import { Skeleton } from "@/components/ui/skeleton";
+import { lazy } from "react";
 
-// Lazy load the heatmap component - only loads when component is rendered.
-// 200px matches the TrendChartLazy fallback rendered beside it in the same
-// dashboard grid row and the heatmap's own data-loading skeleton, so the
-// chunk-load -> data-load handoff doesn't shift layout.
-export const BatchActivityHeatmapLazy = dynamic(
-  () =>
-    import("./batch-activity-heatmap").then((mod) => mod.BatchActivityHeatmap),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="h-[200px] w-full" />,
-  },
+export const BatchActivityHeatmapLazy = lazy(() =>
+  import("./batch-activity-heatmap").then((mod) => ({ default: mod.BatchActivityHeatmap }))
 );
