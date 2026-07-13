@@ -3,9 +3,89 @@ import {
   buildIssuesUrl,
   buildLatestEventUrl,
   formatStackTrace,
+  formatEventContext,
+  formatBreadcrumbs,
   normalizeIssue,
   fetchIssuesWithStacks,
 } from "./sentry-api";
+
+describe("formatEventContext", () => {
+  it("surfaces the PostgrestError code from the extra bag — the field that tells a DB fault apart from a bad error handler", () => {
+    const text = formatEventContext({
+      context: {
+        code: "42501",
+        details: "RLS denied",
+        hint: "check policies",
+        message: "permission denied for function get_production_trends",
+      },
+    });
+    expect(text).toContain("extra.code: 42501");
+    expect(text).toContain("extra.hint: check policies");
+    expect(text).toContain("permission denied for function get_production_trends");
+  });
+
+  it("includes the event message and request line, and serializes nested contexts values", () => {
+    const text = formatEventContext({
+      message: "Failed to fetch production trends",
+      contexts: { response: { status: 400 } },
+      entries: [{ type: "request", data: { url: "https://app/dashboard", method: "GET" } }],
+    });
+    expect(text).toContain("message: Failed to fetch production trends");
+    expect(text).toContain("request: GET https://app/dashboard");
+    expect(text).toContain('contexts.response: {"status":400}');
+  });
+
+  it("drops the trace/runtime contexts that every event carries and that say nothing about the failure", () => {
+    const text = formatEventContext({
+      contexts: { trace: { span_id: "abc" }, runtime: { name: "node" }, response: { status: 500 } },
+    });
+    expect(text).not.toContain("trace");
+    expect(text).not.toContain("runtime");
+    expect(text).toContain("contexts.response");
+  });
+
+  it("truncates oversized values so one fat context key cannot crowd out the prompt", () => {
+    const text = formatEventContext({ context: { blob: "x".repeat(5000) } });
+    expect(text).toContain("… (truncated)");
+    expect(text.length).toBeLessThan(1200);
+  });
+
+  it("returns an empty string when the event carries no context", () => {
+    expect(formatEventContext({})).toBe("");
+  });
+});
+
+describe("formatBreadcrumbs", () => {
+  it("formats the trail oldest-first with timestamp, level, and category", () => {
+    const text = formatBreadcrumbs({
+      entries: [
+        {
+          type: "breadcrumbs",
+          data: {
+            values: [
+              { timestamp: "t1", level: "info", category: "navigation", message: "to /dashboard" },
+              { timestamp: "t2", level: "error", category: "fetch", message: "rpc failed" },
+            ],
+          },
+        },
+      ],
+    });
+    expect(text).toBe("[t1] info navigation: to /dashboard\n[t2] error fetch: rpc failed");
+  });
+
+  it("keeps only the newest 20 breadcrumbs", () => {
+    const values = Array.from({ length: 30 }, (_, i) => ({ message: `crumb-${i}` }));
+    const text = formatBreadcrumbs({ entries: [{ type: "breadcrumbs", data: { values } }] });
+    const lines = text.split("\n");
+    expect(lines).toHaveLength(20);
+    expect(text).toContain("crumb-29");
+    expect(text).not.toContain("crumb-9:");
+  });
+
+  it("returns an empty string when the event has no breadcrumbs entry", () => {
+    expect(formatBreadcrumbs({})).toBe("");
+  });
+});
 
 describe("buildIssuesUrl", () => {
   it("encodes org, project, environment, and statsPeriod in the URL", () => {
