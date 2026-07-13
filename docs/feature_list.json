@@ -537,6 +537,17 @@
       "state": "passing",
       "evidence": "commit:c8d9161",
       "branch": "sentry-fix/SENTRY-7479939863"
+    },
+    {
+      "id": "SENTRY-7542174707",
+      "area": "infra",
+      "title": "Upsert error for %s batch %d: %s",
+      "user_visible_behavior": "MongoDB sync (POST /api/integrations/mongodb/sync) failed an entire 50-row upsert chunk whenever the source Mongo data had two documents resolving to the same onConflict key (e.g. duplicate beer_styles/brands/vessels names) — Postgres rejects a whole INSERT ... ON CONFLICT statement, not just the offending rows, when two rows in it target the same conflict key.",
+      "verification": "bun run test src/integrations/mongodb/__tests__/sync.test.ts",
+      "state": "passing",
+      "evidence": "branch:sentry-fix/SENTRY-7542174707",
+      "branch": "sentry-fix/SENTRY-7542174707",
+      "notes": "Root cause: upsertRows() (src/integrations/mongodb/sync.ts) sent Mongo-derived rows straight through to a single Supabase .upsert() call per 50-row chunk without deduping by the onConflict column(s) first. Fix adds dedupeByConflictKey(), which keeps the last row per conflict-key value (rows missing the conflict column pass through untouched, e.g. recipes upserts with no explicit id) and logs a warning with the dropped count."
     }
   ]
 }
