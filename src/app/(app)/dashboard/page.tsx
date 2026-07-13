@@ -495,17 +495,21 @@ export function ProductionTrends() {
       {/* Trend Charts */}
       <div className="grid gap-6 md:grid-cols-2">
         <DashboardSection title="Batches Scheduled">
-          <BatchActivityHeatmapLazy />
+          <Suspense fallback={<Skeleton className="h-[200px] w-full" />}>
+            <BatchActivityHeatmapLazy />
+          </Suspense>
         </DashboardSection>
         <DashboardSection title="Volume Brewed (weekly)">
-          <TrendChartLazy
-            data={weeklyVolumeData}
-            xKey="date"
-            type="bar"
-            series={[{ key: "value", label: volumeLabel }]}
-            formatValue={(v) => `${Number(v).toFixed(1)} ${volumeLabel}`}
-            formatTooltipDate={(iso) => `Week of ${format(parseISO(iso), "MMM d, yyyy")}`}
-          />
+          <Suspense fallback={<Skeleton className="h-[200px] w-full" />}>
+            <TrendChartLazy
+              data={weeklyVolumeData}
+              xKey="date"
+              type="bar"
+              series={[{ key: "value", label: volumeLabel }]}
+              formatValue={(v) => `${Number(v).toFixed(1)} ${volumeLabel}`}
+              formatTooltipDate={(iso) => `Week of ${format(parseISO(iso), "MMM d, yyyy")}`}
+            />
+          </Suspense>
         </DashboardSection>
       </div>
     </>
