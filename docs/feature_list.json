@@ -103,10 +103,10 @@
       "area": "harness",
       "title": "Sentry error harness end-to-end",
       "user_visible_behavior": "Autonomous fix-loop fetches Sentry issues, opens fix PRs, applies labels.",
-      "verification": "bun run test .github/scripts/sentry-harness/prompt.test.ts",
+      "verification": "bun run test .github/scripts/sentry-harness",
       "state": "passing",
-      "evidence": "commit:67bf68c (PR #244), .github/workflows/sentry-harness.yml",
-      "notes": "Pre-existing harness verified during Step 1 rollout."
+      "evidence": "commit:67bf68c (PR #244), .github/workflows/sentry-harness.yml, .github/scripts/sentry-harness/workflow.test.ts",
+      "notes": "Harness workflow permissions and scoring behavior are covered by focused tests."
     },
     {
       "id": "F100",
