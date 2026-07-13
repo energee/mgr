@@ -4,18 +4,16 @@
  * Lazy-loaded TrendChart
  *
  * Dynamically imports the recharts-heavy TrendChart component so dashboards
- * don't pull recharts into their initial bundle (same pattern as
- * batch-readings-chart-lazy.tsx).
+ * don't pull recharts into their initial bundle. Uses React.lazy + an
+ * explicit <Suspense> at the call site rather than next/dynamic(ssr:false) —
+ * nesting a dynamic(ssr:false) boundary inside another Suspense that itself
+ * suspends (usePeriod()'s useSearchParams) caused a hydration mismatch on
+ * /dashboard (MGR-6 / SENTRY-7477285440), same class of bug already fixed for
+ * ChatLayout's ChatPanel.
  */
 
-import dynamic from "next/dynamic";
-import { Skeleton } from "@/components/ui/skeleton";
+import { lazy } from "react";
 
-// Lazy load the chart component - only loads when component is rendered
-export const TrendChartLazy = dynamic(
-  () => import("./trend-chart").then((mod) => mod.TrendChart),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="h-[200px] w-full" />,
-  },
+export const TrendChartLazy = lazy(() =>
+  import("./trend-chart").then((mod) => ({ default: mod.TrendChart }))
 );

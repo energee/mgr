@@ -497,20 +497,24 @@ function SalesTrends() {
       {/* Trend Charts */}
       <div className="grid gap-6 md:grid-cols-2">
         <DashboardSection title="Revenue">
-          <TrendChartLazy
-            data={currentPeriodData}
-            xKey="date"
-            type="bar"
-            series={[{ key: "revenue", label: "Revenue" }]}
-            formatValue={(v) => formatCurrency(v)}
-          />
+          <Suspense fallback={<Skeleton className="h-[200px] w-full" />}>
+            <TrendChartLazy
+              data={currentPeriodData}
+              xKey="date"
+              type="bar"
+              series={[{ key: "revenue", label: "Revenue" }]}
+              formatValue={(v) => formatCurrency(v)}
+            />
+          </Suspense>
         </DashboardSection>
         <DashboardSection title="Orders">
-          <TrendChartLazy
-            data={currentPeriodData}
-            xKey="date"
-            series={[{ key: "order_count", label: "Orders" }]}
-          />
+          <Suspense fallback={<Skeleton className="h-[200px] w-full" />}>
+            <TrendChartLazy
+              data={currentPeriodData}
+              xKey="date"
+              series={[{ key: "order_count", label: "Orders" }]}
+            />
+          </Suspense>
         </DashboardSection>
       </div>
     </>
