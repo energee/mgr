@@ -41,6 +41,10 @@ assert_eq "$alpha" "$SHARED/source/alpha"
 assert_eq "$(git -C "$alpha" branch --show-current)" "agent/alpha"
 [[ -f "$alpha/.env.local" ]] || fail ".worktreeinclude file was not copied"
 assert_eq "$(run_manager create alpha --base HEAD)" "$alpha"
+if run_manager create alpha --base HEAD --branch feat/different >/dev/null 2>&1; then
+  fail "existing worktree was reused for a different requested branch"
+fi
+assert_eq "$(git -C "$alpha" branch --show-current)" "agent/alpha"
 assert_eq "$(run_manager path alpha)" "$alpha"
 run_manager list | grep -Fq "$alpha" || fail "list did not include alpha"
 

@@ -9,6 +9,8 @@ fail() {
   exit 1
 }
 
+command -v jq >/dev/null 2>&1 || fail "jq is required (install from https://jqlang.org/download/)"
+
 bash -n scripts/agent-worktree
 bash -n scripts/__tests__/agent-worktree.test.sh
 jq -e . .claude/settings.json >/dev/null
@@ -33,6 +35,20 @@ for skill_dir in .agents/skills/*; do
 done
 
 (( skill_count > 0 )) || fail "no canonical skills found under .agents/skills"
+
+adapter_count=0
+for adapter in .claude/skills/*; do
+  [[ -e "$adapter" || -L "$adapter" ]] || continue
+  adapter_count=$((adapter_count + 1))
+  skill_name=$(basename "$adapter")
+
+  [[ -L "$adapter" ]] || fail "$adapter must be a compatibility symlink"
+  [[ -d ".agents/skills/$skill_name" ]] || \
+    fail "$adapter has no canonical skill under .agents/skills"
+done
+
+(( adapter_count == skill_count )) || \
+  fail "canonical skill count ($skill_count) does not match compatibility adapter count ($adapter_count)"
 
 [[ -f .agents/skills/worktree-manager/agents/openai.yaml ]] || \
   fail "worktree-manager is missing Codex UI metadata"

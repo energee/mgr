@@ -74,7 +74,7 @@ check-wip: ## Verify WIP=1 per branch in feature_list.json
 check-coverage: ## Vitest with coverage (thresholds enforced via vitest.config.ts)
 	@bun run test:coverage
 
-check: lint typecheck test check-db check-wip build ## Layers 1+2: pre-commit gate
+check: lint typecheck check-agent-config test check-db check-wip build ## Layers 1+2: pre-commit gate
 	@echo "OK: check passed"
 
 check-all: check e2e ## Layers 1+2+3: full gate including Playwright E2E

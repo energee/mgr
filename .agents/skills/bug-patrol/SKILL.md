@@ -92,7 +92,7 @@ For each AUTO-FIX and INVESTIGATE issue (or batch of related issues):
    Instructions:
    1. Read the affected file and understand the context
    2. Apply the minimal fix (do NOT refactor surrounding code)
-   3. Run `bun typecheck` and `bun run test` to verify your fix
+   3. Run `make check` to verify the complete required pre-commit gate
    4. If the fix passes, commit with message: "fix: {description}"
    5. Push the branch: git push -u origin bugfix/{short-description}
    6. Create a PR:
@@ -102,7 +102,7 @@ For each AUTO-FIX and INVESTIGATE issue (or batch of related issues):
 
    IMPORTANT:
    - Do NOT add Co-Authored-By lines to commits
-   - Run `bun lint` before committing
+   - Run `make check` before committing
    - If the fix requires changing more than 3 files, STOP and report needs-human
    - If you're not confident the fix is correct, create a draft PR
    ```
@@ -183,7 +183,7 @@ Continue looping until:
 1. **Never commit directly to main** — always use feature branches and PRs
 2. **Never modify migration files** — dispatch these to the user
 3. **Never change test assertions** unless the test is clearly wrong (not the implementation)
-4. **Always run the full test suite** before opening a PR
+4. **Always run `make check`** before opening a PR
 5. **Keep PRs small and focused** — one issue per PR (or one batch of related issues)
 6. **Draft PRs for uncertain fixes** — let the user review before merging
 7. Follow all rules in AGENTS.md (no Co-Authored-By, run lint, etc.)

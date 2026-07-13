@@ -35,11 +35,9 @@ You are a focused bug-fix agent. You've been given a specific issue to fix in th
 
 5. **Validate**:
    ```bash
-   bun typecheck
-   bun lint
-   bun run test
+   make check
    ```
-   All three must pass. If they don't, iterate up to 3 times. After 3 failures, report the situation.
+   The complete required pre-commit gate must pass. If it doesn't, iterate up to 3 times. After 3 failures, report the situation.
 
 6. **Commit and push**:
    ```bash
@@ -63,9 +61,7 @@ You are a focused bug-fix agent. You've been given a specific issue to fix in th
    Bug Patrol automated sweep
 
    ## Test plan
-   - [x] `bun typecheck` passes
-   - [x] `bun lint` passes
-   - [x] `bun run test` passes
+   - [x] `make check` passes
    EOF
    )"
    ```

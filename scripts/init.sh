@@ -34,6 +34,7 @@ require() {
 
 require bun  "Install Bun: https://bun.sh"
 require node "Install Node 24+: https://nodejs.org"
+require jq   "Install jq: https://jqlang.org/download/"
 
 if ! command -v supabase >/dev/null 2>&1; then
   echo "WARN: supabase CLI not installed — local DB workflows will fail. brew install supabase/tap/supabase"
@@ -43,6 +44,7 @@ echo
 echo "==> Versions"
 echo "    bun:      $(bun --version)"
 echo "    node:     $(node --version)"
+echo "    jq:       $(jq --version)"
 command -v supabase >/dev/null 2>&1 && echo "    supabase: $(supabase --version)" || true
 
 if [ ! -f .env ]; then

@@ -144,6 +144,7 @@ create_worktree() {
     esac
   done
 
+  branch=${branch#refs/heads/}
   validate_branch "$branch"
   git rev-parse --verify --quiet "${base}^{commit}" >/dev/null || \
     die "base ref does not resolve to a commit: $base"
@@ -153,6 +154,10 @@ create_worktree() {
 
   if is_registered_worktree "$destination"; then
     [[ -d "$destination" ]] || die "registered worktree directory is missing: $destination"
+    local actual_branch
+    actual_branch=$(git -C "$destination" symbolic-ref --quiet --short HEAD || true)
+    [[ "$actual_branch" == "$branch" ]] || \
+      die "worktree '$name' is on branch '${actual_branch:-detached}', not requested branch '$branch': $destination"
     printf '%s\n' "$destination"
     return 0
   fi
