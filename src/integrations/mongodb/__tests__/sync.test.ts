@@ -39,11 +39,13 @@ vi.mock("../client", () => ({
 }));
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 import { getMongoDb } from "../client";
 import { syncEntity } from "../sync";
 
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 const mockedGetMongoDb = vi.mocked(getMongoDb);
+const mockedLoggerWarn = vi.mocked(logger.warn);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -206,5 +208,70 @@ describe("syncRecipes (via syncEntity)", () => {
 
     expect(deletes(writes)).toEqual([]);
     expect(writes.filter((w) => w.op === "upsert")).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// upsertRows duplicate-conflict-key handling (Sentry MGR-A / issue 7542174707)
+//
+// A single upsert() call is one INSERT ... ON CONFLICT statement. Postgres
+// rejects the WHOLE statement — "ON CONFLICT DO UPDATE command cannot affect
+// row a second time" — if two rows in it share an onConflict key. Mongo
+// source collections (styles, beers, vessels) have no uniqueness guarantee on
+// `name`, which is exactly what beer_styles/brands/vessels upsert against, so
+// legacy duplicate-name documents reliably reproduce this on every sync run
+// until the duplicates are deduped client-side before the upsert call.
+// ---------------------------------------------------------------------------
+
+describe("upsertRows duplicate-key handling (via syncEntity('beer_styles'))", () => {
+  it("drops duplicate-name rows before upserting, instead of failing the whole batch", async () => {
+    const STYLE_A = new ObjectId("111111111111111111111111");
+    const STYLE_B = new ObjectId("222222222222222222222222");
+
+    mockedGetMongoDb.mockResolvedValue(
+      makeDb({
+        // Two distinct legacy Mongo documents that both derive the same
+        // beer_styles.name — the real-world duplicate this fix targets.
+        styles: [
+          { _id: STYLE_A, name: "IPA" },
+          { _id: STYLE_B, name: "IPA" },
+        ],
+      })
+    );
+
+    // Simulates the real Postgres error a same-key duplicate would cause
+    // inside a single INSERT ... ON CONFLICT statement, without a real DB.
+    let writesRef: Write[] = [];
+    const { admin, writes } = makeAdminMock(
+      {
+        mongodb_sync_log: { data: { id: "log-1" }, error: null },
+        beer_styles: () => {
+          const lastUpsert = writesRef.findLast((w) => w.op === "upsert" && w.table === "beer_styles");
+          const rows = (lastUpsert?.row ?? []) as Array<{ name: string }>;
+          const names = rows.map((r) => r.name);
+          if (new Set(names).size !== names.length) {
+            return { data: null, error: { message: "ON CONFLICT DO UPDATE command cannot affect row a second time" } };
+          }
+          return { data: rows, error: null };
+        },
+      },
+      { onUnknownTable: "throw" }
+    );
+    writesRef = writes;
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    const result = await syncEntity("beer_styles");
+
+    expect(result).toMatchObject({ entityType: "beer_styles", synced: 1, failed: 0, errors: [] });
+
+    const upsertCall = writes.find((w) => w.op === "upsert" && w.table === "beer_styles");
+    expect(upsertCall?.row).toEqual([expect.objectContaining({ name: "IPA" })]);
+
+    expect(mockedLoggerWarn).toHaveBeenCalledWith(
+      "Dropping %d duplicate-key row(s) for %s before upsert (onConflict=%s)",
+      1,
+      "beer_styles",
+      "name"
+    );
   });
 });

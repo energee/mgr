@@ -549,6 +549,17 @@
       "notes": "PR #308 already fixed the originally-reported cause (ChatLayout's ChatPanel using next/dynamic(ssr:false)), merged 2026-07-05 — but the issue kept receiving new events afterward (last seen 2026-07-11, in a release that already had that fix). Root cause of the recurrence: TrendChartLazy and BatchActivityHeatmapLazy (src/components/dashboard/) also used next/dynamic({ ssr:false }), and are rendered inside ProductionTrends/SalesTrends, which sit inside a Suspense boundary that itself genuinely suspends (usePeriod() -> useSearchParams()). Nesting a dynamic(ssr:false) client-only bailout boundary inside another suspending boundary is the same class of bug already fixed for ChatLayout. Fix: converted both to React.lazy + an explicit <Suspense> at each call site (4 usages across src/app/(app)/dashboard/page.tsx and src/app/(app)/dashboard/sales/page.tsx), mirroring the established ChatLayout fix. cogs-period-chart-lazy.tsx and batch-readings-chart-lazy.tsx use the same next/dynamic(ssr:false) pattern but are not nested inside a suspending boundary, so left as-is."
     },
     {
+      "id": "SENTRY-7542174707",
+      "area": "infra",
+      "title": "Upsert error for %s batch %d: %s",
+      "user_visible_behavior": "MongoDB sync (POST /api/integrations/mongodb/sync) failed an entire 50-row upsert chunk whenever the source Mongo data had two documents resolving to the same onConflict key (e.g. duplicate beer_styles/brands/vessels names) — Postgres rejects a whole INSERT ... ON CONFLICT statement, not just the offending rows, when two rows in it target the same conflict key.",
+      "verification": "bun run test src/integrations/mongodb/__tests__/sync.test.ts",
+      "state": "passing",
+      "evidence": "branch:sentry-fix/SENTRY-7542174707",
+      "branch": "sentry-fix/SENTRY-7542174707",
+      "notes": "Root cause: upsertRows() (src/integrations/mongodb/sync.ts) sent Mongo-derived rows straight through to a single Supabase .upsert() call per 50-row chunk without deduping by the onConflict column(s) first. Fix adds dedupeByConflictKey(), which keeps the last row per conflict-key value (rows missing the conflict column pass through untouched, e.g. recipes upserts with no explicit id) and logs a warning with the dropped count."
+    },
+    {
       "id": "SENTRY-7597067731",
       "area": "infra",
       "title": "Failed to fetch production trends:",
