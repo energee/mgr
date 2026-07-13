@@ -12,13 +12,19 @@
  *   (consumption-service calls mocked).
  * - orders → fulfilled/cancelled: complete/release FG→order reservations
  *   (audit H1/M12), volume stamped from the finished good's container.
+ * - orders → fulfilled with NO reservations: synthesize completed removal
+ *   allocations from order_items (audit BD-5) — FIFO draw, per-item
+ *   idempotency keys, keg-line exclusion, shortfall/guard-rejection
+ *   surfacing.
+ * - deliveries → completed: flip linked packed orders to fulfilled and chain
+ *   the orders → fulfilled entry (audit EA-2).
  */
 
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Database } from "@/types/supabase";
-import { makeSupabase } from "@/test/supabase-mock";
+import { makeSupabase, type QueuedResponse } from "@/test/supabase-mock";
 
 // The batches/packaging entries call into consumption-service; mock it so
 // importing the module under test never touches a real client.
@@ -26,6 +32,12 @@ vi.mock("../consumption-service", () => ({
   completeBatchConsumption: vi.fn(),
   reconcileBatchLoss: vi.fn(),
   consumePackagingMaterials: vi.fn(),
+}));
+
+// The module logs guard rejections / shortfalls; keep tests silent and free
+// of the Sentry transport client-logger pulls in.
+vi.mock("@/lib/client-logger", () => ({
+  log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
 import { runTransitionSideEffects } from "../transition-side-effects";
@@ -336,8 +348,8 @@ describe("runTransitionSideEffects: orders → fulfilled", () => {
       allocations: [
         {
           data: [
-            { id: "a1", source_id: "fg-1", quantity: 10 },
-            { id: "a2", source_id: "fg-2", quantity: 5 },
+            { id: "a1", source_id: "fg-1", quantity: 10, destination_id: ORDER_A },
+            { id: "a2", source_id: "fg-2", quantity: 5, destination_id: ORDER_A },
           ],
           error: null,
         },
@@ -366,6 +378,9 @@ describe("runTransitionSideEffects: orders → fulfilled", () => {
     const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
 
     expect(result.error).toBeNull();
+    // The order HAS reservations → the synthesis path must not run (the fake
+    // throws on any unqueued table, so no order_items read = no synthesis).
+    expect(callsByTable.order_items).toBeUndefined();
     // Read pinned to this order's still-planned FG reservations only.
     const read = callsByTable.allocations[0];
     expect(read.eq.mock.calls).toEqual(
@@ -399,7 +414,7 @@ describe("runTransitionSideEffects: orders → fulfilled", () => {
   it("completes with volume_bbl NULL and surfaces a non-fatal warning when container volume data is missing", async () => {
     const { supabase, callsByTable } = makeSupabase({
       allocations: [
-        { data: [{ id: "a1", source_id: "fg-1", quantity: 10 }], error: null },
+        { data: [{ id: "a1", source_id: "fg-1", quantity: 10, destination_id: ORDER_A }], error: null },
         { data: null, error: null }, // update a1
       ],
       finished_goods: [
@@ -425,16 +440,23 @@ describe("runTransitionSideEffects: orders → fulfilled", () => {
     expect(result.error).toContain("without volume");
   });
 
-  it("no-ops when the order has no planned reservations", async () => {
-    // No finished_goods queue: the fake throws loudly if it gets queried.
+  it("enters the synthesis path (not the completion path) when the order has no planned reservations", async () => {
+    // No finished_goods queue: the fake throws loudly if the COMPLETION
+    // path's volume lookup runs. Synthesis runs instead, and no-ops here
+    // because the order has no line items.
     const { supabase, callsByTable } = makeSupabase({
-      allocations: [{ data: [], error: null }],
+      allocations: [
+        { data: [], error: null }, // planned-reservation read
+        { data: [], error: null }, // synthesis: existing-allocation guard read
+      ],
+      order_items: [{ data: [], error: null }],
     });
 
     const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
 
     expect(result.error).toBeNull();
-    expect(callsByTable.allocations).toHaveLength(1); // read only, no updates
+    expect(callsByTable.allocations).toHaveLength(2); // reads only, no writes
+    expect(callsByTable.order_items).toHaveLength(1);
   });
 
   it("surfaces a reservation read failure", async () => {
@@ -491,5 +513,406 @@ describe("runTransitionSideEffects: orders → cancelled", () => {
 
     expect(result.error).toContain("releasing its inventory reservations failed");
     expect(result.error).toContain("rls denied");
+  });
+});
+
+// =============================================================================
+// orders → fulfilled: removal synthesis (audit BD-5)
+// =============================================================================
+
+// Orders fulfilled WITHOUT reservations get completed FG→order allocations
+// synthesized from order_items: (brand, selling_format) resolved to
+// finished_goods lots FIFO (production_date NULLS LAST, then lot_number),
+// volume via computeUnitFillVolumeBbl, idempotency_key
+// `order_fulfill:<order_id>:<order_item_id>`. Keg-container lines are
+// excluded (they flow through create_keg_ship_transactions_from_order — see
+// the module's deferred keg-attribution note).
+
+const ITEM_1 = "00000000-0000-0000-0000-00000000i001";
+const ITEM_KEG = "00000000-0000-0000-0000-00000000i002";
+const BRAND_1 = "00000000-0000-0000-0000-00000000br01";
+
+/** Queues for the synthesis happy path: one case line (10) + one keg line. */
+function synthesisQueues(): Record<string, QueuedResponse[]> {
+  return {
+    allocations: [
+      { data: [], error: null }, // planned-reservation read → none
+      { data: [], error: null }, // synthesis: existing-allocation guard read
+      // per-lot active allocations: fg-old has 2 already committed → 4 remain
+      { data: [{ source_id: "fg-old", quantity: 2 }], error: null },
+      { data: null, error: null }, // insert draw 1 (fg-old)
+      { data: null, error: null }, // insert draw 2 (fg-new)
+    ],
+    order_items: [
+      {
+        data: [
+          {
+            id: ITEM_1,
+            order_id: ORDER_A,
+            brand_id: BRAND_1,
+            selling_format_id: "sf-case",
+            quantity: 10,
+          },
+          {
+            id: ITEM_KEG,
+            order_id: ORDER_A,
+            brand_id: BRAND_1,
+            selling_format_id: "sf-keg",
+            quantity: 3,
+          },
+        ],
+        error: null,
+      },
+    ],
+    selling_formats: [
+      {
+        data: [
+          {
+            id: "sf-case",
+            // 2 units × 3968 oz (= 1 bbl) per unit → 2 bbl per selling unit
+            unit_count: 2,
+            container: { type: "can", volume_bbl: null, volume_oz: 3968 },
+          },
+          {
+            id: "sf-keg",
+            unit_count: 1,
+            container: { type: "keg", volume_bbl: 0.5, volume_oz: null },
+          },
+        ],
+        error: null,
+      },
+    ],
+    finished_goods: [
+      {
+        data: [
+          // Listed newest-first to prove the FIFO sort, not response order,
+          // decides the draw.
+          {
+            id: "fg-new",
+            brand_id: BRAND_1,
+            selling_format_id: "sf-case",
+            quantity: 100,
+            production_date: "2026-06-01",
+            lot_number: "L2",
+          },
+          {
+            id: "fg-old",
+            brand_id: BRAND_1,
+            selling_format_id: "sf-case",
+            quantity: 6,
+            production_date: "2026-01-01",
+            lot_number: "L1",
+          },
+        ],
+        error: null,
+      },
+    ],
+  };
+}
+
+describe("runTransitionSideEffects: orders → fulfilled (removal synthesis, BD-5)", () => {
+  it("synthesizes completed allocations from order_items — FIFO across lots, volume from the container, per-item idempotency key", async () => {
+    const { supabase, callsByTable } = makeSupabase(synthesisQueues());
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toBeNull();
+
+    // Guard read pinned to this order's active FG→order allocations.
+    const guardRead = callsByTable.allocations[1];
+    expect(guardRead.eq.mock.calls).toEqual(
+      expect.arrayContaining([
+        ["destination_type", "order"],
+        ["source_type", "finished_good"],
+      ])
+    );
+    expect(guardRead.in.mock.calls).toEqual(
+      expect.arrayContaining([
+        ["destination_id", [ORDER_A]],
+        ["status", ["planned", "completed"]],
+      ])
+    );
+
+    // FIFO: fg-old (production 2026-01-01, 6 on hand − 2 committed = 4
+    // available) drains first, fg-new covers the remaining 6. Volume = draw ×
+    // 2 bbl/unit; both rows share the line's idempotency key (00215: one key
+    // per (order, item), many rows per key on a lot split).
+    const insertOld = callsByTable.allocations[3];
+    expect(insertOld.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_type: "finished_good",
+        source_id: "fg-old",
+        destination_type: "order",
+        destination_id: ORDER_A,
+        quantity: 4,
+        volume_bbl: 8,
+        status: "completed",
+        completed_at: expect.any(String),
+        lot_number: "L1",
+        idempotency_key: `order_fulfill:${ORDER_A}:${ITEM_1}`,
+      })
+    );
+    const insertNew = callsByTable.allocations[4];
+    expect(insertNew.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_id: "fg-new",
+        quantity: 6,
+        volume_bbl: 12,
+        idempotency_key: `order_fulfill:${ORDER_A}:${ITEM_1}`,
+      })
+    );
+
+    // The keg line produced NO allocation (deferred to the keg_transactions
+    // ledger): exactly the two case-line inserts above ran.
+    expect(callsByTable.allocations).toHaveLength(5);
+    const insertedKeys = [insertOld, insertNew].map(
+      (b) => b.insert.mock.calls[0][0].idempotency_key
+    );
+    expect(insertedKeys).not.toContain(`order_fulfill:${ORDER_A}:${ITEM_KEG}`);
+  });
+
+  it("invalidates allocation caches after synthesizing", async () => {
+    const { supabase } = makeSupabase(synthesisQueues());
+    const { queryClient, invalidateQueries } = createMockQueryClient();
+
+    await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled", queryClient);
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["allocations"] });
+  });
+
+  it("is idempotent: a re-run skips items whose order_fulfill key already exists", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null }, // planned read (first run completed rows, none planned)
+        {
+          // synthesis guard read: the first run's synthesized rows
+          data: [
+            {
+              destination_id: ORDER_A,
+              idempotency_key: `order_fulfill:${ORDER_A}:${ITEM_1}`,
+            },
+          ],
+          error: null,
+        },
+      ],
+      order_items: [
+        {
+          data: [
+            {
+              id: ITEM_1,
+              order_id: ORDER_A,
+              brand_id: BRAND_1,
+              selling_format_id: "sf-case",
+              quantity: 10,
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toBeNull();
+    // Both allocation builders are reads; no inserts ran (and no
+    // selling_formats/finished_goods queue was ever touched).
+    expect(callsByTable.allocations).toHaveLength(2);
+    expect(callsByTable.selling_formats).toBeUndefined();
+  });
+
+  it("skips synthesis entirely for an order whose allocations came from the reservation flow (no order_fulfill key)", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      allocations: [
+        { data: [], error: null }, // planned read: a racing path already completed them
+        {
+          // guard read: completed reservation WITHOUT our key prefix
+          data: [{ destination_id: ORDER_A, idempotency_key: null }],
+          error: null,
+        },
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(result.error).toBeNull();
+    expect(callsByTable.order_items).toBeUndefined(); // never even read
+  });
+
+  it("surfaces a guard/insert rejection without aborting the other rows (never silently swallowed)", async () => {
+    const queues = synthesisQueues();
+    // First insert (fg-old) rejected — e.g. guard_allocation_availability
+    // (00212) tripping on a concurrent allocator.
+    queues.allocations[3] = {
+      data: null,
+      error: { message: "Allocation of 4 exceeds availability (2 on hand, 0 already allocated) for this finished_good." },
+    };
+
+    const { supabase, callsByTable } = makeSupabase(queues);
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    // The fulfillment stands; the rejection is surfaced in the result.
+    expect(result.error).toContain("Order fulfilled, but");
+    expect(result.error).toContain("removal allocation(s) failed");
+    expect(result.error).toContain("exceeds availability");
+    // The second row still went in (per-row inserts, partial-failure tolerant).
+    expect(callsByTable.allocations[4].insert).toHaveBeenCalledWith(
+      expect.objectContaining({ source_id: "fg-new", quantity: 6 })
+    );
+  });
+
+  it("surfaces a stock shortfall as a warning and allocates only what is available", async () => {
+    const queues = synthesisQueues();
+    // Only fg-old (4 available after commitments) exists — the 10-unit line
+    // cannot be covered.
+    queues.finished_goods = [
+      {
+        data: [
+          {
+            id: "fg-old",
+            brand_id: BRAND_1,
+            selling_format_id: "sf-case",
+            quantity: 6,
+            production_date: "2026-01-01",
+            lot_number: "L1",
+          },
+        ],
+        error: null,
+      },
+    ];
+    queues.allocations = [
+      { data: [], error: null }, // planned read
+      { data: [], error: null }, // guard read
+      { data: [{ source_id: "fg-old", quantity: 2 }], error: null }, // per-lot active
+      { data: null, error: null }, // single insert (the covered 4)
+    ];
+
+    const { supabase, callsByTable } = makeSupabase(queues);
+    const result = await runTransitionSideEffects(supabase, "orders", [ORDER_A], "fulfilled");
+
+    expect(callsByTable.allocations[3].insert).toHaveBeenCalledWith(
+      expect.objectContaining({ source_id: "fg-old", quantity: 4 })
+    );
+    expect(callsByTable.allocations).toHaveLength(4); // no over-availability row
+    expect(result.error).toContain("Order fulfilled, but");
+    expect(result.error).toContain("exceed available finished-goods stock");
+  });
+});
+
+// =============================================================================
+// deliveries → completed (order fulfillment sync, audit EA-2)
+// =============================================================================
+
+const DELIVERY_A = "00000000-0000-0000-0000-0000000000d1";
+
+describe("runTransitionSideEffects: deliveries → completed", () => {
+  it("flips each linked packed order to fulfilled (status-guarded, per order) and chains the fulfillment effect for the flipped ids", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      orders: [
+        { data: [{ id: ORDER_A }, { id: ORDER_B }], error: null }, // linked read
+        { data: [{ id: ORDER_A }], error: null }, // flip A
+        { data: [{ id: ORDER_B }], error: null }, // flip B
+      ],
+      // Chained orders → fulfilled entry for [A, B]:
+      allocations: [
+        { data: [], error: null }, // planned read
+        { data: [], error: null }, // synthesis guard read
+      ],
+      order_items: [{ data: [], error: null }],
+    });
+    const { queryClient, invalidateQueries } = createMockQueryClient();
+
+    const result = await runTransitionSideEffects(
+      supabase,
+      "deliveries",
+      [DELIVERY_A],
+      "completed",
+      queryClient
+    );
+
+    expect(result.error).toBeNull();
+
+    // Linked-order read pinned to this delivery's packed orders.
+    const linkedRead = callsByTable.orders[0];
+    expect(linkedRead.in).toHaveBeenCalledWith("delivery_id", [DELIVERY_A]);
+    expect(linkedRead.eq).toHaveBeenCalledWith("status", "packed");
+
+    // Each flip is its own status-guarded UPDATE (packed → fulfilled is the
+    // 00143-legal edge; the guard makes raced/mismatched states 0-row no-ops,
+    // and per-order statements keep one keg-shortfall trigger RAISE from
+    // aborting the other orders on the run).
+    const flipA = callsByTable.orders[1];
+    expect(flipA.update).toHaveBeenCalledWith({ status: "fulfilled" });
+    expect(flipA.eq.mock.calls).toEqual([
+      ["id", ORDER_A],
+      ["status", "packed"],
+    ]);
+
+    // The chained orders → fulfilled effect ran for BOTH flipped ids.
+    const chainedRead = callsByTable.allocations[0];
+    expect(chainedRead.in).toHaveBeenCalledWith("destination_id", [ORDER_A, ORDER_B]);
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["orders"] });
+  });
+
+  it("tolerates a partial failure: one order's flip error is surfaced while the others still chain", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      orders: [
+        { data: [{ id: ORDER_A }, { id: ORDER_B }], error: null },
+        // Flip A rejected — e.g. the keg-shortfall RAISE from
+        // on_order_fulfillment_keg_transactions (00229).
+        { data: null, error: { message: "cannot ship 5 keg(s)" } },
+        { data: [{ id: ORDER_B }], error: null },
+      ],
+      allocations: [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+      order_items: [{ data: [], error: null }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "deliveries", [DELIVERY_A], "completed");
+
+    expect(result.error).toContain("Delivery completed, but");
+    expect(result.error).toContain("cannot ship 5 keg(s)");
+    // The chained effect ran for ORDER_B only.
+    const chainedRead = callsByTable.allocations[0];
+    expect(chainedRead.in).toHaveBeenCalledWith("destination_id", [ORDER_B]);
+  });
+
+  it("is idempotent: a re-run finds no packed orders and no-ops", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      orders: [{ data: [], error: null }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "deliveries", [DELIVERY_A], "completed");
+
+    expect(result.error).toBeNull();
+    expect(callsByTable.orders).toHaveLength(1); // read only, no updates
+    expect(callsByTable.allocations).toBeUndefined(); // nothing chained
+  });
+
+  it("does not chain an order whose guarded flip matched 0 rows (raced to fulfilled elsewhere)", async () => {
+    const { supabase, callsByTable } = makeSupabase({
+      orders: [
+        { data: [{ id: ORDER_A }], error: null },
+        { data: [], error: null }, // guard matched 0 rows — no flip
+      ],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "deliveries", [DELIVERY_A], "completed");
+
+    expect(result.error).toBeNull();
+    expect(callsByTable.allocations).toBeUndefined(); // nothing chained
+  });
+
+  it("surfaces a linked-order read failure", async () => {
+    const { supabase } = makeSupabase({
+      orders: [{ data: null, error: { message: "boom" } }],
+    });
+
+    const result = await runTransitionSideEffects(supabase, "deliveries", [DELIVERY_A], "completed");
+
+    expect(result.error).toContain("syncing its orders failed");
+    expect(result.error).toContain("boom");
   });
 });

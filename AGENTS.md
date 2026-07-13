@@ -3,6 +3,8 @@
 > **MGR** — brewery management system. Next.js App Router + Supabase/Postgres + AI integration. AI-first, minimalist design philosophy.
 > Read this file first, then load topic docs below as the work demands.
 
+This is the single source of truth for agent instructions, shared by every harness (Claude Code, Codex, and anything else that reads `AGENTS.md`). `CLAUDE.md` only imports this file — put rules here, never there.
+
 ## First run
 
 ```bash
@@ -69,6 +71,24 @@ Full reference (deep architecture, decisions, data model):
 | [`docs/spec/ai-integration.md`](docs/spec/ai-integration.md) | AI patterns, queries, brewing science |
 | [`docs/data-model/`](docs/data-model/) | Per-table schema docs |
 
+## Expert agents and skills (all harnesses)
+
+Domain expertise lives in plain markdown under `.claude/agents/*.md` and `.claude/skills/*/SKILL.md`. They are ordinary files: a harness with subagents (Claude Code) dispatches them; a harness without (Codex) **reads the matching file before editing that area, and follows it**. Either way the rules are the same.
+
+| Touching | Agent file |
+|---|---|
+| `src/entities/`, entity registry, `src/services/` orchestration, entity API routes (`api/{batches,orders,customers,recipes,users}`) | `entity-architect` |
+| `src/lib/supabase/`, `query-keys.ts`, migrations, RLS, auth/portal routes (incl. `api/auth`, `update-password`) | `data-layer-expert` |
+| `src/domain/` calculations (units, BOM, TTB, yeast, water) | `brewing-domain-expert` |
+| `src/integrations/` (Square, QuickBooks, Slack, email, MongoDB) and their API routes | `integrations-expert` |
+| `src/components/` | `ui-systems-expert` |
+| Writing/repairing tests, pre-refactor coverage | `test-surgeon` |
+| Reviewing any refactor/dedup diff (read-only gate) | `refactor-reviewer` |
+
+Each agent file has YAML frontmatter (`name`, `description`, `tools`). Harnesses that don't understand the frontmatter should ignore it and read the body.
+
+Domain source of truth: [`docs/knowledge/brewing-domain.md`](docs/knowledge/brewing-domain.md), [`docs/knowledge/entity-model.md`](docs/knowledge/entity-model.md) — update those, not the agent files, when domain rules change.
+
 ## Tech stack
 
 - **TypeScript** + Next.js App Router (dev: turbopack)
@@ -112,6 +132,10 @@ Litmus test for a new file: does it know what a "batch" is? → `src/domain/`. D
 11. **MUST NOT** use `""` as a Select option value (DEC-008). Use `"_none"` for clear-selection.
 12. **MUST NOT** add `Co-Authored-By` lines to commits.
 13. **MUST NOT** commit migrations on `main` — only in the correct worktree/branch.
+14. **MUST** run tests with `bun run test` (vitest) — `bun test` is Bun's own runner and is not the suite.
+15. **MUST** keep one entity per directory: `src/entities/<name>/` (`core.ts` + `presentation.tsx` + `index.ts`), registered in `src/entities/index.ts`.
+16. **MUST** prefix commit subjects with `feat`/`fix`/`chore`/`docs`/`refactor`/`perf`/`ci`.
+17. **MUST** verify before deleting anything knip/depcheck flags as unused — the entity registry and `z.infer` types produce false positives.
 
 ## Schema registry
 
@@ -130,6 +154,7 @@ Add a `_schema_registry` entry in the migration whenever you create a new table.
 - Pattern: `00XXX_description.sql` in `supabase/migrations/`
 - Pick the next number: ``ls supabase/migrations/ | tail -1`` shows the highest existing; use highest + 1.
 - Follow [`db-security.md`](docs/agents/db-security.md) for every new view, function, and policy.
+- Push with `scripts/db-push.sh` (runs `db push --include-all` and regenerates `supabase/live-catalog.snapshot.txt` — commit both).
 - After applying: verify success before continuing with dependent code changes.
 
 ## AI integration
