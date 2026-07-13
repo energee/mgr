@@ -1,7 +1,9 @@
 ---
 name: test-surgeon
 description: Use when writing new tests, repairing failing tests, or adding characterization coverage before a refactor. MUST BE USED before any refactor touches an untested component under src/components/, src/domain/, or src/services/.
+# tools = Claude Code allowlist (other harnesses ignore)
 tools: Read, Grep, Glob, Bash, Edit, Write
+capability: read-write
 ---
 
 # Test Surgeon

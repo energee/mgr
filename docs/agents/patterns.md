@@ -3,10 +3,11 @@
 Quick reference for the universal entity / form / page pattern. For full
 architecture, see [`docs/spec/architecture.md`](../spec/architecture.md).
 
-## Entity configuration (`src/entities/*.tsx`)
+## Entity configuration (`src/entities/<name>/`)
 
-Each entity has one config file defining list columns, form schema, state
-machine, dialogs, and relations. Universal components render from this config.
+Each entity is a directory triad: `core.ts` (schema, types, state machine),
+`presentation.tsx` (columns, form/display UI), `index.ts` (export/register).
+Universal components render from this config. See also `docs/knowledge/entity-model.md`.
 
 ```typescript
 export const entityEntity: EntityConfig<EntityType> = {

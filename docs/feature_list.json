@@ -109,6 +109,16 @@
       "notes": "Harness workflow permissions and scoring behavior are covered by focused tests."
     },
     {
+      "id": "F010",
+      "area": "harness",
+      "title": "Harness-neutral agent worktrees",
+      "user_visible_behavior": "Claude, Codex, and Grok create and discover worktrees through one shared command under ~/.agents/worktrees.",
+      "verification": "bash scripts/check-agent-config.sh && bash scripts/__tests__/agent-worktree.test.sh",
+      "state": "passing",
+      "evidence": "scripts/agent-worktree,.agents/skills/worktree-manager,scripts/__tests__/agent-worktree.test.sh",
+      "notes": "Canonical workflow is implemented by scripts/agent-worktree and exposed through the shared worktree-manager skill."
+    },
+    {
       "id": "F100",
       "area": "ai",
       "title": "AI chat panel",

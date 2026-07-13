@@ -18,7 +18,7 @@ import { InventoryAlerts } from "@/components/domain/inventory/inventory-alerts"
 import { Suspense } from "react";
 import { AlertTriangle, PackageCheck, Clock, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart } from "@/components/dashboard";
+import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChart, DashboardSwitcher } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
@@ -151,8 +151,11 @@ export default function InventoryDashboardPage() {
     <div className="space-y-6">
       {/* Header with Stats Strip */}
       <div className="space-y-1">
-        <div className="flex items-baseline justify-between">
-          <h1 className="text-2xl font-semibold">Inventory Dashboard</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold">Inventory Dashboard</h1>
+            <DashboardSwitcher />
+          </div>
           <div className="flex items-center gap-4">
             <Suspense fallback={null}>
               <PeriodSelector />
