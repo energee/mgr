@@ -16,7 +16,7 @@ import Link from "next/link";
 import { orderEntity } from "@/entities/order";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Suspense } from "react";
-import { ShoppingCart, Users, BarChart3 } from "lucide-react";
+import { AlertTriangle, ShoppingCart, Users, BarChart3 } from "lucide-react";
 import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChartLazy } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
@@ -431,7 +431,7 @@ function SalesTrends() {
   const supabase = createClient();
   const period = usePeriod();
 
-  const { data: salesTrends = [], isLoading } = useQuery({
+  const { data: salesTrends = [], isLoading, isError } = useQuery({
     queryKey: dashboardKeys.trends.sales(period),
     queryFn: async () => {
       const { data, error } = await dynamicRpc(supabase, "get_sales_trends", {
@@ -439,7 +439,7 @@ function SalesTrends() {
       });
       if (error) {
         log.error("Failed to fetch sales trends:", error);
-        return [];
+        throw error;
       }
       return (data || []) as Array<{
         date: string;
@@ -454,6 +454,13 @@ function SalesTrends() {
 
   if (isLoading) {
     return <SalesTrendsSkeleton />;
+  }
+
+  // Only fall back to the error state when there's no data to show — a
+  // transient background refetch failure (refetchInterval: 60000) should keep
+  // displaying the last known-good trends rather than blanking them out.
+  if (isError && salesTrends.length === 0) {
+    return <DashboardEmpty message="Couldn't load sales trends" icon={AlertTriangle} />;
   }
 
   const currentPeriodData = salesTrends.slice(period);
