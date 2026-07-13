@@ -12,6 +12,7 @@ export const MGRIcon: React.FC<MGRIconProps> = ({
   return (
     <svg
       role="img"
+      aria-label="MGR"
       width={size}
       height={size}
       viewBox="0 0 24 24"

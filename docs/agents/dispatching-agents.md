@@ -1,19 +1,29 @@
 # Dispatching subagents
 
 When to spawn subagents instead of doing the work yourself, and how to brief them.
+Applies to every harness that supports subagents (Claude Code `Agent` tool, Grok `spawn_subagent`, etc.). Prefer **strategy** over tool brand names.
 
 ## Decision rule
 
 | Situation | Approach |
 |---|---|
-| Single read or grep on a known file/pattern | **Do it inline** — `Read`, `Grep`, `Bash`. Faster than dispatch. |
-| 2+ independent reads with no shared state needed | **Parallel subagents** — single message, multiple `Agent` blocks. |
+| Single read or search on a known file/pattern | **Do it inline** — read/search/shell in the current session. Faster than dispatch. |
+| 2+ independent reads with no shared state needed | **Parallel subagents** — one message, multiple children. |
 | Cross-stack investigation (DB / API / UI for one bug) | **Three parallel agents** — one per layer. Synthesize their reports. |
-| Open-ended search across the repo (>3 queries deep) | **One Explore agent** with a focused question. |
-| Full implementation of a planned feature | **Direct work** — keep yourself in the loop, use Task tracking. |
-| Task that is large and self-contained (e.g., bulk migration) | **One general-purpose agent** with full brief. |
+| Open-ended search across the repo (>3 queries deep) | **One explore/research agent** with a focused question. |
+| Full implementation of a planned feature | **Direct work** — keep yourself in the loop; use a task list. |
+| Task that is large and self-contained (e.g., bulk migration) | **One general-purpose agent** with a full brief. |
 
 The cost of a subagent is the briefing — if writing the prompt takes longer than doing the work, dispatch loses.
+
+## Domain experts (MGR)
+
+When the change set matches a row in `AGENTS.md` → **Expert agents**, either:
+
+1. **Dispatch** the matching expert as a subagent (harnesses that support named agents), or
+2. **Read** `.claude/agents/<name>.md` and follow its body before editing that area.
+
+Same rules either way. See also [`process.md`](process.md) for plan/execute and bug workflows.
 
 ## Brief like a smart colleague
 
@@ -44,9 +54,9 @@ Agent 1 (DB):    "Investigate supabase/migrations/00153–00155 for any column o
 Agent 2 (API):   "Trace the request path for GET /api/portal/orders/[id].
                   Find: which Supabase query runs, which RLS policies it
                   triggers, whether it joins customer_portal_view. Read
-                  src/app/api/portal/, src/lib/queries/, related entity
-                  configs. Report the chain in 5–10 bulleted hops + the
-                  exact SQL query string. Under 250 words."
+                  src/app/api/portal/, related entity configs. Report the
+                  chain in 5–10 bulleted hops + the exact SQL query string.
+                  Under 250 words."
 
 Agent 3 (FE):    "Trace what the customer portal calls when loading order
                   details. Find: which hook runs, which queryKey, what error
@@ -58,12 +68,12 @@ Agent 3 (FE):    "Trace what the customer portal calls when loading order
 Synthesize: combine the three reports into one root-cause analysis. Share the
 synthesis with the user before writing any fix.
 
-### Backfill investigation (one Explore agent)
+### Backfill investigation (one explore agent)
 
 You need to know which existing migrations create views that join `auth.users`:
 
 ```
-Agent: Explore subagent_type, search breadth: "very thorough"
+Agent type: explore / research (read-only), thorough search
 Prompt: "Find every CREATE VIEW or CREATE OR REPLACE VIEW in
         supabase/migrations/ that JOINs or SELECTs from auth.users.
         Include views that reference it transitively (e.g., via a function
@@ -77,7 +87,7 @@ Prompt: "Find every CREATE VIEW or CREATE OR REPLACE VIEW in
 Get a second opinion that hasn't seen your reasoning:
 
 ```
-Agent: feature-dev:code-reviewer
+Agent type: code-reviewer (or general-purpose with review brief)
 Prompt: "Review the corrective migration at
         supabase/migrations/00156_security_invoker_corrections.sql.
         Context: backfilling security_invoker on 9 legacy views and
@@ -94,7 +104,7 @@ Prompt: "Review the corrective migration at
 
 - **"Based on your findings, fix the bug."** Don't push synthesis onto the agent. You read the report, you decide the fix.
 - **"Look around the codebase."** Vague prompts get vague answers. Name the question.
-- **Spawning a subagent to do something Read or Grep would do in one call.** Overhead > value.
+- **Spawning a subagent for a one-shot read or search.** Overhead > value.
 - **Multiple agents on the same file.** Either consolidate into one prompt or give each agent a *different slice* of the file.
 - **Forgetting to set the report length.** Subagents return whatever they produce — bound it.
 
@@ -103,6 +113,15 @@ Prompt: "Review the corrective migration at
 Each subagent burns context (its own + a slice of yours via the report). Two heuristics:
 
 - **Length cap the report.** "Under 200 words" is rarely too tight for an investigation; "under 100 lines" works for diff summaries.
-- **Skip subagents for ≤3 trivial steps.** Three `Bash` calls in your own session are faster than one Agent dispatch + report read.
+- **Skip subagents for ≤3 trivial steps.** Three shell/search calls in your own session are faster than one dispatch + report read.
 
 The harness exists to make agents reliable, not to make every task multi-agent. Solo work is the default.
+
+## Harness notes (optional)
+
+| Concern | Claude Code | Grok Build |
+|---|---|---|
+| Spawn | `Agent` / Task tool | `spawn_subagent` |
+| Explore | `subagent_type: Explore` | `subagent_type: explore` |
+| Domain experts | Named agents under `.claude/agents/` | Same files — spawn by name if listed, else read the body |
+| Isolation | shared `scripts/agent-worktree` path | shared `scripts/agent-worktree` path |

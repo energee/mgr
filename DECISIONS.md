@@ -42,3 +42,13 @@
   - `bun check` script in `package.json` — duplicates the chain; doesn't compose layers.
   - `npm-run-all` — extra dependency, no gain over plain Make targets.
 - **Reversibility**: easy — delete `Makefile`, agents fall back to `bun run X`.
+
+## 2026-07-13 — Agent worktrees use a harness-neutral root
+
+- **Decision**: Claude, Codex, and Grok create and locate worktrees through `scripts/agent-worktree`, stored under `${AGENT_WORKTREE_ROOT:-$HOME/.agents/worktrees}/<repo>/<name>`. Shared skills live canonically under `.agents/skills/`, with harness adapters pointing to them.
+- **Why**: Harness-native defaults scatter checkouts across `.claude`, `.codex`, and `.grok` locations, making handoff and cleanup unreliable. One Git-registered root gives every local harness the same absolute path and one lifecycle command.
+- **Alternatives rejected**:
+  - Repository-local `.agents/worktrees/` — nested checkouts expand search and file-watcher scope.
+  - Keep each harness default — requires per-harness discovery and permits duplicate worktrees for the same task.
+  - Documentation only — cannot enforce naming, protected-branch rules, dirty-tree protection, or canonical paths.
+- **Reversibility**: easy — existing worktrees remain standard Git worktrees and can be moved or recreated elsewhere.

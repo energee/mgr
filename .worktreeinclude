@@ -1,0 +1,4 @@
+# Local environment files needed by a fresh agent worktree.
+# Entries must also be ignored by Git.
+.env
+.env.local

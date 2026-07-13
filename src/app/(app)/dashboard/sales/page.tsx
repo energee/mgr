@@ -17,7 +17,7 @@ import { orderEntity } from "@/entities/order";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Suspense } from "react";
 import { AlertTriangle, ShoppingCart, Users, BarChart3 } from "lucide-react";
-import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChartLazy } from "@/components/dashboard";
+import { StatsStrip, DashboardSection, DashboardEmpty, PeriodSelector, usePeriod, StatCardWithDelta, calculateDelta, TrendChartLazy, DashboardSwitcher } from "@/components/dashboard";
 import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
@@ -271,8 +271,11 @@ export default function SalesDashboardPage() {
     <div className="space-y-6">
       {/* Header with Stats Strip */}
       <div className="space-y-1">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-          <h1 className="text-2xl font-semibold">Sales Dashboard</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold">Sales Dashboard</h1>
+            <DashboardSwitcher />
+          </div>
           <div className="flex items-center gap-4">
             <Suspense fallback={null}>
               <PeriodSelector />
