@@ -599,6 +599,16 @@
       "state": "passing",
       "evidence": "branch:sentry-fix/SENTRY-7597067722",
       "branch": "sentry-fix/SENTRY-7597067722"
+    },
+    {
+      "id": "SENTRY-7477285482",
+      "area": "infra",
+      "title": "Hydration Error (culprit: /dashboard)",
+      "verification": "bun run test src/hooks/__tests__/use-persisted-page-size.test.tsx",
+      "state": "passing",
+      "evidence": "pr:396",
+      "branch": "sentry-fix/SENTRY-7477285482",
+      "notes": "This issue ID has a three-act history on /dashboard: PR #297 fixed a prefill-store sessionStorage read happening during render; PR #306 fixed unpinned toLocaleDateString()/toLocaleString() locale mismatches; the issue kept recurring afterward (last seen 2026-07-11T02:25:44Z, release 00fbe79). The sibling Sentry issue MGR-6 (SENTRY-7477285440) — same culprit, same release, same last-seen minute — was root-caused to TrendChartLazy/BatchActivityHeatmapLazy using next/dynamic({ssr:false}) nested inside a genuinely-suspending Suspense (usePeriod->useSearchParams), and fixed by PR #396 (already merged before this run). Confirmed current dashboard/page.tsx and dashboard/sales/page.tsx already reflect that fix, so no further /dashboard-specific change was needed for this recurrence. Pattern scan for the same defect class (browser-storage read during render instead of in an effect — the exact mechanism of this issue's first fix in PR #297) found one more live instance: usePersistedPageSize (src/hooks/use-persisted-page-size.ts), used by EntityDataTable on every entity list page, read localStorage inside a useState lazy initializer. Fixed by deferring the read to useEffect, mirroring usePrefillHydration."
     }
   ]
 }
