@@ -57,6 +57,16 @@ fi
 
 claude=$(printf '{"name":"claude-task"}\n' | run_manager create-from-claude)
 assert_eq "$claude" "$SHARED/source/claude-task"
+assert_eq "$(git -C "$claude" branch --show-current)" "agent/claude-task"
+
+# An explicit branch/base in the hook payload must reach create_worktree, or a
+# later `create <name> --branch <same>` would refuse to reuse the worktree.
+branched=$(printf '{"name":"claude-branched","branch":"feat/claude-branched","base":"HEAD"}\n' \
+  | run_manager create-from-claude)
+assert_eq "$branched" "$SHARED/source/claude-branched"
+assert_eq "$(git -C "$branched" branch --show-current)" "feat/claude-branched"
+assert_eq "$(run_manager create claude-branched --branch feat/claude-branched)" "$branched"
+run_manager remove claude-branched
 
 linked=$(cd "$alpha" && AGENT_WORKTREE_ROOT="$SHARED" "$SCRIPT" create from-linked --base HEAD)
 assert_eq "$linked" "$SHARED/source/from-linked"

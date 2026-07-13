@@ -253,10 +253,20 @@ remove_worktree() {
 
 create_from_claude() {
   require_command jq
-  local name
-  name=$(jq -er '.name | strings | select(length > 0)') || \
+  local payload name branch base
+  payload=$(cat)
+  name=$(printf '%s' "$payload" | jq -er '.name | strings | select(length > 0)') || \
     die "Claude WorktreeCreate input did not include a name"
-  create_worktree "$name"
+  # Pass through an explicit branch/base. Dropping them would pin the worktree to
+  # agent/<name>, and a later `create <name> --branch <requested>` would then refuse
+  # to reuse it because the checked-out branch no longer matches.
+  branch=$(printf '%s' "$payload" | jq -r '.branch // empty')
+  base=$(printf '%s' "$payload" | jq -r '.base // empty')
+
+  local args=("$name")
+  [[ -n "$branch" ]] && args+=(--branch "$branch")
+  [[ -n "$base" ]] && args+=(--base "$base")
+  create_worktree "${args[@]}"
 }
 
 main() {
