@@ -579,6 +579,16 @@
       "state": "passing",
       "evidence": "pr:397",
       "branch": "sentry-fix/SENTRY-7597067759"
+    },
+    {
+      "id": "SENTRY-7597067722",
+      "area": "infra",
+      "title": "Failed to fetch notifications:",
+      "user_visible_behavior": "On /dashboard, NotificationsProvider's unread-notifications fetch intermittently failed with \"AbortError: Lock broken by another request with the 'steal' option.\" Root cause: src/lib/supabase/client.ts's createClient() built a brand-new Supabase browser client (and internal GoTrueClient) on every call; it is called fresh in 145+ client components/hooks, including on every re-render of NotificationsProviderInner. All instances share the same auth storage key, so concurrent GoTrueClient instances raced over the same navigator.locks name, and a newer instance could steal the lock from an older instance's in-flight supabase.auth.getSession()/getUser() call, aborting whatever fetch was waiting on it. Fixed by making createClient() a module-scoped singleton, per Supabase's own documented fix for this class of bug.",
+      "verification": "bun run test src/lib/supabase/__tests__/client.test.ts",
+      "state": "passing",
+      "evidence": "branch:sentry-fix/SENTRY-7597067722",
+      "branch": "sentry-fix/SENTRY-7597067722"
     }
   ]
 }
