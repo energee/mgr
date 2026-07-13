@@ -28,10 +28,74 @@ ${tagLines || "  (none)"}
 ${issue.stackTrace || "(unavailable)"}
 \`\`\`
 
-## Pipeline (follow in order)
+### Event Context (contexts + extra bag, request, message)
+\`\`\`
+${issue.eventContext || "(none captured)"}
+\`\`\`
+
+### Breadcrumbs (oldest first)
+\`\`\`
+${issue.breadcrumbs || "(none captured)"}
+\`\`\`
+
+## Step 0 — Triage: is this fixable in application code?
+
+**Do this before reading any source file, and do not skip it.**
+
+Many of these errors are reported by a \`catch\` block — the stack trace ends
+inside an error handler, so the handler is the only code the trace points at.
+Patching the handler is almost never the fix. It makes the error *prettier*,
+not *gone*, and it is the single most common failure mode of this harness.
+
+Classify the root cause into exactly one of:
+
+- **(A) Application code** — a real defect in this repo reachable from the
+  stack: null-safety, a race, stale state, a wrong query, a bad conditional.
+- **(B) Database / infrastructure** — the app called out and got a failure
+  back. Postgres error codes in the Event Context above are decisive:
+  \`42501\` = permission denied (missing GRANT / RLS policy),
+  \`42883\` = undefined function (an RPC that never shipped, or live drift),
+  \`42P01\` = undefined table, \`57014\` = statement timeout.
+  Also here: Supabase/Square/QuickBooks outages, auth-token expiry, timeouts.
+- **(C) Third-party or unfixable-from-here** — a library bug, a browser
+  extension, a bot, malformed input from an external caller.
+
+Gather evidence before you classify — do not guess:
+
+- Read the **Event Context** block above first. A PostgrestError \`code\` there
+  answers the question outright.
+- If a database object is implicated (an RPC, a table, a view, a policy), grep
+  \`supabase/live-catalog.snapshot.txt\` for it. That file is the source of
+  truth for **what actually exists in the live database**. If the object is
+  absent there but present in \`supabase/migrations/\`, the migration never
+  reached production. If it is present in the snapshot but absent from the
+  migration chain, it was created out-of-band and is live drift.
+- Read the migration that defines the object, and check its \`GRANT\` /
+  \`SECURITY DEFINER\` / RLS policy. A missing \`GRANT EXECUTE ... TO
+  authenticated\` on an RPC produces exactly a \`42501\`.
+
+**Branch on the classification:**
+
+- **(A)** → continue to step 1 below and fix it.
+- **(B) or (C)** → **STOP. Do not open a code PR.** Open a GitHub *issue*
+  instead (\`gh issue create\`), titled \`[sentry] ${issue.shortId}: <root cause>\`,
+  labelled \`sentry-fix\` and \`needs-human\`, containing: the classification and
+  why, the specific evidence (error code, snapshot/migration findings, the
+  object name), the concrete remediation you believe is required (e.g. "add
+  \`GRANT EXECUTE ON FUNCTION foo(int) TO authenticated\` in a new migration"),
+  and a link to the Sentry issue. Then you are done — report the issue URL and
+  exit. Do **not** additionally patch the error handler to compensate.
+
+A **(B)** classification is a *successful* run of this harness. Diagnosing a
+database bug and refusing to paper over it in the client is the outcome we
+want. Never reclassify to (A) just to have code to write.
+
+If — and only if — the root cause genuinely lies in app code, proceed:
+
+## Pipeline (follow in order, only for classification (A))
 
 1. **Trace stack trace** — resolve each frame to a source file. Read the code around each frame.
-2. **Root cause analysis** — determine *why* the error occurs. Null safety? Race condition? Stale state? Missing error boundary? Write the analysis out before fixing.
+2. **Root cause analysis** — determine *why* the error occurs. Null safety? Race condition? Stale state? Missing error boundary? Write the analysis out before fixing. Restate why this is (A) and not (B)/(C).
 3. **Pattern scan** — use Grep to find similar vulnerabilities elsewhere in the codebase. If found, include them in the fix scope.
 4. **Implement the fix** — minimal and targeted. Follow the conventions in AGENTS.md and the topic docs under \`docs/agents/\`: entity configs, universal components, centralized query keys from \`src/lib/query-keys.ts\`, no hardcoded status maps (DEC-007), no empty-string Select values (DEC-008), security_invoker on views, RLS on new tables.
 5. **Add tests** — write a Vitest test that reproduces the error condition. Confirm it fails on the original code, then passes on the fix.
@@ -53,23 +117,37 @@ ${issue.stackTrace || "(unavailable)"}
 - Follow AGENTS.md conventions strictly. Do not invent new patterns.
 - Do not modify unrelated code. No opportunistic refactors.
 - Do not skip hooks (\`--no-verify\`) or bypass validation.
-- If validation fails 3 times in a row, do NOT force a bad fix. Stop and open a **diagnostic PR** instead (see below).
+- If validation fails 3 times in a row, do NOT force a bad fix. Stop and fall back to the investigation issue (see below).
 - Do not create documentation files unless the fix requires them.
+- **Improving the error handler is not a fix.** Passing a richer object to
+  \`log.error\`, rethrowing instead of swallowing, or rendering an error state
+  where there was an empty one — none of these stop the error from firing. They
+  are only ever acceptable as a *secondary* change alongside a real (A) fix, and
+  never as the whole PR. If the only change you can find to make is at the
+  \`catch\` site, you have a (B) or (C) on your hands: go open the issue.
 
-## Diagnostic PR Fallback
+## Investigation-Issue Fallback
 
-If after 3 attempts you cannot produce a working fix, OR the root cause is outside this codebase (infrastructure, third-party library, stale data), open a PR that:
+Open a GitHub issue instead of a PR when the root cause is (B) or (C), or when
+after 3 attempts you cannot produce a working fix for an (A). The issue must:
 
-- Adds better error handling or logging at the failure point.
-- Documents the root cause analysis in the PR body.
-- Applies labels \`sentry-fix\`, \`automated\`, AND \`needs-human\`.
+- State the classification and the evidence for it (error code, live-catalog /
+  migration findings, the offending object).
+- Document the root cause analysis, with \`file:line\` references.
+- Name the concrete remediation you believe is required.
+- Carry labels \`sentry-fix\` and \`needs-human\`.
 
-## PR Body Template
+Report the issue URL and exit. Do not also open a compensating code PR.
+
+## PR Body Template (classification (A) only)
 
 \`\`\`markdown
 ## Sentry Fix: ${issue.title}
 
 **Issue:** [${issue.shortId}](${issue.permalink}) | **Events (14d):** ${issue.eventCount14d} | **First seen:** ${issue.firstSeen} | **Last seen:** ${issue.lastSeen}
+
+### Triage
+Classified **(A) application code**. <why this is not (B) database/infra or (C) third-party — cite the evidence>
 
 ### Root Cause
 <deep analysis with file:line references>
@@ -94,5 +172,5 @@ If after 3 attempts you cannot produce a working fix, OR the root cause is outsi
 - [x] make check passes (incl. check-db and check-wip)
 \`\`\`
 
-Begin with step 1.`;
+Begin with step 0.`;
 }
