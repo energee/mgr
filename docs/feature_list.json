@@ -544,7 +544,7 @@
       "title": "Error: Hydration failed because the server rendered HTML didn't match the client (culprit: /dashboard)",
       "verification": "bun run test src/components/dashboard/__tests__/dashboard-lazy-hydration.test.ts",
       "state": "passing",
-      "evidence": "branch:sentry-fix/SENTRY-7477285440",
+      "evidence": "pr:396",
       "branch": "sentry-fix/SENTRY-7477285440",
       "notes": "PR #308 already fixed the originally-reported cause (ChatLayout's ChatPanel using next/dynamic(ssr:false)), merged 2026-07-05 — but the issue kept receiving new events afterward (last seen 2026-07-11, in a release that already had that fix). Root cause of the recurrence: TrendChartLazy and BatchActivityHeatmapLazy (src/components/dashboard/) also used next/dynamic({ ssr:false }), and are rendered inside ProductionTrends/SalesTrends, which sit inside a Suspense boundary that itself genuinely suspends (usePeriod() -> useSearchParams()). Nesting a dynamic(ssr:false) client-only bailout boundary inside another suspending boundary is the same class of bug already fixed for ChatLayout. Fix: converted both to React.lazy + an explicit <Suspense> at each call site (4 usages across src/app/(app)/dashboard/page.tsx and src/app/(app)/dashboard/sales/page.tsx), mirroring the established ChatLayout fix. cogs-period-chart-lazy.tsx and batch-readings-chart-lazy.tsx use the same next/dynamic(ssr:false) pattern but are not nested inside a suspending boundary, so left as-is."
     }
