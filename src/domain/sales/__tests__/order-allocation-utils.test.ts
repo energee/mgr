@@ -192,12 +192,12 @@ describe("computeFifoFill", () => {
     ).toEqual({});
   });
 
-  it("uses the last line when duplicate combos are supplied (quirk: last wins)", () => {
+  it("sums demand when duplicate combos are supplied", () => {
     const fill = computeFifoFill(
       [line({ remaining: 10 }), line({ remaining: 2 })],
       [lot({ available_quantity: 10 })]
     );
-    expect(fill).toEqual({ "lot-1": 2 });
+    expect(fill).toEqual({ "lot-1": 10 });
   });
 
   it("does not mutate the input lots array order", () => {

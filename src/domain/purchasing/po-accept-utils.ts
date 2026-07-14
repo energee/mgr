@@ -69,6 +69,10 @@ export function buildMappingDefaults(
  * po_receive_id, which is unique per accepted lot in this flow);
  * `placementByReceiveId` carries the user's bin selection and the lot
  * quantity per receive. Lots without a chosen bin produce no placement row.
+ *
+ * A receive's quantity is placed at most once. Should two lots ever share a
+ * po_receive_id, emitting a row for each would place that quantity twice and
+ * overstate on-hand inventory, so only the first lot gets the placement.
  */
 export function buildBinPlacements(
   insertedLots: { id: string; po_receive_id: string | null }[],
@@ -79,10 +83,13 @@ export function buildBinPlacements(
     inventory_lot_id: string;
     quantity: number;
   }[] = [];
+  const placedReceiveIds = new Set<string>();
   for (const lot of insertedLots) {
     if (!lot.po_receive_id) continue;
+    if (placedReceiveIds.has(lot.po_receive_id)) continue;
     const placement = placementByReceiveId.get(lot.po_receive_id);
     if (!placement) continue;
+    placedReceiveIds.add(lot.po_receive_id);
     placements.push({
       bin_id: placement.bin_id,
       inventory_lot_id: lot.id,
