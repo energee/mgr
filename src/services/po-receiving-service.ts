@@ -2,7 +2,7 @@
  * Purchase-order receiving service.
  *
  * A thin wrapper over the `receive_purchase_order_items` Postgres function
- * (supabase/migrations/00245_receive_purchase_order_items.sql), which records the receipts,
+ * (supabase/migrations/00248_receive_purchase_order_items.sql), which records the receipts,
  * decides the resulting status, validates the state-machine transition, and writes the new
  * status — all in ONE transaction.
  *

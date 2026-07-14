@@ -5,7 +5,7 @@
  * The fulfilled/partial rule no longer lives in TypeScript. It — along with the over-receipt
  * check and the state-machine transition validation — now lives inside the
  * `receive_purchase_order_items` Postgres function
- * (supabase/migrations/00245_receive_purchase_order_items.sql), so the whole receipt commits
+ * (supabase/migrations/00248_receive_purchase_order_items.sql), so the whole receipt commits
  * or aborts as one transaction. That closed the last defect from #412: the receives used to be
  * inserted before the status was read and validated, so receiving against a `draft` PO
  * recorded the receipt and then threw, leaving the rows behind with no rollback.
