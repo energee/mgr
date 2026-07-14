@@ -551,3 +551,17 @@ SELECT * FROM get_sales_trends(30);  -- last 30 days + 30-day comparison
 ```
 
 **Known limitations:** `fulfilled_count` uses `updated_at` as an approximation — editing a fulfilled order shifts its fulfillment date. `avg_order_value` is computed client-side as `revenue / order_count`.
+
+## square_locations
+
+Square POS locations pulled from the Square API (00222). A bin links to one location
+1:1 via `bins.square_location_id`. Staff-readable; refreshed from Square rather than
+hand-edited, and seeded during the 00222 data migration from any pre-existing
+location-level POS config.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| square_location_id | TEXT | Square's permanent location ID (primary key). Referenced 1:1 by `bins.square_location_id` |
+| name | TEXT | Human-readable Square location name |
+| status | TEXT | Square location status (e.g. ACTIVE / INACTIVE) |
+| synced_at | TIMESTAMPTZ | When this row was last refreshed from the Square API |
