@@ -778,6 +778,7 @@ WHERE kt.finished_good_id = fb.finished_good_id
 -- p_qty). The webhook's `quantity <= 0` guard already prevents this upstream;
 -- this closes the RPC itself.
 
+-- security-definer: justified the system webhook caller must bypass bin_inventory RLS; EXECUTE is revoked from PUBLIC and granted only to service_role below.
 CREATE OR REPLACE FUNCTION debit_bin_inventory(
   p_bin_id UUID,
   p_finished_good_id UUID,

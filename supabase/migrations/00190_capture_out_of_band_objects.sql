@@ -16,6 +16,7 @@
 
 -- Functions ------------------------------------------------------------------
 
+-- security-definer: justified must bypass the recipient's RLS to write the notification log; EXECUTE is revoked from PUBLIC and granted only to service_role in 00245_lock_dispatch_email_notification.sql.
 CREATE OR REPLACE FUNCTION public.dispatch_email_notification(p_user_id uuid, p_type text, p_title text, p_message text, p_priority text, p_action_url text, p_metadata jsonb)
  RETURNS void
  LANGUAGE plpgsql

@@ -123,3 +123,19 @@ Email integration settings will be added when email notifications are implemente
 | is_enabled | BOOLEAN | Integration enabled |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+## email_settings
+
+Single-row configuration for outbound notification email. Read by
+`dispatch_email_notification` (SECURITY DEFINER, EXECUTE locked to `service_role`
+in 00245); writes gated on `settings:manage`. Introduced live and captured into the
+chain by 00199.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| is_enabled | BOOLEAN | Master on/off switch for notification email |
+| supabase_project_url | TEXT | Project URL used to reach the send-email edge function |
+| app_url | TEXT | Base URL used to build action links in the email body |
+| created_at | TIMESTAMPTZ | Created timestamp |
+| updated_at | TIMESTAMPTZ | Updated timestamp |

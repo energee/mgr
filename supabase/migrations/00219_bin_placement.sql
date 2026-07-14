@@ -91,6 +91,7 @@ CREATE INDEX IF NOT EXISTS idx_packaging_sessions_default_bin_id
 -- inserting user's bin_inventory RLS (see header). NEVER raises -- an unplaceable
 -- FG is a NOTICE, not an error.
 
+-- security-definer: justified trigger-only (RETURNS TRIGGER, never client-callable); placement is a system side-effect that must bypass the inserting user's bin_inventory RLS.
 CREATE OR REPLACE FUNCTION place_finished_good_in_bin()
 RETURNS TRIGGER
 LANGUAGE plpgsql
