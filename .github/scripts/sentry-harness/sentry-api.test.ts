@@ -6,6 +6,8 @@ import {
   formatEventContext,
   formatBreadcrumbs,
   normalizeIssue,
+  fetchIssueSummaries,
+  enrichIssuesWithEvents,
   fetchIssuesWithStacks,
 } from "./sentry-api";
 
@@ -299,5 +301,69 @@ describe("fetchIssuesWithStacks (integration with mocked fetch)", () => {
     await expect(
       fetchIssuesWithStacks({ org: "o", project: "p", authToken: "bad" }),
     ).rejects.toThrow(/401/);
+  });
+
+  it("ranks from list-only summaries before fetching events for selected issues", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            id: "1",
+            shortId: "MGR-1",
+            title: "first",
+            culprit: "a",
+            permalink: "p1",
+            count: "10",
+            firstSeen: "2026-04-14T09:00:00Z",
+            lastSeen: "2026-04-16T14:00:00Z",
+            level: "error",
+          },
+          {
+            id: "2",
+            shortId: "MGR-2",
+            title: "second",
+            culprit: "b",
+            permalink: "p2",
+            count: "5",
+            firstSeen: "2026-04-14T09:00:00Z",
+            lastSeen: "2026-04-16T14:00:00Z",
+            level: "warning",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          tags: [{ key: "environment", value: "development" }],
+          entries: [
+            {
+              type: "exception",
+              data: {
+                values: [{ type: "Error", value: "selected", stacktrace: { frames: [] } }],
+              },
+            },
+          ],
+        }),
+      });
+
+    const summaries = await fetchIssueSummaries({
+      org: "o",
+      project: "p",
+      authToken: "t",
+      environment: "development",
+    });
+
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0]).toMatchObject({ environment: "development", stackTrace: "" });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    const enriched = await enrichIssuesWithEvents([summaries[1]], "t");
+
+    expect(enriched).toHaveLength(1);
+    expect(enriched[0]).toMatchObject({ issueId: "2", environment: "development" });
+    expect(enriched[0].stackTrace).toContain("Error: selected");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[1][0]).toBe(buildLatestEventUrl("2"));
   });
 });

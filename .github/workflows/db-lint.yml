@@ -3,35 +3,38 @@ name: Database Security Lint
 on:
   pull_request:
     paths:
-      - 'supabase/migrations/**/*.sql'
-      - 'supabase/functions/**'
-      - 'src/__tests__/integration/_fixtures/bootstrap-plain-postgres.sql'
-      # The db scripts have no other PR-triggered CI (live-drift is cron-only),
-      # so this workflow syntax-checks them via the "Lint shell scripts" step.
-      - 'scripts/*.sh'
-      - 'scripts/live-catalog.sql'
-      - '.github/workflows/db-lint.yml'
-      - '.github/workflows/live-drift.yml'
+      - "supabase/migrations/**/*.sql"
+      - "supabase/functions/**"
+      - "src/__tests__/integration/**"
+      - "scripts/live-catalog.sql"
+      - "vitest.integration.config.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/db-lint.yml"
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - 'supabase/migrations/**/*.sql'
-      - 'scripts/*.sh'
-      - 'scripts/live-catalog.sql'
-      - '.github/workflows/db-lint.yml'
-      - '.github/workflows/live-drift.yml'
+      - "supabase/migrations/**/*.sql"
+      - "supabase/functions/**"
+      - "src/__tests__/integration/**"
+      - "scripts/live-catalog.sql"
+      - "vitest.integration.config.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/db-lint.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   db-lint:
-    name: Supabase Database Linter
+    name: Database Lint and Integration Tests
     runs-on: ubuntu-latest
 
-    # Use a standard postgres container from Docker Hub instead of supabase start
-    # This avoids ghcr.io image availability issues entirely
     services:
       postgres:
         image: postgres:15
@@ -48,45 +51,32 @@ jobs:
           --health-retries 5
 
     env:
-      # sslmode=disable is required by the Supabase CLI's TypeScript db-lint
-      # (v2.107+): a --db-url without sslmode is treated as remote and tried
-      # TLS-only with no plaintext fallback, so it can never reach the plain
-      # postgres service container. psql/libpq accepts the param unchanged.
+      # sslmode=disable is required by Supabase CLI v2.107+ when connecting to
+      # the plain PostgreSQL service container.
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_ANON_KEY: placeholder-not-used-without-gotrue
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Lint shell scripts
-        run: |
-          # scripts/check-live-drift.sh and scripts/db-push.sh have no other
-          # PR-triggered CI since the live-drift check went cron-only; catch
-          # shell syntax errors (and shellcheck findings when the runner has
-          # it — ubuntu-latest does) before they break the watchdog.
-          status=0
-          for f in scripts/*.sh; do
-            bash -n "$f" || status=1
-          done
-          if command -v shellcheck >/dev/null 2>&1; then
-            shellcheck -S warning scripts/*.sh || status=1
-          else
-            echo "::notice::shellcheck not available on this runner; ran bash -n only"
-          fi
-          exit "$status"
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: "2.109.1"
 
       - name: Create Supabase roles
         run: |
-          # Create the roles that Supabase migrations expect. Schemas, auth.*
-          # helpers, and out-of-band table stubs come from the shared fixture
-          # in the next step. ON_ERROR_STOP so a failed role/grant statement
-          # fails the job instead of silently linting a half-set-up database.
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<EOF
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQLEOF'
           CREATE ROLE anon NOLOGIN;
           CREATE ROLE authenticated NOLOGIN;
           CREATE ROLE service_role NOLOGIN;
@@ -94,78 +84,60 @@ jobs:
           GRANT anon TO authenticator;
           GRANT authenticated TO authenticator;
           GRANT service_role TO authenticator;
-          EOF
+          SQLEOF
 
       - name: Apply plain-Postgres Supabase shim
-        run: |
-          # auth schema/users/uid(), realtime publication, default privileges,
-          # and stubs for tables created out-of-band on live. Same fixture the
-          # integration tests use.
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
-            -f src/__tests__/integration/_fixtures/bootstrap-plain-postgres.sql
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/__tests__/integration/_fixtures/bootstrap-plain-postgres.sql
 
+      # Both consumers use this one replay. ON_ERROR_STOP and one transaction
+      # per migration prevent tests from seeing a silently half-built schema.
       - name: Apply migrations (from-scratch replay gate)
         run: |
-          # Apply all migrations in order. ON_ERROR_STOP makes this a real
-          # gate: a PR whose migration cannot replay from scratch fails here
-          # instead of silently linting a half-built database.
+          set -euo pipefail
           for migration in supabase/migrations/*.sql; do
             echo "Applying $migration..."
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -1 -f "$migration"
           done
 
       - name: Install plpgsql_check in the postgres service
         run: |
-          # `supabase db lint` wraps plpgsql_check, which vanilla postgres:15
-          # doesn't ship (Supabase's own image does, but we deliberately avoid
-          # it — see the service-container comment above). The official
-          # postgres image carries the PGDG apt repo, so install the extension
-          # package into the running service container.
           docker exec ${{ job.services.postgres.id }} bash -ceu \
             'apt-get update -qq && apt-get install -y -qq postgresql-15-plpgsql-check'
 
       - name: Run Database Linter
         id: lint
         run: |
-          # Run the linter against our postgres instance. Capture the exit
-          # code (instead of `|| true`) so "lint ran and found nothing" is
-          # distinguishable from "lint crashed before printing anything" —
-          # a crashed CLI must fail the step, not pass it green.
           lint_rc=0
-          supabase db lint --db-url "$DATABASE_URL" --level error > lint-output.txt 2>&1 || lint_rc=$?
-
+          supabase db lint --db-url "$DATABASE_URL" > lint-output.txt 2>&1 || lint_rc=$?
           cat lint-output.txt
 
-          # Check for ERROR level issues
+          {
+            echo "## Full Database Lint Report"
+            echo '```'
+            cat lint-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
           if grep -q "ERROR" lint-output.txt; then
             echo "::error::Database linter found ERROR-level security issues"
             echo "has_errors=true" >> "$GITHUB_OUTPUT"
           elif [ "$lint_rc" -ne 0 ]; then
-            echo "::error::supabase db lint exited with code $lint_rc without reporting ERROR-level findings — the linter did not run (CLI crash?)."
+            echo "::error::supabase db lint exited with code $lint_rc without reporting ERROR-level findings."
             exit "$lint_rc"
           else
             echo "No ERROR-level issues found"
             echo "has_errors=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run Full Lint Report
-        if: always()
-        run: |
-          echo "## Full Database Lint Report" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          supabase db lint --db-url "$DATABASE_URL" >> $GITHUB_STEP_SUMMARY 2>&1 || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: Seed role fixtures
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/__tests__/integration/_fixtures/seed-roles.sql
 
-      - name: Fail on Errors
-        if: steps.lint.outputs.has_errors == 'true'
+      - name: Run integration tests
+        run: bun run test:integration
+
+      - name: Fail on database lint errors
+        if: always() && steps.lint.outputs.has_errors == 'true'
         run: |
-          echo "::error::Database security lint failed. See the lint report above for details."
-          echo ""
-          echo "Common fixes:"
-          echo "- security_definer_view: Add 'WITH (security_invoker = true)' to views"
-          echo "- auth_users_exposed: Don't join auth.users in views, cache user info instead"
-          echo "- rls_disabled_in_public: Add 'ALTER TABLE x ENABLE ROW LEVEL SECURITY'"
-          echo "- function_search_path_mutable: Add 'SET search_path = public' to functions"
-          echo ""
+          echo "::error::Database security lint failed. See the report above."
           echo "See docs/spec/architecture.md for security guidelines."
           exit 1

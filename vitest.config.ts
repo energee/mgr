@@ -50,40 +50,41 @@ export default defineConfig({
       // decay elsewhere. Ratchet each floor up as its dir's coverage grows.
       // See docs/agents/quality.md for the trend log. Enforced by CI
       // (test.yml) and `make check-coverage`.
-      thresholds: {
-        // NOTE: vitest's global thresholds always apply to ALL included
-        // files as one blended aggregate — the glob entries below are
-        // checked in ADDITION, not instead. Keep these at/below the
-        // aggregate (74/59/74/74 measured 2026-07-01).
-        lines: 50,
-        functions: 50,
-        branches: 50,
-        statements: 50,
-        "src/lib/**": {
+      thresholds:
+        process.env.VITEST_COVERAGE_SHARD === "true" ? undefined : {
+          // NOTE: vitest's global thresholds always apply to ALL included
+          // files as one blended aggregate — the glob entries below are
+          // checked in ADDITION, not instead. Keep these at/below the
+          // aggregate (74/59/74/74 measured 2026-07-01).
           lines: 50,
-          functions: 38,
-          branches: 45,
+          functions: 50,
+          branches: 50,
           statements: 50,
+          "src/lib/**": {
+            lines: 50,
+            functions: 38,
+            branches: 45,
+            statements: 50,
+          },
+          "src/domain/**": {
+            lines: 85,
+            functions: 88,
+            branches: 85,
+            statements: 85,
+          },
+          "src/services/**": {
+            lines: 85,
+            functions: 90,
+            branches: 74,
+            statements: 85,
+          },
+          "src/contexts/**": {
+            lines: 62,
+            functions: 60,
+            branches: 66,
+            statements: 62,
+          },
         },
-        "src/domain/**": {
-          lines: 85,
-          functions: 88,
-          branches: 85,
-          statements: 85,
-        },
-        "src/services/**": {
-          lines: 85,
-          functions: 90,
-          branches: 74,
-          statements: 85,
-        },
-        "src/contexts/**": {
-          lines: 62,
-          functions: 60,
-          branches: 66,
-          statements: 62,
-        },
-      },
     },
   },
   resolve: {

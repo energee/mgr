@@ -11,7 +11,7 @@ import { spawnSync } from "node:child_process";
 import { filterClaimedIssues, filterFixedIssues, type MergedFixPr } from "./sentry-harness/dedup";
 import { buildFixPrompt } from "./sentry-harness/prompt";
 import { scoreIssues, sortByScore } from "./sentry-harness/scoring";
-import { fetchIssuesWithStacks } from "./sentry-harness/sentry-api";
+import { enrichIssuesWithEvents, fetchIssueSummaries } from "./sentry-harness/sentry-api";
 import type { ScoredIssue } from "./sentry-harness/types";
 
 const MAX_ERRORS_PER_RUN = 5;
@@ -65,8 +65,8 @@ async function main(): Promise<void> {
   const environment = process.env.SENTRY_ENVIRONMENT || "development";
 
   console.error(`[harness] Fetching Sentry issues for ${org}/${project} (env: ${environment})`);
-  const issues = await fetchIssuesWithStacks({ org, project, authToken, environment });
-  console.error(`[harness] Fetched ${issues.length} issues`);
+  const issues = await fetchIssueSummaries({ org, project, authToken, environment });
+  console.error(`[harness] Fetched ${issues.length} issue summaries`);
 
   const openBranches = listOpenSentryFixBranches();
   console.error(`[harness] ${openBranches.length} open sentry-fix PRs`);
@@ -78,7 +78,9 @@ async function main(): Promise<void> {
 
   const scored = scoreIssues(eligible);
   const sorted = sortByScore(scored);
-  const top = sorted.slice(0, MAX_ERRORS_PER_RUN);
+  const selected = sorted.slice(0, MAX_ERRORS_PER_RUN);
+  console.error(`[harness] Fetching event diagnostics for ${selected.length} selected issues`);
+  const top = await enrichIssuesWithEvents(selected, authToken);
 
   const output: ScoredIssue[] = top.map((issue) => ({
     ...issue,
