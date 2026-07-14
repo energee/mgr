@@ -65,11 +65,23 @@ export function makeQueryBuilder(response: QueuedResponse) {
  * Returns the client plus `fromSpy` (assert which tables were queried) and
  * `callsByTable` (the builders created per table, in call order — assert
  * chain-method args on them).
+ *
+ * `rpcResponses` is keyed by function name and behaves the same way: each
+ * `.rpc(name, args)` shifts that function's next queued response. Assert the
+ * arguments a function was called with via `rpcSpy.mock.calls`. Calling an
+ * unqueued function throws, so an unexpected RPC fails loudly.
  */
-export function makeSupabase(responses: Record<string, QueuedResponse[]>) {
+export function makeSupabase(
+  responses: Record<string, QueuedResponse[]>,
+  rpcResponses: Record<string, QueuedResponse[]> = {},
+) {
   const queues: Record<string, QueuedResponse[]> = {};
   for (const [table, list] of Object.entries(responses)) {
     queues[table] = [...list];
+  }
+  const rpcQueues: Record<string, QueuedResponse[]> = {};
+  for (const [fn, list] of Object.entries(rpcResponses)) {
+    rpcQueues[fn] = [...list];
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const callsByTable: Record<string, any[]> = {};
@@ -85,8 +97,16 @@ export function makeSupabase(responses: Record<string, QueuedResponse[]>) {
     return builder;
   });
 
-  const supabase = { from: fromSpy } as unknown as SupabaseClient<Database>;
-  return { supabase, fromSpy, callsByTable };
+  const rpcSpy = vi.fn((fn: string, _args?: unknown) => {
+    const queue = rpcQueues[fn];
+    if (!queue || queue.length === 0) {
+      throw new Error(`fake supabase: no queued response for rpc "${fn}"`);
+    }
+    return makeQueryBuilder(queue.shift() as QueuedResponse);
+  });
+
+  const supabase = { from: fromSpy, rpc: rpcSpy } as unknown as SupabaseClient<Database>;
+  return { supabase, fromSpy, rpcSpy, callsByTable };
 }
 
 /** A client whose every `.from()` call throws synchronously (catch-block tests). */
