@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseItemFieldEdit,
   parsePoItemFieldEdit,
-} from "@/components/domain/order/order-item-edit-utils";
+} from "@/domain/sales/order-item-edit-utils";
 
 describe("parseItemFieldEdit — quantity", () => {
   it("parses a valid integer quantity", () => {

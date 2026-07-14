@@ -10,7 +10,7 @@ import {
   buildBinPlacements,
   catalogKey,
   type PriorLotRow,
-} from "@/components/domain/purchasing/po-accept-utils";
+} from "@/domain/purchasing/po-accept-utils";
 
 function lotRow(overrides: Partial<PriorLotRow> = {}): PriorLotRow {
   return {

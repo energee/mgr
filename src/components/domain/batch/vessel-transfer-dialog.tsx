@@ -67,7 +67,7 @@ import { UnitDisplay, UnitInput } from "@/components/ui/unit-input";
 import { log } from "@/lib/client-logger";
 import { getValueLabel } from "@/types/entity";
 import { vesselEntity } from "@/entities/vessel";
-import { isDuplicateTransfer, groupVesselsForTransfer } from "./vessel-transfer-utils";
+import { isDuplicateTransfer, groupVesselsForTransfer } from "@/domain/vessel-transfer-utils";
 import { computeTransferLoss } from "@/domain/consumption-planning";
 import { RecordLossDialog } from "@/components/domain/shared/record-loss-dialog";
 

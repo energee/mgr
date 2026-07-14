@@ -29,7 +29,7 @@ import type { FermentationStage } from "@/components/domain/recipe/fermentation-
 import {
   calculateEstimates,
   type RecipeEstimates,
-} from "./recipe-estimate-calc";
+} from "@/domain/recipe-estimate-calc";
 import { toast } from "sonner";
 
 // =============================================================================

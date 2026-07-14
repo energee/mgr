@@ -20,7 +20,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { setupRenderHarness } from "@/test/react-harness";
 import type { HopScheduleItem } from "../hop-schedule-editor";
-import { getHopUtilizationFactor } from "../recipe-editor/recipe-estimate-calc";
+import { getHopUtilizationFactor } from "@/domain/recipe-estimate-calc";
 
 vi.mock("@/hooks/use-catalog", () => ({
   useCatalog: () => ({ data: [], isLoading: false }),

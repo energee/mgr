@@ -12,7 +12,7 @@ import {
   computeDemandLines,
   computeFifoFill,
   type AllocatableLot,
-} from "@/components/domain/order/order-allocation-utils";
+} from "@/domain/sales/order-allocation-utils";
 
 const BRAND_A = "brand-a";
 const BRAND_B = "brand-b";

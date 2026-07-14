@@ -65,7 +65,7 @@ import { INVENTORY_UNIT_OPTIONS } from "@/domain/inventory-units";
 import {
   parsePoItemFieldEdit,
   type EditableItemField,
-} from "@/components/domain/order/order-item-edit-utils";
+} from "@/domain/sales/order-item-edit-utils";
 
 // =============================================================================
 // Types

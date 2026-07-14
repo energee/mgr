@@ -26,7 +26,7 @@ import { KnockoutSection } from "./knockout-section";
 import { FermentationSection } from "./fermentation-section";
 import { RecipeSidebar } from "./recipe-sidebar";
 import { RecipeCloneDialog } from "@/components/domain/recipe/recipe-clone-dialog";
-import { preparePlanBatchPrefill } from "@/components/domain/recipe/plan-batch-from-recipe";
+import { preparePlanBatchPrefill } from "@/domain/plan-batch-from-recipe";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
 import { Skeleton } from "@/components/ui/skeleton";
