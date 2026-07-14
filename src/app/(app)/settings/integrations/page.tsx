@@ -8,6 +8,7 @@
  * - Square POS (catalog/inventory sync + draft sales)
  * - Slack (notifications)
  * - QuickBooks Online (invoices/bills sync)
+ * - Beer Orders spreadsheet (previewed distributor-order reconciliation)
  * - MongoDB (live data sync from lolev-manager)
  */
 
@@ -20,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IntegrationBadge, type IntegrationStatus } from "@/components/domain/shared/integration-badge";
 import { Switch } from "@/components/ui/switch";
-import { Check, Database, ExternalLink, Loader2, MapPin, RefreshCw } from "lucide-react";
+import { Check, Database, ExternalLink, FileSpreadsheet, Loader2, MapPin, RefreshCw } from "lucide-react";
 import { SecretKeyInput } from "@/components/domain/shared/secret-key-input";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { SquareIcon } from "@/components/ui/square-icon";
@@ -670,6 +671,42 @@ function QuickBooksIntegrationCard() {
 }
 
 // =============================================================================
+// Beer Orders Spreadsheet Card
+// =============================================================================
+
+function BeerOrdersIntegrationCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <FileSpreadsheet className="h-6 w-6" />
+            <div>
+              <CardTitle className="text-base">Beer Orders Spreadsheet</CardTitle>
+              <CardDescription>Preview and reconcile distributor orders</CardDescription>
+            </div>
+          </div>
+          <IntegrationBadge status="enabled" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <ul className="text-sm text-muted-foreground space-y-1">
+          <li>Dry-run preview before every change</li>
+          <li>Saved customer, brand, and Distributor-tier mappings</li>
+          <li>Atomic apply with import history</li>
+        </ul>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/settings/integrations/beer-orders">
+            Open
+            <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================================
 // MongoDB Integration Card
 // =============================================================================
 
@@ -706,7 +743,7 @@ function MongoDBIntegrationCard() {
         <ul className="text-sm text-muted-foreground space-y-1">
           <li>Suppliers, malts, hops, yeasts, beer styles</li>
           <li>Brands, vessels, batches, transfers</li>
-          <li>Orders, order items, batch readings</li>
+          <li>Batch readings and production history</li>
         </ul>
         <Link href="/settings/integrations/mongodb">
           <Button variant="outline" size="sm">
@@ -740,6 +777,9 @@ export default function IntegrationsPage() {
 
       {/* QuickBooks */}
       <QuickBooksIntegrationCard />
+
+      {/* Beer Orders spreadsheet */}
+      <BeerOrdersIntegrationCard />
 
       {/* MongoDB Sync */}
       <MongoDBIntegrationCard />
