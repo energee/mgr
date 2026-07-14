@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
 /**
- * Characterization tests for POReceiving's write path.
+ * Tests for POReceiving's write path (now delegated to receivePurchaseOrderItems).
  *
- * The fulfilled/partial business rule lives inside the component's
- * `useMutation({ mutationFn })` (po-receiving.tsx ~L192-287). These tests pin
- * CURRENT behavior — including bugs — ahead of extracting the rule into
- * src/domain/purchasing/ + a service. They do NOT assert what the rule *should*
- * be; a behavior-preserving extraction must keep every case below green.
+ * These began as characterization tests pinning the rule while it still lived inside the
+ * component's `useMutation`, quirks included. The quirk cases have since been flipped to
+ * assert correct behavior as each defect was fixed: an empty line list or a null/zero
+ * ordered quantity no longer closes the order, float drift no longer strands a line short
+ * of complete, and an over-receipt is now rejected before any row is written.
  *
- * Idiom: react-query is mocked so the mutationFn can be captured and invoked
- * directly (the rule is otherwise only reachable through deep dialog UI). The
- * Supabase client is mocked at the module boundary because
- * `@/lib/supabase/client` runs env validation at import time.
+ * The one defect still open is the lack of atomicity — the receives are inserted before the
+ * status is read and validated, and a later throw does not roll them back. The tests at the
+ * bottom pin that residual behavior so the eventual RPC fix has something to flip.
+ *
+ * Idiom: react-query is mocked so the mutationFn can be captured and invoked directly (the
+ * rule is otherwise only reachable through deep dialog UI). The Supabase client is mocked at
+ * the module boundary because `@/lib/supabase/client` runs env validation at import time.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { setupRenderHarness } from "@/test/react-harness";
@@ -67,11 +70,11 @@ function entry(overrides: Partial<Entry> & { po_line_item_id: string; quantity: 
 }
 
 /**
- * Mounts the component (which registers its mutationFn) against a fake Supabase
- * whose per-table queues are consumed in the mutationFn's call order:
- *   po_receives:     [insert, select-all]
+ * Mounts the component (which registers its mutationFn) against a fake Supabase whose
+ * per-table queues are consumed in the write path's call order:
+ *   po_line_items:   [select ordered (over-receipt check), select ordered (recompute)]
+ *   po_receives:     [select prior (over-receipt check), insert, select all (recompute)]
  *   purchase_orders: [select status, update status]
- *   po_line_items:   [select id/quantity]
  */
 function setup(responses: Record<string, QueuedResponse[]>) {
   const sb = makeSupabase(responses);
@@ -85,20 +88,31 @@ function setup(responses: Record<string, QueuedResponse[]>) {
 
 const ok = { data: null, error: null };
 
-/** Standard happy-path queues; caller supplies line items + existing receives. */
+/**
+ * Standard happy-path queues.
+ *
+ * `items` are the order's line items (read twice); `prior` is what had already been received
+ * BEFORE this submission (defaults to nothing) and drives the over-receipt check; `receives`
+ * is what the database reports AFTER the insert and drives the status decision.
+ */
 function queues(opts: {
   status: string;
   items: Array<{ id: string; quantity: number | null }>;
   receives: Array<{ po_line_item_id: string; quantity: number }>;
+  prior?: Array<{ po_line_item_id: string; quantity: number }>;
   updateResponse?: QueuedResponse;
 }): Record<string, QueuedResponse[]> {
   return {
-    po_receives: [ok, { data: opts.receives, error: null }],
-    purchase_orders: [
-      { data: { status: opts.status }, error: null },
-      opts.updateResponse ?? ok,
+    po_line_items: [
+      { data: opts.items, error: null },
+      { data: opts.items, error: null },
     ],
-    po_line_items: [{ data: opts.items, error: null }],
+    po_receives: [
+      { data: opts.prior ?? [], error: null },
+      ok,
+      { data: opts.receives, error: null },
+    ],
+    purchase_orders: [{ data: { status: opts.status }, error: null }, opts.updateResponse ?? ok],
   };
 }
 
@@ -115,6 +129,7 @@ describe("POReceiving — status decision (fulfilled vs partial)", () => {
           { id: "li-1", quantity: 10 },
           { id: "li-2", quantity: 5 },
         ],
+        prior: [{ po_line_item_id: "li-2", quantity: 5 }],
         receives: [
           { po_line_item_id: "li-1", quantity: 10 },
           { po_line_item_id: "li-2", quantity: 5 },
@@ -156,6 +171,7 @@ describe("POReceiving — status decision (fulfilled vs partial)", () => {
       queues({
         status: "partial",
         items: [{ id: "li-1", quantity: 10 }],
+        prior: [{ po_line_item_id: "li-1", quantity: 6 }],
         receives: [
           { po_line_item_id: "li-1", quantity: 6 },
           { po_line_item_id: "li-1", quantity: 4 },
@@ -170,32 +186,16 @@ describe("POReceiving — status decision (fulfilled vs partial)", () => {
     });
   });
 
-  it("treats over-receipt (received > ordered) as fulfilled — no cap, no error", async () => {
-    const { callsByTable, run } = setup(
-      queues({
-        status: "confirmed",
-        items: [{ id: "li-1", quantity: 10 }],
-        receives: [{ po_line_item_id: "li-1", quantity: 999 }],
-      }),
-    );
-
-    await run([entry({ po_line_item_id: "li-1", quantity: 999 })]);
-
-    expect(callsByTable.purchase_orders[1].update).toHaveBeenCalledWith({
-      status: "fulfilled",
-    });
-  });
-
-  it("QUIRK: float summation error makes an exactly-complete receive land as partial", async () => {
-    // 0.7 + 0.1 === 0.7999999999999999 < 0.8 in IEEE-754. The rule compares with
-    // a bare `>=` and has NO epsilon tolerance, so a line ordered at 0.8 that was
-    // physically fully received (0.7 then 0.1) keeps the PO at "partial" forever.
+  it("float drift no longer strands an exactly-complete receive at partial", async () => {
+    // 0.7 + 0.1 === 0.7999999999999999 < 0.8 in IEEE-754. Compared with a bare `>=` this
+    // kept a physically-complete line at "partial" forever; RECEIPT_EPSILON absorbs it.
     expect(0.7 + 0.1).toBeLessThan(0.8);
 
     const { callsByTable, run } = setup(
       queues({
         status: "confirmed",
         items: [{ id: "li-1", quantity: 0.8 }],
+        prior: [{ po_line_item_id: "li-1", quantity: 0.7 }],
         receives: [
           { po_line_item_id: "li-1", quantity: 0.7 },
           { po_line_item_id: "li-1", quantity: 0.1 },
@@ -206,11 +206,11 @@ describe("POReceiving — status decision (fulfilled vs partial)", () => {
     await run([entry({ po_line_item_id: "li-1", quantity: 0.1 })]);
 
     expect(callsByTable.purchase_orders[1].update).toHaveBeenCalledWith({
-      status: "partial",
+      status: "fulfilled",
     });
   });
 
-  it("QUIRK: a line with NULL ordered quantity counts as fully received (0 >= null)", async () => {
+  it("a line with NULL ordered quantity no longer counts as fully received", async () => {
     const { callsByTable, run } = setup(
       queues({
         status: "confirmed",
@@ -225,28 +225,11 @@ describe("POReceiving — status decision (fulfilled vs partial)", () => {
     await run([entry({ po_line_item_id: "li-1", quantity: 10 })]);
 
     expect(callsByTable.purchase_orders[1].update).toHaveBeenCalledWith({
-      status: "fulfilled",
+      status: "partial",
     });
   });
 
-  it("QUIRK: a PO whose line-item re-query returns [] flips straight to fulfilled", async () => {
-    // Array.prototype.every([]) === true, so zero line items => allFullyReceived.
-    const { callsByTable, run } = setup(
-      queues({
-        status: "confirmed",
-        items: [],
-        receives: [],
-      }),
-    );
-
-    await run([entry({ po_line_item_id: "li-ghost", quantity: 5 })]);
-
-    expect(callsByTable.purchase_orders[1].update).toHaveBeenCalledWith({
-      status: "fulfilled",
-    });
-  });
-
-  it("QUIRK: a line with ZERO ordered quantity is 'fully received' with nothing received", async () => {
+  it("a line with ZERO ordered quantity no longer counts as fully received", async () => {
     const { callsByTable, run } = setup(
       queues({
         status: "confirmed",
@@ -261,7 +244,7 @@ describe("POReceiving — status decision (fulfilled vs partial)", () => {
     await run([entry({ po_line_item_id: "li-1", quantity: 10 })]);
 
     expect(callsByTable.purchase_orders[1].update).toHaveBeenCalledWith({
-      status: "fulfilled",
+      status: "partial",
     });
   });
 
@@ -282,22 +265,63 @@ describe("POReceiving — status decision (fulfilled vs partial)", () => {
       status: "fulfilled",
     });
     // the re-query is filtered by po_id, and receives by the re-queried line ids
-    expect(callsByTable.po_line_items[0].eq).toHaveBeenCalledWith("po_id", PO_ID);
-    expect(callsByTable.po_receives[1].in).toHaveBeenCalledWith(
-      "po_line_item_id",
-      ["li-1"],
+    expect(callsByTable.po_line_items[1].eq).toHaveBeenCalledWith("po_id", PO_ID);
+    expect(callsByTable.po_receives[2].in).toHaveBeenCalledWith("po_line_item_id", ["li-1"]);
+  });
+});
+
+describe("POReceiving — over-receipt rejection", () => {
+  it("rejects a receipt beyond the ordered quantity, writing nothing", async () => {
+    const sb = setup(
+      queues({
+        status: "confirmed",
+        items: [{ id: "li-1", quantity: 10 }],
+        receives: [],
+      }),
     );
+
+    await expect(sb.run([entry({ po_line_item_id: "li-1", quantity: 999 })])).rejects.toThrow(
+      /Cannot receive more than was ordered.*ordered 10.*submitted 999/,
+    );
+    expect(sb.callsByTable.po_receives[0].insert).not.toHaveBeenCalled();
+  });
+
+  it("counts already-received quantity, so a second receipt cannot overshoot", async () => {
+    const sb = setup(
+      queues({
+        status: "partial",
+        items: [{ id: "li-1", quantity: 10 }],
+        prior: [{ po_line_item_id: "li-1", quantity: 8 }],
+        receives: [],
+      }),
+    );
+
+    await expect(sb.run([entry({ po_line_item_id: "li-1", quantity: 3 })])).rejects.toThrow(
+      /already received 8/,
+    );
+  });
+
+  it("rejects a receipt against a line item that is not on the order", async () => {
+    // Previously an order whose line-item query returned [] flipped straight to "fulfilled".
+    const sb = setup(queues({ status: "confirmed", items: [], receives: [] }));
+
+    await expect(sb.run([entry({ po_line_item_id: "li-ghost", quantity: 5 })])).rejects.toThrow(
+      /Cannot receive more than was ordered/,
+    );
+    expect(sb.callsByTable.po_receives[0].insert).not.toHaveBeenCalled();
   });
 });
 
 describe("POReceiving — state-machine transition validation", () => {
   it("no-ops (no status write) when already in the target state", async () => {
     // partial -> partial is not a legal transition, but the code short-circuits.
-    const sb = setup({
-      po_receives: [ok, { data: [{ po_line_item_id: "li-1", quantity: 1 }], error: null }],
-      purchase_orders: [{ data: { status: "partial" }, error: null }],
-      po_line_items: [{ data: [{ id: "li-1", quantity: 10 }], error: null }],
-    });
+    const sb = setup(
+      queues({
+        status: "partial",
+        items: [{ id: "li-1", quantity: 10 }],
+        receives: [{ po_line_item_id: "li-1", quantity: 1 }],
+      }),
+    );
 
     await sb.run([entry({ po_line_item_id: "li-1", quantity: 1 })]);
 
@@ -306,45 +330,51 @@ describe("POReceiving — state-machine transition validation", () => {
   });
 
   it("throws when the current status cannot transition to the target (draft -> partial)", async () => {
-    const sb = setup({
-      po_receives: [ok, { data: [{ po_line_item_id: "li-1", quantity: 1 }], error: null }],
-      purchase_orders: [{ data: { status: "draft" }, error: null }],
-      po_line_items: [{ data: [{ id: "li-1", quantity: 10 }], error: null }],
-    });
+    const sb = setup(
+      queues({
+        status: "draft",
+        items: [{ id: "li-1", quantity: 10 }],
+        receives: [{ po_line_item_id: "li-1", quantity: 1 }],
+      }),
+    );
 
-    await expect(
-      sb.run([entry({ po_line_item_id: "li-1", quantity: 1 })]),
-    ).rejects.toThrow(
+    await expect(sb.run([entry({ po_line_item_id: "li-1", quantity: 1 })])).rejects.toThrow(
       'Cannot transition from "draft" to "partial". Valid transitions: submitted, cancelled',
     );
-    // BUG: the po_receives rows were ALREADY inserted before this throw.
-    expect(sb.callsByTable.po_receives[0].insert).toHaveBeenCalled();
+    // STILL A BUG: the po_receives rows were already inserted before this throw. Closing this
+    // needs the whole sequence inside a Postgres function.
+    expect(sb.callsByTable.po_receives[1].insert).toHaveBeenCalled();
   });
 
   it("throws when receiving against a cancelled PO", async () => {
-    const sb = setup({
-      po_receives: [ok, { data: [{ po_line_item_id: "li-1", quantity: 10 }], error: null }],
-      purchase_orders: [{ data: { status: "cancelled" }, error: null }],
-      po_line_items: [{ data: [{ id: "li-1", quantity: 10 }], error: null }],
-    });
+    const sb = setup(
+      queues({
+        status: "cancelled",
+        items: [{ id: "li-1", quantity: 10 }],
+        receives: [{ po_line_item_id: "li-1", quantity: 10 }],
+      }),
+    );
 
-    await expect(
-      sb.run([entry({ po_line_item_id: "li-1", quantity: 10 })]),
-    ).rejects.toThrow('Cannot transition from "cancelled" to "fulfilled". Valid transitions: none');
+    await expect(sb.run([entry({ po_line_item_id: "li-1", quantity: 10 })])).rejects.toThrow(
+      'Cannot transition from "cancelled" to "fulfilled". Valid transitions: none',
+    );
   });
 
   it("throws when an already-fulfilled PO goes back to partial (line added post-fulfilment)", async () => {
-    const sb = setup({
-      po_receives: [ok, { data: [{ po_line_item_id: "li-1", quantity: 10 }], error: null }],
-      purchase_orders: [{ data: { status: "fulfilled" }, error: null }],
-      po_line_items: [
-        { data: [{ id: "li-1", quantity: 10 }, { id: "li-2", quantity: 5 }], error: null },
-      ],
-    });
+    const sb = setup(
+      queues({
+        status: "fulfilled",
+        items: [
+          { id: "li-1", quantity: 10 },
+          { id: "li-2", quantity: 5 },
+        ],
+        receives: [{ po_line_item_id: "li-1", quantity: 10 }],
+      }),
+    );
 
-    await expect(
-      sb.run([entry({ po_line_item_id: "li-1", quantity: 10 })]),
-    ).rejects.toThrow('Cannot transition from "fulfilled" to "partial"');
+    await expect(sb.run([entry({ po_line_item_id: "li-1", quantity: 10 })])).rejects.toThrow(
+      'Cannot transition from "fulfilled" to "partial"',
+    );
   });
 
   it("allows confirmed -> fulfilled and partial -> fulfilled", async () => {
@@ -386,7 +416,7 @@ describe("POReceiving — insert payload and entry filtering", () => {
       entry({ po_line_item_id: "li-3", quantity: -5, lot_number: "LOT-NEG" }),
     ]);
 
-    expect(sb.callsByTable.po_receives[0].insert).toHaveBeenCalledWith([
+    expect(sb.callsByTable.po_receives[1].insert).toHaveBeenCalledWith([
       {
         po_line_item_id: "li-1",
         quantity: 4,
@@ -411,8 +441,9 @@ describe("POReceiving — insert payload and entry filtering", () => {
       entry({ po_line_item_id: "li-2", quantity: -3 }),
     ]);
 
-    const inserted = sb.callsByTable.po_receives[0].insert.mock
-      .calls[0][0] as Array<{ po_line_item_id: string }>;
+    const inserted = sb.callsByTable.po_receives[1].insert.mock.calls[0][0] as Array<{
+      po_line_item_id: string;
+    }>;
     expect(inserted.map((r) => r.po_line_item_id)).toEqual(["li-1"]);
   });
 
@@ -445,14 +476,14 @@ describe("POReceiving — insert payload and entry filtering", () => {
 
     await sb.run([entry({ po_line_item_id: "li-1", quantity: 0.1 + 0.2 })]);
 
-    expect(sb.callsByTable.po_receives[0].insert).toHaveBeenCalledWith([
+    expect(sb.callsByTable.po_receives[1].insert).toHaveBeenCalledWith([
       expect.objectContaining({ quantity: 0.30000000000000004 }),
     ]);
   });
 });
 
 describe("POReceiving — side-effect ordering and partial failure", () => {
-  it("inserts receives BEFORE reading status / recomputing totals / updating status", async () => {
+  it("validates the over-receipt BEFORE inserting, then reads and updates status", async () => {
     const sb = setup(
       queues({
         status: "confirmed",
@@ -464,6 +495,8 @@ describe("POReceiving — side-effect ordering and partial failure", () => {
     await sb.run([entry({ po_line_item_id: "li-1", quantity: 10 })]);
 
     expect(sb.fromSpy.mock.calls.map((c) => c[0])).toEqual([
+      "po_line_items", // read ordered quantities (over-receipt check)
+      "po_receives", // read prior receipts (over-receipt check)
       "po_receives", // insert
       "purchase_orders", // read current status
       "po_line_items", // re-query ordered quantities
@@ -472,7 +505,9 @@ describe("POReceiving — side-effect ordering and partial failure", () => {
     ]);
   });
 
-  it("BUG (not fixed): a failing status update leaves the inserted receives behind — no rollback", async () => {
+  it("BUG (still open): a failing status update leaves the inserted receives behind — no rollback", async () => {
+    // The over-receipt check narrows the window but does not close it: once the insert lands,
+    // any later failure strands the rows. Fixing this needs a Postgres function.
     const sb = setup(
       queues({
         status: "confirmed",
@@ -482,33 +517,42 @@ describe("POReceiving — side-effect ordering and partial failure", () => {
       }),
     );
 
-    await expect(
-      sb.run([entry({ po_line_item_id: "li-1", quantity: 10 })]),
-    ).rejects.toEqual({ message: "status write failed" });
+    await expect(sb.run([entry({ po_line_item_id: "li-1", quantity: 10 })])).rejects.toEqual({
+      message: "status write failed",
+    });
 
-    expect(sb.callsByTable.po_receives[0].insert).toHaveBeenCalled();
+    expect(sb.callsByTable.po_receives[1].insert).toHaveBeenCalled();
   });
 
   it("aborts before any status work when the receives insert itself fails", async () => {
     const sb = setup({
-      po_receives: [{ data: null, error: { message: "insert failed" } }],
+      po_line_items: [{ data: [{ id: "li-1", quantity: 10 }], error: null }],
+      po_receives: [
+        { data: [], error: null },
+        { data: null, error: { message: "insert failed" } },
+      ],
     });
 
-    await expect(
-      sb.run([entry({ po_line_item_id: "li-1", quantity: 1 })]),
-    ).rejects.toEqual({ message: "insert failed" });
-    expect(sb.fromSpy.mock.calls.map((c) => c[0])).toEqual(["po_receives"]);
+    await expect(sb.run([entry({ po_line_item_id: "li-1", quantity: 1 })])).rejects.toEqual({
+      message: "insert failed",
+    });
+    expect(sb.fromSpy.mock.calls.map((c) => c[0])).toEqual([
+      "po_line_items",
+      "po_receives",
+      "po_receives",
+    ]);
   });
 
   it("propagates a failed current-status fetch after the receives are already written", async () => {
     const sb = setup({
-      po_receives: [ok],
+      po_line_items: [{ data: [{ id: "li-1", quantity: 10 }], error: null }],
+      po_receives: [{ data: [], error: null }, ok],
       purchase_orders: [{ data: null, error: { message: "po missing" } }],
     });
 
-    await expect(
-      sb.run([entry({ po_line_item_id: "li-1", quantity: 1 })]),
-    ).rejects.toEqual({ message: "po missing" });
-    expect(sb.callsByTable.po_receives[0].insert).toHaveBeenCalled();
+    await expect(sb.run([entry({ po_line_item_id: "li-1", quantity: 1 })])).rejects.toEqual({
+      message: "po missing",
+    });
+    expect(sb.callsByTable.po_receives[1].insert).toHaveBeenCalled();
   });
 });

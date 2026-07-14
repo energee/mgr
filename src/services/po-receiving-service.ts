@@ -10,23 +10,24 @@
  * sequence lived inside a React `useMutation`. It is now callable with no React, so a new
  * frontend (or a server route) can receive against a PO without reimplementing the rule.
  *
- * BEHAVIOR IS PRESERVED EXACTLY — extracted under characterization tests
- * (components/domain/purchasing/__tests__/po-receiving.test.tsx). That includes the known
- * defects below; they are pinned by tests and must be fixed deliberately, not as a side
- * effect of this move.
+ * An over-receipt is rejected before any row is written; the status-decision rules live in
+ * po-receipt-status.ts.
  *
- * KNOWN DEFECTS (preserved, not fixed here):
+ * KNOWN DEFECT (still open — tracked separately):
  * - NOT ATOMIC. The po_receives rows are inserted BEFORE the status is read, validated, and
  *   written. An invalid transition or a failed status update throws AFTER the receipt rows
- *   are already persisted, and nothing rolls them back. Fixing this means moving the
- *   sequence into a Postgres function/RPC.
- * - See po-receipt-status.ts for the status-decision quirks (empty line list => fulfilled,
- *   null quantity counts as received, float drift, uncapped over-receipt).
+ *   are already persisted, and nothing rolls them back. Validating the over-receipt up
+ *   front narrows the window but does not close it — fixing this properly means moving the
+ *   whole sequence into a Postgres function/RPC so it commits or aborts as one transaction.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { purchaseOrderEntity } from "@/entities/purchase-order";
-import { decideTargetStatus } from "@/domain/purchasing/po-receipt-status";
+import {
+  decideTargetStatus,
+  findOverReceipts,
+  sumReceivedByLineItem,
+} from "@/domain/purchasing/po-receipt-status";
 
 export type ReceiveEntry = {
   po_line_item_id: string;
@@ -70,6 +71,39 @@ export async function receivePurchaseOrderItems(
 
   if (receivesToInsert.length === 0) {
     throw new Error("No quantities to receive");
+  }
+
+  // Reject an over-receipt BEFORE writing anything. The UI clamps its inputs to the
+  // outstanding quantity, but that clamp does not exist for any other caller, so without
+  // this check a caller could record 999 against 10 ordered and silently close the order.
+  const { data: orderedItems, error: orderedError } = await supabase
+    .from("po_line_items")
+    .select("id, quantity")
+    .eq("po_id", poId);
+  if (orderedError) throw orderedError;
+
+  const { data: priorReceives, error: priorError } = await supabase
+    .from("po_receives")
+    .select("po_line_item_id, quantity")
+    .in(
+      "po_line_item_id",
+      orderedItems.map((i) => i.id)
+    );
+  if (priorError) throw priorError;
+
+  const overReceipts = findOverReceipts(
+    orderedItems,
+    sumReceivedByLineItem(priorReceives),
+    receivesToInsert
+  );
+  if (overReceipts.length > 0) {
+    const detail = overReceipts
+      .map(
+        (o) =>
+          `line ${o.lineItemId}: ordered ${o.ordered}, already received ${o.alreadyReceived}, submitted ${o.submitted}`
+      )
+      .join("; ");
+    throw new Error(`Cannot receive more than was ordered. ${detail}`);
   }
 
   const { error: receiveError } = await supabase.from("po_receives").insert(receivesToInsert);
