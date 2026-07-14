@@ -133,7 +133,7 @@ describe("buildBinPlacements", () => {
     ).toEqual([]);
   });
 
-  it("emits one row per lot when two lots share a receive id (quirk: quantity duplicated)", () => {
+  it("places a receive's quantity once when two lots share a receive id", () => {
     expect(
       buildBinPlacements(
         [
@@ -142,9 +142,6 @@ describe("buildBinPlacements", () => {
         ],
         new Map([["rec-1", { bin_id: "bin-1", quantity: 5 }]])
       )
-    ).toEqual([
-      { bin_id: "bin-1", inventory_lot_id: "lot-1", quantity: 5 },
-      { bin_id: "bin-1", inventory_lot_id: "lot-2", quantity: 5 },
-    ]);
+    ).toEqual([{ bin_id: "bin-1", inventory_lot_id: "lot-1", quantity: 5 }]);
   });
 });

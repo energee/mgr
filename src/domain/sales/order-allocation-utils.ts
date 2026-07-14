@@ -102,12 +102,12 @@ export function computeFifoFill(
   lots: AllocatableLot[],
   excludedLotIds: ReadonlySet<string> = new Set()
 ): Record<string, number> {
+  // Sum, don't overwrite: computeDemandLines already dedupes by combo, but a
+  // caller passing two lines for the same combo means their demands add up.
   const remainingByCombo = new Map<string, number>();
   for (const line of lines) {
-    remainingByCombo.set(
-      comboKey(line.brandId, line.sellingFormatId),
-      line.remaining
-    );
+    const key = comboKey(line.brandId, line.sellingFormatId);
+    remainingByCombo.set(key, (remainingByCombo.get(key) ?? 0) + line.remaining);
   }
 
   // Oldest production date first, undated lots last — matches the RPC's

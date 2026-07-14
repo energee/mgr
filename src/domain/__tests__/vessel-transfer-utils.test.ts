@@ -137,12 +137,12 @@ describe("isDuplicateTransfer", () => {
     expect(isDuplicateTransfer("2026-07-13T12:00:00Z", 0)).toBe(false);
   });
 
-  it("quirk: a future timestamp yields negative minutesAgo and counts as duplicate", () => {
+  it("does not treat a future timestamp (clock skew) as a duplicate", () => {
     freeze("2026-07-13T12:00:00Z");
-    expect(isDuplicateTransfer("2026-07-13T23:00:00Z")).toBe(true);
+    expect(isDuplicateTransfer("2026-07-13T23:00:00Z")).toBe(false);
   });
 
-  it("quirk: an unparseable timestamp yields NaN and is not a duplicate", () => {
+  it("does not treat an unparseable timestamp as a duplicate", () => {
     freeze("2026-07-13T12:00:00Z");
     expect(isDuplicateTransfer("not-a-date")).toBe(false);
   });

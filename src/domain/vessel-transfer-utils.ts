@@ -55,6 +55,11 @@ export function groupVesselsForTransfer<T extends { vessel_type: string }>(
 /**
  * Checks whether a transfer is a likely duplicate based on time proximity.
  * Used by VesselTransferDialog to pre-check before inserting.
+ *
+ * Only a timestamp in the recent past counts. A future timestamp (clock skew
+ * between client and server) and an unparseable one both yield false — the
+ * check exists to catch accidental double-submits, so when the input is not
+ * trustworthy it must not block a legitimate transfer.
  */
 export function isDuplicateTransfer(
   lastTransferredAt: string | null,
@@ -64,5 +69,6 @@ export function isDuplicateTransfer(
   const lastTime = new Date(lastTransferredAt);
   const now = new Date();
   const minutesAgo = (now.getTime() - lastTime.getTime()) / 60000;
+  if (Number.isNaN(minutesAgo) || minutesAgo < 0) return false;
   return minutesAgo < windowMinutes;
 }
