@@ -51,10 +51,10 @@ import {
   getCatalogTypeLabel,
   resolveCatalogNames,
 } from "@/entities/po-line-item";
-import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { purchaseOrderKeys, entityKeys } from "@/lib/query-keys";
 import { parsePositiveNumber } from "@/lib/format";
 import { log } from "@/lib/client-logger";
+import { receivePurchaseOrderItems } from "@/services/po-receiving-service";
 
 // =============================================================================
 // Types
@@ -105,13 +105,6 @@ function defaultReceiveEntry(itemId: string): ReceiveEntry {
     expiration_date: "",
     notes: "",
   };
-}
-
-function isValidTransition(fromState: string, toState: string): boolean {
-  const stateMachine = purchaseOrderEntity.stateMachine;
-  if (!stateMachine) return false;
-  const validTransitions = stateMachine.transitions[fromState] || [];
-  return validTransitions.includes(toState);
 }
 
 // =============================================================================
@@ -189,101 +182,11 @@ export function POReceiving({
 
   // Create receive mutation
   const receiveMutation = useMutation({
+    // The receipt rules (fulfilled/partial decision, transition validation, write order)
+    // live in @/services/po-receiving-service, not here — see that file for the known
+    // non-atomicity of the insert-then-validate sequence.
     mutationFn: async (entries: ReceiveEntry[]) => {
-      const receivesToInsert = entries
-        .filter((e) => e.quantity > 0)
-        .map((entry) => ({
-          po_line_item_id: entry.po_line_item_id,
-          quantity: entry.quantity,
-          lot_number: entry.lot_number || null,
-          expiration_date: entry.expiration_date || null,
-          notes: globalNotes || entry.notes || null,
-        }));
-
-      if (receivesToInsert.length === 0) {
-        throw new Error("No quantities to receive");
-      }
-
-      // Insert po_receives records
-      const { error: receiveError } = await supabase
-        .from("po_receives")
-        .insert(receivesToInsert);
-
-      if (receiveError) throw receiveError;
-
-      // NOTE: Inventory lot creation is intentionally NOT done here.
-      // PO receiving records what was physically received (po_receives with lot_number/expiration).
-      // A separate inventory receiving workflow should create inventory_lots, allowing for:
-      // - QA/inspection steps between receipt and inventory acceptance
-      // - Proper mapping to inventory_items (which may not match catalog items 1:1)
-      // - User control over which items enter inventory tracking
-      // The po_receives.id can be linked via inventory_lots.po_receive_id when lots are created.
-
-      // Get current PO status for state machine validation
-      const { data: currentPO, error: poFetchError } = await supabase
-        .from("purchase_orders")
-        .select("status")
-        .eq("id", poId)
-        .single();
-
-      if (poFetchError) throw poFetchError;
-
-      const currentStatus = currentPO.status;
-
-      // Re-query to get accurate totals after insert (fixes race condition)
-      const { data: updatedItems, error: itemsError } = await supabase
-        .from("po_line_items")
-        .select("id, quantity")
-        .eq("po_id", poId);
-
-      if (itemsError) throw itemsError;
-
-      const { data: allReceives, error: receivesError } = await supabase
-        .from("po_receives")
-        .select("po_line_item_id, quantity")
-        .in(
-          "po_line_item_id",
-          updatedItems.map((i) => i.id)
-        );
-
-      if (receivesError) throw receivesError;
-
-      // Calculate accurate totals from database
-      const receivedByItem = new Map<string, number>();
-      for (const r of allReceives ?? []) {
-        const current = receivedByItem.get(r.po_line_item_id) || 0;
-        receivedByItem.set(r.po_line_item_id, current + r.quantity);
-      }
-
-      const allFullyReceived = updatedItems.every((item) => {
-        const totalReceived = receivedByItem.get(item.id) || 0;
-        return totalReceived >= item.quantity;
-      });
-
-      // Determine target status based on whether all items are received
-      const targetStatus = allFullyReceived ? "fulfilled" : "partial";
-
-      // Validate state machine transition
-      if (!isValidTransition(currentStatus, targetStatus)) {
-        // If we can't transition to target, check if we're already in a valid state
-        if (currentStatus === targetStatus) {
-          // Already in the target state, no update needed
-          return;
-        }
-        // Otherwise throw an error - this shouldn't happen in normal workflow
-        throw new Error(
-          `Cannot transition from "${currentStatus}" to "${targetStatus}". ` +
-          `Valid transitions: ${purchaseOrderEntity.stateMachine?.transitions[currentStatus]?.join(", ") || "none"}`
-        );
-      }
-
-      // Update PO status with error checking
-      const { error: statusError } = await supabase
-        .from("purchase_orders")
-        .update({ status: targetStatus })
-        .eq("id", poId);
-
-      if (statusError) throw statusError;
+      await receivePurchaseOrderItems(supabase, { poId, entries, globalNotes });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
