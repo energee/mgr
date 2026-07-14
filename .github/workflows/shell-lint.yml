@@ -1,0 +1,37 @@
+name: Shell Lint
+
+on:
+  pull_request:
+    paths:
+      - "scripts/*.sh"
+      - ".github/workflows/shell-lint.yml"
+      - ".github/workflows/live-drift.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/*.sh"
+      - ".github/workflows/shell-lint.yml"
+      - ".github/workflows/live-drift.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  shell-lint:
+    name: Shell Syntax and ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Lint shell scripts
+        run: |
+          set -euo pipefail
+          for script in scripts/*.sh; do
+            bash -n "$script"
+          done
+          shellcheck -S warning scripts/*.sh
