@@ -3,9 +3,11 @@
 Scripts for migrating legacy catalog/production data and reconciling sales
 orders into MGR (Supabase / PostgreSQL).
 
-> Orders are owned by `Beer orders.xlsx`. Do not import or clean orders from
-> MongoDB; the legacy Mongo order documents do not contain MGR's customer,
-> selling-format, pricing, or keg-owner relationships.
+> Orders are owned by `Beer orders.xlsx`. The normal reconciliation path is
+> **Settings → Integrations → Beer Orders Spreadsheet**: upload the workbook,
+> review the dry-run, resolve mappings, and explicitly apply. Do not import or
+> clean orders from MongoDB; the legacy Mongo order documents do not contain
+> MGR's customer, selling-format, pricing, or keg-owner relationships.
 
 ## Overview
 
@@ -34,7 +36,7 @@ python3 scripts/migration/migrate_catalog_items.py \
     --backup-dir ./backup-2026-01-08/lolev-manager \
     --output-dir ./sql-output
 
-# 3. Preview the spreadsheet order reconciliation
+# 3. Emergency CLI only: preview the spreadsheet order reconciliation
 python3 scripts/migration/reconcile_beer_orders.py \
     "/path/to/Beer orders.xlsx"
 
@@ -61,7 +63,7 @@ python3 scripts/migration/migrate_catalog_items.py \
 - Hops: `alphaAcid` → `alpha_acid_min/max` (±10% range)
 - Yeasts: Supplier stored as `manufacturer` (inline name)
 
-### reconcile_beer_orders.py
+### reconcile_beer_orders.py (emergency CLI)
 
 Reconciles: customers, orders, order items, selling formats, Distributor
 prices, and keg owners from `Beer orders.xlsx`.
@@ -74,10 +76,19 @@ python3 scripts/migration/reconcile_beer_orders.py \
     ~/Downloads/Beer\ orders.xlsx --apply
 ```
 
-The command is dry-run by default. Apply mode writes a JSON preimage backup to
+Use the Settings integration for routine reimports. This command remains for
+recovery or one-off administrator work when the application is unavailable.
+It is dry-run by default; apply mode writes a JSON preimage backup to
 `/tmp/mgr-beer-orders-backups` before mutating live data. Distribution keg
-lines use Microstar; the internal/taproom rule is KegFleet. Customer and beer
-aliases are explicit in the script so unresolved workbook names fail closed.
+lines use Microstar. Internal/taproom blocks are excluded because taproom stock
+is allocated to an internal bin rather than represented as customer orders.
+Customer and beer aliases are explicit so unresolved workbook names fail closed.
+
+The Settings integration has the same source rules plus saved mappings, an
+audited import history, and a single database transaction. It creates new
+orders in `draft`, preserves existing order statuses, updates deterministic line
+IDs in place, and reports spreadsheet orders missing from a later upload without
+changing or deleting them.
 
 ### migrate_orders.py (legacy — do not run)
 

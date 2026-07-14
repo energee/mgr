@@ -76,6 +76,7 @@
     "react-day-picker": "^9.13.2",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.71.2",
+    "read-excel-file": "^6.0.1",
     "recharts": "^3.7.0",
     "resend": "^6.9.2",
     "shiki": "^3.23.0",
