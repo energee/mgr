@@ -56,7 +56,7 @@ import { useCalculateOrderMaterials } from "@/hooks/use-material-planning";
 import {
   parseItemFieldEdit,
   type EditableItemField,
-} from "@/components/domain/order/order-item-edit-utils";
+} from "@/domain/sales/order-item-edit-utils";
 import { log } from "@/lib/client-logger";
 
 // =============================================================================

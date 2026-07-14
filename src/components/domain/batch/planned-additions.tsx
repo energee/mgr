@@ -25,7 +25,7 @@ import type { AdditionType } from "@/domain/batch-additions";
 import {
   isPlannedAdditionLogged,
   type PlannedAddition,
-} from "@/components/domain/batch/planned-addition-matching";
+} from "@/domain/planned-addition-matching";
 import { recipeKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
 
