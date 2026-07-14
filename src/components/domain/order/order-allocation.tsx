@@ -49,7 +49,7 @@ import {
   comboKey,
   computeDemandLines,
   computeFifoFill,
-} from "@/components/domain/order/order-allocation-utils";
+} from "@/domain/sales/order-allocation-utils";
 
 // =============================================================================
 // Types

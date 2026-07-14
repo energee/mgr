@@ -85,7 +85,7 @@ import {
   buildBinPlacements,
   catalogKey,
   type PriorLotRow,
-} from "./po-accept-utils";
+} from "@/domain/purchasing/po-accept-utils";
 
 // =============================================================================
 // Types

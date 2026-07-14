@@ -24,7 +24,7 @@ vi.mock("@/lib/supabase/client", () => ({
 import {
   preparePlanBatchPrefill,
   NEW_BATCH_PATH,
-} from "@/components/domain/recipe/plan-batch-from-recipe";
+} from "@/domain/plan-batch-from-recipe";
 import { usePrefillStore } from "@/contexts/prefill-store";
 
 beforeEach(() => {

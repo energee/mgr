@@ -27,7 +27,7 @@ import {
   groupMaterialShortfallsBySupplier,
   isShortfallRowOrderable,
   materialShortfallRowKey,
-} from "@/components/domain/purchasing/material-shortfall-po-draft";
+} from "@/domain/purchasing/material-shortfall-po-draft";
 import { materialPlanningKeys, purchasingKeys } from "@/lib/query-keys";
 import {
   Table,
