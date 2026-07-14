@@ -9,8 +9,6 @@ import {
   transformBeer,
   transformVessel,
   transformBatch,
-  transformOrder,
-  transformOrderItem,
   transformTest,
   type HopLookup,
 } from "../transformers";
@@ -163,35 +161,6 @@ describe("Phase 3 transformers", () => {
     expect(result.status).toBe("fermenting");
   });
 
-  it("transforms order with status mapping and stable order number", () => {
-    const result = transformOrder({
-      _id: oid("507f1f77bcf86cd799439019"),
-      status: "completed",
-      date: new Date("2024-10-21"),
-      completedDate: new Date("2024-10-21"),
-      notes: "test order",
-    });
-    expect(result.status).toBe("fulfilled");
-    expect(result.order_number).toBe("ORD-20241021-439019");
-  });
-
-  it("transforms order item with brand resolution", () => {
-    const beerId = "507f1f77bcf86cd799439016";
-    const result = transformOrderItem(
-      {
-        id: "item-1",
-        quantity: 10,
-        product: { relationTo: "beers", value: oid(beerId) },
-        pricing: { unitPrice: 5.5 },
-      },
-      "order-uuid",
-      "order-mongo-id",
-      0
-    );
-    expect(result.brand_id).toBe(objectIdToUuid(beerId));
-    expect(result.quantity).toBe(10);
-    expect(result.unit_price).toBe(5.5);
-  });
 });
 
 describe("Phase 4 transformers", () => {

@@ -1,8 +1,10 @@
 /**
  * MongoDB Integration — Sync Trigger
  *
- * POST: Triggers sync by phase, entity, or all.
+ * POST: Triggers catalog and production sync by phase, entity, or all.
  * Body: { phase?: 1|2|3|4, entity?: string } — if neither, runs all phases.
+ * Orders are spreadsheet-owned and are deliberately excluded from every
+ * MongoDB sync and clean path.
  */
 
 export const maxDuration = 60;
@@ -35,7 +37,7 @@ export const POST = withPermission("integrations:manage", async (req) => {
     const VALID_ENTITIES = [
       "suppliers", "malts", "hops", "yeasts", "beer_styles",
       "brands", "vessels", "recipes", "batches", "vessel_transfers",
-      "orders", "brew_logs", "batch_logs",
+      "brew_logs", "batch_logs",
     ];
 
     if (phase && !VALID_PHASES.includes(phase)) {
@@ -50,8 +52,6 @@ export const POST = withPermission("integrations:manage", async (req) => {
       const admin = await createAdminClient();
       await dynamicFrom(admin, "batch_logs").delete().eq("log_type", "measurement");
       await dynamicFrom(admin, "brew_log_batches").delete().gte("created_at", "1970-01-01");
-      await dynamicFrom(admin, "order_items").delete().gte("created_at", "1970-01-01");
-      await dynamicFrom(admin, "orders").delete().gte("created_at", "1970-01-01");
       await dynamicFrom(admin, "brew_logs").delete().gte("created_at", "1970-01-01");
       await dynamicFrom(admin, "vessel_transfers").delete().gte("created_at", "1970-01-01");
       await dynamicFrom(admin, "recipe_malts").delete().gte("created_at", "1970-01-01");

@@ -211,6 +211,16 @@ describe("syncRecipes (via syncEntity)", () => {
   });
 });
 
+describe("spreadsheet-owned orders", () => {
+  it("rejects MongoDB order syncs before reading the legacy database", async () => {
+    await expect(syncEntity("orders" as never)).rejects.toThrow(
+      "Unknown entity type: orders"
+    );
+
+    expect(mockedGetMongoDb).not.toHaveBeenCalled();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // upsertRows duplicate-conflict-key handling (Sentry MGR-A / issue 7542174707)
 //
