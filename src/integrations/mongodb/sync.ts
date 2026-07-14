@@ -169,7 +169,12 @@ async function upsertRows(
       .upsert(batch, { onConflict, ignoreDuplicates: false });
 
     if (error) {
-      logger.error("Upsert error for %s batch %d: %s", table, i / BATCH_SIZE, error.message);
+      // Pass the PostgrestError instance itself (not a message-only printf
+      // template) so logger.ts's `instanceof Error` check routes this to
+      // Sentry.captureException with the real message/stack/code (audit
+      // SENTRY-7542174707 — a bare printf template here silently degraded to
+      // a generic captureMessage with no table/batch/error diagnostic).
+      logger.error({ err: error, table, batchIndex: i / BATCH_SIZE }, "Upsert error");
       failed += batch.length;
       errors.push({
         mongoId: `batch-${i / BATCH_SIZE}`,
@@ -1047,7 +1052,10 @@ export async function syncPhase(phase: SyncPhase): Promise<SyncResult[]> {
       results.push(await fn());
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      logger.error("Sync error in phase %d: %s", phase, message);
+      // Pass the real error instance (same rationale as upsertRows above,
+      // SENTRY-7542174707) so it routes to Sentry.captureException with a
+      // real stack instead of a bare, un-interpolated printf template.
+      logger.error({ err, phase }, "Sync error in phase");
       results.push({
         entityType: (ENTITY_FN_NAMES.get(fn) ?? "unknown") as SyncEntityType,
         phase,
