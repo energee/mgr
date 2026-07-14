@@ -276,6 +276,38 @@ describe("logger", () => {
       });
     });
 
+    // SENTRY-7542174707 regression: a pino printf-style call
+    // (logger.error("... %s ...", a, b)) must have its placeholders
+    // interpolated before being forwarded to Sentry. Previously the bare,
+    // un-interpolated template string was sent as-is, so Sentry captured
+    // "Upsert error for %s batch %d: %s" with none of the table name, batch
+    // index, or actual Postgres error message — making the issue
+    // undiagnosable from the Sentry event alone.
+    it("interpolates printf-style placeholders before forwarding to Sentry", async () => {
+      const { sentry, logger } = await setup();
+      logger.error(
+        "Upsert error for %s batch %d: %s",
+        "brands",
+        2,
+        "duplicate key value violates unique constraint"
+      );
+      expect(sentry.captureMessage).toHaveBeenCalledWith(
+        "Upsert error for brands batch 2: duplicate key value violates unique constraint",
+        {
+          level: "error",
+          extra: { args: ["brands", 2, "duplicate key value violates unique constraint"] },
+        }
+      );
+    });
+
+    it("does not treat a literal % with no known specifier as a placeholder", async () => {
+      const { sentry, logger } = await setup();
+      logger.error("100% failure rate");
+      expect(sentry.captureMessage).toHaveBeenCalledWith("100% failure rate", {
+        level: "error",
+      });
+    });
+
     it("uses '(no message)' fallback when obj has no string message arg", async () => {
       const { sentry, logger } = await setup();
       logger.error({ service: "postgres" });

@@ -22,6 +22,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import pino from "pino";
+import { format } from "node:util";
 
 export type Logger = pino.Logger;
 
@@ -30,12 +31,16 @@ const PINO_ERROR = 50;
 /** Pino numeric level for "fatal". */
 const PINO_FATAL = 60;
 
+/** Matches pino/util.format printf placeholders: %s %d %i %f %j %o %O %c */
+const PRINTF_PLACEHOLDER = /%[sdifjoOc]/;
+
 /**
  * Forward a pino log call to Sentry. Mirrors pino's flexible call shapes:
  *   logger.error(err)
  *   logger.error({ err, ...ctx }, "message")
  *   logger.error({ ...ctx }, "message")
  *   logger.error("message")
+ *   logger.error("message with %s placeholders", value1, value2)
  *
  * Best-effort — wrapped in a try/catch by the caller so a Sentry failure
  * can never break the logger pipeline.
@@ -46,7 +51,7 @@ const PINO_FATAL = 60;
 function forwardToSentry(args: readonly unknown[], level: number): void {
   const sentryLevel: Sentry.SeverityLevel =
     level >= PINO_FATAL ? "fatal" : "error";
-  const [first, second] = args;
+  const [first, second, ...rest] = args;
 
   if (first instanceof Error) {
     Sentry.captureException(first, { level: sentryLevel });
@@ -66,6 +71,18 @@ function forwardToSentry(args: readonly unknown[], level: number): void {
     return;
   }
   if (typeof first === "string") {
+    // Printf-style call (logger.error("... %s ...", a, b)): interpolate the
+    // placeholders before forwarding, otherwise Sentry captures the bare,
+    // un-interpolated template — losing every diagnostic value the caller
+    // passed (see SENTRY-7542174707).
+    if (args.length > 1 && PRINTF_PLACEHOLDER.test(first)) {
+      const printfArgs = [second, ...rest];
+      Sentry.captureMessage(format(first, ...printfArgs), {
+        level: sentryLevel,
+        extra: { args: printfArgs },
+      });
+      return;
+    }
     Sentry.captureMessage(first, { level: sentryLevel });
   }
 }
