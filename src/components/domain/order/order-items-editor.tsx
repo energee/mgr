@@ -16,7 +16,7 @@
  *   keystroke); invalid input reverts to the saved value
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
@@ -105,6 +105,58 @@ const EMPTY_NEW_ITEM: NewItemState = {
   suggestedPrice: null,
   tierName: null,
 };
+
+type CatalogComboboxProps = {
+  value: string;
+  selectedLabel: string;
+  placeholder: string;
+  emptyText: string;
+  onValueChange: (value: string) => void;
+  onFilter: (values: string[], search: string) => string[];
+  children: ReactNode;
+};
+
+/**
+ * Dice UI snapshots a selected item's label when the combobox mounts. Order
+ * rows often arrive before their catalog queries, so an uncontrolled input
+ * stays blank even after the matching brand/format/owner option appears.
+ * Keep the searchable input controlled and resync it whenever that async
+ * catalog label changes.
+ */
+function CatalogCombobox({
+  value,
+  selectedLabel,
+  placeholder,
+  emptyText,
+  onValueChange,
+  onFilter,
+  children,
+}: CatalogComboboxProps) {
+  const [inputValue, setInputValue] = useState(selectedLabel);
+
+  useEffect(() => {
+    setInputValue(selectedLabel);
+  }, [selectedLabel]);
+
+  return (
+    <Combobox
+      value={value}
+      inputValue={inputValue}
+      onInputValueChange={setInputValue}
+      onValueChange={onValueChange}
+      onFilter={onFilter}
+    >
+      <ComboboxAnchor className="h-8">
+        <ComboboxInput className="h-8" placeholder={placeholder} />
+        <ComboboxTrigger />
+      </ComboboxAnchor>
+      <ComboboxContent>
+        <ComboboxEmpty>{emptyText}</ComboboxEmpty>
+        {children}
+      </ComboboxContent>
+    </Combobox>
+  );
+}
 
 // =============================================================================
 // Inventory Awareness Hooks
@@ -541,8 +593,11 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 {readOnly ? (
                   getBrandName(item.brand_id)
                 ) : (
-                  <Combobox
+                  <CatalogCombobox
                     value={item.brand_id || ""}
+                    selectedLabel={item.brand_id ? (brandNameMap.get(item.brand_id) ?? "") : ""}
+                    placeholder="Select brand"
+                    emptyText="No brands found"
                     onValueChange={(v) =>
                       updateItem.mutate({ id: item.id, field: "brand_id", value: v || null })
                     }
@@ -551,25 +606,18 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                       return values.filter((v) => brands?.find((b) => b.id === v)?.name.toLowerCase().includes(term));
                     }}
                   >
-                    <ComboboxAnchor className="h-8">
-                      <ComboboxInput className="h-8" placeholder="Select brand" />
-                      <ComboboxTrigger />
-                    </ComboboxAnchor>
-                    <ComboboxContent>
-                      <ComboboxEmpty>No brands found</ComboboxEmpty>
-                      {sortedBrands.map((b) => (
-                        <ComboboxItem key={b.id} value={b.id} label={b.name}>
-                          <span className="flex items-center gap-2">
-                            {b.name}
-                            {availability?.byBrand[b.id]
-                              ? <Badge variant="secondary" className="text-xs">{availability.byBrand[b.id]} avail</Badge>
-                              : <span className="text-xs text-muted-foreground">no stock</span>
-                            }
-                          </span>
-                        </ComboboxItem>
-                      ))}
-                    </ComboboxContent>
-                  </Combobox>
+                    {sortedBrands.map((b) => (
+                      <ComboboxItem key={b.id} value={b.id} label={b.name}>
+                        <span className="flex items-center gap-2">
+                          {b.name}
+                          {availability?.byBrand[b.id]
+                            ? <Badge variant="secondary" className="text-xs">{availability.byBrand[b.id]} avail</Badge>
+                            : <span className="text-xs text-muted-foreground">no stock</span>
+                          }
+                        </span>
+                      </ComboboxItem>
+                    ))}
+                  </CatalogCombobox>
                 )}
               </TableCell>
               <TableCell>
@@ -582,42 +630,41 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   </span>
                 ) : (
                   <div className="space-y-1">
-                    <Combobox
+                    <CatalogCombobox
                       value={getFormatId(item)}
+                      selectedLabel={getFormatName(item) === "—" ? "" : getFormatName(item)}
+                      placeholder="Select format"
+                      emptyText="No formats found"
                       onValueChange={(v) => handleFormatChange(item.id, v)}
                       onFilter={(values, search) => {
                         const term = search.toLowerCase();
                         return values.filter((v) => packagingFormats?.find((f) => f.id === v)?.name.toLowerCase().includes(term));
                       }}
                     >
-                      <ComboboxAnchor className="h-8">
-                        <ComboboxInput className="h-8" placeholder="Select format" />
-                        <ComboboxTrigger />
-                      </ComboboxAnchor>
-                      <ComboboxContent>
-                        <ComboboxEmpty>No formats found</ComboboxEmpty>
-                        {packagingFormats?.map((f) => (
-                          <ComboboxItem key={f.id} value={f.id} label={f.name}>
-                            <span className="flex items-center gap-2">
-                              {f.name}
-                              {formatVolumeLabel(f) != null && (
-                                <span className="text-xs text-muted-foreground">{formatVolumeLabel(f)}</span>
-                              )}
-                              {f.container_type === "keg" && (
-                                <Badge variant="outline" className="text-xs">keg</Badge>
-                              )}
-                              {item.brand_id && availability?.byBrandFormat[`${item.brand_id}:${f.id}`]
-                                ? <Badge variant="secondary" className="text-xs">{availability.byBrandFormat[`${item.brand_id}:${f.id}`]} avail</Badge>
-                                : item.brand_id ? <span className="text-xs text-muted-foreground">no stock</span> : null
-                              }
-                            </span>
-                          </ComboboxItem>
-                        ))}
-                      </ComboboxContent>
-                    </Combobox>
+                      {packagingFormats?.map((f) => (
+                        <ComboboxItem key={f.id} value={f.id} label={f.name}>
+                          <span className="flex items-center gap-2">
+                            {f.name}
+                            {formatVolumeLabel(f) != null && (
+                              <span className="text-xs text-muted-foreground">{formatVolumeLabel(f)}</span>
+                            )}
+                            {f.container_type === "keg" && (
+                              <Badge variant="outline" className="text-xs">keg</Badge>
+                            )}
+                            {item.brand_id && availability?.byBrandFormat[`${item.brand_id}:${f.id}`]
+                              ? <Badge variant="secondary" className="text-xs">{availability.byBrandFormat[`${item.brand_id}:${f.id}`]} avail</Badge>
+                              : item.brand_id ? <span className="text-xs text-muted-foreground">no stock</span> : null
+                            }
+                          </span>
+                        </ComboboxItem>
+                      ))}
+                    </CatalogCombobox>
                     {kegFormatIds.has(item.selling_format_id ?? "") && (
-                      <Combobox
+                      <CatalogCombobox
                         value={item.keg_owner_id || ""}
+                        selectedLabel={item.keg_owner_id ? (kegOwnerNameMap.get(item.keg_owner_id) ?? "") : ""}
+                        placeholder="Keg owner (optional)"
+                        emptyText="No owners found"
                         onValueChange={(v) =>
                           updateItem.mutate({ id: item.id, field: "keg_owner_id", value: v || null })
                         }
@@ -626,19 +673,12 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                           return values.filter((v) => kegOwners?.find((o) => o.id === v)?.name.toLowerCase().includes(term));
                         }}
                       >
-                        <ComboboxAnchor className="h-8">
-                          <ComboboxInput className="h-8" placeholder="Keg owner (optional)" />
-                          <ComboboxTrigger />
-                        </ComboboxAnchor>
-                        <ComboboxContent>
-                          <ComboboxEmpty>No owners found</ComboboxEmpty>
-                          {kegOwners?.map((o) => (
-                            <ComboboxItem key={o.id} value={o.id} label={o.name}>
-                              {o.name}
-                            </ComboboxItem>
-                          ))}
-                        </ComboboxContent>
-                      </Combobox>
+                        {kegOwners?.map((o) => (
+                          <ComboboxItem key={o.id} value={o.id} label={o.name}>
+                            {o.name}
+                          </ComboboxItem>
+                        ))}
+                      </CatalogCombobox>
                     )}
                   </div>
                 )}
