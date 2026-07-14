@@ -747,6 +747,15 @@ export const mongodbKeys = {
 };
 
 // =============================================================================
+// Beer Orders Spreadsheet Integration Keys
+// =============================================================================
+
+export const beerOrderImportKeys = {
+  all: () => ["beer-order-imports"] as const,
+  runs: () => ["beer-order-imports", "runs"] as const,
+};
+
+// =============================================================================
 // PO Receive Keys (for accept-into-inventory workflow)
 // =============================================================================
 
