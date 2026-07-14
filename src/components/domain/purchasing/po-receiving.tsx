@@ -182,12 +182,12 @@ export function POReceiving({
 
   // Create receive mutation
   const receiveMutation = useMutation({
-    // The receipt rules (fulfilled/partial decision, transition validation, write order)
-    // live in @/services/po-receiving-service, not here — see that file for the known
-    // non-atomicity of the insert-then-validate sequence.
-    mutationFn: async (entries: ReceiveEntry[]) => {
-      await receivePurchaseOrderItems(supabase, { poId, entries, globalNotes });
-    },
+    // The receipt rules (fulfilled/partial decision, over-receipt check, transition
+    // validation) live in the receive_purchase_order_items Postgres function, which
+    // @/services/po-receiving-service calls. The whole receipt commits or aborts as one
+    // transaction; nothing is written unless all of it succeeds.
+    mutationFn: (entries: ReceiveEntry[]) =>
+      receivePurchaseOrderItems(supabase, { poId, entries, globalNotes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItemsForReceive(poId) });
