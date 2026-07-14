@@ -36,12 +36,14 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).toMatch(/shard:\s*\[1, 2\]/);
     expect(workflow).toContain("--shard=${{ matrix.shard }}/2");
     expect(workflow).toContain("--merge-reports");
+    expect(workflow).toContain("include-hidden-files: true");
     expect(workflow).toContain(".next/cache");
     expect(workflow).toContain(".eslintcache");
     expect(workflow).toContain("tsconfig.tsbuildinfo");
     expect(workflow).toContain("make check-db");
     expect(workflow).toContain("make check-wip");
     expect(workflow).toContain("make check-agent-config");
+    expect(workflows.map(read).join("\n")).not.toContain("cache: true");
   });
 
   it("replays migrations once for DB lint and integration tests", () => {
