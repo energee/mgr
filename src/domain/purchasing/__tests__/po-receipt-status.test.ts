@@ -1,11 +1,10 @@
 /**
- * Characterization tests for the extracted PO receipt-status rules.
+ * Tests for the PO receipt-status rules.
  *
- * These pin CURRENT behavior, quirks included. Several cases below assert what is plainly a
- * bug (an empty line list reporting "fulfilled", a null quantity counting as received). They
- * are asserted deliberately: the extraction from po-receiving.tsx had to be
- * behavior-preserving, so the defects move with the code and get fixed on purpose, in their
- * own change, rather than silently disappearing inside a refactor.
+ * These began as characterization tests pinning the behavior extracted from po-receiving.tsx,
+ * quirks and all. The quirk cases have since been flipped to assert correct behavior as each
+ * defect was fixed (empty line list, null/zero ordered quantity, float drift, over-receipt);
+ * the section below is kept together so the fixed defects stay visible and regression-tested.
  */
 
 import { describe, it, expect } from "vitest";
@@ -13,6 +12,7 @@ import {
   sumReceivedByLineItem,
   isAllFullyReceived,
   decideTargetStatus,
+  findOverReceipts,
   type POLineItemQuantity,
 } from "../po-receipt-status";
 
@@ -62,15 +62,9 @@ describe("decideTargetStatus", () => {
     expect(decideTargetStatus(lines, [])).toBe("partial");
   });
 
-  // --- Quirks preserved from the original implementation -----------------------
+  // --- Defects fixed (each of these used to report "fulfilled") ----------------
 
-  it("QUIRK: over-receipt is uncapped and counts as fulfilled", () => {
-    expect(
-      decideTargetStatus([{ id: "a", quantity: 10 }], [{ po_line_item_id: "a", quantity: 999 }])
-    ).toBe("fulfilled");
-  });
-
-  it("QUIRK: float drift leaves a line permanently partial (0.7 + 0.1 < 0.8)", () => {
+  it("float drift does not strand a line short of complete (0.7 + 0.1 vs 0.8)", () => {
     expect(
       decideTargetStatus(
         [{ id: "a", quantity: 0.8 }],
@@ -79,20 +73,86 @@ describe("decideTargetStatus", () => {
           { po_line_item_id: "a", quantity: 0.1 },
         ]
       )
+    ).toBe("fulfilled");
+  });
+
+  it("an EMPTY line list is not fulfilled — there is nothing to have received", () => {
+    expect(decideTargetStatus([], [])).toBe("partial");
+  });
+
+  it("a null quantity does not count as fully received", () => {
+    const nullQty = [{ id: "a", quantity: null }] as unknown as POLineItemQuantity[];
+    expect(decideTargetStatus(nullQty, [])).toBe("partial");
+  });
+
+  it("a zero-quantity line does not count as fully received", () => {
+    expect(decideTargetStatus([{ id: "a", quantity: 0 }], [])).toBe("partial");
+  });
+
+  it("a bad line keeps an otherwise-complete order out of 'fulfilled'", () => {
+    expect(
+      decideTargetStatus(
+        [
+          { id: "a", quantity: 10 },
+          { id: "bad", quantity: 0 },
+        ],
+        [{ po_line_item_id: "a", quantity: 10 }]
+      )
     ).toBe("partial");
   });
 
-  it("QUIRK: an EMPTY line list reports fulfilled ([].every() is true)", () => {
-    expect(decideTargetStatus([], [])).toBe("fulfilled");
+  it("over-receipt still reports fulfilled — the write path rejects it, not this rule", () => {
+    expect(
+      decideTargetStatus([{ id: "a", quantity: 10 }], [{ po_line_item_id: "a", quantity: 999 }])
+    ).toBe("fulfilled");
+  });
+});
+
+describe("findOverReceipts", () => {
+  const lines: POLineItemQuantity[] = [{ id: "a", quantity: 10 }];
+
+  it("accepts a receipt up to the ordered quantity", () => {
+    expect(findOverReceipts(lines, new Map(), [{ po_line_item_id: "a", quantity: 10 }])).toEqual(
+      []
+    );
   });
 
-  it("QUIRK: a null quantity counts as fully received (0 >= null is true)", () => {
-    const nullQty = [{ id: "a", quantity: null }] as unknown as POLineItemQuantity[];
-    expect(decideTargetStatus(nullQty, [])).toBe("fulfilled");
+  it("rejects a receipt beyond the ordered quantity", () => {
+    expect(findOverReceipts(lines, new Map(), [{ po_line_item_id: "a", quantity: 999 }])).toEqual([
+      { lineItemId: "a", ordered: 10, alreadyReceived: 0, submitted: 999 },
+    ]);
   });
 
-  it("QUIRK: a zero-quantity line is 'complete' with nothing received", () => {
-    expect(decideTargetStatus([{ id: "a", quantity: 0 }], [])).toBe("fulfilled");
+  it("counts what was already received against the order", () => {
+    expect(
+      findOverReceipts(lines, new Map([["a", 8]]), [{ po_line_item_id: "a", quantity: 3 }])
+    ).toEqual([{ lineItemId: "a", ordered: 10, alreadyReceived: 8, submitted: 3 }]);
+    expect(
+      findOverReceipts(lines, new Map([["a", 8]]), [{ po_line_item_id: "a", quantity: 2 }])
+    ).toEqual([]);
+  });
+
+  it("sums multiple entries for the same line item", () => {
+    expect(
+      findOverReceipts(lines, new Map(), [
+        { po_line_item_id: "a", quantity: 6 },
+        { po_line_item_id: "a", quantity: 6 },
+      ])
+    ).toEqual([{ lineItemId: "a", ordered: 10, alreadyReceived: 0, submitted: 12 }]);
+  });
+
+  it("tolerates float drift rather than rejecting an exact receipt", () => {
+    expect(
+      findOverReceipts([{ id: "a", quantity: 0.8 }], new Map([["a", 0.7]]), [
+        { po_line_item_id: "a", quantity: 0.1 },
+      ])
+    ).toEqual([]);
+  });
+
+  it("rejects an entry for a line item that is not on the order", () => {
+    expect(findOverReceipts(lines, new Map(), [{ po_line_item_id: "ghost", quantity: 1 }])).toEqual(
+      [{ lineItemId: "ghost", ordered: 0, alreadyReceived: 0, submitted: 1 }]
+    );
   });
 });
 
