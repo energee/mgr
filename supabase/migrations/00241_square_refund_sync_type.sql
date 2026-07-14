@@ -120,6 +120,7 @@ COMMENT ON CONSTRAINT chk_allocation_volume_nonnegative ON allocations IS
 -- 'refund_ingest', UNIQUE square_payment_id storing the refund id) guarantees
 -- at-most-once per refund.
 
+-- security-definer: justified the system webhook caller must bypass bin_inventory RLS; EXECUTE is revoked from PUBLIC and granted only to service_role below.
 CREATE OR REPLACE FUNCTION credit_bin_inventory(
   p_bin_id UUID,
   p_finished_good_id UUID,
