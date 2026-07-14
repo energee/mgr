@@ -1,2 +1,3 @@
 # Migration script dependencies
 pymongo>=4.0.0  # For BSON decoding
+openpyxl>=3.1.0  # For the Beer orders.xlsx source-of-truth importer

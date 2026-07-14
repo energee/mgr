@@ -29,6 +29,17 @@ const h = vi.hoisted(() => ({
     data: undefined as unknown[] | undefined,
     isLoading: false,
   },
+  brands: [] as Array<{ id: string; name: string }>,
+  formats: [] as Array<{
+    id: string;
+    name: string;
+    container_type: string;
+    container_name: string;
+    unit_count: number;
+    volume_oz: number | null;
+    volume_bbl: number | null;
+  }>,
+  owners: [] as Array<{ id: string; name: string }>,
 }));
 
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
@@ -49,9 +60,9 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("@/hooks/use-catalog", () => ({
-  useBrands: () => ({ data: [] }),
-  usePackagingFormats: () => ({ data: [] }),
-  useKegOwners: () => ({ data: [] }),
+  useBrands: () => ({ data: h.brands }),
+  usePackagingFormats: () => ({ data: h.formats }),
+  useKegOwners: () => ({ data: h.owners }),
   formatVolumeLabel: (v: unknown) => String(v),
 }));
 
@@ -86,10 +97,13 @@ const hasAddItemButton = (c: HTMLElement) =>
     b.textContent?.includes("Add Item"),
   );
 
-const { render } = setupRenderHarness();
+const { render, rerender } = setupRenderHarness();
 
 beforeEach(() => {
   h.itemsState = { data: undefined, isLoading: false };
+  h.brands = [];
+  h.formats = [];
+  h.owners = [];
 });
 
 describe("OrderItemsEditor", () => {
@@ -138,5 +152,43 @@ describe("OrderItemsEditor", () => {
     const footer = c.querySelector("tfoot");
     expect(footer?.textContent).toContain("Order Total");
     expect(footer?.textContent).toContain("$80.00");
+  });
+
+  it("shows selected brand, format, and keg owner after catalogs load asynchronously", () => {
+    h.itemsState = {
+      data: [
+        makeRow({
+          id: "i1",
+          brand_id: "brand-1",
+          selling_format_id: "format-1",
+          keg_owner_id: "owner-1",
+          quantity: 1,
+          unit_price: 98,
+        }),
+      ],
+      isLoading: false,
+    };
+    const c = render(<OrderItemsEditor orderId="o1" />);
+
+    h.brands = [{ id: "brand-1", name: "Rubico II" }];
+    h.formats = [{
+      id: "format-1",
+      name: "Per Keg",
+      container_type: "keg",
+      container_name: "1/6 Barrel",
+      unit_count: 1,
+      volume_oz: null,
+      volume_bbl: 1 / 6,
+    }];
+    h.owners = [{ id: "owner-1", name: "Microstar" }];
+    rerender(<OrderItemsEditor orderId="o1" />);
+
+    const displayedValues = Array.from(
+      c.querySelectorAll<HTMLInputElement>("[data-slot='combobox-input']"),
+      (input) => input.value,
+    );
+    expect(displayedValues).toEqual(
+      expect.arrayContaining(["Rubico II", "Per Keg", "Microstar"]),
+    );
   });
 });
