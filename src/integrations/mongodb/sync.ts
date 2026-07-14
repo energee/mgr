@@ -23,8 +23,6 @@ import {
   transformBatch,
   transformTransfer,
   transformBrewLog,
-  transformOrder,
-  transformOrderItem,
   transformPackagingSession,
   transformTest,
   type HopLookup,
@@ -36,7 +34,6 @@ import type {
   MongoFormat,
   MongoHop,
   MongoMalt,
-  MongoOrder,
   MongoPackagingSession,
   MongoRecipe,
   MongoStyle,
@@ -647,74 +644,6 @@ async function syncTransfers(): Promise<SyncResult> {
   return { entityType: "vessel_transfers", phase: 3, ...result };
 }
 
-async function syncOrders(): Promise<SyncResult> {
-  const logId = await createSyncLog("orders", 3);
-  const db = await requireMongoDb();
-
-  const docs = await db.collection<MongoOrder>("orders").find().sort({ date: 1 }).toArray();
-
-  // Sync orders
-  const orderRows = docs.map((d) => transformOrder(d));
-  const orderResult = await upsertRows("orders", orderRows, "order_number");
-
-  // Build order_number → PG UUID lookup for order_items FK resolution
-  const admin2 = await createAdminClient();
-  const { data: pgOrders, error: pgOrdersError } = await dynamicFrom(admin2, "orders")
-    .select("id, order_number");
-  if (pgOrdersError) {
-    throw new Error(`Failed to read orders for FK resolution: ${pgOrdersError.message}`);
-  }
-  const orderNumberToId = new Map(
-    (pgOrders ?? []).map((o: { id: string; order_number: string }) => [o.order_number, o.id])
-  );
-
-  // Build Mongo beer ObjectId → PG brand UUID lookup
-  const mongoBeers = await db.collection<MongoBeer>("beers").find().toArray();
-  const brandNameToId = new Map(
-    (await selectIdName(admin2, "brands")).map((b) => [b.name, b.id])
-  );
-  const mongoBeerIdToName = new Map(
-    mongoBeers.map((b) => [b._id.toString(), b.name])
-  );
-
-  // Sync order items using PG order UUIDs and brand UUIDs
-  const itemRows = docs.flatMap((doc, orderIdx) => {
-    const orderNumber = orderRows[orderIdx]?.order_number;
-    const pgOrderId = orderNumber ? (orderNumberToId.get(orderNumber) as string | undefined) : null;
-    if (!pgOrderId) return [];
-    return (doc.products ?? []).map((product, itemIdx) => {
-      const row = transformOrderItem(product, pgOrderId, doc._id.toString(), itemIdx);
-      // Resolve brand_id via name lookup
-      if (product.product?.value) {
-        const beerName = mongoBeerIdToName.get(product.product.value.toString());
-        row.brand_id = beerName ? (brandNameToId.get(beerName) ?? null) : null;
-      }
-      return row;
-    });
-  });
-
-  let itemResult = { synced: 0, failed: 0, errors: [] as Array<{ mongoId: string; error: string }> };
-  if (itemRows.length > 0) {
-    // Delete existing order_items for synced orders, then insert fresh
-    const syncedOrderIds = orderRows
-      .map((r) => orderNumberToId.get(r.order_number) as string | undefined)
-      .filter(Boolean) as string[];
-    if (syncedOrderIds.length > 0) {
-      const { error: deleteError } = await dynamicFrom(admin2, "order_items")
-        .delete()
-        .in("order_id", syncedOrderIds);
-      if (deleteError) {
-        throw new Error(`Failed to clear order_items for re-sync: ${deleteError.message}`);
-      }
-    }
-    itemResult = await upsertRows("order_items", itemRows);
-  }
-
-  const combined = mergeResults(orderResult, itemResult);
-  await completeSyncLog(logId, combined);
-  return { entityType: "orders", phase: 3, ...combined };
-}
-
 async function syncBrewLogs(): Promise<SyncResult> {
   const logId = await createSyncLog("brew_logs", 3);
   const db = await requireMongoDb();
@@ -1023,7 +952,10 @@ async function syncPackagingSessions(): Promise<SyncResult> {
 const PHASE_ENTITIES: Record<SyncPhase, Array<() => Promise<SyncResult>>> = {
   1: [syncSuppliers, syncMalts, syncHops, syncYeasts, syncStyles],
   2: [syncBrands, syncVessels, syncRecipes],
-  3: [syncBatches, syncTransfers, syncBrewLogs, syncOrders],
+  // Orders are intentionally absent: Beer orders.xlsx is their source of
+  // truth. Mongo order sync used incomplete legacy references and erased
+  // customer, selling-format, and price data on every destructive re-sync.
+  3: [syncBatches, syncTransfers, syncBrewLogs],
   4: [syncBatchReadings, syncPackagingSessions],
 };
 
@@ -1032,7 +964,7 @@ const ENTITY_FN_NAMES = new Map<() => Promise<SyncResult>, string>([
   [syncSuppliers, "suppliers"], [syncMalts, "malts"], [syncHops, "hops"],
   [syncYeasts, "yeasts"], [syncStyles, "beer_styles"], [syncBrands, "brands"],
   [syncVessels, "vessels"], [syncRecipes, "recipes"], [syncBatches, "batches"], [syncTransfers, "vessel_transfers"],
-  [syncBrewLogs, "brew_logs"], [syncOrders, "orders"], [syncBatchReadings, "batch_logs"],
+  [syncBrewLogs, "brew_logs"], [syncBatchReadings, "batch_logs"],
   [syncPackagingSessions, "packaging_sessions"],
 ]);
 
@@ -1073,7 +1005,6 @@ export async function syncEntity(entityType: SyncEntityType): Promise<SyncResult
     recipes: syncRecipes,
     batches: syncBatches,
     vessel_transfers: syncTransfers,
-    orders: syncOrders,
     brew_logs: syncBrewLogs,
     batch_logs: syncBatchReadings,
     packaging_sessions: syncPackagingSessions,

@@ -172,30 +172,6 @@ export type MongoTransfer = {
   updatedAt?: Date;
 }
 
-export type MongoOrderProduct = {
-  id?: string;
-  quantity: number;
-  packagingFormat?: ObjectId;
-  product?: { relationTo: string; value: ObjectId };
-  pricing?: { unitPrice?: number; totalPrice?: number };
-  fulfillmentStatus?: string;
-}
-
-export type MongoOrder = {
-  _id: ObjectId;
-  date?: Date;
-  customer?: ObjectId;
-  customerName?: string;
-  status?: string;
-  type?: string;
-  products?: MongoOrderProduct[];
-  notes?: string;
-  completedDate?: Date;
-  salesChannel?: ObjectId;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
 export type MongoPackagingProduct = {
   id?: string;
   quantity?: number;
@@ -287,8 +263,6 @@ export type SyncEntityType =
   | "recipe_yeasts"
   | "batches"
   | "vessel_transfers"
-  | "orders"
-  | "order_items"
   | "brew_logs"
   | "brew_log_batches"
   | "batch_logs"

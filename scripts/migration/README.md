@@ -1,6 +1,11 @@
-# Lolev-Manager to MGR Migration Scripts
+# MGR Migration Scripts
 
-Scripts for migrating data from lolev-manager (Payload CMS / MongoDB) to MGR (Supabase / PostgreSQL).
+Scripts for migrating legacy catalog/production data and reconciling sales
+orders into MGR (Supabase / PostgreSQL).
+
+> Orders are owned by `Beer orders.xlsx`. Do not import or clean orders from
+> MongoDB; the legacy Mongo order documents do not contain MGR's customer,
+> selling-format, pricing, or keg-owner relationships.
 
 ## Overview
 
@@ -29,13 +34,13 @@ python3 scripts/migration/migrate_catalog_items.py \
     --backup-dir ./backup-2026-01-08/lolev-manager \
     --output-dir ./sql-output
 
-# 3. Migrate orders
-python3 scripts/migration/migrate_orders.py \
-    --backup-dir ./backup-2026-01-08/lolev-manager \
-    --output-dir ./sql-output
+# 3. Preview the spreadsheet order reconciliation
+python3 scripts/migration/reconcile_beer_orders.py \
+    "/path/to/Beer orders.xlsx"
 
-# 4. Execute SQL via Supabase dashboard or CLI
-# See "Executing the Migration" section below
+# 4. Apply only after the dry run has no unresolved mappings
+python3 scripts/migration/reconcile_beer_orders.py \
+    "/path/to/Beer orders.xlsx" --apply
 ```
 
 ## Migration Scripts
@@ -56,21 +61,28 @@ python3 scripts/migration/migrate_catalog_items.py \
 - Hops: `alphaAcid` → `alpha_acid_min/max` (±10% range)
 - Yeasts: Supplier stored as `manufacturer` (inline name)
 
-### migrate_orders.py
+### reconcile_beer_orders.py
 
-Migrates: orders, order_items
+Reconciles: customers, orders, order items, selling formats, Distributor
+prices, and keg owners from `Beer orders.xlsx`.
 
 ```bash
-python3 scripts/migration/migrate_orders.py \
-    --backup-dir ~/db-backups/backup-2026-01-08/lolev-manager \
-    --output-dir ./sql-output \
-    --chunk-size 50
+python3 scripts/migration/reconcile_beer_orders.py \
+    ~/Downloads/Beer\ orders.xlsx
+
+python3 scripts/migration/reconcile_beer_orders.py \
+    ~/Downloads/Beer\ orders.xlsx --apply
 ```
 
-**Key Transformations:**
-- Status mapping: `completed` → `fulfilled`, `scheduled` → `scheduled`
-- Order numbers: Generated as `ORD-YYYYMMDD-###`
-- Products array → `order_items` table
+The command is dry-run by default. Apply mode writes a JSON preimage backup to
+`/tmp/mgr-beer-orders-backups` before mutating live data. Distribution keg
+lines use Microstar; the internal/taproom rule is KegFleet. Customer and beer
+aliases are explicit in the script so unresolved workbook names fail closed.
+
+### migrate_orders.py (legacy — do not run)
+
+This historical Mongo/BSON converter is retained only for reference. Its SQL
+output is not an authoritative MGR order source and must not be applied.
 
 ## Executing the Migration
 
@@ -93,12 +105,6 @@ supabase db execute --file sql-output/suppliers.sql
 supabase db execute --file sql-output/malts.sql
 supabase db execute --file sql-output/hops.sql
 supabase db execute --file sql-output/yeasts.sql
-supabase db execute --file sql-output/orders.sql
-
-# Execute all order_items chunks
-for file in sql-output/order_items_chunk_*.sql; do
-    supabase db execute --file "$file"
-done
 ```
 
 ## Verification
@@ -108,9 +114,7 @@ done
 SELECT 'suppliers' as entity, count(*) FROM suppliers
 UNION ALL SELECT 'malts', count(*) FROM malts
 UNION ALL SELECT 'hops', count(*) FROM hops
-UNION ALL SELECT 'yeasts', count(*) FROM yeasts
-UNION ALL SELECT 'orders', count(*) FROM orders
-UNION ALL SELECT 'order_items', count(*) FROM order_items;
+UNION ALL SELECT 'yeasts', count(*) FROM yeasts;
 
 -- Check referential integrity
 SELECT id, order_number FROM orders
@@ -139,11 +143,11 @@ def object_id_to_uuid(object_id_str: str) -> str:
 
 ## Future Migrations
 
-To migrate from a new lolev-manager backup:
+To migrate catalog or production data from a new lolev-manager backup:
 
 1. Export new MongoDB backup
 2. Run migration scripts with new `--backup-dir`
-3. Execute generated SQL files
+3. Execute generated catalog/production SQL files; never execute order output
 4. ON CONFLICT will update existing records, insert new ones
 
 The deterministic UUID generation ensures consistency across migrations.

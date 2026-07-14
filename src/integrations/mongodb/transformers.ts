@@ -12,8 +12,6 @@ import type {
   MongoBrewLog,
   MongoHop,
   MongoMalt,
-  MongoOrder,
-  MongoOrderProduct,
   MongoPackagingSession,
   MongoRecipe,
   MongoStyle,
@@ -239,57 +237,6 @@ export function transformTransfer(doc: MongoTransfer) {
     volume_bbl: doc.quantity,
     transferred_at: doc.date instanceof Date ? doc.date.toISOString() : new Date(doc.date).toISOString(),
     notes: null,
-  };
-}
-
-const ORDER_STATUS_MAP: Record<string, string> = {
-  completed: "fulfilled",
-  scheduled: "scheduled",
-  cancelled: "cancelled",
-  draft: "draft",
-  pending: "draft",
-  "in-progress": "confirmed",
-};
-
-export function transformOrder(doc: MongoOrder) {
-  const orderDate = doc.date ? new Date(doc.date) : new Date(doc.createdAt ?? Date.now());
-  const datePart = orderDate.toISOString().slice(0, 10).replace(/-/g, "");
-  // Derive a stable suffix from the ObjectId (last 6 hex chars) instead of array position
-  const idSuffix = doc._id.toString().slice(-6);
-  const orderNumber = `ORD-${datePart}-${idSuffix}`;
-
-  return {
-    order_number: orderNumber,
-    status: ORDER_STATUS_MAP[doc.status ?? "draft"] ?? "draft",
-    order_date: orderDate.toISOString().split("T")[0],
-    fulfilled_date: doc.completedDate
-      ? new Date(doc.completedDate).toISOString().split("T")[0]
-      : null,
-    notes: doc.notes ?? null,
-    is_export: false,
-  };
-}
-
-export function transformOrderItem(
-  product: MongoOrderProduct,
-  orderId: string,
-  orderMongoId: string,
-  itemIndex: number
-) {
-  const itemId = product.id
-    ? objectIdToUuid(product.id)
-    : objectIdToUuid(`${orderMongoId}-${itemIndex}`);
-
-  const brandId = product.product?.value
-    ? objectIdToUuid(product.product.value.toString())
-    : null;
-
-  return {
-    id: itemId,
-    order_id: orderId,
-    brand_id: brandId,
-    quantity: product.quantity,
-    unit_price: product.pricing?.unitPrice ?? null,
   };
 }
 
