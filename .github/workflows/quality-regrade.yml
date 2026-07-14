@@ -31,18 +31,9 @@ jobs:
       actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.10"
-          cache: true
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
 
       # Pre-compute the lookback date once so the prompt has a stable value
       # and we don't depend on GNU `date -d` being available everywhere.
@@ -53,6 +44,17 @@ jobs:
           echo "since=$since" >> "$GITHUB_OUTPUT"
           count=$(git log --since="$since" --oneline | wc -l | tr -d ' ')
           echo "commit_count=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        if: steps.window.outputs.commit_count != '0' || github.event_name == 'workflow_dispatch'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+          cache: true
+
+      - name: Install dependencies
+        if: steps.window.outputs.commit_count != '0' || github.event_name == 'workflow_dispatch'
+        run: bun install --frozen-lockfile
 
       # Skip the LLM call on weeks with zero new commits — manual dispatch
       # always proceeds so you can force a regrade after non-code events.

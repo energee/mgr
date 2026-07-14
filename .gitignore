@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/.eslintcache
+/.vitest-reports
 
 # Playwright
 /test-results/

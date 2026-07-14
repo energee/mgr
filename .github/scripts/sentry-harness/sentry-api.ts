@@ -2,12 +2,10 @@
  * Sentry API client for the error harness.
  *
  * Split into pure functions (URL building, response normalization, stack trace /
- * context / breadcrumb formatting) plus one thin fetch wrapper
- * (`fetchIssuesWithStacks`).
+ * context / breadcrumb formatting) plus thin fetch wrappers.
  *
- * Makes N+1 API calls intentionally: one for the issues list, then one per
- * issue to retrieve its latest event — which carries the stack trace, the
- * contexts/extra bags, and the breadcrumb trail.
+ * Callers can score cheap list-only summaries first, then retrieve latest-event
+ * details only for the issues they will act on.
  */
 
 import type { SentryFetchOptions, SentryIssue } from "./types";
@@ -188,6 +186,7 @@ export function normalizeIssue(
   stackTrace: string,
   eventContext = "",
   breadcrumbs = "",
+  fallbackEnvironment = "unknown",
 ): SentryIssue {
   const tagMap: Record<string, string> = {};
   for (const tag of tags) tagMap[tag.key] = tag.value;
@@ -209,7 +208,7 @@ export function normalizeIssue(
     firstSeen: raw.firstSeen,
     lastSeen: raw.lastSeen,
     level,
-    environment: tagMap.environment ?? "unknown",
+    environment: tagMap.environment ?? fallbackEnvironment,
     tags: tagMap,
   };
 }
@@ -226,33 +225,52 @@ async function sentryGet<T>(url: string, token: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-/**
- * Fetches the top issues for an org/project from Sentry, then retrieves each
- * issue's latest event to attach a stack trace. Returns normalized `SentryIssue[]`.
- *
- * Makes N+1 requests intentionally — one list call plus one per issue.
- */
-export async function fetchIssuesWithStacks(
+/** Fetches normalized issue summaries without retrieving latest events. */
+export async function fetchIssueSummaries(
   opts: SentryFetchOptions,
 ): Promise<SentryIssue[]> {
   const issuesUrl = buildIssuesUrl(opts);
   const rawIssues = await sentryGet<RawIssue[]>(issuesUrl, opts.authToken);
 
-  const results: SentryIssue[] = [];
-  for (const raw of rawIssues) {
-    const event = await sentryGet<RawEvent>(
-      buildLatestEventUrl(raw.id),
-      opts.authToken,
-    );
-    results.push(
-      normalizeIssue(
-        raw,
-        event.tags ?? [],
-        formatStackTrace(event),
-        formatEventContext(event),
-        formatBreadcrumbs(event),
-      ),
-    );
-  }
-  return results;
+  return rawIssues.map((raw) =>
+    normalizeIssue(raw, [], "", "", "", opts.environment ?? "unknown"),
+  );
+}
+
+/**
+ * Attaches latest-event diagnostics to selected issues. Requests run in
+ * parallel while Promise.all preserves the caller's ranking order.
+ */
+export async function enrichIssuesWithEvents<T extends SentryIssue>(
+  issues: T[],
+  authToken: string,
+): Promise<T[]> {
+  return Promise.all(
+    issues.map(async (issue) => {
+      const event = await sentryGet<RawEvent>(
+        buildLatestEventUrl(issue.issueId),
+        authToken,
+      );
+      const tags = Object.fromEntries(
+        (event.tags ?? []).map((tag) => [tag.key, tag.value]),
+      );
+
+      return {
+        ...issue,
+        tags,
+        environment: tags.environment ?? issue.environment,
+        stackTrace: formatStackTrace(event),
+        eventContext: formatEventContext(event),
+        breadcrumbs: formatBreadcrumbs(event),
+      };
+    }),
+  );
+}
+
+/** Backward-compatible convenience wrapper for callers that need every event. */
+export async function fetchIssuesWithStacks(
+  opts: SentryFetchOptions,
+): Promise<SentryIssue[]> {
+  const issues = await fetchIssueSummaries(opts);
+  return enrichIssuesWithEvents(issues, opts.authToken);
 }
