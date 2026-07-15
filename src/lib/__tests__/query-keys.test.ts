@@ -17,7 +17,6 @@ import {
   purchaseOrderKeys,
   yeastKeys,
   revisionKeys,
-  planningKeys,
   purchasingKeys,
   pickListKeys,
   brandKeys,
@@ -182,10 +181,6 @@ describe("dashboardKeys", () => {
     expect(dashboardKeys.all()).toEqual(["dashboard"]);
   });
 
-  it("batchCounts returns consistent key", () => {
-    expect(dashboardKeys.batchCounts()).toEqual(["dashboard", "batch-counts"]);
-  });
-
   it("nested sales keys are unique", () => {
     expect(dashboardKeys.sales.orderCounts()).not.toEqual(
       dashboardKeys.sales.recentOrders()
@@ -306,15 +301,6 @@ describe("Key factory consistency", () => {
       "fk-resolve",
       "customers",
       "c1,c2",
-    ]);
-  });
-
-  it("planningKeys with and without options", () => {
-    expect(planningKeys.shortfalls()).toEqual(["planning", "shortfalls"]);
-    expect(planningKeys.shortfalls({ horizonWeeks: 4 })).toEqual([
-      "planning",
-      "shortfalls",
-      { horizonWeeks: 4 },
     ]);
   });
 

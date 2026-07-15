@@ -321,7 +321,6 @@ export const reportKeys = {
 
 export const dashboardKeys = {
   all: () => ["dashboard"] as const,
-  batchCounts: () => ["dashboard", "batch-counts"] as const,
   activeBatches: () => ["dashboard", "active-batches"] as const,
   vessels: () => ["dashboard", "vessels"] as const,
   lowStock: () => ["dashboard", "low-stock"] as const,
@@ -341,13 +340,6 @@ export const dashboardKeys = {
   },
   heatmap: {
     year: () => ["dashboard", "heatmap", "year"] as const,
-  },
-  /** "Today" attention panel — overdue batches, due POs, aging kegs, expiring lots */
-  today: {
-    overdueBatches: () => ["dashboard", "today", "overdue-batches"] as const,
-    duePOs: () => ["dashboard", "today", "due-pos"] as const,
-    agingKegs: () => ["dashboard", "today", "aging-kegs"] as const,
-    expiringLots: () => ["dashboard", "today", "expiring-lots"] as const,
   },
 };
 
@@ -444,25 +436,6 @@ export const revisionKeys = {
 // =============================================================================
 // Production Planning Keys
 // =============================================================================
-
-export const planningKeys = {
-  all: () => ["planning"] as const,
-  shortfalls: (options?: { includeDrafts?: boolean; horizonWeeks?: number }) =>
-    options
-      ? (["planning", "shortfalls", options] as const)
-      : (["planning", "shortfalls"] as const),
-  demandByProduct: () => ["planning", "demand-by-product"] as const,
-  supplyByProduct: () => ["planning", "supply-by-product"] as const,
-  batchesInProduction: () => ["planning", "batches-in-production"] as const,
-  demandDetail: (brandId: string, sellingFormatId: string, week: string) =>
-    ["planning", "demand-detail", brandId, sellingFormatId, week] as const,
-  orderDemand: (horizonWeeks: number) =>
-    ["planning", "orderDemand", horizonWeeks] as const,
-  productionRequirements: (horizonWeeks: number) =>
-    ["planning", "productionRequirements", horizonWeeks] as const,
-  materialRequirements: (horizonWeeks: number) =>
-    ["planning", "materialRequirements", horizonWeeks] as const,
-};
 
 // =============================================================================
 // Pick List Keys
