@@ -13,7 +13,7 @@ import { successResponse, errorResponse } from "@/lib/api/response";
 import { ApiError } from "@/lib/api/errors";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
-import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
+import { escapeIlikePattern, unwrap } from "@/lib/supabase/query-helpers";
 import { SITE_URL } from "@/lib/env";
 import { dynamicFrom } from "@/services/types";
 import {
@@ -43,6 +43,31 @@ type PortalProfile = {
 type BreweryNameSetting = {
   value: unknown;
 };
+
+type PortalLink = {
+  customer_id: string;
+  user_id: string;
+};
+
+function assertCustomerProfile(
+  data: unknown,
+  userId: string,
+): asserts data is PortalProfile {
+  const profile = data as PortalProfile | null;
+  if (
+    !profile
+    || profile.id !== userId
+    || profile.status !== "active"
+    || !profile.roles
+    || !isPortalUser(profile.roles)
+  ) {
+    throw new ApiError(
+      "INTERNAL_ERROR",
+      "Portal profile verification failed after provisioning.",
+      500,
+    );
+  }
+}
 
 async function readInviteBody(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -94,11 +119,17 @@ async function ensureCustomerProfile(
   const profile = data as PortalProfile | null;
   const roles = profile?.roles ?? null;
   if (roles && isPortalUser(roles)) {
-    if (profile?.status === "inactive") {
-      const { error: activateError } = await dynamicFrom(adminDb, "user_profiles")
-        .update({ status: "active", updated_at: new Date().toISOString() })
-        .eq("id", input.userId);
-      if (activateError) throw activateError;
+    if (profile?.status !== "active") {
+      const activatedProfile = await unwrap(
+        dynamicFrom(adminDb, "user_profiles")
+          .update({ status: "active", updated_at: new Date().toISOString() })
+          .eq("id", input.userId)
+          .select("id, email, roles, status")
+          .single(),
+      );
+      assertCustomerProfile(activatedProfile, input.userId);
+    } else {
+      assertCustomerProfile(profile, input.userId);
     }
     return;
   }
@@ -123,12 +154,18 @@ async function ensureCustomerProfile(
     updated_at: now,
   };
 
-  const { error: writeError } = profile
-    ? await dynamicFrom(adminDb, "user_profiles")
+  const profileWrite = profile
+    ? dynamicFrom(adminDb, "user_profiles")
         .update(profileValues)
         .eq("id", input.userId)
-    : await dynamicFrom(adminDb, "user_profiles").upsert(profileValues);
-  if (writeError) throw writeError;
+        .select("id, email, roles, status")
+        .single()
+    : dynamicFrom(adminDb, "user_profiles")
+        .upsert(profileValues)
+        .select("id, email, roles, status")
+        .single();
+  const provisionedProfile = await unwrap(profileWrite);
+  assertCustomerProfile(provisionedProfile, input.userId);
 }
 
 async function linkPortalUser(
@@ -136,11 +173,22 @@ async function linkPortalUser(
   customerId: string,
   userId: string,
 ) {
-  const { error } = await dynamicFrom(adminDb, "customer_portal_users").upsert(
-    { customer_id: customerId, user_id: userId },
-    { onConflict: "customer_id,user_id" },
-  );
-  if (error) throw error;
+  const link = await unwrap(
+    dynamicFrom(adminDb, "customer_portal_users")
+      .upsert(
+        { customer_id: customerId, user_id: userId },
+        { onConflict: "customer_id,user_id" },
+      )
+      .select("customer_id, user_id")
+      .single(),
+  ) as PortalLink | null;
+  if (link?.customer_id !== customerId || link.user_id !== userId) {
+    throw new ApiError(
+      "INTERNAL_ERROR",
+      "Customer portal link verification failed after provisioning.",
+      500,
+    );
+  }
 }
 
 async function readBreweryName(adminDb: AdminClient): Promise<string> {
@@ -206,6 +254,44 @@ function isExistingAuthUserError(
     error?.message?.includes("already been registered") ||
     error?.message?.includes("already exists")
   );
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return String(error);
+}
+
+async function compensateNewPortalUser(
+  adminDb: AdminClient,
+  userId: string,
+  provisioningError: unknown,
+): Promise<never> {
+  const { error: deleteError } =
+    await adminDb.auth.admin.deleteUser(userId);
+  if (deleteError) {
+    log.error(
+      {
+        provisioningError: errorMessage(provisioningError),
+        compensationError: deleteError.message,
+      },
+      "Customer portal provisioning compensation failed",
+    );
+    throw new ApiError(
+      "INTERNAL_ERROR",
+      `Portal provisioning failed (${errorMessage(provisioningError)}), and removing the incomplete account also failed (${deleteError.message}). Repair the account before retrying.`,
+      500,
+    );
+  }
+
+  throw provisioningError;
 }
 
 export const POST = withPermission(
@@ -308,28 +394,37 @@ export const POST = withPermission(
       });
 
     if (!createError && createData.user) {
-      await ensureCustomerProfile(adminDb, {
-        userId: createData.user.id,
-        email,
-        displayName: invite.displayName,
-        invitedBy: user.id,
-      });
-      await linkPortalUser(adminDb, customerId, createData.user.id);
-      await sendOtp(adminDb, email);
-      log.info(
-        { customerId, userId: createData.user.id, email, invitedBy: user.id },
-        "Customer portal user invited and linked",
-      );
-      return successResponse(
-        {
-          invited: true,
+      const newUserId = createData.user.id;
+      try {
+        await ensureCustomerProfile(adminDb, {
+          userId: newUserId,
           email,
-          userId: createData.user.id,
-          delivery: "otp" as const,
-        },
-        undefined,
-        201,
-      );
+          displayName: invite.displayName,
+          invitedBy: user.id,
+        });
+        await linkPortalUser(adminDb, customerId, newUserId);
+        await sendOtp(adminDb, email);
+        log.info(
+          { customerId, userId: newUserId, email, invitedBy: user.id },
+          "Customer portal user invited and linked",
+        );
+        return successResponse(
+          {
+            invited: true,
+            email,
+            userId: newUserId,
+            delivery: "otp" as const,
+          },
+          undefined,
+          201,
+        );
+      } catch (provisioningError) {
+        return await compensateNewPortalUser(
+          adminDb,
+          newUserId,
+          provisioningError,
+        );
+      }
     }
 
     const isExistingUser = isExistingAuthUserError(createError);

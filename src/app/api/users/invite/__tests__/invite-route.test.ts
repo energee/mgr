@@ -51,15 +51,31 @@ type ProfileRow = { id: string; email: string; status: string };
 /** Every admin write, in order. Re-created per setup(). */
 let writes: Write[];
 let inviteUserByEmail: ReturnType<typeof vi.fn>;
+let deleteUser: ReturnType<typeof vi.fn>;
 
 /**
  * user_profiles response honoring the duplicate pre-check's filter with real
  * eq/ilike semantics (single row or null — the route uses maybeSingle).
  * Write chains (the post-invite roles update) resolve to a plain success.
  */
-function setup(profiles: ProfileRow[]) {
+function setup(
+  profiles: ProfileRow[],
+  options: {
+    profileWriteError?: { message: string };
+    profileWriteData?: unknown;
+    deleteUserError?: { message: string };
+  } = {},
+) {
   const profileTable: TableResponse = ({ calls, ops }) => {
-    if (ops.length > 0) return { data: null, error: null };
+    if (ops.length > 0) {
+      return {
+        data:
+          options.profileWriteData === undefined
+            ? { id: "new-user-1", roles: ["brewer"], status: "pending" }
+            : options.profileWriteData,
+        error: options.profileWriteError ?? null,
+      };
+    }
     const ilike = calls.find((c) => c.method === "ilike" && c.args[0] === "email");
     if (ilike) {
       const re = ilikePatternToRegex(String(ilike.args[1]));
@@ -78,9 +94,13 @@ function setup(profiles: ProfileRow[]) {
     data: { user: { id: "new-user-1", email } },
     error: null,
   }));
+  deleteUser = vi.fn(async () => ({
+    data: {},
+    error: options.deleteUserError ?? null,
+  }));
   const admin = {
     ...(mock.admin as object),
-    auth: { admin: { inviteUserByEmail } },
+    auth: { admin: { inviteUserByEmail, deleteUser } },
   };
   mockedCreateAdminClient.mockResolvedValue(admin as never);
 }
@@ -145,5 +165,44 @@ describe("POST /api/users/invite duplicate pre-check", () => {
         row: expect.objectContaining({ roles: ["brewer"], status: "pending" }),
       }),
     );
+  });
+
+  it("removes the new Auth user when role assignment fails", async () => {
+    setup([], { profileWriteError: { message: "role assignment failed" } });
+
+    await expect(
+      POST(req({ email: "new@acme.com", roles: ["brewer"] })),
+    ).rejects.toMatchObject({ code: "INTERNAL_ERROR" });
+
+    expect(inviteUserByEmail).toHaveBeenCalledTimes(1);
+    expect(deleteUser).toHaveBeenCalledWith("new-user-1");
+  });
+
+  it("removes the new Auth user when role assignment affects no profile row", async () => {
+    setup([], { profileWriteData: null });
+
+    await expect(
+      POST(req({ email: "new@acme.com", roles: ["brewer"] })),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: expect.stringContaining("verification failed"),
+    });
+
+    expect(deleteUser).toHaveBeenCalledWith("new-user-1");
+  });
+
+  it("surfaces a compensation failure for operator repair", async () => {
+    setup([], {
+      profileWriteError: { message: "role assignment failed" },
+      deleteUserError: { message: "auth cleanup failed" },
+    });
+
+    await expect(
+      POST(req({ email: "new@acme.com", roles: ["brewer"] })),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: expect.stringContaining("auth cleanup failed"),
+    });
+    expect(deleteUser).toHaveBeenCalledWith("new-user-1");
   });
 });
