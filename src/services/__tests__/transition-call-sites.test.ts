@@ -1,16 +1,14 @@
 /**
- * Transition Side-Effect Call-Site Enforcement
+ * Atomic Transition Call-Site Enforcement
  *
  * Walks every API route handler under src/app/api and asserts that any route
  * performing a status UPDATE on a table with registered transition side
- * effects also calls runTransitionSideEffects. Mirrors the source-walking
+ * effects uses the shared transactional service. Mirrors the source-walking
  * idiom of entity-configs.test.ts (which walks the app router tree).
  *
- * Why: transition-side-effects.ts exists because the batch-completion effect
- * was once duplicated in only 2 of 4 UI transition paths, silently skipping
- * ingredient consumption. API routes are a fifth path — backlog #7 (PR #336
- * review) found api/batches/[id]/transfer updating batches.status without
- * running the registry. This test makes the next bypass fail CI.
+ * Why: client-side `UPDATE` followed by `runTransitionSideEffects` can commit
+ * only half the operation. The shared service invokes transition_entity_atomic
+ * so PostgreSQL owns rollback and retry safety.
  *
  * The side-effect table list is parsed from transition-side-effects.ts itself
  * (`table === "<name>"` matches), so registering a new effect automatically
@@ -22,17 +20,12 @@ import { join, resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 
 const ROOT = resolve(__dirname, "../../..");
-const REGISTRY_PATH = join(ROOT, "src/services/transition-side-effects.ts");
+const MIGRATION_PATH = join(ROOT, "supabase/migrations/00256_atomic_entity_transitions.sql");
 const API_ROOT = join(ROOT, "src/app/api");
 
 /** Tables with registered (table, toState) side effects, parsed from source. */
 function sideEffectTables(): string[] {
-  const source = readFileSync(REGISTRY_PATH, "utf8");
-  const tables = new Set<string>();
-  for (const match of source.matchAll(/table === "([^"]+)"/g)) {
-    tables.add(match[1]);
-  }
-  return [...tables];
+  return ["batches", "packaging_sessions", "pick_lists", "orders", "deliveries"];
 }
 
 /** All route.ts files under src/app/api, recursively. */
@@ -49,7 +42,19 @@ function performsStatusTransition(source: string, table: string): boolean {
   );
 }
 
-describe("Transition side-effect call sites (API routes)", () => {
+const UI_ENTRY_POINTS = [
+  "src/components/universal/entity-detail-unified.tsx",
+  "src/components/universal/entity-data-table.tsx",
+  "src/app/(app)/production/batches/[id]/batch-detail-client.tsx",
+  "src/app/(app)/production/batches/batches-client.tsx",
+  "src/components/domain/order/pick-list-items.tsx",
+  "src/components/domain/packaging/packaging-completion-review.tsx",
+  "src/components/domain/packaging/packaging-batch-dialog.tsx",
+  "src/components/domain/brew/brew-log-completion-dialog.tsx",
+  "src/app/(app)/production/brew-logs/[id]/page.tsx",
+];
+
+describe("Atomic transition call sites", () => {
   const tables = sideEffectTables();
   const routes = apiRouteFiles();
 
@@ -60,14 +65,15 @@ describe("Transition side-effect call sites (API routes)", () => {
     expect(routes.length).toBeGreaterThan(0);
   });
 
-  it("every API route that transitions a side-effect table calls runTransitionSideEffects", () => {
+  it("every API route that transitions a side-effect table uses the atomic service", () => {
     const violations: string[] = [];
     for (const route of routes) {
       const source = readFileSync(route, "utf8");
       for (const table of tables) {
         if (
           performsStatusTransition(source, table) &&
-          !source.includes("runTransitionSideEffects")
+          !source.includes("entityService.transition") &&
+          !source.includes("transition_entity_atomic")
         ) {
           violations.push(`${route.slice(ROOT.length + 1)} (table: ${table})`);
         }
@@ -75,8 +81,29 @@ describe("Transition side-effect call sites (API routes)", () => {
     }
     expect(
       violations,
-      `Status transitions bypassing the side-effect registry:\n${violations.join("\n")}\n` +
-        `Call runTransitionSideEffects(supabase, table, ids, toState) after the UPDATE succeeds.`
+      `Status transitions bypassing the atomic command:\n${violations.join("\n")}\n` +
+        `Call entityService.transition so status and side effects share one transaction.`
     ).toEqual([]);
+  });
+
+  it("all interactive transition entry points use the shared atomic service", () => {
+    for (const relativePath of UI_ENTRY_POINTS) {
+      const source = readFileSync(join(ROOT, relativePath), "utf8");
+      expect(source, relativePath).toContain("entityService.transition");
+      expect(source, relativePath).not.toContain("runTransitionSideEffects");
+    }
+  });
+
+  it("the database command covers every registered critical side-effect family", () => {
+    const migration = readFileSync(MIGRATION_PATH, "utf8");
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION transition_entity_atomic");
+    expect(migration).toContain("SECURITY INVOKER");
+    expect(migration).toContain("SET search_path = public");
+    for (const table of tables) {
+      expect(migration, table).toContain(`p_table_name = '${table}'`);
+    }
+    expect(migration).toContain("UPDATE vessels");
+    expect(migration).toContain("UPDATE allocations");
+    expect(migration).toContain("PERFORM transition_entity_atomic(");
   });
 });

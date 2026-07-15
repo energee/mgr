@@ -59,7 +59,8 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
-import { runTransitionSideEffects } from "@/services/transition-side-effects";
+import { formatServiceError } from "@/services/types";
+import { entityService } from "@/services/entity-service";
 import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
@@ -700,36 +701,25 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
       if (!entity.stateMachine)
         throw new Error("No state machine configured");
       const stateField = entity.stateMachine.stateField;
-      const currentState = (data as Record<string, unknown> | null)?.[
-        stateField
-      ] as string | undefined;
+      const currentState = (data as Record<string, unknown> | null)?.[stateField] as
+        | string
+        | undefined;
       if (!currentState)
         throw new Error("Current status unknown — refresh and try again");
-      const { data: updated, error } = await dynamicFrom(supabase, entity.table)
-        .update({ ...extraFields, [stateField]: toState })
-        .eq("id", id)
-        .eq(stateField, currentState)
-        .select("id");
-      if (error) throw error;
-      // 0 rows affected = the guard didn't match: someone else changed the state
-      if (!updated || updated.length === 0)
-        throw new Error("Status changed by someone else — refresh and try again");
+      if (!id) throw new Error("Record ID missing — refresh and try again");
+      const result = await entityService.transition(
+        supabase,
+        entity,
+        id,
+        toState,
+        extraFields
+      );
+      if (!result.success) throw new Error(formatServiceError(result.error));
     },
     onMutate: () => ({ loadingId: toast.loading("Updating status...") }),
     onSuccess: (_data, { toState }) => {
       invalidateEntityCaches(id || "");
       triggerSync(id || "", toState);
-      // Post-transition side effects (e.g. completing a batch also confirms
-      // its planned ingredient consumption) — shared registry in
-      // services/transition-side-effects.ts. Fire-and-forget: the status
-      // update already succeeded, so only surface side-effect failures.
-      if (id) {
-        void runTransitionSideEffects(supabase, entity.table, [id], toState).then(
-          ({ error: sideEffectError }) => {
-            if (sideEffectError) toast.error(sideEffectError);
-          }
-        );
-      }
       toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
     },
     onError: (err) => {

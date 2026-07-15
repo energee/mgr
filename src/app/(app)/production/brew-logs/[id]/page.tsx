@@ -12,9 +12,11 @@ import { use, useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { entityService } from "@/services/entity-service";
+import { formatServiceError } from "@/services/types";
+import { brewLogEntity } from "@/entities/brew-log";
 import { createClient } from "@/lib/supabase/client";
 import { EntityDetailUnifiedWithErrorBoundary } from "@/components/universal/entity-detail-unified";
-import { brewLogEntity } from "@/entities/brew-log";
 import { BrewLogCompletionDialog } from "@/components/domain/brew/brew-log-completion-dialog";
 import { BrewLogRecipeSheet } from "@/components/domain/brew/brew-log-recipe-sheet";
 import { NextStepBanner } from "@/components/domain/shared/next-step-banner";
@@ -79,12 +81,14 @@ export default function BrewLogDetailPage({
 
   // Direct state transition for "Start Brew" from the banner
   const handleStartBrew = useCallback(async () => {
-    const { error } = await supabase
-      .from("brew_logs")
-      .update({ status: "in_progress" })
-      .eq("id", id);
-    if (error) {
-      toast.error("Failed to start brew");
+    const result = await entityService.transition(
+      supabase,
+      brewLogEntity,
+      id,
+      "in_progress"
+    );
+    if (!result.success) {
+      toast.error(`Failed to start brew: ${formatServiceError(result.error)}`);
       return;
     }
     invalidateBrewLog();

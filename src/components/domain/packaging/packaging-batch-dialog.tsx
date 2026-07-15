@@ -54,6 +54,9 @@ import {
 import { createNameFilter } from "@/lib/combobox-filter";
 import { parseUnknownError } from "@/lib/errors";
 import { formatDate, formatSmartDecimal } from "@/lib/format";
+import { batchEntity } from "@/entities/batch";
+import { entityService } from "@/services/entity-service";
+import { formatServiceError } from "@/services/types";
 
 // =============================================================================
 // Types
@@ -183,11 +186,15 @@ export function PackagingBatchDialog({
       if (lineError) throw lineError;
 
       // 3. Transition batch to packaging (both new- and existing-session paths)
-      const { error: batchError } = await supabase
-        .from("batches")
-        .update({ status: "packaging" })
-        .eq("id", batchId);
-      if (batchError) throw batchError;
+      const transition = await entityService.transition(
+        supabase,
+        batchEntity,
+        batchId,
+        "packaging"
+      );
+      if (!transition.success) {
+        throw new Error(formatServiceError(transition.error));
+      }
 
       return sessionId;
     },
