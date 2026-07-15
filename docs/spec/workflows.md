@@ -92,9 +92,13 @@ rejected
 | Transition | Trigger |
 |------------|---------|
 | pending → approved | Staff with `orders:write` approves; `apply_change_request()` validates the order/cutoff/line snapshots and atomically updates selling-format order items |
-| pending → rejected | Admin rejects with reason; customer sees rejection on portal |
+| pending → rejected | Admin rejects with reason through `reject_order_change_request()` scoped by both order and request IDs |
 
-**Cutoff rule:** Change requests can only be submitted when the order's status is below the sales channel's `change_request_cutoff_state` (default: `confirmed`).
+`submit_order_change_request()` creates the parent and every item in one
+transaction and rejects an empty item array. Item writes and review transitions
+share a transaction lock, so a request cannot gain items after review.
+
+**Cutoff rule:** Change requests can only be submitted when the order's status is below the sales channel's `change_request_cutoff_state` (default: `confirmed`). The submission RPC derives the status ordering from the `order_status` enum registry.
 
 **Fulfillment rule:** Approval is rejected while the order has a non-cancelled
 pick list or active/completed finished-good allocation. Staff must cancel and

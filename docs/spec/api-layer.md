@@ -68,7 +68,7 @@ Only **batches** and **recipes** have full REST API routes. All other entities u
 |-------|--------|------|---------|
 | `/api/batches/[id]/transfer` | POST | `batches:write` | State transition with optimistic concurrency |
 | `/api/orders/[id]/change-requests/[rid]/approve` | POST | `orders:write` | Approve order change request (RPC) |
-| `/api/orders/[id]/change-requests/[rid]/reject` | POST | `orders:write` | Reject order change request |
+| `/api/orders/[id]/change-requests/[rid]/reject` | POST | `orders:write` | Atomically reject a pending request scoped to the URL order |
 | `/api/users/invite` | POST | `users:manage` | Invite user by email with roles |
 | `/api/users/[id]` | DELETE | `users:manage` | Delete inactive user |
 | `/api/customers/[id]/invite` | POST | `customers:write` | Invite customer to portal |

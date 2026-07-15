@@ -10553,6 +10553,14 @@ export type Database = {
         }
         Returns: string
       }
+      reject_order_change_request: {
+        Args: {
+          p_change_request_id: string
+          p_order_id: string
+          p_reason: string
+        }
+        Returns: string
+      }
       revise_packaging_session: {
         Args: { p_items: Json; p_reason?: string; p_session_id: string }
         Returns: Json
@@ -10579,6 +10587,10 @@ export type Database = {
           p_volume_bbl: number
         }
         Returns: undefined
+      }
+      submit_order_change_request: {
+        Args: { p_items: Json; p_notes: string; p_order_id: string }
+        Returns: string
       }
       suggest_recipe_improvements: {
         Args: { p_recipe_id: string }

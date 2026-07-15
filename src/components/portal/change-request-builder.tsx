@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicFrom } from "@/services/types";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import {
   entityKeys,
@@ -305,34 +305,20 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
   // ---- Submit Mutation ----
   const mutation = useMutation({
     mutationFn: async () => {
-      // 1. Create the change request
-      const request = await unwrap(
-        dynamicFrom(supabase, "order_change_requests")
-          .insert({
-            order_id: orderId,
-            requested_by: (await supabase.auth.getUser()).data.user?.id,
-            notes: notes || null,
-          })
-          .select("id")
-          .single()
-      ) as unknown as { id: string };
-
-      // 2. Create change request items (only for items that actually changed)
-      const items = actualChanges.map((c) => ({
-        change_request_id: request.id,
-        change_type: c.changeType,
-        order_item_id: c.orderItemId || null,
-        brand_id: c.brandId,
-        selling_format_id: c.sellingFormatId || null,
-        quantity: c.proposedQuantity,
-        original_quantity: c.originalQuantity ?? null,
-      }));
-
-      if (items.length > 0) {
-        await unwrap(
-          dynamicFrom(supabase, "order_change_request_items").insert(items)
-        );
-      }
+      await unwrap(
+        dynamicRpc(supabase, "submit_order_change_request", {
+          p_order_id: orderId,
+          p_notes: notes.trim(),
+          p_items: actualChanges.map((c) => ({
+            change_type: c.changeType,
+            order_item_id: c.orderItemId || null,
+            brand_id: c.brandId,
+            selling_format_id: c.sellingFormatId || null,
+            quantity: c.proposedQuantity,
+            original_quantity: c.originalQuantity ?? null,
+          })),
+        })
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
