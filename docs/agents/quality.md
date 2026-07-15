@@ -4,6 +4,10 @@ Codebase health at a glance. Grade each domain and architectural layer A–D.
 Update weekly, or whenever a major change shifts a grade. Compare against
 previous snapshots in `git log -- docs/agents/quality.md`.
 
+This snapshot prioritizes audit areas but is not defect evidence. Follow
+[`health-audit-and-issue-triage.md`](health-audit-and-issue-triage.md) when
+turning a health review into confirmed findings or GitHub issues.
+
 ## Grades
 
 - **A** — solid; would not be the bottleneck if a competent agent took over today.

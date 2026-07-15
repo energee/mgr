@@ -46,6 +46,7 @@ import { syncEntity } from "../sync";
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 const mockedGetMongoDb = vi.mocked(getMongoDb);
 const mockedLoggerWarn = vi.mocked(logger.warn);
+const mockedLoggerError = vi.mocked(logger.error);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -282,6 +283,54 @@ describe("upsertRows duplicate-key handling (via syncEntity('beer_styles'))", ()
       1,
       "beer_styles",
       "name"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SENTRY-7542174707 regression: upsertRows must log a genuine (non-dedupable)
+// Postgres upsert error as a structured { err, table, batchIndex } object,
+// not a printf template string. Passing the bare template dropped every
+// diagnostic value (table name, batch index, real Postgres message) once it
+// reached Sentry — logger.ts's Sentry-forwarding hook only interpolates
+// pino printf placeholders for the *log* output, not (pre-fix) for the
+// message it forwards to Sentry.captureMessage. Passing a structured object
+// with the real PostgrestError instance routes to Sentry.captureException
+// instead, preserving message + stack + code.
+// ---------------------------------------------------------------------------
+
+describe("upsertRows error logging (via syncEntity('beer_styles'))", () => {
+  it("logs a genuine upsert failure as a structured object carrying the real error instance", async () => {
+    const STYLE_A = new ObjectId("333333333333333333333333");
+
+    mockedGetMongoDb.mockResolvedValue(
+      makeDb({ styles: [{ _id: STYLE_A, name: "Stout" }] })
+    );
+
+    const { admin } = makeAdminMock(
+      {
+        mongodb_sync_log: { data: { id: "log-1" }, error: null },
+        beer_styles: {
+          data: null,
+          error: { message: "null value in column \"name\" violates not-null constraint" },
+        },
+      },
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    const result = await syncEntity("beer_styles");
+
+    expect(result).toMatchObject({ entityType: "beer_styles", synced: 0, failed: 1 });
+    expect(mockedLoggerError).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({
+          message: "null value in column \"name\" violates not-null constraint",
+        }),
+        table: "beer_styles",
+        batchIndex: 0,
+      },
+      "Upsert error"
     );
   });
 });

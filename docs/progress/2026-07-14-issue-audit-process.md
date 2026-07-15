@@ -1,0 +1,1 @@
+- **2026-07-14 (Automate health-audit and issue-triage workflow).** Added the evidence-first audit guide plus a weekly, manually runnable GitHub Action that rotates audit domains, emits schema-validated findings from a read-only model job, and uses a tested deterministic publisher for duplicate-safe issue creation, severity/type labels, and read-back verification.
