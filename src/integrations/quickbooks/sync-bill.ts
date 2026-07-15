@@ -8,6 +8,8 @@ import {
   createSyncLog,
   updateSyncLog,
   getDefaultPaymentTermsDays,
+  createQBORequestId,
+  reconciliationRequiredError,
 } from "./sync-utils";
 import { syncSupplier } from "./sync-supplier";
 import type { QBOBill, QBOBillLine, QBOEntityResponse } from "./types";
@@ -147,21 +149,28 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
   // would post a duplicate Bill into QuickBooks (audit SF-2).
   const existing = await getMappingOrLogFailure("purchase_order", purchaseOrderId);
   const action = existing ? "update" : "create";
-  const logId = await createSyncLog("purchase_order", purchaseOrderId, action);
+
+  const txnDate = (po.order_date || new Date().toISOString()).split("T")[0];
+  const qboBill: QBOBill = {
+    DocNumber: po.po_number,
+    VendorRef: { value: supplierMapping.qbo_entity_id },
+    TxnDate: txnDate,
+    DueDate: addDays(txnDate, paymentTermsDays),
+    Line: lines,
+  };
+  const requestId = existing ? null : createQBORequestId("Bill", purchaseOrderId);
+
+  // Persist the exact create intent before calling QuickBooks. Combined with
+  // the stable request ID, this is the durable recovery record when the remote
+  // call succeeds but its response or the local mapping write is lost.
+  const logId = await createSyncLog("purchase_order", purchaseOrderId, action, {
+    qboEntityType: "Bill",
+    requestId,
+    payload: qboBill,
+  });
+  let result: QBOEntityResponse<QBOBill> | undefined;
 
   try {
-    const txnDate = (po.order_date || new Date().toISOString()).split("T")[0];
-
-    const qboBill: QBOBill = {
-      DocNumber: po.po_number,
-      VendorRef: { value: supplierMapping.qbo_entity_id },
-      TxnDate: txnDate,
-      DueDate: addDays(txnDate, paymentTermsDays),
-      Line: lines,
-    };
-
-    let result: QBOEntityResponse<QBOBill>;
-
     if (existing) {
       const current = await qboClient.get<QBOEntityResponse<QBOBill>>(
         `/bill/${existing.qbo_entity_id}`
@@ -171,16 +180,28 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
       qboBill.sparse = true;
       result = await qboClient.post<QBOEntityResponse<QBOBill>>("/bill", qboBill);
     } else {
-      result = await qboClient.post<QBOEntityResponse<QBOBill>>("/bill", qboBill);
+      result = await qboClient.post<QBOEntityResponse<QBOBill>>(
+        `/bill?requestid=${encodeURIComponent(requestId!)}`,
+        qboBill
+      );
     }
 
     const qboId = result.Bill.Id!;
-    await upsertMapping("purchase_order", purchaseOrderId, "Bill", qboId);
+    try {
+      await upsertMapping("purchase_order", purchaseOrderId, "Bill", qboId);
+    } catch (mappingError) {
+      throw reconciliationRequiredError("Bill", qboId, mappingError);
+    }
     await updateSyncLog(logId, "success", result);
     return { qboId, action };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await updateSyncLog(logId, "error", undefined, message);
+    try {
+      await updateSyncLog(logId, "error", result, message);
+    } catch (logError) {
+      const logMessage = logError instanceof Error ? logError.message : String(logError);
+      throw new Error(`${message} Additionally, ${logMessage}`, { cause: err });
+    }
     throw err;
   }
 }

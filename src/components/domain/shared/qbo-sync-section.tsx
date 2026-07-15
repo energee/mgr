@@ -31,9 +31,16 @@ type QBOSyncSectionProps = {
  * Returns { friendly, raw } where `friendly` is the display message
  * and `raw` is the original error for debugging.
  */
-function parseQBOError(raw: string): { friendly: string; raw: string } {
+export function parseQBOError(raw: string): { friendly: string; raw: string } {
   if (!raw) return { friendly: "Unknown error", raw };
 
+  if (/QuickBooks accepted .* but MGR could not save its mapping/i.test(raw)) {
+    return {
+      friendly:
+        "QuickBooks saved the document, but MGR could not save its link. Retry Sync to reconcile it safely.",
+      raw,
+    };
+  }
   if (/AuthenticationFailed|token.*expired|unauthorized/i.test(raw)) {
     return {
       friendly:

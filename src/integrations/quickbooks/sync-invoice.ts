@@ -8,6 +8,8 @@ import {
   createSyncLog,
   updateSyncLog,
   getDefaultPaymentTermsDays,
+  createQBORequestId,
+  reconciliationRequiredError,
 } from "./sync-utils";
 import { syncCustomer } from "./sync-customer";
 import type { QBOInvoice, QBOInvoiceLine, QBOEntityResponse } from "./types";
@@ -95,22 +97,29 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
   // would post a duplicate Invoice into QuickBooks (audit SF-2).
   const existing = await getMappingOrLogFailure("order", orderId);
   const action = existing ? "update" : "create";
-  const logId = await createSyncLog("order", orderId, action);
+
+  const txnDate = (order.fulfilled_date || order.order_date || new Date().toISOString()).split("T")[0];
+  const dueDate = addDays(txnDate, paymentTermsDays);
+  const qboInvoice: QBOInvoice = {
+    DocNumber: order.order_number,
+    CustomerRef: { value: customerMapping.qbo_entity_id },
+    TxnDate: txnDate,
+    DueDate: dueDate,
+    Line: lines,
+  };
+  const requestId = existing ? null : createQBORequestId("Invoice", orderId);
+
+  // Persist the exact create intent before calling QuickBooks. Combined with
+  // the stable request ID, this is the durable recovery record when the remote
+  // call succeeds but its response or the local mapping write is lost.
+  const logId = await createSyncLog("order", orderId, action, {
+    qboEntityType: "Invoice",
+    requestId,
+    payload: qboInvoice,
+  });
+  let result: QBOEntityResponse<QBOInvoice> | undefined;
 
   try {
-    const txnDate = (order.fulfilled_date || order.order_date || new Date().toISOString()).split("T")[0];
-    const dueDate = addDays(txnDate, paymentTermsDays);
-
-    const qboInvoice: QBOInvoice = {
-      DocNumber: order.order_number,
-      CustomerRef: { value: customerMapping.qbo_entity_id },
-      TxnDate: txnDate,
-      DueDate: dueDate,
-      Line: lines,
-    };
-
-    let result: QBOEntityResponse<QBOInvoice>;
-
     if (existing) {
       const current = await qboClient.get<QBOEntityResponse<QBOInvoice>>(
         `/invoice/${existing.qbo_entity_id}`
@@ -120,16 +129,28 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
       qboInvoice.sparse = true;
       result = await qboClient.post<QBOEntityResponse<QBOInvoice>>("/invoice", qboInvoice);
     } else {
-      result = await qboClient.post<QBOEntityResponse<QBOInvoice>>("/invoice", qboInvoice);
+      result = await qboClient.post<QBOEntityResponse<QBOInvoice>>(
+        `/invoice?requestid=${encodeURIComponent(requestId!)}`,
+        qboInvoice
+      );
     }
 
     const qboId = result.Invoice.Id!;
-    await upsertMapping("order", orderId, "Invoice", qboId);
+    try {
+      await upsertMapping("order", orderId, "Invoice", qboId);
+    } catch (mappingError) {
+      throw reconciliationRequiredError("Invoice", qboId, mappingError);
+    }
     await updateSyncLog(logId, "success", result);
     return { qboId, action };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await updateSyncLog(logId, "error", undefined, message);
+    try {
+      await updateSyncLog(logId, "error", result, message);
+    } catch (logError) {
+      const logMessage = logError instanceof Error ? logError.message : String(logError);
+      throw new Error(`${message} Additionally, ${logMessage}`, { cause: err });
+    }
     throw err;
   }
 }

@@ -50,12 +50,14 @@ export async function getMappingOrLogFailure(
       const logId = await createSyncLog(entityType, entityId, "create");
       await updateSyncLog(logId, "error", undefined, message);
     } catch (logErr) {
-      // Best-effort: if the DB is down, logging the failure fails too —
-      // never let that mask the original read error.
+      // Preserve both failures: the mapping read remains the primary cause,
+      // while the audit-write failure must also reach the caller.
+      const logMessage = logErr instanceof Error ? logErr.message : String(logErr);
       logger.warn(
-        { entityType, entityId, err: logErr instanceof Error ? logErr.message : String(logErr) },
+        { entityType, entityId, err: logMessage },
         "QBO sync: could not record failed mapping lookup in qbo_sync_log"
       );
+      throw new Error(`${message}. Additionally, ${logMessage}`, { cause: err });
     }
     throw err;
   }
@@ -68,7 +70,7 @@ export async function upsertMapping(
   qboEntityId: string
 ): Promise<void> {
   const admin = await createAdminClient();
-  await admin.from("qbo_sync_mappings").upsert(
+  const { error } = await admin.from("qbo_sync_mappings").upsert(
     {
       entity_type: entityType,
       entity_id: entityId,
@@ -77,6 +79,48 @@ export async function upsertMapping(
       last_synced_at: new Date().toISOString(),
     },
     { onConflict: "entity_type,entity_id" }
+  );
+  if (error) {
+    throw new Error(
+      `Failed to persist QBO sync mapping for ${entityType} ${entityId} to ${qboEntityType} ${qboEntityId}: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Stable create identity sent to QuickBooks. Intuit limits request IDs to 50
+ * characters and deduplicates writes per company file, which makes a retry
+ * safe after a lost response or a failed local mapping write.
+ */
+export function createQBORequestId(
+  qboEntityType: Extract<QBOEntityType, "Invoice" | "Bill">,
+  entityId: string
+): string {
+  const discriminator = qboEntityType === "Invoice" ? "i" : "b";
+  const requestId = `mgr-${discriminator}-${entityId}`;
+  if (requestId.length > 50) {
+    throw new Error(
+      `Cannot build a QBO request ID for ${qboEntityType}: entity ID exceeds the 50-character request limit`
+    );
+  }
+  return requestId;
+}
+
+/**
+ * The external document exists but its local identity was not made durable.
+ * The stable QuickBooks request ID lets the operator retry without creating a
+ * second accounting document.
+ */
+export function reconciliationRequiredError(
+  qboEntityType: Extract<QBOEntityType, "Invoice" | "Bill">,
+  qboEntityId: string,
+  mappingError: unknown
+): Error {
+  const detail = mappingError instanceof Error ? mappingError.message : String(mappingError);
+  return new Error(
+    `QuickBooks accepted ${qboEntityType} ${qboEntityId}, but MGR could not save its mapping. ` +
+      `The remote document exists; retry sync to reconcile it safely. ${detail}`,
+    { cause: mappingError }
   );
 }
 
@@ -110,7 +154,7 @@ export async function updateSyncLog(
   errorMessage?: string
 ): Promise<void> {
   const admin = await createAdminClient();
-  await admin
+  const { error } = await admin
     .from("qbo_sync_log")
     .update({
       status,
@@ -119,6 +163,9 @@ export async function updateSyncLog(
       completed_at: new Date().toISOString(),
     })
     .eq("id", logId);
+  if (error) {
+    throw new Error(`Failed to update QBO sync log ${logId}: ${error.message}`);
+  }
 }
 
 // Address mapping helper: MGR address JSONB -> QBO Address
