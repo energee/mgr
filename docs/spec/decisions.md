@@ -794,7 +794,7 @@ selling_formats:
 ## Water Chemistry Decisions
 
 ### DEC-WATER-001: Water Addition Profiles
-**Status**: Implemented
+**Status**: Removed during migration renumbering; retained below as history
 
 Replace the non-functional `use_default_additions` toggle with named, reusable water addition profiles.
 
@@ -810,6 +810,28 @@ Replace the non-functional `use_default_additions` toggle with named, reusable w
 - `recipe_additions`: dropped `is_default`, added `profile_id` FK, added mutual exclusivity constraint (recipe_id XOR profile_id)
 - `recipes`: dropped `use_default_additions`, added `water_addition_profile_id` FK
 - New `system_settings` key: `default_water_profile_id`
+
+The `water_addition_profiles` table and its ownership columns are absent from
+the current deployed schema and generated types. Source/target water chemistry
+still uses `water_profiles`; recipe salt/acid rows are recipe-owned.
+
+### DEC-WATER-002: Atomic Category-Scoped Recipe Additions
+**Status**: Implemented (migration 00263)
+
+The water-chemistry display and non-water additions editor share one
+`SECURITY INVOKER`, version-checked replacement function. The caller chooses an
+allowlisted `water_chemistry` or `other` scope, while Postgres resolves actual
+membership from `additives.type`. `NULL` means the category is omitted and an
+empty array explicitly clears it.
+
+The function locks the recipe before checking `recipes.version`; therefore two
+writers starting at the same version cannot merge replacement sets. Deletion
+and insertion share one transaction, so an insertion failure restores the old
+category. The predicate is also limited to the requested `recipe_id`, which
+leaves historical ownerless/profile rows untouched.
+
+**Rationale**: client-side DELETE followed by INSERT cannot provide rollback,
+serialization, or a trustworthy category boundary across PostgREST requests.
 
 ---
 

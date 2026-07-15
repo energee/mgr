@@ -79,6 +79,8 @@ export const recipeKeys = {
   list: (filters?: Record<string, unknown>) =>
     filters ? (["recipes", "list", filters] as const) : (["recipes", "list"] as const),
   detail: (id: string) => ["recipes", id] as const,
+  version: (id: string) => ["recipes", id, "version"] as const,
+  additionsEditor: (id: string) => ["recipes", id, "additions-editor"] as const,
   byBrand: (brandId: string) => ["recipes", "by-brand", brandId] as const,
   summary: (id: string) => ["recipes", id, "summary"] as const,
   estimates: (id: string) => ["recipes", id, "estimates"] as const,

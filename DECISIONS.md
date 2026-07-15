@@ -61,3 +61,12 @@
   - One transaction per ingredient section — protects each replacement but leaves Save All partially committed.
   - Client-side sequencing plus optimistic updates — JavaScript cannot create a transaction across PostgREST requests, and broad cache invalidation can overwrite unsaved local sections.
 - **Reversibility**: moderate — the RPC and contribution registry can be reverted together, but doing so restores the known integrity gap.
+
+## 2026-07-15 — Recipe additions replace one server-owned category
+
+- **Decision**: Water-chemistry and non-water recipe additions share one version-checked PostgreSQL replacement command. The client names an allowlisted scope; the database derives membership from `additives.type`, locks the recipe, and commits the scoped delete/insert together.
+- **Why**: These editors live outside the main six-section Save All aggregate. Separate PostgREST deletes and inserts could erase rows on failure, merge concurrent replacements, and trust a stale client-computed category boundary.
+- **Alternatives rejected**:
+  - Add additions to the main recipe aggregate — these screens save independently and own different additive categories.
+  - Client compensation or retries — cannot roll back a committed delete or serialize two HTTP transactions.
+- **Reversibility**: moderate — both call sites and the RPC can be reverted together, but doing so restores the integrity gap.
