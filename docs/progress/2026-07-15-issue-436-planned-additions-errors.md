@@ -1,0 +1,1 @@
+- **2026-07-15 (Surface planned-addition query failures).** Made planned recipe additions fail closed when any dry-hop, fruit, spice, or adjunct Supabase read errors, with source-specific logging and parameterized regression coverage proving failures never render a partial checklist while successful reads still combine all four sources.
