@@ -5747,6 +5747,7 @@ export type Database = {
           id: string
           location_id: string
           quantity: number
+          reconciled_at: string | null
           selling_format_id: string | null
           sold_at: string
           square_order_id: string
@@ -5761,6 +5762,7 @@ export type Database = {
           id?: string
           location_id: string
           quantity: number
+          reconciled_at?: string | null
           selling_format_id?: string | null
           sold_at: string
           square_order_id: string
@@ -5775,10 +5777,12 @@ export type Database = {
           id?: string
           location_id?: string
           quantity?: number
+          reconciled_at?: string | null
           selling_format_id?: string | null
           sold_at?: string
           square_order_id?: string
           square_payment_id?: string | null
+          unit_price_cents?: number | null
           voided_at?: string | null
           volume_oz?: number | null
         }
@@ -5823,6 +5827,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "square_draft_sales_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {

@@ -7,10 +7,10 @@
 -- 00190/00191 captured the out-of-band views/functions but not these).
 --
 -- On the live database every statement here is a no-op or an exact
--- re-statement of what already exists. On a from-scratch replay the tables
--- come from `src/__tests__/integration/_fixtures/bootstrap-plain-postgres.sql`
--- (pre-00160 shape, applied before the chain) + 00160 (pallet columns), and
--- this migration layers on the RLS state nothing else in the chain creates.
+-- re-statement of what already exists. On a from-scratch replay migration
+-- 00112 creates the pre-00160 shape in the reserved historical gap, 00160 adds
+-- the pallet columns, and this migration layers on the captured RLS state.
+-- The plain-Postgres test shim intentionally contains no application tables.
 --
 -- NOT captured here (already guaranteed elsewhere in the chain):
 --   * pallet columns + trg_selling_formats_pallet_quantity — 00160
