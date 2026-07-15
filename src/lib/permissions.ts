@@ -56,6 +56,7 @@ export type Permission =
   | "purchasing:write"
   | "vessels:read"
   | "vessels:write"
+  | "ai:use"
   | "integrations:manage"
   | "settings:manage"
   | "users:manage";
@@ -103,6 +104,8 @@ export const PERMISSION_MAP: Record<Permission, readonly StaffRole[]> = {
     "viewer",
   ],
   "vessels:write": ["admin", "production_manager", "brewer"],
+
+  "ai:use": ["admin", "production_manager", "brewer", "sales", "viewer"],
 
   "integrations:manage": ["admin"],
   "settings:manage": ["admin"],

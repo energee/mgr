@@ -2,13 +2,14 @@ import { streamText, stepCountIs, type UIMessage, convertToModelMessages } from 
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/errors";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/supabase";
 import { createChatTools } from "./tools";
 import { entityService } from "@/services/entity-service";
 import { coreRegistry } from "@/entities/cores";
-import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
+import { dynamicRpc } from "@/services/types";
 import { logger } from "@/lib/logger";
 
 import { BASE_SYSTEM_PROMPT, PROMPT_VERSION } from "@/domain/ai/prompts";
@@ -20,6 +21,17 @@ type PageContext = {
   entityType?: string;
   entityId?: string;
 }
+
+type AiRateLimitResult = {
+  allowed: boolean;
+  remaining: number;
+  reset_at: string;
+}
+
+const CHAT_RATE_LIMIT = {
+  windowSeconds: 60,
+  maxRequests: 10,
+} as const;
 
 /**
  * Maps display-friendly entity type names (from the chat-context URL parser
@@ -150,6 +162,7 @@ async function buildSystemPrompt(
 async function resolveApiKey(
   supabase: SupabaseClient<Database>,
   userId: string,
+  adminDb: SupabaseClient<Database>,
 ): Promise<string | null> {
   const { data: prefs, error: prefsError } = await supabase
     .from("user_preferences")
@@ -165,9 +178,8 @@ async function resolveApiKey(
     return prefs.anthropic_api_key;
   }
 
-  // Fall back to global key from system_settings.
-  // Uses service role client (no cookie auth) to bypass RLS.
-  const adminDb = await createAdminClient();
+  // Fall back to the brewery-funded key through the already-authorized
+  // service-role client. Forbidden callers never instantiate this client.
   const { data: setting, error: settingError } = await adminDb
     .from("system_settings")
     .select("value")
@@ -186,24 +198,57 @@ async function resolveApiKey(
   return null;
 }
 
-export const POST = withAuth(async (request, { user, supabase }) => {
-  const startTime = Date.now();
+async function consumeChatRateLimit(
+  adminDb: SupabaseClient<Database>,
+  userId: string,
+): Promise<AiRateLimitResult> {
+  const { data, error } = await dynamicRpc(adminDb, "consume_ai_rate_limit", {
+    p_user_id: userId,
+    p_window_seconds: CHAT_RATE_LIMIT.windowSeconds,
+    p_max_requests: CHAT_RATE_LIMIT.maxRequests,
+  });
 
-  // Rate limit: 10 requests per minute per IP
-  const ip = getClientIp(request);
-  const limiter = rateLimit(`chat:${ip}`, { windowMs: 60_000, maxRequests: 10 });
-  if (!limiter.success) {
-    log.warn({ ip, userId: user.id }, "Rate limit exceeded");
+  const result = Array.isArray(data) ? data[0] : data;
+  if (
+    error
+    || !result
+    || typeof result.allowed !== "boolean"
+    || typeof result.remaining !== "number"
+    || typeof result.reset_at !== "string"
+  ) {
+    log.error(
+      { error: error?.message ?? "Invalid durable rate-limit response", userId },
+      "Failed to enforce chat rate limit",
+    );
+    throw new ApiError(
+      "INTERNAL_ERROR",
+      "Unable to enforce the chat rate limit",
+    );
+  }
+
+  return result as AiRateLimitResult;
+}
+
+export const POST = withPermission("ai:use", async (request, { user, supabase }) => {
+  const startTime = Date.now();
+  const adminDb = await createAdminClient();
+
+  // One durable bucket per authenticated staff user, shared by every app
+  // instance. Consume it before reading either a personal or brewery key.
+  const limiter = await consumeChatRateLimit(adminDb, user.id);
+  if (!limiter.allowed) {
+    const resetMs = new Date(limiter.reset_at).getTime() - Date.now();
+    log.warn({ userId: user.id }, "Rate limit exceeded");
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
         status: 429,
-        headers: { "Retry-After": String(Math.ceil(limiter.resetMs / 1000)) },
+        headers: { "Retry-After": String(Math.max(1, Math.ceil(resetMs / 1000))) },
       },
     );
   }
 
-  const apiKey = await resolveApiKey(supabase, user.id);
+  const apiKey = await resolveApiKey(supabase, user.id, adminDb);
 
   if (!apiKey) {
     log.warn({ userId: user.id }, "No API key configured for chat request");
