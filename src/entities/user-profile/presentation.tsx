@@ -156,8 +156,8 @@ export const userProfilePresentation: EntityPresentation<UserProfile> = {
         {
           name: "status",
           label: "Status",
-          type: "select",
-          options: STATUS_OPTIONS,
+          editable: false,
+          description: "Use Deactivate or Reactivate so login access changes safely.",
           colSpan: 6,
         },
         {
@@ -228,12 +228,12 @@ export const userProfilePresentation: EntityPresentation<UserProfile> = {
       label: "Deactivate",
       icon: "user-x",
       type: "button",
-      fromStates: ["active"],
+      fromStates: ["active", "pending"],
       toState: "inactive",
     },
     {
-      name: "activate",
-      label: "Activate",
+      name: "reactivate",
+      label: "Reactivate",
       icon: "user-check",
       type: "button",
       fromStates: ["inactive", "pending"],

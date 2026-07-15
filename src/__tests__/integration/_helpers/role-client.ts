@@ -42,7 +42,11 @@ export type SeededRole =
   | "production_manager"
   | "admin"
   | "no_roles"
-  | "no_profile";
+  | "no_profile"
+  | "inactive_admin"
+  | "pending_admin"
+  | "active_customer"
+  | "inactive_customer";
 
 /** Deterministic UUIDs for each seeded role tier. See `_fixtures/seed-roles.sql`. */
 export const SEEDED_UUIDS: Record<SeededRole, string> = {
@@ -56,6 +60,10 @@ export const SEEDED_UUIDS: Record<SeededRole, string> = {
   no_roles: "00000000-0000-0000-0000-000000000005",
   // auth.users row exists; NO user_profiles row — tests fail-closed behavior
   no_profile: "00000000-0000-0000-0000-000000000006",
+  inactive_admin: "00000000-0000-0000-0000-000000000007",
+  pending_admin: "00000000-0000-0000-0000-000000000008",
+  active_customer: "00000000-0000-0000-0000-000000000009",
+  inactive_customer: "00000000-0000-0000-0000-000000000010",
 };
 
 let pool: Pool | undefined;

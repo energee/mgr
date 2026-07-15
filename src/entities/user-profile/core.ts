@@ -127,6 +127,12 @@ export const userProfileCore: EntityCoreInput<UserProfile> = {
       inactive: ["active"],
       pending: ["active", "inactive"],
     },
+    // These targets require the server command that coordinates the DB gate
+    // with the Supabase Auth ban. Generic/bulk status UPDATEs are suppressed.
+    requiresAction: {
+      inactive: "deactivate",
+      active: "reactivate",
+    },
     stateDisplay: STATUS_DISPLAY,
   },
 

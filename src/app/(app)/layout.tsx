@@ -30,14 +30,20 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   }
 
   // Redirect customer-role users to the customer portal
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
-    .select("roles")
+    .select("roles, status")
     .eq("id", user.id)
     .single();
 
+  // A valid old JWT can outlive deactivation. Fail closed on inactive,
+  // pending, missing, or unreadable profiles before any protected data read.
+  if (profileError || !profile || profile.status !== "active") {
+    redirect("/login?error=account_disabled");
+  }
+
   // Cast needed: generated types don't include the `roles` column yet
-  const roles = ((profile as Record<string, unknown> | null)?.roles ?? ["viewer"]) as UserRole[];
+  const roles = ((profile as Record<string, unknown>).roles ?? []) as UserRole[];
 
   // Any role set containing 'customer' belongs in the portal (audit C1:
   // requiring exactly ['customer'] let mixed role sets into the staff app).

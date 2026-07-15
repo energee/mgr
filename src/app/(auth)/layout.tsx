@@ -28,7 +28,16 @@ export default async function AuthLayout({ children }: AuthLayoutProps) {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/");
+    // Do not bounce a disabled old session back into the protected layout;
+    // that would create a redirect loop. Only enabled profiles leave login.
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("status")
+      .eq("id", user.id)
+      .single();
+    if (profile?.status === "active") {
+      redirect("/");
+    }
   }
 
   return <AuthShell>{children}</AuthShell>;
