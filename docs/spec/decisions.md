@@ -816,6 +816,28 @@ database requests atomic. Moving the complete state transition into PostgreSQL
 eliminates orphan allocations, unmatched bin movements, double effects after a
 timeout, and sale/refund ordering races.
 
+---
+
+### DEC-INT-002: Source-Owned Transactional Legacy Reconciliation
+**Status**: Implemented (migration `00258_atomic_mongodb_aggregate_sync.sql`)
+
+Legacy MongoDB resyncs reconcile one aggregate at a time inside a PostgreSQL
+function. `mongodb_sync_mappings` identifies source-owned parent and child rows;
+only mapped stale children may be removed. Manual rows are outside the cleanup
+set. Stable source IDs make retries idempotent, and a shared advisory transaction
+lock serializes entity, phase, and sync-all entry points.
+
+The global delete-then-rebuild operation is rejected. A partial entity or phase
+result is an API failure, and sync-all stops before phases that depend on the
+failed phase.
+
+**Rationale**: Separate PostgREST requests auto-commit, so checking every error
+cannot restore an already-deleted aggregate. Database functions provide the
+required rollback boundary while the ownership registry prevents the recovery
+path from deleting manually maintained brewery data.
+
+---
+
 ## Performance Decisions
 
 ### DEC-PERF-001: Allocation & Query Performance Indexes

@@ -631,6 +631,12 @@ Audit log for batch events and measurements.
 | created_at | TIMESTAMPTZ | Created timestamp |
 | created_by | UUID | FK to auth.users |
 
+MongoDB test imports use stable `mongodb_sync_mappings` ownership records and
+`reconcile_mongodb_batch_reading_aggregate()`. Reconciliation changes only the
+temperature/pH rows owned by that source test document; manually entered
+measurements for the same batch are preserved. The aggregate update and stale
+source-row cleanup commit or roll back together.
+
 ---
 
 ## `vessels`

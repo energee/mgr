@@ -697,6 +697,35 @@ opposite Auth action.
 
 ---
 
+## MongoDB sync ownership and reconciliation
+
+`mongodb_sync_log` records the outcome of each entity sync. A phase/entity
+exception must be recorded as a failure; an error list with `failed = 0` is not
+a successful result.
+
+`mongodb_sync_mappings` is both an audit trail and the ownership registry for
+legacy MongoDB imports:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| entity_type | TEXT | PostgreSQL aggregate or child-row kind |
+| mongo_id | TEXT | Stable source identifier; child identifiers are prefixed by their aggregate source ID |
+| pg_id | UUID | Stable PostgreSQL row ID owned by that source record |
+
+Migration `00258_atomic_mongodb_aggregate_sync.sql` provides transactional
+reconciliation RPCs for recipes, brew logs, batch readings, and packaging
+sessions. Each RPC takes a fully transformed aggregate, serializes against
+other MongoDB reconciliation calls with an advisory transaction lock, upserts
+the source-owned rows, and removes only stale rows named in this ownership
+registry. Manual rows without mappings are never part of cleanup. A constraint
+or trigger error rolls back the parent, children, and mappings together; retrying
+the same source payload updates the same UUIDs without duplication.
+
+The old global clean operation is intentionally unsupported because it could
+not distinguish imported rows from manually maintained production data.
+
+---
+
 ## Future: Multi-Tenant Support
 
 The following tables would be added for multi-tenant SaaS deployment:
