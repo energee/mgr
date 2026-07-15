@@ -13,7 +13,7 @@
  * (audit A11Y-3).
  */
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@/lib/form-resolver";
 import { z } from "zod";
@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { yeastKeys, batchKeys } from "@/lib/query-keys";
+import { batchKeys, entityKeys, yeastKeys } from "@/lib/query-keys";
 import {
   calculatePitchingRate,
   calculatePitchWeightLbs,
@@ -58,6 +58,7 @@ import {
   formatCellCount,
 } from "@/domain/yeast-calculations";
 import { log } from "@/lib/client-logger";
+import { parseUnknownError, PG_ERROR_CODES } from "@/lib/errors";
 
 // =============================================================================
 // Types
@@ -71,6 +72,18 @@ const pitchYeastSchema = z.object({
 });
 
 type PitchYeastFormValues = z.infer<typeof pitchYeastSchema>;
+
+type PitchYeastRpcResult = {
+  kind: "created" | "duplicate";
+  event_id: string;
+  remaining_quantity_lbs: number;
+  status: string;
+};
+
+type PitchCommandIdentity = {
+  requestId: string;
+  fingerprint: string | null;
+};
 
 /** Row shape returned from yeast_pitches_with_remaining view. */
 type AvailablePitch = {
@@ -120,6 +133,20 @@ export function PitchYeastDialog({
 }: PitchYeastDialogProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
+  const requestIdentityRef = useRef<PitchCommandIdentity | null>(null);
+  if (!requestIdentityRef.current) {
+    requestIdentityRef.current = {
+      requestId: crypto.randomUUID(),
+      fingerprint: null,
+    };
+  }
+
+  const resetRequestIdentity = () => {
+    requestIdentityRef.current = {
+      requestId: crypto.randomUUID(),
+      fingerprint: null,
+    };
+  };
 
   // ---------------------------------------------------------------------------
   // Fetch available yeast pitches (in_stock with remaining quantity)
@@ -257,79 +284,121 @@ export function PitchYeastDialog({
   // ---------------------------------------------------------------------------
   // Submit mutation
   // ---------------------------------------------------------------------------
+  const invalidatePitchCaches = (pitchId: string) => Promise.all([
+    // yeastKeys.all is the prefix for the available-source query as well as
+    // source details, so a concurrent depletion cannot remain selectable.
+    queryClient.invalidateQueries({ queryKey: yeastKeys.all() }),
+    queryClient.invalidateQueries({ queryKey: yeastKeys.events(pitchId) }),
+    queryClient.invalidateQueries({ queryKey: batchKeys.yeastSummary(batchId) }),
+    queryClient.invalidateQueries({ queryKey: batchKeys.yeastStrains(batchId) }),
+    queryClient.invalidateQueries({
+      queryKey: entityKeys.all("yeast_pitches_with_remaining"),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: entityKeys.all("yeast_pitch_events"),
+    }),
+    queryClient.invalidateQueries({ queryKey: yeastKeys.lineageAll() }),
+    queryClient.invalidateQueries({ queryKey: yeastKeys.lineageSummaryAll() }),
+  ]);
+
   const pitchMutation = useMutation({
     mutationFn: async (values: PitchYeastFormValues) => {
       const pitch = sortedPitches.find((p) => p.id === values.pitch_id);
       if (!pitch) throw new Error("Selected yeast pitch not found");
-
-      // Calculate cells pitched (thousands)
-      const cellsPitchedThousand =
-        pitch.cell_density_thousand && values.viability
-          ? values.quantity_lbs *
-            pitch.cell_density_thousand *
-            (values.viability / 100)
-          : null;
-
-      // Insert yeast_pitch_event
-      await unwrap(
-        dynamicFrom(supabase, "yeast_pitch_events")
-          .insert({
-            pitch_id: values.pitch_id,
-            batch_id: batchId,
-            quantity_lbs: values.quantity_lbs,
-            cells_pitched_thousand: cellsPitchedThousand
-              ? Math.round(cellsPitchedThousand * 100) / 100
-              : null,
-            viability_at_pitch: values.viability,
-            pitched_at: new Date().toISOString(),
-            notes: values.notes || null,
-          }),
-      );
-
-      // Check if remaining would be <= 0 after this pitch
-      const newRemaining =
-        pitch.quantity_remaining_lbs - values.quantity_lbs;
-      if (newRemaining <= 0) {
-        await unwrap(
-          dynamicFrom(supabase, "yeast_pitches")
-            .update({ status: "depleted" })
-            .eq("id", values.pitch_id),
+      const fingerprint = JSON.stringify({
+        pitchId: values.pitch_id,
+        batchId,
+        quantityLbs: values.quantity_lbs,
+        viability: values.viability,
+        notes: values.notes || "",
+      });
+      const identity = requestIdentityRef.current;
+      if (!identity) throw new Error("Yeast pitch request identity is unavailable");
+      if (identity.fingerprint && identity.fingerprint !== fingerprint) {
+        throw new Error(
+          "This retry changed an unresolved yeast pitch. Retry with the original values, or close and reopen the dialog to start a new pitch.",
         );
       }
+      identity.fingerprint = fingerprint;
 
-      return { pitch, quantity: values.quantity_lbs };
+      const result = await unwrap(
+        supabase.rpc("pitch_yeast_atomic", {
+          p_request_id: identity.requestId,
+          p_pitch_id: values.pitch_id,
+          p_batch_id: batchId,
+          p_quantity_lbs: values.quantity_lbs,
+          p_viability_at_pitch: values.viability,
+          p_notes: values.notes || "",
+        }),
+      );
+
+      return {
+        pitch,
+        quantity: values.quantity_lbs,
+        result: result as PitchYeastRpcResult,
+      };
     },
-    onSuccess: ({ pitch, quantity }) => {
-      // Invalidate relevant caches
-      queryClient.invalidateQueries({ queryKey: yeastKeys.all() });
-      queryClient.invalidateQueries({ queryKey: yeastKeys.detail(pitch.id) });
-      queryClient.invalidateQueries({ queryKey: batchKeys.yeast(batchId) });
+    onSuccess: async ({ pitch, quantity, result }) => {
+      // No cache or UI state changes until the database confirms created or
+      // duplicate (the latter reconciles an ambiguous response after commit).
+      await invalidatePitchCaches(pitch.id);
+      resetRequestIdentity();
 
-      toast.success(
-        `Pitched ${quantity} lbs of ${pitch.strain_name} (G${pitch.generation})`
+      toast.success(result.kind === "duplicate"
+        ? "This yeast pitch was already recorded"
+        : `Pitched ${quantity} lbs of ${pitch.strain_name} (G${pitch.generation})`
       );
 
       onOpenChange(false);
       form.reset();
 
       // Suggest state transition if batch is in "planned" status
-      if (batchStatus === "planned" && onSuggestTransition) {
+      if (
+        result.kind === "created"
+        && batchStatus === "planned"
+        && onSuggestTransition
+      ) {
         onSuggestTransition("fermenting");
       }
 
       onSuccess?.();
     },
-    onError: (error) => {
+    onError: async (error, values) => {
       log.error("Pitch yeast error:", error);
-      const message =
-        error instanceof Error ? error.message : "Failed to pitch yeast";
-      toast.error(message);
+      const parsed = parseUnknownError(error);
+      const isConflict =
+        typeof error === "object"
+        && error !== null
+        && "code" in error
+        && error.code === PG_ERROR_CODES.CONFLICT
+        && "message" in error;
+      const isBalanceConflict = isConflict
+        && typeof error.message === "string"
+        && error.message.startsWith("Cannot pitch");
+      if (isConflict) {
+        // PT409 is a definitive rolled-back command, but it often means a
+        // concurrent writer changed the source. Reconcile every affected view
+        // before allowing a new request identity.
+        await invalidatePitchCaches(values.pitch_id);
+        resetRequestIdentity();
+      }
+      if (isBalanceConflict) {
+        form.setError("quantity_lbs", { message: parsed.message });
+      }
+      toast.error(parsed.message);
     },
   });
 
   const handleSubmit = form.handleSubmit((values) => {
     pitchMutation.mutate(values);
   });
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && !pitchMutation.isPending) {
+      resetRequestIdentity();
+    }
+    onOpenChange(nextOpen);
+  };
 
   // ---------------------------------------------------------------------------
   // Helpers for display
@@ -341,7 +410,7 @@ export function PitchYeastDialog({
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Pitch Yeast</DialogTitle>
@@ -534,7 +603,7 @@ export function PitchYeastDialog({
               loadingLabel="Pitching..."
               isLoading={pitchMutation.isPending}
               submitDisabled={!sortedPitches.length || isOverdrawing}
-              onCancel={() => onOpenChange(false)}
+              onCancel={() => handleOpenChange(false)}
             />
           </DialogFooter>
         </form>

@@ -120,6 +120,7 @@ export const batchKeys = {
   availableBrewLogs: (id: string) => ["available-brew-logs", id] as const,
   yeast: (id: string) => ["batches", id, "yeast"] as const,
   yeastSummary: (id: string) => ["batch-yeast-summary", id] as const,
+  yeastStrains: (id: string) => ["batch-yeast-strains", id] as const,
   recipeBrand: (id: string) => ["batch-recipe-brand", id] as const,
   transfers: (id: string) => ["batches", id, "transfers"] as const,
   remainingVolume: (id: string, fromVesselId?: string | null) =>
@@ -413,7 +414,9 @@ export const yeastKeys = {
   brinks: () => ["yeast-pitches", "brinks"] as const,
   brinksDetail: (vesselId: string) => ["yeast-pitches", "brinks", vesselId] as const,
   lineageRoot: (pitchId: string) => ["yeast-lineage-root", pitchId] as const,
+  lineageAll: () => ["yeast-lineage"] as const,
   lineage: (rootId: string | undefined) => ["yeast-lineage", rootId] as const,
+  lineageSummaryAll: () => ["yeast-lineage-summary"] as const,
   lineageSummary: (rootId: string | undefined) => ["yeast-lineage-summary", rootId] as const,
   events: (pitchId: string) => ["yeast-pitch-events", pitchId] as const,
 };

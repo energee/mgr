@@ -173,7 +173,9 @@ export function BatchDetailClient({ id }: { id: string }) {
 
   // Fetch batch yeast data for the harvest dialog (which strains were pitched)
   const { data: batchYeastData = [] } = useQuery({
-    queryKey: batchKeys.yeastSummary(id),
+    // This projection feeds YeastHarvestDialog and must not share the full
+    // table summary key: React Query caches by key, not SELECT shape.
+    queryKey: batchKeys.yeastStrains(id),
     queryFn: async () => {
       const { data: result } = await (supabase as unknown as { from: (table: string) => { select: (columns: string) => { eq: (column: string, value: string) => PromiseLike<{ data: Array<{ pitch_id: string; strain_id: string; strain_name: string; generation: number }> | null; error: unknown }> } } })
         .from("batch_yeast_summary")
@@ -321,6 +323,13 @@ export function BatchDetailClient({ id }: { id: string }) {
   const handleDialogSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
     queryClient.invalidateQueries({ queryKey: batchKeys.yeastSummary(id) });
+    queryClient.invalidateQueries({ queryKey: batchKeys.yeastStrains(id) });
+  }, [queryClient, id]);
+
+  const handlePitchDialogSuccess = useCallback(() => {
+    // PitchYeastDialog owns its yeast projections; the parent only refreshes
+    // the batch record used by the surrounding detail page.
+    queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
   }, [queryClient, id]);
 
   const handleBrewDayCreated = useCallback(
@@ -423,7 +432,7 @@ export function BatchDetailClient({ id }: { id: string }) {
             // fall back to the recipe's target.
             recipeOg={batch.actual_og ?? recipe?.target_og}
             recipeYeastIds={recipe?.recipe_yeasts?.map((ry) => ry.yeast_id)}
-            onSuccess={handleDialogSuccess}
+            onSuccess={handlePitchDialogSuccess}
             onSuggestTransition={(state) => handleSuggestTransition(state)}
           />
 
