@@ -4,12 +4,14 @@
  * GET: Receives the OAuth callback from Intuit, exchanges the authorization
  * code for tokens, stores them, and redirects to the settings page.
  *
- * This route is NOT wrapped with withAuth because it's called by Intuit's
- * redirect - we verify the user session manually via Supabase cookies.
+ * This route is not wrapped because Intuit calls it as a browser redirect. It
+ * verifies the session, initiating identity, and integration permission before
+ * exchanging the authorization code.
  */
 
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import { requirePermission } from "@/lib/api/auth";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens, saveTokens } from "@/integrations/quickbooks";
 import { logger } from "@/lib/logger";
@@ -37,10 +39,27 @@ export async function GET(request: NextRequest): Promise<Response> {
   // Validate CSRF state token from cookie
   const cookieStore = await cookies();
   const storedState = cookieStore.get("qbo_oauth_state")?.value;
+  const initiatingUserId = cookieStore.get("qbo_oauth_initiator")?.value;
   cookieStore.delete("qbo_oauth_state");
+  cookieStore.delete("qbo_oauth_initiator");
 
   if (!state || state !== storedState) {
     settingsUrl.searchParams.set("qbo_error", "Invalid OAuth state");
+    return NextResponse.redirect(settingsUrl);
+  }
+
+  if (!initiatingUserId || initiatingUserId !== user.id) {
+    settingsUrl.searchParams.set("qbo_error", "Invalid OAuth initiator");
+    return NextResponse.redirect(settingsUrl);
+  }
+
+  try {
+    await requirePermission("integrations:manage", { user, supabase });
+  } catch {
+    settingsUrl.searchParams.set(
+      "qbo_error",
+      "QuickBooks connection requires integration management permission",
+    );
     return NextResponse.redirect(settingsUrl);
   }
 
