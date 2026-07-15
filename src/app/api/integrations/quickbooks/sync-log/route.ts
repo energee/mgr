@@ -5,11 +5,11 @@
  * Query params: entityType, entityId, status, limit, offset
  */
 
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { successResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
 
-export const GET = withAuth(async (request) => {
+export const GET = withPermission("integrations:manage", async (request) => {
   const { searchParams } = new URL(request.url);
   const entityType = searchParams.get("entityType");
   const entityId = searchParams.get("entityId");
