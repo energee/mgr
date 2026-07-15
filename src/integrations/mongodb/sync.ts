@@ -6,7 +6,8 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { dynamicFrom } from "@/services/types";
+import { unwrap } from "@/lib/supabase/query-helpers";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { logger } from "@/lib/logger";
 import { type Db } from "mongodb";
 import { getMongoDb } from "./client";
@@ -83,7 +84,7 @@ async function completeSyncLog(
   result: Pick<SyncResult, "synced" | "failed" | "errors">
 ) {
   const admin = await createAdminClient();
-  await dynamicFrom(admin, "mongodb_sync_log")
+  const { error } = await dynamicFrom(admin, "mongodb_sync_log")
     .update({
       status: result.failed > 0 ? "error" : "success",
       records_synced: result.synced,
@@ -92,6 +93,7 @@ async function completeSyncLog(
       completed_at: new Date().toISOString(),
     })
     .eq("id", logId);
+  if (error) throw new Error(`Failed to complete sync log: ${error.message}`);
 }
 
 // =============================================================================
@@ -185,6 +187,31 @@ async function upsertRows(
   return { synced, failed, errors };
 }
 
+/** Call an aggregate reconciliation RPC and preserve phase/entity/operation context. */
+async function reconcileAggregate(
+  admin: AdminClient,
+  fn: string,
+  args: Record<string, unknown>,
+  context: { phase: SyncPhase; entity: SyncEntityType; mongoId: string },
+): Promise<{ synced: number; failed: number; errors: Array<{ mongoId: string; error: string }> }> {
+  try {
+    const data = await unwrap<number>(dynamicRpc(admin, fn, args));
+    return { synced: typeof data === "number" ? data : Number(data ?? 0), failed: 0, errors: [] };
+  } catch (error) {
+    const message = error && typeof error === "object" && "message" in error
+      ? String(error.message)
+      : String(error);
+    return {
+      synced: 0,
+      failed: 1,
+      errors: [{
+        mongoId: context.mongoId,
+        error: `phase=${context.phase} entity=${context.entity} operation=reconcile: ${message}`,
+      }],
+    };
+  }
+}
+
 async function requireMongoDb(): Promise<Db> {
   const db = await getMongoDb();
   if (!db) throw new Error("MongoDB not connected");
@@ -209,12 +236,6 @@ async function selectIdName(
   const { data, error } = await dynamicFrom(admin, table).select("id, name");
   if (error) throw new Error(`Failed to read ${table} for FK resolution: ${error.message}`);
   return (data ?? []) as Array<{ id: string; name: string }>;
-}
-
-/** Delete every row of a table (created_at is NOT NULL on synced tables), throwing on error. */
-async function deleteAllOrThrow(admin: AdminClient, table: string): Promise<void> {
-  const { error } = await dynamicFrom(admin, table).delete().gte("created_at", "1970-01-01");
-  if (error) throw new Error(`Failed to clear ${table} for re-sync: ${error.message}`);
 }
 
 // =============================================================================
@@ -400,27 +421,11 @@ async function syncVessels(): Promise<SyncResult> {
   return { entityType: "vessels", phase: 2, ...result };
 }
 
-/**
- * Destructive recipe re-sync, hardened per audit SF-5.
- *
- * Recipes have no UNIQUE(name) constraint, so re-sync is delete-then-rebuild
- * across recipes + recipe_malts/recipe_hops/recipe_yeasts. The Supabase JS
- * client has no client-side transactions, and adding a Postgres RPC just for
- * this legacy import tool would be new infrastructure — so the accepted
- * ceiling is fetch-and-verify BEFORE delete:
- *   1. every Mongo read and every PG FK-lookup read runs first, throwing on
- *      any error (never treating a failed read as "no rows"), and
- *   2. every lookup map the Mongo data references must be non-empty
- * before any destructive statement runs. Upgrade path if this ever needs to
- * be stronger: move the delete+rebuild into a single Postgres function
- * (one transaction) called via rpc().
- */
+/** Reconcile each MongoDB recipe and its ingredient rows in one DB transaction. */
 async function syncRecipes(): Promise<SyncResult> {
   const logId = await createSyncLog("recipes", 2);
   const db = await requireMongoDb();
   const admin = await createAdminClient();
-
-  // ---- Fetch phase: ALL reads happen before any write, all error-checked ----
 
   const docs = await db.collection<MongoRecipe>("recipes").find().toArray();
 
@@ -462,10 +467,6 @@ async function syncRecipes(): Promise<SyncResult> {
     if (pgId) mongoYeastIdToPgId.set(mongoId, pgId);
   }
 
-  // ---- Verify phase: refuse the destructive rebuild if any lookup map the
-  // Mongo data references resolved to nothing. An empty map here would rebuild
-  // every recipe with NULL FKs / drop every junction row AFTER the originals
-  // are already deleted — exactly the SF-5 failure mode. ----
   const lookupGuards = [
     { referenced: docs.some((d) => !!d.style), size: mongoStyleIdToPgId.size, what: "beer_styles" },
     { referenced: docs.some((d) => !!d.beer), size: mongoBeerIdToPgBrandId.size, what: "brands" },
@@ -476,94 +477,85 @@ async function syncRecipes(): Promise<SyncResult> {
   for (const guard of lookupGuards) {
     if (guard.referenced && guard.size === 0) {
       throw new Error(
-        `Refusing destructive recipe re-sync: ${guard.what} lookup resolved 0 entries but Mongo recipes reference it (run earlier sync phases first, or investigate a name mismatch)`
+        `Refusing recipe re-sync: ${guard.what} lookup resolved 0 entries but Mongo recipes reference it (run earlier sync phases first, or investigate a name mismatch)`
       );
     }
   }
 
-  // ---- Destructive rebuild phase (all reads above are verified) ----
-
-  // Delete all existing recipes and re-insert (no UNIQUE(name) constraint on recipes table)
-  await deleteAllOrThrow(admin, "recipe_malts");
-  await deleteAllOrThrow(admin, "recipe_hops");
-  await deleteAllOrThrow(admin, "recipe_yeasts");
-  await deleteAllOrThrow(admin, "recipes");
-
-  const recipeRows = docs.map((d) => {
+  const results = [];
+  for (const d of docs) {
+    const mongoId = d._id.toString();
     const row = transformRecipe(d);
-    // Resolve style FK
+    (row as Record<string, unknown>).id = objectIdToUuid(mongoId);
     if (d.style) {
       (row as Record<string, unknown>).style_id = mongoStyleIdToPgId.get(d.style.toString()) ?? null;
     }
-    // Resolve brand FK
     if (d.beer) {
       (row as Record<string, unknown>).brand_id = mongoBeerIdToPgBrandId.get(d.beer.toString()) ?? null;
     }
-    return row;
-  });
-  const recipeResult = await upsertRows("recipes", recipeRows);
 
-  // Recipes get fresh auto-generated UUIDs on insert, so the name → UUID
-  // lookup for junction rows can only happen after the insert. selectIdName
-  // throws on a failed read rather than silently skipping every junction row.
-  const recipeNameToId = new Map(
-    (await selectIdName(admin, "recipes")).map((r) => [r.name, r.id])
-  );
-
-  // Build junction rows with resolved PG UUIDs
-  const maltRows: Record<string, unknown>[] = [];
-  const hopRows: Record<string, unknown>[] = [];
-  const yeastRows: Record<string, unknown>[] = [];
-
-  for (const doc of docs) {
-    const pgRecipeId = recipeNameToId.get(doc.name);
-    if (!pgRecipeId) continue;
-
-    let maltPos = 0;
-    for (const m of doc.malts ?? []) {
+    const maltRows: Record<string, unknown>[] = [];
+    for (let index = 0; index < (d.malts ?? []).length; index++) {
+      const m = d.malts![index]!;
       const pgMaltId = mongoMaltIdToPgId.get(m.malt.toString());
       if (!pgMaltId) continue;
+      const childMongoId = `${mongoId}:malt:${m.id ?? index}`;
       maltRows.push({
-        recipe_id: pgRecipeId,
+        id: objectIdToUuid(childMongoId),
+        mongo_id: childMongoId,
         malt_id: pgMaltId,
         weight_lbs: m.weight,
-        position: maltPos++,
+        position: index,
       });
     }
 
-    let hopPos = 0;
-    for (const h of doc.hops ?? []) {
+    const hopRows: Record<string, unknown>[] = [];
+    for (let index = 0; index < (d.hops ?? []).length; index++) {
+      const h = d.hops![index]!;
       const pgHopId = mongoHopIdToPgId.get(h.hop.toString());
       if (!pgHopId) continue;
+      const childMongoId = `${mongoId}:hop:${h.id ?? index}`;
       hopRows.push({
-        recipe_id: pgRecipeId,
+        id: objectIdToUuid(childMongoId),
+        mongo_id: childMongoId,
         hop_id: pgHopId,
         weight_oz: Math.round(h.weight * 16 * 100) / 100,
         timing: HOP_TIMING_MAP[h.hopTiming ?? "boil"] ?? "boil",
         boil_time_min: h.boilTime ?? null,
-        position: hopPos++,
+        position: index,
       });
     }
 
-    if (doc.yeast) {
-      const pgYeastId = mongoYeastIdToPgId.get(doc.yeast.toString());
+    const yeastRows: Record<string, unknown>[] = [];
+    if (d.yeast) {
+      const pgYeastId = mongoYeastIdToPgId.get(d.yeast.toString());
       if (pgYeastId) {
+        const childMongoId = `${mongoId}:yeast:0`;
         yeastRows.push({
-          recipe_id: pgRecipeId,
+          id: objectIdToUuid(childMongoId),
+          mongo_id: childMongoId,
           yeast_id: pgYeastId,
           is_primary: true,
           position: 0,
         });
       }
     }
+
+    results.push(await reconcileAggregate(
+      admin,
+      "reconcile_mongodb_recipe_aggregate",
+      {
+        p_mongo_id: mongoId,
+        p_recipe: row,
+        p_malts: maltRows,
+        p_hops: hopRows,
+        p_yeasts: yeastRows,
+      },
+      { phase: 2, entity: "recipes", mongoId },
+    ));
   }
 
-  // Junction tables were already deleted above — plain insert, not upsert
-  const maltResult = await upsertRows("recipe_malts", maltRows);
-  const hopResult = await upsertRows("recipe_hops", hopRows);
-  const yeastResult = await upsertRows("recipe_yeasts", yeastRows);
-
-  const combined = mergeResults(recipeResult, maltResult, hopResult, yeastResult);
+  const combined = mergeResults(...results);
   await completeSyncLog(logId, combined);
   return { entityType: "recipes", phase: 2, ...combined };
 }
@@ -673,60 +665,35 @@ async function syncTransfers(): Promise<SyncResult> {
 async function syncBrewLogs(): Promise<SyncResult> {
   const logId = await createSyncLog("brew_logs", 3);
   const db = await requireMongoDb();
-
   const admin = await createAdminClient();
-
   const docs = await db.collection<MongoBrewLog>("brew-logs").find().sort({ brewDate: 1 }).toArray();
-
-  // Transform brew logs
-  const brewLogRows = docs.map((d) => transformBrewLog(d));
-  const brewLogResult = await upsertRows("brew_logs", brewLogRows, "brew_number");
-
-  // Build brew_number → PG brew_log UUID lookup for junction table
-  const { data: pgBrewLogs, error: pgBrewLogsError } = await dynamicFrom(admin, "brew_logs")
-    .select("id, brew_number");
-  if (pgBrewLogsError) {
-    throw new Error(`Failed to read brew_logs for FK resolution: ${pgBrewLogsError.message}`);
-  }
-  const brewNumberToId = new Map(
-    (pgBrewLogs ?? []).map((bl: { id: string; brew_number: string }) => [bl.brew_number, bl.id])
-  );
-
-  // Create brew_log_batches junction entries
-  const junctionRows: Record<string, unknown>[] = [];
-  for (let i = 0; i < docs.length; i++) {
-    const doc = docs[i];
-    if (!doc.batch) continue;
-
-    const brewNumber = brewLogRows[i].brew_number;
-    const pgBrewLogId = brewNumberToId.get(brewNumber) as string | undefined;
-    if (!pgBrewLogId) continue;
-
-    const pgBatchId = objectIdToUuid(doc.batch.toString());
-
-    // Use knockOut volume if available, otherwise estimate from batch
-    const volume = (doc.knockOut as Record<string, unknown>)?.volumeKO as number ?? 0;
-
-    junctionRows.push({
-      brew_log_id: pgBrewLogId,
-      batch_id: pgBatchId,
-      volume_bbl: volume || DEFAULT_BREW_VOLUME_BBL,
-    });
-  }
-
-  // Delete existing junction entries for these brew logs, then insert
-  const syncedBrewLogIds = junctionRows.map((r) => r.brew_log_id as string);
-  if (syncedBrewLogIds.length > 0) {
-    const { error: deleteError } = await dynamicFrom(admin, "brew_log_batches")
-      .delete()
-      .in("brew_log_id", syncedBrewLogIds);
-    if (deleteError) {
-      throw new Error(`Failed to clear brew_log_batches for re-sync: ${deleteError.message}`);
+  const results = [];
+  for (const doc of docs) {
+    const mongoId = doc._id.toString();
+    const brewLog = {
+      id: objectIdToUuid(mongoId),
+      ...transformBrewLog(doc),
+    };
+    const batches: Record<string, unknown>[] = [];
+    if (doc.batch) {
+      const childMongoId = `${mongoId}:batch:${doc.batch.toString()}`;
+      const volume = (doc.knockOut as Record<string, unknown>)?.volumeKO as number ?? 0;
+      batches.push({
+        id: objectIdToUuid(childMongoId),
+        mongo_id: childMongoId,
+        batch_id: objectIdToUuid(doc.batch.toString()),
+        volume_bbl: volume || DEFAULT_BREW_VOLUME_BBL,
+      });
     }
+    results.push(await reconcileAggregate(
+      admin,
+      "reconcile_mongodb_brew_aggregate",
+      { p_mongo_id: mongoId, p_brew_log: brewLog, p_batches: batches },
+      { phase: 3, entity: "brew_logs", mongoId },
+    ));
   }
-  const junctionResult = await upsertRows("brew_log_batches", junctionRows);
 
-  const combined = mergeResults(brewLogResult, junctionResult);
+  const combined = mergeResults(...results);
   await completeSyncLog(logId, combined);
   return { entityType: "brew_logs", phase: 3, ...combined };
 }
@@ -741,7 +708,7 @@ async function syncBatchReadings(): Promise<SyncResult> {
   const admin = await createAdminClient();
 
   const docs = await db.collection<MongoTest>("tests").find().sort({ time: 1 }).toArray();
-  const rows: Record<string, unknown>[] = [];
+  const results = [];
   const errors: Array<{ mongoId: string; error: string }> = [];
 
   for (const doc of docs) {
@@ -751,36 +718,36 @@ async function syncBatchReadings(): Promise<SyncResult> {
         continue;
       }
       const pgBatchId = objectIdToUuid(doc.batch.toString());
-      // transformTest returns multiple rows (one per measurement type)
+      const mongoId = doc._id.toString();
       const logRows = transformTest(doc);
-      for (const row of logRows) {
+      const readings = logRows.map((row) => {
+        const readingType = String(row.data.reading_type);
+        const childMongoId = `${mongoId}:${readingType}`;
         row.batch_id = pgBatchId;
-        rows.push(row);
-      }
+        return {
+          ...row,
+          id: objectIdToUuid(childMongoId),
+          mongo_id: childMongoId,
+        };
+      });
+      results.push(await reconcileAggregate(
+        admin,
+        "reconcile_mongodb_batch_reading_aggregate",
+        { p_mongo_id: mongoId, p_readings: readings },
+        { phase: 4, entity: "batch_logs", mongoId },
+      ));
     } catch (err) {
-      errors.push({ mongoId: doc._id.toString(), error: err instanceof Error ? err.message : String(err) });
+      errors.push({
+        mongoId: doc._id.toString(),
+        error: `phase=4 entity=batch_logs operation=transform: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
-
-  // Delete existing synced measurement logs before inserting fresh.
-  // Only delete logs that look like sync-created ones (measurement type with mongo-style timestamps).
-  // We use a broad delete of all measurement logs for the synced batches.
-  const syncedBatchIds = [...new Set(rows.map((r) => r.batch_id as string))];
-  if (syncedBatchIds.length > 0) {
-    const { error: deleteError } = await dynamicFrom(admin, "batch_logs")
-      .delete()
-      .in("batch_id", syncedBatchIds)
-      .eq("log_type", "measurement");
-    if (deleteError) {
-      throw new Error(`Failed to clear batch_logs for re-sync: ${deleteError.message}`);
-    }
-  }
-
-  const insertResult = await upsertRows("batch_logs", rows);
+  const reconciled = mergeResults(...results);
   const combined = {
-    synced: insertResult.synced,
-    failed: insertResult.failed + errors.length,
-    errors: [...insertResult.errors, ...errors.slice(0, 10)],
+    synced: reconciled.synced,
+    failed: reconciled.failed + errors.length,
+    errors: [...reconciled.errors, ...errors.slice(0, 10)],
   };
 
   await completeSyncLog(logId, combined);
@@ -800,7 +767,6 @@ async function syncPackagingSessions(): Promise<SyncResult> {
   const docs = await db.collection<MongoPackagingSession>("packaging-sessions")
     .find().sort({ date: 1 }).toArray();
   const sessionRows = docs.map(transformPackagingSession);
-  const sessionResult = await upsertRows("packaging_sessions", sessionRows);
 
   // 2. Build lookups for line item FK resolution
   // Batch → beer → brand chain (to derive brand_id, which is NOT NULL)
@@ -941,6 +907,7 @@ async function syncPackagingSessions(): Promise<SyncResult> {
 
       lineItems.push({
         id: itemId,
+        mongo_id: `${doc._id.toString()}:line:${product.id ?? i}`,
         session_id: pgSessionId,
         brand_id: pgBrandId,
         selling_format_id: pgFormatId,
@@ -951,21 +918,29 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     }
   }
 
-  // 4. Delete existing line items for synced sessions, then insert fresh
-  const syncedSessionIds = sessionRows.map((r) => r.id);
-  if (syncedSessionIds.length > 0) {
-    const { error: deleteError } = await dynamicFrom(admin, "session_line_items")
-      .delete()
-      .in("session_id", syncedSessionIds);
-    if (deleteError) {
-      throw new Error(`Failed to clear session_line_items for re-sync: ${deleteError.message}`);
-    }
+  // 4. Reconcile each complete source aggregate. A line-resolution failure
+  // leaves the previous session and its lines untouched.
+  const results = [];
+  for (let index = 0; index < docs.length; index++) {
+    const doc = docs[index]!;
+    const mongoId = doc._id.toString();
+    if (lineErrors.some((error) => error.mongoId === mongoId)) continue;
+    const session = sessionRows[index]!;
+    const lines = lineItems.filter((line) => line.session_id === session.id);
+    results.push(await reconcileAggregate(
+      admin,
+      "reconcile_mongodb_packaging_aggregate",
+      { p_mongo_id: mongoId, p_session: session, p_lines: lines },
+      { phase: 4, entity: "packaging_sessions", mongoId },
+    ));
   }
-  const lineResult = await upsertRows("session_line_items", lineItems);
 
-  const combined = mergeResults(sessionResult, lineResult);
+  const combined = mergeResults(...results);
   combined.failed += lineErrors.length;
-  combined.errors.push(...lineErrors.slice(0, 10));
+  combined.errors.push(...lineErrors.slice(0, 10).map((error) => ({
+    ...error,
+    error: `phase=4 entity=packaging_sessions operation=resolve-line: ${error.error}`,
+  })));
 
   await completeSyncLog(logId, combined);
   return { entityType: "packaging_sessions", phase: 4, ...combined };
@@ -1013,8 +988,11 @@ export async function syncPhase(phase: SyncPhase): Promise<SyncResult[]> {
         entityType: (ENTITY_FN_NAMES.get(fn) ?? "unknown") as SyncEntityType,
         phase,
         synced: 0,
-        failed: 0,
-        errors: [{ mongoId: "phase-error", error: message }],
+        failed: 1,
+        errors: [{
+          mongoId: "phase-error",
+          error: `phase=${phase} entity=${ENTITY_FN_NAMES.get(fn) ?? "unknown"} operation=sync: ${message}`,
+        }],
       });
     }
   }
@@ -1050,6 +1028,9 @@ export async function syncAll(): Promise<SyncResult[]> {
   for (const phase of [1, 2, 3, 4] as SyncPhase[]) {
     const phaseResults = await syncPhase(phase);
     results.push(...phaseResults);
+    if (phaseResults.some((result) => result.failed > 0 || result.errors.length > 0)) {
+      break;
+    }
   }
   return results;
 }

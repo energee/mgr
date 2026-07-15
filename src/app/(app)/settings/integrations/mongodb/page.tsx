@@ -175,7 +175,7 @@ function SyncTab() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: async (opts: { phase?: number; clean?: boolean }) => {
+    mutationFn: async (opts: { phase?: number }) => {
       const res = await fetch("/api/integrations/mongodb/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -183,10 +183,14 @@ function SyncTab() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Sync failed");
-      return json.data;
+      const data = json.data;
+      if (data.totalFailed > 0 || data.entities?.some((entity: { errors?: unknown[] }) => entity.errors?.length)) {
+        throw new Error("MongoDB sync reported one or more failures.");
+      }
+      return data;
     },
     onSuccess: (data) => {
-      toast.success(`Synced ${data.totalSynced} records (${data.totalFailed} failed)`);
+      toast.success(`Synced ${data.totalSynced} records`);
       queryClient.invalidateQueries({ queryKey: mongodbKeys.all() });
     },
     onError: (err: Error) => {
@@ -236,22 +240,10 @@ function SyncTab() {
           disabled={!isConnected || syncMutation.isPending}
           onClick={() => syncMutation.mutate({})}
         >
-          {syncMutation.isPending && !syncMutation.variables?.clean && !syncMutation.variables?.phase ? (
+          {syncMutation.isPending && !syncMutation.variables?.phase ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing All...</>
           ) : (
             <><RefreshCw className="mr-2 h-4 w-4" /> Sync All</>
-          )}
-        </Button>
-        <Button
-          className="flex-1"
-          variant="outline"
-          disabled={!isConnected || syncMutation.isPending}
-          onClick={() => syncMutation.mutate({ clean: true })}
-        >
-          {syncMutation.isPending && syncMutation.variables?.clean ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cleaning + Syncing...</>
-          ) : (
-            <><RefreshCw className="mr-2 h-4 w-4" /> Clean + Sync All</>
           )}
         </Button>
       </div>
