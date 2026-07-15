@@ -101,8 +101,11 @@ beforeEach(() => {
 
 describe("atomic recipe-additions mutation call sites", () => {
   it("does not report or cache water-addition success when the RPC rejects", async () => {
-    const { supabase } = makeSupabase({
-      recipes: [{ data: { version: 7 }, error: null }],
+    const { supabase, callsByTable } = makeSupabase({
+      recipes: [
+        { data: { version: 7 }, error: null },
+        { data: { version: 7 }, error: null },
+      ],
       recipe_additions: [{ data: [], error: null }],
       water_profiles: [
         {
@@ -168,6 +171,10 @@ describe("atomic recipe-additions mutation call sites", () => {
         timing: "mash",
       })],
     });
+    expect(callsByTable.recipes).toHaveLength(2);
+    for (const versionRead of callsByTable.recipes) {
+      expect(versionRead.eq).toHaveBeenCalledWith("id", RECIPE_ID);
+    }
     expect(mocks.toastError).toHaveBeenCalledWith(
       "Failed to apply: Recipe version conflict",
     );
