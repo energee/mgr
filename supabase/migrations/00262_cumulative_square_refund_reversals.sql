@@ -5,6 +5,11 @@
 -- therefore credited floor(1.5) + floor(1.5) = two units. Refund transactions
 -- already serialize per order, so compute the cumulative target once and
 -- insert only the delta beyond quantities recorded by prior refund logs.
+--
+-- Unsizeable refunds (missing/zero order total or refund amount) now RAISE and
+-- roll back the whole transaction — including the refund_ingest claim row — so a
+-- retry after the source data is corrected starts clean. They are no longer
+-- recorded as completed failed logs (which a retry mistook for a 'duplicate').
 
 CREATE OR REPLACE FUNCTION ingest_square_refund_atomic(
   p_refund_id TEXT,
@@ -224,15 +229,16 @@ BEGIN
   END;
 
   IF v_event_proportion IS NULL THEN
-    v_items_failed := 1;
-    v_errors := jsonb_build_array(jsonb_build_object(
-      'item', 'sizing',
-      'error', format(
-        'Cannot size refund reversal: refund amount %s vs order total %s; reverse manually from this log entry',
-        COALESCE(p_refund_amount::TEXT, '(missing)'),
-        COALESCE(p_order_total::TEXT, '(missing)')
-      )
-    ));
+    -- Refund cannot be sized (missing/zero order total or refund amount). Raise
+    -- so the whole transaction — including the refund_ingest claim row inserted
+    -- this transaction — rolls back. Sizing happens before any allocation/bin
+    -- writes, so rollback leaves no partial effects and a later retry (after the
+    -- source data is corrected) starts cleanly rather than hitting a sealed,
+    -- falsely 'duplicate' completed log.
+    RAISE EXCEPTION 'Cannot size Square refund reversal: refund amount %, order total %; correct the source data and retry',
+      COALESCE(p_refund_amount::TEXT, '(missing)'),
+      COALESCE(p_order_total::TEXT, '(missing)')
+      USING ERRCODE = '22023';
   ELSE
     -- Completed refund logs are the durable per-event audit ledger. Include
     -- prior valid amounts even when a historical event only reversed some
