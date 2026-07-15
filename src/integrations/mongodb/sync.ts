@@ -93,7 +93,10 @@ async function completeSyncLog(
       completed_at: new Date().toISOString(),
     })
     .eq("id", logId);
-  if (error) throw new Error(`Failed to complete sync log: ${error.message}`);
+  // The aggregate RPCs have already committed by this point, so a failed
+  // bookkeeping write must NOT flip a successful reconciliation to "failed"
+  // (which would also halt later phases in syncAll). Surface it loudly instead.
+  if (error) logger.error({ logId, err: error.message }, "Failed to complete MongoDB sync log");
 }
 
 // =============================================================================

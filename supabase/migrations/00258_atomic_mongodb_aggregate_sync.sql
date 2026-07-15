@@ -41,6 +41,13 @@ BEGIN
   WHERE entity_type = 'recipes' AND mongo_id = p_mongo_id;
 
   IF v_recipe_id IS NULL THEN
+    -- First-run adoption: pre-migration syncs wrote recipes with random UUIDs and
+    -- no ownership mapping, so on the initial run of this reconciler the only way
+    -- to update those rows in place (instead of duplicating every recipe) is to
+    -- match by unique name. The tradeoff: a manually created recipe that shares an
+    -- exact name is adopted and becomes MongoDB-owned. We only adopt an unambiguous
+    -- single match; 0 or >1 matches fall through to the source/generated id. The
+    -- brew-log reconciler below adopts by brew_number for the same reason.
     SELECT count(*) INTO v_existing_count
       FROM recipes WHERE name = p_recipe->>'name';
     IF v_existing_count = 1 THEN
@@ -272,8 +279,10 @@ BEGIN
     VALUES (v_reading_id, (v_reading->>'batch_id')::UUID,
             COALESCE(v_reading->>'log_type', 'measurement'), v_reading->'data',
             COALESCE(NULLIF(v_reading->>'created_at', '')::TIMESTAMPTZ, NOW()))
+    -- Preserve the original created_at on retry: the source rarely carries one,
+    -- so re-running the same payload would otherwise reset it to NOW() each time.
     ON CONFLICT (id) DO UPDATE SET batch_id = EXCLUDED.batch_id,
-      log_type = EXCLUDED.log_type, data = EXCLUDED.data, created_at = EXCLUDED.created_at;
+      log_type = EXCLUDED.log_type, data = EXCLUDED.data;
     INSERT INTO mongodb_sync_mappings (entity_type, mongo_id, pg_id)
     VALUES ('batch_logs', v_reading_mongo_id, v_reading_id)
     ON CONFLICT (entity_type, mongo_id) DO UPDATE SET pg_id = EXCLUDED.pg_id;

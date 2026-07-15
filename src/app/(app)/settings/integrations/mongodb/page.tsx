@@ -182,12 +182,10 @@ function SyncTab() {
         body: JSON.stringify(opts),
       });
       const json = await res.json();
+      // The route returns a non-2xx status whenever any entity/phase failed, so
+      // a 2xx response is already a clean success — no client-side re-check needed.
       if (!res.ok) throw new Error(json.error?.message || "Sync failed");
-      const data = json.data;
-      if (data.totalFailed > 0 || data.entities?.some((entity: { errors?: unknown[] }) => entity.errors?.length)) {
-        throw new Error("MongoDB sync reported one or more failures.");
-      }
-      return data;
+      return json.data;
     },
     onSuccess: (data) => {
       toast.success(`Synced ${data.totalSynced} records`);
