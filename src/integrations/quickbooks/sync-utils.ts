@@ -91,6 +91,11 @@ export async function upsertMapping(
  * Stable create identity sent to QuickBooks. Intuit limits request IDs to 50
  * characters and deduplicates writes per company file, which makes a retry
  * safe after a lost response or a failed local mapping write.
+ *
+ * Ceiling: Intuit's request-ID dedup is time-bounded, not indefinite. A retry
+ * issued after that window has elapsed (e.g. re-running a stale failed
+ * sync-log row days later) can create a second remote document. Retries close
+ * to the original attempt — the common recovery case — are the safe path.
  */
 export function createQBORequestId(
   qboEntityType: Extract<QBOEntityType, "Invoice" | "Bill">,
@@ -166,6 +171,46 @@ export async function updateSyncLog(
   if (error) {
     throw new Error(`Failed to update QBO sync log ${logId}: ${error.message}`);
   }
+}
+
+/**
+ * Close out a successful document sync. The remote document and its local
+ * mapping are already durable by this point, so a failed audit-log write must
+ * NOT turn a completed sync into a reported failure — log it loudly instead.
+ */
+export async function completeSyncLogSuccess(
+  logId: string,
+  responsePayload: unknown
+): Promise<void> {
+  try {
+    await updateSyncLog(logId, "success", responsePayload);
+  } catch (logError) {
+    logger.warn(
+      { logId, err: logError instanceof Error ? logError.message : String(logError) },
+      "QBO sync: document created and mapped, but the success log write failed"
+    );
+  }
+}
+
+/**
+ * Record a failed document sync in qbo_sync_log and rethrow. Preserves the
+ * response payload (present when the remote create succeeded but a later local
+ * write failed) and, if the audit-log write itself fails, surfaces both
+ * failures rather than masking the primary one.
+ */
+export async function recordSyncFailure(
+  logId: string,
+  responsePayload: unknown,
+  err: unknown
+): Promise<never> {
+  const message = err instanceof Error ? err.message : String(err);
+  try {
+    await updateSyncLog(logId, "error", responsePayload, message);
+  } catch (logError) {
+    const logMessage = logError instanceof Error ? logError.message : String(logError);
+    throw new Error(`${message} Additionally, ${logMessage}`, { cause: err });
+  }
+  throw err;
 }
 
 // Address mapping helper: MGR address JSONB -> QBO Address

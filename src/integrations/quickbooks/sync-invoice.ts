@@ -6,7 +6,8 @@ import {
   getMappingOrLogFailure,
   upsertMapping,
   createSyncLog,
-  updateSyncLog,
+  completeSyncLogSuccess,
+  recordSyncFailure,
   getDefaultPaymentTermsDays,
   createQBORequestId,
   reconciliationRequiredError,
@@ -107,6 +108,10 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
     DueDate: dueDate,
     Line: lines,
   };
+  // The request ID is derived from the entity, not the payload. If a create
+  // whose mapping write failed is retried after the order is edited, QuickBooks
+  // dedups on this ID and returns the original document; the edit reaches QBO on
+  // the next (update) sync, not this retry.
   const requestId = existing ? null : createQBORequestId("Invoice", orderId);
 
   // Persist the exact create intent before calling QuickBooks. Combined with
@@ -141,16 +146,9 @@ export async function syncInvoice(orderId: string): Promise<{ qboId: string; act
     } catch (mappingError) {
       throw reconciliationRequiredError("Invoice", qboId, mappingError);
     }
-    await updateSyncLog(logId, "success", result);
+    await completeSyncLogSuccess(logId, result);
     return { qboId, action };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    try {
-      await updateSyncLog(logId, "error", result, message);
-    } catch (logError) {
-      const logMessage = logError instanceof Error ? logError.message : String(logError);
-      throw new Error(`${message} Additionally, ${logMessage}`, { cause: err });
-    }
-    throw err;
+    return recordSyncFailure(logId, result, err);
   }
 }
