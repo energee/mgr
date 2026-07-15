@@ -70,16 +70,23 @@ type SetupOptions = {
     email: string;
     roles: string[];
     status: string;
+    display_name?: string | null;
+    invited_at?: string | null;
+    invited_by?: string | null;
   };
   profileMissing?: boolean;
   profileWriteData?: unknown;
   linkWriteError?: { message: string };
   linkWriteData?: unknown;
   deleteUserError?: { message: string };
+  profileCompensationError?: { message: string };
+  linkCompensationError?: { message: string };
+  otpError?: { message: string };
 };
 
 function setup(options: SetupOptions = {}) {
   const links = options.links ?? [];
+  let profileWriteCount = 0;
   const tables: TableData = {
     customers: {
       data: { id: CUSTOMER_ID, email: PRIMARY_EMAIL, name: "Example Customer" },
@@ -90,7 +97,10 @@ function setup(options: SetupOptions = {}) {
       error: null,
     },
     customer_portal_users: ({ ops }) => {
-      if (ops.length > 0) {
+      if (ops.includes("delete")) {
+        return { data: null, error: options.linkCompensationError ?? null };
+      }
+      if (ops.includes("upsert")) {
         linkWritten();
         const userId = options.existingProfile?.id
           ?? (options.profileMissing ? "existing-user-1" : "new-user-1");
@@ -105,7 +115,11 @@ function setup(options: SetupOptions = {}) {
       return { data: links[0] ?? null, error: null };
     },
     user_profiles: ({ ops, calls }) => {
-      if (ops.length > 0) {
+      if (ops.includes("delete")) {
+        return { data: null, error: options.profileCompensationError ?? null };
+      }
+      if (ops.includes("update") || ops.includes("upsert")) {
+        profileWriteCount += 1;
         profileWritten();
         const userId = options.existingProfile?.id
           ?? (options.profileMissing ? "existing-user-1" : "new-user-1");
@@ -114,7 +128,10 @@ function setup(options: SetupOptions = {}) {
             options.profileWriteData === undefined
               ? { id: userId, roles: ["customer"], status: "active" }
               : options.profileWriteData,
-          error: null,
+          error:
+            profileWriteCount > 1
+              ? (options.profileCompensationError ?? null)
+              : null,
         };
       }
       if (calls.some((call) => call.method === "ilike")) {
@@ -154,7 +171,10 @@ function setup(options: SetupOptions = {}) {
     error: null,
   }));
   updateUserById = vi.fn(async () => ({ data: {}, error: null }));
-  signInWithOtp = vi.fn(async () => ({ data: {}, error: null }));
+  signInWithOtp = vi.fn(async () => ({
+    data: {},
+    error: options.otpError ?? null,
+  }));
 
   mockedCreateAdminClient.mockResolvedValue({
     ...(adminMock.admin as object),
@@ -370,5 +390,172 @@ describe("POST /api/customers/[id]/invite", () => {
       message: expect.stringContaining("auth cleanup failed"),
     });
     expect(deleteUser).toHaveBeenCalledWith("new-user-1");
+  });
+
+  it("restores an existing viewer profile when linking it fails", async () => {
+    setup({
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["viewer"],
+        status: "pending",
+        display_name: "Original Viewer",
+        invited_at: null,
+        invited_by: null,
+      },
+      linkWriteError: { message: "junction write failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL, displayName: "Buyer" }), routeContext),
+    ).rejects.toMatchObject({ message: "junction write failed" });
+
+    const profileWrites = writes.filter(
+      (write) => write.table === "user_profiles",
+    );
+    expect(profileWrites).toHaveLength(2);
+    expect(profileWrites[1]).toMatchObject({
+      op: "update",
+      row: {
+        email: SECOND_EMAIL,
+        display_name: "Original Viewer",
+        roles: ["viewer"],
+        status: "pending",
+        invited_at: null,
+        invited_by: null,
+      },
+    });
+    expect(writes).toContainEqual({
+      table: "customer_portal_users",
+      op: "delete",
+      row: "existing-user-1",
+    });
+    expect(deleteUser).not.toHaveBeenCalled();
+    expect(signInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it("reactivates an existing customer only if the remaining invite steps commit", async () => {
+    setup({
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["customer"],
+        status: "inactive",
+        display_name: "Inactive Buyer",
+        invited_at: "2026-01-01T00:00:00.000Z",
+        invited_by: "old-staff",
+      },
+      otpError: { message: "delivery failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("delivery failed"),
+    });
+
+    expect(
+      writes.filter((write) => write.table === "user_profiles"),
+    ).toHaveLength(2);
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: "user_profiles",
+        op: "update",
+        row: expect.objectContaining({
+          roles: ["customer"],
+          status: "inactive",
+          invited_at: "2026-01-01T00:00:00.000Z",
+          invited_by: "old-staff",
+        }),
+      }),
+    );
+    expect(writes).toContainEqual({
+      table: "customer_portal_users",
+      op: "delete",
+      row: "existing-user-1",
+    });
+  });
+
+  it("removes a recovered profile but not its pre-existing Auth user when linking fails", async () => {
+    setup({
+      profileMissing: true,
+      linkWriteError: { message: "junction write failed" },
+    });
+    createUser.mockResolvedValue({
+      data: { user: null },
+      error: { code: "email_exists", message: "Email already exists" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({ message: "junction write failed" });
+
+    expect(writes).toContainEqual({
+      table: "user_profiles",
+      op: "delete",
+      row: "existing-user-1",
+    });
+    expect(writes).toContainEqual({
+      table: "customer_portal_users",
+      op: "delete",
+      row: "existing-user-1",
+    });
+    expect(deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("preserves a portal link that existed before an OTP delivery failure", async () => {
+    setup({
+      links: [{ customer_id: CUSTOMER_ID, user_id: "existing-user-1" }],
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["customer"],
+        status: "active",
+      },
+      otpError: { message: "delivery failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("delivery failed"),
+    });
+
+    expect(writes).not.toContainEqual(
+      expect.objectContaining({
+        table: "customer_portal_users",
+        op: "delete",
+      }),
+    );
+    expect(writes).not.toContainEqual(
+      expect.objectContaining({
+        table: "user_profiles",
+        op: "delete",
+      }),
+    );
+  });
+
+  it("surfaces a repair-required error when existing-user compensation fails", async () => {
+    setup({
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["viewer"],
+        status: "active",
+      },
+      otpError: { message: "delivery failed" },
+      linkCompensationError: { message: "link cleanup failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: expect.stringContaining("link cleanup failed"),
+    });
+    expect(
+      writes.filter((write) => write.table === "user_profiles"),
+    ).toHaveLength(2);
+    expect(deleteUser).not.toHaveBeenCalled();
   });
 });
