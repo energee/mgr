@@ -91,10 +91,15 @@ rejected
 
 | Transition | Trigger |
 |------------|---------|
-| pending → approved | Admin approves; `apply_change_request()` atomically updates order items |
+| pending → approved | Staff with `orders:write` approves; `apply_change_request()` validates the order/cutoff/line snapshots and atomically updates selling-format order items |
 | pending → rejected | Admin rejects with reason; customer sees rejection on portal |
 
 **Cutoff rule:** Change requests can only be submitted when the order's status is below the sales channel's `change_request_cutoff_state` (default: `confirmed`).
+
+**Fulfillment rule:** Approval is rejected while the order has a non-cancelled
+pick list or active/completed finished-good allocation. Staff must cancel and
+regenerate those artifacts so approval never rewrites inventory history against
+changed order lines.
 
 ### Transfer States
 
