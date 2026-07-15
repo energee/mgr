@@ -248,6 +248,11 @@ BEGIN
       USING ERRCODE = 'PT409';
   END IF;
 
+  -- A replenished source that was auto-depleted becomes pitchable again.
+  IF NEW.status = 'depleted' AND v_used_quantity < COALESCE(NEW.quantity_lbs, 0) THEN
+    NEW.status := 'in_stock';
+  END IF;
+
   RETURN NEW;
 END;
 $$;
