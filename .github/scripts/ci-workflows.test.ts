@@ -10,6 +10,7 @@ const workflows = [
   ".github/workflows/claude-code-review.yml",
   ".github/workflows/claude.yml",
   ".github/workflows/db-lint.yml",
+  ".github/workflows/health-audit.yml",
   ".github/workflows/live-drift.yml",
   ".github/workflows/progress.yml",
   ".github/workflows/quality-regrade.yml",
@@ -106,5 +107,35 @@ describe("GitHub Actions performance contracts", () => {
 
     expect(config).toContain('package-ecosystem: "github-actions"');
     expect(config).toContain('interval: "weekly"');
+  });
+
+  it("keeps scheduled health analysis read-only and isolates issue writes in the publisher", () => {
+    const workflow = read(".github/workflows/health-audit.yml");
+    const auditJob = workflow.match(/  audit:\n([\s\S]*?)\n  publish:/)?.[1];
+    const publishJob = workflow.match(/  publish:\n([\s\S]*)/)?.[1];
+
+    expect(auditJob).toBeDefined();
+    expect(auditJob).toContain("contents: read");
+    expect(auditJob).toContain("issues: read");
+    expect(auditJob).not.toContain("issues: write");
+    expect(auditJob).toContain("fetch-depth: 0");
+    expect(auditJob).not.toContain("needs.audit.outputs.audit_sha");
+    expect(auditJob).toContain("--json-schema");
+    expect(auditJob).toContain("--disallowedTools");
+    expect(auditJob).toContain("Edit,Write");
+    expect(auditJob).toContain("steps.audit.outputs.structured_output");
+
+    expect(publishJob).toBeDefined();
+    expect(publishJob).toContain("contents: read");
+    expect(publishJob).toContain("issues: write");
+    expect(publishJob).toContain("ref: ${{ needs.audit.outputs.audit_sha }}");
+    expect(publishJob).toContain("publish-health-audit.ts");
+    expect(publishJob).toContain("CREATE_ISSUES:");
+    expect(publishJob).toContain("AUDIT_FOCUS:");
+
+    expect(workflow).toContain('cron: "37 13 * * 3"');
+    expect(workflow).toMatch(/create_issues:\n[\s\S]*?default: false/);
+    expect(workflow).toContain("cancel-in-progress: false");
+    expect(workflow).not.toContain('show_full_output: "true"');
   });
 });
