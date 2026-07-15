@@ -32,6 +32,15 @@ Many-to-many junction linking auth users to customers for portal access.
 
 **Primary key:** (customer_id, user_id)
 
+One customer can have multiple independently authenticated portal users, and
+one portal user can be linked to multiple customers. Staff manage these links
+from the customer's **Portal Access** section. Removing a link revokes access
+to that customer without deleting the user's other customer links.
+
+**Migration:** `00095_customer_portal_many_to_many.sql` (original),
+`00252_restore_customer_portal_users.sql` (hosted-database restoration and
+current RLS policies).
+
 ---
 
 ## `orders`

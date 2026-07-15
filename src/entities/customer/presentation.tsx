@@ -15,6 +15,7 @@ import { CustomerShippingPreferences } from "@/components/domain/order/customer-
 import { CustomerPalletConfigs } from "@/components/domain/order/customer-pallet-configs";
 import { CustomerAddressSection } from "@/components/domain/order/customer-address-section";
 import { CustomerOrdersRelation } from "@/components/domain/order/customer-orders-relation";
+import { CustomerPortalAccess } from "@/components/domain/order/customer-portal-access";
 import { customerCore, customerTypeOptions } from "./core";
 import type { Customer } from "./core";
 
@@ -32,6 +33,20 @@ function CustomerShippingPreferencesSection({ data }: { data: { id: string } }) 
 function CustomerPalletConfigsSection({ data }: { data: { id: string } }) {
   if (!data?.id) return null;
   return <CustomerPalletConfigs customerId={data.id} />;
+}
+
+function CustomerPortalAccessSection({
+  data,
+}: {
+  data: { id: string; email?: string | null };
+}) {
+  if (!data?.id) return null;
+  return (
+    <CustomerPortalAccess
+      customerId={data.id}
+      primaryEmail={data.email}
+    />
+  );
 }
 
 export const customerPresentation: EntityPresentation<Customer> = {
@@ -163,6 +178,11 @@ export const customerPresentation: EntityPresentation<Customer> = {
           colSpan: 6,
         },
       ],
+    },
+    {
+      id: "portal-access",
+      title: "Portal Access",
+      component: CustomerPortalAccessSection,
     },
     {
       id: "pricing",
@@ -319,13 +339,6 @@ export const customerPresentation: EntityPresentation<Customer> = {
   // Actions
   // ---------------------------------------------------------------------------
   actions: [
-    {
-      name: "send_portal_invite",
-      label: "Send Portal Invite",
-      icon: "mail",
-      type: "dropdown",
-      confirm: true,
-    },
     deleteAction("Customer"),
   ],
 

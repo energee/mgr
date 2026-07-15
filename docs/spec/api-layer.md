@@ -107,7 +107,8 @@ Only **batches** and **recipes** have full REST API routes. All other entities u
 
 | Route | Method | Auth | Purpose |
 |-------|--------|------|---------|
-| `/api/auth/callback` | GET | None (public) | Supabase auth code exchange |
+| `/api/auth/callback` | GET | None (public) | Supabase PKCE auth-code exchange |
+| `/api/auth/confirm` | GET | None (public) | Supabase email token-hash exchange with same-origin redirect |
 | `/api/health` | GET | None (public) | Health check |
 | `/api/dev/confirm-user` | POST | Env-gated | Dev-only: confirm user email |
 

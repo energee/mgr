@@ -106,7 +106,7 @@ export function LoginForm() {
           // via create_user_profile() (audit DL-2). Staff are provisioned
           // via /api/users/invite.
           shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=${redirect}`,
+          emailRedirectTo: `${window.location.origin}${redirect}`,
         },
       });
 
