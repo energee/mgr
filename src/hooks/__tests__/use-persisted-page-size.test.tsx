@@ -41,7 +41,7 @@ describe("usePersistedPageSize", () => {
     // Pre-effect: matches what the server would have rendered (no
     // localStorage access) — this is the invariant that prevents the
     // hydration mismatch.
-    expect(log[0]).toBe(10);
+    expect(log[0]).toBe(25);
     // Post-effect: corrected to the stored value.
     expect(log[log.length - 1]).toBe(50);
   });
@@ -50,7 +50,7 @@ describe("usePersistedPageSize", () => {
     const log: number[] = [];
     harness.render(<Probe log={log} />);
 
-    expect(log.every((size) => size === 10)).toBe(true);
+    expect(log.every((size) => size === 25)).toBe(true);
   });
 
   it("ignores invalid stored values and keeps the default", () => {
@@ -59,7 +59,7 @@ describe("usePersistedPageSize", () => {
     const log: number[] = [];
     harness.render(<Probe log={log} />);
 
-    expect(log.every((size) => size === 10)).toBe(true);
+    expect(log.every((size) => size === 25)).toBe(true);
   });
 
   it("setPageSize updates state and persists to localStorage", () => {
@@ -71,7 +71,29 @@ describe("usePersistedPageSize", () => {
     }
     harness.render(<Setter />);
 
-    act(() => setters[setters.length - 1](25));
-    expect(localStorage.getItem(STORAGE_KEY)).toBe("25");
+    act(() => setters[setters.length - 1](50));
+    expect(localStorage.getItem(STORAGE_KEY)).toBe("50");
+  });
+
+  it("persists per table key, independently of the global key", () => {
+    localStorage.setItem(`${STORAGE_KEY}:orders`, "50");
+
+    const log: number[] = [];
+    const setters: Array<(size: number) => void> = [];
+    function KeyedProbe() {
+      const { pageSize, setPageSize } = usePersistedPageSize(25, "orders");
+      log.push(pageSize);
+      setters.push(setPageSize);
+      return null;
+    }
+    harness.render(<KeyedProbe />);
+
+    // Reads the orders-specific stored value, not the global key.
+    expect(log[log.length - 1]).toBe(50);
+
+    // Writing goes to the namespaced key only.
+    act(() => setters[setters.length - 1](100));
+    expect(localStorage.getItem(`${STORAGE_KEY}:orders`)).toBe("100");
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 });

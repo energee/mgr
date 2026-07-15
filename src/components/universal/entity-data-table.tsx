@@ -540,7 +540,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
 
   // Persisted page size (per-entity defaultPageSize overrides the global default)
   const { pageSize: persistedPageSize, setPageSize: setPersistedPageSize } =
-    usePersistedPageSize(defaultPageSize);
+    usePersistedPageSize(defaultPageSize, entity.table);
   const [pagination, setPagination] = useState<PaginationState>(() => ({
     pageIndex: 0,
     pageSize: defaultPageSize ?? persistedPageSize,

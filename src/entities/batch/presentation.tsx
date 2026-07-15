@@ -28,11 +28,6 @@ export const batchPresentation: EntityPresentation<Batch> = {
   // ---------------------------------------------------------------------------
   listColumns: [
     {
-      accessorKey: "batch_code",
-      header: "Batch Code",
-      sortable: true,
-    },
-    {
       accessorKey: "name",
       header: "Name",
       sortable: true,
