@@ -87,6 +87,20 @@ export type EntityCore<T = Record<string, unknown>> = {
   /** Default sort configuration */
   defaultSort?: { column: keyof T & string; direction: "asc" | "desc" };
 
+  /**
+   * Server-safe mirror of the FK relation columns in `presentation.listColumns`
+   * — `{ accessorKey, relation }` for each list column whose display value is
+   * resolved from a related table (the `__rel_` loop in runListQuery). Lives in
+   * core so a Server Component can reproduce the list prefetch without importing
+   * the client presentation half (sitewide loading pattern). Populate only when
+   * the entity has relation list columns AND its list page is server-prefetched;
+   * the client path reads the columns directly from `listColumns` regardless.
+   */
+  listRelations?: {
+    accessorKey: string;
+    relation: { entity: string; displayField: string };
+  }[];
+
   /** Searchable fields (for quick search) */
   searchableFields?: (keyof T & string)[];
 

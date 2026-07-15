@@ -51,6 +51,15 @@ export const brandCore: EntityCoreInput<Brand> = {
   displayName: "Brand",
   defaultSort: { column: "name", direction: "asc" },
   description: "Beer brands and products",
+
+  // Server-safe mirror of the FK relation column in presentation.listColumns
+  // (style_id → beer_style.name), so the server-prefetched brands list resolves
+  // `__rel_style_id` display values identically to the client (sitewide loading
+  // pattern). Keep in sync with the `style_id` list column in presentation.tsx.
+  listRelations: [
+    { accessorKey: "style_id", relation: { entity: "beer_style", displayField: "name" } },
+  ],
+
   domain: "production",
   basePath: "/settings/brands",
 
