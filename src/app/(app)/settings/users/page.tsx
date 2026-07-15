@@ -20,6 +20,7 @@ import { entityKeys } from "@/lib/query-keys";
 import type { EntityConfig } from "@/types/entity";
 import { UserInviteDialog } from "@/components/domain/shared/user-invite-dialog";
 import { usePermissions } from "@/contexts/permissions";
+import { useUserAccountStatusCommand } from "@/hooks/use-user-account-status-command";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,7 @@ export default function UsersSettingsPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const queryClient = useQueryClient();
   const { can } = usePermissions();
+  const { handleUserStatusAction } = useUserAccountStatusCommand();
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -72,6 +74,9 @@ export default function UsersSettingsPage() {
         showCreate={can("users:manage")}
         onCreateClick={() => setInviteOpen(true)}
         onAction={(actionName, record) => {
+          if (handleUserStatusAction(actionName, record)) {
+            return true;
+          }
           if (actionName === "delete") {
             const r = record as Record<string, unknown>;
             setDeleteTarget({

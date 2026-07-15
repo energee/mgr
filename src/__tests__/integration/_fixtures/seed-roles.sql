@@ -22,6 +22,10 @@
 -- admin              : 00000000-0000-0000-0000-000000000004
 -- no_roles           : 00000000-0000-0000-0000-000000000005
 -- no_profile         : 00000000-0000-0000-0000-000000000006
+-- inactive_admin     : 00000000-0000-0000-0000-000000000007
+-- pending_admin      : 00000000-0000-0000-0000-000000000008
+-- active_customer    : 00000000-0000-0000-0000-000000000009
+-- inactive_customer  : 00000000-0000-0000-0000-000000000010
 --
 -- Password for all seeded users: "test-password-123!"
 -- (bcrypt hash below generated with cost factor 10)
@@ -73,6 +77,34 @@ VALUES
     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
     now(),
     '{"display_name": "Test No Profile"}'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000007',
+    'inactive-admin@test.local',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    now(),
+    '{"display_name": "Test Inactive Admin"}'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000008',
+    'pending-admin@test.local',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    now(),
+    '{"display_name": "Test Pending Admin"}'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000009',
+    'active-customer@test.local',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    now(),
+    '{"display_name": "Test Active Customer"}'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000010',
+    'inactive-customer@test.local',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    now(),
+    '{"display_name": "Test Inactive Customer"}'
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -127,6 +159,38 @@ VALUES
     ARRAY['admin'],
     'active',
     now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000007',
+    'inactive-admin@test.local',
+    'Test Inactive Admin',
+    ARRAY['admin'],
+    'inactive',
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000008',
+    'pending-admin@test.local',
+    'Test Pending Admin',
+    ARRAY['admin'],
+    'pending',
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000009',
+    'active-customer@test.local',
+    'Test Active Customer',
+    ARRAY['customer'],
+    'active',
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000010',
+    'inactive-customer@test.local',
+    'Test Inactive Customer',
+    ARRAY['customer'],
+    'inactive',
+    now()
   )
 ON CONFLICT (id) DO UPDATE SET
   roles = EXCLUDED.roles,
@@ -159,3 +223,45 @@ ALTER TABLE user_profiles ENABLE TRIGGER ALL;
 -- no_profile user (000...006) deliberately has NO user_profiles row.
 -- This tests the fail-closed behavior for race conditions (auth user exists,
 -- profile row missing — should be denied access to all domain tables).
+-- auth.users is seeded after the migration chain, so its AFTER INSERT profile
+-- trigger has already created a default row; remove that row explicitly.
+DELETE FROM user_profiles
+WHERE id = '00000000-0000-0000-0000-000000000006';
+
+-- ---------------------------------------------------------------------------
+-- Customer-scoped policy fixture
+-- ---------------------------------------------------------------------------
+-- Both portal users are linked to the same customer/order. The active user
+-- must see them; the inactive user presents an otherwise-valid old JWT but
+-- must be filtered by the current-user-enabled restrictive policy.
+INSERT INTO customers (id, name, customer_type, email, is_active)
+VALUES (
+  '00000000-0000-0000-0005-000000000099',
+  'RLS Account Status Customer',
+  'wholesale',
+  'active-customer@test.local',
+  true
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO orders (id, customer_id, order_number, status, order_date)
+VALUES (
+  '00000000-0000-0000-0006-000000000099',
+  '00000000-0000-0000-0005-000000000099',
+  'RLS-ACCOUNT-STATUS-001',
+  'draft',
+  CURRENT_DATE
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO customer_portal_users (customer_id, user_id)
+VALUES
+  (
+    '00000000-0000-0000-0005-000000000099',
+    '00000000-0000-0000-0000-000000000009'
+  ),
+  (
+    '00000000-0000-0000-0005-000000000099',
+    '00000000-0000-0000-0000-000000000010'
+  )
+ON CONFLICT DO NOTHING;

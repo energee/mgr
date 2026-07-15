@@ -597,7 +597,10 @@ User profiles with cached auth info and multi-role assignment. Caches user infor
 | display_name | TEXT | User's display name |
 | avatar_url | TEXT | Profile avatar URL |
 | roles | TEXT[] | User roles array (replaces single `role` column) |
-| status | TEXT | Account status: active, inactive, pending |
+| status | TEXT | Authorization status: only `active` may access protected UI, APIs, or authenticated RLS data; `inactive`, `pending`, and missing profiles fail closed |
+| account_status_operation_id | UUID | Durable fence token while a deactivate/reactivate command crosses the Auth boundary |
+| account_status_operation | TEXT | Fenced command: `deactivate` or `reactivate`; null when idle |
+| account_status_operation_started_at | TIMESTAMPTZ | Audit timestamp for a fenced command; no automatic expiry |
 | last_active_at | TIMESTAMPTZ | Last activity timestamp |
 | invited_at | TIMESTAMPTZ | When user was invited |
 | invited_by | UUID | FK to auth.users (who invited them) |
@@ -610,6 +613,7 @@ User profiles with cached auth info and multi-role assignment. Caches user infor
 -- Validated via function: each role must be one of the valid values
 CONSTRAINT chk_user_roles CHECK (validate_user_roles(roles))
 CONSTRAINT chk_user_status CHECK (status IN ('active', 'inactive', 'pending'))
+CONSTRAINT chk_user_account_status_operation CHECK (operation fields are all null or form one complete fenced command)
 ```
 
 ### User Roles
@@ -637,7 +641,7 @@ CREATE TRIGGER on_auth_user_created_profile
 
 ### Permission Helper Functions
 
-All RLS policies use `user_has_permission()` to check access. This function maps permission strings to role arrays and checks if the user's roles overlap.
+All RLS policies use `user_has_permission()` to check access. This function maps permission strings to role arrays and checks if the user's roles overlap. Role membership is never sufficient on its own: `current_user_is_enabled()` must also find an `active` profile for `auth.uid()`. Every public RLS table has a restrictive authenticated policy using that predicate, so an already-issued JWT stops authorizing data access as soon as the profile becomes non-active.
 
 ```sql
 -- Check a granular permission (used in RLS policies)
@@ -652,6 +656,21 @@ SELECT get_user_role();  -- Returns roles[1]
 -- Check if current user is admin
 SELECT is_admin();  -- Returns boolean
 ```
+
+`roles` and `status` are authorization fields. The own-profile update path may
+change display data but cannot change either field. Deactivation/reactivation
+uses the dedicated server command so database access and the Supabase Auth ban
+remain consistently ordered:
+
+- Deactivate: persist `inactive` first, then ban Auth. A failed ban remains
+  safely inactive and is retryable.
+- Reactivate: unban Auth first, then persist `active`. If the final write
+  fails, the command attempts to re-ban Auth and reports the compensation.
+
+Each command first claims the profile with a UUID fence. Concurrent commands
+return a conflict before calling Auth. Claims do not expire automatically:
+allowing a paused old process to resume after an expiry could overwrite a newer
+opposite Auth action.
 
 **Permission mapping** (see `docs/spec/workflows.md` for full table):
 - `recipes:read` -> admin, production_manager, brewer, sales, viewer

@@ -16,12 +16,24 @@ import { NextRequest, NextResponse } from "next/server";
 // =============================================================================
 
 const mockGetUser = vi.fn();
+const mockProfileSingle = vi.fn().mockResolvedValue({
+  data: { status: "active" },
+  error: null,
+});
+const mockProfileBuilder = {
+  select: vi.fn(),
+  eq: vi.fn(),
+  single: mockProfileSingle,
+};
+mockProfileBuilder.select.mockReturnValue(mockProfileBuilder);
+mockProfileBuilder.eq.mockReturnValue(mockProfileBuilder);
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: {
       getUser: () => mockGetUser(),
     },
+    from: vi.fn(() => mockProfileBuilder),
   }),
   createAdminClient: vi.fn().mockReturnValue({
     from: () => ({

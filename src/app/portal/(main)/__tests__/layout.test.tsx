@@ -63,11 +63,20 @@ let adminWrites: Write[];
 
 function setup(opts: {
   user: { id: string; email: string } | null;
+  profile?: { data: unknown; error: unknown };
   links?: unknown[];
   customers?: CustomerRow[];
 }) {
+  let linkReads = 0;
   const userMock = makeAdminMock({
-    customer_portal_users: { data: opts.links ?? [], error: null },
+    user_profiles: opts.profile ?? {
+      data: { roles: ["customer"], status: "active" },
+      error: null,
+    },
+    customer_portal_users: () => {
+      linkReads += 1;
+      return { data: opts.links ?? [], error: null };
+    },
     system_settings: { data: [], error: null },
   });
   const client = {
@@ -81,6 +90,7 @@ function setup(opts: {
   });
   adminWrites = adminMock.writes;
   mockedCreateAdminClient.mockResolvedValue(adminMock.admin as never);
+  return { linkReads: () => linkReads };
 }
 
 /** Runs the async server component and exposes the PortalShell props. */
@@ -161,5 +171,47 @@ describe("PortalLayout customer auto-link", () => {
     await expect(PortalLayout({ children: null })).rejects.toThrow(
       "REDIRECT:/portal/login",
     );
+  });
+
+  it.each(["inactive", "pending"])(
+    "redirects a %s portal profile before reading customer links",
+    async (status) => {
+      const state = setup({
+        user: { id: "user-1", email: "buyer@acme.com" },
+        profile: { data: { roles: ["customer"], status }, error: null },
+      });
+
+      await expect(PortalLayout({ children: null })).rejects.toThrow(
+        "REDIRECT:/portal/login?error=account_disabled",
+      );
+      expect(state.linkReads()).toBe(0);
+      expect(mockedCreateAdminClient).not.toHaveBeenCalled();
+    },
+  );
+
+  it("fails closed when the portal profile is missing", async () => {
+    const state = setup({
+      user: { id: "user-1", email: "buyer@acme.com" },
+      profile: { data: null, error: null },
+    });
+
+    await expect(PortalLayout({ children: null })).rejects.toThrow(
+      "REDIRECT:/portal/login?error=account_disabled",
+    );
+    expect(state.linkReads()).toBe(0);
+    expect(mockedCreateAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the portal profile read errors", async () => {
+    const state = setup({
+      user: { id: "user-1", email: "buyer@acme.com" },
+      profile: { data: null, error: { message: "read failed" } },
+    });
+
+    await expect(PortalLayout({ children: null })).rejects.toThrow(
+      "REDIRECT:/portal/login?error=account_disabled",
+    );
+    expect(state.linkReads()).toBe(0);
+    expect(mockedCreateAdminClient).not.toHaveBeenCalled();
   });
 });

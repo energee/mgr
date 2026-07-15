@@ -83,11 +83,14 @@ Permissions are strings in `resource:action` format. The source of truth is `src
 
 ## Enforcement
 
-Defense-in-depth: permissions are enforced at three layers.
+Defense-in-depth: permissions are enforced at three layers. At every enforcing
+layer, a valid session and an authorized role are insufficient unless the
+caller's matching `user_profiles` row exists with `status = 'active'`.
+`pending`, `inactive`, missing, and unreadable profiles fail closed.
 
 ### 1. API Layer (enforcement)
 
-`withPermission("domain:action")` middleware in `src/lib/api/auth.ts` wraps route handlers. It loads `user_profiles.roles`, calls `hasPermission()`, and returns 403 if denied.
+`withPermission("domain:action")` middleware in `src/lib/api/auth.ts` wraps route handlers. It loads `user_profiles.roles` and `status`, requires `active`, calls `hasPermission()`, and returns 403 if either prerequisite is denied. `withAuth()` applies the same active-profile check to authenticated routes that do not require a granular permission.
 
 ```typescript
 // src/lib/api/auth.ts
@@ -98,24 +101,25 @@ export const GET = withPermission("recipes:read", async (request, context) => {
 
 ### 2. Database Layer (enforcement)
 
-`user_has_permission(p_permission TEXT)` Postgres function is used in RLS policies. It checks `user_profiles.roles` against a SQL mirror of the permission map via `get_roles_for_permission()`.
+`user_has_permission(p_permission TEXT)` Postgres function is used in RLS policies. It first applies `current_user_is_enabled()`, then checks `user_profiles.roles` against a SQL mirror of the permission map via `get_roles_for_permission()`. A restrictive `current_user_enabled` policy on every public RLS table composes with permissive staff/customer policies, so an old valid JWT cannot bypass deactivation.
 
 ```sql
 -- RLS policy using permission function
 CREATE POLICY "Permission-based access" ON batches
   FOR SELECT USING (user_has_permission('batches:read'));
 
--- The function (from migration 00092):
+-- Current helper contract (migration 00255):
 CREATE FUNCTION user_has_permission(p_permission TEXT)
 RETURNS BOOLEAN
 LANGUAGE sql STABLE SECURITY INVOKER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM user_profiles
-    WHERE id = (SELECT auth.uid())
-    AND roles && get_roles_for_permission(p_permission)
-  );
+  SELECT current_user_is_enabled()
+    AND EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE id = (SELECT auth.uid())
+      AND roles && get_roles_for_permission(p_permission)
+    );
 $$;
 ```
 
@@ -129,6 +133,29 @@ const { can } = usePermissions();
 // Hide button if user lacks permission
 {can("batches:write") && <Button>Create Batch</Button>}
 ```
+
+## Account Status Changes
+
+`roles` and `status` are authorization fields. Users may update ordinary
+profile data but cannot change their own roles or status. Active admins may
+change another user's roles, but even an admin cannot write status directly.
+
+The dedicated `POST /api/users/:id/status` command coordinates PostgreSQL and
+Supabase Auth under a durable per-user operation fence:
+
+- **Deactivate:** claim the user and persist `inactive` in one transaction,
+  then ban the Auth user, then release the matching claim. Old JWTs lose RLS
+  access before the external Auth call.
+- **Reactivate:** claim the user without opening RLS, unban Auth, then persist
+  `active` and release the matching claim in one transaction. A failed enable
+  re-bans Auth before a known-safe claim release.
+- Concurrent or duplicate commands fail with `409` before touching Auth. A
+  crashed/unknown attempt remains fenced rather than expiring and allowing a
+  stale process to overwrite a newer command.
+
+Self-deactivation is rejected to prevent an administrator from removing their
+own recovery path. Pending accounts have no protected access and may be either
+approved through Reactivate or declined through Deactivate.
 
 ## Customer Portal
 
