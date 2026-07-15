@@ -37,6 +37,12 @@ one portal user can be linked to multiple customers. Staff manage these links
 from the customer's **Portal Access** section. Removing a link revokes access
 to that customer without deleting the user's other customer links.
 
+Portal provisioning verifies the returned active customer profile and this
+junction row before it sends a login OTP or reports success. First-login
+email auto-linking likewise exposes a matched customer in memory only after
+every expected junction row is returned by the write. A failed new-user
+provisioning attempt deletes the new Auth identity as compensation.
+
 **Migration:** `00095_customer_portal_many_to_many.sql` (original),
 `00252_restore_customer_portal_users.sql` (hosted-database restoration and
 current RLS policies).

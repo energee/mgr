@@ -639,6 +639,12 @@ CREATE TRIGGER on_auth_user_created_profile
   FOR EACH ROW EXECUTE FUNCTION create_user_profile();
 ```
 
+Staff invitation is complete only when the post-invite profile update returns
+the created user's exact requested roles and `pending` status. If that
+verification fails, the newly created Auth user is deleted so the trigger's
+default active-viewer profile cannot remain usable. Cleanup failures are
+reported for manual repair.
+
 ### Permission Helper Functions
 
 All RLS policies use `user_has_permission()` to check access. This function maps permission strings to role arrays and checks if the user's roles overlap. Role membership is never sufficient on its own: `current_user_is_enabled()` must also find an `active` profile for `auth.uid()`. Every public RLS table has a restrictive authenticated policy using that predicate, so an already-issued JWT stops authorizing data access as soon as the profile becomes non-active.

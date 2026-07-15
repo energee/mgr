@@ -24,7 +24,7 @@ import {
 } from "@/lib/api";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
-import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
+import { escapeIlikePattern, unwrap } from "@/lib/supabase/query-helpers";
 import { STAFF_ROLES } from "@/lib/permissions";
 import { logger } from "@/lib/logger";
 import { SITE_URL } from "@/lib/env";
@@ -40,6 +40,40 @@ const inviteSchema = z.object({
     .min(1, "At least one role is required"),
   display_name: z.string().min(1).optional(),
 });
+
+type ProvisionedProfile = {
+  id: string;
+  roles: string[] | null;
+  status: string | null;
+};
+
+function hasExpectedRoles(
+  profile: ProvisionedProfile | null,
+  userId: string,
+  roles: readonly string[],
+) {
+  return Boolean(
+    profile
+      && profile.id === userId
+      && profile.status === "pending"
+      && Array.isArray(profile.roles)
+      && profile.roles.length === roles.length
+      && roles.every((role) => profile.roles?.includes(role)),
+  );
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (
+    error
+    && typeof error === "object"
+    && "message" in error
+    && typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return String(error);
+}
 
 export const POST = withPermission(
   "users:manage",
@@ -133,18 +167,30 @@ export const POST = withPermission(
 
     // Update the auto-created profile with the requested roles,
     // invitation metadata, and pending status.
-    const { error: updateError } = await adminDb
-      .from("user_profiles")
-      .update({
-        roles,
-        status: "pending",
-        display_name: display_name ?? email.split("@")[0],
-        invited_at: new Date().toISOString(),
-        invited_by: user.id,
-      })
-      .eq("id", userId);
+    let provisioningError: string | null = null;
+    try {
+      const updatedProfile = await unwrap(
+        adminDb
+          .from("user_profiles")
+          .update({
+            roles,
+            status: "pending",
+            display_name: display_name ?? email.split("@")[0],
+            invited_at: new Date().toISOString(),
+            invited_by: user.id,
+          })
+          .eq("id", userId)
+          .select("id, roles, status")
+          .single(),
+      );
+      if (!hasExpectedRoles(updatedProfile, userId, roles)) {
+        provisioningError = "Profile verification failed after assigning roles";
+      }
+    } catch (error) {
+      provisioningError = errorMessage(error);
+    }
 
-    if (updateError) {
+    if (provisioningError) {
       // The auth user was created with default roles=['viewer'] and
       // status='active' by the create_user_profile trigger. If we don't
       // surface this failure, the invitee will sign in with the wrong
@@ -152,12 +198,28 @@ export const POST = withPermission(
       // were not applied. Fail loudly so the operator can retry or repair
       // the profile manually before the invitee signs in.
       log.error(
-        { error: updateError.message, userId, email },
+        { error: provisioningError },
         "User invited but profile update failed",
       );
+      const { error: deleteError } =
+        await adminDb.auth.admin.deleteUser(userId);
+      if (deleteError) {
+        log.error(
+          {
+            profileError: provisioningError,
+            compensationError: deleteError.message,
+          },
+          "User invite compensation failed",
+        );
+        throw new ApiError(
+          "INTERNAL_ERROR",
+          `Assigning roles failed (${provisioningError}), and removing the incomplete account also failed (${deleteError.message}). Repair the account before retrying.`,
+          500,
+        );
+      }
       throw new ApiError(
         "INTERNAL_ERROR",
-        `Invitation email sent, but assigning roles failed: ${updateError.message}. The user was created with default 'viewer' role — fix from the user detail page before they sign in.`,
+        `Assigning roles failed: ${provisioningError}. The incomplete account was removed; retry the invitation.`,
         500,
       );
     }
