@@ -121,3 +121,13 @@ When the user requests a feature with **"I want to implement a new feature: [des
 - Do not dismiss user-reported bugs as "stale build" without evidence — verify the code first.
 
 See also [`debugging.md`](debugging.md) for investigation patterns.
+
+## Health audits and GitHub issue triage
+
+For the evidence-first workflow from read-only code inspection through issue
+creation, severity ranking, root-cause labeling, and verification, follow
+[`health-audit-and-issue-triage.md`](health-audit-and-issue-triage.md).
+
+An audit or report request does not authorize GitHub mutations. Creating
+issues, changing labels, and changing issue state are separate actions that
+require explicit user authorization.

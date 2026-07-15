@@ -1,0 +1,1 @@
+- **2026-07-14 (Document health-audit and issue-triage workflow).** Added an evidence-first process for read-only correctness audits, duplicate detection, issue creation authorization, severity ranking, root-cause labels, and post-mutation verification, linked from the process and quality guides.
