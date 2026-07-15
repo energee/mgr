@@ -11,43 +11,32 @@ One-way: MGR → QuickBooks
 - **Bills**: Create from POs when status = fulfilled
 
 ### Implementation
-```typescript
-// Supabase Edge Function triggered by database webhook
-export async function syncOrderToQBO(order: Order) {
-  if (order.status !== 'out_the_door') return;
-  if (order.qb_invoice_id) return; // Already synced
 
-  const customer = await getCustomer(order.customer_id);
+Server-side sync routes call `src/integrations/quickbooks/` and track remote
+identity in `qbo_sync_mappings`. Customers and suppliers resolve by their
+mapping, then by exact QBO display name. Orders and purchase orders map to
+Invoices and Bills.
 
-  // Ensure customer exists in QBO
-  if (!customer.qb_customer_id) {
-    const qbCustomer = await qbo.createCustomer({
-      DisplayName: customer.name,
-      // ... other fields
-    });
-    await updateCustomer(customer.id, { qb_customer_id: qbCustomer.Id });
-  }
+Invoice and Bill creation uses a durable intent:
 
-  // Create invoice
-  const invoice = await qbo.createInvoice({
-    CustomerRef: { value: customer.qb_customer_id },
-    Line: order.line_items.map(li => ({
-      Amount: li.line_total,
-      Description: formatLineDescription(li),
-      // ...
-    })),
-    // ...
-  });
+1. Write a pending `qbo_sync_log` row containing the exact outbound payload and
+   deterministic per-entity QuickBooks `requestid`.
+2. POST the document with that request ID. QuickBooks returns the original
+   result when the same create is retried.
+3. Persist `qbo_sync_mappings`, then mark the log successful. Every mapping and
+   log write checks and propagates its database error.
+4. If QuickBooks accepted the document but the mapping write failed, record the
+   remote response as an error and tell the operator to retry. The retry reuses
+   the same request ID, receives the same remote document, and restores the
+   local mapping without creating another accounting document.
 
-  await updateOrder(order.id, { qb_invoice_id: invoice.Id });
-}
-```
+See the [Intuit request ID guidance](https://developer.intuit.com/app/developer/qbpayments/docs/learn/learn-basic-field-definitions).
 
 ### Settings
 System-wide QBO connection:
-- OAuth tokens (encrypted)
-- Company ID
-- Sync preferences
+- OAuth tokens and company realm ID in sensitive `system_settings` rows
+- Sandbox or production environment per connection
+- Sync preferences and account-category mappings
 
 ---
 

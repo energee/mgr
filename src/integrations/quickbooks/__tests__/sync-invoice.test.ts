@@ -11,6 +11,10 @@
  *   SF-11 a failed customer payment-terms read still falls back to the
  *         default terms, but logs a warning naming the failed read.
  *
+ * Durable-create coverage also proves mapping/log write failures surface,
+ * the pending intent precedes the external create, and retry uses one stable
+ * QuickBooks request identity after mapping failure or a lost response.
+ *
  * Mock idiom mirrors sync-bill.test.ts: shared admin mock for Supabase,
  * module mocks for the QBO HTTP client and syncCustomer. Assertions are on
  * posted payloads and rows written to qbo_sync_mappings / qbo_sync_log.
@@ -88,9 +92,15 @@ type ErrorLike = { message: string };
  * create-vs-update decision, distinguished by the eq("entity_type", ...)
  * filter; upsertMapping's write resolves empty.
  */
-function mappingsTable(opts: { existing?: typeof orderMapping | null; readError?: ErrorLike } = {}) {
+function mappingsTable(
+  opts: {
+    existing?: typeof orderMapping | null;
+    readError?: ErrorLike;
+    writeErrors?: Array<ErrorLike | null>;
+  } = {}
+) {
   return ({ calls, ops }: { calls: { method: string; args: unknown[] }[]; ops: string[] }) => {
-    if (ops.length) return { data: null, error: null };
+    if (ops.length) return { data: null, error: opts.writeErrors?.shift() ?? null };
     const entityType = calls.find((c) => c.method === "eq" && c.args[0] === "entity_type")?.args[1];
     if (entityType === "customer") return { data: customerMapping, error: null };
     if (entityType === "order") {
@@ -155,7 +165,7 @@ describe("syncInvoice — happy paths (characterization)", () => {
     expect(result).toEqual({ qboId: "I-9", action: "create" });
 
     const [path, invoice] = mockedPost.mock.calls[0] as [string, QBOInvoice];
-    expect(path).toBe("/invoice");
+    expect(path).toBe("/invoice?requestid=mgr-i-ord-1");
     expect(invoice).toMatchObject({
       DocNumber: "SO-100",
       CustomerRef: { value: "C-55" },
@@ -261,5 +271,86 @@ describe("syncInvoice — failed reads are not treated as empty", () => {
       expect.objectContaining({ err: "customer read failed", customerId: CUSTOMER_ID }),
       expect.stringContaining("failed to read customer payment terms")
     );
+  });
+});
+
+describe("syncInvoice — durable remote creation", () => {
+  it("retries a remote success after mapping failure without creating another Invoice", async () => {
+    const writes = useTables(
+      makeTables({
+        qbo_sync_mappings: mappingsTable({
+          writeErrors: [{ message: "mapping connection lost" }, null],
+        }),
+      })
+    );
+    const remoteByRequestId = new Map<string, string>();
+    let remoteCreates = 0;
+    mockedPost.mockImplementation(async (path) => {
+      const requestId = new URL(path, "https://qbo.invalid").searchParams.get("requestid");
+      const key = requestId ?? `unkeyed-${remoteCreates}`;
+      if (!remoteByRequestId.has(key)) {
+        remoteCreates += 1;
+        remoteByRequestId.set(key, "I-9");
+      }
+      return { Invoice: { Id: remoteByRequestId.get(key) } };
+    });
+
+    await expect(syncInvoice(ORDER_ID)).rejects.toThrow(
+      /QuickBooks accepted Invoice I-9, but MGR could not save its mapping.*mapping connection lost/
+    );
+    await expect(syncInvoice(ORDER_ID)).resolves.toEqual({ qboId: "I-9", action: "create" });
+
+    expect(remoteCreates).toBe(1);
+    expect(mockedPost).toHaveBeenCalledTimes(2);
+    expect(mockedPost.mock.calls.map(([path]) => path)).toEqual([
+      "/invoice?requestid=mgr-i-ord-1",
+      "/invoice?requestid=mgr-i-ord-1",
+    ]);
+    const pendingIntents = writes
+      .filter((write) => write.table === "qbo_sync_log" && write.op === "insert")
+      .map((write) => write.row as Record<string, unknown>);
+    expect(pendingIntents[0]?.request_payload).toMatchObject({
+      requestId: "mgr-i-ord-1",
+      qboEntityType: "Invoice",
+      payload: { DocNumber: "SO-100" },
+    });
+    const reconciliation = writes
+      .filter((write) => write.table === "qbo_sync_log" && write.op === "update")
+      .map((write) => write.row as Record<string, unknown>)
+      .find((row) => row.status === "error");
+    expect(reconciliation).toMatchObject({
+      status: "error",
+      response_payload: { Invoice: { Id: "I-9" } },
+    });
+    expect(reconciliation?.error_message).toMatch(/remote document exists.*retry/i);
+  });
+
+  it("reuses the same request identity after a lost create response", async () => {
+    useTables(makeTables());
+    const remoteByRequestId = new Map<string, string>();
+    let remoteCreates = 0;
+    let loseFirstResponse = true;
+    mockedPost.mockImplementation(async (path) => {
+      const requestId = new URL(path, "https://qbo.invalid").searchParams.get("requestid");
+      const key = requestId ?? `unkeyed-${remoteCreates}`;
+      if (!remoteByRequestId.has(key)) {
+        remoteCreates += 1;
+        remoteByRequestId.set(key, "I-9");
+      }
+      if (loseFirstResponse) {
+        loseFirstResponse = false;
+        throw new Error("response connection reset");
+      }
+      return { Invoice: { Id: remoteByRequestId.get(key) } };
+    });
+
+    await expect(syncInvoice(ORDER_ID)).rejects.toThrow(/response connection reset/);
+    await expect(syncInvoice(ORDER_ID)).resolves.toEqual({ qboId: "I-9", action: "create" });
+
+    expect(remoteCreates).toBe(1);
+    expect(mockedPost.mock.calls.map(([path]) => path)).toEqual([
+      "/invoice?requestid=mgr-i-ord-1",
+      "/invoice?requestid=mgr-i-ord-1",
+    ]);
   });
 });

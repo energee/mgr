@@ -37,6 +37,8 @@ import {
   getMapping,
   getMappingOrLogFailure,
   getDefaultPaymentTermsDays,
+  upsertMapping,
+  updateSyncLog,
 } from "@/integrations/quickbooks/sync-utils";
 
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
@@ -108,20 +110,44 @@ describe("getMappingOrLogFailure", () => {
     expect(update?.error_message).toMatch(/Failed to read QBO sync mapping/);
   });
 
-  it("SF-2: a failing log write never masks the original read error", async () => {
+  it("SF-2: a failing log write preserves and propagates both failures", async () => {
     useTables({
       qbo_sync_mappings: { data: null, error: { message: "db down" } },
       qbo_sync_log: { data: null, error: { message: "insert also failed" } },
     });
 
-    // The ORIGINAL mapping-read error propagates, not the log-write error.
-    await expect(getMappingOrLogFailure("order", "ord-1")).rejects.toThrow(
-      /Failed to read QBO sync mapping for order ord-1: db down/
+    const rejection = await getMappingOrLogFailure("order", "ord-1").then(
+      () => null,
+      (error: Error) => error
     );
+    expect(rejection?.message).toMatch(/Failed to read QBO sync mapping for order ord-1: db down/);
+    expect(rejection?.message).toMatch(/Failed to create sync log: insert also failed/);
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ entityType: "order", entityId: "ord-1" }),
       expect.stringContaining("could not record failed mapping lookup")
     );
+  });
+});
+
+describe("durable sync writes", () => {
+  it("propagates a qbo_sync_mappings write failure", async () => {
+    useTables({
+      qbo_sync_mappings: { data: null, error: { message: "mapping write failed" } },
+    });
+
+    await expect(
+      upsertMapping("order", "ord-1", "Invoice", "I-9")
+    ).rejects.toThrow(/Failed to persist QBO sync mapping.*mapping write failed/);
+  });
+
+  it("propagates a qbo_sync_log update failure", async () => {
+    useTables({
+      qbo_sync_log: { data: null, error: { message: "log update failed" } },
+    });
+
+    await expect(
+      updateSyncLog("log-1", "success", { Invoice: { Id: "I-9" } })
+    ).rejects.toThrow(/Failed to update QBO sync log log-1.*log update failed/);
   });
 });
 
