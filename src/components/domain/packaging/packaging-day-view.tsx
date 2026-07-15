@@ -211,6 +211,7 @@ export function PackagingDayView({ sessionId }: PackagingDayViewProps) {
                 <BatchCell
                   brandId={item.brand_id}
                   currentBatchId={item.batch_id ?? ""}
+                  currentBatchCode={item.batch_code}
                   onSelect={(batchId) =>
                     updateItem.mutate({
                       id: item.id,

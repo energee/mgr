@@ -1,6 +1,9 @@
+"use client";
+
 import * as ComboboxPrimitive from "@diceui/combobox";
 import { Check, ChevronDown, X } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -261,8 +264,111 @@ function ComboboxSeparator({
   );
 }
 
+type ComboboxFieldProps = {
+  /** Selected item's value (controlled). */
+  value: string | undefined;
+  /**
+   * Display label for the selected value. Dice UI only snapshots a selected
+   * item's label from registered items when the list first renders, so an
+   * uncontrolled input stays blank on mount (or until the async options/value
+   * settle). Pass the resolved label here — the field keeps the searchable
+   * input controlled and resyncs whenever this changes.
+   */
+  selectedLabel?: string;
+  onValueChange: (value: string) => void;
+  onFilter?: (values: string[], search: string) => string[];
+  placeholder?: string;
+  emptyText?: string;
+  disabled?: boolean;
+  id?: string;
+  /** When provided and a value is set, renders a clear (X) button. */
+  onClear?: () => void;
+  className?: string;
+  anchorClassName?: string;
+  inputClassName?: string;
+  /** Extra props (e.g. aria-*) forwarded to the input. */
+  inputProps?: React.ComponentProps<typeof ComboboxPrimitive.Input>;
+  /** The <ComboboxItem> options. */
+  children: React.ReactNode;
+};
+
+/**
+ * ComboboxField — a searchable single-select that correctly displays a
+ * pre-existing selected value.
+ *
+ * The raw {@link Combobox} does not show a selected item's label on mount
+ * (Dice UI resolves value→label only from registered items, which register
+ * when the list first opens). This wrapper controls the input text from
+ * `selectedLabel`, fixing the "blank field with a value set" bug once for
+ * every dropdown that shows an existing selection.
+ */
+function ComboboxField({
+  value,
+  selectedLabel = "",
+  onValueChange,
+  onFilter,
+  placeholder,
+  emptyText = "No results found",
+  disabled,
+  id,
+  onClear,
+  className,
+  anchorClassName,
+  inputClassName,
+  inputProps,
+  children,
+}: ComboboxFieldProps) {
+  const [inputValue, setInputValue] = useState(selectedLabel);
+
+  // Resync display when the resolved label changes (value change, async load,
+  // form reset). Guard the empty-string case so clearing works too.
+  useEffect(() => {
+    setInputValue(selectedLabel);
+  }, [selectedLabel]);
+
+  return (
+    <Combobox
+      className={className}
+      value={value ?? ""}
+      inputValue={inputValue}
+      onInputValueChange={setInputValue}
+      onValueChange={onValueChange}
+      onFilter={onFilter}
+      disabled={disabled}
+    >
+      <ComboboxAnchor className={anchorClassName}>
+        <ComboboxInput
+          id={id}
+          className={inputClassName}
+          placeholder={placeholder}
+          {...inputProps}
+        />
+        {onClear && value ? (
+          <button
+            type="button"
+            onClick={() => {
+              onClear();
+              setInputValue("");
+            }}
+            className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            aria-label="Clear selection"
+          >
+            <X className="size-3.5" />
+          </button>
+        ) : null}
+        <ComboboxTrigger />
+      </ComboboxAnchor>
+      <ComboboxContent>
+        <ComboboxEmpty>{emptyText}</ComboboxEmpty>
+        {children}
+      </ComboboxContent>
+    </Combobox>
+  );
+}
+
 export {
   Combobox,
+  ComboboxField,
   ComboboxAnchor,
   ComboboxInput,
   ComboboxTrigger,

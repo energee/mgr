@@ -22,13 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Combobox,
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
+  ComboboxField,
   ComboboxItem,
-  ComboboxTrigger,
 } from "@/components/ui/combobox";
 import { useBatchesForBrand, useKegFormatIds } from "@/hooks/use-packaging";
 import { usePackagingFormats, useKegOwners, formatVolumeLabel } from "@/hooks/use-catalog";
@@ -42,6 +37,14 @@ import { UnitDisplay } from "@/components/ui/unit-input";
 type BatchCellProps = {
   brandId: string;
   currentBatchId: string;
+  /**
+   * Batch code of the currently-selected batch, if known by the caller.
+   * `useBatchesForBrand` only returns active batches (planned…packaging), so a
+   * line item pointing at an already-packaged/completed batch would otherwise
+   * fall out of the options and the Select would render blank. Passing the
+   * known code lets us inject a fallback option so the selection still shows.
+   */
+  currentBatchCode?: string | null;
   onSelect: (batchId: string) => void;
   readOnly?: boolean;
 };
@@ -53,6 +56,7 @@ type BatchCellProps = {
 export function BatchCell({
   brandId,
   currentBatchId,
+  currentBatchCode,
   onSelect,
   readOnly = false,
 }: BatchCellProps) {
@@ -60,8 +64,13 @@ export function BatchCell({
 
   if (readOnly) {
     const batch = batches?.find((b) => b.id === currentBatchId);
-    return <span>{batch?.batch_code ?? "—"}</span>;
+    return <span>{batch?.batch_code ?? currentBatchCode ?? "—"}</span>;
   }
+
+  // The selected batch may be excluded from the active-status option list
+  // (e.g. already packaged); inject it so the Select can display it.
+  const selectedInOptions = batches?.some((b) => b.id === currentBatchId);
+  const showFallback = !!currentBatchId && !isLoading && !selectedInOptions;
 
   return (
     <Select value={currentBatchId} onValueChange={onSelect}>
@@ -72,6 +81,11 @@ export function BatchCell({
         {isLoading && (
           <SelectItem value="_loading" disabled>
             Loading...
+          </SelectItem>
+        )}
+        {showFallback && (
+          <SelectItem value={currentBatchId}>
+            {currentBatchCode ?? currentBatchId}
           </SelectItem>
         )}
         {batches?.map((batch) => (
@@ -130,60 +144,60 @@ export function FormatCell({
   const formatFilter = useMemo(() => createNameFilter(packagingFormats), [packagingFormats]);
   const ownerFilter = useMemo(() => createNameFilter(kegOwners), [kegOwners]);
 
+  const formatLabel = formatId
+    ? (packagingFormats?.find((f) => f.id === formatId)?.name ?? "")
+    : "";
+  const ownerLabel = kegOwnerId
+    ? (kegOwners?.find((o) => o.id === kegOwnerId)?.name ?? "")
+    : "";
+
   return (
     <div className="space-y-1">
-      <Combobox
+      <ComboboxField
         value={formatId}
+        selectedLabel={formatLabel}
         onValueChange={onFormatChange}
         onFilter={formatFilter}
+        placeholder="Select format"
+        emptyText="No formats found"
+        anchorClassName="h-8"
+        inputClassName="h-8"
       >
-        <ComboboxAnchor className="h-8">
-          <ComboboxInput className="h-8" placeholder="Select format" />
-          <ComboboxTrigger />
-        </ComboboxAnchor>
-        <ComboboxContent>
-          <ComboboxEmpty>No formats found</ComboboxEmpty>
-          {packagingFormats?.map((f) => (
-            <ComboboxItem key={f.id} value={f.id} label={f.name}>
-              <span className="flex items-center gap-2">
-                {f.name}
-                {formatVolumeLabel(f) != null && (
-                  <span className="text-xs text-muted-foreground">
-                    {formatVolumeLabel(f)}
-                  </span>
-                )}
-                {f.container_type === "keg" && (
-                  <Badge variant="outline" className="text-xs">
-                    keg
-                  </Badge>
-                )}
-              </span>
-            </ComboboxItem>
-          ))}
-        </ComboboxContent>
-      </Combobox>
+        {packagingFormats?.map((f) => (
+          <ComboboxItem key={f.id} value={f.id} label={f.name}>
+            <span className="flex items-center gap-2">
+              {f.name}
+              {formatVolumeLabel(f) != null && (
+                <span className="text-xs text-muted-foreground">
+                  {formatVolumeLabel(f)}
+                </span>
+              )}
+              {f.container_type === "keg" && (
+                <Badge variant="outline" className="text-xs">
+                  keg
+                </Badge>
+              )}
+            </span>
+          </ComboboxItem>
+        ))}
+      </ComboboxField>
       {isKeg && (
-        <Combobox
+        <ComboboxField
           value={kegOwnerId}
+          selectedLabel={ownerLabel}
           onValueChange={onKegOwnerChange}
           onFilter={ownerFilter}
+          placeholder="Keg owner (optional)"
+          emptyText="No owners found"
+          anchorClassName="h-8"
+          inputClassName="h-8"
         >
-          <ComboboxAnchor className="h-8">
-            <ComboboxInput
-              className="h-8"
-              placeholder="Keg owner (optional)"
-            />
-            <ComboboxTrigger />
-          </ComboboxAnchor>
-          <ComboboxContent>
-            <ComboboxEmpty>No owners found</ComboboxEmpty>
-            {kegOwners?.map((o) => (
-              <ComboboxItem key={o.id} value={o.id} label={o.name}>
-                {o.name}
-              </ComboboxItem>
-            ))}
-          </ComboboxContent>
-        </Combobox>
+          {kegOwners?.map((o) => (
+            <ComboboxItem key={o.id} value={o.id} label={o.name}>
+              {o.name}
+            </ComboboxItem>
+          ))}
+        </ComboboxField>
       )}
     </div>
   );
