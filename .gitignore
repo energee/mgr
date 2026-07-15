@@ -69,6 +69,8 @@ bun-debug.log*
 # Other files in supabase/.temp/ (project-ref, version stamps) are tracked
 # intentionally so the team shares the same supabase context.
 supabase/.temp/cli-latest
+supabase/.temp/linked-project.json
+supabase/.branches/
 
 # legacy lockfiles
 package-lock.json

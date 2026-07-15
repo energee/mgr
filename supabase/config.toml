@@ -1,0 +1,23 @@
+# Local-only Supabase configuration used by migration replay and integration tests.
+# Hosted project settings are managed separately and are not changed by this file.
+project_id = "phwjrfdtebftetctkhdr"
+
+[api]
+# The migration history predates Supabase's 2026 default-revoke change and the
+# hosted project exposes tables through explicit/default grants. Preserve that
+# behavior in the local replay until the chain captures every table grant.
+auto_expose_new_tables = true
+
+[db]
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+# The historical seed.sql is application demo data, not part of schema replay.
+# Keeping it disabled lets `supabase start` and `db reset --no-seed` validate only
+# the migration chain from an empty database.
+enabled = false
+sql_paths = ["./seed.sql"]

@@ -78,7 +78,10 @@ import {
   PAYMENT_REPLAY_WINDOW_MS,
   verifyWebhookSignature,
 } from "@/integrations/square/webhook";
-import { calculateVolumeOz } from "@/integrations/square/utils";
+import {
+  buildSquareDraftSaleInsert,
+  calculateVolumeOz,
+} from "@/integrations/square/utils";
 import { computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
 import type { SquareSyncType } from "@/integrations/square/types";
 import { dynamicFrom } from "@/services/types";
@@ -918,19 +921,22 @@ async function handleCompletedPayment(
           // would be unrecoverable AND invisible. Surface it so the per-line
           // catch records the line as FAILED (same handling as allocError /
           // debitError on the packaged path).
-          const { error: draftError } = await admin.from("square_draft_sales").insert({
-            square_order_id: orderId,
-            square_payment_id: paymentId ?? null,
-            brand_id: mapping.brand_id,
-            selling_format_id: mapping.selling_format_id,
+          const draftSale = buildSquareDraftSaleInsert({
+            orderId,
+            paymentId: paymentId ?? null,
+            brandId: mapping.brand_id,
+            sellingFormatId: mapping.selling_format_id,
             quantity,
-            volume_oz: volumeOz,
-            unit_price_cents: lineItem.basePriceMoney?.amount
+            volumeOz,
+            unitPriceCents: lineItem.basePriceMoney?.amount
               ? Number(lineItem.basePriceMoney.amount)
               : 0,
-            location_id: locationId,
-            sold_at: event.created_at ?? new Date().toISOString(),
+            locationId,
+            soldAt: event.created_at ?? new Date().toISOString(),
           });
+          const { error: draftError } = await admin
+            .from("square_draft_sales")
+            .insert(draftSale);
           if (draftError) throw draftError;
 
           itemsSynced++;
