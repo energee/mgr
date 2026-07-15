@@ -14,6 +14,9 @@
  *   SF-11 a failed supplier payment-terms read still falls back to the
  *         default terms, but logs a warning naming the failed read.
  *
+ * Durable-create coverage also proves a remote-success/local-mapping failure
+ * is visible and retries with one stable QuickBooks request identity.
+ *
  * The Supabase admin client is faked with the shared admin mock
  * (src/test/supabase-admin-mock.ts); the QBO HTTP client and syncSupplier are
  * module-mocked. Assertions are on the payloads posted to QBO and the rows
@@ -93,9 +96,15 @@ type ErrorLike = { message: string };
  * the eq("entity_type", ...) filter, and let upsertMapping's write resolve
  * empty.
  */
-function mappingsTable(opts: { existing?: typeof poMapping | null; readError?: ErrorLike } = {}) {
+function mappingsTable(
+  opts: {
+    existing?: typeof poMapping | null;
+    readError?: ErrorLike;
+    writeErrors?: Array<ErrorLike | null>;
+  } = {}
+) {
   return ({ calls, ops }: { calls: { method: string; args: unknown[] }[]; ops: string[] }) => {
-    if (ops.length) return { data: null, error: null }; // upsertMapping write
+    if (ops.length) return { data: null, error: opts.writeErrors?.shift() ?? null };
     const entityType = calls.find((c) => c.method === "eq" && c.args[0] === "entity_type")?.args[1];
     if (entityType === "supplier") return { data: supplierMapping, error: null };
     if (entityType === "purchase_order") {
@@ -178,7 +187,7 @@ describe("syncBill — happy paths (characterization)", () => {
     expect(result).toEqual({ qboId: "B-9", action: "create" });
 
     const [path, bill] = mockedPost.mock.calls[0] as [string, QBOBill];
-    expect(path).toBe("/bill");
+    expect(path).toBe("/bill?requestid=mgr-b-po-1");
     expect(bill).toMatchObject({
       DocNumber: "PO-1001",
       VendorRef: { value: "V-77" },
@@ -336,5 +345,57 @@ describe("syncBill — failed reads are not treated as empty", () => {
       expect.objectContaining({ err: "supplier read failed", supplierId: SUPPLIER_ID }),
       expect.stringContaining("failed to read supplier payment terms")
     );
+  });
+});
+
+describe("syncBill — durable remote creation", () => {
+  it("retries a remote success after mapping failure without creating another Bill", async () => {
+    const writes = useTables(
+      makeTables({
+        qbo_sync_mappings: mappingsTable({
+          writeErrors: [{ message: "mapping connection lost" }, null],
+        }),
+      })
+    );
+    const remoteByRequestId = new Map<string, string>();
+    let remoteCreates = 0;
+    mockedPost.mockImplementation(async (path) => {
+      const requestId = new URL(path, "https://qbo.invalid").searchParams.get("requestid");
+      const key = requestId ?? `unkeyed-${remoteCreates}`;
+      if (!remoteByRequestId.has(key)) {
+        remoteCreates += 1;
+        remoteByRequestId.set(key, "B-9");
+      }
+      return { Bill: { Id: remoteByRequestId.get(key) } };
+    });
+
+    await expect(syncBill(PO_ID)).rejects.toThrow(
+      /QuickBooks accepted Bill B-9, but MGR could not save its mapping.*mapping connection lost/
+    );
+    await expect(syncBill(PO_ID)).resolves.toEqual({ qboId: "B-9", action: "create" });
+
+    expect(remoteCreates).toBe(1);
+    expect(mockedPost).toHaveBeenCalledTimes(2);
+    expect(mockedPost.mock.calls.map(([path]) => path)).toEqual([
+      "/bill?requestid=mgr-b-po-1",
+      "/bill?requestid=mgr-b-po-1",
+    ]);
+    const pendingIntents = writes
+      .filter((write) => write.table === "qbo_sync_log" && write.op === "insert")
+      .map((write) => write.row as Record<string, unknown>);
+    expect(pendingIntents[0]?.request_payload).toMatchObject({
+      requestId: "mgr-b-po-1",
+      qboEntityType: "Bill",
+      payload: { DocNumber: "PO-1001" },
+    });
+    const reconciliation = writes
+      .filter((write) => write.table === "qbo_sync_log" && write.op === "update")
+      .map((write) => write.row as Record<string, unknown>)
+      .find((row) => row.status === "error");
+    expect(reconciliation).toMatchObject({
+      status: "error",
+      response_payload: { Bill: { Id: "B-9" } },
+    });
+    expect(reconciliation?.error_message).toMatch(/remote document exists.*retry/i);
   });
 });

@@ -1,0 +1,1 @@
+- **2026-07-15 (yeast pitch review fix).** The source-quantity guard now flips an auto-depleted yeast source back to in_stock when it is replenished above its used quantity, so recovered capacity is pitchable again.
