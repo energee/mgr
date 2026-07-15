@@ -1,17 +1,12 @@
 /**
- * MongoDB sync orchestrator tests — syncRecipes destructive re-sync safety
- * (audit SF-5).
+ * MongoDB sync orchestrator tests — atomic recipe aggregate safety.
  *
  * syncRecipes is delete-then-rebuild (recipes + recipe_malts/hops/yeasts have
  * no UNIQUE(name) to upsert against). These tests pin the hardened contract:
  *
- *   (1) Happy path: all FK lookups resolve, junctions cleared then rebuilt
- *       with resolved PG UUIDs, sync log completed as success.
- *   (2) A FAILED FK-lookup read (Supabase error) aborts BEFORE any delete —
- *       previously a transient read failure was treated as "no rows" and every
- *       recipe was rebuilt with NULL FKs after the originals were gone.
- *   (3) An EMPTY lookup map that the Mongo data references (e.g. phase 1 never
- *       ran, so `brands` is empty) also refuses the destructive rebuild.
+ *   (1) Happy path stages a complete source aggregate for one transactional RPC.
+ *   (2) A failed FK lookup aborts before the RPC.
+ *   (3) An empty referenced lookup also refuses reconciliation.
  *
  * createAdminClient is faked with the shared admin mock
  * (src/test/supabase-admin-mock.ts); the Mongo Db handle with a tiny
@@ -41,7 +36,7 @@ vi.mock("../client", () => ({
 import { createAdminClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { getMongoDb } from "../client";
-import { syncEntity } from "../sync";
+import { syncAll, syncEntity, syncPhase } from "../sync";
 
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 const mockedGetMongoDb = vi.mocked(getMongoDb);
@@ -109,15 +104,19 @@ function pgTables(overrides: TableData = {}): TableData {
 }
 
 function setup(overrides: TableData = {}): Write[] {
-  const { admin, writes } = makeAdminMock(pgTables(overrides), { onUnknownTable: "throw" });
+  const { admin, writes, rpcCalls } = makeAdminMock(pgTables(overrides), {
+    onUnknownTable: "throw",
+    rpc: { data: 4, error: null },
+  });
+  aggregateRpcCalls = rpcCalls;
   mockedCreateAdminClient.mockResolvedValue(admin as never);
   mockedGetMongoDb.mockResolvedValue(makeDb(MONGO_COLLECTIONS));
   return writes;
 }
 
+let aggregateRpcCalls: Array<{ fn: string; args: unknown }> = [];
+
 const deletes = (writes: Write[]) => writes.filter((w) => w.op === "delete");
-const upsertFor = (writes: Write[], table: string) =>
-  writes.find((w) => w.op === "upsert" && w.table === table);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -128,52 +127,30 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("syncRecipes (via syncEntity)", () => {
-  it("rebuilds recipes + junctions with resolved FKs; deletes happen only after verified reads", async () => {
+  it("reconciles the complete recipe aggregate through one transactional RPC", async () => {
     const writes = setup();
 
     const result = await syncEntity("recipes");
 
-    // All four tables cleared, in junction-first order.
-    expect(deletes(writes).map((w) => w.table)).toEqual([
-      "recipe_malts",
-      "recipe_hops",
-      "recipe_yeasts",
-      "recipes",
-    ]);
-    // Deletes precede the recipes rebuild insert.
-    const firstDeleteIdx = writes.findIndex((w) => w.op === "delete");
-    const recipesUpsertIdx = writes.findIndex((w) => w.op === "upsert" && w.table === "recipes");
-    expect(firstDeleteIdx).toBeGreaterThan(-1);
-    expect(recipesUpsertIdx).toBeGreaterThan(firstDeleteIdx);
-
-    // Recipe row carries resolved style + brand FKs.
-    expect(upsertFor(writes, "recipes")?.row).toEqual([
-      expect.objectContaining({
+    expect(deletes(writes)).toEqual([]);
+    expect(writes.filter((write) => write.op === "upsert")).toEqual([]);
+    expect(aggregateRpcCalls).toEqual([{
+      fn: "reconcile_mongodb_recipe_aggregate",
+      args: expect.objectContaining({
+        p_mongo_id: RECIPE_OID.toString(),
+        p_recipe: expect.objectContaining({
         name: "Hazy IPA",
         style_id: "pg-style-1",
         brand_id: "pg-brand-1",
+        }),
+        p_malts: [expect.objectContaining({ malt_id: "pg-malt-1", weight_lbs: 10, position: 0 })],
+        p_hops: [expect.objectContaining({
+          hop_id: "pg-hop-1", weight_oz: 16, timing: "dry_hop", boil_time_min: null, position: 0,
+        })],
+        p_yeasts: [expect.objectContaining({ yeast_id: "pg-yeast-1", is_primary: true, position: 0 })],
       }),
-    ]);
+    }]);
 
-    // Junction rows carry the post-insert recipe UUID and resolved ingredient UUIDs.
-    expect(upsertFor(writes, "recipe_malts")?.row).toEqual([
-      { recipe_id: "pg-recipe-1", malt_id: "pg-malt-1", weight_lbs: 10, position: 0 },
-    ]);
-    expect(upsertFor(writes, "recipe_hops")?.row).toEqual([
-      {
-        recipe_id: "pg-recipe-1",
-        hop_id: "pg-hop-1",
-        weight_oz: 16,
-        timing: "dry_hop",
-        boil_time_min: null,
-        position: 0,
-      },
-    ]);
-    expect(upsertFor(writes, "recipe_yeasts")?.row).toEqual([
-      { recipe_id: "pg-recipe-1", yeast_id: "pg-yeast-1", is_primary: true, position: 0 },
-    ]);
-
-    // 1 recipe + 3 junction rows, no failures; sync log completed as success.
     expect(result).toMatchObject({ entityType: "recipes", synced: 4, failed: 0, errors: [] });
     expect(writes.at(-1)).toMatchObject({
       table: "mongodb_sync_log",
@@ -204,7 +181,7 @@ describe("syncRecipes (via syncEntity)", () => {
     const writes = setup({ brands: { data: [], error: null } });
 
     await expect(syncEntity("recipes")).rejects.toThrow(
-      /Refusing destructive recipe re-sync: brands lookup resolved 0 entries/
+      /Refusing recipe re-sync: brands lookup resolved 0 entries/
     );
 
     expect(deletes(writes)).toEqual([]);
@@ -218,6 +195,41 @@ describe("spreadsheet-owned orders", () => {
       "Unknown entity type: orders"
     );
 
+    expect(mockedGetMongoDb).not.toHaveBeenCalled();
+  });
+});
+
+describe("phase failure reporting", () => {
+  it("counts a thrown entity failure and attributes its phase, entity, and operation", async () => {
+    const { admin } = makeAdminMock({
+      mongodb_sync_log: { data: null, error: { message: "sync log unavailable" } },
+    });
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    const results = await syncPhase(1);
+
+    expect(results[0]).toMatchObject({
+      entityType: "suppliers",
+      phase: 1,
+      synced: 0,
+      failed: 1,
+      errors: [{
+        mongoId: "phase-error",
+        error: expect.stringContaining("phase=1 entity=suppliers operation=sync"),
+      }],
+    });
+  });
+
+  it("stops sync-all before dependent phases after a phase reports a failure", async () => {
+    const { admin } = makeAdminMock({
+      mongodb_sync_log: { data: null, error: { message: "sync log unavailable" } },
+    });
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    const results = await syncAll();
+
+    expect(results).toHaveLength(5);
+    expect(new Set(results.map((result) => result.phase))).toEqual(new Set([1]));
     expect(mockedGetMongoDb).not.toHaveBeenCalled();
   });
 });
