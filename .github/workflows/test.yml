@@ -151,8 +151,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Check for dependency vulnerabilities
-        run: bun pm audit --level high
-        continue-on-error: true
+        # Exception requirements: docs/security/dependency-policy.md
+        run: bun audit --audit-level=high
 
   quality:
     name: Code Quality

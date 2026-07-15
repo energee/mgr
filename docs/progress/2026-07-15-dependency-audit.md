@@ -1,0 +1,1 @@
+- **2026-07-15 (Restore the dependency audit gate).** Replaced the unsupported non-blocking audit command with Bun's blocking high-severity audit, upgraded the vulnerable framework packages, patched compatible transitive dependencies, and documented the remediation and exception policy.
