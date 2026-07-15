@@ -41,7 +41,11 @@ Portal provisioning verifies the returned active customer profile and this
 junction row before it sends a login OTP or reports success. First-login
 email auto-linking likewise exposes a matched customer in memory only after
 every expected junction row is returned by the write. A failed new-user
-provisioning attempt deletes the new Auth identity as compensation.
+provisioning attempt deletes the new Auth identity as compensation. For a
+pre-existing Auth identity, the route snapshots the profile and requested
+junction before provisioning; a later failure removes only a newly added link
+and restores (or removes) only the profile state created by that attempt. It
+never deletes the pre-existing Auth identity or an earlier customer link.
 
 **Migration:** `00095_customer_portal_many_to_many.sql` (original),
 `00252_restore_customer_portal_users.sql` (hosted-database restoration and
