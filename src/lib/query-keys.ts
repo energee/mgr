@@ -650,6 +650,13 @@ export const portalKeys = {
   cutoff: (orderId: string) => ["portal", "cutoff", orderId] as const,
 };
 
+/** Staff-side management of customer-to-portal-user access links. */
+export const customerPortalKeys = {
+  all: () => ["customer-portal-users"] as const,
+  users: (customerId: string) =>
+    ["customer-portal-users", customerId] as const,
+};
+
 // =============================================================================
 // Finished Good Keys
 // =============================================================================

@@ -136,10 +136,25 @@ The customer portal (`/portal`) provides a separate interface for brewery custom
 
 ### Authentication Flow
 
-1. Admin sends portal invite from customer detail page (Settings > Customers > [customer] > "Send Portal Invite")
-2. Customer receives magic link email
-3. Customer clicks link or enters OTP code at `/portal/login`
-4. On first login, auto-links auth user to customer record by email match via `customer_portal_users` junction table
+1. Staff with `customers:write` opens **Sales > Customers > [customer] > Portal Access** and enters a contact email
+2. The server provisions the auth identity without sending mail, assigns the portal-only `customer` role, and creates the `customer_portal_users` link
+3. Only after the role and link exist, the route adds the configured `brewery_name` to the auth user's portal-email metadata and Supabase sends the contact a portal-specific magic-link/OTP email
+4. The customer clicks the token-hash link, which `/api/auth/confirm` exchanges for a cookie-backed session before redirecting to `/portal/orders`; entering the OTP code at `/portal/login` remains available as a fallback
+
+The ordering in steps 2–3 is security-sensitive: an additional contact's email
+does not necessarily match `customers.email`, so the auth-profile trigger may
+initially apply the default `viewer` role. The invite route replaces that role
+and persists the customer link before sending usable credentials.
+
+The hosted Supabase **Magic Link** subject and HTML must match
+`supabase/templates/magic-link-subject.txt` and
+`supabase/templates/magic-link.html`. The template deliberately uses
+`TokenHash` instead of `ConfirmationURL`: Supabase's default implicit-flow URL
+returns the session in a fragment that a server callback cannot read, while
+`/api/auth/confirm` verifies the token hash and writes the SSR session cookies.
+`RedirectTo` is treated only as a same-origin destination.
+Deploy `/api/auth/confirm` before updating the hosted template; reversing that
+order would break existing magic links.
 
 ### Portal Features
 
@@ -152,6 +167,8 @@ The customer portal (`/portal`) provides a separate interface for brewery custom
 Portal users are linked to customers via `customer_portal_users` (junction table):
 - One user can access multiple customers' orders
 - One customer can have multiple portal users
+- Staff can invite, resend, and remove individual contacts from the customer's **Portal Access** section
+- Removing one link leaves that user's links to other customers unchanged
 
 ### Change Request Cutoff
 
@@ -160,7 +177,7 @@ Each sales channel has a `change_request_cutoff_state` (default: `confirmed`). C
 ### Role Behavior
 
 - Users with `customer` role are redirected from the admin app to `/portal`
-- The `customer` role is auto-assigned when an auth user's email matches an existing customer record
+- The `customer` role is auto-assigned when an auth user's email matches an existing customer record; the invite route explicitly enforces it for additional contacts
 - Brewery contact email (from Settings > System > `brewery_email`) is shown on the "No Account Linked" page
 - Customer role does not participate in the `PERMISSION_MAP` -- portal access is governed by dedicated RLS policies on `customer_portal_users`
 
