@@ -536,6 +536,28 @@ merge concurrent formulations, or report success after only some sections
 committed. The recipe row is the shared serialization boundary for the full
 editor aggregate.
 
+### DEC-GAP-013: Atomic Yeast Pitch Commands
+**Status**: Implemented (migration 00260)
+
+Yeast deductions use one `pitch_yeast_atomic` PostgreSQL command. A stable
+caller UUID becomes both the immutable event id and idempotency key. The
+command serializes retries by request id, locks the source pitch, recomputes
+committed usage, rejects overdraw, inserts the event, and maintains depleted
+status in one transaction. A retry with identical input returns the original
+result; reusing the id with different input conflicts.
+
+Defensive table triggers apply the same source-row lock to direct inserts,
+block event updates/deletes, and reject source-quantity reductions below
+committed usage. Partial sources stay `in_stock`; a pitch that consumes the
+last available quantity performs the automatic `in_stock → depleted`
+transition. Migration preflight aborts when legacy data is already invalid so
+operators reconcile it explicitly instead of guessing which events to remove.
+
+**Rationale**: a derived balance view prevents stale stored totals, but it does
+not serialize writers. The command and triggers keep the event ledger as the
+source of truth while guaranteeing that its derived balance cannot be
+negative.
+
 ---
 
 ## Redundancy Resolutions

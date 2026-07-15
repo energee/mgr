@@ -10512,6 +10512,17 @@ export type Database = {
         }
         Returns: number
       }
+      pitch_yeast_atomic: {
+        Args: {
+          p_batch_id: string
+          p_notes: string
+          p_pitch_id: string
+          p_quantity_lbs: number
+          p_request_id: string
+          p_viability_at_pitch: number
+        }
+        Returns: Json
+      }
       record_keg_transaction: {
         Args: {
           p_batch_id?: string
