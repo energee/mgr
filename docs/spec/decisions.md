@@ -793,6 +793,29 @@ Replace the non-functional `use_default_additions` toggle with named, reusable w
 
 ---
 
+## Integration Decisions
+
+### DEC-INT-001: Atomic Square Sale and Refund Ingestion
+**Status**: Implemented (migration 00257_atomic_square_ingestion.sql)
+
+Square webhook handlers fetch the external order before starting durable work,
+then submit the normalized sale or refund to one service-role-only PostgreSQL
+function. The function owns the dedup claim, FIFO allocation/reversal ledger,
+physical bin movement, draft sale mutation, and claim finalization in one
+transaction. A per-order transaction advisory lock serializes sales and refunds,
+including the interval before an uncommitted sale claim is visible.
+
+Unexpected failures roll the full statement back and are safe to retry.
+Deterministic line/sizing failures are finalized as audit records. Incomplete
+claims written by the former multi-request flow are never replayed because their
+prior effects cannot be reconstructed reliably; they are marked for manual
+reconciliation instead.
+
+**Rationale**: exactly-once claim rows alone cannot make several independent
+database requests atomic. Moving the complete state transition into PostgreSQL
+eliminates orphan allocations, unmatched bin movements, double effects after a
+timeout, and sale/refund ordering races.
+
 ## Performance Decisions
 
 ### DEC-PERF-001: Allocation & Query Performance Indexes

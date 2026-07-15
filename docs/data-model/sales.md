@@ -513,7 +513,7 @@ CONSTRAINT square_settings_singleton CHECK (id = '00000000-0000-0000-0000-000000
 
 ---
 
-## `square_item_mappings`
+## `square_catalog_map`
 
 Map Square catalog items to MGR products.
 
@@ -521,14 +521,17 @@ Map Square catalog items to MGR products.
 |--------|------|-------------|
 | id | UUID | Primary key |
 | square_catalog_id | TEXT | Square catalog object ID |
-| square_item_name | TEXT | Item name from Square (for display) |
 | brand_id | UUID | FK to brands |
-| selling_format_id | UUID | FK to selling_formats |
-| is_active | BOOLEAN | Active flag |
+| selling_format_id | UUID | FK to selling_formats; present for sellable variations |
+| square_version | BIGINT | Square catalog version for optimistic updates |
+| object_type | TEXT | `ITEM` parent or `ITEM_VARIATION` sellable SKU |
+| pour_size_oz | NUMERIC | Optional per-variation draft serving size |
+| last_synced_at | TIMESTAMPTZ | Most recent successful catalog synchronization |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**Unique constraint:** `square_catalog_id`
+`square_catalog_id` is unique. Parent items are unique per brand; sellable
+variations are unique per `(brand_id, selling_format_id, object_type)`.
 
 ### Mapping Resolution
 
@@ -536,25 +539,47 @@ Map Square catalog items to MGR products.
 // When processing a Square sale:
 // 1. Match square_catalog_id to brand_id + selling_format_id
 // 2. Find available FG matching brand + selling format
-// 3. If no inventory available → log error, skip item
+// 3. The atomic ingest RPC locks matching FG/bin rows and draws FIFO
+// 4. Deterministic validation failures are finalized in square_sync_log
 ```
 
 ---
 
 ## `square_sync_log`
 
-Successful sync records for deduplication and audit.
+Sync claims and audit records. Inbound sale/refund claims are created and
+finalized inside the same transaction as their inventory effects.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| square_order_id | TEXT | Square order ID |
-| square_payment_id | TEXT | Square payment ID |
+| sync_type | TEXT | `catalog_push`, `inventory_push`, `inventory_event`, `sale_ingest`, or `refund_ingest` |
+| event_id | TEXT | Square webhook event ID; unique when present |
+| square_payment_id | TEXT | Dedup claim key: order ID for sales, refund ID for refunds |
+| location_id | UUID | FK to the resolved MGR location, when applicable |
 | items_synced | INTEGER | Number of items successfully processed |
-| items_skipped | INTEGER | Number of items skipped (unmapped, no inventory) |
-| synced_at | TIMESTAMPTZ | When sync occurred |
+| items_failed | INTEGER | Number of deterministic item failures requiring review |
+| details | JSONB | Order/refund identifiers, errors, warnings, reversals, and manual-reconciliation flags |
+| started_at | TIMESTAMPTZ | Claim/sync start timestamp |
+| completed_at | TIMESTAMPTZ | Completion timestamp; null only for an unfinished legacy/in-flight operation |
+| created_at | TIMESTAMPTZ | Row creation timestamp |
 
-**Unique constraint:** `square_order_id`
+`event_id` and non-null `square_payment_id` are independently unique.
+
+### Atomic sale/refund functions
+
+- `ingest_square_sale_atomic(...)` claims one Square order, resolves mapped
+  lines, locks finished goods then bin rows in canonical order, records FIFO TTB
+  allocations or draft rows, debits physical inventory, and finalizes the log.
+- `ingest_square_refund_atomic(...)` serializes with the order's sale/refunds,
+  writes inverse adjustment allocations, credits bins, voids full-refund draft
+  rows, and finalizes the refund claim.
+
+Both functions are `SECURITY INVOKER`, executable only by `service_role`, and
+run as one PostgreSQL statement/transaction. Unexpected errors roll back the
+claim and all effects so delivery can retry. A stale claim from the earlier
+multi-statement implementation is completed with `manual_reconcile: true`
+instead of replayed.
 
 ---
 
