@@ -28,6 +28,7 @@ import {
 } from "@/domain/planned-addition-matching";
 import { recipeKeys } from "@/lib/query-keys";
 import { log } from "@/lib/client-logger";
+import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
 // Types
@@ -70,15 +71,18 @@ export function PlannedAdditions({
   const { data: plannedAdditions, isLoading, error } = useQuery({
     queryKey: recipeKeys.fermentationAdditions(recipeId),
     queryFn: async () => {
+      let source = "dry hops";
       try {
         const additions: PlannedAddition[] = [];
 
         // Dry hops
-        const { data: dryHops } = await supabase
-          .from("recipe_hops")
-          .select("id, hop_id, weight_oz, notes, hop:hops(name)")
-          .eq("recipe_id", recipeId)
-          .eq("timing", "dry_hop");
+        const dryHops = await unwrap(
+          supabase
+            .from("recipe_hops")
+            .select("id, hop_id, weight_oz, notes, hop:hops(name)")
+            .eq("recipe_id", recipeId)
+            .eq("timing", "dry_hop"),
+        );
 
         if (dryHops) {
           dryHops.forEach((h) => {
@@ -96,10 +100,13 @@ export function PlannedAdditions({
         }
 
         // Fruits
-        const { data: fruits } = await supabase
-          .from("recipe_fruits")
-          .select("id, fruit_id, amount, unit, timing, notes, fruit:fruits(name)")
-          .eq("recipe_id", recipeId);
+        source = "fruits";
+        const fruits = await unwrap(
+          supabase
+            .from("recipe_fruits")
+            .select("id, fruit_id, amount, unit, timing, notes, fruit:fruits(name)")
+            .eq("recipe_id", recipeId),
+        );
 
         if (fruits) {
           fruits.forEach((f) => {
@@ -118,11 +125,14 @@ export function PlannedAdditions({
         }
 
         // Spices (fermentation/secondary timing)
-        const { data: spices } = await supabase
-          .from("recipe_spices")
-          .select("id, spice_id, amount, unit, timing, notes, spice:spices(name)")
-          .eq("recipe_id", recipeId)
-          .in("timing", ["fermentation", "secondary"]);
+        source = "spices";
+        const spices = await unwrap(
+          supabase
+            .from("recipe_spices")
+            .select("id, spice_id, amount, unit, timing, notes, spice:spices(name)")
+            .eq("recipe_id", recipeId)
+            .in("timing", ["fermentation", "secondary"]),
+        );
 
         if (spices) {
           spices.forEach((s) => {
@@ -141,11 +151,14 @@ export function PlannedAdditions({
         }
 
         // Adjuncts (fermentation timing)
-        const { data: adjuncts } = await supabase
-          .from("recipe_adjuncts")
-          .select("id, adjunct_id, weight_lbs, notes, adjunct:adjuncts(name)")
-          .eq("recipe_id", recipeId)
-          .eq("timing", "fermentation");
+        source = "adjuncts";
+        const adjuncts = await unwrap(
+          supabase
+            .from("recipe_adjuncts")
+            .select("id, adjunct_id, weight_lbs, notes, adjunct:adjuncts(name)")
+            .eq("recipe_id", recipeId)
+            .eq("timing", "fermentation"),
+        );
 
         if (adjuncts) {
           adjuncts.forEach((a) => {
@@ -164,7 +177,7 @@ export function PlannedAdditions({
 
         return additions;
       } catch (err) {
-        log.error("Failed to load planned additions:", err);
+        log.error(`Failed to load planned ${source}:`, err);
         throw err;
       }
     },
