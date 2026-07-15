@@ -61,3 +61,13 @@
   - One transaction per ingredient section — protects each replacement but leaves Save All partially committed.
   - Client-side sequencing plus optimistic updates — JavaScript cannot create a transaction across PostgREST requests, and broad cache invalidation can overwrite unsaved local sections.
 - **Reversibility**: moderate — the RPC and contribution registry can be reverted together, but doing so restores the known integrity gap.
+
+## 2026-07-15 — Yeast pitch events use their UUID as the retry key
+
+- **Decision**: `pitch_yeast_atomic` accepts a stable request UUID and stores it directly as `yeast_pitch_events.id`; source-row locking and defensive triggers make balance, status, and event creation one database transaction.
+- **Why**: the event already has a globally unique immutable identifier, so a second idempotency column would duplicate identity without improving retry semantics. The source lock is the shared serialization point for RPC and direct writers.
+- **Alternatives rejected**:
+  - A separate nullable `idempotency_key` column — adds a second unique identity and legacy-null behavior with no benefit for immutable events.
+  - Client-only availability checks — cached readers cannot serialize concurrent deductions.
+  - RPC without table guards — authenticated direct inserts and source edits could still produce a negative derived balance.
+- **Reversibility**: hard — event UUIDs become part of the public command contract, though the RPC can later accept a separate key while preserving existing IDs.

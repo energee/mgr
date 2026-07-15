@@ -81,7 +81,8 @@ export const yeastPitchStateMachine = {
   initialState: "in_stock" as const,
   states: yeastPitchStates,
   transitions: {
-    in_stock: ["in_use", "discarded"],
+    // Atomic pitch recording can consume the entire source in one command.
+    in_stock: ["in_use", "depleted", "discarded"],
     in_use: ["harvested", "depleted", "discarded"],
     harvested: [] as string[],
     depleted: [] as string[],
