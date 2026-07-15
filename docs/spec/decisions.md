@@ -516,6 +516,26 @@ Bulk operations use **per-record atomicity**. Each selected record invokes the c
 
 **Rationale**: A committed terminal status is operationally false when its inventory or accounting work failed. A database transaction is the only boundary shared by every client and route entry point.
 
+### DEC-GAP-012: Recipe Editor Saves One Versioned Aggregate
+**Status**: Implemented (migration 00259)
+
+The recipe editor submits every dirty recipe field and each dirty ingredient
+collection to one `SECURITY INVOKER` PostgreSQL command. The command locks the
+recipe row, rejects a stale `recipes.version`, applies only allowlisted fields
+and the six concrete ingredient tables, and increments the version once.
+Omitted collections remain unchanged; an explicitly present empty collection
+clears that ingredient type.
+
+Child rows keep client-generated UUIDs across saves. The database derives their
+positions from array order and preserves catalog snapshots on updates. The UI
+resets dirty state and invalidates exact cache keys only after the transaction
+returns its committed version.
+
+**Rationale**: sequential DELETE/INSERT requests could leave a section empty,
+merge concurrent formulations, or report success after only some sections
+committed. The recipe row is the shared serialization boundary for the full
+editor aggregate.
+
 ---
 
 ## Redundancy Resolutions
@@ -815,6 +835,28 @@ reconciliation instead.
 database requests atomic. Moving the complete state transition into PostgreSQL
 eliminates orphan allocations, unmatched bin movements, double effects after a
 timeout, and sale/refund ordering races.
+
+---
+
+### DEC-INT-002: Source-Owned Transactional Legacy Reconciliation
+**Status**: Implemented (migration `00258_atomic_mongodb_aggregate_sync.sql`)
+
+Legacy MongoDB resyncs reconcile one aggregate at a time inside a PostgreSQL
+function. `mongodb_sync_mappings` identifies source-owned parent and child rows;
+only mapped stale children may be removed. Manual rows are outside the cleanup
+set. Stable source IDs make retries idempotent, and a shared advisory transaction
+lock serializes entity, phase, and sync-all entry points.
+
+The global delete-then-rebuild operation is rejected. A partial entity or phase
+result is an API failure, and sync-all stops before phases that depend on the
+failed phase.
+
+**Rationale**: Separate PostgREST requests auto-commit, so checking every error
+cannot restore an already-deleted aggregate. Database functions provide the
+required rollback boundary while the ownership registry prevents the recovery
+path from deleting manually maintained brewery data.
+
+---
 
 ## Performance Decisions
 

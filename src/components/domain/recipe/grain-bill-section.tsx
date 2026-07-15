@@ -3,8 +3,8 @@
 /**
  * GrainBillSection - Section wrapper for GrainBillEditor in recipe detail view.
  *
- * Uses useRecipeChildRows for the recipe_malts fetch/dirty/delete-all-reinsert
- * save cycle, and registers with the recipe editor's saver registry.
+ * Uses useRecipeChildRows for fetch/dirty state and contributes recipe_malts
+ * to the recipe editor's aggregate atomic save.
  * View mode = read-only editor; Edit mode = interactive editor with save button.
  */
 
@@ -16,7 +16,10 @@ import {
   type GrainBillItem,
 } from "@/components/domain/recipe/grain-bill-editor";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
+import {
+  useRecipeEditor,
+  useRegisterSaver,
+} from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 
 type GrainBillSectionProps = {
   data: { id: string };
@@ -27,8 +30,9 @@ type GrainBillSectionProps = {
 
 export function GrainBillSection({ data, editing, onDataChange }: GrainBillSectionProps) {
   const recipeId = data.id;
+  const { isSaving } = useRecipeEditor();
 
-  const { items: grainItems, dirty, update, save, isLoading, isPending } =
+  const { items: grainItems, dirty, update, prepareSave, isLoading } =
     useRecipeChildRows<GrainBillItem & { malts: GrainBillItem["malt"] }, GrainBillItem>({
       recipeId,
       table: "recipe_malts",
@@ -74,7 +78,7 @@ export function GrainBillSection({ data, editing, onDataChange }: GrainBillSecti
     onDataChange?.(grainItems);
   }, [grainItems, onDataChange]);
 
-  useRegisterSaver("grain-bill", Boolean(editing && dirty), save);
+  useRegisterSaver("grain-bill", Boolean(editing && dirty), prepareSave);
 
   if (isLoading) {
     return (
@@ -91,7 +95,7 @@ export function GrainBillSection({ data, editing, onDataChange }: GrainBillSecti
       <GrainBillEditor
         items={grainItems}
         onChange={update}
-        disabled={!editing || isPending}
+        disabled={!editing || isSaving}
       />
     </div>
   );

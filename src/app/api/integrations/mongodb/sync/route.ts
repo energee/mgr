@@ -3,16 +3,14 @@
  *
  * POST: Triggers catalog and production sync by phase, entity, or all.
  * Body: { phase?: 1|2|3|4, entity?: string } — if neither, runs all phases.
- * Orders are spreadsheet-owned and are deliberately excluded from every
- * MongoDB sync and clean path.
+ * Orders are spreadsheet-owned and are deliberately excluded from MongoDB
+ * reconciliation. Global clean is rejected; normal sync owns cleanup scope.
  */
 
 export const maxDuration = 60;
 
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
-import { createAdminClient } from "@/lib/supabase/server";
-import { dynamicFrom } from "@/services/types";
 import { getMongoDb, closeMongoClient } from "@/integrations/mongodb/client";
 import { syncAll, syncPhase, syncEntity } from "@/integrations/mongodb/sync";
 import type { SyncEntityType, SyncPhase } from "@/integrations/mongodb/types";
@@ -30,33 +28,46 @@ export const POST = withPermission("integrations:manage", async (req) => {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
-    const { phase, entity, clean } = body as { phase?: number; entity?: string; clean?: boolean };
+    const body: unknown = await req.json().catch(() => ({}));
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return errorResponse("INVALID_SYNC_REQUEST", "Request body must be a JSON object.", undefined, 400);
+    }
+
+    const { phase, entity, clean } = body as Record<string, unknown>;
+    if (
+      (phase !== undefined && typeof phase !== "number")
+      || (entity !== undefined && typeof entity !== "string")
+      || (clean !== undefined && typeof clean !== "boolean")
+    ) {
+      return errorResponse(
+        "INVALID_SYNC_REQUEST",
+        "phase must be a number, entity must be a string, and clean must be a boolean.",
+        undefined,
+        400,
+      );
+    }
 
     const VALID_PHASES = [1, 2, 3, 4];
     const VALID_ENTITIES = [
       "suppliers", "malts", "hops", "yeasts", "beer_styles",
       "brands", "vessels", "recipes", "batches", "vessel_transfers",
-      "brew_logs", "batch_logs",
+      "brew_logs", "batch_logs", "packaging_sessions",
     ];
 
-    if (phase && !VALID_PHASES.includes(phase)) {
+    if (phase !== undefined && !VALID_PHASES.includes(phase)) {
       return errorResponse("INVALID_PHASE", `Invalid phase: ${phase}. Valid: 1-4`, undefined, 400);
     }
     if (entity && !VALID_ENTITIES.includes(entity)) {
       return errorResponse("INVALID_ENTITY", `Invalid entity: ${entity}`, undefined, 400);
     }
 
-    // Clean synced data before re-syncing (delete in FK-safe order)
-    if (clean) {
-      const admin = await createAdminClient();
-      await dynamicFrom(admin, "batch_logs").delete().eq("log_type", "measurement");
-      await dynamicFrom(admin, "brew_log_batches").delete().gte("created_at", "1970-01-01");
-      await dynamicFrom(admin, "brew_logs").delete().gte("created_at", "1970-01-01");
-      await dynamicFrom(admin, "vessel_transfers").delete().gte("created_at", "1970-01-01");
-      await dynamicFrom(admin, "recipe_malts").delete().gte("created_at", "1970-01-01");
-      await dynamicFrom(admin, "recipe_hops").delete().gte("created_at", "1970-01-01");
-      await dynamicFrom(admin, "recipe_yeasts").delete().gte("created_at", "1970-01-01");
+    if (clean === true) {
+      return errorResponse(
+        "UNSAFE_CLEAN_DISABLED",
+        "Global clean is disabled. Normal sync atomically reconciles only MongoDB-owned rows.",
+        undefined,
+        400,
+      );
     }
 
     let results;
@@ -81,6 +92,17 @@ export const POST = withPermission("integrations:manage", async (req) => {
         errors: r.errors,
       })),
     };
+
+    const hasFailure = summary.totalFailed > 0
+      || summary.entities.some((result) => result.errors.length > 0);
+    if (hasFailure) {
+      return errorResponse(
+        "SYNC_PARTIAL_FAILURE",
+        "MongoDB sync did not complete successfully.",
+        summary,
+        502,
+      );
+    }
 
     return successResponse(summary);
   } catch (err) {

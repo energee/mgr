@@ -8,12 +8,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
-import { recipeKeys, entityKeys } from "@/lib/query-keys";
-import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
@@ -57,9 +53,7 @@ const WATER_PROFILE_FIELDS = [
 ];
 
 export function WaterChemistrySection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
-  const supabase = createClient();
-  const queryClient = useQueryClient();
+  const { recipe, updateRecipe } = useRecipeEditor();
 
   const { optionsMap, isLoading: optionsLoading } = useDynamicOptions(WATER_PROFILE_FIELDS);
   const waterProfileOptions = optionsMap.water_profile_id ?? [];
@@ -94,44 +88,14 @@ export function WaterChemistrySection() {
     return () => subscription.unsubscribe();
   }, [form, updateRecipe]);
 
-  const stopSavingRef = useRef<(() => void) | null>(null);
-
-  const saveMutation = useMutation({
-    mutationFn: async (values: WaterFormValues) => {
-      stopSavingRef.current = startSaving();
-      return updateWithOptimisticLockOrThrow(
-        supabase,
-        "recipes",
-        recipe.id,
-        {
-          water_profile_id: values.water_profile_id,
-          target_water_profile_id: values.target_water_profile_id,
-          mash_water_volume_gal: values.mash_water_volume_gal,
-          sparge_water_volume_gal: values.sparge_water_volume_gal,
-          preboil_volume_bbl: values.preboil_volume_bbl,
-        },
-        getVersion()
-      );
-    },
-    onSuccess: (data) => {
-      updateRecipe({ version: data.version });
-      form.reset(form.getValues());
-      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
-      queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-    },
-    onError: handleSaveError,
-    onSettled: () => {
-      stopSavingRef.current?.();
-      stopSavingRef.current = null;
-    },
-  });
-
   useRegisterSaver("water-chemistry", isDirty, useCallback(async () => {
-    if (!form.formState.isDirty) return;
-    await form.handleSubmit(async (values) => {
-      await saveMutation.mutateAsync(values);
-    })();
-  }, [form, saveMutation]));
+    if (!(await form.trigger())) throw new Error("Water chemistry settings are invalid");
+    const values = form.getValues();
+    return {
+      recipePatch: values,
+      onCommitted: () => form.reset(values),
+    };
+  }, [form]));
 
   return (
     <RecipeSectionCard

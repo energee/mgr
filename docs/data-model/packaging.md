@@ -99,6 +99,13 @@ Packaging sessions (group multiple products/batches packaged together). Created 
 
 **Audit trail:** All changes tracked in `entity_revisions` table (entity_type='packaging_session'). See `docs/data-model/system.md`.
 
+Legacy MongoDB imports use `reconcile_mongodb_packaging_aggregate()` to update
+the session and its source-owned line items in one transaction. Line items are
+upserted by stable mapped UUID before stale imported rows are removed, preserving
+both manual lines and finished-goods references to unchanged imported lines.
+An unresolved brand/format or database error leaves the previous session
+aggregate intact.
+
 ---
 
 ## `session_line_items`

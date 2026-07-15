@@ -10490,6 +10490,28 @@ export type Database = {
         }
         Returns: number
       }
+      reconcile_mongodb_batch_reading_aggregate: {
+        Args: { p_mongo_id: string; p_readings?: Json }
+        Returns: number
+      }
+      reconcile_mongodb_brew_aggregate: {
+        Args: { p_batches?: Json; p_brew_log: Json; p_mongo_id: string }
+        Returns: number
+      }
+      reconcile_mongodb_packaging_aggregate: {
+        Args: { p_lines?: Json; p_mongo_id: string; p_session: Json }
+        Returns: number
+      }
+      reconcile_mongodb_recipe_aggregate: {
+        Args: {
+          p_hops?: Json
+          p_malts?: Json
+          p_mongo_id: string
+          p_recipe: Json
+          p_yeasts?: Json
+        }
+        Returns: number
+      }
       record_keg_transaction: {
         Args: {
           p_batch_id?: string
@@ -10513,6 +10535,15 @@ export type Database = {
       }
       revise_packaging_session: {
         Args: { p_items: Json; p_reason?: string; p_session_id: string }
+        Returns: Json
+      }
+      save_recipe_aggregate_atomic: {
+        Args: {
+          p_expected_version: number
+          p_recipe_id: string
+          p_recipe_patch?: Json
+          p_sections?: Json
+        }
         Returns: Json
       }
       ship_transfer_partial: {

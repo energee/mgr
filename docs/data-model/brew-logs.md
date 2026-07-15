@@ -23,6 +23,12 @@ Brew logs capture the hot-side brewing process. They are **decoupled from batche
 **Note:** Recipe is owned by batches, not brew logs. Brew logs derive recipe info
 from their linked batches via the `brew_logs_with_batches` view.
 
+Legacy MongoDB brew-log imports reconcile one `brew_logs` row and its
+source-owned `brew_log_batches` rows through
+`reconcile_mongodb_brew_aggregate()`. The parent and links are one transaction,
+use stable ownership mappings for retry idempotency, and do not delete manually
+created links.
+
 ---
 
 ## `brew_logs`

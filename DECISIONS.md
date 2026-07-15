@@ -61,3 +61,12 @@
   - Query by `DocNumber` before every create — document numbers are business-controlled and not a reliable unique request identity.
   - Only propagate mapping-write errors — honest failure reporting alone would still let the retry create a second remote document.
 - **Reversibility**: easy — the intent uses the existing sync-log schema, and the request-ID behavior is isolated to the two transaction create paths.
+
+## 2026-07-15 — Recipe Save All is one database transaction
+
+- **Decision**: The main recipe editor collects dirty parent fields and the six ingredient collections, then sends one version-checked `SECURITY INVOKER` RPC. Local dirty state and cache invalidation occur only after that transaction commits.
+- **Why**: Separate DELETE/INSERT requests could erase ingredients on insertion failure, concurrent editors could merge replacement sets, and sequential section saves could leave a misleading partial commit.
+- **Alternatives rejected**:
+  - One transaction per ingredient section — protects each replacement but leaves Save All partially committed.
+  - Client-side sequencing plus optimistic updates — JavaScript cannot create a transaction across PostgREST requests, and broad cache invalidation can overwrite unsaved local sections.
+- **Reversibility**: moderate — the RPC and contribution registry can be reverted together, but doing so restores the known integrity gap.
