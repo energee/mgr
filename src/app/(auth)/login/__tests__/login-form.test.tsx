@@ -147,7 +147,7 @@ describe("LoginForm passwordless flow", () => {
       email: "staff@brewery.com",
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: expect.stringContaining("/api/auth/callback"),
+        emailRedirectTo: "http://localhost:3000/",
       },
     });
   });

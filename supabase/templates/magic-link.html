@@ -6,6 +6,8 @@
 </head>
 <!-- Reference copy of the Supabase dashboard Magic Link template (Auth → Email Templates).
      Paste the <table> fragment only; the dashboard supplies its own document wrapper.
+     The token-hash URL is required for cookie-backed SSR sessions. Portal copy
+     is selected using auth.users.user_metadata set by the customer invite API.
      Colors are hex equivalents of the app theme tokens in src/app/globals.css. -->
 <body style="margin: 0; padding: 0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; padding: 40px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
@@ -22,10 +24,16 @@
               </svg>
               <span style="font-size: 20px; font-weight: 600; color: #0a0a0b; vertical-align: middle;">MGR</span>
 
+              {{ if .Data.portal_access }}
+              <h1 style="margin: 24px 0 8px; font-size: 24px; font-weight: 600; color: #0a0a0b; letter-spacing: -0.025em;">Your {{ .Data.brewery_name }} customer portal</h1>
+              <p style="margin: 0 0 12px; font-size: 14px; color: #4c4d4f; line-height: 1.5;">{{ .Data.brewery_name }} has invited you to its customer portal.</p>
+              <p style="margin: 0 0 24px; font-size: 14px; color: #4c4d4f; line-height: 1.5;">View and manage orders, review order status, and request changes using your own secure login.</p>
+              {{ else }}
               <h1 style="margin: 24px 0 8px; font-size: 24px; font-weight: 600; color: #0a0a0b; letter-spacing: -0.025em;">Sign in</h1>
               <p style="margin: 0 0 24px; font-size: 14px; color: #4c4d4f;">Click the button below to sign in to your brewery account.</p>
+              {{ end }}
 
-              <a href="{{ .ConfirmationURL }}" style="display: block; padding: 12px 0; background-color: #4665ae; color: #f8f8f8; text-decoration: none; font-size: 14px; font-weight: 500; border-radius: 6px;">Sign in to MGR</a>
+              <a href="{{ .SiteURL }}/api/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email&amp;redirect_to={{ .RedirectTo }}" style="display: block; padding: 12px 0; background-color: #4665ae; color: #f8f8f8; text-decoration: none; font-size: 14px; font-weight: 500; border-radius: 6px;">{{ if .Data.portal_access }}Open customer portal{{ else }}Sign in to MGR{{ end }}</a>
 
               <p style="margin: 24px 0 12px; font-size: 14px; color: #4c4d4f;">Or enter this code manually:</p>
 

@@ -46,7 +46,7 @@ export function PortalLoginForm() {
         // Invite-only portal: never create an auth user for an unknown email
         // (self-registration granted the staff 'viewer' role — audit C1/M16).
         shouldCreateUser: false,
-        emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=/portal/orders`,
+        emailRedirectTo: `${window.location.origin}/portal/orders`,
       },
     });
     if (error) {

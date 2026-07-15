@@ -200,6 +200,14 @@ describe("customer entity wiring", () => {
     expect(section?.component).toBe(CustomerAddressSection);
   });
 
+  it("uses the Portal Access section instead of a handlerless invite action", () => {
+    const section = customerEntity.sections?.find((s) => s.id === "portal-access");
+    expect(section?.component).toBeTypeOf("function");
+    expect(
+      customerEntity.actions?.find((action) => action.name === "send_portal_invite"),
+    ).toBeUndefined();
+  });
+
   it("schema accepts the JSONB address object and null", () => {
     expect(
       customerSchema.safeParse({
