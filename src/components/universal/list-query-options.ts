@@ -48,6 +48,7 @@ export type ListQueryEntity<T> = Pick<EntityConfig<T>, "table"> &
       | "defaultSort"
       | "searchableFields"
       | "listColumns"
+      | "listRelations"
       | "listFilters"
       | "quickFilters"
       | "stateMachine"
@@ -218,19 +219,23 @@ export async function runListQuery<T>(
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
 
-  // Batch-resolve FK relation columns (parallel, one query per relation table)
-  const relationCols = (entity.listColumns ?? []).filter(
-    (c: EntityColumnDef<T>) => c.relation && c.accessorKey
-  );
+  // Batch-resolve FK relation columns (parallel, one query per relation table).
+  // The client path reads them from listColumns; a server prefetch (no client
+  // presentation) falls back to the core's server-safe listRelations mirror.
+  // Both yield the same { accessorKey, relation } so resolution is identical.
+  const relationCols = (entity.listColumns ?? [])
+    .filter((c: EntityColumnDef<T>) => c.relation && c.accessorKey)
+    .map((c) => ({ accessorKey: c.accessorKey as string, relation: c.relation! }));
+  const relations = relationCols.length > 0 ? relationCols : entity.listRelations ?? [];
   await Promise.allSettled(
-    relationCols.map(async (col) => {
-      const key = col.accessorKey as string;
+    relations.map(async (col) => {
+      const key = col.accessorKey;
       const uniqueIds = [...new Set(rows.map((r) => r[key]).filter(Boolean))] as string[];
       if (uniqueIds.length === 0) return;
 
-      const relEntity = entityRegistry.get(col.relation!.entity);
-      const table = relEntity?.table ?? `${col.relation!.entity}s`;
-      const displayField = col.relation!.displayField;
+      const relEntity = entityRegistry.get(col.relation.entity);
+      const table = relEntity?.table ?? `${col.relation.entity}s`;
+      const displayField = col.relation.displayField;
 
       const { data: relData } = await dynamicFrom(supabase, table)
         .select(`id, ${displayField}`)
@@ -285,7 +290,19 @@ export function defaultListParams<T>(
     hasOnAction = false,
     propFilters,
     pageSize = 10,
-  }: { hasOnAction?: boolean; propFilters?: Record<string, unknown>; pageSize?: number } = {}
+    select,
+  }: {
+    hasOnAction?: boolean;
+    propFilters?: Record<string, unknown>;
+    pageSize?: number;
+    /**
+     * Explicit projection override. buildSelectList returns "*" whenever a list
+     * column has a custom `render` (among other cases) — the server can't see
+     * those render fns (they live in the client presentation), so a page whose
+     * client list renders "*" passes `select: "*"` here to match its first key.
+     */
+    select?: string;
+  } = {}
 ): ResolvedListParams<T> {
   // Server ORDER BY: entity default sort + unique `id` tiebreaker (matches the
   // client's orderSpec for the no-explicit-sort first render).
@@ -310,6 +327,6 @@ export function defaultListParams<T>(
     from: 0,
     to: pageSize - 1,
     order,
-    select: buildSelectList(entity, propFilters, hasOnAction),
+    select: select ?? buildSelectList(entity, propFilters, hasOnAction),
   };
 }

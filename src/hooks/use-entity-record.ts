@@ -12,9 +12,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { unwrap } from "@/lib/supabase/query-helpers";
-import { entityKeys } from "@/lib/query-keys";
-import { dynamicFrom } from "@/services/types";
+import { detailQueryOptions } from "@/components/universal/detail-query-options";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig } from "@/types/entity";
 
@@ -24,16 +22,14 @@ export function useEntityRecord<T extends Record<string, unknown>>(
   options: { enabled?: boolean } = {},
 ) {
   const supabase = createClient();
-  const fetchTable = entity.viewTable || entity.table;
   const enabled = options.enabled !== false && !!id;
 
+  // Shared factory so the key + select stay identical to a server component's
+  // detail prefetch (sitewide loading pattern) — the client hydrates without a
+  // second skeleton or a key mismatch.
   return useQuery({
-    queryKey: entityKeys.detail(fetchTable, id || ""),
+    ...detailQueryOptions<T>(supabase, entity, id || ""),
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     enabled,
-    queryFn: () =>
-      unwrap(
-        dynamicFrom(supabase, fetchTable).select("*").eq("id", id!).single()
-      ) as Promise<T>,
   });
 }
