@@ -932,7 +932,7 @@ Yeast sources — purchases or harvests stored in brink vessels. Tracks lineage,
 | parent_pitch_id | UUID | FK to yeast_pitches (lineage — NULL for purchases) |
 | generation | INTEGER | Generation (0 = purchased, 1+ = harvested) |
 | status | TEXT | Status: in_stock, depleted, discarded |
-| quantity_lbs | DECIMAL(10,2) | Total weight in pounds |
+| quantity_lbs | DECIMAL(10,2) | Total weight in pounds; cannot be reduced below committed pitch events |
 | cell_count_thousand | DECIMAL(14,2) | Total cell count in thousands |
 | cell_density_thousand | DECIMAL(14,2) | Thousand cells per pound |
 | initial_viability | DECIMAL(5,2) | Viability at harvest/purchase (0-100) |
@@ -969,18 +969,33 @@ Immutable event log recording each yeast deduction from a source into a batch. Q
 
 | Column | Type | Description |
 |--------|------|-------------|
-| id | UUID | Primary key |
+| id | UUID | Primary key and stable idempotency key for the atomic pitch command |
 | pitch_id | UUID | FK to yeast_pitches (source) |
 | batch_id | UUID | FK to batches (target) |
-| quantity_lbs | DECIMAL(10,2) | Weight pitched |
+| quantity_lbs | DECIMAL(10,2) | Positive weight pitched |
 | cells_pitched_thousand | DECIMAL(14,2) | Cells pitched in thousands |
-| viability_at_pitch | DECIMAL(5,2) | Measured/estimated viability at pitch time |
+| viability_at_pitch | DECIMAL(5,2) | Measured/estimated viability at pitch time (0–100) |
 | pitched_at | TIMESTAMPTZ | When pitched |
 | notes | TEXT | Notes |
 | created_by | UUID | FK to auth.users |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
 **Indexes:** `pitch_id`, `batch_id`
+
+**Write invariants (migration `00260_atomic_yeast_pitch.sql`):**
+
+- `pitch_yeast_atomic` is the application command. It locks the source,
+  recomputes committed usage, rejects overdraw, inserts the event, and updates
+  depleted status in one transaction.
+- The event `id` is the caller's stable request UUID. Identical retries return
+  `kind = duplicate`; the same UUID with different input is rejected.
+- Direct inserts pass through the same locking balance guard, so callers cannot
+  bypass the invariant through table DML.
+- Events are immutable: updates and deletes are rejected. Corrections require a
+  separately designed compensating-event workflow.
+- Source `quantity_lbs` cannot be lowered below the sum of committed events.
+- When the last available quantity is pitched, source status changes atomically
+  from `in_stock` to `depleted`; partial sources remain `in_stock`.
 
 ---
 
@@ -1000,7 +1015,7 @@ Enriched yeast pitch view with strain info, vessel details, calculated quantity 
 | vessel_name | TEXT | Brink vessel name |
 | vessel_vessel_type | TEXT | Vessel type |
 | location_name | TEXT | Location name |
-| quantity_remaining_lbs | DECIMAL | `quantity_lbs - SUM(events.quantity_lbs)` |
+| quantity_remaining_lbs | DECIMAL | `quantity_lbs - SUM(events.quantity_lbs)`; database guards keep this non-negative |
 | batches_pitched | INTEGER | Count of distinct batches from events |
 | days_old | INTEGER | Days since harvest or received date |
 | estimated_viability | DECIMAL(5,2) | Viability after decay |

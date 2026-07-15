@@ -53,6 +53,15 @@
   - Documentation only — cannot enforce naming, protected-branch rules, dirty-tree protection, or canonical paths.
 - **Reversibility**: easy — existing worktrees remain standard Git worktrees and can be moved or recreated elsewhere.
 
+## 2026-07-15 — QuickBooks creates use durable request identities
+
+- **Decision**: Before creating a QuickBooks Invoice or Bill, persist the exact outbound payload in `qbo_sync_log` and send a deterministic, per-entity `requestid`. Treat mapping and log-write errors as sync failures; a known remote success with a failed local mapping is reported as requiring reconciliation and is retried with the same request identity.
+- **Why**: A QuickBooks POST and a Postgres mapping write cannot share a transaction. Intuit deduplicates repeated writes with the same request ID, so this closes both lost-response and remote-success/local-write-failure duplicate windows while retaining an operator-visible recovery record.
+- **Alternatives rejected**:
+  - Query by `DocNumber` before every create — document numbers are business-controlled and not a reliable unique request identity.
+  - Only propagate mapping-write errors — honest failure reporting alone would still let the retry create a second remote document.
+- **Reversibility**: easy — the intent uses the existing sync-log schema, and the request-ID behavior is isolated to the two transaction create paths.
+
 ## 2026-07-15 — Recipe Save All is one database transaction
 
 - **Decision**: The main recipe editor collects dirty parent fields and the six ingredient collections, then sends one version-checked `SECURITY INVOKER` RPC. Local dirty state and cache invalidation occur only after that transaction commits.
@@ -70,3 +79,13 @@
   - Add additions to the main recipe aggregate — these screens save independently and own different additive categories.
   - Client compensation or retries — cannot roll back a committed delete or serialize two HTTP transactions.
 - **Reversibility**: moderate — both call sites and the RPC can be reverted together, but doing so restores the integrity gap.
+
+## 2026-07-15 — Yeast pitch events use their UUID as the retry key
+
+- **Decision**: `pitch_yeast_atomic` accepts a stable request UUID and stores it directly as `yeast_pitch_events.id`; source-row locking and defensive triggers make balance, status, and event creation one database transaction.
+- **Why**: the event already has a globally unique immutable identifier, so a second idempotency column would duplicate identity without improving retry semantics. The source lock is the shared serialization point for RPC and direct writers.
+- **Alternatives rejected**:
+  - A separate nullable `idempotency_key` column — adds a second unique identity and legacy-null behavior with no benefit for immutable events.
+  - Client-only availability checks — cached readers cannot serialize concurrent deductions.
+  - RPC without table guards — authenticated direct inserts and source edits could still produce a negative derived balance.
+- **Reversibility**: hard — event UUIDs become part of the public command contract, though the RPC can later accept a separate key while preserving existing IDs.

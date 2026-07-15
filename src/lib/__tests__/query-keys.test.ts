@@ -170,6 +170,12 @@ describe("batchKeys", () => {
   it("logs and readings are different keys for same batch", () => {
     expect(batchKeys.logs("b1")).not.toEqual(batchKeys.readings("b1"));
   });
+
+  it("keeps the full yeast summary separate from the harvest strain projection", () => {
+    expect(batchKeys.yeastSummary("b1")).not.toEqual(
+      batchKeys.yeastStrains("b1"),
+    );
+  });
 });
 
 // =============================================================================
