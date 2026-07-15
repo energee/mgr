@@ -55,10 +55,9 @@ import { useQueryState } from "nuqs";
 import { parseAsStringEnum } from "nuqs";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicFrom } from "@/services/types";
-import { runTransitionSideEffects } from "@/services/transition-side-effects";
+import { dynamicFrom, formatServiceError } from "@/services/types";
+import { entityService } from "@/services/entity-service";
 import { entityKeys } from "@/lib/query-keys";
-import { parsePostgresError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
 import { getStateLabel, getTransitionFieldsAction } from "@/types/entity";
@@ -317,43 +316,22 @@ export function EntityDataTable<T = Record<string, unknown>>({
         if (listKey && previous) queryClient.setQueryData(listKey, previous);
       };
 
-      // State-guarded UPDATE — 0 rows affected means another user changed the
-      // state between render and click (race guard without a pre-SELECT)
-      let update = dynamicFrom(supabase, entity.table)
-        .update({ ...extraFields, [stateField]: toState })
-        .eq("id", id);
-      update = currentState
-        ? update.eq(stateField, currentState)
-        : update.in(stateField, validFromStates);
-      const { data: updated, error } = await update.select("id");
+      const result = await entityService.transition(
+        supabase,
+        entity,
+        id,
+        toState,
+        extraFields
+      );
 
-      if (error) {
+      if (!result.success) {
         rollback();
-        // Friendly translation of DB-level failures — e.g. keg_transactions
-        // state checks surface their CONSTRAINT_MESSAGES entry instead of a
-        // generic failure (src/lib/errors.ts)
-        toast.error(parsePostgresError(error));
-        return;
-      }
-      if (!updated || updated.length === 0) {
-        rollback();
-        toast.error("Transition no longer valid — status may have changed");
+        toast.error(formatServiceError(result.error));
         queryClient.invalidateQueries({ queryKey: entityKeys.all(fetchTable) });
         return;
       }
 
       toast.success(`Status updated to ${getStateLabel(entity, toState)}`);
-
-      // Post-transition side effects (e.g. completing a batch also confirms
-      // its planned ingredient consumption) live in the shared registry in
-      // services/transition-side-effects.ts so every transition path runs
-      // them. Fire-and-forget: the status update already succeeded, so only
-      // surface side-effect failures.
-      void runTransitionSideEffects(supabase, entity.table, [id], toState).then(
-        ({ error: sideEffectError }) => {
-          if (sideEffectError) toast.error(sideEffectError);
-        }
-      );
 
       // Background reconcile — the row may now fall outside active filters or
       // belong on another page; the optimistic row keeps the UI instant.
@@ -974,23 +952,23 @@ export function EntityDataTable<T = Record<string, unknown>>({
         return 0;
       }
 
-      const { error } = await dynamicFrom(supabase, entity.table)
-        .update({ [stateField]: targetStatus })
-        .in("id", validIds);
-
-      if (error) {
-        toast.dismiss(loadingId);
-        throw error;
-      }
-
-      // Post-transition side effects for the rows that actually transitioned
-      // (see services/transition-side-effects.ts). Fire-and-forget: the bulk
-      // update already succeeded, so only surface side-effect failures.
-      void runTransitionSideEffects(supabase, entity.table, validIds, targetStatus).then(
-        ({ error: sideEffectError }) => {
-          if (sideEffectError) toast.error(sideEffectError);
-        }
+      // Bulk transitions are atomic per record. One failure rolls back that
+      // record's status and side effects without undoing unrelated records.
+      const results = await Promise.all(
+        validIds.map((recordId: string) =>
+          entityService.transition(supabase, entity, recordId, targetStatus)
+        )
       );
+      const failures = results.filter((result) => !result.success);
+      if (failures.length > 0) {
+        const first = failures[0];
+        if (first && !first.success) {
+          toast.error(
+            `${failures.length} item${failures.length === 1 ? "" : "s"} failed: ${formatServiceError(first.error)}`
+          );
+        }
+      }
+      const succeeded = results.length - failures.length;
 
       // Invalidate queries
       queryClient.invalidateQueries({
@@ -1006,7 +984,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       setRowSelection({});
 
       toast.dismiss(loadingId);
-      return validIds.length;
+      return succeeded;
     },
     [entity, selectedRows, supabase, queryClient, fetchTable]
   );
@@ -1502,4 +1480,3 @@ export function EntityDataTableWithErrorBoundary<
     </EntityErrorBoundary>
   );
 }
-

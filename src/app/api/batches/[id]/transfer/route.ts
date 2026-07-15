@@ -1,10 +1,9 @@
 /**
  * POST /api/batches/[id]/transfer — transition a batch to a new status.
  *
- * Validates the target against batchTransitions, applies an optimistic-locked
- * UPDATE, then runs the central transition side-effect registry (e.g.
- * batches → completed confirms planned ingredient consumption). Response is
- * the updated batch row plus a `side_effects` summary.
+ * Validates the target against batchTransitions, then submits one atomic
+ * transition command. The state change and all database side effects commit
+ * together or roll back together.
  */
 import { z } from "zod";
 import {
@@ -15,11 +14,15 @@ import {
   ApiError,
 } from "@/lib/api";
 import { batchStates, batchTransitions } from "@/lib/schemas/batch";
-import { runTransitionSideEffects } from "@/services/transition-side-effects";
+import { batchCore as batchCoreInput } from "@/entities/batch/core";
+import { resolveServerCore } from "@/types/entity";
+import { entityService } from "@/services/entity-service";
+import { formatServiceError } from "@/services/types";
 
 const transitionSchema = z.object({
   to_status: z.enum(batchStates),
 });
+const batchCore = resolveServerCore(batchCoreInput);
 
 export const POST = withPermission("batches:write", async (request, { supabase, params }) => {
   const id = params?.id;
@@ -46,35 +49,20 @@ export const POST = withPermission("batches:write", async (request, { supabase, 
     );
   }
 
-  // Optimistic lock: only update if status hasn't changed since we read it
-  const { data, error } = await supabase
-    .from("batches")
-    .update({ status: to_status })
-    .eq("id", id)
-    .eq("status", batch.status)
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") {
-      throw new ApiError(
-        "CONFLICT",
-        "Batch status was modified concurrently. Please refresh and try again.",
-        409
-      );
-    }
-    throw error;
+  const result = await entityService.transition(
+    supabase,
+    batchCore,
+    id,
+    to_status
+  );
+  if (!result.success) {
+    const conflict = result.error.code === "INVALID_TRANSITION";
+    throw new ApiError(
+      conflict ? "CONFLICT" : "INTERNAL_ERROR",
+      formatServiceError(result.error),
+      conflict ? 409 : 500
+    );
   }
 
-  // Post-transition side effects (registry: src/services/transition-side-effects.ts).
-  // Never throws; failures surface in the response instead of silently skipping.
-  const sideEffects = await runTransitionSideEffects(supabase, "batches", [id], to_status);
-
-  return successResponse({
-    ...data,
-    side_effects: {
-      error: sideEffects.error,
-      completed_allocations: sideEffects.completedAllocations,
-    },
-  });
+  return successResponse(result.data);
 });

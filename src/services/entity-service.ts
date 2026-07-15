@@ -23,6 +23,7 @@ import {
   err,
   parseSupabaseError,
   dynamicFrom,
+  dynamicRpc,
 } from "./types";
 
 // =============================================================================
@@ -56,7 +57,7 @@ function readTable<T>(entity: EntityCore<T>): string {
  * Build invalidation key arrays for an entity mutation.
  * Invalidates the base table, view table (if different), and the specific record.
  */
-function invalidationKeys<T>(entity: EntityConfig<T>, id?: string): readonly (readonly string[])[] {
+function invalidationKeys<T>(entity: EntityCore<T>, id?: string): readonly (readonly string[])[] {
   const keys: (readonly string[])[] = [entityKeys.all(entity.table)];
 
   if (entity.viewTable) {
@@ -285,9 +286,10 @@ export const entityService = {
    */
   async transition<T>(
     supabase: SupabaseClient<Database>,
-    entity: EntityConfig<T>,
+    entity: EntityCore<T>,
     id: string,
-    targetState: string
+    targetState: string,
+    extraFields: Record<string, unknown> = {}
   ): Promise<ServiceResult<T>> {
     try {
       const sm = entity.stateMachine;
@@ -333,19 +335,25 @@ export const entityService = {
         }
       }
 
-      // Perform the transition atomically — include current state in the WHERE
-      // clause to prevent race conditions where another process changes the
-      // state between our SELECT and UPDATE.
-      const { data: updated, error: updateError } = await dynamicFrom(supabase, entity.table)
-        .update({ [sm.stateField]: targetState })
-        .eq("id", id)
-        .eq(sm.stateField, currentState)
-        .select()
-        .single();
+      // One RPC owns both the guarded state change and every registered
+      // database side effect. PostgreSQL rolls the complete command back if
+      // any statement fails, so callers can safely retry after a timeout.
+      const { data: updated, error: updateError } = await dynamicRpc(
+        supabase,
+        "transition_entity_atomic",
+        {
+          p_table_name: entity.table,
+          p_id: id,
+          p_from_state: currentState,
+          p_to_state: targetState,
+          p_extra_fields: extraFields,
+        }
+      );
 
       if (updateError) {
-        // PGRST116 = .single() matched no rows → state changed between read and write
-        if (updateError.code === "PGRST116") {
+        // The RPC uses SQLSTATE 40001 when its locked row no longer matches
+        // the state read above.
+        if (updateError.code === "40001" || updateError.code === "PGRST116") {
           return err({
             code: "INVALID_TRANSITION",
             from: currentState,
@@ -356,7 +364,11 @@ export const entityService = {
         return err(parseSupabaseError(updateError, { table: entity.table, id }));
       }
 
-      return ok(updated as T, invalidationKeys(entity, id));
+      const record =
+        updated && typeof updated === "object" && "record" in updated
+          ? (updated as { record: T }).record
+          : (updated as T);
+      return ok(record, invalidationKeys(entity, id));
     } catch (e) {
       return err({
         code: "UNKNOWN",

@@ -34,6 +34,8 @@ import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-ba
 import { VesselTransferDialog } from "@/components/domain/batch/vessel-transfer-dialog";
 import { useBrewConsumptionFlow } from "@/components/domain/brew/use-brew-consumption-flow";
 import { usePrefillStore } from "@/contexts/prefill-store";
+import { entityService } from "@/services/entity-service";
+import { formatServiceError } from "@/services/types";
 
 type BatchRecord = {
   id: string;
@@ -125,17 +127,14 @@ export function BatchesClient() {
         action: {
           label: "Yes, update",
           onClick: async () => {
-            // Status-guarded so a raced/stale row is a harmless 0-row no-op
-            // instead of a transition check_violation (migration 00143). The
-            // suggested states (fermenting/conditioning) have no registered
-            // transition side effects, so skipping the registry here is safe.
-            const { error } = await supabase
-              .from("batches")
-              .update({ status: toState })
-              .eq("id", batch.id)
-              .eq("status", batch.status ?? "");
-            if (error) {
-              toast.error("Failed to update status");
+            const result = await entityService.transition(
+              supabase,
+              batchEntity,
+              batch.id,
+              toState
+            );
+            if (!result.success) {
+              toast.error(`Failed to update status: ${formatServiceError(result.error)}`);
             } else {
               handleDialogSuccess();
               toast.success(`Batch marked as ${toState}`);

@@ -99,10 +99,9 @@ function makeBuilder(result: QueryResult) {
   return { builder, spies };
 }
 
-/** Fake SupabaseClient whose `.from()` hands back a fresh builder for each
- *  call, consuming `results` in order (methods like transition() call
- *  `.from()` twice: once to read, once to write). Throws if `.from()` is
- *  called more times than results were queued, rather than silently
+/** Fake SupabaseClient whose `.from()` and `.rpc()` consume `results` in
+ *  order. Throws if either method is called more times than results were
+ *  queued, rather than silently
  *  recycling the last response — a test that under-queues should fail
  *  loudly, not pass vacuously on stale data. */
 function makeSupabase(results: QueryResult[]) {
@@ -118,8 +117,19 @@ function makeSupabase(results: QueryResult[]) {
     call++;
     return made.builder;
   });
-  const supabase = { from } as unknown as SupabaseClient<Database>;
-  return { supabase, from, builders };
+  const rpc = vi.fn(() => {
+    if (call >= results.length) {
+      throw new Error(`fake supabase: no queued result for rpc() call #${call}`);
+    }
+    const result = results[call];
+    call++;
+    return Promise.resolve({
+      data: result.data == null ? null : { record: result.data },
+      error: result.error,
+    });
+  });
+  const supabase = { from, rpc } as unknown as SupabaseClient<Database>;
+  return { supabase, from, rpc, builders };
 }
 
 /** Fake SupabaseClient whose `.from()` throws synchronously, to exercise
@@ -760,14 +770,15 @@ describe("entityService.transition — hooks.validate", () => {
   });
 
   it("proceeds to the write when the hook returns null", async () => {
-    const { supabase, from } = makeSupabase([
+    const { supabase, from, rpc } = makeSupabase([
       { data: { status: "draft" }, error: null },
       { data: { id: TEST_ID, status: "active", name: "Widget A" }, error: null },
     ]);
 
     const result = await entityService.transition(supabase, widgetWithHook, TEST_ID, "active");
 
-    expect(from).toHaveBeenCalledTimes(2); // read + write
+    expect(from).toHaveBeenCalledTimes(1); // read
+    expect(rpc).toHaveBeenCalledTimes(1); // transactional write + effects
     expect(result.success).toBe(true);
   });
 });
