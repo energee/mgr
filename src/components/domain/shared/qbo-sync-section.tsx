@@ -37,7 +37,7 @@ export function parseQBOError(raw: string): { friendly: string; raw: string } {
   if (/QuickBooks accepted .* but MGR could not save its mapping/i.test(raw)) {
     return {
       friendly:
-        "QuickBooks saved the document, but MGR could not save its link. Retry Sync to reconcile it safely.",
+        "QuickBooks saved the document, but MGR could not save its link. Retry Sync WITHOUT editing this record first — reconciling re-links the existing document; edits made before reconciling will not reach QuickBooks on the retry.",
       raw,
     };
   }

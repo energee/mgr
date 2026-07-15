@@ -9,8 +9,9 @@ describe("parseQBOError", () => {
         "The remote document exists; retry sync to reconcile it safely."
     );
 
-    expect(result.friendly).toBe(
-      "QuickBooks saved the document, but MGR could not save its link. Retry Sync to reconcile it safely."
+    expect(result.friendly).toContain("WITHOUT editing this record first");
+    expect(result.friendly).toContain(
+      "edits made before reconciling will not reach QuickBooks on the retry"
     );
   });
 

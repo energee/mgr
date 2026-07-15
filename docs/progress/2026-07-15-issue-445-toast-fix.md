@@ -1,0 +1,1 @@
+- **2026-07-15 (QBO durability review fix).** The remote-success/local-failure reconciliation toast now warns operators not to edit the record before retrying, since the deterministic request id dedups the retry to the original document.
