@@ -80,3 +80,13 @@
   - Client-only availability checks — cached readers cannot serialize concurrent deductions.
   - RPC without table guards — authenticated direct inserts and source edits could still produce a negative derived balance.
 - **Reversibility**: hard — event UUIDs become part of the public command contract, though the RPC can later accept a separate key while preserving existing IDs.
+
+## 2026-07-15 — Order change approval stops at fulfillment history
+
+- **Decision**: Apply order change requests atomically against `selling_format_id`, but reject approval when the order already has a non-cancelled pick list or active/completed finished-good allocation. Staff cancels and regenerates those artifacts first.
+- **Why**: Allocations are order-level and cannot reliably identify one of multiple matching order lines. Automatic cancellation could rewrite the wrong reservation, and sales users may approve orders without inventory-write permission.
+- **Alternatives rejected**:
+  - Reproduce the legacy brand/format running-total cancellation — ambiguous for duplicate product lines and could over-cancel a larger reservation.
+  - Give sales users inventory-write access — materially broadens their role beyond order management.
+  - Run the entire approval as `SECURITY DEFINER` — unnecessary privilege for the actual order/request mutation.
+- **Reversibility**: moderate — a future line-linked allocation model could safely replace the precondition with exact reservation reconciliation.

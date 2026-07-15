@@ -482,6 +482,19 @@ Individual line-item changes within a change request.
 | quantity | INTEGER | Proposed quantity |
 | original_quantity | INTEGER | Original quantity (snapshot) |
 
+Approval is performed by
+`apply_change_request(p_order_id, p_change_request_id, p_approved_by)`. The
+invoker-rights function verifies `orders:write`, the route/order relationship,
+the authenticated reviewer, the sales-channel cutoff, and the original line
+snapshot before applying every add/modify/remove in one transaction. Adds use
+`selling_format_id` and customer-tier pricing. A retry of an already-approved
+request is a no-op.
+
+Orders with a non-cancelled pick list or an active/completed finished-good
+allocation must have those fulfillment artifacts cancelled or regenerated
+before approval. The command never rewrites fulfillment history while changing
+order lines.
+
 ---
 
 ## Square Integration (Taproom POS)

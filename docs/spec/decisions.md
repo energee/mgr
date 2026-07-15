@@ -558,6 +558,27 @@ not serialize writers. The command and triggers keep the event ledger as the
 source of truth while guaranteeing that its derived balance cannot be
 negative.
 
+### DEC-GAP-014: Order Change Approval Preserves Fulfillment History
+**Status**: Implemented (migration `00261_rebuild_apply_change_request.sql`)
+
+Apply a pending order change request through one `SECURITY INVOKER` database
+command using the canonical `selling_format_id` model. The command verifies the
+route order, authenticated reviewer, channel cutoff, and original line
+snapshots, then commits every add/modify/remove plus the review status together.
+Approved retries are no-ops.
+
+Reject approval when a non-cancelled pick list or active/completed
+finished-good allocation already exists. A narrow, read-only
+`SECURITY DEFINER` predicate exposes only that cross-domain boolean to an
+active `orders:write` caller; the mutation itself never bypasses RLS or edits
+fulfillment history.
+
+**Rationale**: The old function targeted dropped package/keg columns and tried
+to infer order-line ownership from order-level allocations. Duplicate products
+make that inference ambiguous, and sales users do not have inventory-write
+permission. Requiring cancellation/regeneration is explicit, role-consistent,
+and preserves the allocation ledger.
+
 ---
 
 ## Redundancy Resolutions
