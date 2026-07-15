@@ -83,6 +83,13 @@ export const orderPresentation: EntityPresentation<Order> = {
       sortable: true,
       format: "date",
     },
+    {
+      // Computed by the order_list_details view (sum of line items).
+      accessorKey: "total_amount",
+      header: "Total",
+      sortable: true,
+      format: "currency",
+    },
   ],
 
   listFilters: [
