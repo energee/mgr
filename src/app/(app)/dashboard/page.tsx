@@ -16,8 +16,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
-import { dashboardKeys, planningKeys } from "@/lib/query-keys";
-import type { ProductionShortfall } from "@/types/planning";
+import { dashboardKeys } from "@/lib/query-keys";
 import Link from "next/link";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
@@ -29,7 +28,6 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense, useMemo } from "react";
 import {
-  StatsStrip,
   DashboardSection,
   DashboardEmpty,
   PeriodSelector,
@@ -37,11 +35,9 @@ import {
   StatCardWithDelta,
   calculateDelta,
   TrendChartLazy,
-  TodayPanel,
   GettingStartedChecklist,
   DashboardSwitcher,
 } from "@/components/dashboard";
-import type { StatItem } from "@/components/dashboard";
 import { BatchActivityHeatmapLazy } from "@/components/dashboard/batch-activity-heatmap-lazy";
 import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
 import { useVolumeUnit } from "@/hooks/use-unit-preferences";
@@ -52,14 +48,6 @@ import { unwrap } from "@/lib/supabase/query-helpers";
 // =============================================================================
 // Types
 // =============================================================================
-
-type BatchStatusCounts = {
-  planned: number;
-  fermenting: number;
-  conditioning: number;
-  packaging: number;
-  completed: number;
-}
 
 type ActiveBatch = {
   id: string;
@@ -86,14 +74,6 @@ type VesselStatus = {
 
 const MAX_BATCHES_SHOWN = 8;
 
-const DEFAULT_BATCH_COUNTS: BatchStatusCounts = {
-  planned: 0,
-  fermenting: 0,
-  conditioning: 0,
-  packaging: 0,
-  completed: 0,
-};
-
 // =============================================================================
 // Component
 // =============================================================================
@@ -101,27 +81,6 @@ const DEFAULT_BATCH_COUNTS: BatchStatusCounts = {
 export default function DashboardPage() {
   const supabase = createClient();
   const volumeUnit = useVolumeUnit();
-
-  const { data: batchCounts = DEFAULT_BATCH_COUNTS, isLoading: countsLoading } = useQuery({
-    queryKey: dashboardKeys.batchCounts(),
-    queryFn: async () => {
-      const data = await unwrap(
-        dynamicFrom(supabase, "batch_status_counts").select("status, count")
-      ) as unknown as Array<{ status: string; count: number }>;
-
-      const counts = { ...DEFAULT_BATCH_COUNTS };
-      for (const row of data ?? []) {
-        const status = row.status as keyof BatchStatusCounts;
-        if (status in counts) {
-          counts[status] = row.count;
-        }
-      }
-      return counts;
-    },
-    refetchInterval: POLLING_INTERVALS.FAST,
-    refetchIntervalInBackground: false,
-    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
-  });
 
   // Fetch active batches (not completed or cancelled)
   const { data: activeBatches = [], isLoading: batchesLoading } = useQuery({
@@ -167,22 +126,6 @@ export default function DashboardPage() {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  // Fetch production shortfalls
-  const { data: shortfalls = [] } = useQuery({
-    queryKey: planningKeys.shortfalls({ includeDrafts: true, horizonWeeks: 8 }),
-    queryFn: async () => {
-      const { data, error } = await dynamicRpc(supabase, "calculate_production_shortfalls", {
-        p_include_drafts: true,
-        p_horizon_weeks: 8,
-      });
-      if (error) return [];
-      return (data || []) as ProductionShortfall[];
-    },
-    refetchInterval: POLLING_INTERVALS.NORMAL,
-    refetchIntervalInBackground: false,
-    staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
-  });
-
   // Calculate per-type vessel utilization
   const vesselArray = vessels as VesselStatus[];
   const vesselsByType = VESSEL_TYPES
@@ -199,31 +142,6 @@ export default function DashboardPage() {
   const utilizationPercent = totalVessels > 0
     ? Math.round((totalInUse / totalVessels) * 100)
     : 0;
-
-  const urgentShortfalls = shortfalls.filter((s) => s.is_urgent);
-
-  // Build stats for the strip
-  const primaryStats: StatItem[] = [
-    { value: batchCounts.fermenting, label: "fermenting" },
-    { value: batchCounts.conditioning, label: "conditioning" },
-    { value: batchCounts.packaging, label: "packaging" },
-  ];
-
-  if (shortfalls.length > 0) {
-    primaryStats.push({
-      value: shortfalls.length,
-      label: urgentShortfalls.length > 0
-        ? `shortfalls (${urgentShortfalls.length} urgent)`
-        : "shortfalls",
-      href: "/production/planning",
-      variant: urgentShortfalls.length > 0 ? "warning" : "default",
-    });
-  }
-
-  const secondaryStats: StatItem[] = [
-    { value: batchCounts.planned, label: "planned" },
-    { value: batchCounts.completed, label: "completed" },
-  ];
 
   return (
     <div className="space-y-6">
@@ -249,15 +167,7 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
-        {countsLoading ? (
-          <Skeleton className="h-9 w-full max-w-md" />
-        ) : (
-          <StatsStrip stats={primaryStats} secondaryStats={secondaryStats} />
-        )}
       </div>
-
-      {/* Today: morning attention list (hidden when nothing needs attention) */}
-      <TodayPanel />
 
       {/* Two-Column Layout */}
       <div className="grid gap-6 lg:grid-cols-5">

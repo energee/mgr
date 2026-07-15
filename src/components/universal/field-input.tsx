@@ -32,20 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Combobox,
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxTrigger,
-} from "@/components/ui/combobox";
+import { ComboboxField, ComboboxItem } from "@/components/ui/combobox";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { UnitInput } from "@/components/ui/unit-input";
 import { useNumericInput } from "@/hooks/use-numeric-input";
-import { X } from "lucide-react";
-import { useState, useEffect, useMemo, type FC } from "react";
+import { useMemo, type FC } from "react";
 import { getColSpanClass } from "./field-utils";
 import { QuickCreateButton, isQuickCreateEntity } from "./quick-create-dialog";
 import { log } from "@/lib/client-logger";
@@ -479,13 +470,6 @@ function RelationCombobox({
   const comboboxValue = value != null && value !== "" ? String(value) : undefined;
   const resolvedLabel = comboboxValue ? (labelByValue.get(comboboxValue) ?? "") : "";
 
-  const [inputText, setInputText] = useState(resolvedLabel);
-
-  // Sync display text when value or options change (e.g. form.reset, options load)
-  useEffect(() => {
-    setInputText(resolvedLabel);
-  }, [resolvedLabel]);
-
   const onFilter = useMemo(
     () => (values: string[], inputValue: string) => {
       const q = inputValue.trim().toLowerCase();
@@ -498,44 +482,24 @@ function RelationCombobox({
   );
 
   return (
-    <Combobox
+    <ComboboxField
       className="flex-1"
       value={comboboxValue}
-      inputValue={inputText}
-      onInputValueChange={setInputText}
+      selectedLabel={resolvedLabel}
       onValueChange={(v) => onChange(v || null)}
       onFilter={onFilter}
       disabled={disabled}
+      id={fieldName}
+      inputProps={ariaProps}
+      placeholder={placeholder || "Search..."}
+      emptyText="No results found"
+      onClear={!required ? () => onChange(null) : undefined}
     >
-      <ComboboxAnchor>
-        <ComboboxInput
-          id={fieldName}
-          placeholder={placeholder || "Search..."}
-          {...ariaProps}
-        />
-        {!required && !!value && (
-          <button
-            type="button"
-            onClick={() => {
-              onChange(null);
-              setInputText("");
-            }}
-            className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            aria-label="Clear selection"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
-        <ComboboxTrigger />
-      </ComboboxAnchor>
-      <ComboboxContent>
-        <ComboboxEmpty>No results found</ComboboxEmpty>
-        {options.map((option) => (
-          <ComboboxItem key={option.value} value={option.value} label={option.label}>
-            {option.label}
-          </ComboboxItem>
-        ))}
-      </ComboboxContent>
-    </Combobox>
+      {options.map((option) => (
+        <ComboboxItem key={option.value} value={option.value} label={option.label}>
+          {option.label}
+        </ComboboxItem>
+      ))}
+    </ComboboxField>
   );
 }

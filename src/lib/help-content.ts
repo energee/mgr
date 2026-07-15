@@ -73,10 +73,6 @@ Sales Dashboard (/dashboard/sales): Open orders, revenue trends, and top custome
     title: "Production",
     content: `Production is the core of MGR. Key pages:
 
-Planning (/production/planning): Demand-driven production planning with List and Timeline views. Shows demand, available supply, shortfalls, and urgent counts in a stats strip. Configure the time window with a weeks selector (4, 8, or 12 weeks) and toggle a "Drafts" switch to include or exclude draft orders. Create batches directly from shortfalls.
-
-Backward Planning (/production/planning/backward): Order-driven view that calculates production requirements from confirmed orders. Shows demand by product and package format, highlights shortages, and displays demand weeks and shortfall quantities. Configure the planning horizon and drill into individual order line items.
-
 Batches (/production/batches): Track batches through their lifecycle: Planned → Brewing → Fermenting → Conditioning → Carbonating → Completed. Create a new batch from a recipe or from scratch.
 
 Recipes (/production/recipes): Define grain bills, hop schedules, yeast, and water profiles. The system auto-calculates OG, FG, ABV, IBU, and SRM estimates. Check style compliance against BJCP guidelines.

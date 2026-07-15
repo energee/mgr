@@ -40,15 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Combobox,
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxTrigger,
-} from "@/components/ui/combobox";
+import { ComboboxField, ComboboxItem } from "@/components/ui/combobox";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { entityKeys, batchKeys, packagingKeys } from "@/lib/query-keys";
@@ -248,24 +240,22 @@ export function PackagingBatchDialog({
           {brandId === null && (
             <div className="space-y-2">
               <Label>Brand</Label>
-              <Combobox
+              <ComboboxField
                 value={selectedBrandId}
+                selectedLabel={
+                  brands?.find((b) => b.id === selectedBrandId)?.name ?? ""
+                }
                 onValueChange={setSelectedBrandId}
                 onFilter={createNameFilter(brands)}
+                placeholder="Select brand"
+                emptyText="No brands found"
               >
-                <ComboboxAnchor>
-                  <ComboboxInput placeholder="Select brand" />
-                  <ComboboxTrigger />
-                </ComboboxAnchor>
-                <ComboboxContent>
-                  <ComboboxEmpty>No brands found</ComboboxEmpty>
-                  {brands?.map((b) => (
-                    <ComboboxItem key={b.id} value={b.id} label={b.name}>
-                      {b.name}
-                    </ComboboxItem>
-                  ))}
-                </ComboboxContent>
-              </Combobox>
+                {brands?.map((b) => (
+                  <ComboboxItem key={b.id} value={b.id} label={b.name}>
+                    {b.name}
+                  </ComboboxItem>
+                ))}
+              </ComboboxField>
               <p className="text-xs text-muted-foreground">
                 This batch has no recipe brand, so pick the brand to package under.
               </p>
@@ -294,53 +284,49 @@ export function PackagingBatchDialog({
           {/* Selling format */}
           <div className="space-y-2">
             <Label>Selling Format</Label>
-            <Combobox
+            <ComboboxField
               value={formatId}
+              selectedLabel={
+                packagingFormats?.find((f) => f.id === formatId)?.name ?? ""
+              }
               onValueChange={handleFormatChange}
               onFilter={createNameFilter(packagingFormats)}
+              placeholder="Select format"
+              emptyText="No formats found"
             >
-              <ComboboxAnchor>
-                <ComboboxInput placeholder="Select format" />
-                <ComboboxTrigger />
-              </ComboboxAnchor>
-              <ComboboxContent>
-                <ComboboxEmpty>No formats found</ComboboxEmpty>
-                {packagingFormats?.map((f) => (
-                  <ComboboxItem key={f.id} value={f.id} label={f.name}>
-                    <span className="flex items-center gap-2">
-                      {f.name}
-                      <span className="text-xs text-muted-foreground">
-                        {formatVolumeLabel(f) ?? f.container_name}
-                      </span>
+              {packagingFormats?.map((f) => (
+                <ComboboxItem key={f.id} value={f.id} label={f.name}>
+                  <span className="flex items-center gap-2">
+                    {f.name}
+                    <span className="text-xs text-muted-foreground">
+                      {formatVolumeLabel(f) ?? f.container_name}
                     </span>
-                  </ComboboxItem>
-                ))}
-              </ComboboxContent>
-            </Combobox>
+                  </span>
+                </ComboboxItem>
+              ))}
+            </ComboboxField>
           </div>
 
           {/* Keg owner (conditional) */}
           {isKeg && (
             <div className="space-y-2">
               <Label>Keg Owner</Label>
-              <Combobox
+              <ComboboxField
                 value={kegOwnerId}
+                selectedLabel={
+                  kegOwners?.find((o) => o.id === kegOwnerId)?.name ?? ""
+                }
                 onValueChange={setKegOwnerId}
                 onFilter={createNameFilter(kegOwners)}
+                placeholder="Keg owner (optional)"
+                emptyText="No owners found"
               >
-                <ComboboxAnchor>
-                  <ComboboxInput placeholder="Keg owner (optional)" />
-                  <ComboboxTrigger />
-                </ComboboxAnchor>
-                <ComboboxContent>
-                  <ComboboxEmpty>No owners found</ComboboxEmpty>
-                  {kegOwners?.map((o) => (
-                    <ComboboxItem key={o.id} value={o.id} label={o.name}>
-                      {o.name}
-                    </ComboboxItem>
-                  ))}
-                </ComboboxContent>
-              </Combobox>
+                {kegOwners?.map((o) => (
+                  <ComboboxItem key={o.id} value={o.id} label={o.name}>
+                    {o.name}
+                  </ComboboxItem>
+                ))}
+              </ComboboxField>
             </div>
           )}
 

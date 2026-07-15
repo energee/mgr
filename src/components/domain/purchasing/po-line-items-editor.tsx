@@ -44,13 +44,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Combobox,
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
+  ComboboxField,
   ComboboxItem,
-  ComboboxTrigger,
 } from "@/components/ui/combobox";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -472,28 +467,28 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                     placeholder="Enter item description"
                   />
                 ) : (
-                  <Combobox
+                  <ComboboxField
                     value={newItem.catalog_id}
+                    selectedLabel={
+                      catalogItems?.find((ci) => ci.id === newItem.catalog_id)?.name ?? ""
+                    }
                     onValueChange={(v) => setNewItem({ ...newItem, catalog_id: v })}
                     disabled={!newItem.catalog_type}
                     onFilter={(values, search) => {
                       const term = search.toLowerCase();
                       return values.filter((v) => catalogItems?.find((ci) => ci.id === v)?.name.toLowerCase().includes(term));
                     }}
+                    placeholder={newItem.catalog_type ? "Search items..." : "Select type first"}
+                    emptyText="No items found"
+                    anchorClassName="h-8"
+                    inputClassName="h-8"
                   >
-                    <ComboboxAnchor className="h-8">
-                      <ComboboxInput className="h-8" placeholder={newItem.catalog_type ? "Search items..." : "Select type first"} />
-                      <ComboboxTrigger />
-                    </ComboboxAnchor>
-                    <ComboboxContent>
-                      <ComboboxEmpty>No items found</ComboboxEmpty>
-                      {catalogItems?.map((item) => (
-                        <ComboboxItem key={item.id} value={item.id} label={item.name}>
-                          {item.name}
-                        </ComboboxItem>
-                      ))}
-                    </ComboboxContent>
-                  </Combobox>
+                    {catalogItems?.map((item) => (
+                      <ComboboxItem key={item.id} value={item.id} label={item.name}>
+                        {item.name}
+                      </ComboboxItem>
+                    ))}
+                  </ComboboxField>
                 )}
               </TableCell>
               <TableCell>

@@ -270,13 +270,34 @@ async function buildVesselLookups(db: Db) {
 // Phase 1 — Standalone entities
 // =============================================================================
 
+/** Case-insensitive, whitespace-collapsed name key — matches the
+ *  suppliers_name_lower_key unique index (migration 00252). */
+function normalizeSupplierName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 async function syncSuppliers(): Promise<SyncResult> {
   const logId = await createSyncLog("suppliers", 1);
   const db = await requireMongoDb();
 
   const docs = await db.collection<MongoSupplier>("suppliers").find().toArray();
   const rows = docs.map(transformSupplier);
-  const result = await upsertRows("suppliers", rows);
+
+  // Reuse an existing supplier's id when the name already exists, so a re-sync
+  // updates that row instead of inserting a parallel copy under the Mongo
+  // objectId-derived id. Without this the suppliers table re-duplicates on
+  // every sync (and now fails the unique name index from migration 00252).
+  const admin = await createAdminClient();
+  const { data: existing } = await admin.from("suppliers").select("id, name");
+  const idByName = new Map(
+    (existing ?? []).map((s) => [normalizeSupplierName(s.name), s.id])
+  );
+  const remapped = rows.map((row) => {
+    const existingId = idByName.get(normalizeSupplierName(String(row.name)));
+    return existingId ? { ...row, id: existingId } : row;
+  });
+
+  const result = await upsertRows("suppliers", remapped);
 
   await completeSyncLog(logId, result);
   return { entityType: "suppliers", phase: 1, ...result };
