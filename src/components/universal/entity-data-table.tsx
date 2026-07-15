@@ -61,9 +61,14 @@ import { entityKeys } from "@/lib/query-keys";
 import { parsePostgresError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import type { EntityConfig, EntityActionDef } from "@/types/entity";
-import { getStateLabel, getTransitionFieldsAction, entityRegistry } from "@/types/entity";
-import type { EntityColumnDef } from "@/types/entity";
+import { getStateLabel, getTransitionFieldsAction } from "@/types/entity";
 import type { ExtendedColumnFilter, ExtendedColumnSort } from "@/types/data-table";
+import {
+  configColumnIds,
+  buildSelectList,
+  listQueryOptions,
+  type ResolvedListParams,
+} from "@/components/universal/list-query-options";
 import { getFiltersStateParser, getSortingStateParser } from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { EntityKanban } from "@/components/universal/entity-kanban";
@@ -76,9 +81,6 @@ import {
   buildDataTableColumns,
   buildSelectColumn,
   buildActionsColumn,
-  buildSupabaseFiltersFromUrl,
-  escapePostgrestOrValue,
-  REL_KEY_PREFIX,
 } from "@/components/data-table/adapter";
 import { useDynamicFilterOptions } from "@/hooks/use-dynamic-filter-options";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
@@ -144,59 +146,8 @@ export type EntityDataTableProps<T = Record<string, unknown>> = {
  */
 const KANBAN_FETCH_CAP = 1000;
 
-/**
- * Column ids the entity config provably places on the fetched table/view:
- * `id` ∪ listColumns ∪ listFilters ∪ defaultSort ∪ quickFilter sort columns.
- * Shared core for the safe ORDER BY targets (orderableColumnIds) and the
- * select-list projection (buildSelectList, which extends it).
- */
-function configColumnIds<T>(entity: EntityConfig<T>): Set<string> {
-  const ids = new Set<string>(["id"]);
-  for (const c of entity.listColumns) {
-    if (c.accessorKey) ids.add(c.accessorKey as string);
-  }
-  for (const f of entity.listFilters ?? []) ids.add(f.field);
-  if (entity.defaultSort) ids.add(entity.defaultSort.column);
-  for (const qf of entity.quickFilters ?? []) {
-    if (qf.sort) ids.add(qf.sort.column);
-  }
-  return ids;
-}
-
-/**
- * Build the PostgREST select list for the list query from entity config.
- *
- * Projection is only safe when no code path can read arbitrary row fields.
- * Falls back to "*" when:
- * - a listColumn has a custom `render` function (receives the whole row)
- * - an action has `handler`/`showWhen`/`disabledWhen` (receive the whole record)
- * - an `onAction` prop is passed (page-level handlers receive the record)
- * - a delete action exists without `detailHeader.title` (delete dialog falls
- *   back to reading `record.name`, which we can't prove exists)
- *
- * Otherwise projects configColumnIds ∪ stateField ∪ detailHeader.title
- * ∪ searchableFields ∪ quickFilter filter columns ∪ prop-filter keys.
- */
-function buildSelectList<T>(
-  entity: EntityConfig<T>,
-  propFilters: Record<string, unknown> | undefined,
-  hasOnAction: boolean
-): string {
-  if (hasOnAction) return "*";
-  if (entity.listColumns.some((c) => c.render)) return "*";
-  if (entity.actions?.some((a) => a.handler || a.showWhen || a.disabledWhen)) return "*";
-  if (entity.actions?.some((a) => a.deleteMode) && !entity.detailHeader?.title) return "*";
-
-  const cols = configColumnIds(entity);
-  if (entity.stateMachine) cols.add(entity.stateMachine.stateField as string);
-  if (entity.detailHeader?.title) cols.add(entity.detailHeader.title as string);
-  for (const s of entity.searchableFields ?? []) cols.add(s as string);
-  for (const qf of entity.quickFilters ?? []) {
-    for (const f of qf.filters) cols.add(f.column);
-  }
-  for (const k of Object.keys(propFilters ?? {})) cols.add(k);
-  return [...cols].join(",");
-}
+// configColumnIds and buildSelectList moved to ./list-query-options (shared
+// with the server prefetch); imported at the top of this file.
 
 /**
  * Reconcile the id→row snapshot map backing cross-page row selection and
@@ -782,22 +733,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // Data fetching
   // ---------------------------------------------------------------------------
 
-  // Build a stable key from URL filters for query cache
-  const filterKey = useMemo(
-    () =>
-      urlFilters.length > 0
-        ? {
-            filters: urlFilters.map((f) => ({
-              id: f.id,
-              value: f.value,
-              operator: f.operator,
-            })),
-            joinOperator,
-          }
-        : {},
-    [urlFilters, joinOperator]
-  );
-
   // Columns known to exist on the fetched table/view (the config renders/filters
   // them), i.e. safe targets for a server-side ORDER BY.
   const orderableColumnIds = useMemo(() => configColumnIds(entity), [entity]);
@@ -837,28 +772,36 @@ export function EntityDataTable<T = Record<string, unknown>>({
         ? mobilePages * pagination.pageSize - 1
         : rangeFrom + pagination.pageSize - 1;
 
-  // Exact key of the active list query. Mirrored into listQueryKeyRef so
-  // handleSingleTransition (defined above, before the query) can apply
+  // Resolved inputs for the shared list query factory (query key + queryFn),
+  // consumed identically by the server prefetch. Mirrored into listQueryKeyRef
+  // so handleSingleTransition (defined above, before the query) can apply
   // optimistic updates to this cache entry at event time.
-  const listQueryKey = entityKeys.pagedList(
-    fetchTable,
-    {
-      ...filters,
-      ...filterKey,
+  const resolvedParams = useMemo<ResolvedListParams<T>>(
+    () => ({
+      fetchTable,
+      propFilters: filters,
+      urlFilters: urlFilters as ExtendedColumnFilter<T>[],
+      joinOperator,
       search: debouncedSearch || undefined,
-    },
-    {
       mode: fetchMode,
       from: rangeFrom,
       to: rangeTo,
       order: orderSpec,
       select: selectList,
-    }
+    }),
+    [fetchTable, filters, urlFilters, joinOperator, debouncedSearch, fetchMode, rangeFrom, rangeTo, orderSpec, selectList]
+  );
+
+  const { queryKey: listQueryKey, queryFn: listQueryFn } = listQueryOptions(
+    supabase,
+    entity,
+    resolvedParams
   );
   listQueryKeyRef.current = listQueryKey;
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: listQueryKey,
+    queryFn: listQueryFn,
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
     // Keep showing the previous page while the next one loads (no flash on
     // page/sort/filter changes) — but never across different tables, so an
@@ -866,78 +809,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
     // instead of the previous entity's rows.
     placeholderData: (previousData, previousQuery) =>
       previousQuery?.queryKey[0] === fetchTable ? keepPreviousData(previousData) : undefined,
-    queryFn: async () => {
-      let query = dynamicFrom(supabase, fetchTable).select(selectList, {
-        count: "estimated",
-      });
-
-      // Apply prop-level filters
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          query = query.eq(key, value);
-        });
-      }
-
-      // Apply URL filters from DataTableFilterList (translated to Supabase ops)
-      const applyFilters = buildSupabaseFiltersFromUrl(
-        urlFilters as ExtendedColumnFilter<T>[],
-        joinOperator
-      );
-      query = applyFilters(query);
-
-      // Apply global search (debounced)
-      if (debouncedSearch && entity.searchableFields?.length) {
-        const escaped = escapePostgrestOrValue(debouncedSearch);
-        const searchCondition = entity.searchableFields
-          .map((field) => `${field}.ilike.%${escaped}%`)
-          .join(",");
-        query = query.or(searchCondition);
-      }
-
-      // Server-side sort + fetch window (see fetchMode comment above).
-      // Board mode is unpaginated (kanban needs the full filtered dataset)
-      // but capped as a safety valve.
-      for (const o of orderSpec) {
-        query = query.order(o.column, { ascending: o.ascending });
-      }
-      query = query.range(rangeFrom, rangeTo);
-
-      const { data, error, count } = await query;
-      if (error) throw error;
-      const rows = (data ?? []) as Record<string, unknown>[];
-
-      // Batch-resolve FK relation columns (parallel, one query per relation table)
-      const relationCols = entity.listColumns.filter(
-        (c: EntityColumnDef<T>) => c.relation && c.accessorKey
-      );
-      await Promise.allSettled(relationCols.map(async (col) => {
-        const key = col.accessorKey as string;
-        const uniqueIds = [...new Set(rows.map((r) => r[key]).filter(Boolean))] as string[];
-        if (uniqueIds.length === 0) return;
-
-        const relEntity = entityRegistry.get(col.relation!.entity);
-        const table = relEntity?.table ?? `${col.relation!.entity}s`;
-        const displayField = col.relation!.displayField;
-
-        const { data: relData } = await dynamicFrom(supabase, table)
-          .select(`id, ${displayField}`)
-          .in("id", uniqueIds);
-
-        if (relData) {
-          const lookup = new Map(
-            relData.map((r: Record<string, unknown>) => [r.id as string, r[displayField] as string])
-          );
-          for (const row of rows) {
-            const fkVal = row[key] as string | null;
-            if (fkVal && lookup.has(fkVal)) {
-              row[`${REL_KEY_PREFIX}${key}`] = lookup.get(fkVal);
-            }
-          }
-        }
-      }));
-
-      return { rows: rows as T[], totalCount: count as number | null };
-    },
   });
 
   const rows = useMemo(() => data?.rows ?? [], [data]);
