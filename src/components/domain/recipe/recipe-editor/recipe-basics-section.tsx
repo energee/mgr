@@ -2,18 +2,14 @@
  * RecipeBasicsSection - Compact always-editable row for core recipe fields.
  *
  * Renders name, batch_size_bbl, volume_bbl, boil_time_min, and style/brand
- * dropdowns in a single responsive row. Saves independently to the recipes
- * table via optimistic locking.
+ * dropdowns in a single responsive row. Contributes its fields to the
+ * editor's version-checked aggregate save.
  */
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
-import { recipeKeys, entityKeys } from "@/lib/query-keys";
-import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
@@ -60,9 +56,7 @@ const DYNAMIC_FIELDS = [
 ];
 
 export function RecipeBasicsSection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
-  const supabase = createClient();
-  const queryClient = useQueryClient();
+  const { recipe, updateRecipe } = useRecipeEditor();
 
   const { optionsMap, isLoading: optionsLoading } = useDynamicOptions(DYNAMIC_FIELDS);
   const styleOptions = useMemo(() => optionsMap.style_id ?? [], [optionsMap.style_id]);
@@ -105,45 +99,14 @@ export function RecipeBasicsSection() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- recipe.name is only a fallback default; including it recreates the subscription on every keystroke
   }, [form, updateRecipe, styleOptions]);
 
-  const stopSavingRef = useRef<(() => void) | null>(null);
-
-  const saveMutation = useMutation({
-    mutationFn: async (values: BasicsFormValues) => {
-      stopSavingRef.current = startSaving();
-      return updateWithOptimisticLockOrThrow(
-        supabase,
-        "recipes",
-        recipe.id,
-        {
-          name: values.name,
-          batch_size_bbl: values.batch_size_bbl,
-          boil_time_min: values.boil_time_min,
-          style_id: values.style_id,
-          brand_id: values.brand_id,
-          volume_bbl: values.volume_bbl,
-        },
-        getVersion()
-      );
-    },
-    onSuccess: (data) => {
-      updateRecipe({ version: data.version });
-      form.reset(form.getValues());
-      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
-      queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-    },
-    onError: handleSaveError,
-    onSettled: () => {
-      stopSavingRef.current?.();
-      stopSavingRef.current = null;
-    },
-  });
-
   useRegisterSaver("basics", isDirty, useCallback(async () => {
-    if (!form.formState.isDirty) return;
-    await form.handleSubmit(async (values) => {
-      await saveMutation.mutateAsync(values);
-    })();
-  }, [form, saveMutation]));
+    if (!(await form.trigger())) throw new Error("Recipe basics are invalid");
+    const values = form.getValues();
+    return {
+      recipePatch: values,
+      onCommitted: () => form.reset(values),
+    };
+  }, [form]));
 
   return (
     <RecipeSectionCard

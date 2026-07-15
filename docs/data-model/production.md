@@ -104,8 +104,19 @@ Brewing recipes with all parameters. Ingredients are stored in junction tables f
 | target_water_profile_id | UUID | FK to [water_profiles](#water_profiles), ON DELETE SET NULL |
 | water_addition_profile_id | UUID | FK to [water_addition_profiles](#water_addition_profiles), ON DELETE SET NULL |
 | **Meta** | | |
+| version | INTEGER | Optimistic-lock version; incremented once per aggregate editor save |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+### Atomic editor writes
+
+`save_recipe_aggregate_atomic(recipe_id, expected_version, recipe_patch,
+sections)` is the write boundary for the main recipe editor. It locks the
+recipe, rejects stale versions, and commits the parent patch plus any supplied
+`recipe_malts`, `recipe_hops`, `recipe_adjuncts`, `recipe_sugars`,
+`recipe_spices`, and `recipe_fruits` replacements in one transaction. A section
+omitted from `sections` is unchanged; a supplied empty array clears it. The
+function runs with invoker rights, so normal recipe RLS remains authoritative.
 
 ### Schedule JSONB Schemas
 
