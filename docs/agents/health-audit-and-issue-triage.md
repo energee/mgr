@@ -310,6 +310,71 @@ produce a deterministic severity ranking:
 The invalid list must be empty. Verify issue states and unrelated labels were
 not changed.
 
+## Scheduled automation
+
+The [Scheduled Health Audit](../../.github/workflows/health-audit.yml) applies
+this process weekly. It runs Wednesdays at 13:37 UTC and can also be started
+manually. Scheduled runs skip the model call when the repository has had no
+commits in the preceding eight days.
+
+The workflow rotates its primary focus over four weeks:
+
+| Rotation | Primary focus |
+|---|---|
+| 0 | API authentication, authorization, privileged clients, and UI/API enforcement |
+| 1 | Supabase errors, transaction boundaries, and operational mutations |
+| 2 | OAuth, webhooks, integrations, retries, caches, and idempotency |
+| 3 | Migrations, RLS, SECURITY DEFINER, deployed assumptions, CI, and production configuration |
+
+Every run inspects recently changed files before its rotating focus. The
+automation intentionally separates analysis from mutation:
+
+| Job | Permissions | Responsibility |
+|---|---|---|
+| audit | Repository, issue, and Actions read; OIDC only | Read instructions and code, search open and closed issues, and emit a schema-validated report |
+| publish | Repository read and issue write | Validate the report again, verify labels, recheck duplicates, create issues, and read them back |
+
+The audit job cannot write repository content or issues. It rejects
+low-confidence and Low/Informational candidates and returns at most eight
+Critical, High, or Medium findings. The publisher is deterministic TypeScript;
+it does not make a second model call. It fails before creating anything if the
+report is invalid or a required label is absent.
+
+The publisher prevents repeat creation using normalized exact titles and a
+stable audit marker stored in every generated issue. The model performs the
+broader semantic duplicate search. Both checks include open and closed issues.
+Each created issue receives automated, one severity label, and one root-cause
+type label, then is read back to verify its title, body, and labels.
+
+### Setup
+
+The repository needs:
+
+- The CLAUDE_CODE_OAUTH_TOKEN Actions secret already used by the other Claude
+  workflows
+- The automated label
+- severity:critical, severity:high, and severity:medium
+- Every type label listed in this guide
+
+The publisher uses the run-scoped GITHUB_TOKEN supplied by GitHub Actions; do
+not replace it with a personal access token.
+
+### Running it manually
+
+Open Actions, select Scheduled Health Audit, and choose Run workflow.
+
+- Leave create_issues false for a dry run. The publisher validates and
+  deduplicates the report but only lists what it would create in the run
+  summary.
+- Set create_issues true to allow the deterministic publisher to create
+  confirmed issues.
+- Scheduled runs create issues automatically.
+
+Review generated issues before implementation. The workflow does not contact
+the live database or third-party application services, so findings that depend
+on deployed schema or runtime state must state that assumption. Disable the
+schedule or use manual dry runs if issue quality degrades.
+
 ## Completion checklist
 
 For a read-only audit:
