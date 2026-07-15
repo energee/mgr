@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
+import { escapeIlikePattern, unwrap } from "@/lib/supabase/query-helpers";
 import { PortalShell } from "@/components/portal/portal-shell";
 import type { PortalCustomer } from "@/contexts/portal";
 import { dynamicFrom } from "@/services/types";
+
+type PortalLinkRow = {
+  customer_id: string;
+  user_id: string;
+};
 
 export const metadata: Metadata = {
   title: "Customer Portal",
@@ -40,9 +45,13 @@ export default async function PortalLayout({
   }
 
   // Find linked customers via junction table
-  const { data: links } = await dynamicFrom(supabase, "customer_portal_users")
+  const { data: links, error: linksError } = await dynamicFrom(
+    supabase,
+    "customer_portal_users",
+  )
     .select("customer_id, customers(id, name, email)")
     .eq("user_id", user.id);
+  if (linksError) throw linksError;
 
   let customers: PortalCustomer[] = (links ?? [])
     .map((l: { customers: PortalCustomer | null }) => l.customers)
@@ -56,9 +65,13 @@ export default async function PortalLayout({
   // link, i.e. a permanently empty portal.
   if (customers.length === 0 && user.email) {
     const adminDb = await createAdminClient();
-    const { data: candidates } = await dynamicFrom(adminDb, "customers")
+    const { data: candidates, error: candidatesError } = await dynamicFrom(
+      adminDb,
+      "customers",
+    )
       .select("id, name, email")
       .ilike("email", escapeIlikePattern(user.email));
+    if (candidatesError) throw candidatesError;
 
     // Auto-linking grants access to a customer's orders, so re-verify exact
     // case-insensitive equality in JS: a pattern-escaping edge case must
@@ -68,9 +81,24 @@ export default async function PortalLayout({
       .filter((c) => c.email?.toLowerCase() === authEmail);
 
     if (matched.length > 0) {
-      for (const cust of matched) {
-        await dynamicFrom(adminDb, "customer_portal_users")
-          .upsert({ customer_id: cust.id, user_id: user.id });
+      const expectedLinks = matched.map((cust) => ({
+        customer_id: cust.id,
+        user_id: user.id,
+      }));
+      const returnedLinks = await unwrap(
+        dynamicFrom(adminDb, "customer_portal_users")
+          .upsert(expectedLinks, { onConflict: "customer_id,user_id" })
+          .select("customer_id, user_id"),
+      ) as PortalLinkRow[];
+      const linksVerified = expectedLinks.every((expected) =>
+        returnedLinks.some(
+          (returned) =>
+            returned.customer_id === expected.customer_id
+            && returned.user_id === expected.user_id,
+        ),
+      );
+      if (!linksVerified) {
+        throw new Error("Customer portal link verification failed");
       }
       customers = matched.map((c) => ({
         id: c.id,
