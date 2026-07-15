@@ -1,0 +1,1 @@
+- **2026-07-14 (order totals on /sales/orders).** Added a computed `total_amount` (sum of order_items quantity × unit_price) to the `order_list_details` view (migration 00251) and surfaced it as a currency "Total" column on the orders list. Migration not yet applied to live DB — run `scripts/db-push.sh` with `SUPABASE_DB_URL` set.

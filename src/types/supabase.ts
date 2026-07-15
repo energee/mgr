@@ -8963,6 +8963,7 @@ export type Database = {
           scheduled_date: string | null
           shipping_address: Json | null
           status: string | null
+          total_amount: number | null
           updated_at: string | null
           version: number | null
         }

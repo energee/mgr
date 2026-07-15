@@ -17,6 +17,8 @@ import type { Database } from "@/types/supabase";
 export type Order = Database["public"]["Tables"]["orders"]["Row"] & {
   // Joined from the order_list_details view for list/kanban/search display.
   customer_name?: string | null;
+  // Sum of order_items (quantity * unit_price), computed by the view.
+  total_amount?: number | null;
 };
 
 // =============================================================================
