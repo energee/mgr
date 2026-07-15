@@ -1,0 +1,1 @@
+- **2026-07-15 (recipe additions review fix).** Water-chemistry apply now reads the recipe version fresh before the atomic RPC, eliminating spurious optimistic-lock conflicts from benign out-of-band version bumps.

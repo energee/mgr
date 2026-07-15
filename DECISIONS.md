@@ -81,6 +81,15 @@
   - Alert and reconcile later — detects corruption after it occurs instead of preserving inventory in the ingest transaction.
 - **Reversibility**: moderate — the replacement RPC can be reverted, but doing so restores deterministic inventory drift for sequential refunds.
 
+## 2026-07-15 — Recipe additions replace one server-owned category
+
+- **Decision**: Water-chemistry and non-water recipe additions share one version-checked PostgreSQL replacement command. The client names an allowlisted scope; the database derives membership from `additives.type`, locks the recipe, and commits the scoped delete/insert together.
+- **Why**: These editors live outside the main six-section Save All aggregate. Separate PostgREST deletes and inserts could erase rows on failure, merge concurrent replacements, and trust a stale client-computed category boundary.
+- **Alternatives rejected**:
+  - Add additions to the main recipe aggregate — these screens save independently and own different additive categories.
+  - Client compensation or retries — cannot roll back a committed delete or serialize two HTTP transactions.
+- **Reversibility**: moderate — both call sites and the RPC can be reverted together, but doing so restores the integrity gap.
+
 ## 2026-07-15 — Yeast pitch events use their UUID as the retry key
 
 - **Decision**: `pitch_yeast_atomic` accepts a stable request UUID and stores it directly as `yeast_pitch_events.id`; source-row locking and defensive triggers make balance, status, and event creation one database transaction.
@@ -90,3 +99,13 @@
   - Client-only availability checks — cached readers cannot serialize concurrent deductions.
   - RPC without table guards — authenticated direct inserts and source edits could still produce a negative derived balance.
 - **Reversibility**: hard — event UUIDs become part of the public command contract, though the RPC can later accept a separate key while preserving existing IDs.
+
+## 2026-07-15 — Order change approval stops at fulfillment history
+
+- **Decision**: Apply order change requests atomically against `selling_format_id`, but reject approval when the order already has a non-cancelled pick list or active/completed finished-good allocation. Staff cancels and regenerates those artifacts first.
+- **Why**: Allocations are order-level and cannot reliably identify one of multiple matching order lines. Automatic cancellation could rewrite the wrong reservation, and sales users may approve orders without inventory-write permission.
+- **Alternatives rejected**:
+  - Reproduce the legacy brand/format running-total cancellation — ambiguous for duplicate product lines and could over-cancel a larger reservation.
+  - Give sales users inventory-write access — materially broadens their role beyond order management.
+  - Run the entire approval as `SECURITY DEFINER` — unnecessary privilege for the actual order/request mutation.
+- **Reversibility**: moderate — a future line-linked allocation model could safely replace the precondition with exact reservation reconciliation.

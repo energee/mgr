@@ -558,6 +558,27 @@ not serialize writers. The command and triggers keep the event ledger as the
 source of truth while guaranteeing that its derived balance cannot be
 negative.
 
+### DEC-GAP-014: Order Change Approval Preserves Fulfillment History
+**Status**: Implemented (migration `00261_rebuild_apply_change_request.sql`)
+
+Apply a pending order change request through one `SECURITY INVOKER` database
+command using the canonical `selling_format_id` model. The command verifies the
+route order, authenticated reviewer, channel cutoff, and original line
+snapshots, then commits every add/modify/remove plus the review status together.
+Approved retries are no-ops.
+
+Reject approval when a non-cancelled pick list or active/completed
+finished-good allocation already exists. A narrow, read-only
+`SECURITY DEFINER` predicate exposes only that cross-domain boolean to an
+active `orders:write` caller; the mutation itself never bypasses RLS or edits
+fulfillment history.
+
+**Rationale**: The old function targeted dropped package/keg columns and tried
+to infer order-line ownership from order-level allocations. Duplicate products
+make that inference ambiguous, and sales users do not have inventory-write
+permission. Requiring cancellation/regeneration is explicit, role-consistent,
+and preserves the allocation ledger.
+
 ---
 
 ## Redundancy Resolutions
@@ -816,7 +837,7 @@ selling_formats:
 ## Water Chemistry Decisions
 
 ### DEC-WATER-001: Water Addition Profiles
-**Status**: Implemented
+**Status**: Removed during migration renumbering; retained below as history
 
 Replace the non-functional `use_default_additions` toggle with named, reusable water addition profiles.
 
@@ -832,6 +853,28 @@ Replace the non-functional `use_default_additions` toggle with named, reusable w
 - `recipe_additions`: dropped `is_default`, added `profile_id` FK, added mutual exclusivity constraint (recipe_id XOR profile_id)
 - `recipes`: dropped `use_default_additions`, added `water_addition_profile_id` FK
 - New `system_settings` key: `default_water_profile_id`
+
+The `water_addition_profiles` table and its ownership columns are absent from
+the current deployed schema and generated types. Source/target water chemistry
+still uses `water_profiles`; recipe salt/acid rows are recipe-owned.
+
+### DEC-WATER-002: Atomic Category-Scoped Recipe Additions
+**Status**: Implemented (migration 00263)
+
+The water-chemistry display and non-water additions editor share one
+`SECURITY INVOKER`, version-checked replacement function. The caller chooses an
+allowlisted `water_chemistry` or `other` scope, while Postgres resolves actual
+membership from `additives.type`. `NULL` means the category is omitted and an
+empty array explicitly clears it.
+
+The function locks the recipe before checking `recipes.version`; therefore two
+writers starting at the same version cannot merge replacement sets. Deletion
+and insertion share one transaction, so an insertion failure restores the old
+category. The predicate is also limited to the requested `recipe_id`, which
+leaves historical ownerless/profile rows untouched.
+
+**Rationale**: client-side DELETE followed by INSERT cannot provide rollback,
+serialization, or a trustworthy category boundary across PostgREST requests.
 
 ---
 

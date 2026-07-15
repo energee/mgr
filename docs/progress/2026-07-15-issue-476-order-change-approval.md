@@ -1,0 +1,1 @@
+- **2026-07-15 (issue #476 order change-request approval).** Rebuilt the atomic approval RPC on `selling_format_id`, added route ownership/status handling and complete staff cache invalidation, guarded stale/cross-order edits and fulfillment history, and covered add/modify/remove, rollback, idempotency, security, route, and UI behavior with real-Postgres and component tests.

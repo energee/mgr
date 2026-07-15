@@ -26,6 +26,7 @@
 -- pending_admin      : 00000000-0000-0000-0000-000000000008
 -- active_customer    : 00000000-0000-0000-0000-000000000009
 -- inactive_customer  : 00000000-0000-0000-0000-000000000010
+-- sales              : 00000000-0000-0000-0000-000000000011
 --
 -- Password for all seeded users: "test-password-123!"
 -- (bcrypt hash below generated with cost factor 10)
@@ -105,6 +106,13 @@ VALUES
     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
     now(),
     '{"display_name": "Test Inactive Customer"}'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000011',
+    'sales@test.local',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    now(),
+    '{"display_name": "Test Sales"}'
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -190,6 +198,14 @@ VALUES
     'Test Inactive Customer',
     ARRAY['customer'],
     'inactive',
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000011',
+    'sales@test.local',
+    'Test Sales',
+    ARRAY['sales'],
+    'active',
     now()
   )
 ON CONFLICT (id) DO UPDATE SET
